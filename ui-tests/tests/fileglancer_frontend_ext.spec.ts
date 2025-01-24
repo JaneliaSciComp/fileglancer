@@ -16,6 +16,8 @@ test('should emit an activation console message', async ({ page }) => {
   await page.goto();
 
   expect(
-    logs.filter(s => s === 'JupyterLab extension fileglancer-frontend-ext is activated!')
+    logs.filter(
+      s => s === 'JupyterLab extension fileglancer-frontend-ext is activated!'
+    )
   ).toHaveLength(1);
 });

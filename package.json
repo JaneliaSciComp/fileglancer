@@ -53,10 +53,15 @@
         "watch:labextension": "jupyter labextension watch ."
     },
     "dependencies": {
+        "@emotion/react": "^11.14.0",
+        "@emotion/styled": "^11.14.0",
+        "@fontsource/roboto": "^5.1.1",
         "@jupyterlab/application": "^4.0.0",
         "@jupyterlab/apputils": "^4.4.4",
         "@jupyterlab/launcher": "^4.3.4",
-        "@jupyterlab/ui-components": "^4.3.4"
+        "@jupyterlab/ui-components": "^4.3.4",
+        "@mui/icons-material": "^6.4.1",
+        "@mui/material": "^6.4.1"
     },
     "devDependencies": {
         "@jupyterlab/builder": "^4.0.0",

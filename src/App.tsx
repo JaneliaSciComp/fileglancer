@@ -1,27 +1,26 @@
 import { ReactWidget } from '@jupyterlab/ui-components';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Toggle } from './components/Toggle';
+import { FileList } from './components/FileList';
 
 /**
  * React component for a counter.
  *
  * @returns The React component
  */
-const CounterComponent = (): JSX.Element => {
-  const [counter, setCounter] = useState(0);
-
+const AppComponent = (): JSX.Element => {
   return (
-    <div>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+        boxSizing: 'border-box'
+      }}
+    >
       <Toggle />
-      <p>You clicked {counter} times!</p>
-      <button
-        onClick={(): void => {
-          setCounter(counter + 1);
-        }}
-      >
-        Increment
-      </button>
+      <FileList />
     </div>
   );
 };
@@ -29,7 +28,7 @@ const CounterComponent = (): JSX.Element => {
 /**
  * A Counter Lumino Widget that wraps a CounterComponent.
  */
-export class CounterWidget extends ReactWidget {
+export class AppWidget extends ReactWidget {
   /**
    * Constructs a new CounterWidget.
    */
@@ -39,6 +38,6 @@ export class CounterWidget extends ReactWidget {
   }
 
   render(): JSX.Element {
-    return <CounterComponent />;
+    return <AppComponent />;
   }
 }
