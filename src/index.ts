@@ -48,7 +48,6 @@ const plugin: JupyterFrontEndPlugin<void> = {
       launcher.add({ command });
     }
 
-    console.log('Calling file share paths API...');
     requestAPI<any>('file-share-paths')
       .then(data => {
         console.log('File share paths:');
@@ -60,10 +59,20 @@ const plugin: JupyterFrontEndPlugin<void> = {
         );
       });
       
-    console.log('Calling listing API...');
-    requestAPI<any>('files/src')
+    requestAPI<any>('files/local')
       .then(data => {
-        console.log('File listing:');
+        console.log('File listing /local:');
+        console.log(data);
+      })
+      .catch(reason => {
+        console.error(
+          `Problem getting file listing:\n${reason}`
+        );
+      });
+
+    requestAPI<any>('files/local?subpath=src')
+      .then(data => {
+        console.log('File listing /local/src:');
         console.log(data);
       })
       .catch(reason => {

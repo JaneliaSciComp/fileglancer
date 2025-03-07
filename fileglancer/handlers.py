@@ -5,22 +5,7 @@ from jupyter_server.base.handlers import APIHandler
 from jupyter_server.utils import url_path_join
 from tornado import web
 from fileglancer.filestore import Filestore
-
-
-class ServerRootMixin:
-    """
-    Mixin for getting the server root directory
-    """
-    def get_server_root_dir(self):
-        """
-        Get the server root directory
-        """
-        jupyter_root_dir = self.settings.get("server_root_dir", os.getcwd())
-        self.log.debug(f"Jupyter root directory: {jupyter_root_dir}")
-        jupyter_root_dir = os.path.abspath(os.path.expanduser(jupyter_root_dir))
-        self.log.debug(f"Jupyter absolute directory: {jupyter_root_dir}")
-        return jupyter_root_dir
-
+from fileglancer.paths import get_fsp_manager
 
 class StreamingProxy(APIHandler):
     """
@@ -48,68 +33,61 @@ class StreamingProxy(APIHandler):
             }))
 
 
-class FileSharePathsHandler(StreamingProxy, ServerRootMixin): 
+class FileSharePathsHandler(StreamingProxy): 
     """
     API handler for file share paths
     """
     @web.authenticated
     def get(self):
-        self.log.info("GET /fileglancer/file-share-paths")
-        central_url = self.settings["fileglancer"].central_url
-
-        if not central_url:
-            server_root_dir = self.get_server_root_dir()
-            self.log.warning("No central URL found, using local path")
-            file_share_paths = [
-            {
-                "zone": "Local",
-                "group": "local",
-                "storage": "home",
-                "linux_path": server_root_dir
-                }
-            ]
-            self.set_header('Content-Type', 'application/json')
-            self.set_status(200)
-            self.write(json.dumps(file_share_paths))
-            self.finish()
-
-        else:
-            self.log.info(f"Central URL: {central_url}")
-            self.stream_response(f"{central_url}/file-share-paths")
+        self.log.info("GET /api/fileglancer/file-share-paths")
+        file_share_paths = get_fsp_manager(self.settings).get_file_share_paths()
+        self.set_header('Content-Type', 'application/json')
+        self.set_status(200)
+        # Convert Pydantic objects to dicts before JSON serialization
+        file_share_paths_json = [fsp.model_dump() for fsp in file_share_paths]
+        self.write(json.dumps(file_share_paths_json))
+        self.finish()
 
 
-
-
-
-class FilestoreHandler(APIHandler, ServerRootMixin):
+class FileShareHandler(APIHandler):
     """
     API handler for file access using the Filestore class
     """
 
-    def initialize(self):
-        """
-        Initialize the handler with a Filestore instance
-        """
-        self.filestore = Filestore(self.get_server_root_dir())
-        self.log.info(f"Filestore initialized with root directory: {self.filestore.get_root_path()}")
+    def _get_filestore(self, path):
+        actual_path = f"/{path}"
+        fsp = get_fsp_manager(self.settings).get_file_share_path(actual_path)
+        if fsp is None:
+            self.set_status(404)
+            self.finish(json.dumps({"error": f"File share path '{actual_path}' not found"}))
+            self.log.error(f"File share path '{actual_path}' not found")
+            return None
+        return Filestore(fsp.linux_path)
 
-
+    """
+    API handler for file access using the Filestore class
+    """
     @web.authenticated
     def get(self, path=""):
         """
         Handle GET requests to list directory contents or stream file contents
         """
-        self.log.info(f"GET /fileglancer/files/{path}")
+        subpath = self.get_argument("subpath", '')
+        self.log.info(f"GET /api/fileglancer/files/{path} subpath={subpath}")
+
+        filestore = self._get_filestore(path)
+        if filestore is None:
+            return
         
         try:
-            # Check if path is a directory by getting file info
-            file_info = self.filestore.get_file_info(path)
+            # Check if subpath is a directory by getting file info
+            file_info = filestore.get_file_info(subpath)
             
             if file_info.is_dir:
                 # Write JSON response, streaming the files one by one
                 self.write("{\n")
                 self.write("\"files\": [\n")
-                for i, file in enumerate(self.filestore.yield_file_infos(path)):
+                for i, file in enumerate(filestore.yield_file_infos(subpath)):
                     if i > 0:
                         self.write(",\n")
                     self.write(json.dumps(file.model_dump(), indent=4))
@@ -120,7 +98,7 @@ class FilestoreHandler(APIHandler, ServerRootMixin):
                 self.set_header('Content-Type', 'application/octet-stream')
                 self.set_header('Content-Disposition', f'attachment; filename="{file_info.name}"')
                 
-                for chunk in self.filestore.stream_file_contents(path):
+                for chunk in filestore.stream_file_contents(subpath):
                     self.write(chunk)
                 self.finish()
                 
@@ -137,7 +115,12 @@ class FilestoreHandler(APIHandler, ServerRootMixin):
         """
         Handle POST requests to create a new file or directory
         """
-        self.log.info(f"POST /fileglancer/files/{path}")
+        subpath = self.get_argument("subpath", '')
+        self.log.info(f"POST /api/fileglancer/files/{path} subpath={subpath}")
+        filestore = self._get_filestore(path)
+        if filestore is None:
+            return
+        
         file_info = self.get_json_body()
         if file_info is None:
             raise web.HTTPError(400, "JSON body missing")
@@ -145,10 +128,10 @@ class FilestoreHandler(APIHandler, ServerRootMixin):
         file_type = file_info.get("type")
         if file_type == "directory":
             self.log.info(f"Creating {path} as a directory")
-            self.filestore.create_dir(path)
+            filestore.create_dir(path)
         elif file_type == "file":
             self.log.info(f"Creating {path} as a file")
-            self.filestore.create_empty_file(path)
+            filestore.create_empty_file(path)
         else:
             raise web.HTTPError(400, "Invalid file type")
 
@@ -161,23 +144,28 @@ class FilestoreHandler(APIHandler, ServerRootMixin):
         """
         Handle PATCH requests to rename or update file permissions.
         """
-        self.log.info(f"PATCH /fileglancer/files/{path}")
+        subpath = self.get_argument("subpath", '')
+        self.log.info(f"PATCH /api/fileglancer/files/{path} subpath={subpath}")
+        filestore = self._get_filestore(path)
+        if filestore is None:
+            return
+        
         file_info = self.get_json_body()
         if file_info is None:
             raise web.HTTPError(400, "JSON body missing")
 
-        old_file_info = self.filestore.get_file_info(path)
+        old_file_info = filestore.get_file_info(subpath)
         new_path = file_info.get("path")
         new_permissions = file_info.get("permissions")
         
         try:
             if new_permissions is not None and new_permissions != old_file_info.permissions:
-                self.log.info(f"Changing permissions of {path} to {new_permissions}")
-                self.filestore.change_file_permissions(path, new_permissions)
+                self.log.info(f"Changing permissions of {old_file_info.path} to {new_permissions}")
+                filestore.change_file_permissions(subpath, new_permissions)
 
             if new_path is not None and new_path != old_file_info.path:
                 self.log.info(f"Renaming {old_file_info.path} to {new_path}")
-                self.filestore.rename_file_or_dir(old_file_info.path, new_path)
+                filestore.rename_file_or_dir(old_file_info.path, new_path)
 
         except OSError as e:
             self.set_status(500)
@@ -192,8 +180,13 @@ class FilestoreHandler(APIHandler, ServerRootMixin):
         """
         Handle DELETE requests to remove a file or (empty) directory.
         """
-        self.log.info(f"DELETE /fileglancer/files/{path}")
-        self.filestore.remove_file_or_dir(path)
+        subpath = self.get_argument("subpath", '')
+        self.log.info(f"DELETE /api/fileglancer/files/{path} subpath={subpath}")
+        filestore = self._get_filestore(path)
+        if filestore is None:
+            return
+        
+        filestore.remove_file_or_dir(subpath)
         self.set_status(204)
         self.finish()
 
@@ -204,8 +197,8 @@ def setup_handlers(web_app):
     """
     base_url = web_app.settings["base_url"]
     handlers = [
-        (url_path_join(base_url, "fileglancer", "file-share-paths"), FileSharePathsHandler),
-        (url_path_join(base_url, "fileglancer", "files", "(.*)"), FilestoreHandler),
-        (url_path_join(base_url, "fileglancer", "files"), FilestoreHandler),
+        (url_path_join(base_url, "api", "fileglancer", "file-share-paths"), FileSharePathsHandler),
+        (url_path_join(base_url, "api", "fileglancer", "files", "(.*)"), FileShareHandler),
+        (url_path_join(base_url, "api", "fileglancer", "files"), FileShareHandler),
     ]
     web_app.add_handlers(".*$", handlers)
