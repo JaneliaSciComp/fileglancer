@@ -12,7 +12,7 @@ import Jobs from './components/Jobs';
 function Profile() {
   return (
     <div className="p-4">
-      <h2 className="text-foreground text-lg">Profile Page</h2>
+      <h2 className="text-foreground text-lg">Profile</h2>
     </div>
   );
 }
