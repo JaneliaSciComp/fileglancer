@@ -22,33 +22,26 @@ export default function FileListCrumbs({
   selectedZone,
   getFiles
 }: FileListCrumbsProps): JSX.Element {
-  function getStringAfterSubstring(str: string, substring: string) {
-    const index = str.indexOf(substring);
-    if (index === -1) {
-      return ''; // Substring not found
+  function makeDirArray(path: string) {
+    if (currentPath.includes('?subpath=')) {
+      const firstSegment = currentPath.split('?subpath=')[0];
+      const subpathSegment = currentPath.split('?subpath=')[1];
+      const subpathArray = subpathSegment
+        .split('/')
+        .filter(item => item !== '');
+      return [firstSegment, ...subpathArray];
+    } else {
+      return [path];
     }
-    return str.substring(index + substring.length);
   }
 
-  const dirArray = currentPath
-    .split('/')
-    .filter(item => item !== '')
-    .map(segment => {
-      if (segment.includes('?subpath=')) {
-        return getStringAfterSubstring(segment, '?subpath=');
-      }
-      return segment;
-    });
-  console.log('FileListCrumbs dirArray', dirArray);
+  const dirArray = makeDirArray(currentPath);
   const dirDepth = dirArray.length;
 
   return (
     <div className="w-full py-2 px-3">
       <Breadcrumb className="bg-transparent p-0">
-        <div
-          className="flex items-center gap-1 h-5 rounded-md hover:bg-primary-light/20 transition-colors cursor-pointer"
-          onClick={() => selectedZone && getFiles(selectedZone)}
-        >
+        <div className="flex items-center gap-1 h-5">
           <Squares2X2Icon className="h-5 w-5 text-primary-light" />
           <ChevronRightIcon className="h-5 w-5" />
         </div>
@@ -61,11 +54,15 @@ export default function FileListCrumbs({
               <BreadcrumbLink
                 variant="text"
                 className="rounded-md hover:bg-primary-light/20 hover:!text-black focus:!text-black transition-colors cursor-pointer"
-                onClick={() =>
-                  getFiles(
-                    `${selectedZone}?subpath=${dirArray.slice(0, index + 1).join('/')}`
-                  )
-                }
+                onClick={() => {
+                  if (index === 0) {
+                    getFiles(`${selectedZone}`);
+                  } else {
+                    getFiles(
+                      `${selectedZone}?subpath=${dirArray.slice(1, index + 1).join('/')}`
+                    );
+                  }
+                }}
               >
                 <Typography
                   variant="small"
