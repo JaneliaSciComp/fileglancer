@@ -12,20 +12,20 @@ import {
 } from '@heroicons/react/24/outline';
 
 type FileListCrumbsProps = {
-  currentPath: string;
-  selectedZone: string | null;
-  getFiles: (path: string) => void;
+  currentNavigationPath: string;
+  currentNavigationZone: string | null;
+  fetchAndFormatFilesForDisplay: (path: string) => void;
 };
 
 export default function FileListCrumbs({
-  currentPath,
-  selectedZone,
-  getFiles
+  currentNavigationPath,
+  currentNavigationZone,
+  fetchAndFormatFilesForDisplay
 }: FileListCrumbsProps): JSX.Element {
   function makeDirArray(path: string) {
-    if (currentPath.includes('?subpath=')) {
-      const firstSegment = currentPath.split('?subpath=')[0];
-      const subpathSegment = currentPath.split('?subpath=')[1];
+    if (currentNavigationPath.includes('?subpath=')) {
+      const firstSegment = currentNavigationPath.split('?subpath=')[0];
+      const subpathSegment = currentNavigationPath.split('?subpath=')[1];
       const subpathArray = subpathSegment
         .split('/')
         .filter(item => item !== '');
@@ -35,7 +35,7 @@ export default function FileListCrumbs({
     }
   }
 
-  const dirArray = makeDirArray(currentPath);
+  const dirArray = makeDirArray(currentNavigationPath);
   const dirDepth = dirArray.length;
 
   return (
@@ -56,10 +56,10 @@ export default function FileListCrumbs({
                 className="rounded-md hover:bg-primary-light/20 hover:!text-black focus:!text-black transition-colors cursor-pointer"
                 onClick={() => {
                   if (index === 0) {
-                    getFiles(`${selectedZone}`);
+                    fetchAndFormatFilesForDisplay(`${currentNavigationZone}`);
                   } else {
-                    getFiles(
-                      `${selectedZone}?subpath=${dirArray.slice(1, index + 1).join('/')}`
+                    fetchAndFormatFilesForDisplay(
+                      `${currentNavigationZone}?subpath=${dirArray.slice(1, index + 1).join('/')}`
                     );
                   }
                 }}

@@ -7,15 +7,13 @@ import {
 } from '@material-tailwind/react';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid';
 
-type FileControlPanelProps = {
-  hideDotFiles: boolean;
-  setHideDotFiles: React.Dispatch<React.SetStateAction<boolean>>;
-};
-
 export default function FileControlPanel({
   hideDotFiles,
   setHideDotFiles
-}: FileControlPanelProps) {
+}: {
+  hideDotFiles: boolean;
+  setHideDotFiles: React.Dispatch<React.SetStateAction<boolean>>;
+}) {
   return (
     <div className="flex flex-col min-w-full p-2 border-b border-surface">
       <ButtonGroup className="self-start">

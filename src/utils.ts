@@ -19,4 +19,54 @@ const formatDate = (timestamp: number): string => {
   });
 };
 
-export { formatFileSize, formatDate };
+function getAPIPathRoot() {
+  const match = window.location.pathname.match(/^\/jupyter\/user\/[^/]+\//);
+  if (match) {
+    return match[0];
+  }
+  return '/';
+}
+
+async function sendGetRequest(
+  url: string,
+  xrsfCookie: string
+): Promise<Response> {
+  const response = await fetch(url, {
+    credentials: 'include',
+    headers: {
+      'X-Xsrftoken': xrsfCookie
+    }
+  });
+  if (!response.ok) {
+    throw new Error(`Response status: ${response.status}`);
+  }
+  return response;
+}
+
+async function sendPutRequest(
+  url: string,
+  xrsfCookie: string,
+  body: any
+): Promise<Response> {
+  const response = await fetch(url, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: {
+      'X-Xsrftoken': xrsfCookie,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) {
+    throw new Error(`Response status: ${response.status}`);
+  }
+  return response;
+}
+
+export {
+  formatFileSize,
+  formatDate,
+  getAPIPathRoot,
+  sendGetRequest,
+  sendPutRequest
+};

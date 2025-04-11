@@ -6,40 +6,49 @@ import {
   FolderIcon
 } from '@heroicons/react/24/outline';
 
+import type { File } from '../../shared.types';
 import FileListCrumbs from './FileListCrumbs';
 
-import { File } from '../../hooks/useFileBrowser';
+import { useFileBrowserContext } from '../../contexts/FileBrowserContext';
+import { useZoneBrowserContext } from '../../contexts/ZoneBrowserContext';
+
+import useHandleLeftClick from '../../hooks/useHandleLeftClick';
+import useSelectedFiles from '../../hooks/useSelectedFiles';
 import { formatDate, formatFileSize } from '../../utils';
 
 type FileListProps = {
   displayFiles: File[];
-  currentPath: string;
-  selectedFiles: string[];
-  selectedZone: string | null;
-  getFiles: (path: string) => void;
-  showFileDrawer: boolean;
-  handleContextMenu: (e: React.MouseEvent<HTMLDivElement>, file: File) => void;
-  handleLeftClicks: (e: React.MouseEvent<HTMLDivElement>, file: File) => void;
+  showFilePropertiesDrawer: boolean;
+  setPropertiesTarget: React.Dispatch<React.SetStateAction<File | null>>;
+  handleRightClick: (
+    e: React.MouseEvent<HTMLDivElement>,
+    file: File,
+    selectedFiles: File[],
+    setSelectedFiles: React.Dispatch<React.SetStateAction<File[]>>,
+    setPropertiesTarget: React.Dispatch<React.SetStateAction<File | null>>
+  ) => void;
 };
 
 export default function FileList({
   displayFiles,
-  currentPath,
-  selectedFiles,
-  selectedZone,
-  getFiles,
-  showFileDrawer,
-  handleContextMenu,
-  handleLeftClicks
+  showFilePropertiesDrawer,
+  setPropertiesTarget,
+  handleRightClick
 }: FileListProps): JSX.Element {
+  const { currentNavigationZone } = useZoneBrowserContext();
+  const { currentNavigationPath, fetchAndFormatFilesForDisplay } =
+    useFileBrowserContext();
+  const { handleLeftClick } = useHandleLeftClick();
+  const { selectedFiles, setSelectedFiles } = useSelectedFiles();
+
   return (
     <div
-      className={`px-2 transition-all duration-300 ${showFileDrawer ? 'mr-[350px]' : ''}`}
+      className={`px-2 transition-all duration-300 ${showFilePropertiesDrawer ? 'mr-[350px]' : ''}`}
     >
       <FileListCrumbs
-        currentPath={currentPath}
-        selectedZone={selectedZone}
-        getFiles={getFiles}
+        currentNavigationPath={currentNavigationPath}
+        currentNavigationZone={currentNavigationZone}
+        fetchAndFormatFilesForDisplay={fetchAndFormatFilesForDisplay}
       />
       <div className="min-w-full bg-background">
         {/* Header row */}
@@ -70,21 +79,29 @@ export default function FileList({
         {/* File rows */}
         {displayFiles.length > 0 &&
           displayFiles.map((file, index) => {
-            const isSelected = selectedFiles.includes(file.name);
+            const isSelected = selectedFiles.includes(file);
 
             return (
               <div
                 key={file.name}
                 className={`cursor-pointer min-w-fit grid grid-cols-[minmax(170px,2fr)_minmax(80px,1fr)_minmax(95px,1fr)_minmax(75px,1fr)_minmax(40px,1fr)] gap-4 hover:bg-primary-light/30 focus:bg-primary-light/30 ${isSelected && 'bg-primary-light/30'} ${index % 2 === 0 && !isSelected && 'bg-surface/50'}  `}
                 onClick={(e: React.MouseEvent<HTMLDivElement>) =>
-                  handleLeftClicks(e, file)
+                  handleLeftClick(e, file)
                 }
                 onContextMenu={(e: React.MouseEvent<HTMLDivElement>) =>
-                  handleContextMenu(e, file)
+                  handleRightClick(
+                    e,
+                    file,
+                    selectedFiles,
+                    setSelectedFiles,
+                    setPropertiesTarget
+                  )
                 }
                 onDoubleClick={() => {
                   if (file.is_dir) {
-                    getFiles(`${selectedZone}?subpath=${file.path}`);
+                    fetchAndFormatFilesForDisplay(
+                      `${currentNavigationZone}?subpath=${file.path}`
+                    );
                   }
                 }}
               >
@@ -125,7 +142,13 @@ export default function FileList({
                 <div
                   className="py-1 text-grey-700 flex items-center flex-shrink-0"
                   onClick={e => {
-                    handleContextMenu(e, file);
+                    handleRightClick(
+                      e,
+                      file,
+                      selectedFiles,
+                      setSelectedFiles,
+                      setPropertiesTarget
+                    );
                   }}
                 >
                   <IconButton variant="ghost">

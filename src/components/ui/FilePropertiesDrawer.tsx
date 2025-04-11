@@ -6,7 +6,7 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 
-import { File } from '../../hooks/useFileBrowser';
+import type { File } from '../../shared.types';
 
 import FilePermissionTable from './FilePermissionTable';
 import FileOverviewTable from './FileOverviewTable';
@@ -14,13 +14,13 @@ import FileOverviewTable from './FileOverviewTable';
 type FilePropertiesPanelProps = {
   propertiesTarget: File | null;
   open: boolean;
-  setShowFileDrawer: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowFilePropertiesDrawer: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
 export default function FilePropertiesDrawer({
   propertiesTarget,
   open,
-  setShowFileDrawer
+  setShowFilePropertiesDrawer
 }: FilePropertiesPanelProps) {
   return (
     <div
@@ -34,7 +34,9 @@ export default function FilePropertiesDrawer({
             variant="ghost"
             color="secondary"
             className="h-8 w-8 rounded-full text-foreground hover:bg-secondary-light/20"
-            onClick={() => setShowFileDrawer((prev: boolean) => !prev)}
+            onClick={() =>
+              setShowFilePropertiesDrawer((prev: boolean) => !prev)
+            }
           >
             <XMarkIcon className="h-5 w-5" />
           </IconButton>

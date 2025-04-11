@@ -1,5 +1,5 @@
 import React from 'react';
-import { File } from '../../hooks/useFileBrowser';
+import { File } from '../../shared.types';
 import { formatDate, formatFileSize } from '../../utils';
 
 type FileOverviewTableProps = {
