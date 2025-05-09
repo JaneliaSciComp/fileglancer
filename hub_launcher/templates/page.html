@@ -1,0 +1,282 @@
+{% macro modal(title, btn_label=None, btn_class="btn-primary") %}
+  {% set key = title.replace(' ', '-').lower() %}
+  {% set btn_label = btn_label or title %}
+  <div class="modal fade"
+       id="{{ key }}-dialog"
+       tabindex="-1"
+       role="dialog"
+       aria-labelledby="{{ key }}-label"
+       aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title" id="{{ key }}-label">{{ title }}</h2>
+          <button type="button"
+                  class="btn-close"
+                  data-bs-dismiss="modal"
+                  aria-label="Close"></button>
+        </div>
+        <div class="modal-body">{{ caller() }}</div>
+        <div class="modal-footer">
+          <button type="button"
+                  class="btn {{ btn_class }}"
+                  data-bs-dismiss="modal"
+                  data-dismiss="modal">{{ btn_label }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endmacro %}
+<!DOCTYPE HTML>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>
+      {%- block title -%}
+        JupyterHub
+      {%- endblock title -%}
+    </title>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% block stylesheet %}
+      <link rel="stylesheet"
+            href="{{ static_url('css/style.min.css') }}"
+            type="text/css" />
+    {% endblock stylesheet %}
+    {% block favicon %}
+      <link rel="icon" href="{{ static_url('favicon.ico') }}" type="image/x-icon">
+    {% endblock favicon %}
+    {% block scripts %}
+      <script src="{{static_url("components/bootstrap/dist/js/bootstrap.bundle.min.js") }}" type="text/javascript" charset="utf-8"></script>
+      <script src="{{static_url("components/requirejs/require.js") }}" type="text/javascript" charset="utf-8"></script>
+      <script src="{{static_url("components/jquery/dist/jquery.min.js") }}" type="text/javascript" charset="utf-8"></script>
+      <script src="{{static_url("js/darkmode.js") }}" type="text/javascript" charset="utf-8"></script>
+    {% endblock scripts %}
+    {# djlint js formatting doesn't handle template blocks in js #}
+    {# djlint: off #}
+    <script type="text/javascript">
+      require.config({
+        {% if version_hash %}
+        urlArgs: "v={{version_hash}}",
+        {% endif %}
+        baseUrl: '{{static_url("js", include_version=False)}}',
+        paths: {
+          components: '../components',
+          jquery: '../components/jquery/dist/jquery.min',
+          moment: "../components/moment/moment",
+        },
+      });
+
+      window.jhdata = {
+        base_url: "{{base_url}}",
+        prefix: "{{prefix}}",
+        {% if user %}
+        {#- Autoescaping in templates is turned on in JupyterHub, #}
+        {#-  need `| safe` to prevent escaping #}
+        {#- `https://github.com/pallets/markupsafe/blob/2.1.4/src/markupsafe/_native.py#L6` #}
+        user: "{{ user.json_escaped_name | safe }}",
+        {% endif %}
+        {% if admin_access %}
+        admin_access: true,
+        {% else %}
+        admin_access: false,
+        {% endif %}
+        {% if not no_spawner_check and user and user.spawner.options_form %}
+        options_form: true,
+        {% else %}
+        options_form: false,
+        {% endif %}
+        xsrf_token: "{{ xsrf_token }}",
+      };
+
+</script>
+<style>
+    .navbar-brand {
+        background-image: linear-gradient(to right, #36a9b0, #8b5cf6);
+        background-clip: text;
+        color: transparent;
+    }
+    .navbar-brand a {
+        text-decoration: none;
+        color: inherit;
+        font-weight: bold;
+        font-size: 1.5rem;
+    }
+    .navbar-brand svg {
+        width: 1.5rem;
+        height: 1.5rem;
+        color: #058d96;
+        margin-top:-3px;
+    }
+    #login-main .auth-form-header {
+        background-color: #36a9b0;
+    }
+    #login_submit {
+        background-color: #36a9b0;
+        color: white;
+        border: #0000ff
+    }
+    #login_submit:hover {
+        background-color: #297f84;
+        color: white;
+        border: #0000ff
+    }
+    .form-control:focus {
+        box-shadow: inset 0 1px 1px rgba(0,0,0,.075),0 0 8px #36a9b0;
+        border-color: #36a9b0;
+        outline-color: #36a9b0;
+    }
+
+</style>
+    {# djlint: on #}
+    {% block meta %}
+      <meta name="description" content="JupyterHub">
+      <meta name="keywords" content="Jupyter, JupyterHub">
+    {% endblock meta %}
+  </head>
+  <body>
+    <noscript>
+      <div id='noscript'>
+        JupyterHub requires JavaScript.
+        <br>
+        Please enable it to proceed.
+      </div>
+    </noscript>
+    {% block nav_bar %}
+      <nav class="navbar navbar-expand-sm bg-body-tertiary mb-4">
+        <div class="container-fluid">
+          {% block logo %}
+            <span id="jupyterhub-logo" class="navbar-brand">
+              <a href="{{ logo_url or base_url }}">
+				 <svg
+              viewBox="0 0 18 24"
+              version="1.1"
+              xmlns="http://www.w3.org/2000/svg"
+              stroke="currentColor"
+              fill="currentColor"
+            >
+              <path
+                d="M 16.49997,21 V 9 h -5.25 c -1.24218,0 -2.25,-1.00781 -2.25,-2.25 V 1.5 h -6 c -0.82968,0 -1.5,0.67032 -1.5,1.5 v 18 c 0,0.82969 0.67032,1.5 1.5,1.5 h 12 c 0.82969,0 1.5,-0.67031 1.5,-1.5 z M 16.47657,7.5 C 16.44377,7.36875 16.37817,7.24688 16.27969,7.15313 L 10.84688,1.72032 C 10.74848,1.62192 10.63125,1.55625 10.5,1.52344 V 6.75 c 0,0.4125 0.3375,0.75 0.75,0.75 z M 0,3 C 0,1.34532 1.34532,0 3,0 h 7.31719 c 0.59531,0 1.16719,0.23907 1.58906,0.66094 l 5.43282,5.42813 C 17.76094,6.51094 18,7.08282 18,7.67813 V 21 c 0,1.65469 -1.34531,3 -3,3 H 3 C 1.34532,24 0,22.65469 0,21 Z"
+                stroke-width="0.046875"
+                stroke="currentColor"
+              />
+
+              <g transform="matrix(0.61810071,0,0,0.61810071,-80.271649,-148.50575)">
+                <path
+                  d="m 144.45891,267.17308 c 1.6569,0 3,-1.3431 3,-3 0,-1.6569 -1.3431,-3 -3,-3 -1.6569,0 -3,1.3431 -3,3 0,1.6569 1.3431,3 3,3 z"
+                  stroke="currentColor"
+                />
+                <path
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                  d="m 133.78232,263.61978 c 1.48725,-4.47099 5.7045,-7.6967 10.67709,-7.6967 4.9703,0 9.1859,3.22271 10.675,7.6905 0.1204,0.361 0.1205,0.7517 4e-4,1.1128 -1.4873,4.471 -5.7045,7.6967 -10.6771,7.6967 -4.97033,0 -9.18596,-3.2227 -10.67506,-7.6905 -0.12034,-0.361 -0.12046,-0.7517 -3.3e-4,-1.1128 z m 15.92659,0.5533 c 0,2.8995 -2.3505,5.25 -5.25,5.25 -2.8995,0 -5.25,-2.3505 -5.25,-5.25 0,-2.8995 2.3505,-5.25 5.25,-5.25 2.8995,0 5.25,2.3505 5.25,5.25 z"
+                  stroke="currentColor"
+                />
+              </g>
+            </svg>
+
+                 Janelia Fileglancer
+              </a>
+            </span>
+          {% endblock logo %}
+          {% if user %}
+            <button class="navbar-toggler"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#thenavbar"
+                    aria-controls="thenavbar"
+                    aria-expanded="false"
+                    aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+          {% endif %}
+          <div class="collapse navbar-collapse" id="thenavbar">
+            <ul class="navbar-nav me-auto mb-0">
+              {% if user %}
+                {% block nav_bar_left_items %}
+                  <li class="nav-item">
+                    <a class="nav-link" href="{{ base_url }}home">Home</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="{{ base_url }}token">Token</a>
+                  </li>
+                  {% if 'admin-ui' in parsed_scopes %}
+                    <li class="nav-item">
+                      <a class="nav-link" href="{{ base_url }}admin">Admin</a>
+                    </li>
+                  {% endif %}
+                  {% if services %}
+                    <li class="nav-item dropdown">
+                      <a href="#"
+                         class="nav-link dropdown-toggle"
+                         data-bs-toggle="dropdown"
+                         role="button"
+                         aria-expanded="false">Services</a>
+                      <ul class="dropdown-menu">
+                        {% for service in services %}
+                          {% block service scoped %}
+                            <li>
+                              <a class="dropdown-item" href="{{ service.href }}">{{ service.name }}</a>
+                            </li>
+                          {% endblock service %}
+                        {% endfor %}
+                      </ul>
+                    </li>
+                  {% endif %}
+                {% endblock nav_bar_left_items %}
+              {% endif %}
+            </ul>
+            <ul class="nav navbar-nav me-2">
+              {% block nav_bar_right_items %}
+                <li class="nav-item">
+                  {% block theme_toggle %}
+                    <button class="btn btn-sm"
+                            id="dark-theme-toggle"
+                            aria-label="Toggle dark mode"
+                            title="Toggle dark mode">
+                      <i aria-hidden="true" class="fa fa-circle-half-stroke"></i>
+                    </button>
+                  {% endblock theme_toggle %}
+                </li>
+                <li class="nav-item">
+                  {% block login_widget %}
+                    <span id="login_widget">
+                      {% if user %}
+                        <span class="me-1">{{ user.name }}</span>
+                        <a id="logout"
+                           role="button"
+                           class="btn btn-sm btn-outline-contrast"
+                           href="{{ logout_url }}"> <i aria-hidden="true" class="fa fa-sign-out"></i> Logout</a>
+                      {% else %}
+                        <a id="login"
+                           role="button"
+                           class="btn btn-sm btn-outline-contrast"
+                           href="{{ login_url }}">Login</a>
+                      {% endif %}
+                    </span>
+                  {% endblock login_widget %}
+                </li>
+              {% endblock nav_bar_right_items %}
+            </ul>
+          </div>
+          {% block header %}
+          {% endblock header %}
+        </div>
+      </nav>
+    {% endblock nav_bar %}
+    {% block announcement %}
+      {% if announcement %}
+        <div class="container text-center announcement alert alert-warning">{{ announcement | safe }}</div>
+      {% endif %}
+    {% endblock announcement %}
+    {% block main %}
+    {% endblock main %}
+    {% block footer %}
+    {% endblock footer %}
+    {% call modal('Error', btn_label='OK') %}
+      <div class="ajax-error alert-danger">The error</div>
+    {% endcall %}
+    {% block script %}
+    {% endblock script %}
+  </body>
+</html>
