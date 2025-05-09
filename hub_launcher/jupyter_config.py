@@ -31,7 +31,6 @@ c.Spawner.environment = {}
 c.JupyterHub.implicit_spawn_seconds = 0.01
 
 # apply cylc styling to jupyterhub
-c.JupyterHub.logo_file = '/Users/clementsj/Code/fileglancer/fileglancer/hub_launcher/logo.svg'
 c.JupyterHub.template_vars = {
     'hub_title': 'Fileglancer',
     'hub_subtitle': ''
@@ -39,7 +38,7 @@ c.JupyterHub.template_vars = {
 
 
 c.JupyterHub.log_datefmt = '%Y-%m-%dT%H:%M:%S'  # ISO8601 (expanded)
-c.JupyterHub.template_paths = ['/Users/clementsj/Code/fileglancer/fileglancer/hub_launcher/templates']
+c.JupyterHub.template_paths = [Path(__file__).parent / 'templates']
 
 # store JupyterHub runtime files in the user config directory
 c.JupyterHub.cookie_secret_file = 'cookie_secret'
