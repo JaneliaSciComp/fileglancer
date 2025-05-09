@@ -52,6 +52,10 @@ async function sendFetchRequest(
   return response;
 }
 
+function makeMapKey(type: string, name: string): string {
+  return `${type}_${name}`;
+}
+
 function removeLastSegmentFromPath(path: string): string {
   const segments = path.split('/');
   if (segments.length > 1) {
@@ -87,6 +91,7 @@ export {
   formatDate,
   getAPIPathRoot,
   sendFetchRequest,
+  makeMapKey,
   removeLastSegmentFromPath,
   parsePermissions
 };
