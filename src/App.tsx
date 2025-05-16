@@ -1,14 +1,11 @@
-import { ReactWidget } from '@jupyterlab/ui-components';
-import React from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router';
-// import { CookiesProvider } from 'react-cookie';
+import { CookiesProvider } from 'react-cookie';
 import { MainLayout } from './layouts/MainLayout';
 import { FilesLayout } from './layouts/FilesLayout';
 import Home from './components/Home';
 import Files from './components/Files';
 import Help from './components/Help';
 import Jobs from './components/Jobs';
-import Preferences from './components/Preferences';
 
 function Profile() {
   return (
@@ -26,20 +23,28 @@ function Login() {
   );
 }
 
+function Preferences() {
+  return (
+    <div className="p-4">
+      <h2 className="text-foreground text-lg">Preferences Page</h2>
+    </div>
+  );
+}
+
 function getBasename() {
   const { pathname } = window.location;
   // Try to match /user/:username/lab
-  const userLabMatch = pathname.match(/^\/jupyter\/user\/[^/]+\/lab/);
+  const userLabMatch = pathname.match(/^\/user\/[^/]+\/fg/);
   if (userLabMatch) {
     // Return the matched part, e.g. "/user/<username>/lab"
     return userLabMatch[0];
   }
   // Otherwise, check if it starts with /lab
-  if (pathname.startsWith('/lab')) {
-    return '/lab';
+  if (pathname.startsWith('/fg')) {
+    return '/fg';
   }
   // Fallback to root if no match is found
-  return '/';
+  return '/fg';
 }
 
 /**
@@ -47,7 +52,7 @@ function getBasename() {
  *
  * @returns The React component
  */
-const AppComponent = (): JSX.Element => {
+const AppComponent = () => {
   const basename = getBasename();
   return (
     <BrowserRouter basename={basename}>
@@ -68,19 +73,10 @@ const AppComponent = (): JSX.Element => {
   );
 };
 
-/**
- * A Counter Lumino Widget that wraps a CounterComponent.
- */
-export class AppWidget extends ReactWidget {
-  /**
-   * Constructs a new CounterWidget.
-   */
-  constructor() {
-    super();
-    this.addClass('jp-react-widget');
-  }
-
-  render(): JSX.Element {
-    return <AppComponent />;
-  }
+export default function App() {
+  return (
+    <CookiesProvider>
+      <AppComponent />
+    </CookiesProvider>
+  );
 }

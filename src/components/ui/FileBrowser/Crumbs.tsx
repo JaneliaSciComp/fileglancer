@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { ReactNode } from 'react';
 import {
   BreadcrumbLink,
   Breadcrumb,
@@ -14,7 +14,7 @@ import {
 import { useFileBrowserContext } from '../../../contexts/FileBrowserContext';
 import { useZoneBrowserContext } from '../../../contexts/ZoneBrowserContext';
 
-export default function Crumbs(): JSX.Element {
+export default function Crumbs(): ReactNode {
   const { dirArray, fetchAndFormatFilesForDisplay } = useFileBrowserContext();
   const { currentFileSharePath } = useZoneBrowserContext();
 

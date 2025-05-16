@@ -20,7 +20,9 @@ const FileBrowserContext = React.createContext<FileBrowserContextType | null>(
 export const useFileBrowserContext = () => {
   const context = React.useContext(FileBrowserContext);
   if (!context) {
-    throw new Error('useFileBrowserContext must be used within a FileBrowserContextProvider');
+    throw new Error(
+      'useFileBrowserContext must be used within a FileBrowserContextProvider'
+    );
   }
   return context;
 };

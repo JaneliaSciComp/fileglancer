@@ -8,6 +8,7 @@ node_modules/
 .ipynb_checkpoints
 *.tsbuildinfo
 fileglancer/labextension
+fileglancer/ui
 # Version file is handled by hatchling
 fileglancer/_version.py
 

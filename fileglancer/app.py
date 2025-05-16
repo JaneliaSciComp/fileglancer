@@ -37,7 +37,7 @@ class Fileglancer(ExtensionApp):
     name = "fileglancer"
     app_name = "fileglancer-server"
     load_other_extensions = True
-    default_url = "/fg"
+    default_url = "/fg/"
 
     ui_path = PathType(
         default_value=Path(__file__).parent / "ui",

@@ -457,10 +457,22 @@ class StaticHandler(JupyterHandler, web.StaticFileHandler):
             return None
         return super().compute_etag()
 
-    def prepare(self):
-        # Ensure XSRF cookie is set for index.html
-        if self.get_absolute_path == "index.html":
+    @web.authenticated
+    def get(self, path):
+        # authenticate the static handler
+        # this provides us with login redirection and token caching
+        if not path:
+            # Request for /index.html
+            # Accessing xsrf_token ensures xsrf cookie is set
+            # to be available for next request to /userprofile
             self.xsrf_token
+            # Ensure request goes through this method even when cached so
+            # that the xsrf cookie is set on new browser sessions
+            # (doesn't prevent browser storing the response):
+            self.set_header('Cache-Control', 'no-cache')
+        return web.StaticFileHandler.get(self, path)
+
+
 
 
 def setup_handlers(web_app):

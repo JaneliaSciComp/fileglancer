@@ -7,6 +7,7 @@ export default function useTheme() {
     setIsLightTheme(prev => {
       const newTheme = !prev;
       localStorage.setItem('theme', newTheme ? 'light' : 'dark');
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       newTheme
         ? document.documentElement.classList.remove('dark')
         : document.documentElement.classList.add('dark');

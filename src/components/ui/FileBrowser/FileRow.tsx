@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { ReactNode } from 'react';
 
 import { IconButton, Typography } from '@material-tailwind/react';
 import {
@@ -39,7 +39,7 @@ export default function FileRow({
   showPropertiesDrawer,
   setPropertiesTarget,
   handleRightClick
-}: FileRowProps): JSX.Element {
+}: FileRowProps): ReactNode {
   const { fetchAndFormatFilesForDisplay } = useFileBrowserContext();
   const { handleLeftClick } = useHandleLeftClick();
   const { currentFileSharePath } = useZoneBrowserContext();
