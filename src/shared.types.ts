@@ -1,4 +1,4 @@
-export type File = {
+export type FileOrFolder = {
   name: string;
   path: string;
   size: number;
@@ -9,7 +9,7 @@ export type File = {
   last_modified: number;
 };
 
-export type FileSharePathItem = {
+export type FileSharePath = {
   zone: string;
   name: string;
   group: string;
@@ -20,6 +20,8 @@ export type FileSharePathItem = {
   windows_path: string | null;
 };
 
-export type ZonesAndFileSharePaths = Record<string, FileSharePathItem[]>;
+export type Zone = { name: string; fileSharePaths: FileSharePath[] };
+
+export type ZonesAndFileSharePathsMap = Record<string, FileSharePath | Zone>;
 
 export type Cookies = { [key: string]: string };

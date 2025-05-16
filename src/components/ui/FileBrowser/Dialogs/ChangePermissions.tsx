@@ -1,195 +1,195 @@
-import React from 'react';
-import {
-  Alert,
-  Button,
-  Dialog,
-  IconButton,
-  Typography
-} from '@material-tailwind/react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
-import usePermissionsDialog from '../../../../hooks/usePermissionsDialog';
-import type { File } from '../../../../shared.types';
+// import React from 'react';
+// import {
+//   Alert,
+//   Button,
+//   Dialog,
+//   IconButton,
+//   Typography
+// } from '@material-tailwind/react';
+// import { XMarkIcon } from '@heroicons/react/24/outline';
+// import usePermissionsDialog from '../../../../hooks/usePermissionsDialog';
+// import type { File } from '../../../../shared.types';
 
-type ChangePermissionsProps = {
-  targetItem: File | null;
-  showPermissionsDialog: boolean;
-  setShowPermissionsDialog: React.Dispatch<React.SetStateAction<boolean>>;
-};
+// type ChangePermissionsProps = {
+//   targetItem: File | null;
+//   showPermissionsDialog: boolean;
+//   setShowPermissionsDialog: React.Dispatch<React.SetStateAction<boolean>>;
+// };
 
-export default function ChangePermissions({
-  targetItem,
-  showPermissionsDialog,
-  setShowPermissionsDialog
-}: ChangePermissionsProps): JSX.Element {
-  const { handleChangePermissions, showAlert, setShowAlert, alertContent } =
-    usePermissionsDialog();
-  const [localPermissions, setLocalPermissions] = React.useState(
-    targetItem ? targetItem.permissions : null
-  );
+// export default function ChangePermissions({
+//   targetItem,
+//   showPermissionsDialog,
+//   setShowPermissionsDialog
+// }: ChangePermissionsProps): JSX.Element {
+//   const { handleChangePermissions, showAlert, setShowAlert, alertContent } =
+//     usePermissionsDialog();
+//   const [localPermissions, setLocalPermissions] = React.useState(
+//     targetItem ? targetItem.permissions : null
+//   );
 
-  function handleLocalPermissionChange(
-    event: React.ChangeEvent<HTMLInputElement>
-  ) {
-    if (!localPermissions) {
-      return;
-    }
+//   function handleLocalPermissionChange(
+//     event: React.ChangeEvent<HTMLInputElement>
+//   ) {
+//     if (!localPermissions) {
+//       return;
+//     }
 
-    const { name, checked } = event.target;
-    const [value, position] = name.split('_');
+//     const { name, checked } = event.target;
+//     const [value, position] = name.split('_');
 
-    setLocalPermissions(prev => {
-      if (!prev) {
-        return prev; // Ensure the type remains consistent
-      }
-      const splitPermissions = prev.split('');
-      if (checked) {
-        splitPermissions.splice(parseInt(position), 1, value);
-      } else {
-        splitPermissions.splice(parseInt(position), 1, '-');
-      }
-      const newPermissions = splitPermissions.join('');
-      return newPermissions;
-    });
-  }
+//     setLocalPermissions(prev => {
+//       if (!prev) {
+//         return prev; // Ensure the type remains consistent
+//       }
+//       const splitPermissions = prev.split('');
+//       if (checked) {
+//         splitPermissions.splice(parseInt(position), 1, value);
+//       } else {
+//         splitPermissions.splice(parseInt(position), 1, '-');
+//       }
+//       const newPermissions = splitPermissions.join('');
+//       return newPermissions;
+//     });
+//   }
 
-  return (
-    <Dialog open={showPermissionsDialog}>
-      <Dialog.Overlay>
-        <Dialog.Content className="p-6">
-          <IconButton
-            size="sm"
-            variant="outline"
-            color="secondary"
-            className="absolute right-4 top-4 text-secondary hover:text-background"
-            isCircular
-            onClick={() => {
-              setShowPermissionsDialog(false);
-              setShowAlert(false);
-            }}
-          >
-            <XMarkIcon className="h-5 w-5" />
-          </IconButton>
-          {targetItem ? (
-            <form
-              onSubmit={event => {
-                event.preventDefault();
-                if (!localPermissions) {
-                  return;
-                }
-                handleChangePermissions(targetItem, localPermissions);
-              }}
-            >
-              <Typography className="mt-8">
-                Change permisions for file
-                <span className="font-semibold"> {targetItem.name}</span>
-              </Typography>
-              <table className="w-full my-4 border border-surface">
-                <thead className="border-b border-surface bg-surface-dark text-sm font-medium">
-                  <tr>
-                    <th className="px-3 py-2 text-start font-medium">
-                      Who can view or edit this data?
-                    </th>
-                    <th className="px-3 py-2 text-center font-medium">Read</th>
-                    <th className="px-3 py-2 text-center font-medium">Write</th>
-                  </tr>
-                </thead>
+//   return (
+//     <Dialog open={showPermissionsDialog}>
+//       <Dialog.Overlay>
+//         <Dialog.Content className="p-6">
+//           <IconButton
+//             size="sm"
+//             variant="outline"
+//             color="secondary"
+//             className="absolute right-4 top-4 text-secondary hover:text-background"
+//             isCircular
+//             onClick={() => {
+//               setShowPermissionsDialog(false);
+//               setShowAlert(false);
+//             }}
+//           >
+//             <XMarkIcon className="h-5 w-5" />
+//           </IconButton>
+//           {targetItem ? (
+//             <form
+//               onSubmit={event => {
+//                 event.preventDefault();
+//                 if (!localPermissions) {
+//                   return;
+//                 }
+//                 handleChangePermissions(targetItem, localPermissions);
+//               }}
+//             >
+//               <Typography className="mt-8">
+//                 Change permisions for file
+//                 <span className="font-semibold"> {targetItem.name}</span>
+//               </Typography>
+//               <table className="w-full my-4 border border-surface">
+//                 <thead className="border-b border-surface bg-surface-dark text-sm font-medium">
+//                   <tr>
+//                     <th className="px-3 py-2 text-start font-medium">
+//                       Who can view or edit this data?
+//                     </th>
+//                     <th className="px-3 py-2 text-center font-medium">Read</th>
+//                     <th className="px-3 py-2 text-center font-medium">Write</th>
+//                   </tr>
+//                 </thead>
 
-                {localPermissions ? (
-                  <tbody className="text-sm">
-                    <tr className="border-b border-surface">
-                      <td className="p-3 font-medium">
-                        Owner: {targetItem.owner}
-                      </td>
-                      {/* Owner read/write */}
-                      <td className="p-3">
-                        <input
-                          type="checkbox"
-                          name="r_1"
-                          checked={localPermissions[1] === 'r'}
-                          disabled
-                        />
-                      </td>
-                      <td className="p-3">
-                        <input
-                          type="checkbox"
-                          name="w_2"
-                          checked={localPermissions[2] === 'w'}
-                          onChange={event => handleLocalPermissionChange(event)}
-                          className="accent-secondary-light hover:cursor-pointer"
-                        />
-                      </td>
-                    </tr>
+//                 {localPermissions ? (
+//                   <tbody className="text-sm">
+//                     <tr className="border-b border-surface">
+//                       <td className="p-3 font-medium">
+//                         Owner: {targetItem.owner}
+//                       </td>
+//                       {/* Owner read/write */}
+//                       <td className="p-3">
+//                         <input
+//                           type="checkbox"
+//                           name="r_1"
+//                           checked={localPermissions[1] === 'r'}
+//                           disabled
+//                         />
+//                       </td>
+//                       <td className="p-3">
+//                         <input
+//                           type="checkbox"
+//                           name="w_2"
+//                           checked={localPermissions[2] === 'w'}
+//                           onChange={event => handleLocalPermissionChange(event)}
+//                           className="accent-secondary-light hover:cursor-pointer"
+//                         />
+//                       </td>
+//                     </tr>
 
-                    <tr className="border-b border-surface">
-                      <td className="p-3 font-medium">
-                        Group: {targetItem.group}
-                      </td>
-                      {/* Group read/write */}
-                      <td className="p-3">
-                        <input
-                          type="checkbox"
-                          name="r_4"
-                          checked={localPermissions[4] === 'r'}
-                          onChange={event => handleLocalPermissionChange(event)}
-                          className="accent-secondary-light hover:cursor-pointer"
-                        />
-                      </td>
-                      <td className="p-3">
-                        <input
-                          type="checkbox"
-                          name="w_5"
-                          checked={localPermissions[5] === 'w'}
-                          onChange={event => handleLocalPermissionChange(event)}
-                          className="accent-secondary-light hover:cursor-pointer"
-                        />
-                      </td>
-                    </tr>
+//                     <tr className="border-b border-surface">
+//                       <td className="p-3 font-medium">
+//                         Group: {targetItem.group}
+//                       </td>
+//                       {/* Group read/write */}
+//                       <td className="p-3">
+//                         <input
+//                           type="checkbox"
+//                           name="r_4"
+//                           checked={localPermissions[4] === 'r'}
+//                           onChange={event => handleLocalPermissionChange(event)}
+//                           className="accent-secondary-light hover:cursor-pointer"
+//                         />
+//                       </td>
+//                       <td className="p-3">
+//                         <input
+//                           type="checkbox"
+//                           name="w_5"
+//                           checked={localPermissions[5] === 'w'}
+//                           onChange={event => handleLocalPermissionChange(event)}
+//                           className="accent-secondary-light hover:cursor-pointer"
+//                         />
+//                       </td>
+//                     </tr>
 
-                    <tr>
-                      <td className="p-3 font-medium">Everyone else</td>
-                      {/* Everyone else read/write */}
-                      <td className="p-3">
-                        <input
-                          type="checkbox"
-                          name="r_7"
-                          checked={localPermissions[7] === 'r'}
-                          onChange={event => handleLocalPermissionChange(event)}
-                          className="accent-secondary-light hover:cursor-pointer"
-                        />
-                      </td>
-                      <td className="p-3">
-                        <input
-                          type="checkbox"
-                          name="w_8"
-                          checked={localPermissions[8] === 'w'}
-                          onChange={event => handleLocalPermissionChange(event)}
-                          className="accent-secondary-light hover:cursor-pointer"
-                        />
-                      </td>
-                    </tr>
-                  </tbody>
-                ) : null}
-              </table>
-              <Button className="!rounded-md" type="submit">
-                Change Permissions
-              </Button>
-            </form>
-          ) : null}
-          {showAlert === true ? (
-            <Alert
-              className={`flex items-center gap-6 mt-6 border-none ${alertContent.startsWith('Error') ? 'bg-error-light/90' : 'bg-secondary-light/70'}`}
-            >
-              <Alert.Content>{alertContent}</Alert.Content>
-              <XMarkIcon
-                className="h-5 w-5 cursor-pointer"
-                onClick={() => {
-                  setShowAlert(false);
-                }}
-              />
-            </Alert>
-          ) : null}
-        </Dialog.Content>
-      </Dialog.Overlay>
-    </Dialog>
-  );
-}
+//                     <tr>
+//                       <td className="p-3 font-medium">Everyone else</td>
+//                       {/* Everyone else read/write */}
+//                       <td className="p-3">
+//                         <input
+//                           type="checkbox"
+//                           name="r_7"
+//                           checked={localPermissions[7] === 'r'}
+//                           onChange={event => handleLocalPermissionChange(event)}
+//                           className="accent-secondary-light hover:cursor-pointer"
+//                         />
+//                       </td>
+//                       <td className="p-3">
+//                         <input
+//                           type="checkbox"
+//                           name="w_8"
+//                           checked={localPermissions[8] === 'w'}
+//                           onChange={event => handleLocalPermissionChange(event)}
+//                           className="accent-secondary-light hover:cursor-pointer"
+//                         />
+//                       </td>
+//                     </tr>
+//                   </tbody>
+//                 ) : null}
+//               </table>
+//               <Button className="!rounded-md" type="submit">
+//                 Change Permissions
+//               </Button>
+//             </form>
+//           ) : null}
+//           {showAlert === true ? (
+//             <Alert
+//               className={`flex items-center gap-6 mt-6 border-none ${alertContent.startsWith('Error') ? 'bg-error-light/90' : 'bg-secondary-light/70'}`}
+//             >
+//               <Alert.Content>{alertContent}</Alert.Content>
+//               <XMarkIcon
+//                 className="h-5 w-5 cursor-pointer"
+//                 onClick={() => {
+//                   setShowAlert(false);
+//                 }}
+//               />
+//             </Alert>
+//           ) : null}
+//         </Dialog.Content>
+//       </Dialog.Overlay>
+//     </Dialog>
+//   );
+// }

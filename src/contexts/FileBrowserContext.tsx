@@ -1,15 +1,17 @@
 import React from 'react';
-import { File } from '../shared.types';
+import { FileOrFolder } from '../shared.types';
 import { getAPIPathRoot, sendFetchRequest } from '../utils';
 import { useCookiesContext } from './CookiesContext';
 
 type FileBrowserContextType = {
-  files: File[];
-  currentNavigationPath: File['path'];
+  files: FileOrFolder[];
+  currentNavigationPath: FileOrFolder['path'];
   dirArray: string[];
   currentDir: string;
-  setCurrentNavigationPath: React.Dispatch<React.SetStateAction<File['path']>>;
-  fetchAndFormatFilesForDisplay: (path: File['path']) => Promise<void>;
+  setCurrentNavigationPath: React.Dispatch<
+    React.SetStateAction<FileOrFolder['path']>
+  >;
+  fetchAndFormatFilesForDisplay: (path: FileOrFolder['path']) => Promise<void>;
 };
 
 const FileBrowserContext = React.createContext<FileBrowserContextType | null>(
@@ -29,9 +31,9 @@ export const FileBrowserContextProvider = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const [files, setFiles] = React.useState<File[]>([]);
+  const [files, setFiles] = React.useState<FileOrFolder[]>([]);
   const [currentNavigationPath, setCurrentNavigationPath] =
-    React.useState<File['path']>('');
+    React.useState<FileOrFolder['path']>('');
   const [dirArray, setDirArray] = React.useState<string[]>([]);
   const [currentDir, setCurrentDir] = React.useState<string>('');
 
@@ -66,7 +68,7 @@ export const FileBrowserContextProvider = ({
   }
 
   async function fetchAndFormatFilesForDisplay(
-    path: File['path']
+    path: FileOrFolder['path']
   ): Promise<void> {
     let cleanPath = path;
 
@@ -90,13 +92,13 @@ export const FileBrowserContextProvider = ({
       if (data.files) {
         // display directories first, then files
         // within a type (directories or files), display alphabetically
-        data.files = data.files.sort((a: File, b: File) => {
+        data.files = data.files.sort((a: FileOrFolder, b: FileOrFolder) => {
           if (a.is_dir === b.is_dir) {
             return a.name.localeCompare(b.name);
           }
           return a.is_dir ? -1 : 1;
         });
-        setFiles(data.files as File[]);
+        setFiles(data.files as FileOrFolder[]);
       }
     } catch (error: unknown) {
       if (error instanceof Error) {

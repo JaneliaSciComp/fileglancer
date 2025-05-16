@@ -82,11 +82,16 @@ const parsePermissions = (permissionString: string) => {
   };
 };
 
+function makeMapKey(type: string, name: string): string {
+  return `${type}_${name}`;
+}
+
 export {
   formatFileSize,
   formatDate,
   getAPIPathRoot,
   sendFetchRequest,
+  makeMapKey,
   removeLastSegmentFromPath,
   parsePermissions
 };

@@ -2,15 +2,15 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Typography } from '@material-tailwind/react';
 
-import type { File } from '../../../shared.types';
-import { useZoneBrowserContext } from '../../../contexts/ZoneBrowserContext';
-import { usePreferencesContext } from '../../../contexts/PreferencesContext';
+import type { FileOrFolder } from '../../../shared.types';
+// import { useZoneBrowserContext } from '../../../contexts/ZoneBrowserContext';
+// import { usePreferencesContext } from '../../../contexts/PreferencesContext';
 
 type ContextMenuProps = {
   x: number;
   y: number;
   menuRef: React.RefObject<HTMLDivElement>;
-  selectedFiles: File[];
+  selectedFiles: FileOrFolder[];
   setShowPropertiesDrawer: React.Dispatch<React.SetStateAction<boolean>>;
   setShowContextMenu: React.Dispatch<React.SetStateAction<boolean>>;
   setShowRenameDialog: React.Dispatch<React.SetStateAction<boolean>>;
@@ -29,9 +29,9 @@ export default function ContextMenu({
   setShowDeleteDialog,
   setShowPermissionsDialog
 }: ContextMenuProps): JSX.Element {
-  const { currentNavigationZone, currentFileSharePath } =
-    useZoneBrowserContext();
-  const { handleFavoriteChange } = usePreferencesContext();
+  //   const { currentNavigationZone, currentFileSharePath } =
+  //     useZoneBrowserContext();
+  //   const { handleFavoriteChange } = usePreferencesContext();
   return ReactDOM.createPortal(
     <div
       ref={menuRef}
@@ -53,7 +53,7 @@ export default function ContextMenu({
           View file properties
         </Typography>
 
-        {/* Set/unset folders as favorites */}
+        {/* Set/unset folders as favorites
         {(selectedFiles.length === 1 && selectedFiles[0].is_dir) ||
         (selectedFiles.length > 1 &&
           selectedFiles.some(file => file.is_dir)) ? (
@@ -88,7 +88,7 @@ export default function ContextMenu({
           >
             Set/unset as favorite
           </Typography>
-        ) : null}
+        ) : null} */}
 
         {/* Rename file or folder */}
         {selectedFiles.length === 1 ? (

@@ -2,28 +2,28 @@ import React from 'react';
 import { Collapse, Typography, List } from '@material-tailwind/react';
 import { ChevronRightIcon, Squares2X2Icon } from '@heroicons/react/24/outline';
 
-import { ZonesAndFileSharePaths } from '../../../shared.types';
+import { ZonesAndFileSharePathsMap } from '../../../shared.types';
 import { useZoneBrowserContext } from '../../../contexts/ZoneBrowserContext';
 import Zone from './Zone';
 
 export default function ZonesBrowser({
-  searchQuery,
+  //   searchQuery,
   openZones,
-  toggleOpenZones,
-  filteredZonesAndFileSharePaths
+  toggleOpenZones
+  //   filteredZonesAndFileSharePaths
 }: {
-  searchQuery: string;
+  //   searchQuery: string;
   openZones: Record<string, boolean>;
   toggleOpenZones: (zone: string) => void;
-  filteredZonesAndFileSharePaths: ZonesAndFileSharePaths;
+  //   filteredZonesAndFileSharePaths: ZonesAndFileSharePathsMap;
 }) {
-  const { zonesAndFileSharePaths } = useZoneBrowserContext();
+  const { zonesAndFileSharePathsMap } = useZoneBrowserContext();
 
-  const displayZones: ZonesAndFileSharePaths =
-    Object.keys(filteredZonesAndFileSharePaths).length > 0 ||
-    searchQuery.length > 0
-      ? filteredZonesAndFileSharePaths
-      : zonesAndFileSharePaths;
+  const displayZones: ZonesAndFileSharePathsMap = zonesAndFileSharePathsMap;
+  // Object.keys(filteredZonesAndFileSharePaths).length > 0 ||
+  // searchQuery.length > 0
+  //   ? filteredZonesAndFileSharePaths
+  //   : zonesAndFileSharePathsMap;
 
   return (
     <div className="flex flex-col h-full overflow-hidden w-[calc(100%-1.5rem)] my-3 mx-3 bg-surface/50">
@@ -50,15 +50,16 @@ export default function ZonesBrowser({
         className="!overflow-y-auto overflow-x-hidden flex-grow"
       >
         <List className="!overflow-y-auto h-full py-0 gap-0 pr-2 bg-background">
-          {Object.entries(displayZones).map(([zoneName, fileSharePaths]) => {
-            return (
-              <Zone
-                zoneName={zoneName}
-                fileSharePaths={fileSharePaths}
-                openZones={openZones}
-                toggleOpenZones={toggleOpenZones}
-              />
-            );
+          {Object.entries(displayZones).map(([key, value]) => {
+            if (key.startsWith('zone') && 'fileSharePaths' in value) {
+              return (
+                <Zone
+                  zone={value}
+                  openZones={openZones}
+                  toggleOpenZones={toggleOpenZones}
+                />
+              );
+            }
           })}
         </List>
       </Collapse>
