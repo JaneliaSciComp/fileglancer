@@ -12,7 +12,6 @@ import {
   FolderFavorite,
   usePreferencesContext
 } from '@/contexts/PreferencesContext';
-import { X } from 'iconoir-react';
 
 type MissingFolderFavoriteDialogProps = {
   folderFavorite: FolderFavorite;

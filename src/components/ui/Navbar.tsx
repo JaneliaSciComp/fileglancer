@@ -18,6 +18,7 @@ import {
   AdjustmentsHorizontalIcon,
   BriefcaseIcon,
   XMarkIcon,
+  ShareIcon,
   SunIcon
 } from '@heroicons/react/24/outline';
 
@@ -28,6 +29,11 @@ const LINKS = [
     icon: FolderIcon,
     title: 'Browse',
     href: '/browse'
+  },
+  {
+    icon: ShareIcon,
+    title: 'Sharing',
+    href: '/sharing'
   },
   {
     icon: BriefcaseIcon,
