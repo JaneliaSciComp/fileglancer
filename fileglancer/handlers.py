@@ -579,6 +579,7 @@ class StaticHandler(JupyterHandler, web.StaticFileHandler):
 
     @web.authenticated
     def get(self, path):
+        self.log.info(f"GET /fg/{path}")
         # authenticate the static handler
         # this provides us with login redirection and token caching
         if not path:

@@ -3,7 +3,7 @@ import React from 'react';
 import type { FileSharePath, Zone } from '@/shared.types';
 import { useCookiesContext } from '@/contexts/CookiesContext';
 import { useZoneBrowserContext } from './ZoneBrowserContext';
-import { getAPIPathRoot, sendFetchRequest, makeMapKey } from '@/utils';
+import { getAPIPathRoot, sendFetchRequest, makeMapKey, HTTPError } from '@/utils';
 
 export type FolderFavorite = {
   type: 'folder';
@@ -93,10 +93,13 @@ export const PreferencesProvider = ({
       ).then(response => response.json());
       return data?.value;
     } catch (error) {
-      console.log(
-        `Potential error fetching preferences, or preference with key ${key} is not set:`,
-        error
-      );
+      if (error instanceof HTTPError && error.responseCode === 404) {
+        console.log(`Preference '${key}' not found`);
+      }
+      else {
+        console.log(`Error fetching preference '${key}':`, error);
+      }
+      return null;
     }
   }
 
@@ -175,10 +178,10 @@ export const PreferencesProvider = ({
 
     (async function () {
       const backendPrefs = await fetchPreferences('zone');
-      const zoneArray = backendPrefs.map((pref: ZonePreference) => {
+      const zoneArray = backendPrefs?.map((pref: ZonePreference) => {
         const key = makeMapKey(pref.type, pref.name);
         return { [key]: pref };
-      });
+      }) || [];
       const zoneMap = Object.assign({}, ...zoneArray);
       if (zoneMap) {
         updateLocalZonePreferenceStates(zoneMap);
@@ -193,10 +196,10 @@ export const PreferencesProvider = ({
 
     (async function () {
       const backendPrefs = await fetchPreferences('fileSharePath');
-      const fspArray = backendPrefs.map((pref: FileSharePathPreference) => {
+      const fspMap = backendPrefs?.map((pref: FileSharePathPreference) => {
         const key = makeMapKey(pref.type, pref.name);
         return { [key]: pref };
-      });
+      }) || [];
       const fspMap = Object.assign({}, ...fspArray);
       if (fspMap) {
         updateLocalFspPreferenceStates(fspMap);
@@ -211,10 +214,10 @@ export const PreferencesProvider = ({
 
     (async function () {
       const backendPrefs = await fetchPreferences('folder');
-      const folderArray = backendPrefs.map((pref: FolderPreference) => {
+      const folderArray = backendPrefs?.map((pref: FolderPreference) => {
         const key = makeMapKey(pref.type, `${pref.fspName}_${pref.folderPath}`);
         return { [key]: pref };
-      });
+      }) || [];
       const folderMap = Object.assign({}, ...folderArray);
       if (folderMap) {
         updateLocalFolderPreferenceStates(folderMap);
@@ -231,7 +234,7 @@ export const PreferencesProvider = ({
         { value: value }
       );
     } catch (error) {
-      console.error(`Error updating ${key}:`, error);
+      console.error(`Error updating preference '${key}':`, error);
     }
   }
 
@@ -245,7 +248,7 @@ export const PreferencesProvider = ({
       setPathPreference(localPathPreference);
       setShowPathPrefAlert(true);
     } catch (error) {
-      console.error('Error updating path preference:', error);
+      console.error('Error in handlePathPreferenceSubmit:', error);
       setShowPathPrefAlert(false);
     }
   }
@@ -266,59 +269,56 @@ export const PreferencesProvider = ({
   }
 
   async function handleZoneFavoriteChange(item: Zone) {
-    const key = makeMapKey('zone', item.name);
-    const updatedZonePreferenceMap = updatePreferenceList(
-      key,
-      { type: 'zone', name: item.name },
-      zonePreferenceMap
-    ) as Record<string, ZonePreference>;
-
     try {
+      const key = makeMapKey('zone', item.name);
+      const updatedZonePreferenceMap = updatePreferenceList(
+        key,
+        { type: 'zone', name: item.name },
+        zonePreferenceMap
+      ) as Record<string, ZonePreference>;  
       await savePreferencesToBackend(
         'zone',
         Object.values(updatedZonePreferenceMap)
       );
       updateLocalZonePreferenceStates(updatedZonePreferenceMap);
     } catch (error) {
-      console.error('Error updating zone favorites:', error);
+      console.error('Error in handleZoneFavoriteChange:', error);
     }
   }
 
   async function handleFileSharePathFavoriteChange(item: FileSharePath) {
-    const key = makeMapKey('fsp', item.name);
-    const updatedFileSharePathMap = updatePreferenceList(
-      key,
-      { type: 'fsp', name: item.name },
-      fileSharePathPreferenceMap
-    ) as Record<string, FileSharePathPreference>;
-
     try {
+      const key = makeMapKey('fsp', item.name);
+      const updatedFileSharePathMap = updatePreferenceList(
+        key,
+        { type: 'fsp', name: item.name },
+        fileSharePathPreferenceMap
+      ) as Record<string, FileSharePathPreference>;
       await savePreferencesToBackend(
         'fileSharePath',
         Object.values(updatedFileSharePathMap)
       );
       updateLocalFspPreferenceStates(updatedFileSharePathMap);
     } catch (error) {
-      console.error('Error updating file share path favorites:', error);
+      console.error('Error in handleFileSharePathFavoriteChange:', error);
     }
   }
 
   async function handleFolderFavoriteChange(item: FolderFavorite) {
-    const folderPrefKey = makeMapKey(
-      'folder',
-      `${item.fsp.name}_${item.folderPath}`
-    );
-    const updatedFolderMap = updatePreferenceList(
-      folderPrefKey,
-      { type: 'folder', folderPath: item.folderPath, fspName: item.fsp.name },
-      folderPreferenceMap
-    ) as Record<string, FolderPreference>;
-
     try {
+      const folderPrefKey = makeMapKey(
+        'folder',
+        `${item.fsp.name}_${item.folderPath}`
+      );
+      const updatedFolderMap = updatePreferenceList(
+        folderPrefKey,
+        { type: 'folder', folderPath: item.folderPath, fspName: item.fsp.name },
+        folderPreferenceMap
+      ) as Record<string, FolderPreference>;
       await savePreferencesToBackend('folder', Object.values(updatedFolderMap));
       updateLocalFolderPreferenceStates(updatedFolderMap);
     } catch (error) {
-      console.error('Error updating folder favorites:', error);
+      console.error('Error in handleFolderFavoriteChange:', error);
     }
   }
 
@@ -326,31 +326,22 @@ export const PreferencesProvider = ({
     item: Zone | FileSharePath | FolderFavorite,
     type: string
   ) {
-    switch (type) {
-      case 'zone':
-        try {
+    try {
+      switch (type) {
+        case 'zone':
           await handleZoneFavoriteChange(item as Zone);
-        } catch (error) {
-          console.log(error);
-        }
-        break;
-      case 'fileSharePath':
-        try {
+          break;
+        case 'fileSharePath':
           await handleFileSharePathFavoriteChange(item as FileSharePath);
-        } catch (error) {
-          console.log(error);
-        }
-        break;
-      case 'folder':
-        try {
+          break;
+        case 'folder':
           await handleFolderFavoriteChange(item as FolderFavorite);
-        } catch (error) {
-          console.log(error);
-        }
-        break;
-      default:
-        console.error('Invalid type provided for handleFavoriteChange:', type);
-        break;
+          break;
+        default:
+          throw new Error(`Invalid type: ${type}`);
+      }
+    } catch (error) {
+      console.error('Error in handleFavoriteChange:', error);
     }
   }
 
