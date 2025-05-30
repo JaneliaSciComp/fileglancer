@@ -11,16 +11,24 @@ import { fetchFileAsJson } from '@/utils';
 import { useCookies } from 'react-cookie';
 import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
 
+export type OpenWithToolUrls = {
+  copy: string;
+  validator: string;
+  neuroglancer: string;
+  vole: string;
+};
+
 export default function useZarrMetadata(files: FileOrFolder[]) {
   const [thumbnailSrc, setThumbnailSrc] = React.useState<string | null>(null);
-  const [neuroglancerUrl, setNeuroglancerUrl] = React.useState<string | null>(
-    null
-  );
+  const [openWithToolUrls, setOpenWithToolUrls] =
+    React.useState<OpenWithToolUrls | null>(null);
   const [metadata, setMetadata] = React.useState<Metadata | null>(null);
   const [hasMultiscales, setHasMultiscales] = React.useState(false);
   const [loadingThumbnail, setLoadingThumbnail] = React.useState(false);
 
+  const validatorBaseUrl = 'https://ome.github.io/ome-ngff-validator/?source=';
   const neuroglancerBaseUrl = 'https://neuroglancer-demo.appspot.com/#!';
+  const voleBaseUrl = 'https://volumeviewer.allencell.org/viewer?url=';
   const { currentNavigationPath, getFileFetchPath } = useFileBrowserContext();
   const { currentFileSharePath } = useZoneBrowserContext();
   const { dataUrl } = useProxiedPathContext();
@@ -30,7 +38,7 @@ export default function useZarrMetadata(files: FileOrFolder[]) {
     setHasMultiscales(false);
     setThumbnailSrc(null);
     setMetadata(null);
-    setNeuroglancerUrl(null);
+    setOpenWithToolUrls(null);
     const zattrsFile = files.find(file => file.name === '.zattrs');
     if (zattrsFile && currentFileSharePath) {
       try {
@@ -63,22 +71,33 @@ export default function useZarrMetadata(files: FileOrFolder[]) {
   }, [checkZattrsForMultiscales]);
 
   React.useEffect(() => {
-    setNeuroglancerUrl(null);
+    setOpenWithToolUrls(null);
     if (metadata && dataUrl) {
-      const neuroglancerState = generateNeuroglancerState(
-        dataUrl,
-        metadata.zarr_version,
-        metadata.multiscale,
-        metadata.arr,
-        metadata.omero
-      );
-      setNeuroglancerUrl(neuroglancerBaseUrl + neuroglancerState);
+      const openWithToolUrls = {
+        copy: dataUrl,
+        validator: validatorBaseUrl + dataUrl,
+        vole: voleBaseUrl + dataUrl
+      } as OpenWithToolUrls;
+      try {
+        openWithToolUrls.neuroglancer =
+          neuroglancerBaseUrl +
+          generateNeuroglancerState(
+            dataUrl,
+            metadata.zarr_version,
+            metadata.multiscale,
+            metadata.arr,
+            metadata.omero
+          );
+      } catch (error) {
+        console.error('Error generating neuroglancer state:', error);
+      }
+      setOpenWithToolUrls(openWithToolUrls);
     }
   }, [metadata, dataUrl]);
 
   return {
     thumbnailSrc,
-    neuroglancerUrl,
+    openWithToolUrls,
     metadata,
     hasMultiscales,
     loadingThumbnail

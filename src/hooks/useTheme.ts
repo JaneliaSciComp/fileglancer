@@ -3,7 +3,7 @@ import * as React from 'react';
 export default function useTheme() {
   const [isLightTheme, setIsLightTheme] = React.useState(true);
 
-  function toggleTheme() {
+  const toggleTheme = React.useCallback(() => {
     setIsLightTheme(prev => {
       const newTheme = !prev;
       localStorage.setItem('theme', newTheme ? 'light' : 'dark');
@@ -13,6 +13,7 @@ export default function useTheme() {
         : document.documentElement.classList.add('dark');
       return newTheme;
     });
-  }
+  }, []);
+
   return { isLightTheme, setIsLightTheme, toggleTheme };
 }

@@ -14,7 +14,7 @@ export default function Preferences() {
 
   React.useEffect(() => {
     setShowPathPrefAlert(false);
-  }, []);
+  }, [setShowPathPrefAlert]);
 
   return (
     <div className="pt-12 w-4/5">

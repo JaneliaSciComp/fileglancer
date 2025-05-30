@@ -17,7 +17,10 @@ type ProxiedPath = {
 type ProxiedPathContextType = {
   proxiedPath: ProxiedPath | null;
   dataUrl: string | null;
-  createProxiedPath: (fspMountPath: string, path: string) => Promise<ProxiedPath | null>;
+  createProxiedPath: (
+    fspMountPath: string,
+    path: string
+  ) => Promise<ProxiedPath | null>;
   deleteProxiedPath: () => Promise<void>;
 };
 
@@ -63,7 +66,11 @@ export const ProxiedPathProvider = ({
     try {
       const filePath = currentNavigationPath.replace('?subpath=', '/');
       const filePathWithoutFsp = filePath.split('/').slice(1).join('/');
-      console.log('Fetching proxied path for', currentFileSharePath?.mount_path, filePathWithoutFsp);
+      console.log(
+        'Fetching proxied path for',
+        currentFileSharePath?.mount_path,
+        filePathWithoutFsp
+      );
       const response = await sendFetchRequest(
         `${getAPIPathRoot()}api/fileglancer/proxied-path?fsp_mount_path=${currentFileSharePath?.mount_path}&path=${filePathWithoutFsp}`,
         'GET',

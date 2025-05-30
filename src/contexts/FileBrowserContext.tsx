@@ -42,33 +42,21 @@ export const FileBrowserContextProvider = ({
 
   const { cookies } = useCookiesContext();
 
-  React.useEffect(() => {
-    if (currentNavigationPath) {
-      const dirArray = makeDirArray(currentNavigationPath);
-      setDirArray(dirArray);
-    }
-  }, [currentNavigationPath]);
-
-  React.useEffect(() => {
-    if (dirArray.length > 1) {
-      setCurrentDir(dirArray[dirArray.length - 1]);
-    } else {
-      setCurrentDir(dirArray[0]);
-    }
-  }, [dirArray]);
-
-  function makeDirArray(path: string) {
-    if (currentNavigationPath.includes('?subpath=')) {
-      const firstSegment = currentNavigationPath.split('?subpath=')[0];
-      const subpathSegment = currentNavigationPath.split('?subpath=')[1];
-      const subpathArray = subpathSegment
-        .split('/')
-        .filter(item => item !== '');
-      return [firstSegment, ...subpathArray];
-    } else {
-      return [path];
-    }
-  }
+  const makeDirArray = React.useCallback(
+    (path: string) => {
+      if (currentNavigationPath.includes('?subpath=')) {
+        const firstSegment = currentNavigationPath.split('?subpath=')[0];
+        const subpathSegment = currentNavigationPath.split('?subpath=')[1];
+        const subpathArray = subpathSegment
+          .split('/')
+          .filter(item => item !== '');
+        return [firstSegment, ...subpathArray];
+      } else {
+        return [path];
+      }
+    },
+    [currentNavigationPath]
+  );
 
   async function fetchAndFormatFilesForDisplay(
     path: FileOrFolder['path']
@@ -102,6 +90,21 @@ export const FileBrowserContextProvider = ({
       }
     }
   }
+
+  React.useEffect(() => {
+    if (currentNavigationPath) {
+      const dirArray = makeDirArray(currentNavigationPath);
+      setDirArray(dirArray);
+    }
+  }, [makeDirArray, currentNavigationPath]);
+
+  React.useEffect(() => {
+    if (dirArray.length > 1) {
+      setCurrentDir(dirArray[dirArray.length - 1]);
+    } else {
+      setCurrentDir(dirArray[0]);
+    }
+  }, [dirArray]);
 
   return (
     <FileBrowserContext.Provider

@@ -1,17 +1,18 @@
 import React from 'react';
 import {
-  Alert,
   Button,
   ButtonGroup,
   Switch,
-  Typography
+  Typography,
+  Tooltip
 } from '@material-tailwind/react';
 import { Link } from 'react-router-dom';
-import { Square2StackIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 import neuroglancer_logo from '@/assets/neuroglancer.png';
+import validator_logo from '@/assets/ome-ngff-validator.png';
 import volE_logo from '@/assets/aics_website-3d-cell-viewer.png';
-import napari_logo from '@/assets/napari.png';
+import copy_logo from '@/assets/copy-link-64.png';
+// import napari_logo from '@/assets/napari.png';
 
 import useCopyPath from '@/hooks/useCopyPath';
 import type { Metadata } from '@/omezarr-helper';
@@ -19,25 +20,27 @@ import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import ZarrMetadataTable from './ZarrMetadataTable';
 import SharingDialog from '../Dialogs/SharingDialog';
+import type { OpenWithToolUrls } from '@/hooks/useZarrMetadata';
 
 type ZarrPreviewProps = {
   thumbnailSrc: string | null;
   loadingThumbnail: boolean;
-  neuroglancerUrl: string | null;
+  openWithToolUrls: OpenWithToolUrls | null;
   metadata: Metadata | null;
 };
 
 export default function ZarrPreview({
   thumbnailSrc,
   loadingThumbnail,
-  neuroglancerUrl,
+  openWithToolUrls,
   metadata
 }: ZarrPreviewProps): React.ReactNode {
   const [showSharingDialog, setShowSharingDialog] =
     React.useState<boolean>(false);
   const [isImageShared, setIsImageShared] = React.useState(false);
+  const [showCopiedTooltip, setShowCopiedTooltip] = React.useState(false);
 
-  const { copyToClipboard, showCopyAlert, dismissCopyAlert } = useCopyPath();
+  const { copyToClipboard } = useCopyPath();
   const { proxiedPath } = useProxiedPathContext();
   const { currentNavigationPath } = useFileBrowserContext();
 
@@ -47,6 +50,16 @@ export default function ZarrPreview({
   React.useEffect(() => {
     setIsImageShared(proxiedPath !== null);
   }, [proxiedPath]);
+
+  const handleCopyUrl = async () => {
+    if (openWithToolUrls?.copy) {
+      await copyToClipboard(openWithToolUrls.copy);
+      setShowCopiedTooltip(true);
+      setTimeout(() => {
+        setShowCopiedTooltip(false);
+      }, 1000);
+    }
+  };
 
   return (
     <div className="my-4 p-4 shadow-sm rounded-md bg-primary-light/30">
@@ -110,43 +123,115 @@ export default function ZarrPreview({
             />
           ) : null}
 
-          {neuroglancerUrl && isImageShared ? (
+          {openWithToolUrls && isImageShared ? (
             <div>
               <Typography className="font-semibold text-sm text-surface-foreground">
                 Open with:
               </Typography>
               <ButtonGroup className="relative">
-                <Button
-                  as={Link}
-                  to={neuroglancerUrl}
-                  title="View in Neuroglancer"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  variant="ghost"
-                  className="rounded-sm m-0 p-0"
+                <Tooltip placement="top">
+                  <Tooltip.Trigger
+                    as={Button}
+                    variant="ghost"
+                    className="rounded-sm m-0 p-0 transform active:scale-90 transition-transform duration-75"
+                  >
+                    <Link
+                      to={openWithToolUrls.validator}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <img
+                        src={validator_logo}
+                        alt="OME-Zarr Validator logo"
+                        className="max-h-8 max-w-8 m-1 rounded-sm"
+                      />
+                    </Link>
+                    <Tooltip.Content className="px-2.5 py-1.5 text-primary-foreground">
+                      <Typography type="small" className="opacity-90">
+                        View in OME-Zarr Validator
+                      </Typography>
+                      <Tooltip.Arrow />
+                    </Tooltip.Content>
+                  </Tooltip.Trigger>
+                </Tooltip>
+
+                <Tooltip placement="top">
+                  <Tooltip.Trigger
+                    as={Button}
+                    variant="ghost"
+                    className="rounded-sm m-0 p-0 transform active:scale-90 transition-transform duration-75"
+                  >
+                    <Link
+                      to={openWithToolUrls.neuroglancer}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <img
+                        src={neuroglancer_logo}
+                        alt="Neuroglancer logo"
+                        className="max-h-8 max-w-8 m-1 rounded-sm"
+                      />
+                    </Link>
+                    <Tooltip.Content className="px-2.5 py-1.5 text-primary-foreground">
+                      <Typography type="small" className="opacity-90">
+                        View in Neuroglancer
+                      </Typography>
+                      <Tooltip.Arrow />
+                    </Tooltip.Content>
+                  </Tooltip.Trigger>
+                </Tooltip>
+
+                <Tooltip placement="top">
+                  <Tooltip.Trigger
+                    as={Button}
+                    variant="ghost"
+                    className="rounded-sm m-0 p-0 transform active:scale-90 transition-transform duration-75"
+                  >
+                    <Link
+                      to={openWithToolUrls.vole}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <img
+                        src={volE_logo}
+                        alt="Vol-E logo"
+                        className="max-h-8 max-w-8 m-1 rounded-sm"
+                      />
+                    </Link>
+                    <Tooltip.Content className="px-2.5 py-1.5 text-primary-foreground">
+                      <Typography type="small" className="opacity-90">
+                        View in Vol-E
+                      </Typography>
+                      <Tooltip.Arrow />
+                    </Tooltip.Content>
+                  </Tooltip.Trigger>
+                </Tooltip>
+
+                <Tooltip
+                  placement="top"
+                  open={showCopiedTooltip ? true : undefined}
                 >
-                  <img
-                    src={neuroglancer_logo}
-                    alt="Neuroglancer logo"
-                    className="max-h-8 max-w-8 m-1 rounded-sm"
-                  />
-                </Button>
-                <Button
-                  as={Link}
-                  to="#"
-                  title="View in Vol-E"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  variant="ghost"
-                  className="rounded-sm m-0 p-0"
-                >
-                  <img
-                    src={volE_logo}
-                    alt="Vol-E logo"
-                    className="max-h-8 max-w-8 m-1 rounded-sm"
-                  />
-                </Button>
-                <div>
+                  <Tooltip.Trigger
+                    as={Button}
+                    variant="ghost"
+                    className="rounded-sm m-0 p-0 transform active:scale-90 transition-transform duration-75"
+                    onClick={handleCopyUrl}
+                  >
+                    <img
+                      src={copy_logo}
+                      alt="Copy URL icon"
+                      className="max-h-8 max-w-8 m-1 rounded-sm"
+                    />
+                    <Tooltip.Content className="px-2.5 py-1.5 text-primary-foreground">
+                      <Typography type="small" className="opacity-90">
+                        {showCopiedTooltip ? 'Copied!' : 'Copy data URL'}
+                      </Typography>
+                      <Tooltip.Arrow />
+                    </Tooltip.Content>
+                  </Tooltip.Trigger>
+                </Tooltip>
+
+                {/* <div>
                   <Button
                     title="Copy link to view in Napari"
                     variant="ghost"
@@ -170,17 +255,8 @@ export default function ZarrPreview({
                     See <a href="https://napari.org">napari.org</a> for
                     instructions. Then <code>napari URL</code>
                   </Typography>
-                </div>
+                </div> */}
               </ButtonGroup>
-              {showCopyAlert === true ? (
-                <Alert className="flex items-center max-w-max p-1 bg-secondary-light/70 border-none">
-                  <Alert.Content>URL copied to clipboard!</Alert.Content>
-                  <XMarkIcon
-                    className="h-5 w-5 cursor-pointer"
-                    onClick={dismissCopyAlert}
-                  />
-                </Alert>
-              ) : null}
             </div>
           ) : null}
         </div>

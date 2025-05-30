@@ -23,7 +23,6 @@ export default function NewFolderDialog({
     handleNewFolderSubmit,
     newName,
     setNewName,
-    showAlert,
     setShowAlert,
     alertContent
   } = useNewFolderDialog();
