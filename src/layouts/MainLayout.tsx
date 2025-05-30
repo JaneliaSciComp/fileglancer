@@ -15,7 +15,13 @@ export const MainLayout = () => {
         <PreferencesProvider>
           <FileBrowserContextProvider>
             <ProxiedPathProvider>
-              <Toaster />
+              <Toaster
+                position="bottom-center"
+                toastOptions={{
+                  className: 'min-w-fit',
+                  success: { duration: 4000 }
+                }}
+              />
               <div className="flex flex-col items-center h-full w-full overflow-y-hidden bg-background text-foreground box-border">
                 <FileglancerNavbar />
                 <Outlet />
