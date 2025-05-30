@@ -125,6 +125,8 @@ dev-watch = { cmd = "npm run watch" }
 dev-launch = { cmd = "jupyter lab --autoreload" }
 dev-launch-remote = { cmd = "jupyter lab --autoreload --ip=0.0.0.0 --no-browser" }
 pypi-build = { cmd = "python -m build", depends-on = ["node-install"] }
+node-install-ui-test = "npm --prefix ui-tests install"
+ui-test = { cmd = "npm --prefix ui-tests run test", depends-on = ["node-install-ui-test"] }
 
 [tool.pixi.dependencies]
 python = ">=3.13.2,<4"

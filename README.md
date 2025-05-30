@@ -103,6 +103,26 @@ This extension uses [Playwright](https://playwright.dev/docs/intro) for the inte
 More precisely, the JupyterLab helper [Galata](https://github.com/jupyterlab/jupyterlab/tree/master/galata) is used to handle testing the extension in JupyterLab.
 More information are provided within the [ui-tests](./ui-tests/README.md) README.
 
+To execute the UI integration test, run:
+```bash
+pixi run ui-test
+```
+
+You can also run these in headed or debug mode using:
+```bash
+pixi run ui-test -- --headed --debug
+```
+
+or to run only a specific test:
+```bash
+pixi run ui-test -- --headed tests/fgzones.spec.ts
+```
+
+You can also use the name of the test:
+```bash
+pixi run ui-test -- -g "the test description"
+```
+
 ## Packaging and Releases
 
 See [RELEASE](RELEASE.md)

@@ -41,7 +41,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
       label: 'Fileglancer',
       icon: FileglancerIcon,
       execute: () => {
-        console.log('Create React widget command executed');
+        console.log('Open fileglancer command');
         window.location.href = '/fg/';
       }
     });
