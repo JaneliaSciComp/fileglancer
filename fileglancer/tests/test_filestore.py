@@ -54,7 +54,7 @@ def test_get_root_info(filestore, test_dir):
     file_info = filestore.get_file_info(None)
     assert file_info is not None
     assert file_info.name == os.path.basename(test_dir)
-    assert file_info.path is None
+    assert file_info.path == '.'
     assert file_info.size == 0
     assert file_info.is_dir
 
