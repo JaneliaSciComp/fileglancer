@@ -3,7 +3,7 @@ name: Build
 on:
   workflow_dispatch:
   push:
-    branches: main
+    branches: ga-with-pixi
   pull_request:
     branches: '*'
 
@@ -19,13 +19,21 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Base Setup
+    - name: Jupyterlab Base Setup
       uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
       with:
         node_version: "22.13.0"
 
+    - name: Install pixi
+      uses: prefix-dev/setup-pixi@v0.8.8
+      with:
+        pixi-version: v0.46.0
+        cache: false
+        manifest-path: pyproject.toml
+
     - name: Install dependencies
-      run: python -m pip install -U "jupyterlab>=4.0.0,<5"
+      run: |
+        pixi run dev-install
 
     - name: Lint the extension
       run: |
@@ -33,31 +41,34 @@ jobs:
         npm install
         npx prettier --write "**/*.{ts,tsx,js,jsx,json,md}" && npm run lint:check
 
-    - name: Test the extension
+    - name: Test the extension frontend
       run: |
         set -eux
-        npm run test
+        pixi run test-frontend
 
-    - name: Build the extension
+    - name: Test the extension backend
       run: |
         set -eux
-        python -m pip install .[test]
+        pixi run test-backend
 
-        pytest -vv -r ap --cov fileglancer
-        jupyter server extension list
-        jupyter server extension list 2>&1 | grep -ie "fileglancer.*OK"
+    - name: Build the extension frontend
+      run: |
+        set -eux
+        # up to this point jupyter has not been installed
+        pixi run node-build
 
-        jupyter labextension list
-        jupyter labextension list 2>&1 | grep -ie "fileglancer.*OK"
-        python -m jupyterlab.browser_check
+        pixi run jupyter server extension list
+        pixi run jupyter server extension list 2>&1 | grep -ie "fileglancer.*OK"
+
+        pixi run jupyter labextension list
+        pixi run jupyter labextension list 2>&1 | grep -ie "fileglancer.*OK"
+        pixi run python -m jupyterlab.browser_check
 
     - name: Package the extension
       run: |
         set -eux
 
-        pip install build
-        python -m build
-        pip uninstall -y "fileglancer" jupyterlab
+        pixi run pypi-build
 
     - name: Upload extension packages
       uses: actions/upload-artifact@v4
@@ -79,16 +90,15 @@ jobs:
     - uses: actions/download-artifact@v4
       with:
         name: extension-artifacts
-    - name: Install and Test
+    - name: Install Extension
       run: |
         set -eux
         # Remove NodeJS, twice to take care of system and locally installed node versions.
         sudo rm -rf $(which node)
         sudo rm -rf $(which node)
-
+        # Install extension
         pip install fileglancer*.whl
-
-
+        # Check that the extension is present
         jupyter server extension list
         jupyter server extension list 2>&1 | grep -ie "fileglancer.*OK"
 
@@ -98,7 +108,6 @@ jobs:
 
   integration-tests:
     name: Integration tests
-    needs: build
     runs-on: ubuntu-latest
 
     env:
@@ -108,25 +117,25 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Base Setup
+    - name: Jupyterlab Base Setup
       uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
-
-    - name: Download extension package
-      uses: actions/download-artifact@v4
       with:
-        name: extension-artifacts
+        node_version: "22.13.0"
 
-    - name: Install the extension
-      run: |
-        set -eux
-        python -m pip install fileglancer*.whl
+    - name: Install pixi
+      uses: prefix-dev/setup-pixi@v0.8.8
+      with:
+        pixi-version: v0.46.0
+        cache: false
+        manifest-path: pyproject.toml
 
     - name: Install dependencies
-      working-directory: ui-tests
       env:
         YARN_ENABLE_IMMUTABLE_INSTALLS: 0
         PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
-      run: npm install
+      run: |
+        pixi run dev-install
+        pixi run node-install-ui-test
 
     - name: Set up browser cache
       uses: actions/cache@v4
@@ -140,9 +149,8 @@ jobs:
       working-directory: ui-tests
 
     - name: Execute integration tests
-      working-directory: ui-tests
       run: |
-        npx playwright test
+        pixi run ui-test
 
     - name: Upload Playwright Test report
       if: always()

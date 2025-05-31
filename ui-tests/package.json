@@ -6,10 +6,11 @@
   "scripts": {
     "start": "jupyter lab --config jupyter_server_test_config.py",
     "test": "npx playwright test",
+    "test:report": "npx playwright show-report",
     "test:update": "npx playwright test --update-snapshots"
   },
   "devDependencies": {
-    "@jupyterlab/galata": "^5.0.5",
-    "@playwright/test": "^1.37.0"
+    "@jupyterlab/galata": "^5.4.3",
+    "@playwright/test": "^1.52.0"
   }
 }

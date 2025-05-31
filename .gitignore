@@ -131,10 +131,6 @@ dmypy.json
 .pixi
 *.egg-info
 
-# lock files
-pixi.lock
-package-lock.json
-
 # Zarr files
 *.zarr
 

@@ -23,7 +23,7 @@ classifiers = [
 ]
 dynamic = ["version", "description", "authors", "urls", "keywords"]
 dependencies = [
-    "jupyterlab>=4.3.0",
+    "jupyterlab>=4.3.0,<5",
     "jupyter_server>=2.4.0,<3",
     "pydantic>=2.10.6,<3"
 ]
@@ -114,7 +114,7 @@ test = { features = ["test"], solve-group = "default" }
 
 [tool.pixi.tasks]
 ext-clean = "rm -rf fileglancer/labextension && rm -rf .pixi/envs/default/share/jupyter/labextensions/fileglancer"
-pip-install = { cmd = "pip install -e .", depends-on = ["ext-clean"] }
+pip-install = "pip install -e ."
 pip-uninstall = "pip uninstall -y fileglancer"
 node-install = "npm install"
 node-build = "npm run build"
@@ -124,7 +124,9 @@ dev-install = { depends-on = ["pip-install", "node-install", "ext-enable"] }
 dev-watch = { cmd = "npm run watch" }
 dev-launch = { cmd = "jupyter lab --autoreload" }
 dev-launch-remote = { cmd = "jupyter lab --autoreload --ip=0.0.0.0 --no-browser" }
-pypi-build = { cmd = "python -m build", depends-on = ["node-install"] }
+pypi-build = { cmd = "pip install build && python -m build", depends-on = ["node-install"] }
+node-install-ui-test = "npm --prefix ui-tests install"
+ui-test = { cmd = "npm --prefix ui-tests run test", depends-on = ["node-install-ui-test"] }
 
 [tool.pixi.dependencies]
 python = ">=3.13.2,<4"

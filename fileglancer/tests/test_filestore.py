@@ -59,8 +59,8 @@ def test_get_root_info(filestore, test_dir):
     assert file_info.is_dir
 
 
-def test_yield_file_and_dir_infos(filestore, test_dir):
-    fs_iterator = filestore.yield_file_infos("")
+def test_yield_file_and_dir_infos(filestore):
+    fs_iterator = filestore.yield_file_infos(None)
 
     # Test directory info
     dir_info = next(fs_iterator)
