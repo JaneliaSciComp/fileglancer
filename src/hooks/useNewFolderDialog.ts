@@ -1,52 +1,77 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 
-import { getAPIPathRoot, sendFetchRequest } from '../utils';
-import { useFileBrowserContext } from '../contexts/FileBrowserContext';
-import { useZoneBrowserContext } from '../contexts/ZoneBrowserContext';
-import { useCookiesContext } from '../contexts/CookiesContext';
+import {
+  getFileFetchPath,
+  sendFetchRequest,
+  joinPaths,
+  getPreferredPathForDisplay
+} from '@/utils';
+import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import { useCookiesContext } from '@/contexts/CookiesContext';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
 
 export default function useNewFolderDialog() {
   const [newName, setNewName] = useState<string>('');
   const [showAlert, setShowAlert] = useState<boolean>(false);
   const [alertContent, setAlertContent] = useState<string>('');
 
-  const { fetchAndFormatFilesForDisplay } = useFileBrowserContext();
-  const { currentFileSharePath } = useZoneBrowserContext();
+  const { handleFileBrowserNavigation, currentFileOrFolder } =
+    useFileBrowserContext();
+  const { currentFileSharePath } = useFileBrowserContext();
+  const { pathPreference } = usePreferencesContext();
   const { cookies } = useCookiesContext();
 
-  async function addNewFolder(subpath: string) {
+  async function addNewFolder() {
+    if (!currentFileSharePath) {
+      throw new Error('No file share path selected.');
+    }
+    if (!currentFileOrFolder) {
+      throw new Error('No current file or folder selected.');
+    }
     await sendFetchRequest(
-      `${getAPIPathRoot()}api/fileglancer/files/${currentFileSharePath?.name}?subpath=${subpath}`,
+      getFileFetchPath(
+        currentFileSharePath.name,
+        joinPaths(currentFileOrFolder.path, newName)
+      ),
       'POST',
       cookies['_xsrf'],
-      { type: 'directory' }
-    );
-    await fetchAndFormatFilesForDisplay(
-      `${currentFileSharePath?.name}?subpath=${subpath}`
+      {
+        type: 'directory'
+      }
     );
   }
 
-  async function handleNewFolderSubmit(subpath: string) {
+  async function handleNewFolderSubmit() {
     setShowAlert(false);
-    const newPath = `${subpath}/${newName}`;
-    if (currentFileSharePath) {
+    if (!currentFileSharePath) {
+      setAlertContent('No file share path selected.');
+      return false;
+    } else if (!currentFileOrFolder) {
+      setAlertContent('No current file or folder selected.');
+      return false;
+    } else {
+      const displayPath = getPreferredPathForDisplay(
+        pathPreference,
+        currentFileSharePath,
+        `${currentFileOrFolder.path}/${newName}`
+      );
       try {
-        await addNewFolder(newPath);
-        const alertContent = `Created new folder at path: ${currentFileSharePath.name}/${newPath}`;
+        await addNewFolder();
+        await handleFileBrowserNavigation({
+          fspName: currentFileSharePath.name,
+          path: currentFileOrFolder.path
+        });
+        const alertContent = `Created new folder at path: ${displayPath}`;
         toast.success(alertContent);
         return true;
       } catch (error) {
-        const errorContent = `Error creating new folder at path: ${currentFileSharePath.name}/${subpath}/${newName}`;
+        const errorContent = `Error creating new folder at path: ${displayPath}`;
         setAlertContent(
           `${errorContent}. Error details: ${error instanceof Error ? error.message : 'Unknown error'}`
         );
         return false;
       }
-    } else if (!currentFileSharePath) {
-      setAlertContent('No file share path selected.');
-      setShowAlert(true);
-      return false;
     }
   }
 

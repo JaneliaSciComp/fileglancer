@@ -59,6 +59,7 @@ export default function Browse() {
   return (
     <div className="flex-1 overflow-auto flex flex-col">
       <Toolbar
+        selectedFiles={selectedFiles}
         hideDotFiles={hideDotFiles}
         setHideDotFiles={setHideDotFiles}
         showPropertiesDrawer={showPropertiesDrawer}

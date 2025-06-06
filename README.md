@@ -87,11 +87,11 @@ To run backend tests using pytest:
 pixi run test-backend
 ```
 
-### Frontend tests
+### Frontend unit tests
 
-This extension is using [Jest](https://jestjs.io/) for JavaScript code testing.
+This extension is using [Vitest](https://vitest.dev/) for JavaScript code testing.
 
-To execute them, execute:
+To execute the unit tests:
 
 ```bash
 pixi run test-frontend
@@ -104,21 +104,25 @@ More precisely, the JupyterLab helper [Galata](https://github.com/jupyterlab/jup
 More information are provided within the [ui-tests](./ui-tests/README.md) README.
 
 To execute the UI integration test, run:
+
 ```bash
 pixi run ui-test
 ```
 
 You can also run these in headed or debug mode using:
+
 ```bash
 pixi run ui-test -- --headed --debug
 ```
 
 or to run only a specific test:
+
 ```bash
 pixi run ui-test -- --headed tests/fgzones.spec.ts
 ```
 
 You can also use the name of the test:
+
 ```bash
 pixi run ui-test -- -g "the test description"
 ```

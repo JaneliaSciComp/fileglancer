@@ -2,7 +2,7 @@ import { Outlet } from 'react-router';
 import { Toaster } from 'react-hot-toast';
 
 import { CookiesProvider } from '@/contexts/CookiesContext';
-import { ZoneBrowserContextProvider } from '@/contexts/ZoneBrowserContext';
+import { ZonesAndFspMapContextProvider } from '@/contexts/ZonesAndFspMapContext';
 import { FileBrowserContextProvider } from '@/contexts/FileBrowserContext';
 import { PreferencesProvider } from '@/contexts/PreferencesContext';
 import { ProxiedPathProvider } from '@/contexts/ProxiedPathContext';
@@ -11,7 +11,7 @@ import FileglancerNavbar from '@/components/ui/Navbar';
 export const MainLayout = () => {
   return (
     <CookiesProvider>
-      <ZoneBrowserContextProvider>
+      <ZonesAndFspMapContextProvider>
         <PreferencesProvider>
           <FileBrowserContextProvider>
             <ProxiedPathProvider>
@@ -29,7 +29,7 @@ export const MainLayout = () => {
             </ProxiedPathProvider>
           </FileBrowserContextProvider>
         </PreferencesProvider>
-      </ZoneBrowserContextProvider>
+      </ZonesAndFspMapContextProvider>
     </CookiesProvider>
   );
 };

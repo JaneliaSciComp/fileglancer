@@ -7,7 +7,6 @@ import {
   Typography
 } from '@material-tailwind/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import useNewFolderDialog from '@/hooks/useNewFolderDialog';
 
 type ItemNamingDialogProps = {
@@ -26,8 +25,6 @@ export default function NewFolderDialog({
     setShowAlert,
     alertContent
   } = useNewFolderDialog();
-  const { dirArray } = useFileBrowserContext();
-  const pathToParentFolder = dirArray.slice(1).join('/');
 
   return (
     <Dialog open={showNewFolderDialog}>
@@ -51,7 +48,7 @@ export default function NewFolderDialog({
             onSubmit={async event => {
               event.preventDefault();
               setShowAlert(false);
-              const success = await handleNewFolderSubmit(pathToParentFolder);
+              const success = await handleNewFolderSubmit();
               if (success) {
                 setShowNewFolderDialog(false);
                 setNewName('');

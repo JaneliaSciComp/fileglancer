@@ -6,10 +6,13 @@ import {
   Typography
 } from '@material-tailwind/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 
 import useDeleteDialog from '@/hooks/useDeleteDialog';
 import type { FileOrFolder } from '@/shared.types';
-import { useZoneBrowserContext } from '@/contexts/ZoneBrowserContext';
+import { getPreferredPathForDisplay } from '@/utils';
+import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
 
 type DeleteDialogProps = {
   targetItem: FileOrFolder;
@@ -23,7 +26,19 @@ export default function DeleteDialog({
   setShowDeleteDialog
 }: DeleteDialogProps): JSX.Element {
   const { handleDelete } = useDeleteDialog();
-  const { currentFileSharePath } = useZoneBrowserContext();
+  const { currentFileSharePath } = useFileBrowserContext();
+  const { pathPreference } = usePreferencesContext();
+
+  if (!currentFileSharePath) {
+    return <>{toast.error('No file share path selected')}</>; // No file share path available
+  }
+
+  const displayPath = getPreferredPathForDisplay(
+    pathPreference,
+    currentFileSharePath,
+    targetItem.path
+  );
+
   return (
     <Dialog open={showDeleteDialog}>
       <Dialog.Overlay>
@@ -42,10 +57,7 @@ export default function DeleteDialog({
           </IconButton>
           <Typography className="my-8 text-large text-foreground">
             Are you sure you want to delete{' '}
-            <span className="font-semibold">
-              {currentFileSharePath?.name}/{targetItem.path}
-            </span>
-            ?
+            <span className="font-semibold">{displayPath}</span>?
           </Typography>
           <Button
             color="error"

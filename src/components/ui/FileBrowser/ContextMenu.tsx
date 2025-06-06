@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import { Typography } from '@material-tailwind/react';
 
 import type { FileOrFolder } from '@/shared.types';
-import { useZoneBrowserContext } from '@/contexts/ZoneBrowserContext';
+import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 
 type ContextMenuProps = {
@@ -29,7 +29,7 @@ export default function ContextMenu({
   setShowDeleteDialog,
   setShowPermissionsDialog
 }: ContextMenuProps): React.ReactNode {
-  const { currentFileSharePath } = useZoneBrowserContext();
+  const { currentFileSharePath } = useFileBrowserContext();
   const { handleFavoriteChange } = usePreferencesContext();
 
   return ReactDOM.createPortal(

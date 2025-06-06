@@ -1,40 +1,27 @@
 import React from 'react';
+import { Zone, FileSharePath, ZonesAndFileSharePathsMap } from '@/shared.types';
+import { sendFetchRequest, makeMapKey } from '@/utils';
+import { useCookiesContext } from './CookiesContext';
 
-import {
-  Zone,
-  FileSharePath,
-  ZonesAndFileSharePathsMap
-} from '../shared.types';
-import { getAPIPathRoot, sendFetchRequest, makeMapKey } from '../utils';
-import { useCookiesContext } from '../contexts/CookiesContext';
-
-type ZoneBrowserContextType = {
+type ZonesAndFspMapContextType = {
   isZonesMapReady: boolean;
   zonesAndFileSharePathsMap: ZonesAndFileSharePathsMap;
-  currentNavigationZone: string | null;
-  setCurrentNavigationZone: React.Dispatch<React.SetStateAction<string | null>>;
-  currentFileSharePath: FileSharePath | null;
-  setCurrentFileSharePath: React.Dispatch<
-    React.SetStateAction<FileSharePath | null>
-  >;
-  updateZonesAndFileSharePathsMap: () => Promise<void>;
 };
 
-const ZoneBrowserContext = React.createContext<ZoneBrowserContextType | null>(
-  null
-);
+const ZonesAndFspMapContext =
+  React.createContext<ZonesAndFspMapContextType | null>(null);
 
-export const useZoneBrowserContext = () => {
-  const context = React.useContext(ZoneBrowserContext);
+export const useZoneAndFspMapContext = () => {
+  const context = React.useContext(ZonesAndFspMapContext);
   if (!context) {
     throw new Error(
-      'useZoneBrowserContext must be used within a ZoneBrowserProvider'
+      'useZoneAndFspMapContext must be used within a ZoneAndFspMapContextProvider'
     );
   }
   return context;
 };
 
-export const ZoneBrowserContextProvider = ({
+export const ZonesAndFspMapContextProvider = ({
   children
 }: {
   children: React.ReactNode;
@@ -42,16 +29,11 @@ export const ZoneBrowserContextProvider = ({
   const [isZonesMapReady, setIsZonesMapReady] = React.useState(false);
   const [zonesAndFileSharePathsMap, setZonesAndFileSharePathsMap] =
     React.useState<ZonesAndFileSharePathsMap>({});
-  const [currentNavigationZone, setCurrentNavigationZone] = React.useState<
-    string | null
-  >(null);
-  const [currentFileSharePath, setCurrentFileSharePath] =
-    React.useState<FileSharePath | null>(null);
 
   const { cookies } = useCookiesContext();
 
-  async function getZones(): Promise<{ paths: FileSharePath[] }> {
-    const url = `${getAPIPathRoot()}api/fileglancer/file-share-paths`;
+  const getZones = React.useCallback(async () => {
+    const url = '/api/fileglancer/file-share-paths';
     let rawData: { paths: FileSharePath[] } = { paths: [] };
     try {
       const response = await sendFetchRequest(url, 'GET', cookies['_xsrf']);
@@ -64,7 +46,7 @@ export const ZoneBrowserContextProvider = ({
       }
     }
     return rawData;
-  }
+  }, [cookies]);
 
   function createZonesAndFileSharePathsMap(rawData: {
     paths: FileSharePath[];
@@ -125,7 +107,7 @@ export const ZoneBrowserContextProvider = ({
     return sortedMap;
   }
 
-  async function updateZonesAndFileSharePathsMap() {
+  const updateZonesAndFileSharePathsMap = React.useCallback(async () => {
     let rawData: { paths: FileSharePath[] } = { paths: [] };
     try {
       rawData = await getZones();
@@ -142,27 +124,25 @@ export const ZoneBrowserContextProvider = ({
         console.error('An unknown error occurred when fetching zones');
       }
     }
-  }
+  }, [getZones]);
 
   // When app first loads, fetch file share paths
   // and create a map of zones and file share paths
   React.useEffect(() => {
-    updateZonesAndFileSharePathsMap();
-  }, []);
+    const fetchAndSetInitialFspsAndZones = async () => {
+      await updateZonesAndFileSharePathsMap();
+    };
+    fetchAndSetInitialFspsAndZones();
+  }, [updateZonesAndFileSharePathsMap]);
 
   return (
-    <ZoneBrowserContext.Provider
+    <ZonesAndFspMapContext.Provider
       value={{
         isZonesMapReady,
-        zonesAndFileSharePathsMap,
-        currentNavigationZone,
-        setCurrentNavigationZone,
-        currentFileSharePath,
-        setCurrentFileSharePath,
-        updateZonesAndFileSharePathsMap
+        zonesAndFileSharePathsMap
       }}
     >
       {children}
-    </ZoneBrowserContext.Provider>
+    </ZonesAndFspMapContext.Provider>
   );
 };

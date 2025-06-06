@@ -20,7 +20,9 @@ import type { FileOrFolder } from '@/shared.types';
 import PermissionsTable from './PermissionsTable';
 import OverviewTable from './OverviewTable';
 import useCopyPath from '@/hooks/useCopyPath';
-import { useZoneBrowserContext } from '@/contexts/ZoneBrowserContext';
+import { getPreferredPathForDisplay } from '@/utils';
+import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
 
 type PropertiesDrawerProps = {
   propertiesTarget: FileOrFolder | null;
@@ -42,9 +44,14 @@ export default function PropertiesDrawer({
     copyToClipboard,
     dismissCopyAlert
   } = useCopyPath();
-  const { currentFileSharePath } = useZoneBrowserContext();
+  const { currentFileSharePath } = useFileBrowserContext();
+  const { pathPreference } = usePreferencesContext();
 
-  const fullPath = `${currentFileSharePath?.name}/${propertiesTarget?.path}`;
+  const fullPath = getPreferredPathForDisplay(
+    pathPreference,
+    currentFileSharePath,
+    propertiesTarget?.path
+  );
 
   return (
     <Card className="min-w-full h-full max-h-full overflow-y-auto overflow-x-hidden p-4 rounded-none shadow-lg flex flex-col">

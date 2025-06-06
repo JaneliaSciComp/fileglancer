@@ -1,36 +1,41 @@
 import toast from 'react-hot-toast';
+
+import type { FileOrFolder } from '@/shared.types';
 import {
-  getAPIPathRoot,
+  getFileFetchPath,
   sendFetchRequest,
   removeLastSegmentFromPath
-} from '../utils';
-import { useCookiesContext } from '../contexts/CookiesContext';
-import type { FileOrFolder } from '../shared.types';
-import { useZoneBrowserContext } from '../contexts/ZoneBrowserContext';
-import { useFileBrowserContext } from '../contexts/FileBrowserContext';
+} from '@/utils';
+import { useCookiesContext } from '@/contexts/CookiesContext';
+import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 
 export default function useDeleteDialog() {
   const { cookies } = useCookiesContext();
-  const { currentFileSharePath } = useZoneBrowserContext();
-  const { fetchAndFormatFilesForDisplay } = useFileBrowserContext();
+  const { handleFileBrowserNavigation, currentFileSharePath } =
+    useFileBrowserContext();
 
   async function handleDelete(targetItem: FileOrFolder) {
+    if (!currentFileSharePath) {
+      toast.error('No file share path selected.');
+      return false;
+    }
+
+    const fetchPath = getFileFetchPath(
+      currentFileSharePath.name,
+      targetItem.path
+    );
+
     try {
-      await sendFetchRequest(
-        `${getAPIPathRoot()}api/fileglancer/files/${currentFileSharePath?.name}?subpath=${targetItem.path}`,
-        'DELETE',
-        cookies['_xsrf']
-      );
-      await fetchAndFormatFilesForDisplay(
-        `${currentFileSharePath?.name}?subpath=${removeLastSegmentFromPath(targetItem.path)}`
-      );
-      toast.success(
-        `Successfully deleted ${currentFileSharePath?.name}/${targetItem.path}`
-      );
+      await sendFetchRequest(fetchPath, 'DELETE', cookies['_xsrf']);
+      await handleFileBrowserNavigation({
+        fspName: currentFileSharePath.name,
+        path: removeLastSegmentFromPath(targetItem.path)
+      });
+      toast.success(`Successfully deleted ${targetItem.path}`);
       return true;
     } catch (error) {
       toast.error(
-        `Error deleting ${currentFileSharePath?.name}/${targetItem.path}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Error deleting ${targetItem.path}: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
 
       return false;

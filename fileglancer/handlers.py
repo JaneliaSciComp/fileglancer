@@ -116,16 +116,17 @@ class FileShareHandler(BaseHandler):
     #@web.authenticated
     def get(self, path=""):
         """
-        Handle GET requests to list directory contents or stream file contents
+        Handle GET requests to list directory contents, stream file contents, or return info for the file/folder itself
         """
         subpath = self.get_argument("subpath", '')
+        cwd_only = self.get_argument("cwd_only", 'false').lower() == 'true'
         self.set_cors_headers()
 
         if subpath:
-            self.log.info(f"GET /api/fileglancer/files/{path} subpath={subpath}")
+            self.log.info(f"GET /api/fileglancer/files/{path} subpath={subpath} cwd_only={cwd_only}")
             filestore_name = path
         else:
-            self.log.info(f"GET /api/fileglancer/files/{path}")
+            self.log.info(f"GET /api/fileglancer/files/{path} cwd_only={cwd_only}")
             filestore_name, _, subpath = path.partition('/')
         
         filestore = self._get_filestore(filestore_name)
@@ -136,6 +137,13 @@ class FileShareHandler(BaseHandler):
             # Check if subpath is a directory by getting file info
             file_info = filestore.get_file_info(subpath)
             self.log.info(f"File info: {file_info}")
+
+            if cwd_only:
+                # Return only the info for the file/folder at the path
+                self.set_status(200)
+                self.set_header('Content-Type', 'application/json')
+                self.finish(json.dumps(file_info.model_dump(), indent=4))
+                return
 
             if file_info.is_dir:
                 # Write JSON response, streaming the files one by one

@@ -12,13 +12,20 @@ import {
 } from '@heroicons/react/24/outline';
 
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-import { useZoneBrowserContext } from '@/contexts/ZoneBrowserContext';
+import { makePathSegmentArray, joinPaths } from '@/utils';
 
 export default function Crumbs(): ReactNode {
-  const { dirArray, fetchAndFormatFilesForDisplay } = useFileBrowserContext();
-  const { currentFileSharePath } = useZoneBrowserContext();
+  const {
+    handleFileBrowserNavigation,
+    currentFileOrFolder,
+    currentFileSharePath
+  } = useFileBrowserContext();
 
+  const dirArray = makePathSegmentArray(currentFileOrFolder?.path || '');
+  // Add the current file share path name as the first segment in the array
+  dirArray.unshift(currentFileSharePath?.name || '');
   const dirDepth = dirArray.length;
+
   return (
     <div className="w-full py-2 px-3">
       <Breadcrumb className="bg-transparent p-0">
@@ -28,7 +35,7 @@ export default function Crumbs(): ReactNode {
         </div>
 
         {/* Path segments */}
-        {dirArray.map((item, index) => {
+        {dirArray.map((pathSegment, index) => {
           if (index < dirDepth - 1) {
             // Render a breadcrumb link for each segment in the parent path
             return (
@@ -36,23 +43,21 @@ export default function Crumbs(): ReactNode {
                 <BreadcrumbLink
                   variant="text"
                   className="rounded-md hover:bg-primary-light/20 hover:!text-black focus:!text-black transition-colors cursor-pointer"
-                  onClick={() => {
-                    if (index === 0 && currentFileSharePath) {
-                      fetchAndFormatFilesForDisplay(
-                        `${currentFileSharePath.name}`
-                      );
-                    } else if (currentFileSharePath) {
-                      fetchAndFormatFilesForDisplay(
-                        `${currentFileSharePath.name}?subpath=${dirArray.slice(1, index + 1).join('/')}`
-                      );
+                  onClick={async () => {
+                    if (!currentFileSharePath) {
+                      return;
                     }
+                    await handleFileBrowserNavigation({
+                      fspName: currentFileSharePath.name,
+                      path: joinPaths(...dirArray.slice(1, index))
+                    });
                   }}
                 >
                   <Typography
                     variant="small"
                     className="font-medium text-primary-light"
                   >
-                    {item}
+                    {pathSegment}
                   </Typography>
                 </BreadcrumbLink>
                 {/* Add separator since is not the last segment */}
@@ -69,7 +74,7 @@ export default function Crumbs(): ReactNode {
                   variant="small"
                   className="font-medium text-primary-default"
                 >
-                  {item}
+                  {pathSegment}
                 </Typography>
               </React.Fragment>
             );

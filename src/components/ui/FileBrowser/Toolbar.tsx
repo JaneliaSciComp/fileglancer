@@ -14,12 +14,14 @@ import {
 import { StarIcon as StarOutline } from '@heroicons/react/24/outline';
 import { StarIcon as StarFilled } from '@heroicons/react/24/solid';
 import { GoSidebarCollapse, GoSidebarExpand } from 'react-icons/go';
+
+import type { FileOrFolder } from '@/shared.types';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-import { useZoneBrowserContext } from '@/contexts/ZoneBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { makeMapKey } from '@/utils';
 
 type ToolbarProps = {
+  selectedFiles: FileOrFolder[];
   hideDotFiles: boolean;
   setHideDotFiles: React.Dispatch<React.SetStateAction<boolean>>;
   showPropertiesDrawer: boolean;
@@ -30,6 +32,7 @@ type ToolbarProps = {
 };
 
 export default function Toolbar({
+  selectedFiles,
   hideDotFiles,
   setHideDotFiles,
   showPropertiesDrawer,
@@ -38,56 +41,62 @@ export default function Toolbar({
   setShowSidebar,
   setShowNewFolderDialog
 }: ToolbarProps): JSX.Element {
-  const { fetchAndFormatFilesForDisplay, currentNavigationPath } =
-    useFileBrowserContext();
-  const { currentFileSharePath } = useZoneBrowserContext();
-  const { folderPreferenceMap, handleFavoriteChange } = usePreferencesContext();
+  const {
+    handleFileBrowserNavigation,
+    currentFileOrFolder,
+    currentFileSharePath
+  } = useFileBrowserContext();
 
-  // Extract the folder path from currentNavigationPath for favorites
-  const getFolderPath = React.useCallback(() => {
-    if (!currentNavigationPath || !currentFileSharePath) {
-      return null;
-    }
+  const {
+    folderPreferenceMap,
+    fileSharePathPreferenceMap,
+    handleFavoriteChange
+  } = usePreferencesContext();
 
-    if (currentNavigationPath.includes('?subpath=')) {
-      return currentNavigationPath.split('?subpath=')[1];
-    }
-
-    // If at root of file share path, return empty string
-    return '';
-  }, [currentNavigationPath, currentFileSharePath]);
-
-  const folderPath = getFolderPath();
-
-  // Check if current folder is favorited
   const isFavorited = React.useMemo(() => {
-    if (!currentFileSharePath || folderPath === null) {
+    if (!currentFileSharePath || !currentFileOrFolder) {
       return false;
     }
-
-    const mapKey = makeMapKey(
+    if (currentFileOrFolder.path === '.') {
+      const fspKey = makeMapKey('fsp', currentFileSharePath.name);
+      return fspKey in fileSharePathPreferenceMap;
+    }
+    const folderKey = makeMapKey(
       'folder',
-      `${currentFileSharePath.name}_${folderPath}`
+      `${currentFileSharePath.name}_${currentFileOrFolder.path}`
     );
-    return mapKey in folderPreferenceMap;
-  }, [currentFileSharePath, folderPath, folderPreferenceMap]);
+    return folderKey in folderPreferenceMap;
+  }, [
+    currentFileSharePath,
+    currentFileOrFolder,
+    folderPreferenceMap,
+    fileSharePathPreferenceMap
+  ]);
 
   const handleFavoriteClick = React.useCallback(async () => {
-    if (!currentFileSharePath || folderPath === null) {
+    if (!currentFileSharePath || !currentFileOrFolder) {
       return;
     }
-
-    const folderFavorite = {
-      type: 'folder' as const,
-      folderPath,
-      fsp: currentFileSharePath
-    };
-
-    await handleFavoriteChange(folderFavorite, 'folder');
-  }, [currentFileSharePath, folderPath, handleFavoriteChange]);
+    console.log('path:', currentFileOrFolder.path);
+    if (currentFileOrFolder.path === '.') {
+      await handleFavoriteChange(currentFileSharePath, 'fileSharePath');
+      return;
+    } else {
+      await handleFavoriteChange(
+        {
+          type: 'folder',
+          folderPath: currentFileOrFolder.path,
+          fsp: currentFileSharePath
+        },
+        'folder'
+      );
+    }
+  }, [currentFileSharePath, handleFavoriteChange, currentFileOrFolder]);
 
   // Don't show favorite button if not in a valid location
-  const showFavoriteButton = currentFileSharePath && folderPath !== null;
+  const showFavoriteButton =
+    currentFileSharePath && currentFileOrFolder && currentFileOrFolder.is_dir;
+
   return (
     <div className="flex flex-col min-w-full p-2 border-b border-surface">
       <div className="flex justify-between items-center">
@@ -131,9 +140,15 @@ export default function Toolbar({
             <Tooltip.Trigger
               as={IconButton}
               variant="outline"
-              onClick={() =>
-                fetchAndFormatFilesForDisplay(currentNavigationPath)
-              }
+              onClick={async () => {
+                if (!currentFileSharePath || !currentFileOrFolder) {
+                  return;
+                }
+                await handleFileBrowserNavigation({
+                  fspName: currentFileSharePath.name,
+                  path: currentFileOrFolder.path
+                });
+              }}
             >
               <ArrowPathIcon className="icon-default" />
               <Tooltip.Content className="px-2.5 py-1.5 text-primary-foreground">
@@ -195,6 +210,7 @@ export default function Toolbar({
               <Tooltip.Trigger
                 as={IconButton}
                 variant="outline"
+                disabled={!selectedFiles}
                 onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                   handleFavoriteClick();
                   e.currentTarget.blur();
@@ -207,7 +223,9 @@ export default function Toolbar({
                 )}
                 <Tooltip.Content className="px-2.5 py-1.5 text-primary-foreground">
                   <Typography type="small" className="opacity-90">
-                    {isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+                    {isFavorited
+                      ? 'Remove current directory from favorites'
+                      : 'Add current directory to favorites'}
                   </Typography>
                   <Tooltip.Arrow />
                 </Tooltip.Content>

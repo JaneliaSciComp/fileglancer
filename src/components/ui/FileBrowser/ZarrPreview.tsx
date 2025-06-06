@@ -42,10 +42,7 @@ export default function ZarrPreview({
 
   const { copyToClipboard } = useCopyPath();
   const { proxiedPath } = useProxiedPathContext();
-  const { currentNavigationPath } = useFileBrowserContext();
-
-  const filePath = currentNavigationPath.replace('?subpath=', '/');
-  const filePathWithoutFsp = filePath.split('/').slice(1).join('/');
+  const { currentFileOrFolder } = useFileBrowserContext();
 
   React.useEffect(() => {
     setIsImageShared(proxiedPath !== null);
@@ -117,7 +114,7 @@ export default function ZarrPreview({
             <SharingDialog
               isImageShared={isImageShared}
               setIsImageShared={setIsImageShared}
-              filePathWithoutFsp={filePathWithoutFsp}
+              filePathWithoutFsp={currentFileOrFolder?.path || ''}
               showSharingDialog={showSharingDialog}
               setShowSharingDialog={setShowSharingDialog}
             />

@@ -2,12 +2,14 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 
 import {
-  getAPIPathRoot,
+  getFileFetchPath,
+  joinPaths,
   sendFetchRequest,
-  removeLastSegmentFromPath
+  removeLastSegmentFromPath,
+  getPreferredPathForDisplay
 } from '../utils';
 import { useFileBrowserContext } from '../contexts/FileBrowserContext';
-import { useZoneBrowserContext } from '../contexts/ZoneBrowserContext';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useCookiesContext } from '../contexts/CookiesContext';
 
 export default function useRenameDialog() {
@@ -15,38 +17,45 @@ export default function useRenameDialog() {
   const [showAlert, setShowAlert] = useState<boolean>(false);
   const [alertContent, setAlertContent] = useState<string>('');
 
-  const { fetchAndFormatFilesForDisplay } = useFileBrowserContext();
-  const { currentFileSharePath } = useZoneBrowserContext();
+  const {
+    handleFileBrowserNavigation,
+    currentFileSharePath,
+    currentFileOrFolder
+  } = useFileBrowserContext();
+  const { pathPreference } = usePreferencesContext();
   const { cookies } = useCookiesContext();
 
-  async function renameItem(
-    originalPath: string,
-    originalPathWithoutFileName: string
-  ) {
-    const newPath = `${originalPathWithoutFileName}${newName}`;
-    await sendFetchRequest(
-      `${getAPIPathRoot()}api/fileglancer/files/${currentFileSharePath?.name}?subpath=${originalPath}`,
-      'PATCH',
-      cookies['_xsrf'],
-      { path: newPath }
-    );
-    await fetchAndFormatFilesForDisplay(
-      `${currentFileSharePath?.name}?subpath=${originalPathWithoutFileName}`
-    );
+  async function renameItem(path: string) {
+    if (!currentFileSharePath) {
+      throw new Error('No file share path selected.');
+    }
+    const newPath = joinPaths(removeLastSegmentFromPath(path), newName);
+    const fetchPath = getFileFetchPath(currentFileSharePath?.name, path);
+    await sendFetchRequest(fetchPath, 'PATCH', cookies['_xsrf'], {
+      path: newPath
+    });
+    await handleFileBrowserNavigation({
+      fspName: currentFileSharePath.name,
+      path: currentFileOrFolder?.path
+    });
   }
 
-  async function handleRenameSubmit(subpath: string) {
+  async function handleRenameSubmit(path: string) {
     setShowAlert(false);
+    const displayPath = getPreferredPathForDisplay(
+      pathPreference,
+      currentFileSharePath,
+      path
+    );
 
     if (currentFileSharePath) {
-      const originalPathWithoutFileName = removeLastSegmentFromPath(subpath);
       try {
-        await renameItem(subpath, originalPathWithoutFileName);
-        const alertContent = `Renamed item at path: ${currentFileSharePath.name}/${subpath} to ${newName}`;
+        await renameItem(path);
+        const alertContent = `Renamed item at path: ${displayPath} to ${newName}`;
         toast.success(alertContent);
         return true;
       } catch (error) {
-        const errorContent = `Error renaming item at path: ${currentFileSharePath.name}/${subpath} to ${newName}`;
+        const errorContent = `Error renaming item at path: ${displayPath} to ${newName}`;
         setAlertContent(
           `${errorContent}. Error details: ${error instanceof Error ? error.message : 'Unknown error'}`
         );

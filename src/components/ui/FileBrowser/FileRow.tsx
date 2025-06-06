@@ -5,10 +5,10 @@ import {
   EllipsisHorizontalCircleIcon,
   FolderIcon
 } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 
 import type { FileOrFolder } from '@/shared.types';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-import { useZoneBrowserContext } from '@/contexts/ZoneBrowserContext';
 import useHandleLeftClick from '@/hooks/useHandleLeftClick';
 import { formatDate, formatFileSize } from '@/utils';
 
@@ -46,9 +46,9 @@ export default function FileRow({
   const nameRef = React.useRef<HTMLDivElement>(null);
   const [isTruncated, setIsTruncated] = React.useState(false);
 
-  const { fetchAndFormatFilesForDisplay } = useFileBrowserContext();
+  const { handleFileBrowserNavigation, currentFileSharePath } =
+    useFileBrowserContext();
   const { handleLeftClick } = useHandleLeftClick();
-  const { currentFileSharePath } = useZoneBrowserContext();
 
   const isSelected = selectedFiles.some(
     selectedFile => selectedFile.name === file.name
@@ -66,6 +66,28 @@ export default function FileRow({
     window.addEventListener('resize', checkTruncation);
     return () => window.removeEventListener('resize', checkTruncation);
   }, [file.name]);
+
+  const handleNavigationClick = async (e: React.MouseEvent<HTMLElement>) => {
+    e.stopPropagation();
+    if (file.is_dir) {
+      try {
+        if (!currentFileSharePath) {
+          throw new Error('No current file share path set');
+        }
+        await handleFileBrowserNavigation({
+          fspName: currentFileSharePath.name,
+          path: file.path
+        });
+        setPropertiesTarget(file);
+      } catch (error) {
+        toast.error(
+          `Failed to open folder: ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`
+        );
+      }
+    }
+  };
 
   return (
     <div
@@ -90,13 +112,7 @@ export default function FileRow({
           setPropertiesTarget
         )
       }
-      onDoubleClick={() => {
-        if (file.is_dir && currentFileSharePath) {
-          fetchAndFormatFilesForDisplay(
-            `${currentFileSharePath.name}?subpath=${file.path}`
-          );
-        }
-      }}
+      onDoubleClick={e => handleNavigationClick(e)}
     >
       {/* Name column */}
       <div className="flex items-center gap-3 pl-3 py-1">
@@ -107,13 +123,9 @@ export default function FileRow({
                 ref={nameRef}
                 variant="small"
                 className="font-medium text-primary-light hover:underline truncate"
-                onClick={(e: React.MouseEvent<HTMLDivElement>) => {
-                  e.stopPropagation();
-                  if (file.is_dir) {
-                    fetchAndFormatFilesForDisplay(
-                      `${currentFileSharePath?.name}?subpath=${file.path}`
-                    );
-                    setPropertiesTarget(file);
+                onClick={(e: React.MouseEvent<HTMLElement>) => {
+                  if (e.detail === 1) {
+                    handleNavigationClick(e);
                   }
                 }}
               >
@@ -127,13 +139,9 @@ export default function FileRow({
             ref={nameRef}
             variant="small"
             className="font-medium text-primary-light hover:underline truncate"
-            onClick={(e: React.MouseEvent<HTMLDivElement>) => {
-              e.stopPropagation();
-              if (file.is_dir) {
-                fetchAndFormatFilesForDisplay(
-                  `${currentFileSharePath?.name}?subpath=${file.path}`
-                );
-                setPropertiesTarget(file);
+            onClick={(e: React.MouseEvent<HTMLElement>) => {
+              if (e.detail === 1) {
+                handleNavigationClick(e);
               }
             }}
           >

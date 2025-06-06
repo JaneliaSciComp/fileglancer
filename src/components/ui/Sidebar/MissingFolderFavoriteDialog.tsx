@@ -12,6 +12,7 @@ import {
   FolderFavorite,
   usePreferencesContext
 } from '@/contexts/PreferencesContext';
+import { getPreferredPathForDisplay } from '@/utils';
 
 type MissingFolderFavoriteDialogProps = {
   folderFavorite: FolderFavorite;
@@ -26,7 +27,13 @@ export default function MissingFolderFavoriteDialog({
   showMissingFolderFavoriteDialog,
   setShowMissingFolderFavoriteDialog
 }: MissingFolderFavoriteDialogProps): JSX.Element {
-  const { handleFavoriteChange } = usePreferencesContext();
+  const { handleFavoriteChange, pathPreference } = usePreferencesContext();
+
+  const displayPath = getPreferredPathForDisplay(
+    pathPreference,
+    folderFavorite.fsp,
+    folderFavorite.folderPath
+  );
 
   return (
     <Dialog open={showMissingFolderFavoriteDialog}>
@@ -45,9 +52,8 @@ export default function MissingFolderFavoriteDialog({
             <XMarkIcon className="icon-default" />
           </IconButton>
           <Typography className="my-8 text-large">
-            Folder{' '}
-            <span className="font-semibold">{folderFavorite.folderPath}</span>{' '}
-            does not exist. Do you want to delete it from your favorites?
+            Folder <span className="font-semibold">{displayPath}</span> does not
+            exist. Do you want to delete it from your favorites?
           </Typography>
           <div className="flex gap-2">
             <Button
@@ -57,12 +63,10 @@ export default function MissingFolderFavoriteDialog({
               onClick={() => {
                 try {
                   handleFavoriteChange(folderFavorite, 'folder');
-                  toast.success(
-                    `Deleted favorite folder ${folderFavorite.folderPath}`
-                  );
+                  toast.success(`Deleted favorite folder ${displayPath}`);
                 } catch (error) {
                   toast.error(
-                    `Error deleting favorite folder ${folderFavorite.folderPath}: ${
+                    `Error deleting favorite folder ${displayPath}: ${
                       error instanceof Error ? error.message : 'Unknown error'
                     }`
                   );
