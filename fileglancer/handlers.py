@@ -1,9 +1,9 @@
 import os
 import json
 import requests
+from abc import ABC
 
 from jupyter_server.base.handlers import APIHandler, JupyterHandler
-from jupyter_server.utils import url_path_join
 from requests.exceptions import HTTPError
 from tornado import web
 
@@ -64,7 +64,7 @@ class StreamingProxy(BaseHandler):
             }))
 
 
-class FileSharePathsHandler(StreamingProxy):
+class FileSharePathsHandler(BaseHandler):
     """
     API handler for file share paths
     """
@@ -80,16 +80,12 @@ class FileSharePathsHandler(StreamingProxy):
         self.finish()
 
 
-class FileShareHandler(BaseHandler):
+
+class FileShareHandler(BaseHandler, ABC):
     """
-    API handler for file access using the Filestore class
+    Abstract base handler for endpoints that use the Filestore class.
+    This class cannot be instantiated directly.
     """
-    def set_cors_headers(self):
-        self.set_header('Access-Control-Allow-Origin', '*')
-        self.set_header('Access-Control-Allow-Credentials', 'true')
-        self.set_header('Access-Control-Allow-Methods', 'GET, POST')
-        self.set_header('Access-Control-Allow-Headers', 'Content-Type, X-XSRFToken')
-        self.set_header('Expose-Headers', 'Range, Content-Range')
 
     def _get_filestore(self, path_name):
         """
@@ -112,21 +108,65 @@ class FileShareHandler(BaseHandler):
 
         return filestore
 
-    # TODO: Uncomment once we have a file server for Neuroglancer
-    #@web.authenticated
+
+class FileContentHandler(FileShareHandler):
+    """
+    API handler for file content
+    """
+
+    @web.authenticated
+    def get(self, path=""):
+        """
+        Handle GET requests to get file content
+        """
+        subpath = self.get_argument("subpath", '')
+        if subpath:
+            self.log.info(f"GET /api/fileglancer/content/{path} subpath={subpath}")
+            filestore_name = path
+        else:
+            self.log.info(f"GET /api/fileglancer/content/{path}")
+            filestore_name, _, subpath = path.partition('/')
+
+        filestore = self._get_filestore(filestore_name)
+        if filestore is None:
+            return
+        
+        # Stream file contents
+        file_name = subpath.split('/')[-1]
+        self.set_status(200)
+        self.set_header('Content-Type', 'application/octet-stream')
+        self.set_header('Content-Disposition', f'attachment; filename="{file_name}"')
+
+        try:
+            for chunk in filestore.stream_file_contents(subpath):
+                self.write(chunk)
+            self.finish()
+        except FileNotFoundError:
+            self.log.error(f"File or directory not found: {subpath}")
+            self.set_status(404)
+            self.finish(json.dumps({"error": "File or directory not found"}))
+        except PermissionError:
+            self.set_status(403)
+            self.finish(json.dumps({"error": "Permission denied"}))
+
+
+class FileMetadataHandler(FileShareHandler):
+    """
+    API handler for file metadata
+    """
+
+    @web.authenticated
     def get(self, path=""):
         """
         Handle GET requests to list directory contents, stream file contents, or return info for the file/folder itself
         """
         subpath = self.get_argument("subpath", '')
-        cwd_only = self.get_argument("cwd_only", 'false').lower() == 'true'
-        self.set_cors_headers()
 
         if subpath:
-            self.log.info(f"GET /api/fileglancer/files/{path} subpath={subpath} cwd_only={cwd_only}")
+            self.log.info(f"GET /api/fileglancer/files/{path} subpath={subpath}")
             filestore_name = path
         else:
-            self.log.info(f"GET /api/fileglancer/files/{path} cwd_only={cwd_only}")
+            self.log.info(f"GET /api/fileglancer/files/{path}")
             filestore_name, _, subpath = path.partition('/')
         
         filestore = self._get_filestore(filestore_name)
@@ -134,38 +174,24 @@ class FileShareHandler(BaseHandler):
             return
 
         try:
-            # Check if subpath is a directory by getting file info
             file_info = filestore.get_file_info(subpath)
-            self.log.info(f"File info: {file_info}")
+            self.log.debug(f"File info: {file_info}")
 
-            if cwd_only:
-                # Return only the info for the file/folder at the path
-                self.set_status(200)
-                self.set_header('Content-Type', 'application/json')
-                self.finish(json.dumps(file_info.model_dump(), indent=4))
-                return
-
+            # Write JSON response, streaming the files one by one
+            self.set_status(200)
+            self.set_header('Content-Type', 'application/json')
+            self.write("{\n")
+            self.write("\"info\":")
+            self.write(json.dumps(file_info.model_dump(), indent=4))
             if file_info.is_dir:
-                # Write JSON response, streaming the files one by one
-                self.set_status(200)
-                self.set_header('Content-Type', 'application/json')
-                self.write("{\n")
+                self.write(",\n")
                 self.write("\"files\": [\n")
                 for i, file in enumerate(filestore.yield_file_infos(subpath)):
                     if i > 0:
                         self.write(",\n")
                     self.write(json.dumps(file.model_dump(), indent=4))
                 self.write("]\n")
-                self.write("}\n")
-            else:
-                # Stream file contents
-                self.set_status(200)
-                self.set_header('Content-Type', 'application/octet-stream')
-                self.set_header('Content-Disposition', f'attachment; filename="{file_info.name}"')
-
-                for chunk in filestore.stream_file_contents(subpath):
-                    self.write(chunk)
-                self.finish()
+            self.write("}\n")
 
         except FileNotFoundError:
             self.log.error(f"File or directory not found: {subpath}")
@@ -174,6 +200,7 @@ class FileShareHandler(BaseHandler):
         except PermissionError:
             self.set_status(403)
             self.finish(json.dumps({"error": "Permission denied"}))
+
 
     @web.authenticated
     def post(self, path=""):
@@ -202,6 +229,7 @@ class FileShareHandler(BaseHandler):
 
         self.set_status(201)
         self.finish()
+
 
     @web.authenticated
     def patch(self, path=""):
@@ -238,6 +266,7 @@ class FileShareHandler(BaseHandler):
         self.set_status(204)
         self.finish()
 
+
     @web.authenticated
     def delete(self, path=""):
         """
@@ -250,13 +279,6 @@ class FileShareHandler(BaseHandler):
             return
 
         filestore.remove_file_or_dir(subpath)
-        self.set_status(204)
-        self.finish()
-
-    # TODO: Uncomment once we have a file server for Neuroglancer
-    #@web.authenticated
-    def options(self, *args, **kwargs):
-        self.set_cors_headers()
         self.set_status(204)
         self.finish()
 
@@ -339,6 +361,45 @@ class ProxiedPathHandler(BaseHandler):
     """
     API handler for ProxiedPath (user shared data paths)
     """
+
+    @web.authenticated
+    def get(self):
+        """
+        Get all proxied paths or a specific proxied path for the current user.
+        """
+        username = self.get_current_user()
+        key = self.get_argument("sharing_key", None)
+        fsp_name = self.get_argument("fsp_name", None)
+        path = self.get_argument("path", None)
+        try:
+            proxied_path_manager = get_proxiedpath_manager(self.settings)
+            if key:
+                self.log.info(f"GET /api/fileglancer/proxied-path username={username} key={key}")
+                response = proxied_path_manager.get_proxied_path_by_key(username, key)
+            elif fsp_name and path:
+                self.log.info(f"GET /api/fileglancer/proxied-path username={username} fsp_name={fsp_name} path={path}")
+                response = proxied_path_manager.get_proxied_paths(username, fsp_name, path)
+            else:
+                self.log.info(f"GET /api/fileglancer/proxied-path username={username}")
+                response = proxied_path_manager.get_proxied_paths(username)
+            response.raise_for_status()
+            self.set_status(200)
+            self.finish(response.json())
+        except HTTPError as e:
+            if e.response.status_code == 404:
+                self.log.warning(f"Proxied path not found: {str(e)}")
+                self.set_status(404)
+                self.finish(json.dumps({"error": "Proxied path not found"}))
+            else:
+                self.log.error(f"Error getting proxied paths: {str(e)}")    
+                self.set_status(500)
+                self.finish(json.dumps({"error": str(e)}))
+        except Exception as e:
+            self.log.error(f"Error getting proxied paths: {str(e)}")
+            self.set_status(500)
+            self.finish(json.dumps({"error": str(e)}))
+
+
     @web.authenticated
     def post(self):
         """
@@ -348,35 +409,40 @@ class ProxiedPathHandler(BaseHandler):
         data = self.get_json_body()
         if data is None:
             self.set_status(400)
-            self.finish(json.dumps({"error": "JSON body with fsp_mount_path and path is required to create a proxied path"}))
+            self.finish(json.dumps({"error": "JSON body with fsp_name and path is required to create a proxied path"}))
             return
-        fsp_mount_path = data.get("fsp_mount_path", None)
+        fsp_name = data.get("fsp_name", None)
         path = data.get("path", None)
-        self.log.info(f"POST /api/fileglancer/proxied-path username={username} fsp_mount_path={fsp_mount_path} path={path}")
+        self.log.info(f"POST /api/fileglancer/proxied-path username={username} fsp_name={fsp_name} path={path}")
         try:
-            if fsp_mount_path is None or path is None:
-                self.log.warning("fsp_mount_path and path are required to create a proxied path")
+            if fsp_name is None or path is None:
+                self.log.warning("fsp and path are required to create a proxied path")
                 self.set_status(400)
-                self.finish(json.dumps({"error": "fsp_mount_path and path are required to create a proxied path"}))
+                self.finish(json.dumps({"error": "fsp_name and path are required to create a proxied path"}))
                 return
-
             proxied_path_manager = get_proxiedpath_manager(self.settings)
-            response = proxied_path_manager.create_proxied_path(username, fsp_mount_path, path)
+            response = proxied_path_manager.create_proxied_path(username, fsp_name, path)
             response.raise_for_status()
             rjson = response.json()
             self.set_status(201)
             self.finish(rjson)
         except HTTPError as e:
-            self.log.error(f"Error getting proxied paths: {str(e)}")
-            self.set_status(e.response.status_code)
-            self.finish(json.dumps({"error": str(e.response.text)}))
+            if e.response.status_code == 404:
+                self.log.warning(f"Proxied path not found: {str(e)}")
+                self.set_status(404)
+                self.finish(json.dumps({"error": "Proxied path not found"}))
+            else:   
+                self.log.error(f"Error creating proxied path: {str(e)}")
+                self.set_status(500)
+                self.finish(json.dumps({"error": str(e)}))
         except Exception as e:
             self.log.error(f"Error creating proxied path: {str(e)}")
             self.set_status(500)
             self.finish(json.dumps({"error": str(e)}))
 
+
     @web.authenticated
-    def put(self):
+    def patch(self):
         """
         Update a shared path for the current user.
         """
@@ -387,66 +453,38 @@ class ProxiedPathHandler(BaseHandler):
             self.finish(json.dumps({"error": "JSON body is required to update a proxied path"}))
             return
         key = data.get("sharing_key", None)
-        fsp_mount_path = data.get("fsp_mount_path", None)
+        fsp_name = data.get("fsp_name", None)
         path = data.get("path", None)
         sharing_name = data.get("sharing_name", None)
         self.log.info((
-            "PUT /api/fileglancer/proxied-path "
-            f"username={username} key={key} "
-            f"fsp_mount_path={fsp_mount_path} path={path} sharing_name={sharing_name}"
+            "PATCH /api/fileglancer/proxied-path"
+            f"username={username} fsp_name={fsp_name} path={path} sharing_name={sharing_name}"
         ))
         try:
             if key is None:
-                self.log.warning("Key is required to update a proxied path")
+                self.log.warning("sharing_key is required to update a proxied path")
                 self.set_status(400)
-                self.finish(json.dumps({"error": "Key is required to update a proxied path"}))
+                self.finish(json.dumps({"error": "sharing_key is required to update a proxied path"}))
                 return
-
             proxied_path_manager = get_proxiedpath_manager(self.settings)
-            response = proxied_path_manager.update_proxied_path(username, key, fsp_mount_path, path, sharing_name)
+            response = proxied_path_manager.update_proxied_path(username, key, fsp_name, path, sharing_name)
             response.raise_for_status()
             self.set_status(200)
             self.finish(response.json())
         except HTTPError as e:
-            self.log.error(f"Error getting proxied paths: {str(e)}")
-            self.set_status(e.response.status_code)
-            self.finish(json.dumps({"error": str(e.response.text)}))
+            if e.response.status_code == 404:
+                self.log.warning(f"Proxied path not found: {str(e)}")
+                self.set_status(404)
+                self.finish(json.dumps({"error": "Proxied path not found"}))
+            else:
+                self.log.error(f"Error updating proxied path: {str(e)}")
+                self.set_status(500)
+                self.finish(json.dumps({"error": str(e)}))
         except Exception as e:
             self.log.error(f"Error updating proxied path: {str(e)}")
             self.set_status(500)
             self.finish(json.dumps({"error": str(e)}))
 
-    @web.authenticated
-    def get(self):
-        """
-        Get all proxied paths or a specific proxied path for the current user.
-        """
-        username = self.get_current_user()
-        key = self.get_argument("sharing_key", None)
-        fsp_mount_path = self.get_argument("fsp_mount_path", None)
-        path = self.get_argument("path", None)
-        try:
-            proxied_path_manager = get_proxiedpath_manager(self.settings)
-            if key:
-                self.log.info(f"GET /api/fileglancer/proxied-path username={username} key={key}")
-                response = proxied_path_manager.get_proxied_path_by_key(username, key)
-            elif fsp_mount_path and path:
-                self.log.info(f"GET /api/fileglancer/proxied-path username={username} fsp_mount_path={fsp_mount_path} path={path}")
-                response = proxied_path_manager.get_proxied_paths(username, fsp_mount_path, path)
-            else:
-                self.log.info(f"GET /api/fileglancer/proxied-path username={username}")
-                response = proxied_path_manager.get_proxied_paths(username)
-            response.raise_for_status()
-            self.set_status(200)
-            self.finish(response.json())
-        except HTTPError as e:
-            self.log.error(f"Error getting proxied paths: {str(e)}")
-            self.set_status(e.response.status_code)
-            self.finish(json.dumps({"error": str(e.response.text)}))
-        except Exception as e:
-            self.log.error(f"Error getting proxied paths: {str(e)}")
-            self.set_status(500)
-            self.finish(json.dumps({"error": str(e)}))
 
     @web.authenticated
     def delete(self):
@@ -468,12 +506,16 @@ class ProxiedPathHandler(BaseHandler):
             self.set_status(204)
             self.finish()
         except HTTPError as e:
-            self.log.warning(f"Proxied path not found: {str(e)}")
-            self.set_status(e.response.status_code)
-            self.finish(json.dumps({"error": str(e)}))
+            if e.response.status_code == 404:
+                self.log.warning(f"Proxied path not found: {str(e)}")
+                self.set_status(404)
+                self.finish(json.dumps({"error": "Proxied path not found"}))
+            else:
+                self.log.error(f"Error deleting proxied path: {str(e)}")
+                self.set_status(500)
+                self.finish(json.dumps({"error": str(e)}))
         except Exception as e:
-            # Handle the case where the proxied path is not found
-            self.log.error(f"Error deleting proxied paths: {str(e)}")
+            self.log.error(f"Error deleting proxied path: {str(e)}")
             self.set_status(500)
             self.finish(json.dumps({"error": str(e)}))
 
@@ -482,6 +524,29 @@ class TicketHandler(APIHandler):
     """
     API handler for ticket operations
     """
+
+    @web.authenticated
+    def get(self):
+        """Get ticket details"""
+        ticket_key = self.get_argument("ticket_key")
+        try:
+            response = requests.get(
+                f"{self.settings['fileglancer'].central_url}/ticket/{ticket_key}"
+            )
+            if response.status_code == 404:
+                self.set_status(404)
+                self.finish(json.dumps({"error": "Ticket not found"}))
+                return
+            response.raise_for_status()
+            self.set_status(200)
+            self.finish(response.text)
+
+        except Exception as e:
+            self.log.error(f"Error getting ticket: {str(e)}")
+            self.set_status(500)
+            self.finish(json.dumps({"error": str(e)}))
+
+
     @web.authenticated
     def post(self):
         """Create a new ticket"""
@@ -502,28 +567,6 @@ class TicketHandler(APIHandler):
 
         except Exception as e:
             self.log.error(f"Error creating ticket: {str(e)}")
-            self.set_status(500)
-            self.finish(json.dumps({"error": str(e)}))
-
-
-    @web.authenticated
-    def get(self):
-        """Get ticket details"""
-        ticket_key = self.get_argument("ticket_key")
-        try:
-            response = requests.get(
-                f"{self.settings['fileglancer'].central_url}/ticket/{ticket_key}"
-            )
-            if response.status_code == 404:
-                self.set_status(404)
-                self.finish(json.dumps({"error": "Ticket not found"}))
-                return
-            response.raise_for_status()
-            self.set_status(200)
-            self.finish(response.text)
-
-        except Exception as e:
-            self.log.error(f"Error getting ticket: {str(e)}")
             self.set_status(500)
             self.finish(json.dumps({"error": str(e)}))
 

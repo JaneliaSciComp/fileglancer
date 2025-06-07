@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import {
   sendFetchRequest,
   removeLastSegmentFromPath,
-  getFileFetchPath
+  getFileBrowsePath
 } from '@/utils';
 import { useCookiesContext } from '@/contexts/CookiesContext';
 import type { FileOrFolder } from '@/shared.types';
@@ -25,7 +25,7 @@ export default function usePermissionsDialog() {
       return;
     }
 
-    const fetchPath = getFileFetchPath(
+    const fetchPath = getFileBrowsePath(
       currentFileSharePath.name,
       targetItem.path
     );

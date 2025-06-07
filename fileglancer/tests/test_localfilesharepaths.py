@@ -3,9 +3,6 @@ import pytest
 
 from . import server_config_without_central_server
 
-"""
-"""
-
 @pytest.fixture
 def jp_server_config(server_config_without_central_server):
     return server_config_without_central_server

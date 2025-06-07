@@ -5,10 +5,9 @@ function joinPaths(...paths: string[]): string {
   return path.posix.join(...paths.map(path => path.trim()));
 }
 
-function getFileFetchPath(
+function getFileBrowsePath(
   fspName: string,
-  filePath?: string,
-  parentOnly?: boolean
+  filePath?: string
 ): string {
   let fetchPath = joinPaths('/api/fileglancer/files/', fspName);
 
@@ -16,8 +15,22 @@ function getFileFetchPath(
   if (filePath) {
     params.push(`subpath=${encodeURIComponent(filePath)}`);
   }
-  if (parentOnly) {
-    params.push(`cwd_only=${parentOnly}`);
+  if (params.length > 0) {
+    fetchPath += `?${params.join('&')}`;
+  }
+
+  return fetchPath;
+}
+
+function getFileContentPath(
+  fspName: string,
+  filePath: string
+): string {
+  let fetchPath = joinPaths('/api/fileglancer/content/', fspName);
+
+  const params: string[] = [];
+  if (filePath) {
+    params.push(`subpath=${encodeURIComponent(filePath)}`);
   }
   if (params.length > 0) {
     fetchPath += `?${params.join('&')}`;
@@ -29,14 +42,12 @@ function getFileFetchPath(
 function getFileURL(fspName: string, filePath?: string): string {
   let url = joinPaths(
     window.location.origin,
-    '/api/fileglancer/files/',
+    '/api/fileglancer/content/',
     fspName
   );
   if (!filePath) {
     return url;
   } else if (filePath) {
-    // Ensure the filePath is URL-encoded
-    filePath = encodeURIComponent(filePath);
     url = joinPaths(url, filePath);
   }
   return url;
@@ -78,7 +89,8 @@ function getPreferredPathForDisplay(
 
 export {
   convertPathToWindowsStyle,
-  getFileFetchPath,
+  getFileBrowsePath,
+  getFileContentPath,
   getFileURL,
   getLastSegmentFromPath,
   getPreferredPathForDisplay,

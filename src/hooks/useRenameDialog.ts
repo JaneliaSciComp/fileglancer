@@ -2,7 +2,7 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 
 import {
-  getFileFetchPath,
+  getFileBrowsePath,
   joinPaths,
   sendFetchRequest,
   removeLastSegmentFromPath,
@@ -30,7 +30,7 @@ export default function useRenameDialog() {
       throw new Error('No file share path selected.');
     }
     const newPath = joinPaths(removeLastSegmentFromPath(path), newName);
-    const fetchPath = getFileFetchPath(currentFileSharePath?.name, path);
+    const fetchPath = getFileBrowsePath(currentFileSharePath?.name, path);
     await sendFetchRequest(fetchPath, 'PATCH', cookies['_xsrf'], {
       path: newPath
     });

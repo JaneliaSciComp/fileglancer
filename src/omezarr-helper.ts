@@ -411,6 +411,7 @@ async function getOmeZarrMetadata(
   maxThumbnailSize: number = 1024,
   autoBoost: boolean = true
 ): Promise<Metadata> {
+  console.log('Getting OME-Zarr metadata for', dataUrl);
   const store = new zarr.FetchStore(dataUrl);
   const { arr, shapes, multiscale, omero, scales, zarr_version } =
     await omezarr.getMultiscaleWithArray(store, 0);

@@ -49,7 +49,7 @@ export default function Crumbs(): ReactNode {
                     }
                     await handleFileBrowserNavigation({
                       fspName: currentFileSharePath.name,
-                      path: joinPaths(...dirArray.slice(1, index))
+                      path: joinPaths(...dirArray.slice(1, index+1))
                     });
                   }}
                 >

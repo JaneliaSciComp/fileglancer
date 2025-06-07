@@ -1,6 +1,7 @@
 import {
   convertPathToWindowsStyle,
-  getFileFetchPath,
+  getFileContentPath,
+  getFileBrowsePath,
   getFileURL,
   getLastSegmentFromPath,
   getPreferredPathForDisplay,
@@ -114,7 +115,7 @@ async function fetchFileContent(
   path: string,
   cookies: Record<string, string>
 ): Promise<Uint8Array> {
-  const url = getFileFetchPath(fspName, path);
+  const url = getFileContentPath(fspName, path);
   const response = await sendFetchRequest(url, 'GET', cookies._xsrf);
   if (!response.ok) {
     throw new Error(`Failed to fetch file: ${response.statusText}`);
@@ -149,7 +150,7 @@ export {
   fetchFileContent,
   formatDate,
   formatFileSize,
-  getFileFetchPath,
+  getFileBrowsePath,
   getFileURL,
   getLastSegmentFromPath,
   getPreferredPathForDisplay,

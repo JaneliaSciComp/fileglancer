@@ -6,7 +6,7 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 const proxyBaseUrl = import.meta.env.VITE_PROXY_BASE_URL;
 
 type ProxiedPath = {
-  fsp_mount_path: string;
+  fsp_name: string;
   path: string;
   sharing_key: string;
   sharing_name: string;
@@ -17,7 +17,7 @@ type ProxiedPathContextType = {
   proxiedPath: ProxiedPath | null;
   dataUrl: string | null;
   createProxiedPath: (
-    fspMountPath: string,
+    fspName: string,
     path: string
   ) => Promise<ProxiedPath | null>;
   deleteProxiedPath: () => Promise<void>;
@@ -70,7 +70,7 @@ export const ProxiedPathProvider = ({
     }
     try {
       const response = await sendFetchRequest(
-        `/api/fileglancer/proxied-path?fsp_mount_path=${currentFileSharePath.mount_path}&path=${currentFileOrFolder.path}`,
+        `/api/fileglancer/proxied-path?fsp_name=${currentFileSharePath.name}&path=${currentFileOrFolder.path}`,
         'GET',
         cookies['_xsrf']
       );
@@ -91,12 +91,12 @@ export const ProxiedPathProvider = ({
   }, [cookies, currentFileSharePath, currentFileOrFolder]);
 
   const createProxiedPath = React.useCallback(
-    async (fspMountPath: string, path: string) => {
+    async (fspName: string, path: string) => {
       const response = await sendFetchRequest(
         '/api/fileglancer/proxied-path',
         'POST',
         cookies['_xsrf'],
-        { fsp_mount_path: fspMountPath, path: path }
+        { fsp_name: fspName, path: path }
       );
       if (!response.ok) {
         throw new Error(

@@ -89,7 +89,7 @@ export default function SharingDialog({
                 onClick={async () => {
                   try {
                     const newProxiedPath = await createProxiedPath(
-                      currentFileSharePath?.mount_path || '',
+                      currentFileSharePath.name,
                       filePathWithoutFsp
                     );
                     if (newProxiedPath) {

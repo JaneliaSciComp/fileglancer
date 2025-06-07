@@ -2,7 +2,7 @@ import toast from 'react-hot-toast';
 
 import type { FileOrFolder } from '@/shared.types';
 import {
-  getFileFetchPath,
+  getFileBrowsePath,
   sendFetchRequest,
   removeLastSegmentFromPath
 } from '@/utils';
@@ -20,7 +20,7 @@ export default function useDeleteDialog() {
       return false;
     }
 
-    const fetchPath = getFileFetchPath(
+    const fetchPath = getFileBrowsePath(
       currentFileSharePath.name,
       targetItem.path
     );

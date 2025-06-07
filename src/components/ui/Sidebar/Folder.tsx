@@ -11,7 +11,7 @@ import { StarIcon as StarFilled } from '@heroicons/react/24/solid';
 
 import {
   makeMapKey,
-  getFileFetchPath,
+  getFileBrowsePath,
   sendFetchRequest,
   getLastSegmentFromPath,
   getPreferredPathForDisplay
@@ -55,7 +55,7 @@ export default function Folder({ folderFavorite, setOpenZones }: FolderProps) {
 
   async function checkFolderExists(folderFavorite: FolderFavorite) {
     try {
-      const fetchPath = getFileFetchPath(
+      const fetchPath = getFileBrowsePath(
         folderFavorite.fsp.name,
         folderFavorite.folderPath
       );

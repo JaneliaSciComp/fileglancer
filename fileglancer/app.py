@@ -1,7 +1,8 @@
 from jupyter_server.extension.application import ExtensionApp
 from fileglancer.handlers import (
     FileSharePathsHandler,
-    FileShareHandler,
+    FileMetadataHandler,
+    FileContentHandler,
     VersionHandler,
     StaticHandler,
     PreferencesHandler,
@@ -77,8 +78,9 @@ class Fileglancer(ExtensionApp):
         self.handlers.extend([
             (r"/api/fileglancer/file-share-paths", FileSharePathsHandler),
             (r"/api/fileglancer/proxied-path", ProxiedPathHandler),
-            (r"/api/fileglancer/files/(.*)", FileShareHandler),
-            (r"/api/fileglancer/files", FileShareHandler),
+            (r"/api/fileglancer/files/(.*)", FileMetadataHandler),
+            (r"/api/fileglancer/files", FileMetadataHandler),
+            (r"/api/fileglancer/content/(.*)", FileContentHandler),
             (r"/api/fileglancer/version", VersionHandler),
             (r"/api/fileglancer/preference", PreferencesHandler),
             (r"/api/fileglancer/profile", ProfileHandler),

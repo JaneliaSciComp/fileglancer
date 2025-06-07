@@ -2,7 +2,7 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 
 import {
-  getFileFetchPath,
+  getFileBrowsePath,
   sendFetchRequest,
   joinPaths,
   getPreferredPathForDisplay
@@ -30,7 +30,7 @@ export default function useNewFolderDialog() {
       throw new Error('No current file or folder selected.');
     }
     await sendFetchRequest(
-      getFileFetchPath(
+      getFileBrowsePath(
         currentFileSharePath.name,
         joinPaths(currentFileOrFolder.path, newName)
       ),
