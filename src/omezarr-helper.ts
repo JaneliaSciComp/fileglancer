@@ -1,7 +1,6 @@
+import { default as log } from '@/logger';
 import * as zarr from 'zarrita';
 import * as omezarr from 'ome-zarr.js';
-
-const DEBUG = false;
 
 // Copied since ome-zarr.js doesn't export the types
 // TODO: use the types from ome-zarr.js when they become available
@@ -126,9 +125,7 @@ function getMinMaxValues(arr: zarr.Array<any>): { min: number; max: number } {
 
   if (arr.dtype) {
     const dtype = arr.dtype;
-    if (DEBUG) {
-      console.log('Parsing dtype:', dtype);
-    }
+    log.trace('Parsing dtype:', dtype);
     // Parse numpy-style dtype strings (int8, int16, uint8, etc.)
     if (dtype.includes('int') || dtype.includes('uint')) {
       // Extract the numeric part for bit depth
@@ -137,16 +134,12 @@ function getMinMaxValues(arr: zarr.Array<any>): { min: number; max: number } {
         const bitCount = parseInt(bitMatch[0]);
         if (dtype.startsWith('u')) {
           // Unsigned integer (uint8, uint16, etc.)
-          if (DEBUG) {
-            console.log('Unsigned integer');
-          }
+          log.trace('Unsigned integer');
           dtypeMin = 0;
           dtypeMax = 2 ** bitCount - 1;
         } else {
           // Signed integer (int8, int16, etc.)
-          if (DEBUG) {
-            console.log('Signed integer');
-          }
+          log.trace('Signed integer');
           dtypeMin = -(2 ** (bitCount - 1));
           dtypeMax = 2 ** (bitCount - 1) - 1;
         }
@@ -159,25 +152,21 @@ function getMinMaxValues(arr: zarr.Array<any>): { min: number; max: number } {
           const bitCount = bytes * 8;
           if (typeCode === 'i') {
             // Signed integer
-            if (DEBUG) {
-              console.log('Signed integer');
-            }
+            log.trace('Signed integer');
             dtypeMin = -(2 ** (bitCount - 1));
             dtypeMax = 2 ** (bitCount - 1) - 1;
           } else if (typeCode === 'u') {
             // Unsigned integer
-            if (DEBUG) {
-              console.log('Unsigned integer');
-            }
+            log.trace('Unsigned integer');
             dtypeMin = 0;
             dtypeMax = 2 ** bitCount - 1;
           }
         } else {
-          console.warn('Could not determine min/max values for dtype: ', dtype);
+          log.warn('Could not determine min/max values for dtype: ', dtype);
         }
       }
     } else {
-      console.warn('Unrecognized dtype format: ', dtype);
+      log.warn('Unrecognized dtype format: ', dtype);
     }
   }
 
@@ -228,20 +217,14 @@ function generateNeuroglancerState(
   arr: zarr.Array<any>,
   omero?: Omero | null
 ): string | null {
-  if (DEBUG) {
-    console.log('Generating Neuroglancer state for', dataUrl);
-  }
+  log.info('Generating Neuroglancer state for', dataUrl);
 
   // Convert axes array to a map for easier access
   const axesMap = getAxesMap(multiscale);
-  if (DEBUG) {
-    console.log('Axes map: ', axesMap);
-  }
+  log.debug('Axes map: ', axesMap);
 
   const { min: dtypeMin, max: dtypeMax } = getMinMaxValues(arr);
-  if (DEBUG) {
-    console.log('Inferred min/max values:', dtypeMin, dtypeMax);
-  }
+  log.debug('Inferred min/max values:', dtypeMin, dtypeMax);
 
   // Create the scaffold for theNeuroglancer viewer state
   const state: any = {
@@ -257,7 +240,7 @@ function generateNeuroglancerState(
     (t: any) => t.type === 'scale'
   );
   if (!scaleTransform) {
-    console.error('No scale transformation found in the full scale dataset');
+    log.error('No scale transformation found in the full scale dataset');
     return null;
   }
   const scale = scaleTransform.scale;
@@ -275,20 +258,18 @@ function generateNeuroglancerState(
       state.position.push(Math.floor(extent / 2));
       imageDimensions.delete(name);
     } else {
-      console.warn('Dimension not found in axes map: ', name);
+      log.warn('Dimension not found in axes map: ', name);
     }
   }
 
-  if (DEBUG) {
-    console.log('Dimensions: ', state.dimensions);
-    console.log('Positions: ', state.position);
-  }
+  log.debug('Dimensions: ', state.dimensions);
+  log.debug('Positions: ', state.position);
 
   // Remove the channel dimension, which will be handled by layers
   imageDimensions.delete('c');
   // Log any unused dimensions
   if (imageDimensions.size > 0) {
-    console.warn('Unused dimensions: ', Array.from(imageDimensions));
+    log.warn('Unused dimensions: ', Array.from(imageDimensions));
   }
 
   // Set up the zoom
@@ -299,9 +280,7 @@ function generateNeuroglancerState(
   let colorIndex = 0;
   const channels = [];
   if (omero && omero.channels) {
-    if (DEBUG) {
-      console.log('Omero channels: ', omero.channels);
-    }
+    log.debug('Omero channels: ', omero.channels);
     for (let i = 0; i < omero.channels.length; i++) {
       const channelMeta = omero.channels[i];
       const window = channelMeta.window || {};
@@ -333,7 +312,7 @@ function generateNeuroglancerState(
   }
 
   if (channels.length === 0) {
-    console.warn('No channels found in metadata, using default shader');
+    log.warn('No channels found in metadata, using default shader');
     const layer: Record<string, any> = {
       type: 'image',
       source: getNeuroglancerSource(dataUrl, zarr_version),
@@ -414,11 +393,11 @@ async function getOmeZarrMetadata(
   const store = new zarr.FetchStore(dataUrl);
   const { arr, shapes, multiscale, omero, scales, zarr_version } =
     await omezarr.getMultiscaleWithArray(store, 0);
-  console.log('Zarr version: ', zarr_version);
-  console.log('Multiscale: ', multiscale);
-  console.log('Omero: ', omero);
-  console.log('Array: ', arr);
-  console.log('Shapes: ', shapes);
+  log.debug('Zarr version: ', zarr_version);
+  log.debug('Multiscale: ', multiscale);
+  log.debug('Omero: ', omero);
+  log.debug('Array: ', arr);
+  log.debug('Shapes: ', shapes);
   const thumbnail = await omezarr.renderThumbnail(
     store,
     thumbnailSize,

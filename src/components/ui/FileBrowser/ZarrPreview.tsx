@@ -91,7 +91,7 @@ export default function ZarrPreview({
             <Switch
               id="share-switch"
               className="mt-2 bg-secondary-light border-secondary-light hover:!bg-secondary-light/80 hover:!border-secondary-light/80"
-              onClick={() => {
+              onChange={() => {
                 setShowSharingDialog(true);
               }}
               checked={isImageShared}

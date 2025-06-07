@@ -74,6 +74,7 @@ export default function FavoritesBrowser({
             {displayZones.map(zone => {
               return (
                 <ZoneComponent
+                  key={zone.name}
                   zone={zone}
                   openZones={openFavorites}
                   toggleOpenZones={toggleOpenFavorites}
@@ -83,13 +84,22 @@ export default function FavoritesBrowser({
 
             {/* File share path favorites */}
             {displayFileSharePaths.map((fsp, index) => {
-              return <FileSharePathComponent fsp={fsp} index={index} />;
+              return (
+                <FileSharePathComponent
+                  key={fsp.name}
+                  fsp={fsp}
+                  index={index}
+                />
+              );
             })}
 
             {/* Directory favorites */}
             {displayFolders.map(folderFavorite => {
               return (
                 <Folder
+                  key={
+                    folderFavorite.fsp.name + '-' + folderFavorite.folderPath
+                  }
                   folderFavorite={folderFavorite}
                   setOpenZones={setOpenZones}
                 />

@@ -1,4 +1,5 @@
 import React from 'react';
+import { default as log } from '@/logger';
 
 import type { FileSharePath, Zone } from '@/shared.types';
 import { useCookiesContext } from '@/contexts/CookiesContext';
@@ -99,9 +100,9 @@ export const PreferencesProvider = ({
       return data?.value;
     } catch (error) {
       if (error instanceof HTTPError && error.responseCode === 404) {
-        console.log(`Preference '${key}' not found`);
+        log.debug(`Preference '${key}' not found`);
       } else {
-        console.log(`Error fetching preference '${key}':`, error);
+        log.error(`Error fetching preference '${key}':`, error);
       }
       return null;
     }
@@ -112,13 +113,8 @@ export const PreferencesProvider = ({
       return zonesAndFileSharePathsMap[key];
     });
     // To help with debugging edge cases
-    console.log(
-      'length of preference keys list: ',
-      keys.length,
-      '\n',
-      'length of accessed items list: ',
-      itemsArray.length
-    );
+    log.debug(`length of preference keys list: ${keys.length}`);
+    log.debug(`length of accessed items list: ${itemsArray.length}`);
     return itemsArray;
   }
 
@@ -169,7 +165,7 @@ export const PreferencesProvider = ({
     (async function () {
       const rawPathPreference = await fetchPreferences('path');
       if (rawPathPreference) {
-        console.log('setting initial path preference:', rawPathPreference);
+        log.debug('setting initial path preference:', rawPathPreference);
         setPathPreference(rawPathPreference);
       }
     })();
@@ -244,7 +240,7 @@ export const PreferencesProvider = ({
         { value: value }
       );
     } catch (error) {
-      console.error(`Error updating preference '${key}':`, error);
+      log.error(`Error updating preference '${key}':`, error);
     }
   }
 
@@ -258,7 +254,7 @@ export const PreferencesProvider = ({
       setPathPreference(localPathPreference);
       setShowPathPrefAlert(true);
     } catch (error) {
-      console.error('Error in handlePathPreferenceSubmit:', error);
+      log.error('Error in handlePathPreferenceSubmit:', error);
       setShowPathPrefAlert(false);
     }
   }
@@ -292,7 +288,7 @@ export const PreferencesProvider = ({
       );
       updateLocalZonePreferenceStates(updatedZonePreferenceMap);
     } catch (error) {
-      console.error('Error in handleZoneFavoriteChange:', error);
+      log.error('Error in handleZoneFavoriteChange:', error);
     }
   }
 
@@ -310,7 +306,7 @@ export const PreferencesProvider = ({
       );
       updateLocalFspPreferenceStates(updatedFileSharePathMap);
     } catch (error) {
-      console.error('Error in handleFileSharePathFavoriteChange:', error);
+      log.error('Error in handleFileSharePathFavoriteChange:', error);
     }
   }
 
@@ -328,7 +324,7 @@ export const PreferencesProvider = ({
       await savePreferencesToBackend('folder', Object.values(updatedFolderMap));
       updateLocalFolderPreferenceStates(updatedFolderMap);
     } catch (error) {
-      console.error('Error in handleFolderFavoriteChange:', error);
+      log.error('Error in handleFolderFavoriteChange:', error);
     }
   }
 
@@ -351,7 +347,7 @@ export const PreferencesProvider = ({
           throw new Error(`Invalid type: ${type}`);
       }
     } catch (error) {
-      console.error('Error in handleFavoriteChange:', error);
+      log.error('Error in handleFavoriteChange:', error);
     }
   }
 

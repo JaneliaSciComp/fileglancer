@@ -16,13 +16,11 @@ test('should emit an activation console message', async ({ page }) => {
 
   await page.goto();
 
-  expect(
+  await expect(
     logs.filter(s => s === 'JupyterLab extension fileglancer is activated!')
   ).toHaveLength(1);
-  expect(
-    // open fileglancer command not executed yet
-    logs.filter(s => s === 'Open fileglancer command')
-  ).toHaveLength(0);
+  // we are still on the JupyterLab page
+  await expect(page).toHaveTitle('JupyterLab');
 
 });
 
@@ -35,7 +33,7 @@ test('when fg icon clicked should open fileglancer extension', async ({ page }) 
 
   await openFileGlancer(page);
 
-  expect(
-    logs.filter(s => s === 'Open fileglancer command')
-  ).toHaveLength(1);
+  // we are still on the Fileglancer page
+  await expect(page).toHaveTitle('Fileglancer');
+
 })

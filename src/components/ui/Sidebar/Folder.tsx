@@ -1,4 +1,5 @@
 import React from 'react';
+import { default as log } from '@/logger';
 import { Link } from 'react-router-dom';
 import {
   IconButton,
@@ -71,7 +72,7 @@ export default function Folder({ folderFavorite, setOpenZones }: FolderProps) {
         return false;
       }
     } catch (error) {
-      console.error('Error checking folder existence:', error);
+      log.error('Error checking folder existence:', error);
       return false;
     }
   }
@@ -85,7 +86,7 @@ export default function Folder({ folderFavorite, setOpenZones }: FolderProps) {
           try {
             folderExists = await checkFolderExists(folderFavorite);
           } catch (error) {
-            console.error('Error checking folder existence:', error);
+            log.error('Error checking folder existence:', error);
           }
           if (folderExists) {
             setOpenZones({

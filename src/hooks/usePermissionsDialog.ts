@@ -1,4 +1,5 @@
 import React from 'react';
+import { default as log } from '@/logger';
 import toast from 'react-hot-toast';
 
 import {
@@ -22,7 +23,7 @@ export default function usePermissionsDialog() {
     localPermissions: FileOrFolder['permissions']
   ) {
     try {
-      console.log('Change permissions for item:', targetItem);
+      log.debug('Change permissions for item:', targetItem);
       await sendFetchRequest(
         `${getAPIPathRoot()}api/fileglancer/files/${currentFileSharePath?.name}?subpath=${targetItem.path}`,
         'PATCH',

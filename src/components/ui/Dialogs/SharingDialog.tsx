@@ -38,8 +38,7 @@ export default function SharingDialog({
             size="sm"
             variant="outline"
             color="secondary"
-            className="absolute right-2 top-2 text-secondary hover:text-background"
-            isCircular
+            className="absolute right-2 top-2 text-secondary hover:text-background rounded-full"
             onClick={() => {
               setShowSharingDialog(false);
             }}
@@ -48,25 +47,27 @@ export default function SharingDialog({
           </IconButton>
           {/* TODO: Move Janelia-specific text elsewhere */}
           {isImageShared ? (
-            <Typography className="my-8 text-large text-foreground">
-              <p>
+            <div className="my-8 text-large text-foreground">
+              <Typography>
                 Are you sure you want to unshare{' '}
                 <span className="font-semibold break-all">{displayPath}</span>?
-              </p>
-              <p>
+              </Typography>
+              <Typography className="mt-4">
                 If you previously shared a link to these data with
                 collaborators, the link will no longer work. You can always
                 share these data again later.
-              </p>
-            </Typography>
+              </Typography>
+            </div>
           ) : (
-            <Typography className="my-8 text-large text-foreground">
-              <p>
+            <div className="my-8 text-large text-foreground">
+              <Typography>
                 Are you sure you want to share{' '}
                 <span className="font-semibold break-all">{displayPath}</span>?
-              </p>
-              <p>This will allow anyone at Janelia to view this data.</p>
-            </Typography>
+              </Typography>
+              <Typography className="mt-4">
+                This will allow anyone at Janelia to view this data.
+              </Typography>
+            </div>
           )}
 
           <div className="flex gap-2">

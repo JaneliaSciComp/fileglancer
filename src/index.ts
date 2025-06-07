@@ -17,10 +17,10 @@ const FileglancerIcon = new LabIcon({
 });
 
 /**
- * The command IDs used by the react-widget plugin.
+ * The command IDs used by the fileglancer plugin.
  */
 namespace CommandIDs {
-  export const createReactWidget = 'create-react-widget';
+  export const createFileglancerWidget = 'create-fileglancer-widget';
 }
 
 /**
@@ -33,26 +33,24 @@ const plugin: JupyterFrontEndPlugin<void> = {
   optional: [ILauncher],
   activate: (app: JupyterFrontEnd, launcher: ILauncher) => {
     console.log('JupyterLab extension fileglancer is activated!');
-
+    
     const { commands } = app;
-    const command = CommandIDs.createReactWidget;
+    const command = CommandIDs.createFileglancerWidget;
 
     commands.addCommand(command, {
       label: 'Fileglancer',
       icon: FileglancerIcon,
       execute: () => {
-        console.log('Open fileglancer command');
         window.location.href = '/fg/';
       }
     });
 
     if (launcher) {
-      console.log('Adding command to launcher');
       launcher.add({ command });
     }
 
     if (navigator.webdriver) {
-      console.log('Running in test mode, skipping demos.');
+      console.log('Running in webdriver mode.');
       return;
     }
   }

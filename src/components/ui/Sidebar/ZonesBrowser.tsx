@@ -53,6 +53,7 @@ export default function ZonesBrowser({
             if (key.startsWith('zone') && 'fileSharePaths' in value) {
               return (
                 <Zone
+                  key={key}
                   zone={value}
                   openZones={openZones}
                   toggleOpenZones={toggleOpenZones}

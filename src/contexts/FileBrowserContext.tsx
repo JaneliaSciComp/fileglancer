@@ -1,4 +1,5 @@
 import React from 'react';
+import { default as log } from '@/logger';
 import { FileOrFolder } from '../shared.types';
 import { getFileFetchPath, sendFetchRequest } from '../utils';
 import { useCookiesContext } from './CookiesContext';
@@ -84,9 +85,9 @@ export const FileBrowserContextProvider = ({
       }
     } catch (error: unknown) {
       if (error instanceof Error) {
-        console.error(error.message);
+        log.error(error.message);
       } else {
-        console.error('An unknown error occurred');
+        log.error('An unknown error occurred');
       }
     }
   }

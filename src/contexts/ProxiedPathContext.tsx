@@ -1,4 +1,5 @@
 import React from 'react';
+import { default as log } from '@/logger';
 import { useCookiesContext } from '@/contexts/CookiesContext';
 import { getAPIPathRoot, sendFetchRequest } from '@/utils';
 import { useZoneBrowserContext } from './ZoneBrowserContext';
@@ -66,18 +67,14 @@ export const ProxiedPathProvider = ({
     try {
       const filePath = currentNavigationPath.replace('?subpath=', '/');
       const filePathWithoutFsp = filePath.split('/').slice(1).join('/');
-      console.log(
-        'Fetching proxied path for',
-        currentFileSharePath?.mount_path,
-        filePathWithoutFsp
-      );
+      log.debug('Fetching proxied path for', currentFileSharePath?.mount_path, filePathWithoutFsp);
       const response = await sendFetchRequest(
         `${getAPIPathRoot()}api/fileglancer/proxied-path?fsp_mount_path=${currentFileSharePath?.mount_path}&path=${filePathWithoutFsp}`,
         'GET',
         cookies['_xsrf']
       );
       if (!response.ok) {
-        console.error(
+        log.error(
           `Failed to fetch proxied path: ${response.status} ${response.statusText}`
         );
         return null;
@@ -87,7 +84,7 @@ export const ProxiedPathProvider = ({
         return data.paths[0] as ProxiedPath;
       }
     } catch (error) {
-      console.error('Error fetching proxied path:', error);
+      log.error('Error fetching proxied path:', error);
     }
     return null;
   }
@@ -109,13 +106,13 @@ export const ProxiedPathProvider = ({
     }
     const proxiedPath = (await response.json()) as ProxiedPath;
     updateProxiedPath(proxiedPath);
-    console.log('Created proxied path:', proxiedPath);
+    log.debug('Created proxied path:', proxiedPath);
     return proxiedPath;
   }
 
   async function deleteProxiedPath(): Promise<void> {
     if (!proxiedPath) {
-      console.error('No proxied path to delete');
+      log.error('No proxied path to delete');
       return;
     }
     const response = await sendFetchRequest(
@@ -128,7 +125,7 @@ export const ProxiedPathProvider = ({
         `Failed to delete proxied path: ${response.status} ${response.statusText}`
       );
     }
-    console.log('Deleted proxied path:', proxiedPath);
+    log.debug('Deleted proxied path:', proxiedPath);
     updateProxiedPath(null);
   }
 
@@ -142,7 +139,7 @@ export const ProxiedPathProvider = ({
           updateProxiedPath(null);
         }
       } catch (error) {
-        console.error('Error in useEffect:', error);
+        log.error('Error in useEffect:', error);
       }
     })();
   }, [currentFileSharePath, currentNavigationPath]);

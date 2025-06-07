@@ -32,7 +32,7 @@ export default function Crumbs(): ReactNode {
           if (index < dirDepth - 1) {
             // Render a breadcrumb link for each segment in the parent path
             return (
-              <React.Fragment key={index}>
+              <React.Fragment key={item + '-' + index}>
                 <BreadcrumbLink
                   variant="text"
                   className="rounded-md hover:bg-primary-light/20 hover:!text-black focus:!text-black transition-colors cursor-pointer"
@@ -64,7 +64,7 @@ export default function Crumbs(): ReactNode {
           } else {
             // Render the last path component as text only
             return (
-              <React.Fragment key={index}>
+              <React.Fragment key={item + '-' + index}>
                 <Typography
                   variant="small"
                   className="font-medium text-primary-default"

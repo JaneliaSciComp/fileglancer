@@ -1,4 +1,5 @@
 import React from 'react';
+import { default as log } from '@/logger';
 
 // Clipboard when the clipboard API is not available (like when using insecure HTTP)
 // From https://stackoverflow.com/questions/400212/how-do-i-copy-to-the-clipboard-in-javascript/30810322#30810322
@@ -45,7 +46,7 @@ export default function useCopyPath() {
         setShowCopyAlert(true);
         console.log('Copied to clipboard:', text);
       } catch (error) {
-        console.error('Failed to copy to clipboard:', error);
+        log.error('Failed to copy to clipboard:', error);
         setCopiedText({
           value: text,
           isCopied: false
