@@ -1,3 +1,5 @@
+import { createErrorResult } from './errorHandling';
+
 import {
   getFileContentPath,
   getFileBrowsePath,
@@ -144,6 +146,7 @@ async function fetchFileAsJson(
 }
 
 export {
+  createErrorResult,
   fetchFileAsJson,
   fetchFileAsText,
   fetchFileContent,
