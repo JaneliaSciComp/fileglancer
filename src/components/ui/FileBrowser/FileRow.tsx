@@ -67,22 +67,17 @@ export default function FileRow({
   const handleNavigationClick = async (e: React.MouseEvent<HTMLElement>) => {
     e.stopPropagation();
     if (file.is_dir) {
-      try {
-        if (!currentFileSharePath) {
-          throw new Error('No current file share path set');
-        }
-        await handleFileBrowserNavigation({
-          fspName: currentFileSharePath.name,
-          path: file.path
-        });
-        setPropertiesTarget(file);
-      } catch (error) {
-        toast.error(
-          `Failed to open folder: ${
-            error instanceof Error ? error.message : 'Unknown error'
-          }`
-        );
+      const result = await handleFileBrowserNavigation({
+        fspName: currentFileSharePath?.name,
+        path: file.path
+      });
+
+      if (result.error) {
+        toast.error(`Failed to open folder: ${result.error}`);
+        return;
       }
+
+      setPropertiesTarget(file);
     }
   };
 

@@ -1,7 +1,11 @@
 import React from 'react';
-import { default as log } from '@/logger';
-import { FileOrFolder, FileSharePath } from '@/shared.types';
-import { getFileBrowsePath, sendFetchRequest } from '@/utils';
+
+import { FileOrFolder, FileSharePath, TryCatchResult } from '@/shared.types';
+import {
+  createErrorResult,
+  getFileBrowsePath,
+  sendFetchRequest
+} from '@/utils';
 import { useCookiesContext } from './CookiesContext';
 import { useZoneAndFspMapContext } from './ZonesAndFspMapContext';
 import { usePreferencesContext } from './PreferencesContext';
@@ -19,11 +23,11 @@ type FileBrowserContextType = {
   updateCurrentFileOrFolder: (args: {
     fspName: string;
     path?: string;
-  }) => Promise<void>;
+  }) => Promise<TryCatchResult>;
   handleFileBrowserNavigation: (args: {
     fspName?: string;
     path?: string;
-  }) => Promise<void>;
+  }) => Promise<TryCatchResult>;
 };
 
 const FileBrowserContext = React.createContext<FileBrowserContextType | null>(
@@ -66,12 +70,9 @@ export const FileBrowserContextProvider = ({
         if (data) {
           setCurrentFileOrFolder(data['info'] as FileOrFolder);
         }
+        return { success: true };
       } catch (error: unknown) {
-        if (error instanceof Error) {
-          console.error(error.message);
-        } else {
-          console.error('An unknown error occurred');
-        }
+        return createErrorResult('Update current file or folder', error);
       }
     },
     [cookies]
@@ -98,13 +99,11 @@ export const FileBrowserContextProvider = ({
             return a.is_dir ? -1 : 1;
           });
           setFiles(data.files as FileOrFolder[]);
+          return { success: true };
         }
+        return { success: true };
       } catch (error: unknown) {
-        if (error instanceof Error) {
-          log.error(error.message);
-        } else {
-          log.error('An unknown error occurred');
-        }
+        return createErrorResult('Fetch files', error);
       }
     },
     [cookies]
@@ -117,24 +116,31 @@ export const FileBrowserContextProvider = ({
         setCurrentFileOrFolder(null);
         setCurrentFileSharePath(null);
         setFiles([]);
+        return { success: false, error: 'No file share path specified' };
       }
       try {
-        await fetchAndFormatFilesForDisplay({
+        const fetchFilesResult = await fetchAndFormatFilesForDisplay({
           fspName: fetchPathFsp as string,
           ...(path && { path })
         });
+        // if fetchFilesResult is not successful, return early
+        if (!fetchFilesResult.success) {
+          return fetchFilesResult;
+        }
+
         if (!currentFileOrFolder || currentFileOrFolder.path !== path) {
-          await updateCurrentFileOrFolder({
+          const updateResult = await updateCurrentFileOrFolder({
             fspName: fetchPathFsp as string,
             ...(path && { path })
           });
+          // if updateResult is not successful, return early
+          if (!updateResult.success) {
+            return updateResult;
+          }
         }
+        return { success: true };
       } catch (error: unknown) {
-        if (error instanceof Error) {
-          console.error(`Failed to navigate: ${error.message}`);
-        } else {
-          console.error('An unknown error occurred while navigating');
-        }
+        return createErrorResult('Navigation', error);
       }
     },
     [
