@@ -1,14 +1,10 @@
 import React from 'react';
 
 import { FileOrFolder, FileSharePath, TryCatchResult } from '@/shared.types';
-import {
-  createErrorResult,
-  getFileBrowsePath,
-  sendFetchRequest
-} from '@/utils';
+import { getFileBrowsePath, tryCatchWrapper, sendFetchRequest } from '@/utils';
 import { useCookiesContext } from './CookiesContext';
-import { useZoneAndFspMapContext } from './ZonesAndFspMapContext';
-import { usePreferencesContext } from './PreferencesContext';
+// import { useZoneAndFspMapContext } from './ZonesAndFspMapContext';
+// import { usePreferencesContext } from './PreferencesContext';
 
 type FileBrowserContextType = {
   files: FileOrFolder[];
@@ -56,24 +52,22 @@ export const FileBrowserContextProvider = ({
     React.useState<FileSharePath | null>(null);
 
   const { cookies } = useCookiesContext();
-  const { zonesAndFileSharePathsMap, isZonesMapReady } =
-    useZoneAndFspMapContext();
-  const { fileSharePathFavorites, isFileSharePathFavoritesReady } =
-    usePreferencesContext();
+  // const { zonesAndFileSharePathsMap, isZonesMapReady } =
+  //   useZoneAndFspMapContext();
+  // const { fileSharePathFavorites, isFileSharePathFavoritesReady } =
+  //   usePreferencesContext();
 
   const updateCurrentFileOrFolder = React.useCallback(
     async ({ fspName, path }: { fspName: string; path?: string }) => {
       const url = getFileBrowsePath(fspName, path);
-      try {
+      return tryCatchWrapper('Update current file or folder', async () => {
         const response = await sendFetchRequest(url, 'GET', cookies['_xsrf']);
         const data = await response.json();
         if (data) {
           setCurrentFileOrFolder(data['info'] as FileOrFolder);
         }
         return { success: true };
-      } catch (error: unknown) {
-        return createErrorResult('Update current file or folder', error);
-      }
+      });
     },
     [cookies]
   );
@@ -85,7 +79,7 @@ export const FileBrowserContextProvider = ({
         : getFileBrowsePath(fspName);
 
       let data = [];
-      try {
+      return tryCatchWrapper('Send fetch request', async () => {
         const response = await sendFetchRequest(url, 'GET', cookies['_xsrf']);
         data = await response.json();
 
@@ -99,12 +93,8 @@ export const FileBrowserContextProvider = ({
             return a.is_dir ? -1 : 1;
           });
           setFiles(data.files as FileOrFolder[]);
-          return { success: true };
         }
-        return { success: true };
-      } catch (error: unknown) {
-        return createErrorResult('Fetch files', error);
-      }
+      });
     },
     [cookies]
   );
@@ -118,7 +108,7 @@ export const FileBrowserContextProvider = ({
         setFiles([]);
         return { success: false, error: 'No file share path specified' };
       }
-      try {
+      return tryCatchWrapper('Fetch files', async () => {
         const fetchFilesResult = await fetchAndFormatFilesForDisplay({
           fspName: fetchPathFsp as string,
           ...(path && { path })
@@ -138,10 +128,7 @@ export const FileBrowserContextProvider = ({
             return updateResult;
           }
         }
-        return { success: true };
-      } catch (error: unknown) {
-        return createErrorResult('Navigation', error);
-      }
+      });
     },
     [
       currentFileSharePath,
@@ -151,37 +138,37 @@ export const FileBrowserContextProvider = ({
     ]
   );
 
-  React.useEffect(() => {
-    // Only run if zones are ready and fileSharePathFavorites have been loaded (not undefined)
-    if (!isZonesMapReady || !isFileSharePathFavoritesReady) {
-      return;
-    }
+  // React.useEffect(() => {
+  //   // Only run if zones are ready and fileSharePathFavorites have been loaded (not undefined)
+  //   if (!isZonesMapReady || !isFileSharePathFavoritesReady) {
+  //     return;
+  //   }
 
-    // Only set if currentFileSharePath is not set
-    if (!currentFileSharePath) {
-      if (fileSharePathFavorites.length > 0) {
-        setCurrentFileSharePath(() => fileSharePathFavorites[0]);
-      }
-    }
-  }, [
-    isZonesMapReady,
-    zonesAndFileSharePathsMap,
-    fileSharePathFavorites,
-    isFileSharePathFavoritesReady,
-    currentFileSharePath,
-    setCurrentFileSharePath
-  ]);
+  //   // Only set if currentFileSharePath is not set
+  //   if (!currentFileSharePath) {
+  //     if (fileSharePathFavorites.length > 0) {
+  //       setCurrentFileSharePath(() => fileSharePathFavorites[0]);
+  //     }
+  //   }
+  // }, [
+  //   isZonesMapReady,
+  //   zonesAndFileSharePathsMap,
+  //   fileSharePathFavorites,
+  //   isFileSharePathFavoritesReady,
+  //   currentFileSharePath,
+  //   setCurrentFileSharePath
+  // ]);
 
-  React.useEffect(() => {
-    const setInitialFiles = async () => {
-      if (currentFileSharePath && !currentFileOrFolder) {
-        await handleFileBrowserNavigation({
-          fspName: currentFileSharePath.name
-        });
-      }
-    };
-    setInitialFiles();
-  }, [currentFileSharePath, currentFileOrFolder, handleFileBrowserNavigation]);
+  // React.useEffect(() => {
+  //   const setInitialFiles = async () => {
+  //     if (currentFileSharePath && !currentFileOrFolder) {
+  //       await handleFileBrowserNavigation({
+  //         fspName: currentFileSharePath.name
+  //       });
+  //     }
+  //   };
+  //   setInitialFiles();
+  // }, [currentFileSharePath, currentFileOrFolder, handleFileBrowserNavigation]);
 
   return (
     <FileBrowserContext.Provider

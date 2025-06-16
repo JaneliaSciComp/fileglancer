@@ -1,4 +1,4 @@
-import { createErrorResult } from './errorHandling';
+import { tryCatchWrapper } from './errorHandling';
 
 import {
   getFileContentPath,
@@ -146,7 +146,6 @@ async function fetchFileAsJson(
 }
 
 export {
-  createErrorResult,
   fetchFileAsJson,
   fetchFileAsText,
   fetchFileContent,
@@ -163,5 +162,6 @@ export {
   makeProxiedPathUrl,
   parsePermissions,
   removeLastSegmentFromPath,
-  sendFetchRequest
+  sendFetchRequest,
+  tryCatchWrapper
 };
