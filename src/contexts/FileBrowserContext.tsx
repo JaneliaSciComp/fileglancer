@@ -1,10 +1,10 @@
 import React from 'react';
-import { default as log } from '@/logger';
-import { FileOrFolder, FileSharePath } from '@/shared.types';
-import { getFileBrowsePath, sendFetchRequest } from '@/utils';
+
+import { FileOrFolder, FileSharePath, TryCatchResult } from '@/shared.types';
+import { getFileBrowsePath, tryCatchWrapper, sendFetchRequest } from '@/utils';
 import { useCookiesContext } from './CookiesContext';
-import { useZoneAndFspMapContext } from './ZonesAndFspMapContext';
-import { usePreferencesContext } from './PreferencesContext';
+// import { useZoneAndFspMapContext } from './ZonesAndFspMapContext';
+// import { usePreferencesContext } from './PreferencesContext';
 
 type FileBrowserContextType = {
   files: FileOrFolder[];
@@ -19,11 +19,11 @@ type FileBrowserContextType = {
   updateCurrentFileOrFolder: (args: {
     fspName: string;
     path?: string;
-  }) => Promise<void>;
+  }) => Promise<TryCatchResult>;
   handleFileBrowserNavigation: (args: {
     fspName?: string;
     path?: string;
-  }) => Promise<void>;
+  }) => Promise<TryCatchResult>;
 };
 
 const FileBrowserContext = React.createContext<FileBrowserContextType | null>(
@@ -52,27 +52,22 @@ export const FileBrowserContextProvider = ({
     React.useState<FileSharePath | null>(null);
 
   const { cookies } = useCookiesContext();
-  const { zonesAndFileSharePathsMap, isZonesMapReady } =
-    useZoneAndFspMapContext();
-  const { fileSharePathFavorites, isFileSharePathFavoritesReady } =
-    usePreferencesContext();
+  // const { zonesAndFileSharePathsMap, isZonesMapReady } =
+  //   useZoneAndFspMapContext();
+  // const { fileSharePathFavorites, isFileSharePathFavoritesReady } =
+  //   usePreferencesContext();
 
   const updateCurrentFileOrFolder = React.useCallback(
     async ({ fspName, path }: { fspName: string; path?: string }) => {
       const url = getFileBrowsePath(fspName, path);
-      try {
+      return tryCatchWrapper('Update current file or folder', async () => {
         const response = await sendFetchRequest(url, 'GET', cookies['_xsrf']);
         const data = await response.json();
         if (data) {
           setCurrentFileOrFolder(data['info'] as FileOrFolder);
         }
-      } catch (error: unknown) {
-        if (error instanceof Error) {
-          console.error(error.message);
-        } else {
-          console.error('An unknown error occurred');
-        }
-      }
+        return { success: true };
+      });
     },
     [cookies]
   );
@@ -84,7 +79,7 @@ export const FileBrowserContextProvider = ({
         : getFileBrowsePath(fspName);
 
       let data = [];
-      try {
+      return tryCatchWrapper('Send fetch request', async () => {
         const response = await sendFetchRequest(url, 'GET', cookies['_xsrf']);
         data = await response.json();
 
@@ -99,13 +94,7 @@ export const FileBrowserContextProvider = ({
           });
           setFiles(data.files as FileOrFolder[]);
         }
-      } catch (error: unknown) {
-        if (error instanceof Error) {
-          log.error(error.message);
-        } else {
-          log.error('An unknown error occurred');
-        }
-      }
+      });
     },
     [cookies]
   );
@@ -117,25 +106,29 @@ export const FileBrowserContextProvider = ({
         setCurrentFileOrFolder(null);
         setCurrentFileSharePath(null);
         setFiles([]);
+        return { success: false, error: 'No file share path specified' };
       }
-      try {
-        await fetchAndFormatFilesForDisplay({
+      return tryCatchWrapper('Fetch files', async () => {
+        const fetchFilesResult = await fetchAndFormatFilesForDisplay({
           fspName: fetchPathFsp as string,
           ...(path && { path })
         });
+        // if fetchFilesResult is not successful, return early
+        if (!fetchFilesResult.success) {
+          return fetchFilesResult;
+        }
+
         if (!currentFileOrFolder || currentFileOrFolder.path !== path) {
-          await updateCurrentFileOrFolder({
+          const updateResult = await updateCurrentFileOrFolder({
             fspName: fetchPathFsp as string,
             ...(path && { path })
           });
+          // if updateResult is not successful, return early
+          if (!updateResult.success) {
+            return updateResult;
+          }
         }
-      } catch (error: unknown) {
-        if (error instanceof Error) {
-          console.error(`Failed to navigate: ${error.message}`);
-        } else {
-          console.error('An unknown error occurred while navigating');
-        }
-      }
+      });
     },
     [
       currentFileSharePath,
@@ -145,37 +138,37 @@ export const FileBrowserContextProvider = ({
     ]
   );
 
-  React.useEffect(() => {
-    // Only run if zones are ready and fileSharePathFavorites have been loaded (not undefined)
-    if (!isZonesMapReady || !isFileSharePathFavoritesReady) {
-      return;
-    }
+  // React.useEffect(() => {
+  //   // Only run if zones are ready and fileSharePathFavorites have been loaded (not undefined)
+  //   if (!isZonesMapReady || !isFileSharePathFavoritesReady) {
+  //     return;
+  //   }
 
-    // Only set if currentFileSharePath is not set
-    if (!currentFileSharePath) {
-      if (fileSharePathFavorites.length > 0) {
-        setCurrentFileSharePath(() => fileSharePathFavorites[0]);
-      }
-    }
-  }, [
-    isZonesMapReady,
-    zonesAndFileSharePathsMap,
-    fileSharePathFavorites,
-    isFileSharePathFavoritesReady,
-    currentFileSharePath,
-    setCurrentFileSharePath
-  ]);
+  //   // Only set if currentFileSharePath is not set
+  //   if (!currentFileSharePath) {
+  //     if (fileSharePathFavorites.length > 0) {
+  //       setCurrentFileSharePath(() => fileSharePathFavorites[0]);
+  //     }
+  //   }
+  // }, [
+  //   isZonesMapReady,
+  //   zonesAndFileSharePathsMap,
+  //   fileSharePathFavorites,
+  //   isFileSharePathFavoritesReady,
+  //   currentFileSharePath,
+  //   setCurrentFileSharePath
+  // ]);
 
-  React.useEffect(() => {
-    const setInitialFiles = async () => {
-      if (currentFileSharePath && !currentFileOrFolder) {
-        await handleFileBrowserNavigation({
-          fspName: currentFileSharePath.name
-        });
-      }
-    };
-    setInitialFiles();
-  }, [currentFileSharePath, currentFileOrFolder, handleFileBrowserNavigation]);
+  // React.useEffect(() => {
+  //   const setInitialFiles = async () => {
+  //     if (currentFileSharePath && !currentFileOrFolder) {
+  //       await handleFileBrowserNavigation({
+  //         fspName: currentFileSharePath.name
+  //       });
+  //     }
+  //   };
+  //   setInitialFiles();
+  // }, [currentFileSharePath, currentFileOrFolder, handleFileBrowserNavigation]);
 
   return (
     <FileBrowserContext.Provider

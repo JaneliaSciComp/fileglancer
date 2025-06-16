@@ -1,3 +1,5 @@
+import { tryCatchWrapper } from './errorHandling';
+
 import {
   getFileContentPath,
   getFileBrowsePath,
@@ -160,5 +162,6 @@ export {
   makeProxiedPathUrl,
   parsePermissions,
   removeLastSegmentFromPath,
-  sendFetchRequest
+  sendFetchRequest,
+  tryCatchWrapper
 };

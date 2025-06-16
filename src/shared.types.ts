@@ -25,3 +25,8 @@ export type Zone = { name: string; fileSharePaths: FileSharePath[] };
 export type ZonesAndFileSharePathsMap = Record<string, FileSharePath | Zone>;
 
 export type Cookies = { [key: string]: string };
+
+export type TryCatchResult = {
+  success: boolean;
+  error?: string;
+};
