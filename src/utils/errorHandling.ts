@@ -6,6 +6,7 @@ function formatError(error: unknown): string {
 
 function logError(operation: string, error: unknown): void {
   log.error(`${operation} failed: ${formatError(error)}`);
+  // TODO
   //   navigator.sendBeacon('/log', JSON.stringify({
   //     operation,
   //     error: formatError(error)
