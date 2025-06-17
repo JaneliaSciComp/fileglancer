@@ -10,6 +10,7 @@ import {
   SlashIcon,
   Squares2X2Icon
 } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { makePathSegmentArray, joinPaths } from '@/utils';
@@ -47,10 +48,16 @@ export default function Crumbs(): ReactNode {
                     if (!currentFileSharePath) {
                       return;
                     }
-                    await handleFileBrowserNavigation({
+                    const result = await handleFileBrowserNavigation({
                       fspName: currentFileSharePath.name,
                       path: joinPaths(...dirArray.slice(1, index + 1))
                     });
+                    if (result.error) {
+                      toast.error(
+                        `File browser navigation failed: ${result.error}`
+                      );
+                      return;
+                    }
                   }}
                 >
                   <Typography

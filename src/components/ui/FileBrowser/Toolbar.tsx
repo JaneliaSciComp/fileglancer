@@ -14,6 +14,7 @@ import {
 import { StarIcon as StarOutline } from '@heroicons/react/24/outline';
 import { StarIcon as StarFilled } from '@heroicons/react/24/solid';
 import { GoSidebarCollapse, GoSidebarExpand } from 'react-icons/go';
+import toast from 'react-hot-toast';
 
 import type { FileOrFolder } from '@/shared.types';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
@@ -144,10 +145,16 @@ export default function Toolbar({
                 if (!currentFileSharePath || !currentFileOrFolder) {
                   return;
                 }
-                await handleFileBrowserNavigation({
+                const result = await handleFileBrowserNavigation({
                   fspName: currentFileSharePath.name,
                   path: currentFileOrFolder.path
                 });
+                if (result.error) {
+                  toast.error(
+                    `File browser navigation failed: ${result.error}`
+                  );
+                  return;
+                }
               }}
             >
               <ArrowPathIcon className="icon-default" />

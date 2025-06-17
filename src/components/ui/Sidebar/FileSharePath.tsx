@@ -6,6 +6,7 @@ import {
   StarIcon as StarOutline
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarFilled } from '@heroicons/react/24/solid';
+import toast from 'react-hot-toast';
 
 import type { FileSharePath } from '@/shared.types';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
@@ -36,7 +37,11 @@ export default function FileSharePathComponent({
     <List.Item
       onClick={async () => {
         setCurrentFileSharePath(fsp);
-        await handleFileBrowserNavigation({ fspName: fsp.name });
+        const result = await handleFileBrowserNavigation({ fspName: fsp.name });
+        if (result.error) {
+          toast.error(`File browser navigation failed: ${result.error}`);
+          return;
+        }
       }}
       className="file-share-path pl-6 w-full flex items-center justify-between rounded-md cursor-pointer text-foreground hover:!bg-primary-light/30 focus:!bg-primary-light/30"
     >

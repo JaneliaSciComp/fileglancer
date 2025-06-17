@@ -9,6 +9,7 @@ import {
 } from '@material-tailwind/react';
 import { FolderIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarFilled } from '@heroicons/react/24/solid';
+import toast from 'react-hot-toast';
 
 import {
   makeMapKey,
@@ -90,10 +91,14 @@ export default function Folder({ folderFavorite, setOpenZones }: FolderProps) {
               [folderFavorite.fsp.zone]: true
             });
             setCurrentFileSharePath(folderFavorite.fsp);
-            await handleFileBrowserNavigation({
+            const result = await handleFileBrowserNavigation({
               fspName: folderFavorite.fsp.name,
               path: folderFavorite.folderPath
             });
+            if (result.error) {
+              toast.error(`File browser navigation failed: ${result.error}`);
+              return;
+            }
           } else if (folderExists === false) {
             setShowMissingFolderFavoriteDialog(true);
           }
