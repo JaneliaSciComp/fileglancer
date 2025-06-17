@@ -108,7 +108,7 @@ export const FileBrowserContextProvider = ({
         setFiles([]);
         return { success: false, error: 'No file share path specified' };
       }
-      return tryCatchWrapper('Fetch files', async () => {
+      return tryCatchWrapper('File browser navigation', async () => {
         const fetchFilesResult = await fetchAndFormatFilesForDisplay({
           fspName: fetchPathFsp as string,
           ...(path && { path })
