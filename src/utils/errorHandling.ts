@@ -26,8 +26,12 @@ async function tryCatchWrapper<T>(
   fn: () => Promise<T>
 ): Promise<{ success: boolean; data?: T; error?: string }> {
   try {
-    const data = await fn();
-    return { success: true, data };
+    const result = await fn();
+    // If the function runs w/o error but returns undefined (void),
+    // we still want a consistent success result
+    return result === undefined
+      ? { success: true }
+      : { success: true, data: result };
   } catch (error) {
     return createErrorResult(operation, error);
   }
