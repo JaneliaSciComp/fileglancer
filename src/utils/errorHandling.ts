@@ -5,7 +5,12 @@ function formatError(error: unknown): string {
 }
 
 function logError(operation: string, error: unknown): void {
-  log.error(`${operation} failed: ${formatError(error)}`);
+  if (error instanceof HTTPError && error.responseCode === 404) {
+    log.debug(`${operation} - resource not found: ${formatError(error)}`);
+  } else {
+    // Log all other errors as error level
+    log.error(`${operation} failed: ${formatError(error)}`);
+  }
   // TODO
   //   navigator.sendBeacon('/log', JSON.stringify({
   //     operation,
