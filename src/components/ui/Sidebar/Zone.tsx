@@ -7,6 +7,7 @@ import {
 } from '@material-tailwind/react';
 import { HiChevronRight, HiOutlineStar, HiStar } from 'react-icons/hi';
 import { HiOutlineSquares2X2 } from 'react-icons/hi2';
+import toast from 'react-hot-toast';
 
 import FileSharePathComponent from './FileSharePath';
 import type { Zone } from '@/shared.types';
@@ -45,7 +46,12 @@ export default function Zone({
             <IconButton
               variant="ghost"
               isCircular
-              onClick={() => handleFavoriteChange(zone, 'zone')}
+              onClick={async () => {
+                const result = await handleFavoriteChange(zone, 'zone');
+                if (!result.success) {
+                  toast.error(`Failed to update favorites: ${result.error}`);
+                }
+              }}
             >
               {isFavoriteZone ? (
                 <HiStar className="icon-small short:icon-xsmall mb-[2px]" />

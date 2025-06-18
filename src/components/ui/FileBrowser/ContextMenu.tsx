@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { Menu, Typography } from '@material-tailwind/react';
+import toast from 'react-hot-toast';
 
 import type { FileOrFolder } from '@/shared.types';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
@@ -58,9 +59,9 @@ export default function ContextMenu({
         <Menu.Item>
           <Typography
             className="text-sm p-1 cursor-pointer text-secondary-light"
-            onClick={() => {
+            onClick={async () => {
               if (currentFileSharePath) {
-                handleFavoriteChange(
+                const result = await handleFavoriteChange(
                   {
                     type: 'folder',
                     folderPath: selectedFiles[0].path,
@@ -68,6 +69,9 @@ export default function ContextMenu({
                   },
                   'folder'
                 );
+                if (!result.success) {
+                  toast.error(`Failed to update favorites: ${result.error}`);
+                }
               }
               setShowContextMenu(false);
             }}
