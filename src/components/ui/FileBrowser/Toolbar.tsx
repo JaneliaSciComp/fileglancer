@@ -17,9 +17,9 @@ import { GoSidebarCollapse, GoSidebarExpand } from 'react-icons/go';
 import toast from 'react-hot-toast';
 
 import type { FileOrFolder } from '@/shared.types';
+import useCheckFavorites from '@/hooks/useCheckFavorites';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
-import { makeMapKey } from '@/utils';
 
 type ToolbarProps = {
   selectedFiles: FileOrFolder[];
@@ -48,37 +48,36 @@ export default function Toolbar({
     currentFileSharePath
   } = useFileBrowserContext();
 
-  const {
-    folderPreferenceMap,
-    fileSharePathPreferenceMap,
-    handleFavoriteChange
-  } = usePreferencesContext();
+  const { handleFavoriteChange } = usePreferencesContext();
+
+  const { isFavorite } = useCheckFavorites();
 
   const isFavorited = React.useMemo(() => {
     if (!currentFileSharePath || !currentFileOrFolder) {
       return false;
     }
     if (currentFileOrFolder.path === '.') {
-      const fspKey = makeMapKey('fsp', currentFileSharePath.name);
-      return fspKey in fileSharePathPreferenceMap;
+      return isFavorite(currentFileSharePath, 'fileSharePath');
     }
-    const folderKey = makeMapKey(
-      'folder',
-      `${currentFileSharePath.name}_${currentFileOrFolder.path}`
+    return isFavorite(
+      {
+        type: 'folder',
+        folderPath: currentFileOrFolder.path,
+        fsp: currentFileSharePath
+      },
+      'folder'
     );
-    return folderKey in folderPreferenceMap;
-  }, [
-    currentFileSharePath,
-    currentFileOrFolder,
-    folderPreferenceMap,
-    fileSharePathPreferenceMap
-  ]);
+  }, [currentFileSharePath, currentFileOrFolder, isFavorite]);
 
   const handleFavoriteClick = React.useCallback(async () => {
     if (!currentFileSharePath || !currentFileOrFolder) {
       return;
     }
-    console.log('path:', currentFileOrFolder.path);
+
+    let result;
+    const isCurrentlyFavorited = isFavorited;
+    const action = isCurrentlyFavorited ? 'remove from' : 'add to';
+
     if (currentFileOrFolder.path === '.') {
       await handleFavoriteChange(currentFileSharePath, 'fileSharePath');
       return;
