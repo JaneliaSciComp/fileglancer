@@ -1,4 +1,5 @@
 import React from 'react';
+import toast from 'react-hot-toast';
 import {
   Alert,
   Button,
@@ -22,14 +23,7 @@ export default function RenameDialog({
   showRenameDialog,
   setShowRenameDialog
 }: ItemNamingDialogProps): JSX.Element {
-  const {
-    handleRenameSubmit,
-    newName,
-    setNewName,
-    showAlert,
-    setShowAlert,
-    alertContent
-  } = useRenameDialog();
+  const { handleRenameSubmit, newName, setNewName } = useRenameDialog();
 
   return (
     <Dialog open={showRenameDialog}>
@@ -44,7 +38,6 @@ export default function RenameDialog({
             onClick={() => {
               setShowRenameDialog(false);
               setNewName('');
-              setShowAlert(false);
             }}
           >
             <XMarkIcon className="icon-default" />
@@ -52,15 +45,17 @@ export default function RenameDialog({
           <form
             onSubmit={async event => {
               event.preventDefault();
-              setShowAlert(false);
-
-              const success = await handleRenameSubmit(
+              const result = await handleRenameSubmit(
                 `${propertiesTarget?.path}`
               );
-              if (success) {
-                setShowRenameDialog(false);
-                setNewName('');
+
+              if (result.success) {
+                toast.success('Item renamed successfully');
+              } else if (result.error) {
+                toast.error(`Failed to rename item: ${result.error}`);
               }
+              setShowRenameDialog(false);
+              setNewName('');
             }}
           >
             <div className="mt-8 flex flex-col gap-2">
@@ -86,15 +81,6 @@ export default function RenameDialog({
             <Button className="!rounded-md" type="submit">
               Submit
             </Button>
-            {showAlert === true ? (
-              <Alert className="flex items-center gap-6 mt-6 border-none bg-error-light/90">
-                <Alert.Content>{alertContent}</Alert.Content>
-                <XMarkIcon
-                  className="icon-default cursor-pointer"
-                  onClick={() => setShowAlert(false)}
-                />
-              </Alert>
-            ) : null}
           </form>
         </Dialog.Content>
       </Dialog.Overlay>

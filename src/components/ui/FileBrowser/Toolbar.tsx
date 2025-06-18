@@ -79,10 +79,12 @@ export default function Toolbar({
     const action = isCurrentlyFavorited ? 'remove from' : 'add to';
 
     if (currentFileOrFolder.path === '.') {
-      await handleFavoriteChange(currentFileSharePath, 'fileSharePath');
-      return;
+      result = await handleFavoriteChange(
+        currentFileSharePath,
+        'fileSharePath'
+      );
     } else {
-      await handleFavoriteChange(
+      result = await handleFavoriteChange(
         {
           type: 'folder',
           folderPath: currentFileOrFolder.path,
@@ -91,7 +93,16 @@ export default function Toolbar({
         'folder'
       );
     }
-  }, [currentFileSharePath, handleFavoriteChange, currentFileOrFolder]);
+
+    if (!result.success) {
+      toast.error(`Failed to ${action} favorites: ${result.error}`);
+    }
+  }, [
+    currentFileSharePath,
+    currentFileOrFolder,
+    isFavorited,
+    handleFavoriteChange
+  ]);
 
   // Don't show favorite button if not in a valid location
   const showFavoriteButton =

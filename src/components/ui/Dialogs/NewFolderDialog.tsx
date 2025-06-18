@@ -1,4 +1,5 @@
 import React from 'react';
+import toast from 'react-hot-toast';
 import {
   Alert,
   Button,
@@ -18,13 +19,7 @@ export default function NewFolderDialog({
   showNewFolderDialog,
   setShowNewFolderDialog
 }: ItemNamingDialogProps): JSX.Element {
-  const {
-    handleNewFolderSubmit,
-    newName,
-    setNewName,
-    setShowAlert,
-    alertContent
-  } = useNewFolderDialog();
+  const { handleNewFolderSubmit, newName, setNewName } = useNewFolderDialog();
 
   return (
     <Dialog open={showNewFolderDialog}>
@@ -39,7 +34,6 @@ export default function NewFolderDialog({
             onClick={() => {
               setShowNewFolderDialog(false);
               setNewName('');
-              setShowAlert(false);
             }}
           >
             <XMarkIcon className="icon-default" />
@@ -47,12 +41,14 @@ export default function NewFolderDialog({
           <form
             onSubmit={async event => {
               event.preventDefault();
-              setShowAlert(false);
-              const success = await handleNewFolderSubmit();
-              if (success) {
-                setShowNewFolderDialog(false);
-                setNewName('');
+              const result = await handleNewFolderSubmit();
+              if (!result.success) {
+                toast.error(`Failed to create new folder: ${result.error}`);
+              } else if (result.success) {
+                toast.success('New folder created successfully');
               }
+              setNewName('');
+              setShowNewFolderDialog(false);
             }}
           >
             <div className="mt-8 flex flex-col gap-2">
@@ -78,15 +74,6 @@ export default function NewFolderDialog({
             <Button className="!rounded-md" type="submit">
               Submit
             </Button>
-            {alertContent ? (
-              <Alert className="flex items-center gap-6 mt-6 border-none bg-error-light/90">
-                <Alert.Content>{alertContent}</Alert.Content>
-                <XMarkIcon
-                  className="icon-default cursor-pointer"
-                  onClick={() => setShowAlert(false)}
-                />
-              </Alert>
-            ) : null}
           </form>
         </Dialog.Content>
       </Dialog.Overlay>

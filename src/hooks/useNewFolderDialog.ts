@@ -1,25 +1,20 @@
-import { useState } from 'react';
-import toast from 'react-hot-toast';
+import React from 'react';
 
 import {
   getFileBrowsePath,
   sendFetchRequest,
   joinPaths,
-  getPreferredPathForDisplay
+  tryCatchWrapper
 } from '@/utils';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { useCookiesContext } from '@/contexts/CookiesContext';
-import { usePreferencesContext } from '@/contexts/PreferencesContext';
 
 export default function useNewFolderDialog() {
-  const [newName, setNewName] = useState<string>('');
-  const [showAlert, setShowAlert] = useState<boolean>(false);
-  const [alertContent, setAlertContent] = useState<string>('');
+  const [newName, setNewName] = React.useState<string>('');
 
   const { handleFileBrowserNavigation, currentFileOrFolder } =
     useFileBrowserContext();
   const { currentFileSharePath } = useFileBrowserContext();
-  const { pathPreference } = usePreferencesContext();
   const { cookies } = useCookiesContext();
 
   async function addNewFolder() {
@@ -43,44 +38,30 @@ export default function useNewFolderDialog() {
   }
 
   async function handleNewFolderSubmit() {
-    setShowAlert(false);
-    if (!currentFileSharePath) {
-      setAlertContent('No file share path selected.');
-      return false;
-    } else if (!currentFileOrFolder) {
-      setAlertContent('No current file or folder selected.');
-      return false;
-    } else {
-      const displayPath = getPreferredPathForDisplay(
-        pathPreference,
-        currentFileSharePath,
-        `${currentFileOrFolder.path}/${newName}`
-      );
-      try {
-        await addNewFolder();
-        await handleFileBrowserNavigation({
-          fspName: currentFileSharePath.name,
-          path: currentFileOrFolder.path
-        });
-        const alertContent = `Created new folder at path: ${displayPath}`;
-        toast.success(alertContent);
-        return true;
-      } catch (error) {
-        const errorContent = `Error creating new folder at path: ${displayPath}`;
-        setAlertContent(
-          `${errorContent}. Error details: ${error instanceof Error ? error.message : 'Unknown error'}`
-        );
-        return false;
+    return tryCatchWrapper('Create new folder', async () => {
+      await addNewFolder();
+      const navResult = await handleFileBrowserNavigation({
+        fspName: currentFileSharePath?.name,
+        path: currentFileOrFolder?.path
+      });
+
+      if (!navResult.success) {
+        return {
+          success: false,
+          error: `Folder created but navigation failed: ${navResult.error}`
+        };
       }
-    }
+
+      return {
+        success: true,
+        folderPath: `${currentFileOrFolder?.path}/${newName}`
+      };
+    });
   }
 
   return {
     handleNewFolderSubmit,
     newName,
-    setNewName,
-    showAlert,
-    setShowAlert,
-    alertContent
+    setNewName
   };
 }

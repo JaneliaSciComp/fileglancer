@@ -1,11 +1,10 @@
 import React from 'react';
-import { default as log } from '@/logger';
-import toast from 'react-hot-toast';
 
 import {
   sendFetchRequest,
   removeLastSegmentFromPath,
-  getFileBrowsePath
+  getFileBrowsePath,
+  tryCatchWrapper
 } from '@/utils';
 import { useCookiesContext } from '@/contexts/CookiesContext';
 import type { FileOrFolder } from '@/shared.types';
@@ -22,8 +21,10 @@ export default function usePermissionsDialog() {
     localPermissions: FileOrFolder['permissions']
   ) {
     if (!currentFileSharePath) {
-      toast.error('No file share path selected.');
-      return;
+      return {
+        success: false,
+        error: 'No file share path selected.'
+      };
     }
 
     const fetchPath = getFileBrowsePath(
@@ -31,21 +32,30 @@ export default function usePermissionsDialog() {
       targetItem.path
     );
 
-    try {
+    return tryCatchWrapper('Update permissions', async () => {
       await sendFetchRequest(fetchPath, 'PATCH', cookies['_xsrf'], {
         permissions: localPermissions
       });
-      await handleFileBrowserNavigation({
+
+      const navResult = await handleFileBrowserNavigation({
         fspName: currentFileSharePath.name,
         path: removeLastSegmentFromPath(targetItem.path)
       });
-      toast.success(`Successfully updated permissions for ${fetchPath}`);
-    } catch (error) {
-      toast.error(
-        `Error updating permissions for ${fetchPath}: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-    setShowAlert(true);
+
+      if (!navResult.success) {
+        return {
+          success: false,
+          error: `Permissions updated but navigation failed: ${navResult.error}`
+        };
+      }
+
+      setShowAlert(true);
+
+      return {
+        success: true,
+        targetPath: targetItem.path
+      };
+    });
   }
 
   return { handleChangePermissions, showAlert, setShowAlert };

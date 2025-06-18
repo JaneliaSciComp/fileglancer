@@ -1,4 +1,5 @@
 import React from 'react';
+import toast from 'react-hot-toast';
 import {
   Button,
   Dialog,
@@ -74,7 +75,15 @@ export default function ChangePermissions({
                 if (!localPermissions) {
                   return;
                 }
-                await handleChangePermissions(targetItem, localPermissions);
+                const result = await handleChangePermissions(
+                  targetItem,
+                  localPermissions
+                );
+                if (result.success) {
+                  toast.success(`Permissions updated for ${targetItem.name}`);
+                } else if (result.error) {
+                  toast.error(`Failed to update permissions: ${result.error}`);
+                }
                 setShowPermissionsDialog(false);
               }}
             >
