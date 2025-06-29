@@ -4,10 +4,6 @@ import type { FileSharePath } from '@/shared.types';
 import type { ProxiedPath } from '@/contexts/ProxiedPathContext';
 
 const PATH_DELIMITER = '/';
-const PROXY_BASE_URL = import.meta.env.VITE_PROXY_BASE_URL;
-if (!PROXY_BASE_URL) {
-  log.warn('VITE_PROXY_BASE_URL is not defined in the environment.');
-}
 
 /**
  * Joins multiple path segments into a single POSIX-style path, trimming any whitespace first.
@@ -174,25 +170,6 @@ function getPreferredPathForDisplay(
 }
 
 /**
- * Constructs a shareable URL for a proxied path item.
- * Optional override for the proxy base URL; defaults to VITE_PROXY_BASE_URL env variable.
- * Example:
- * makeProxiedPathUrl({ sharing_key: 'key123', sharing_name: 'shared-folder' });
- * // Returns 'http://localhost:8888/proxy/key123/shared-folder'
- */
-function makeProxiedPathUrl(
-  item: ProxiedPath,
-  proxyBaseUrl: string = PROXY_BASE_URL
-): string {
-  // Ensure the base URL ends with a slash for proper path joining
-  const baseWithSlash = proxyBaseUrl.endsWith('/')
-    ? proxyBaseUrl
-    : `${proxyBaseUrl}/`;
-  return new URL(joinPaths(item.sharing_key, item.sharing_name), baseWithSlash)
-    .href;
-}
-
-/**
  * Constructs a browse link for a file share path.
  * If filePath is provided, appends it to the base path.
  * Example:
@@ -221,6 +198,5 @@ export {
   joinPaths,
   makeBrowseLink,
   makePathSegmentArray,
-  makeProxiedPathUrl,
   removeLastSegmentFromPath
 };

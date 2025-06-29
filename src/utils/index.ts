@@ -8,7 +8,6 @@ import {
   joinPaths,
   makeBrowseLink,
   makePathSegmentArray,
-  makeProxiedPathUrl,
   removeLastSegmentFromPath
 } from './pathHandling';
 
@@ -144,7 +143,6 @@ export {
   makeBrowseLink,
   makeMapKey,
   makePathSegmentArray,
-  makeProxiedPathUrl,
   parsePermissions,
   removeLastSegmentFromPath,
   sendFetchRequest

@@ -12,8 +12,7 @@ import SharingDialog from '@/components/ui/Dialogs/SharingDialog';
 import type { FileSharePath } from '@/shared.types';
 import {
   getPreferredPathForDisplay,
-  makeMapKey,
-  makeProxiedPathUrl
+  makeMapKey
 } from '@/utils';
 import useSharingDialog from '@/hooks/useSharingDialog';
 import useCopyPath from '@/hooks/useCopyPath';
@@ -57,7 +56,7 @@ export default function ProxiedPathRow({
     pathFsp,
     item.path
   );
-  const proxiedPathUrl = makeProxiedPathUrl(item);
+
 
   const handleCopyPath = async () => {
     try {
@@ -71,7 +70,7 @@ export default function ProxiedPathRow({
 
   const handleCopyUrl = async () => {
     try {
-      await copyToClipboard(proxiedPathUrl);
+      await copyToClipboard(item.url);
       toast.success('URL copied to clipboard');
     } catch (error) {
       log.error('Failed to copy sharing URL:', error);

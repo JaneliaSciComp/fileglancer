@@ -1,17 +1,18 @@
 import React from 'react';
 import { default as log } from '@/logger';
 import { useCookiesContext } from '@/contexts/CookiesContext';
-import { sendFetchRequest, makeProxiedPathUrl } from '@/utils';
+import { sendFetchRequest } from '@/utils';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 
 export type ProxiedPath = {
-  fsp_name: string;
-  path: string;
+  username: string;
   sharing_key: string;
   sharing_name: string;
+  path: string;
+  fsp_name: string;
   created_at: string;
   updated_at: string;
-  username: string;
+  url: string;
 };
 
 type ProxiedPathContextType = {
@@ -65,7 +66,7 @@ export const ProxiedPathProvider = ({
     (proxiedPath: ProxiedPath | null) => {
       setProxiedPath(proxiedPath);
       if (proxiedPath) {
-        setDataUrl(makeProxiedPathUrl(proxiedPath));
+        setDataUrl(proxiedPath.url);
       } else {
         setDataUrl(null);
       }

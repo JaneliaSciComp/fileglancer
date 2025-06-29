@@ -4,8 +4,6 @@ import logging
 from typing import Optional
 from functools import cache
 
-from fileglancer.uimodels import ProxiedPath, ProxiedPathResponse
-
 log = logging.getLogger(__name__)
 
 class ProxiedPathManager:
