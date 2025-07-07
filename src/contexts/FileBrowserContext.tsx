@@ -1,11 +1,9 @@
 import React from 'react';
 import { default as log } from '@/logger';
-import { useErrorBoundary } from 'react-error-boundary';
 
 import { FileOrFolder, FileSharePath } from '@/shared.types';
 import {
   getFileBrowsePath,
-  HTTPError,
   makeMapKey,
   removeLastSegmentFromPath,
   sendFetchRequest
@@ -26,8 +24,7 @@ type FileBrowserContextType = {
   files: FileOrFolder[];
   currentFolder: FileOrFolder | null;
   currentFileSharePath: FileSharePath | null;
-  fetchAndSetFiles: (fspName: string, path?: string) => Promise<void>;
-  setCurrentFileSharePath: (fspName: string) => void;
+  fetchAndSetFiles: (fspName: string, path?: string) => Promise<Response>;
 };
 
 const FileBrowserContext = React.createContext<FileBrowserContextType | null>(
@@ -58,7 +55,6 @@ export const FileBrowserContextProvider = ({
   const [currentFileSharePath, setCurrentFileSharePath] =
     React.useState<FileSharePath | null>(null);
 
-  const { showBoundary } = useErrorBoundary();
   const { cookies } = useCookiesContext();
   const { zonesAndFileSharePathsMap, isZonesMapReady } =
     useZoneAndFspMapContext();
@@ -67,56 +63,41 @@ export const FileBrowserContextProvider = ({
   const fetchFileOrFolderInfo = React.useCallback(
     async (fspName: string, path?: string): Promise<FileOrFolder | null> => {
       const url = getFileBrowsePath(fspName, path);
-      try {
-        const response = await sendFetchRequest(url, 'GET', cookies['_xsrf']);
-        const data = await response.json();
-        if (data && data['info']) {
-          return data['info'] as FileOrFolder;
-        }
-      } catch (error) {
-        if (error instanceof HTTPError && error.responseCode === 404) {
-          showBoundary(error);
-        } else {
-          log.error(error);
-        }
+      const response = await sendFetchRequest(url, 'GET', cookies['_xsrf']);
+      const data = await response.json();
+      if (data && data['info']) {
+        return data['info'] as FileOrFolder;
       }
       return null;
     },
-    [cookies, showBoundary]
+    [cookies]
   );
 
   // Function to fetch files for the current FSP and current folder
   const fetchAndSetFiles = React.useCallback(
-    async (fspName: string, path?: string): Promise<void> => {
+    async (fspName: string, path?: string): Promise<Response> => {
       const url = path
         ? getFileBrowsePath(fspName, path)
         : getFileBrowsePath(fspName);
 
       let files: FileOrFolder[] = [];
 
-      try {
-        const response = await sendFetchRequest(url, 'GET', cookies['_xsrf']);
-        const data = await response.json();
+      const response = await sendFetchRequest(url, 'GET', cookies['_xsrf']);
+      const data = await response.json();
 
-        if (data.files) {
-          // Sort: directories first, then files; alphabetically within each type
-          files = data.files.sort((a: FileOrFolder, b: FileOrFolder) => {
-            if (a.is_dir === b.is_dir) {
-              return a.name.localeCompare(b.name);
-            }
-            return a.is_dir ? -1 : 1;
-          }) as FileOrFolder[];
-        }
-      } catch (error) {
-        if (error instanceof HTTPError && error.responseCode === 404) {
-          showBoundary(error);
-        } else {
-          log.error(error);
-        }
+      if (data.files) {
+        // Sort: directories first, then files; alphabetically within each type
+        files = data.files.sort((a: FileOrFolder, b: FileOrFolder) => {
+          if (a.is_dir === b.is_dir) {
+            return a.name.localeCompare(b.name);
+          }
+          return a.is_dir ? -1 : 1;
+        }) as FileOrFolder[];
       }
       setFiles(files);
+      return response;
     },
-    [cookies, showBoundary]
+    [cookies]
   );
 
   // Effect to update currentFolder when currentFileSharePath or filePath URL param changes
