@@ -1,5 +1,4 @@
 import React from 'react';
-import { default as log } from '@/logger';
 import { Link } from 'react-router-dom';
 import {
   IconButton,
@@ -18,6 +17,7 @@ import {
   getPreferredPathForDisplay,
   makeBrowseLink
 } from '@/utils';
+import { handleFailure } from '@/utils/errorHandling';
 import { useCookiesContext } from '@/contexts/CookiesContext';
 import MissingFolderFavoriteDialog from './MissingFolderFavoriteDialog';
 
@@ -64,14 +64,11 @@ export default function Folder({ folderFavorite }: FolderProps) {
         cookies['_xsrf']
       );
 
-      if (response.status === 200) {
-        return true;
-      } else {
-        return false;
+      if (response.status === 404) {
+        setShowMissingFolderFavoriteDialog(true);
       }
     } catch (error) {
-      log.error('Error checking folder existence:', error);
-      return false;
+      handleFailure('checking folder exists', error);
     }
   }
 
@@ -79,17 +76,7 @@ export default function Folder({ folderFavorite }: FolderProps) {
     <>
       <List.Item
         key={mapKey}
-        onClick={async () => {
-          let folderExists;
-          try {
-            folderExists = await checkFolderExists(folderFavorite);
-          } catch (error) {
-            log.error('Error checking folder existence:', error);
-          }
-          if (folderExists === false) {
-            setShowMissingFolderFavoriteDialog(true);
-          }
-        }}
+        onClick={() => checkFolderExists(folderFavorite)}
         className="pl-6 w-full flex gap-2 items-center justify-between rounded-md cursor-pointer text-foreground hover:bg-primary-light/30 focus:bg-primary-light/30 "
       >
         <Link
@@ -121,9 +108,9 @@ export default function Folder({ folderFavorite }: FolderProps) {
             className="min-w-0 min-h-0"
             variant="ghost"
             isCircular
-            onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
               e.stopPropagation();
-              await handleFavoriteChange(folderFavorite, 'folder');
+              handleFavoriteChange(folderFavorite, 'folder');
             }}
           >
             <StarFilled className="icon-small short:icon-xsmall mb-[2px]" />

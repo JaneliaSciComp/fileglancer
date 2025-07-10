@@ -19,6 +19,7 @@ import type { FileOrFolder } from '@/shared.types';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { makeMapKey } from '@/utils';
+import { handleFailure } from '@/utils/errorHandling';
 
 type ToolbarProps = {
   selectedFiles: FileOrFolder[];
@@ -70,24 +71,53 @@ export default function Toolbar({
     fileSharePathPreferenceMap
   ]);
 
-  const handleFavoriteClick = React.useCallback(async () => {
+  async function handleRefresh() {
+    if (!currentFileSharePath) {
+      return;
+    }
+    try {
+      const response = await fetchAndSetFiles(
+        currentFileSharePath.name,
+        currentFolder?.path
+      );
+      if (!response.ok) {
+        handleFailure('refreshing file browser', response);
+      }
+    } catch (error) {
+      handleFailure('refreshing file browser', error);
+    }
+  }
+
+  async function handleFavoriteClick() {
     if (!currentFileSharePath || !currentFolder) {
       return;
     }
-    if (!currentFolder || currentFolder.path === '.') {
-      await handleFavoriteChange(currentFileSharePath, 'fileSharePath');
-      return;
-    } else {
-      await handleFavoriteChange(
-        {
-          type: 'folder',
-          folderPath: currentFolder.path,
-          fsp: currentFileSharePath
-        },
-        'folder'
-      );
+    try {
+      if (!currentFolder || currentFolder.path === '.') {
+        const response = await handleFavoriteChange(
+          currentFileSharePath,
+          'fileSharePath'
+        );
+        if (!response.ok) {
+          handleFailure('adding/removing file share path favorite', response);
+        }
+      } else {
+        const response = await handleFavoriteChange(
+          {
+            type: 'folder',
+            folderPath: currentFolder.path,
+            fsp: currentFileSharePath
+          },
+          'folder'
+        );
+        if (!response.ok) {
+          handleFailure('adding/removing folder favorite', response);
+        }
+      }
+    } catch (error) {
+      handleFailure('adding/removing folder favorite', error);
     }
-  }, [currentFolder, currentFileSharePath, handleFavoriteChange]);
+  }
 
   // Don't show favorite button if not in a valid location
   const showFavoriteButton =
@@ -136,15 +166,7 @@ export default function Toolbar({
             <Tooltip.Trigger
               as={IconButton}
               variant="outline"
-              onClick={async () => {
-                if (!currentFileSharePath) {
-                  return;
-                }
-                await fetchAndSetFiles(
-                  currentFileSharePath.name,
-                  currentFolder?.path
-                );
-              }}
+              onClick={() => handleRefresh()}
             >
               <ArrowPathIcon className="icon-default" />
               <Tooltip.Content className="px-2.5 py-1.5 text-primary-foreground">
