@@ -5,7 +5,6 @@ import { useTicketContext } from '@/contexts/TicketsContext';
 
 export default function Jobs() {
   const { allTickets } = useTicketContext();
-
   return (
     <div className="w-full flex justify-center">
       <div className="w-full max-w-6xl p-6">

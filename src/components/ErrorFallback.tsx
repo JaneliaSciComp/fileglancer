@@ -1,4 +1,5 @@
 import logger from '@/logger';
+import { Link } from 'react-router';
 import { Typography } from '@material-tailwind/react';
 
 import errorImg from '@/assets/error_icon_gradient.png';
@@ -33,13 +34,24 @@ export default function ErrorFallback({ error }: any) {
         )}
         <Typography
           type="h5"
-          as="a"
-          href="https://forms.clickup.com/10502797/f/a0gmd-713/NBUCBCIN78SI2BE71G"
+          as={Link}
+          to="https://forms.clickup.com/10502797/f/a0gmd-713/NBUCBCIN78SI2BE71G"
           target="_blank"
           rel="noopener noreferrer"
           className="text-black dark:text-white underline"
         >
           Submit a bug report
+        </Typography>
+
+        <Typography
+          type="h5"
+          as={Link}
+          to="/browse"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-black dark:text-white underline"
+        >
+          Go back home
         </Typography>
 
         <img
