@@ -3,7 +3,8 @@ import { CookiesProvider } from 'react-cookie';
 import { ErrorBoundary } from 'react-error-boundary';
 
 import { MainLayout } from './layouts/MainLayout';
-import { BrowseLayout } from './layouts/BrowseLayout';
+import { BrowsePageLayout } from './layouts/BrowseLayout';
+import { OtherPagesLayout } from './layouts/OtherPagesLayout';
 import Home from '@/components/Home';
 import Browse from '@/components/Browse';
 import Help from '@/components/Help';
@@ -56,12 +57,14 @@ const AppComponent = () => {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/*" element={<MainLayout />}>
-          <Route path="shared" element={<Shared />} />
-          <Route path="jobs" element={<Jobs />} />
-          <Route path="help" element={<Help />} />
-          <Route path="profile" element={<Profile />} />
-          <Route path="preferences" element={<Preferences />} />
-          <Route element={<BrowseLayout />}>
+          <Route element={<OtherPagesLayout />}>
+            <Route path="shared" element={<Shared />} />
+            <Route path="jobs" element={<Jobs />} />
+            <Route path="help" element={<Help />} />
+            <Route path="profile" element={<Profile />} />
+            <Route path="preferences" element={<Preferences />} />
+          </Route>
+          <Route element={<BrowsePageLayout />}>
             <Route path="browse" element={<Browse />} />
             <Route path="browse/:fspName" element={<Browse />} />
             <Route path="browse/:fspName/*" element={<Browse />} />

@@ -56,7 +56,7 @@ export default function Browse() {
   const [showRenameDialog, setShowRenameDialog] = React.useState(false);
 
   return (
-    <div className="flex-1 overflow-auto flex flex-col h-full">
+    <div className="flex-1 flex flex-col h-full">
       <Toolbar
         hideDotFiles={hideDotFiles}
         setHideDotFiles={setHideDotFiles}
@@ -66,7 +66,7 @@ export default function Browse() {
         setShowSidebar={setShowSidebar}
         setShowNewFolderDialog={setShowNewFolderDialog}
       />
-      <div className="relative grow h-full flex flex-col overflow-hidden mb-3">
+      <div className="relative grow h-full flex flex-col overflow-y-auto mb-3">
         {!currentFileSharePath ? (
           <Dashboard />
         ) : (
