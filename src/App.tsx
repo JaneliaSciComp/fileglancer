@@ -12,14 +12,6 @@ import Preferences from '@/components/Preferences';
 import Shared from '@/components/Shared';
 import ErrorFallback from '@/components/ErrorFallback';
 
-function Profile() {
-  return (
-    <div className="p-4">
-      <h2 className="text-foreground text-lg">Profile Page</h2>
-    </div>
-  );
-}
-
 function Login() {
   return (
     <div className="p-4">
@@ -59,7 +51,6 @@ const AppComponent = () => {
           <Route path="shared" element={<Shared />} />
           <Route path="jobs" element={<Jobs />} />
           <Route path="help" element={<Help />} />
-          <Route path="profile" element={<Profile />} />
           <Route path="preferences" element={<Preferences />} />
           <Route element={<BrowseLayout />}>
             <Route path="browse" element={<Browse />} />

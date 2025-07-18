@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { IconButton, Menu } from '@material-tailwind/react';
+import { IconButton, Menu, Typography } from '@material-tailwind/react';
 import { HiOutlineLogout, HiOutlineUserCircle } from 'react-icons/hi';
 import { HiOutlineAdjustmentsHorizontal } from 'react-icons/hi2';
 import { Link } from 'react-router-dom';
@@ -26,14 +26,13 @@ export default function ProfileMenu() {
         <HiOutlineUserCircle className="stroke-2 icon-large short:icon-default" />
       </Menu.Trigger>
       <Menu.Content>
-        <Menu.Item
-          as={Link}
-          to="/profile"
-          className="text-foreground hover:!text-foreground focus:!text-foreground hover:bg-hover-gradient hover:dark:bg-hover-gradient-dark focus:bg-hover-gradient focus:dark:bg-hover-gradient-dark"
-        >
+        <div className="w-full flex items-center py-1.5 px-2.5 rounded align-middle select-none outline-none bg-transparent">
           <HiOutlineUserCircle className="mr-2 icon-default" />
-          {profile ? profile.username : 'Loading...'}
-        </Menu.Item>
+          <Typography className="text-sm text-foreground font-sans font-semibold">
+            {profile ? profile.username : 'Loading...'}
+          </Typography>
+        </div>
+        <hr className="!my-1 -mx-1 border-surface" />
         <Menu.Item
           as={Link}
           to="/preferences"
@@ -42,7 +41,6 @@ export default function ProfileMenu() {
           <HiOutlineAdjustmentsHorizontal className="mr-2 icon-default" />
           Preferences
         </Menu.Item>
-        <hr className="!my-1 -mx-1 border-surface" />
         <Menu.Item
           as={Link}
           to={`${origin}/logout`}
