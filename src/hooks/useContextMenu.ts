@@ -1,6 +1,8 @@
 import * as React from 'react';
+
 import { FileOrFolder } from '@/shared.types';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
 
 export default function useContextMenu() {
   const [contextMenuCoords, setContextMenuCoords] = React.useState({
@@ -11,7 +13,8 @@ export default function useContextMenu() {
 
   const menuRef = React.useRef<HTMLDivElement>(null);
 
-  const { setPropertiesTarget } = useFileBrowserContext();
+  const { currentFileSharePath, setPropertiesTarget } = useFileBrowserContext();
+  const { handleFavoriteChange } = usePreferencesContext();
 
   function onClose() {
     setShowContextMenu(false);
@@ -52,7 +55,7 @@ export default function useContextMenu() {
     };
   }, [contextMenuCoords.x, contextMenuCoords.y]);
 
-  function handleRightClick(
+  function handleContextMenuClick(
     e: React.MouseEvent<HTMLDivElement>,
     file: FileOrFolder,
     selectedFiles: FileOrFolder[],
@@ -67,11 +70,27 @@ export default function useContextMenu() {
     const newSelectedFiles = currentIndex === -1 ? [file] : [...selectedFiles];
     setSelectedFiles(newSelectedFiles);
   }
+
+  const handleFavoriteToggleMenuItemClick = async (selectedFiles: FileOrFolder[]) => {
+    if (currentFileSharePath) {
+      await handleFavoriteChange(
+        {
+          type: 'folder',
+          folderPath: selectedFiles[0].path,
+          fsp: currentFileSharePath
+        },
+        'folder'
+      );
+    }
+    setShowContextMenu(false);
+  };
+
   return {
     contextMenuCoords,
     showContextMenu,
     setShowContextMenu,
     menuRef,
-    handleRightClick
+    handleContextMenuClick,
+    handleFavoriteToggleMenuItemClick
   };
 }

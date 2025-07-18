@@ -14,7 +14,7 @@ type FileListProps = {
   setSelectedFiles: React.Dispatch<React.SetStateAction<FileOrFolder[]>>;
   showPropertiesDrawer: boolean;
   hideDotFiles: boolean;
-  handleRightClick: (
+  handleContextMenuClick: (
     e: React.MouseEvent<HTMLDivElement>,
     file: FileOrFolder,
     selectedFiles: FileOrFolder[],
@@ -27,7 +27,7 @@ export default function FileList({
   setSelectedFiles,
   showPropertiesDrawer,
   hideDotFiles,
-  handleRightClick
+  handleContextMenuClick
 }: FileListProps): React.ReactNode {
   const { files, isFileBrowserReady, fetchErrorMsg } = useFileBrowserContext();
   const {
@@ -97,7 +97,7 @@ export default function FileList({
                 setSelectedFiles={setSelectedFiles}
                 displayFiles={displayFiles}
                 showPropertiesDrawer={showPropertiesDrawer}
-                handleRightClick={handleRightClick}
+                handleContextMenuClick={handleContextMenuClick}
               />
             );
           })

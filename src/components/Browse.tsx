@@ -1,7 +1,6 @@
 import React from 'react';
 import { useOutletContext } from 'react-router';
 
-import type { FileOrFolder } from '@/shared.types';
 import useContextMenu from '@/hooks/useContextMenu';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
 import useSelectedFiles from '@/hooks/useSelectedFiles';
@@ -9,7 +8,7 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 
 import FileList from './ui/FileBrowser/FileList';
 import Toolbar from './ui/FileBrowser/Toolbar';
-import ContextMenu from './ui/FileBrowser/ContextMenu';
+import ContextMenu from './ui/Menus/ContextMenu';
 import RenameDialog from './ui/Dialogs/RenameDialog';
 import NewFolderDialog from './ui/Dialogs/NewFolderDialog';
 import Delete from './ui/Dialogs/Delete';
@@ -40,7 +39,8 @@ export default function Browse() {
     showContextMenu,
     setShowContextMenu,
     menuRef,
-    handleRightClick
+    handleContextMenuClick,
+    handleFavoriteToggleMenuItemClick
   } = useContextMenu();
 
   const { hideDotFiles, setHideDotFiles } = useHideDotFiles();
@@ -72,7 +72,7 @@ export default function Browse() {
             setSelectedFiles={setSelectedFiles}
             showPropertiesDrawer={showPropertiesDrawer}
             hideDotFiles={hideDotFiles}
-            handleRightClick={handleRightClick}
+            handleContextMenuClick={handleContextMenuClick}
           />
         )}
       </div>
@@ -82,6 +82,7 @@ export default function Browse() {
           y={contextMenuCoords.y}
           menuRef={menuRef}
           selectedFiles={selectedFiles}
+          handleFavoriteToggleMenuItemClick={handleFavoriteToggleMenuItemClick}
           setShowPropertiesDrawer={setShowPropertiesDrawer}
           setShowContextMenu={setShowContextMenu}
           setShowRenameDialog={setShowRenameDialog}

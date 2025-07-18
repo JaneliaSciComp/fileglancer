@@ -23,7 +23,7 @@ type FileRowProps = {
   setSelectedFiles: React.Dispatch<React.SetStateAction<FileOrFolder[]>>;
   displayFiles: FileOrFolder[];
   showPropertiesDrawer: boolean;
-  handleRightClick: (
+  handleContextMenuClick: (
     e: React.MouseEvent<HTMLDivElement>,
     file: FileOrFolder,
     selectedFiles: FileOrFolder[],
@@ -38,7 +38,7 @@ export default function FileRow({
   setSelectedFiles,
   displayFiles,
   showPropertiesDrawer,
-  handleRightClick
+  handleContextMenuClick
 }: FileRowProps): ReactNode {
   const { currentFileSharePath } = useFileBrowserContext();
   const { handleLeftClick } = useHandleLeftClick();
@@ -57,16 +57,14 @@ export default function FileRow({
       className={`cursor-pointer grid grid-cols-[minmax(170px,2fr)_minmax(80px,1fr)_minmax(95px,1fr)_minmax(75px,1fr)_minmax(40px,1fr)] gap-4 hover:bg-primary-light/30 focus:bg-primary-light/30 ${isSelected && 'bg-primary-light/30'} ${index % 2 === 0 && !isSelected && 'bg-surface/50'}  `}
       onClick={(e: React.MouseEvent<HTMLDivElement>) =>
         handleLeftClick(
-          e,
           file,
           selectedFiles,
           setSelectedFiles,
-          displayFiles,
           showPropertiesDrawer
         )
       }
       onContextMenu={(e: React.MouseEvent<HTMLDivElement>) =>
-        handleRightClick(e, file, selectedFiles, setSelectedFiles)
+        handleContextMenuClick(e, file, selectedFiles, setSelectedFiles)
       }
     >
       {/* Name column */}
@@ -121,7 +119,7 @@ export default function FileRow({
       <div
         className="py-1 text-grey-700 flex items-center flex-shrink-0"
         onClick={e => {
-          handleRightClick(e, file, selectedFiles, setSelectedFiles);
+          handleContextMenuClick(e, file, selectedFiles, setSelectedFiles);
         }}
       >
         <IconButton variant="ghost">
