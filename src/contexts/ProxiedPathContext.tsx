@@ -89,6 +89,7 @@ export const ProxiedPathProvider = ({
           errorMsg = data.error;
         }
       } catch (e) {
+        log.error('Error fetching proxied paths:', e);
         // response was not JSON, keeping default errorMsg...
       }
       throw new Error(errorMsg);

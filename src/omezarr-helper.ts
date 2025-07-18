@@ -4,7 +4,6 @@ import * as omezarr from 'ome-zarr.js';
 
 // Copied since ome-zarr.js doesn't export the types
 // TODO: use the types from ome-zarr.js when they become available
-/* eslint-disable @typescript-eslint/naming-convention */
 export interface Multiscale {
   axes: Axis[];
   /**
@@ -82,9 +81,7 @@ export type Metadata = {
   omero: Omero | null | undefined;
   scales: number[][];
   zarr_version: 2 | 3;
-  thumbnail: string | null;
 };
-/* eslint-enable @typescript-eslint/naming-convention */
 
 const COLORS = ['magenta', 'green', 'cyan', 'white', 'red', 'green', 'blue'];
 
@@ -207,17 +204,45 @@ function getNeuroglancerSource(dataUrl: string, zarr_version: 2 | 3): string {
   return dataUrl + '|zarr' + zarr_version + ':';
 }
 
+function generateNeuroglancerStateForZarrArray(
+  dataUrl: string,
+  zarr_version: 2 | 3
+): string | null {
+  log.debug('Generating Neuroglancer state for Zarr array:', dataUrl);
+
+  const layer: Record<string, any> = {
+    name: 'Default',
+    type: 'image',
+    source: getNeuroglancerSource(dataUrl, zarr_version),
+    tab: 'rendering'
+  };
+
+  // Create the scaffold for theNeuroglancer viewer state
+  const state: any = {
+    layers: [layer],
+    layout: '4panel',
+    selectedLayer: {
+      visible: true,
+      layer: 'Default'
+    }
+  };
+
+  // Convert the state to a URL-friendly format
+  const stateJson = JSON.stringify(state);
+  return encodeURIComponent(stateJson);
+}
+
 /**
  * Generate a Neuroglancer state for a given Zarr array.
  */
-function generateNeuroglancerState(
+function generateNeuroglancerStateForOmeZarr(
   dataUrl: string,
   zarr_version: 2 | 3,
   multiscale: Multiscale,
   arr: zarr.Array<any>,
   omero?: Omero | null
 ): string | null {
-  log.debug('Generating Neuroglancer state for', dataUrl);
+  log.debug('Generating Neuroglancer state for OME-Zarr:', dataUrl);
 
   // Convert axes array to a map for easier access
   const axesMap = getAxesMap(multiscale);
@@ -230,7 +255,11 @@ function generateNeuroglancerState(
   const state: any = {
     dimensions: {},
     layers: [],
-    layout: '4panel'
+    layout: '4panel',
+    selectedLayer: {
+      visible: true,
+      layer: 'Default'
+    }
   };
 
   const fullres = multiscale.datasets[0];
@@ -252,11 +281,9 @@ function generateNeuroglancerState(
       const axis = axesMap[name];
       const unit = translateUnitToNeuroglancer(axis.unit);
       state.dimensions[name] = [scale[axis.index], unit];
-      // Center the image in the viewer
-      const extent = arr.shape[axis.index];
       imageDimensions.delete(name);
     } else {
-      log.warn('Dimension not found in axes map: ', name);
+      log.debug('Dimension not found in axes map: ', name);
     }
   }
 
@@ -304,7 +331,7 @@ function generateNeuroglancerState(
   }
 
   if (channels.length === 0) {
-    log.warn('No channels found in metadata, using default shader');
+    log.debug('No channels found in metadata, using default shader');
     const layer: Record<string, any> = {
       type: 'image',
       source: getNeuroglancerSource(dataUrl, zarr_version),
@@ -366,27 +393,27 @@ function generateNeuroglancerState(
         ...layer
       });
     });
-  }
 
-  state.selectedLayer = {
-    visible: true,
-    layer: channels[0].name
-  };
+    // Fix the selected layer name
+    state.selectedLayer.layer = channels[0].name;
+  }
 
   // Convert the state to a URL-friendly format
   const stateJson = JSON.stringify(state);
   return encodeURIComponent(stateJson);
 }
 
+async function getZarrArray(dataUrl: string): Promise<zarr.Array<any>> {
+  log.debug('Getting Zarr array for', dataUrl);
+  const zarr_version = 2;
+  const store = new zarr.FetchStore(dataUrl);
+  return await omezarr.getArray(store, '/', zarr_version);
+}
+
 /**
  * Process the given OME-Zarr array and return the metadata, thumbnail, and Neuroglancer link.
  */
-async function getOmeZarrMetadata(
-  dataUrl: string,
-  thumbnailSize: number = 300,
-  maxThumbnailSize: number = 1024,
-  autoBoost: boolean = true
-): Promise<[Metadata, string | null]> {
+async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
   log.debug('Getting OME-Zarr metadata for', dataUrl);
   const store = new zarr.FetchStore(dataUrl);
   const { arr, shapes, multiscale, omero, scales, zarr_version } =
@@ -396,24 +423,6 @@ async function getOmeZarrMetadata(
   log.debug('Omero: ', omero);
   log.debug('Array: ', arr);
   log.debug('Shapes: ', shapes);
-  let thumbnail = null;
-  let errorMessage: string | null = null;
-
-  try {
-    thumbnail = await omezarr.renderThumbnail(
-      store,
-      thumbnailSize,
-      autoBoost,
-      maxThumbnailSize
-    );
-  } catch (err: unknown) {
-    if (err instanceof Error) {
-      errorMessage = err.message;
-    } else {
-      errorMessage = String(err);
-    }
-    thumbnail = null;
-  }
 
   const metadata: Metadata = {
     arr,
@@ -421,11 +430,47 @@ async function getOmeZarrMetadata(
     multiscale,
     omero,
     scales,
-    zarr_version,
-    thumbnail
+    zarr_version
   };
 
-  return [metadata, errorMessage];
+  return metadata;
 }
 
-export { getOmeZarrMetadata, generateNeuroglancerState };
+type ThumbnailResult = [thumbnail: string | null, errorMessage: string | null];
+
+async function getOmeZarrThumbnail(
+  dataUrl: string,
+  thumbnailSize: number = 300,
+  maxThumbnailSize: number = 1024,
+  autoBoost: boolean = true
+): Promise<ThumbnailResult> {
+  log.debug('Getting OME-Zarr thumbnail for', dataUrl);
+  const store = new zarr.FetchStore(dataUrl);
+  try {
+    return [
+      await omezarr.renderThumbnail(
+        store,
+        thumbnailSize,
+        autoBoost,
+        maxThumbnailSize
+      ),
+      null
+    ];
+  } catch (err: unknown) {
+    let errorMessage: string | null = null;
+    if (err instanceof Error) {
+      errorMessage = err.message;
+    } else {
+      errorMessage = String(err);
+    }
+    return [null, errorMessage];
+  }
+}
+
+export {
+  getZarrArray,
+  getOmeZarrMetadata,
+  getOmeZarrThumbnail,
+  generateNeuroglancerStateForZarrArray,
+  generateNeuroglancerStateForOmeZarr
+};

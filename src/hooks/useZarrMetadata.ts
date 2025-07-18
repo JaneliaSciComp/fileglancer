@@ -3,12 +3,16 @@ import { default as log } from '@/logger';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import {
   getOmeZarrMetadata,
-  generateNeuroglancerState
+  getOmeZarrThumbnail,
+  getZarrArray,
+  generateNeuroglancerStateForZarrArray,
+  generateNeuroglancerStateForOmeZarr
 } from '@/omezarr-helper';
 import type { Metadata } from '@/omezarr-helper';
 import { fetchFileAsJson, getFileURL } from '@/utils';
 import { useCookies } from 'react-cookie';
 import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
+import * as zarr from 'zarrita';
 
 export type OpenWithToolUrls = {
   copy: string;
@@ -17,13 +21,15 @@ export type OpenWithToolUrls = {
   vole: string;
 };
 
+export type ZarrArray = zarr.Array<any>;
+export type ZarrMetadata = Metadata | ZarrArray | null;
+
 export default function useZarrMetadata() {
-  const [imageUrl, setImageUrl] = React.useState<string | null>(null);
   const [thumbnailSrc, setThumbnailSrc] = React.useState<string | null>(null);
   const [openWithToolUrls, setOpenWithToolUrls] =
     React.useState<OpenWithToolUrls | null>(null);
-  const [metadata, setMetadata] = React.useState<Metadata | null>(null);
-  const [hasMultiscales, setHasMultiscales] = React.useState(false);
+  const [metadata, setMetadata] = React.useState<ZarrMetadata>(null);
+  const [omeZarrUrl, setOmeZarrUrl] = React.useState<string | null>(null);
   const [loadingThumbnail, setLoadingThumbnail] = React.useState(false);
   const [thumbnailError, setThumbnailError] = React.useState<string | null>(
     null
@@ -32,104 +38,173 @@ export default function useZarrMetadata() {
   const validatorBaseUrl = 'https://ome.github.io/ome-ngff-validator/?source=';
   const neuroglancerBaseUrl = 'https://neuroglancer-demo.appspot.com/#!';
   const voleBaseUrl = 'https://volumeviewer.allencell.org/viewer?url=';
-  const { currentFolder, currentFileSharePath, files, isFileBrowserReady } =
-    useFileBrowserContext();
+  const { fileBrowserState } = useFileBrowserContext();
   const { dataUrl } = useProxiedPathContext();
   const [cookies] = useCookies(['_xsrf']);
 
-  const checkZattrsForMultiscales = React.useCallback(async () => {
-    if (!isFileBrowserReady) {
-      return;
-    }
-    setHasMultiscales(false);
-    setImageUrl(null);
-    setThumbnailSrc(null);
-    setMetadata(null);
-    setOpenWithToolUrls(null);
-    const zattrsFile = files.find(file => file.name === '.zattrs');
-    if (zattrsFile && currentFileSharePath && currentFolder) {
-      try {
-        const zattrs = (await fetchFileAsJson(
-          currentFileSharePath.name,
-          zattrsFile.path,
-          cookies
-        )) as any;
-        log.debug('Zattrs', zattrs);
-        if (zattrs.multiscales) {
-          setHasMultiscales(true);
-          setImageUrl(
-            getFileURL(currentFileSharePath.name, currentFolder.path)
-          );
-        }
-      } catch (error) {
-        log.error('Error fetching OME-Zarr metadata:', error);
+  const checkZarrMetadata = React.useCallback(
+    async (cancelRef: { cancel: boolean }) => {
+      if (!fileBrowserState.isFileBrowserReady) {
+        return;
       }
-    }
-  }, [files, currentFileSharePath, currentFolder, cookies, isFileBrowserReady]);
+      setMetadata(null);
+      setOmeZarrUrl(null);
+      setThumbnailSrc(null);
+      setThumbnailError(null);
+      setLoadingThumbnail(false);
+      setOpenWithToolUrls(null);
 
-  // 2. Run checkZattrsForMultiscales when dependencies change
-  React.useEffect(() => {
-    let cancelled = false;
-    if (!cancelled) {
-      checkZattrsForMultiscales();
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [checkZattrsForMultiscales]);
-
-  // 3. Run your metadata/thumbnail logic when hasMultiscales and currentFolder are ready
-  React.useEffect(() => {
-    if (!hasMultiscales || !imageUrl) {
-      return;
-    }
-    let cancelled = false;
-    const fetchMetadata = async () => {
-      setLoadingThumbnail(true);
-      try {
-        const [metadata, error] = await getOmeZarrMetadata(imageUrl);
-        if (!cancelled) {
-          setMetadata(metadata);
-          setThumbnailSrc(metadata.thumbnail);
-          if (error) {
-            setThumbnailError(error);
-            log.error('Error fetching OME-Zarr metadata:', error);
-          } else {
-            setThumbnailError(null);
+      if (
+        fileBrowserState.currentFileSharePath &&
+        fileBrowserState.currentFolder
+      ) {
+        const imageUrl = getFileURL(
+          fileBrowserState.currentFileSharePath.name,
+          fileBrowserState.currentFolder.path
+        );
+        const zarrayFile = fileBrowserState.files.find(
+          file => file.name === '.zarray'
+        );
+        if (zarrayFile) {
+          try {
+            try {
+              const arr = await getZarrArray(imageUrl);
+              if (cancelRef.cancel) {
+                return;
+              }
+              setMetadata(arr);
+            } catch (error) {
+              log.error('Error fetching Zarr array:', error);
+              if (cancelRef.cancel) {
+                return;
+              }
+              setThumbnailError('Error fetching Zarr array');
+            }
+          } catch (error) {
+            log.error('Error fetching Zarr array metadata:', error);
+          }
+        } else {
+          const zattrsFile = fileBrowserState.files.find(
+            file => file.name === '.zattrs'
+          );
+          if (zattrsFile) {
+            try {
+              const zattrs = (await fetchFileAsJson(
+                fileBrowserState.currentFileSharePath.name,
+                zattrsFile.path,
+                cookies
+              )) as any;
+              if (zattrs.multiscales) {
+                setThumbnailError(null);
+                try {
+                  setOmeZarrUrl(imageUrl);
+                  const metadata = await getOmeZarrMetadata(imageUrl);
+                  if (cancelRef.cancel) {
+                    return;
+                  }
+                  setMetadata(metadata);
+                  setLoadingThumbnail(true);
+                } catch (error) {
+                  log.error(
+                    'Exception fetching OME-Zarr metadata:',
+                    imageUrl,
+                    error
+                  );
+                  if (cancelRef.cancel) {
+                    return;
+                  }
+                  setThumbnailError('Error fetching OME-Zarr metadata');
+                }
+              }
+            } catch (error) {
+              log.error('Error fetching OME-Zarr metadata:', error);
+            }
           }
         }
-      } catch (error) {
-        log.error('Error fetching OME-Zarr metadata:', error);
-      } finally {
+      }
+    },
+    [fileBrowserState, cookies]
+  );
+
+  // When the file browser state changes, check for Zarr metadata
+  React.useEffect(() => {
+    const cancelRef = { cancel: false };
+    checkZarrMetadata(cancelRef);
+    return () => {
+      cancelRef.cancel = true;
+    };
+  }, [checkZarrMetadata]);
+
+  // When an OME-Zarr URL is set, load the thumbnail
+  React.useEffect(() => {
+    if (!omeZarrUrl) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const loadThumbnail = async (signal: AbortSignal) => {
+      try {
+        const [thumbnail, error] = await getOmeZarrThumbnail(omeZarrUrl);
+        if (signal.aborted) {
+          return;
+        }
+
         setLoadingThumbnail(false);
+        if (error) {
+          console.error('Thumbnail load failed:', error);
+          setThumbnailError(error);
+        } else {
+          setThumbnailSrc(thumbnail);
+        }
+      } catch (err) {
+        if (!signal.aborted) {
+          console.error('Unexpected error loading thumbnail:', err);
+          setThumbnailError(err instanceof Error ? err.message : String(err));
+        }
       }
     };
-    fetchMetadata();
-    return () => {
-      cancelled = true;
-    };
-  }, [hasMultiscales, imageUrl]);
 
+    loadThumbnail(controller.signal);
+
+    return () => {
+      controller.abort();
+    };
+  }, [omeZarrUrl]);
+
+  // Run tool url generation when the proxied path url or metadata changes
   React.useEffect(() => {
     setOpenWithToolUrls(null);
     if (metadata && dataUrl) {
       const openWithToolUrls = {
-        copy: dataUrl,
-        validator: validatorBaseUrl + dataUrl,
-        vole: voleBaseUrl + dataUrl
+        copy: dataUrl
       } as OpenWithToolUrls;
-      try {
+      if (metadata instanceof zarr.Array) {
+        openWithToolUrls.validator = '';
+        openWithToolUrls.vole = '';
         openWithToolUrls.neuroglancer =
           neuroglancerBaseUrl +
-          generateNeuroglancerState(
-            dataUrl,
-            metadata.zarr_version,
-            metadata.multiscale,
-            metadata.arr,
-            metadata.omero
-          );
-      } catch (error) {
-        log.error('Error generating neuroglancer state:', error);
+          generateNeuroglancerStateForZarrArray(dataUrl, 2);
+      } else {
+        openWithToolUrls.validator = validatorBaseUrl + dataUrl;
+        openWithToolUrls.vole = voleBaseUrl + dataUrl;
+        try {
+          openWithToolUrls.neuroglancer =
+            neuroglancerBaseUrl +
+            generateNeuroglancerStateForOmeZarr(
+              dataUrl,
+              metadata.zarr_version,
+              metadata.multiscale,
+              metadata.arr,
+              metadata.omero
+            );
+        } catch (error) {
+          log.error('Error generating Neuroglancer state for OME-Zarr:', error);
+          log.error('Falling back to Zarr array state');
+          openWithToolUrls.neuroglancer =
+            neuroglancerBaseUrl +
+            generateNeuroglancerStateForZarrArray(dataUrl, 2);
+        }
       }
       setOpenWithToolUrls(openWithToolUrls);
     }
@@ -139,7 +214,6 @@ export default function useZarrMetadata() {
     thumbnailSrc,
     openWithToolUrls,
     metadata,
-    hasMultiscales,
     loadingThumbnail,
     thumbnailError
   };
