@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: fix-playwright-action-on-misc-bugs
-  pull_request:
-    branches: '*'
+  # pull_request:
+  #   branches: '*'
 
 # concurrency:
 #   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

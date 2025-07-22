@@ -188,7 +188,7 @@ export const FileBrowserContextProvider = ({
         const response = await fetchFileInfo(fsp.name, folderPath);
         folder = response.info as FileOrFolder;
         console.log('Fetched folder:', folder);
-        if (folder) {
+        if (folder && folder.path) {
           folder = {
             ...folder,
             path: normalizePosixStylePath(folder.path)
@@ -200,10 +200,16 @@ export const FileBrowserContextProvider = ({
         let files = response.files as FileOrFolder[];
         console.log('Fetched files:', files);
         if (files) {
-          files = files.map(file => ({
-            ...file,
-            path: normalizePosixStylePath(file.path)
-          }));
+          files = files.map(file => {
+            if (file.path) {
+              return {
+                ...file,
+                path: normalizePosixStylePath(file.path)
+              };
+            } else {
+              return file;
+            }
+          });
           console.log('Normalized files:', files);
 
           // Sort: directories first, then files; alphabetically within each type
