@@ -79,10 +79,11 @@ export const ZonesAndFspMapContextProvider = ({
       if (!newZonesAndFileSharePathsMap[fspKey]) {
         const fspWithNormalizedMountPaths = {
           ...item,
-          linux_path: removeTrailingSlashes(item.linux_path),
-          mac_path: removeTrailingSlashes(item.mac_path),
-          mount_path: removeTrailingSlashes(item.mount_path),
-          windows_path: removeTrailingSlashes(item.windows_path)
+          linux_path: removeTrailingSlashes(item.linux_path) || item.linux_path,
+          mac_path: removeTrailingSlashes(item.mac_path) || item.mac_path,
+          mount_path: removeTrailingSlashes(item.mount_path) || item.mount_path,
+          windows_path:
+            removeTrailingSlashes(item.windows_path) || item.windows_path
         };
         newZonesAndFileSharePathsMap[fspKey] = fspWithNormalizedMountPaths;
       }
