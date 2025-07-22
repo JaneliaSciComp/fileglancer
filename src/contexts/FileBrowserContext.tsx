@@ -187,25 +187,29 @@ export const FileBrowserContextProvider = ({
       try {
         const response = await fetchFileInfo(fsp.name, folderPath);
         folder = response.info as FileOrFolder;
-        if (folder){
+        if (folder) {
           folder = {
-                    ...folder, path: normalizePosixStylePath(folder.path)
-                  };
+            ...folder,
+            path: normalizePosixStylePath(folder.path)
+          };
         }
-        
+
         // Normalize the file paths in POSIX style, assuming POSIX-style paths
-        let files = response.files.map(file => ({
-          ...file,
-          path: normalizePosixStylePath(file.path)})) as FileOrFolder[];
-        // Sort: directories first, then files; alphabetically within each type
-        files = files.sort(
-          (a: FileOrFolder, b: FileOrFolder) => {
+        let files = response.files as FileOrFolder[];
+        if (files) {
+          files = files.map(file => ({
+            ...file,
+            path: normalizePosixStylePath(file.path)
+          }));
+
+          // Sort: directories first, then files; alphabetically within each type
+          files = files.sort((a: FileOrFolder, b: FileOrFolder) => {
             if (a.is_dir === b.is_dir) {
               return a.name.localeCompare(b.name);
             }
             return a.is_dir ? -1 : 1;
-          }
-        )
+          });
+        }
 
         // Update all states consistently
         updateAllStates(true, fsp, folder, files, null);
