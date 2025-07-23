@@ -84,7 +84,9 @@ export const TicketProvider = ({ children }: { children: React.ReactNode }) => {
 
   const fetchTicket = React.useCallback(async () => {
     if (!currentFileSharePath || !propertiesTarget) {
-      log.warn('Cannot fetch ticket; no current file share path or file/folder selected');
+      log.warn(
+        'Cannot fetch ticket; no current file share path or file/folder selected'
+      );
       return null;
     }
     try {
@@ -194,7 +196,7 @@ export const TicketProvider = ({ children }: { children: React.ReactNode }) => {
   React.useEffect(() => {
     (async function () {
       if (!currentFileSharePath || !propertiesTarget) {
-        return 
+        return;
       }
       try {
         const ticket = await fetchTicket();

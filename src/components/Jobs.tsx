@@ -10,12 +10,12 @@ export default function Jobs() {
       <Typography type="h5" className="mb-6 text-foreground font-bold">
         Jobs
       </Typography>
-        <Typography variant="small" className="mb-6 text-foreground">
-          A job is created when you request a file to be converted to a
-          different format. To start a file conversion job, select a file in the
-          file browser, open the <strong>Properties</strong> panel, and click
-          the <strong>Convert</strong> button.
-        </Typography>
+      <Typography variant="small" className="mb-6 text-foreground">
+        A job is created when you request a file to be converted to a different
+        format. To start a file conversion job, select a file in the file
+        browser, open the <strong>Properties</strong> panel, and click the{' '}
+        <strong>Convert</strong> button.
+      </Typography>
       <div className="rounded-lg shadow bg-background">
         <div className="grid grid-cols-[2fr_3fr_1fr_1fr] gap-4 px-4 py-2 border-b border-surface">
           <Typography className="font-bold">File Path</Typography>
