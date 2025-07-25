@@ -19,8 +19,10 @@ import { GoSidebarCollapse, GoSidebarExpand } from 'react-icons/go';
 
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
+import { useOpenFavoritesContext } from '@/contexts/OpenFavoritesContext';
 import { getPreferredPathForDisplay, makeMapKey } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
+import useToolbar from '@/hooks/useToolbar';
 
 type ToolbarProps = {
   hideDotFiles: boolean;
@@ -44,12 +46,11 @@ export default function Toolbar({
   const { currentFolder, currentFileSharePath, refreshFiles } =
     useFileBrowserContext();
 
-  const {
-    folderPreferenceMap,
-    fileSharePathPreferenceMap,
-    pathPreference,
-    handleFavoriteChange
-  } = usePreferencesContext();
+  const { folderPreferenceMap, fileSharePathPreferenceMap, pathPreference } =
+    usePreferencesContext();
+
+  const { handleFavoriteClick } = useToolbar();
+  const { openFavoritesSection } = useOpenFavoritesContext();
 
   const fullPath = getPreferredPathForDisplay(
     pathPreference,
@@ -76,25 +77,6 @@ export default function Toolbar({
     folderPreferenceMap,
     fileSharePathPreferenceMap
   ]);
-
-  const handleFavoriteClick = React.useCallback(async () => {
-    if (!currentFileSharePath || !currentFolder) {
-      return;
-    }
-    if (!currentFolder || currentFolder.path === '.') {
-      await handleFavoriteChange(currentFileSharePath, 'fileSharePath');
-      return;
-    } else {
-      await handleFavoriteChange(
-        {
-          type: 'folder',
-          folderPath: currentFolder.path,
-          fsp: currentFileSharePath
-        },
-        'folder'
-      );
-    }
-  }, [currentFolder, currentFileSharePath, handleFavoriteChange]);
 
   // Don't show favorite button if not in a valid location
   const showFavoriteButton =
@@ -214,8 +196,16 @@ export default function Toolbar({
                 as={IconButton}
                 variant="outline"
                 disabled={!currentFileSharePath}
-                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                  handleFavoriteClick();
+                onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
+                  const result = await handleFavoriteClick();
+                  if (!result.success) {
+                    toast.error(`Error updating favorites: ${result.error}`);
+                  } else if (result.data === true) {
+                    openFavoritesSection();
+                    toast.success('Favorite added!');
+                  } else {
+                    toast.success('Favorite removed!');
+                  }
                   e.currentTarget.blur();
                 }}
               >
@@ -242,12 +232,12 @@ export default function Toolbar({
               as={IconButton}
               variant="outline"
               disabled={!currentFileSharePath}
-              onClick={() => {
-                try {
-                  copyToClipboard(fullPath);
+              onClick={async () => {
+                const result = await copyToClipboard(fullPath);
+                if (result.success) {
                   toast.success('Path copied to clipboard!');
-                } catch (error) {
-                  toast.error(`Failed to copy path. Error: ${error}`);
+                } else {
+                  toast.error(`Failed to copy path. Error: ${result.error}`);
                 }
               }}
             >

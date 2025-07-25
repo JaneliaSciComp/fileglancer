@@ -19,10 +19,11 @@ export default function ConvertFileDialog({
   showConvertFileDialog,
   setShowConvertFileDialog
 }: ItemNamingDialogProps): JSX.Element {
-  const { destinationFolder, setDestinationFolder } = useConvertFileDialog();
+  const { destinationFolder, setDestinationFolder, handleTicketSubmit } =
+    useConvertFileDialog();
   const { pathPreference } = usePreferencesContext();
   const { propertiesTarget, currentFileSharePath } = useFileBrowserContext();
-  const { createTicket, fetchAllTickets } = useTicketContext();
+  const { fetchAllTickets } = useTicketContext();
 
   const placeholderText =
     pathPreference[0] === 'windows_path'
@@ -54,15 +55,20 @@ export default function ConvertFileDialog({
       <form
         onSubmit={async event => {
           event.preventDefault();
-          const result = await createTicket(destinationFolder);
-          if (result.ok) {
-            await fetchAllTickets();
-            setShowConvertFileDialog(false);
-            setDestinationFolder('');
-            toast.success('Ticket created successfully!');
-          } else if (!result.ok) {
-            toast.error(result.error.message);
+          const createTicketResult = await handleTicketSubmit();
+
+          if (!createTicketResult.success) {
+            toast.error(`Error creating ticket: ${createTicketResult.error}`);
+          } else {
+            toast.success('Ticket created!');
+            const refreshTicketResponse = await fetchAllTickets();
+            if (!refreshTicketResponse.success) {
+              toast.error(
+                `Error refreshing ticket list: ${refreshTicketResponse.error}`
+              );
+            }
           }
+          setShowConvertFileDialog(false);
         }}
       >
         <TextWithFilePath text="Source Folder" path={displayPath} />

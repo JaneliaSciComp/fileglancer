@@ -10,6 +10,7 @@ import {
   joinPaths
 } from '@/utils';
 import type { Result } from '@/shared.types';
+import { createSuccess, handleError } from '@/utils/errorHandling';
 
 export type Ticket = {
   username: string;
@@ -28,10 +29,8 @@ export type Ticket = {
 type TicketContextType = {
   ticket: Ticket | null;
   allTickets?: Ticket[];
-  createTicket: (
-    destination: string
-  ) => Promise<Result<Ticket[] | null, Error>>;
-  fetchAllTickets: () => Promise<void>;
+  createTicket: (destination: string) => Promise<Result<Ticket[] | null>>;
+  fetchAllTickets: () => Promise<Result<null>>;
 };
 
 function sortTicketsByDate(tickets: Ticket[]): Ticket[] {
@@ -57,34 +56,33 @@ export const TicketProvider = ({ children }: { children: React.ReactNode }) => {
   const { currentFileSharePath, propertiesTarget } = useFileBrowserContext();
   const { profile } = useProfileContext();
 
-  const fetchAllTickets = React.useCallback(async (): Promise<void> => {
-    const response = await sendFetchRequest(
-      '/api/fileglancer/ticket',
-      'GET',
-      cookies['_xsrf']
-    );
-    if (!response.ok) {
-      if (response.status === 404) {
-        logger.warn('No tickets found');
-        setAllTickets([]);
-        return;
-      } else {
-        logger.error(
-          `Failed to fetch tickets: ${response.status} ${response.statusText}`
-        );
-        return;
+  const fetchAllTickets = React.useCallback(async (): Promise<Result<null>> => {
+    try {
+      const response = await sendFetchRequest(
+        '/api/fileglancer/ticket',
+        'GET',
+        cookies['_xsrf']
+      );
+      const data = await response.json();
+      if (data?.tickets) {
+        setAllTickets(sortTicketsByDate(data.tickets) as Ticket[]);
       }
-    }
-    const data = await response.json();
-    logger.debug('Fetched all tickets:', data);
-    if (data?.tickets) {
-      setAllTickets(sortTicketsByDate(data.tickets) as Ticket[]);
+      return createSuccess();
+      // if (response.status === 404) {
+      //    logger.info('No tickets found');
+      //    setAllTickets([]);
+      //    return createSuccess([] as Ticket[]);
+      //  }
+    } catch (error) {
+      return handleError(error);
     }
   }, [cookies]);
 
   const fetchTicket = React.useCallback(async () => {
     if (!currentFileSharePath || !propertiesTarget) {
-      log.warn('Cannot fetch ticket; no current file share path or file/folder selected');
+      log.warn(
+        'Cannot fetch ticket; no current file share path or file/folder selected'
+      );
       return null;
     }
     try {
@@ -194,7 +192,7 @@ export const TicketProvider = ({ children }: { children: React.ReactNode }) => {
   React.useEffect(() => {
     (async function () {
       if (!currentFileSharePath || !propertiesTarget) {
-        return 
+        return;
       }
       try {
         const ticket = await fetchTicket();

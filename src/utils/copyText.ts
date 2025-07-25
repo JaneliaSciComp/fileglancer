@@ -1,4 +1,6 @@
 import { default as log } from '@/logger';
+import { createSuccess, handleError } from './errorHandling';
+import type { Result } from '@/shared.types';
 
 // Clipboard when the clipboard API is not available (like when using insecure HTTP)
 // From https://stackoverflow.com/questions/400212/how-do-i-copy-to-the-clipboard-in-javascript/30810322#30810322
@@ -14,7 +16,7 @@ function fallbackCopyTextToClipboard(text: string) {
     textArea.focus();
     textArea.select();
     if (document.execCommand('copy')) {
-      log.debug('Fallback clipboard copy succeeded');
+      log.info('Fallback clipboard copy succeeded');
     } else {
       throw new Error('Fallback clipboard copy failed');
     }
@@ -23,7 +25,7 @@ function fallbackCopyTextToClipboard(text: string) {
   }
 }
 
-const copyToClipboard = async (text: string | null) => {
+const copyToClipboard = async (text: string | null): Promise<Result<null>> => {
   if (text) {
     try {
       if (!navigator.clipboard) {
@@ -31,11 +33,13 @@ const copyToClipboard = async (text: string | null) => {
       } else {
         await navigator.clipboard.writeText(text);
       }
-
-      log.debug('Copied to clipboard:', text);
+      log.info('Copied to clipboard:', text);
     } catch (error) {
-      log.error('Failed to copy to clipboard:', error);
+      return handleError(error);
     }
+    return createSuccess();
+  } else {
+    return handleError(new Error('No text provided to copy to clipboard'));
   }
 };
 
