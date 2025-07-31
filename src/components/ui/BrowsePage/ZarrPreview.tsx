@@ -14,7 +14,7 @@ import validator_logo from '@/assets/ome-ngff-validator.png';
 import volE_logo from '@/assets/aics_website-3d-cell-viewer.png';
 import copy_logo from '@/assets/copy-link-64.png';
 
-import ZarrMetadataTable from '@/components/ui/FileBrowser/ZarrMetadataTable';
+import ZarrMetadataTable from '@/components/ui/BrowsePage/ZarrMetadataTable';
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
 import Loader from '@/components/ui/Loader';
 import type { OpenWithToolUrls, ZarrMetadata } from '@/hooks/useZarrMetadata';

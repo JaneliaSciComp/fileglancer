@@ -13,7 +13,7 @@ test.afterAll('Close browser', ({ browser }) => {
 
 test('Home becomes visible when Local is expanded', async ({ page }) => {
   const zonesLocator = page.getByText('Zones');
-  const homeLocator = page.getByRole('link', { name: 'home' });
+  const homeLocator = page.getByRole('link', { name: 'home', exact: true });
   const localZoneLocator = page.getByText('Local');
 
   await expect(zonesLocator).toBeVisible();

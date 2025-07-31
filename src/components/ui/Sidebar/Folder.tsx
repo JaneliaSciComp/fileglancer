@@ -20,6 +20,7 @@ import {
 } from '@/utils';
 import { useCookiesContext } from '@/contexts/CookiesContext';
 import MissingFolderFavoriteDialog from './MissingFolderFavoriteDialog';
+import type { FileSharePath } from '@/shared.types';
 
 import {
   FolderFavorite,
@@ -27,32 +28,47 @@ import {
 } from '@/contexts/PreferencesContext';
 
 type FolderProps = {
-  folderFavorite: FolderFavorite;
+  fsp: FileSharePath;
+  folderPath: string;
+  isFavoritable?: boolean;
+  icon?: React.ReactNode;
 };
 
-export default function Folder({ folderFavorite }: FolderProps) {
+export default function Folder({
+  fsp,
+  folderPath,
+  isFavoritable = true,
+  icon
+}: FolderProps) {
   const [showMissingFolderFavoriteDialog, setShowMissingFolderFavoriteDialog] =
     React.useState(false);
   const { pathPreference, handleFavoriteChange } = usePreferencesContext();
   const { cookies } = useCookiesContext();
 
+  const folderFavorite = React.useMemo(() => {
+    if (isFavoritable) {
+      return {
+        type: 'folder',
+        folderPath,
+        fsp
+      } as FolderFavorite;
+    }
+  }, [folderPath, fsp, isFavoritable]);
+
   const displayPath = getPreferredPathForDisplay(
     pathPreference,
-    folderFavorite.fsp,
-    folderFavorite.folderPath
+    fsp,
+    folderPath
   );
 
-  const mapKey = makeMapKey(
-    'folder',
-    `${folderFavorite.fsp.name}_${folderFavorite.folderPath}`
-  ) as string;
+  const mapKey = makeMapKey('folder', `${fsp.name}_${folderPath}`) as string;
 
-  const link = makeBrowseLink(
-    folderFavorite.fsp.name,
-    folderFavorite.folderPath
-  );
+  const link = makeBrowseLink(fsp.name, folderPath);
 
-  async function checkFolderExists(folderFavorite: FolderFavorite) {
+  async function checkFavFolderExists() {
+    if (!folderFavorite) {
+      return;
+    }
     try {
       const fetchPath = getFileBrowsePath(
         folderFavorite.fsp.name,
@@ -82,7 +98,7 @@ export default function Folder({ folderFavorite }: FolderProps) {
         onClick={async () => {
           let folderExists;
           try {
-            folderExists = await checkFolderExists(folderFavorite);
+            folderExists = await checkFavFolderExists();
           } catch (error) {
             log.error('Error checking folder existence:', error);
           }
@@ -97,9 +113,11 @@ export default function Folder({ folderFavorite }: FolderProps) {
           className="w-[calc(100%-2rem)] flex flex-col items-start gap-2 short:gap-1 !text-foreground hover:!text-black focus:!text-black hover:dark:!text-white focus:dark:!text-white"
         >
           <div className="w-full flex gap-1 items-center">
-            <HiOutlineFolder className="icon-small short:icon-xsmall stroke-2" />
+            {icon || (
+              <HiOutlineFolder className="icon-small short:icon-xsmall stroke-2" />
+            )}
             <Typography className="w-[calc(100%-2rem)] truncate text-sm leading-4 short:text-xs font-semibold">
-              {getLastSegmentFromPath(folderFavorite.folderPath)}
+              {getLastSegmentFromPath(folderPath)}
             </Typography>
           </div>
           <Tooltip placement="right">
@@ -111,26 +129,28 @@ export default function Folder({ folderFavorite }: FolderProps) {
             <Tooltip.Content>{displayPath}</Tooltip.Content>
           </Tooltip>
         </Link>
-        <div
-          onClick={e => {
-            e.stopPropagation();
-            e.preventDefault();
-          }}
-        >
-          <IconButton
-            className="min-w-0 min-h-0"
-            variant="ghost"
-            isCircular
-            onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
+        {folderFavorite ? (
+          <div
+            onClick={e => {
               e.stopPropagation();
-              await handleFavoriteChange(folderFavorite, 'folder');
+              e.preventDefault();
             }}
           >
-            <HiStar className="icon-small short:icon-xsmall mb-[2px]" />
-          </IconButton>
-        </div>
+            <IconButton
+              className="min-w-0 min-h-0"
+              variant="ghost"
+              isCircular
+              onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
+                e.stopPropagation();
+                await handleFavoriteChange(folderFavorite, 'folder');
+              }}
+            >
+              <HiStar className="icon-small short:icon-xsmall mb-[2px]" />
+            </IconButton>
+          </div>
+        ) : null}
       </List.Item>
-      {showMissingFolderFavoriteDialog ? (
+      {showMissingFolderFavoriteDialog && folderFavorite ? (
         <MissingFolderFavoriteDialog
           folderFavorite={folderFavorite}
           showMissingFolderFavoriteDialog={showMissingFolderFavoriteDialog}
