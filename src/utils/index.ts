@@ -93,7 +93,13 @@ const parsePermissions = (permissionString: string) => {
   };
 };
 
-function makeMapKey(type: string, name: string): string {
+/**
+ * Used to access objects in the ZonesAndFileSharePathsMap or in the zone, fsp, or folder preference maps
+ * @param type zone, fsp, or folder
+ * @param name for zones or FSPs, use zone.name or fsp.name. For folders, the name is defined as `${fsp.name}_${folder.path}`
+ * @returns a map key string
+ */
+function makeMapKey(type: 'zone' | 'fsp' | 'folder', name: string): string {
   return `${type}_${name}`;
 }
 

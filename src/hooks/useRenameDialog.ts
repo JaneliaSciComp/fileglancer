@@ -1,72 +1,52 @@
-import { useState } from 'react';
-import toast from 'react-hot-toast';
+import React from 'react';
 
 import {
   getFileBrowsePath,
   joinPaths,
   sendFetchRequest,
-  removeLastSegmentFromPath,
-  getPreferredPathForDisplay
+  removeLastSegmentFromPath
 } from '@/utils';
+import { handleBadResponse, handleError } from '@/utils/errorHandling';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useCookiesContext } from '@/contexts/CookiesContext';
+import { Result } from '@/shared.types';
 
 export default function useRenameDialog() {
-  const [newName, setNewName] = useState<string>('');
-  const [showAlert, setShowAlert] = useState<boolean>(false);
-  const [alertContent, setAlertContent] = useState<string>('');
+  const [newName, setNewName] = React.useState<string>('');
 
   const { currentFileSharePath, refreshFiles } = useFileBrowserContext();
-  const { pathPreference } = usePreferencesContext();
   const { cookies } = useCookiesContext();
 
-  async function renameItem(path: string) {
+  async function handleRenameSubmit(path: string): Promise<Result<void>> {
     if (!currentFileSharePath) {
-      throw new Error('No file share path selected.');
+      return handleError(new Error('No file share path selected.'));
     }
-    const newPath = joinPaths(removeLastSegmentFromPath(path), newName);
-    const fetchPath = getFileBrowsePath(currentFileSharePath?.name, path);
-    await sendFetchRequest(fetchPath, 'PATCH', cookies['_xsrf'], {
-      path: newPath
-    });
-    await refreshFiles();
-  }
 
-  async function handleRenameSubmit(path: string) {
-    setShowAlert(false);
-    const displayPath = getPreferredPathForDisplay(
-      pathPreference,
-      currentFileSharePath,
-      path
-    );
+    try {
+      const newPath = joinPaths(removeLastSegmentFromPath(path), newName);
+      const fetchPath = getFileBrowsePath(currentFileSharePath?.name, path);
+      const response = await sendFetchRequest(
+        fetchPath,
+        'PATCH',
+        cookies['_xsrf'],
+        {
+          path: newPath
+        }
+      );
 
-    if (currentFileSharePath) {
-      try {
-        await renameItem(path);
-        const alertContent = `Renamed item at path: ${displayPath} to ${newName}`;
-        toast.success(alertContent);
-        return true;
-      } catch (error) {
-        const errorContent = `Error renaming item at path: ${displayPath} to ${newName}`;
-        setAlertContent(
-          `${errorContent}. Error details: ${error instanceof Error ? error.message : 'Unknown error'}`
-        );
-        setShowAlert(true);
-        return false;
+      if (response.ok) {
+        return await refreshFiles();
+      } else {
+        return handleBadResponse(response);
       }
-    } else if (!currentFileSharePath) {
-      setAlertContent('No file share path selected.');
-      return false;
+    } catch (error) {
+      return handleError(error);
     }
   }
 
   return {
     handleRenameSubmit,
     newName,
-    setNewName,
-    showAlert,
-    setShowAlert,
-    alertContent
+    setNewName
   };
 }

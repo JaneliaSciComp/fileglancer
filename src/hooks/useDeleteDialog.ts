@@ -1,17 +1,18 @@
-import toast from 'react-hot-toast';
-import type { FileOrFolder } from '@/shared.types';
+import type { FileOrFolder, Result } from '@/shared.types';
 import { getFileBrowsePath, sendFetchRequest } from '@/utils';
 import { useCookiesContext } from '@/contexts/CookiesContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import { handleError, handleBadResponse } from '@/utils/errorHandling';
 
 export default function useDeleteDialog() {
   const { cookies } = useCookiesContext();
   const { currentFileSharePath, refreshFiles } = useFileBrowserContext();
 
-  async function handleDelete(targetItem: FileOrFolder) {
+  async function handleDelete(targetItem: FileOrFolder): Promise<Result<void>> {
     if (!currentFileSharePath) {
-      toast.error('No file share path selected.');
-      return false;
+      return handleError(
+        new Error('Current file share path not set; cannot delete item')
+      );
     }
 
     const fetchPath = getFileBrowsePath(
@@ -20,16 +21,18 @@ export default function useDeleteDialog() {
     );
 
     try {
-      await sendFetchRequest(fetchPath, 'DELETE', cookies['_xsrf']);
-      await refreshFiles();
-      toast.success(`Successfully deleted ${targetItem.path}`);
-      return true;
-    } catch (error) {
-      toast.error(
-        `Error deleting ${targetItem.path}: ${error instanceof Error ? error.message : 'Unknown error'}`
+      const response = await sendFetchRequest(
+        fetchPath,
+        'DELETE',
+        cookies['_xsrf']
       );
-
-      return false;
+      if (!response.ok) {
+        return handleBadResponse(response);
+      } else {
+        return await refreshFiles();
+      }
+    } catch (error) {
+      return handleError(error);
     }
   }
 

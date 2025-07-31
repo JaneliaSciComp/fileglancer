@@ -34,7 +34,7 @@ export default function FileList({
   setShowPermissionsDialog,
   setShowConvertFileDialog
 }: FileListProps): React.ReactNode {
-  const { files, isFileBrowserReady, fetchErrorMsg } = useFileBrowserContext();
+  const { fileBrowserState } = useFileBrowserContext();
 
   const {
     contextMenuCoords,
@@ -42,7 +42,7 @@ export default function FileList({
     setShowContextMenu,
     menuRef,
     handleContextMenuClick,
-    handleFavoriteToggleMenuItemClick
+    handleContextMenuFavorite
   } = useContextMenu();
 
   const {
@@ -55,9 +55,9 @@ export default function FileList({
 
   const displayFiles = React.useMemo(() => {
     return hideDotFiles
-      ? files.filter(file => !file.name.startsWith('.'))
-      : files;
-  }, [files, hideDotFiles]);
+      ? fileBrowserState.files.filter(file => !file.name.startsWith('.'))
+      : fileBrowserState.files;
+  }, [fileBrowserState, hideDotFiles]);
 
   return (
     <div className="px-2 transition-all duration-300 flex flex-col h-full overflow-hidden">
@@ -100,7 +100,7 @@ export default function FileList({
           </div>
         </div>
         {/* File rows */}
-        {isFileBrowserReady && displayFiles.length > 0 ? (
+        {fileBrowserState.isFileBrowserReady && displayFiles.length > 0 ? (
           displayFiles.map((file, index) => {
             return (
               <FileRow
@@ -115,18 +115,20 @@ export default function FileList({
               />
             );
           })
-        ) : isFileBrowserReady &&
+        ) : fileBrowserState.isFileBrowserReady &&
           displayFiles.length === 0 &&
-          !fetchErrorMsg ? (
+          !fileBrowserState.uiErrorMsg ? (
           <div className="flex items-center pl-3 py-1">
             <Typography className="text-primary-default">
               No files available for display.
             </Typography>
           </div>
-        ) : isFileBrowserReady && displayFiles.length === 0 && fetchErrorMsg ? (
+        ) : fileBrowserState.isFileBrowserReady &&
+          displayFiles.length === 0 &&
+          fileBrowserState.uiErrorMsg ? (
           <div className="flex items-center pl-3 py-1">
             <Typography className="text-primary-default">
-              {fetchErrorMsg}
+              {fileBrowserState.uiErrorMsg}
             </Typography>
           </div>
         ) : (
@@ -141,7 +143,7 @@ export default function FileList({
           y={contextMenuCoords.y}
           menuRef={menuRef}
           selectedFiles={selectedFiles}
-          handleFavoriteToggleMenuItemClick={handleFavoriteToggleMenuItemClick}
+          handleContextMenuFavorite={handleContextMenuFavorite}
           setShowPropertiesDrawer={setShowPropertiesDrawer}
           setShowContextMenu={setShowContextMenu}
           setShowRenameDialog={setShowRenameDialog}

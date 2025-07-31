@@ -63,18 +63,17 @@ export default function MissingFolderFavoriteDialog({
               color="error"
               className="!rounded-md flex items-center gap-2"
               onClick={async () => {
-                try {
-                  await handleFavoriteChange(folderFavorite, 'folder');
+                const result = await handleFavoriteChange(
+                  folderFavorite,
+                  'folder'
+                );
+                if (result.success) {
                   navigate(
                     `/browse/${folderFavorite.fsp.name}/${removeLastSegmentFromPath(folderFavorite.folderPath)}`
                   );
                   toast.success(`Deleted favorite folder ${displayPath}`);
-                } catch (error) {
-                  toast.error(
-                    `Error deleting favorite folder ${displayPath}: ${
-                      error instanceof Error ? error.message : 'Unknown error'
-                    }`
-                  );
+                } else {
+                  toast.error(`Error deleting favorite: ${result.error}`);
                 }
               }}
             >

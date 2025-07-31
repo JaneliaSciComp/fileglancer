@@ -12,6 +12,7 @@ import FileSharePathComponent from './FileSharePath';
 import type { Zone } from '@/shared.types';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { makeMapKey } from '@/utils/index';
+import toast from 'react-hot-toast';
 
 export default function Zone({
   zone,
@@ -45,7 +46,16 @@ export default function Zone({
             <IconButton
               variant="ghost"
               isCircular
-              onClick={async () => await handleFavoriteChange(zone, 'zone')}
+              onClick={async () => {
+                const result = await handleFavoriteChange(zone, 'zone');
+                if (result.success) {
+                  toast.success(
+                    `Favorite ${result.data === true ? 'added!' : 'removed!'}`
+                  );
+                } else {
+                  toast.error(`Error adding favorite: ${result.error}`);
+                }
+              }}
             >
               {isFavoriteZone ? (
                 <HiStar className="icon-small short:icon-xsmall mb-[2px]" />

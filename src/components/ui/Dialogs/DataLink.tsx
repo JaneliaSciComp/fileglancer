@@ -81,28 +81,22 @@ export default function DataLinkDialog({
             color="error"
             className="!rounded-md flex items-center gap-2"
             onClick={async () => {
-              try {
-                const newProxiedPath = await createProxiedPath(
-                  currentFileSharePath.name,
-                  filePathWithoutFsp
+              const result = await createProxiedPath(
+                currentFileSharePath.name,
+                filePathWithoutFsp
+              );
+              if (result.success) {
+                toast.success(
+                  `Successfully created data link for ${displayPath}`
                 );
-                if (newProxiedPath) {
-                  toast.success(
-                    `Successfully created data link for ${displayPath}`
-                  );
-                } else {
-                  toast.error(`Error creating data link for ${displayPath}`);
-                }
-                setShowDataLinkDialog(false);
-                if (setIsImageShared) {
-                  setIsImageShared(true);
-                }
-              } catch (error) {
-                toast.error(
-                  `Error creating data link for ${displayPath}: ${
-                    error instanceof Error ? error.message : 'Unknown error'
-                  }`
-                );
+              } else {
+                toast.error(`Error creating data link: ${result.error}`);
+              }
+              setShowDataLinkDialog(false);
+              if (setIsImageShared) {
+                // setIsImageShared does not exist in props for proxied path row,
+                // where the image is always shared
+                setIsImageShared(true);
               }
             }}
           >

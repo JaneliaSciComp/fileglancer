@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Typography } from '@material-tailwind/react';
+import { Button } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
@@ -48,8 +48,11 @@ export default function DeleteDialog({
         color="error"
         className="!rounded-md"
         onClick={async () => {
-          const success = await handleDelete(targetItem);
-          if (success) {
+          const result = await handleDelete(targetItem);
+          if ('error' in result) {
+            toast.error(`Error deleting item: ${result.error}`);
+          } else {
+            toast.success(`Item deleted!`);
             setShowDeleteDialog(false);
           }
         }}

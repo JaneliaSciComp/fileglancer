@@ -1,8 +1,16 @@
 import React from 'react';
+
 import { default as log } from '@/logger';
 import { useCookiesContext } from '@/contexts/CookiesContext';
-import { sendFetchRequest } from '@/utils';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import { sendFetchRequest } from '@/utils';
+import type { Result } from '@/shared.types';
+import {
+  createSuccess,
+  getResponseError,
+  handleBadResponse,
+  handleError
+} from '@/utils/errorHandling';
 
 export type ProxiedPath = {
   username: string;
@@ -19,10 +27,7 @@ type ProxiedPathContextType = {
   proxiedPath: ProxiedPath | null;
   dataUrl: string | null;
   allProxiedPaths?: ProxiedPath[];
-  createProxiedPath: (
-    fspName: string,
-    path: string
-  ) => Promise<ProxiedPath | null>;
+  createProxiedPath: (fspName: string, path: string) => Promise<Result<void>>;
   deleteProxiedPath: (proxiedPath: ProxiedPath) => Promise<void>;
 };
 
@@ -81,19 +86,14 @@ export const ProxiedPathProvider = ({
       'GET',
       cookies['_xsrf']
     );
+
     if (!response.ok) {
-      let errorMsg = `HTTP error: ${response.status}`;
-      try {
-        const data = await response.json();
-        if (data && data.error) {
-          errorMsg = data.error;
-        }
-      } catch (e) {
-        log.error('Error fetching proxied paths:', e);
-        // response was not JSON, keeping default errorMsg...
-      }
-      throw new Error(errorMsg);
+      const error = getResponseError(response);
+      throw new Error(
+        `Error fetching proxied paths: ${response.status}: ${error} `
+      );
     }
+
     const data = await response.json();
     if (data?.paths) {
       setAllProxiedPaths(sortProxiedPathsByDate(data.paths) as ProxiedPath[]);
@@ -130,23 +130,27 @@ export const ProxiedPathProvider = ({
   async function createProxiedPath(
     fspName: string,
     path: string
-  ): Promise<ProxiedPath | null> {
-    const response = await sendFetchRequest(
-      '/api/fileglancer/proxied-path',
-      'POST',
-      cookies['_xsrf'],
-      { fsp_name: fspName, path: path }
-    );
-    if (!response.ok) {
-      throw new Error(
-        `Failed to create proxied path: ${response.status} ${response.statusText}`
+  ): Promise<Result<void>> {
+    try {
+      const response = await sendFetchRequest(
+        '/api/fileglancer/proxied-path',
+        'POST',
+        cookies['_xsrf'],
+        { fsp_name: fspName, path: path }
       );
+
+      if (response.ok) {
+        const proxiedPath = (await response.json()) as ProxiedPath;
+        updateProxiedPath(proxiedPath);
+        await fetchAllProxiedPaths();
+        log.debug('Created proxied path:', proxiedPath);
+      } else {
+        return handleBadResponse(response);
+      }
+    } catch (error) {
+      return handleError(error);
     }
-    const proxiedPath = (await response.json()) as ProxiedPath;
-    updateProxiedPath(proxiedPath);
-    await fetchAllProxiedPaths();
-    log.debug('Created proxied path:', proxiedPath);
-    return proxiedPath;
+    return createSuccess();
   }
 
   const deleteProxiedPath = React.useCallback(
@@ -170,7 +174,11 @@ export const ProxiedPathProvider = ({
 
   React.useEffect(() => {
     (async function () {
-      await fetchAllProxiedPaths();
+      try {
+        await fetchAllProxiedPaths();
+      } catch (error) {
+        log.error(error);
+      }
     })();
   }, [fetchAllProxiedPaths]);
 

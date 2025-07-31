@@ -12,16 +12,17 @@ import {
 } from '@/utils';
 import useDataLinkDialog from '@/hooks/useDataLinkDialog';
 import type { ProxiedPath } from '@/contexts/ProxiedPathContext';
-import type { FileSharePath } from '@/shared.types';
+import type { FileSharePath, Result } from '@/shared.types';
 import type { MenuItem } from '@/components/ui/Menus/FgMenuItems';
+import toast from 'react-hot-toast';
 
 type ProxiedPathRowProps = {
   item: ProxiedPath;
 };
 
 type ProxiedPathRowActionProps = {
-  handleCopyPath: (path: string) => void;
-  handleCopyUrl: (item: ProxiedPath) => void;
+  handleCopyPath: (path: string) => Promise<Result<void>>;
+  handleCopyUrl: (item: ProxiedPath) => Promise<Result<void>>;
   handleUnshare: (pathFsp: FileSharePath) => void;
   item: ProxiedPath;
   displayPath: string;
@@ -54,13 +55,25 @@ export default function ProxiedPathRow({ item }: ProxiedPathRowProps) {
   const menuItems: MenuItem<ProxiedPathRowActionProps>[] = [
     {
       name: 'Copy path',
-      action: (props: ProxiedPathRowActionProps) =>
-        props.handleCopyPath(props.displayPath)
+      action: async (props: ProxiedPathRowActionProps) => {
+        const result = await props.handleCopyPath(props.displayPath);
+        if (result.success) {
+          toast.success('Path copied!');
+        } else {
+          toast.error(`Error copying path: ${result.error}`);
+        }
+      }
     },
     {
       name: 'Copy sharing link (S3-compatible URL)',
-      action: (props: ProxiedPathRowActionProps) =>
-        props.handleCopyUrl(props.item)
+      action: async (props: ProxiedPathRowActionProps) => {
+        const result = await props.handleCopyUrl(props.item);
+        if (result.success) {
+          toast.success('Sharing link copied!');
+        } else {
+          toast.error(`Error copying sharing link: ${result.error}`);
+        }
+      }
     },
     {
       name: 'Unshare',

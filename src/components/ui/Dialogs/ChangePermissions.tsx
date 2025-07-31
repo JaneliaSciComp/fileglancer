@@ -1,5 +1,6 @@
 import React from 'react';
-import { Button, Typography } from '@material-tailwind/react';
+import { Button } from '@material-tailwind/react';
+import toast from 'react-hot-toast';
 
 import FgDialog from './FgDialog';
 import TextWithFilePath from './TextWithFilePath';
@@ -17,36 +18,11 @@ export default function ChangePermissions({
 }: ChangePermissionsProps): JSX.Element {
   const { propertiesTarget: targetItem } = useFileBrowserContext();
 
-  const [localPermissions, setLocalPermissions] = React.useState(
-    targetItem ? targetItem.permissions : null
-  );
-
-  const { handleChangePermissions } = usePermissionsDialog();
-
-  function handleLocalPermissionChange(
-    event: React.ChangeEvent<HTMLInputElement>
-  ) {
-    if (!localPermissions) {
-      return;
-    }
-
-    const { name, checked } = event.target;
-    const [value, position] = name.split('_');
-
-    setLocalPermissions(prev => {
-      if (!prev) {
-        return prev; // Ensure the type remains consistent
-      }
-      const splitPermissions = prev.split('');
-      if (checked) {
-        splitPermissions.splice(parseInt(position), 1, value);
-      } else {
-        splitPermissions.splice(parseInt(position), 1, '-');
-      }
-      const newPermissions = splitPermissions.join('');
-      return newPermissions;
-    });
-  }
+  const {
+    handleLocalPermissionChange,
+    localPermissions,
+    handleChangePermissions
+  } = usePermissionsDialog();
 
   return (
     <FgDialog
@@ -58,9 +34,20 @@ export default function ChangePermissions({
           onSubmit={async event => {
             event.preventDefault();
             if (!localPermissions) {
+              toast.error(
+                'Error setting permissions: no local permission state'
+              );
               return;
             }
-            await handleChangePermissions(targetItem, localPermissions);
+            const result = await handleChangePermissions(
+              targetItem,
+              localPermissions
+            );
+            if (result.success) {
+              toast.success('Permissions changed!');
+            } else {
+              toast.error(`Error changing permissions: ${result.error}`);
+            }
             setShowPermissionsDialog(false);
           }}
         >

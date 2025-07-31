@@ -1,11 +1,16 @@
 import React from 'react';
 import { default as log } from '@/logger';
 
-import type { FileOrFolder, FileSharePath } from '@/shared.types';
+import type { FileOrFolder, FileSharePath, Result } from '@/shared.types';
 import { getFileBrowsePath, makeMapKey, sendFetchRequest } from '@/utils';
 import { useCookiesContext } from './CookiesContext';
 import { useZoneAndFspMapContext } from './ZonesAndFspMapContext';
 import { normalizePosixStylePath } from '@/utils/pathHandling';
+import {
+  createSuccess,
+  getResponseError,
+  handleError
+} from '@/utils/errorHandling';
 
 type FileBrowserResponse = {
   info: FileOrFolder;
@@ -23,8 +28,8 @@ interface FileBrowserState {
   currentFileSharePath: FileSharePath | null;
   currentFolder: FileOrFolder | null;
   files: FileOrFolder[];
-  fetchErrorMsg: string | null;
   propertiesTarget: FileOrFolder | null;
+  uiErrorMsg: string | null;
 }
 
 type FileBrowserContextType = {
@@ -38,9 +43,8 @@ type FileBrowserContextType = {
   currentFileSharePath: FileSharePath | null;
   currentFolder: FileOrFolder | null;
   files: FileOrFolder[];
-  fetchErrorMsg: string | null;
   // END DUPLICATES
-  refreshFiles: () => Promise<void>;
+  refreshFiles: () => Promise<Result<void>>;
   setPropertiesTarget: React.Dispatch<
     React.SetStateAction<FileOrFolder | null>
   >;
@@ -76,8 +80,8 @@ export const FileBrowserContextProvider = ({
       currentFileSharePath: null,
       currentFolder: null,
       files: [],
-      fetchErrorMsg: null,
-      propertiesTarget: null
+      propertiesTarget: null,
+      uiErrorMsg: null
     });
 
   // Duplicate states for convenience until all clients are updated.
@@ -89,7 +93,6 @@ export const FileBrowserContextProvider = ({
     null
   );
   const [files, setFiles] = React.useState<FileOrFolder[]>([]);
-  const [fetchErrorMsg, setFetchErrorMsg] = React.useState<string | null>(null);
 
   const [propertiesTarget, setPropertiesTarget] =
     React.useState<FileOrFolder | null>(null);
@@ -113,8 +116,8 @@ export const FileBrowserContextProvider = ({
       sharePath: FileSharePath | null,
       folder: FileOrFolder | null,
       fileList: FileOrFolder[],
-      errorMsg: string | null,
-      targetItem: FileOrFolder | null
+      targetItem: FileOrFolder | null,
+      msg: string | null
     ) => {
       // Update fileBrowserState with complete, consistent data
       updateFileBrowserState({
@@ -122,8 +125,8 @@ export const FileBrowserContextProvider = ({
         currentFileSharePath: sharePath,
         currentFolder: folder,
         files: fileList,
-        fetchErrorMsg: errorMsg,
-        propertiesTarget: targetItem
+        propertiesTarget: targetItem,
+        uiErrorMsg: msg
       });
 
       // Update local states for individual parts
@@ -132,14 +135,12 @@ export const FileBrowserContextProvider = ({
         setCurrentFileSharePath(sharePath);
         setCurrentFolder(folder);
         setFiles(fileList);
-        setFetchErrorMsg(errorMsg);
         setPropertiesTarget(targetItem);
       } else {
         setIsFileBrowserReady(false);
         setCurrentFileSharePath(null);
         setCurrentFolder(null);
         setFiles([]);
-        setFetchErrorMsg(errorMsg);
         setPropertiesTarget(null);
       }
     },
@@ -174,6 +175,9 @@ export const FileBrowserContextProvider = ({
           }
         } else if (response.status === 404) {
           throw new Error('Folder not found');
+        } else {
+          const error = await getResponseError(response);
+          throw new Error(error);
         }
       }
 
@@ -184,10 +188,7 @@ export const FileBrowserContextProvider = ({
 
   // Fetch files for the given FSP and folder, and update the fileBrowserState
   const fetchAndUpdateFileBrowserState = React.useCallback(
-    async (
-      fsp: FileSharePath,
-      folderPath: string
-    ): Promise<FileOrFolder | null> => {
+    async (fsp: FileSharePath, folderPath: string): Promise<void> => {
       log.debug('Fetching files for FSP:', fsp.name, 'and folder:', folderPath);
       let folder: FileOrFolder | null = null;
       try {
@@ -214,45 +215,47 @@ export const FileBrowserContextProvider = ({
         });
 
         // Update all states consistently
-        updateAllStates(true, fsp, folder, files, null, folder);
+        updateAllStates(true, fsp, folder, files, folder, null);
       } catch (error) {
         log.error(error);
         if (error instanceof Error) {
-          updateAllStates(true, fsp, folder, [], error.message, folder);
+          updateAllStates(true, fsp, folder, [], folder, error.message);
         } else {
           updateAllStates(
             true,
             fsp,
             folder,
             [],
-            'An unknown error occurred',
-            folder
+            folder,
+            'An unknown error occurred'
           );
         }
       }
-      return folder;
     },
     [updateAllStates, fetchFileInfo]
   );
 
   // Function to refresh files for the current FSP and current folder
-  const refreshFiles = React.useCallback(async (): Promise<void> => {
+  const refreshFiles = async (): Promise<Result<void>> => {
     if (
       !fileBrowserState.currentFileSharePath ||
       !fileBrowserState.currentFolder
     ) {
-      return;
+      return handleError(
+        new Error('File share path and folder required to refresh files')
+      );
     }
     log.debug('Refreshing file list');
-    await fetchAndUpdateFileBrowserState(
-      fileBrowserState.currentFileSharePath,
-      fileBrowserState.currentFolder.path
-    );
-  }, [
-    fileBrowserState.currentFileSharePath,
-    fileBrowserState.currentFolder,
-    fetchAndUpdateFileBrowserState
-  ]);
+    try {
+      await fetchAndUpdateFileBrowserState(
+        fileBrowserState.currentFileSharePath,
+        fileBrowserState.currentFolder.path
+      );
+      return createSuccess();
+    } catch (error) {
+      return handleError(error);
+    }
+  };
 
   // Effect to update currentFolder and propertiesTarget when URL params change
   React.useEffect(() => {
@@ -274,7 +277,14 @@ export const FileBrowserContextProvider = ({
         if (cancelled) {
           return;
         }
-        updateAllStates(false, null, null, [], null, null);
+        updateAllStates(
+          false,
+          null,
+          null,
+          [],
+          null,
+          'Invalid file share path name'
+        );
         return;
       }
 
@@ -309,7 +319,6 @@ export const FileBrowserContextProvider = ({
         files,
         currentFolder,
         currentFileSharePath,
-        fetchErrorMsg,
         refreshFiles,
         propertiesTarget,
         setPropertiesTarget,

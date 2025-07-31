@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { List, Typography, IconButton } from '@material-tailwind/react';
 import { HiOutlineStar, HiStar } from 'react-icons/hi';
 import { HiOutlineRectangleStack } from 'react-icons/hi2';
+import toast from 'react-hot-toast';
 
 import type { FileSharePath } from '@/shared.types';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
@@ -58,7 +59,14 @@ export default function FileSharePathComponent({
           isCircular
           onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
             e.stopPropagation();
-            await handleFavoriteChange(fsp, 'fileSharePath');
+            const result = await handleFavoriteChange(fsp, 'fileSharePath');
+            if (result.success) {
+              toast.success(
+                `Favorite ${result.data === true ? 'added!' : 'removed!'}`
+              );
+            } else {
+              toast.error(`Error adding favorite: ${result.error}`);
+            }
           }}
         >
           {isFavoritePath ? (

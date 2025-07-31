@@ -22,9 +22,9 @@ export const MainLayout = () => {
   return (
     <CookiesProvider>
       <ZonesAndFspMapContextProvider>
-        <OpenFavoritesProvider>
-          <PreferencesProvider>
-            <FileBrowserContextProvider fspName={fspName} filePath={filePath}>
+        <FileBrowserContextProvider fspName={fspName} filePath={filePath}>
+          <OpenFavoritesProvider>
+            <PreferencesProvider>
               <ProxiedPathProvider>
                 <ProfileContextProvider>
                   <TicketProvider>
@@ -45,9 +45,9 @@ export const MainLayout = () => {
                   </TicketProvider>
                 </ProfileContextProvider>
               </ProxiedPathProvider>
-            </FileBrowserContextProvider>
-          </PreferencesProvider>
-        </OpenFavoritesProvider>
+            </PreferencesProvider>
+          </OpenFavoritesProvider>
+        </FileBrowserContextProvider>
       </ZonesAndFspMapContextProvider>
     </CookiesProvider>
   );

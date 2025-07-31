@@ -25,6 +25,7 @@ import {
   FolderFavorite,
   usePreferencesContext
 } from '@/contexts/PreferencesContext';
+import toast from 'react-hot-toast';
 
 type FolderProps = {
   folderFavorite: FolderFavorite;
@@ -123,7 +124,17 @@ export default function Folder({ folderFavorite }: FolderProps) {
             isCircular
             onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
               e.stopPropagation();
-              await handleFavoriteChange(folderFavorite, 'folder');
+              const result = await handleFavoriteChange(
+                folderFavorite,
+                'folder'
+              );
+              if (result.success) {
+                toast.success(
+                  `Favorite ${result.data === true ? 'added!' : 'removed!'}`
+                );
+              } else {
+                toast.error(`Error adding favorite: ${result.error}`);
+              }
             }}
           >
             <HiStar className="icon-small short:icon-xsmall mb-[2px]" />

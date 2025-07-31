@@ -1,10 +1,10 @@
 import React from 'react';
-import { Alert, Button, Typography } from '@material-tailwind/react';
-import { HiX } from 'react-icons/hi';
+import { Button, Typography } from '@material-tailwind/react';
 
 import useRenameDialog from '@/hooks/useRenameDialog';
 import FgDialog from './FgDialog';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import toast from 'react-hot-toast';
 
 type ItemNamingDialogProps = {
   showRenameDialog: boolean;
@@ -16,14 +16,7 @@ export default function RenameDialog({
   setShowRenameDialog
 }: ItemNamingDialogProps): JSX.Element {
   const { propertiesTarget } = useFileBrowserContext();
-  const {
-    handleRenameSubmit,
-    newName,
-    setNewName,
-    showAlert,
-    setShowAlert,
-    alertContent
-  } = useRenameDialog();
+  const { handleRenameSubmit, newName, setNewName } = useRenameDialog();
 
   return (
     <FgDialog
@@ -33,13 +26,20 @@ export default function RenameDialog({
       <form
         onSubmit={async event => {
           event.preventDefault();
-          setShowAlert(false);
 
-          const success = await handleRenameSubmit(`${propertiesTarget?.path}`);
-          if (success) {
-            setShowRenameDialog(false);
-            setNewName('');
+          if (!propertiesTarget) {
+            toast.error(`No target file selected`);
+            return;
           }
+
+          const result = await handleRenameSubmit(`${propertiesTarget.path}`);
+          if (result.success) {
+            toast.success('Item renamed successfully!');
+          } else {
+            toast.error(`Error renaming item: ${result.error}`);
+          }
+          setShowRenameDialog(false);
+          setNewName('');
         }}
       >
         <div className="mt-8 flex flex-col gap-2">
@@ -65,15 +65,6 @@ export default function RenameDialog({
         <Button className="!rounded-md" type="submit">
           Submit
         </Button>
-        {showAlert === true ? (
-          <Alert className="flex items-center gap-6 mt-6 border-none bg-error-light/90">
-            <Alert.Content>{alertContent}</Alert.Content>
-            <HiX
-              className="icon-default cursor-pointer"
-              onClick={() => setShowAlert(false)}
-            />
-          </Alert>
-        ) : null}
       </form>
     </FgDialog>
   );

@@ -1,12 +1,11 @@
-import log from 'loglevel';
-import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router';
 
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import type { ProxiedPath } from '@/contexts/ProxiedPathContext';
 import { makeBrowseLink } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
-import { FileSharePath } from '@/shared.types';
+import { createSuccess, handleError } from '@/utils/errorHandling';
+import { FileSharePath, Result } from '@/shared.types';
 
 export default function useProxiedPathRow({
   item,
@@ -21,24 +20,22 @@ export default function useProxiedPathRow({
   // Create navigation link for the file browser
   const browseLink = makeBrowseLink(item.fsp_name, item.path);
 
-  const handleCopyPath = async (displayPath: string) => {
+  const handleCopyPath = async (displayPath: string): Promise<Result<void>> => {
     try {
       await copyToClipboard(displayPath);
-      toast.success('Path copied to clipboard');
     } catch (error) {
-      log.error('Failed to copy path:', error);
-      toast.error('Failed to copy path');
+      return handleError(error);
     }
+    return createSuccess();
   };
 
-  const handleCopyUrl = async (item: ProxiedPath) => {
+  const handleCopyUrl = async (item: ProxiedPath): Promise<Result<void>> => {
     try {
       await copyToClipboard(item.url);
-      toast.success('URL copied to clipboard');
     } catch (error) {
-      log.error('Failed to copy sharing URL:', error);
-      toast.error('Failed to copy URL');
+      return handleError(error);
     }
+    return createSuccess();
   };
 
   const handleUnshare = (pathFsp: FileSharePath) => {

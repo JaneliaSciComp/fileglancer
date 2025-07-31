@@ -1,8 +1,9 @@
 import * as React from 'react';
 
-import { FileOrFolder } from '@/shared.types';
+import type { FileOrFolder, Result } from '@/shared.types';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
+import { handleError } from '@/utils/errorHandling';
 
 export default function useContextMenu() {
   const [contextMenuCoords, setContextMenuCoords] = React.useState({
@@ -71,11 +72,11 @@ export default function useContextMenu() {
     setSelectedFiles(newSelectedFiles);
   }
 
-  const handleFavoriteToggleMenuItemClick = async (
+  const handleContextMenuFavorite = async (
     selectedFiles: FileOrFolder[]
-  ): Promise<void> => {
+  ): Promise<Result<boolean>> => {
     if (currentFileSharePath) {
-      await handleFavoriteChange(
+      return await handleFavoriteChange(
         {
           type: 'folder',
           folderPath: selectedFiles[0].path,
@@ -83,8 +84,9 @@ export default function useContextMenu() {
         },
         'folder'
       );
+    } else {
+      return handleError(new Error('No file share path selected'));
     }
-    setShowContextMenu(false);
   };
 
   return {
@@ -93,6 +95,6 @@ export default function useContextMenu() {
     setShowContextMenu,
     menuRef,
     handleContextMenuClick,
-    handleFavoriteToggleMenuItemClick
+    handleContextMenuFavorite
   };
 }
