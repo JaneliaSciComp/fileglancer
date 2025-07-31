@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { Typography } from '@material-tailwind/react';
 
+import Tag from './Tag';
+
 function BetaBanner() {
   return (
     <div className="flex justify-center items-center gap-1 w-full bg-yellow-200 dark:bg-yellow-200/80 pt-[5px] pb-1 text-yellow-800 font-semibold">
@@ -21,11 +23,7 @@ function BetaBanner() {
 }
 
 function BetaSticker() {
-  return (
-    <Typography className="text-xs font-bold py-1 px-2 text-yellow-800 bg-yellow-200 rounded-md">
-      BETA
-    </Typography>
-  );
+  return <Tag classProps="text-yellow-800 bg-yellow-200">BETA</Tag>;
 }
 
 export { BetaBanner, BetaSticker };
