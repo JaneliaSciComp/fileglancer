@@ -14,6 +14,8 @@ import ChangePermissions from './ui/Dialogs/ChangePermissions';
 import ConvertFileDialog from './ui/Dialogs/ConvertFile';
 import RecentDataLinksCard from './ui/BrowsePage/Dashboard/RecentDataLinksCard';
 import RecentlyViewedCard from './ui/BrowsePage/Dashboard/RecentlyViewedCard';
+import NavigationInput from './ui/widgets/NavigateInput';
+import NavigationDialog from './ui/Dialogs/Navigate';
 
 type OutletContextType = {
   setShowPermissionsDialog: React.Dispatch<React.SetStateAction<boolean>>;
@@ -45,6 +47,7 @@ export default function Browse() {
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
   const [showNewFolderDialog, setShowNewFolderDialog] = React.useState(false);
   const [showRenameDialog, setShowRenameDialog] = React.useState(false);
+  const [showNavigationDialog, setShowNavigationDialog] = React.useState(false);
 
   return (
     <div className="flex flex-col h-full max-h-full">
@@ -56,12 +59,14 @@ export default function Browse() {
         showSidebar={showSidebar}
         setShowSidebar={setShowSidebar}
         setShowNewFolderDialog={setShowNewFolderDialog}
+        setShowNavigationDialog={setShowNavigationDialog}
       />
       <div
-        className={`relative grow max-h-full flex flex-col overflow-y-auto ${!currentFileSharePath ? 'grid grid-cols-2 bg-surface-light gap-6 p-6' : ''}`}
+        className={`relative grow max-h-full flex flex-col overflow-y-auto ${!currentFileSharePath ? 'grid grid-cols-2 grid-rows-2 grid-rows-[60px_1fr] bg-surface-light gap-6 p-6' : ''}`}
       >
         {!currentFileSharePath ? (
           <>
+            <NavigationInput location="dashboard" />
             <RecentlyViewedCard />
             <RecentDataLinksCard />
           </>
@@ -108,6 +113,12 @@ export default function Browse() {
         <ConvertFileDialog
           showConvertFileDialog={showConvertFileDialog}
           setShowConvertFileDialog={setShowConvertFileDialog}
+        />
+      ) : null}
+      {showNavigationDialog ? (
+        <NavigationDialog
+          showNavigationDialog={showNavigationDialog}
+          setShowNavigationDialog={setShowNavigationDialog}
         />
       ) : null}
     </div>

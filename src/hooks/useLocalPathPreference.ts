@@ -4,9 +4,8 @@ import { usePreferencesContext } from '../contexts/PreferencesContext';
 export default function useLocalPathPreference() {
   const { pathPreference } = usePreferencesContext();
 
-  const [localPathPreference, setLocalPathPreference] = React.useState(
-    pathPreference || ['linux_path']
-  );
+  const [localPathPreference, setLocalPathPreference] =
+    React.useState(pathPreference);
 
   const handleLocalChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (
@@ -17,6 +16,11 @@ export default function useLocalPathPreference() {
       setLocalPathPreference([event.target.value]);
     }
   };
+
+  // Update localPathPreference when pathPreference changes
+  React.useEffect(() => {
+    setLocalPathPreference(pathPreference);
+  }, [pathPreference]);
 
   return {
     localPathPreference,

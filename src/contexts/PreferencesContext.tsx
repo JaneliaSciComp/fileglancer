@@ -26,12 +26,9 @@ export type FolderPreference = {
 
 type PreferencesContextType = {
   pathPreference: ['linux_path'] | ['windows_path'] | ['mac_path'];
-  showPathPrefAlert: boolean;
-  setShowPathPrefAlert: React.Dispatch<React.SetStateAction<boolean>>;
   handlePathPreferenceSubmit: (
-    event: React.FormEvent<HTMLFormElement>,
     localPathPreference: PreferencesContextType['pathPreference']
-  ) => void;
+  ) => Promise<Result<void>>;
   zonePreferenceMap: Record<string, ZonePreference>;
   zoneFavorites: Zone[];
   fileSharePathPreferenceMap: Record<string, FileSharePathPreference>;
@@ -69,8 +66,6 @@ export const PreferencesProvider = ({
   const [pathPreference, setPathPreference] = React.useState<
     ['linux_path'] | ['windows_path'] | ['mac_path']
   >(['linux_path']);
-  const [showPathPrefAlert, setShowPathPrefAlert] = React.useState(false);
-
   const [zonePreferenceMap, setZonePreferenceMap] = React.useState<
     Record<string, ZonePreference>
   >({});
@@ -199,10 +194,8 @@ export const PreferencesProvider = ({
 
   const handlePathPreferenceSubmit = React.useCallback(
     async (
-      event: React.FormEvent<HTMLFormElement>,
       localPathPreference: ['linux_path'] | ['windows_path'] | ['mac_path']
     ): Promise<Result<void>> => {
-      event.preventDefault();
       try {
         await savePreferencesToBackend('path', localPathPreference);
         setPathPreference(localPathPreference);
@@ -554,8 +547,6 @@ export const PreferencesProvider = ({
     <PreferencesContext.Provider
       value={{
         pathPreference,
-        showPathPrefAlert,
-        setShowPathPrefAlert,
         handlePathPreferenceSubmit,
         zonePreferenceMap,
         zoneFavorites,

@@ -1,21 +1,14 @@
 import * as React from 'react';
-import { Alert, Button, Card, Typography } from '@material-tailwind/react';
-import { HiX } from 'react-icons/hi';
+import { Button, Card, Typography } from '@material-tailwind/react';
+import toast from 'react-hot-toast';
 
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import useLocalPathPreference from '@/hooks/useLocalPathPreference';
 
 export default function Preferences() {
-  const {
-    showPathPrefAlert,
-    setShowPathPrefAlert,
-    handlePathPreferenceSubmit
-  } = usePreferencesContext();
+  const { pathPreference, handlePathPreferenceSubmit } =
+    usePreferencesContext();
   const { localPathPreference, handleLocalChange } = useLocalPathPreference();
-
-  React.useEffect(() => {
-    setShowPathPrefAlert(false);
-  }, [setShowPathPrefAlert]);
 
   return (
     <>
@@ -24,9 +17,15 @@ export default function Preferences() {
       </Typography>
 
       <form
-        onSubmit={(event: React.FormEvent<HTMLFormElement>) =>
-          handlePathPreferenceSubmit(event, localPathPreference)
-        }
+        onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
+          event.preventDefault();
+          const result = await handlePathPreferenceSubmit(localPathPreference);
+          if (result.success) {
+            toast.success('Path preference updated successfully!');
+          } else {
+            toast.error(result.error);
+          }
+        }}
       >
         <Card>
           <Card.Header>
@@ -41,10 +40,11 @@ export default function Preferences() {
                 type="radio"
                 id="linux_path"
                 value="linux_path"
-                checked={localPathPreference[0] === 'linux_path'}
+                checked={
+                  localPathPreference && localPathPreference[0] === 'linux_path'
+                }
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
                   handleLocalChange(event);
-                  setShowPathPrefAlert(false);
                 }}
               />
 
@@ -63,10 +63,12 @@ export default function Preferences() {
                 type="radio"
                 id="windows_path"
                 value="windows_path"
-                checked={localPathPreference[0] === 'windows_path'}
+                checked={
+                  localPathPreference &&
+                  localPathPreference[0] === 'windows_path'
+                }
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
                   handleLocalChange(event);
-                  setShowPathPrefAlert(false);
                 }}
               />
               <Typography
@@ -84,10 +86,11 @@ export default function Preferences() {
                 type="radio"
                 id="mac_path"
                 value="mac_path"
-                checked={localPathPreference[0] === 'mac_path'}
+                checked={
+                  localPathPreference && localPathPreference[0] === 'mac_path'
+                }
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
                   handleLocalChange(event);
-                  setShowPathPrefAlert(false);
                 }}
               />
               <Typography
@@ -100,18 +103,16 @@ export default function Preferences() {
             </div>
           </Card.Body>
           <Card.Footer>
-            <Button className="!rounded-md" type="submit">
+            <Button
+              className="!rounded-md"
+              type="submit"
+              disabled={
+                localPathPreference &&
+                localPathPreference[0] === pathPreference[0]
+              }
+            >
               Submit
             </Button>
-            {showPathPrefAlert === true ? (
-              <Alert className="flex items-center gap-6 mt-6 bg-secondary-light/70 border-none">
-                <Alert.Content>Preference updated!</Alert.Content>
-                <HiX
-                  className="icon-default cursor-pointer"
-                  onClick={() => setShowPathPrefAlert(false)}
-                />
-              </Alert>
-            ) : null}
           </Card.Footer>
         </Card>
       </form>

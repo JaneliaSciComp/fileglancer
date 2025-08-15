@@ -165,6 +165,14 @@ function removeLastSegmentFromPath(itemPath: string): string {
 }
 
 /**
+ * Converts a Windows-style path string to a POSIX-style path string.
+ * Used for the navigation input to ensure paths match the expected format.
+ */
+function convertPathToPosixStyle(pathString: string): string {
+  return pathString.replace(/\\/g, '/');
+}
+
+/**
  * Converts a POSIX-style path string to a Windows-style path string.
  * Should only be used in getPrefferedPathForDisplay function.
  * For example:
@@ -230,6 +238,7 @@ function makeBrowseLink(
 }
 
 export {
+  convertPathToPosixStyle,
   getAPIPathRoot,
   getFileBrowsePath,
   getFileContentPath,

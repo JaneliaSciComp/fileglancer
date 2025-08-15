@@ -9,6 +9,7 @@ import {
   removeLastSegmentFromPath
 } from '@/utils';
 import {
+  convertPathToPosixStyle,
   normalizePosixStylePath,
   removeTrailingSlashes
 } from '@/utils/pathHandling';
@@ -25,6 +26,17 @@ describe('removeTrailingSlashes', () => {
   });
   test('returns empty string for null input', () => {
     expect(removeTrailingSlashes(null)).toBe('');
+  });
+});
+
+describe('convertPathToPosixStyle', () => {
+  test('can convert Windows-style paths to POSIX', () => {
+    expect(convertPathToPosixStyle('\\path\\to\\folder')).toBe(
+      '/path/to/folder'
+    );
+  });
+  test('keeps POSIX-style paths unchanged', () => {
+    expect(convertPathToPosixStyle('/path/to/folder')).toBe('/path/to/folder');
   });
 });
 
