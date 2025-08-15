@@ -84,6 +84,8 @@ export default function usePermissionsDialog() {
       );
       if (response.ok) {
         return await refreshFiles();
+      } else if (response.status === 403) {
+        return handleError(new Error('Permission denied'));
       } else {
         throw await toHttpError(response);
       }

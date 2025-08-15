@@ -37,7 +37,11 @@ export default function useRenameDialog() {
       if (response.ok) {
         return await refreshFiles();
       } else {
-        throw await toHttpError(response);
+        if (response.status === 403) {
+          return handleError(new Error('Permission denied'));
+        } else {
+          throw await toHttpError(response);
+        }
       }
     } catch (error) {
       return handleError(error);

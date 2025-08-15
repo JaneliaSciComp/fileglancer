@@ -27,7 +27,11 @@ export default function useDeleteDialog() {
         cookies['_xsrf']
       );
       if (!response.ok) {
-        throw await toHttpError(response);
+        if (response.status === 403) {
+          return handleError(new Error('Permission denied'));
+        } else {
+          throw await toHttpError(response);
+        }
       } else {
         await refreshFiles();
         return createSuccess(undefined);
