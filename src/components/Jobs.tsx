@@ -9,12 +9,12 @@ export default function Jobs() {
   return (
     <>
       <Typography type="h5" className="mb-6 text-foreground font-bold">
-        Jobs
+        Tasks
       </Typography>
       <Typography className="mb-6 text-foreground">
-        A job is created when you request a file to be converted to a different
-        format. To start a file conversion job, select a file in the file
-        browser, open the <strong>Properties</strong> panel, and click the{' '}
+        A task is created in Jira when you request a file to be converted to a
+        different format. To start a file conversion task, select a file in the
+        file browser, open the <strong>Properties</strong> panel, and click the{' '}
         <strong>Convert</strong> button.
       </Typography>
       <TableCard
@@ -23,7 +23,7 @@ export default function Jobs() {
         rowContent={TicketRow}
         items={allTickets}
         loadingState={loadingTickets}
-        emptyText="You have not started any jobs."
+        emptyText="You have not opened any Jira tasks."
       />
     </>
   );

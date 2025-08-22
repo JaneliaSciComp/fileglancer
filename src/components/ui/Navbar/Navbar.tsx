@@ -35,7 +35,7 @@ const LINKS = [
   },
   {
     icon: HiOutlineBriefcase,
-    title: 'Jobs',
+    title: 'Tasks',
     href: '/jobs'
   },
   {
