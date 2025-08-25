@@ -2,6 +2,7 @@ import os
 import json
 import requests
 from abc import ABC
+from mimetypes import guess_type
 
 from jupyter_server.base.handlers import APIHandler, JupyterHandler
 from requests.exceptions import HTTPError
@@ -13,6 +14,23 @@ from fileglancer.paths import get_fsp_manager
 from fileglancer.preferences import get_preference_manager
 from fileglancer.proxiedpath import get_proxiedpath_manager
 from fileglancer.externalbucket import get_externalbucket_manager
+
+
+def _guess_content_type(filename):
+    """
+    A wrapper for guess_type which deals with unknown MIME types
+    Copied from https://github.com/JaneliaSciComp/x2s3/blob/85a743cc55b3797200e87cd9b74882a5ed39f1f0/x2s3/utils.py#L221
+    """
+    content_type, _ = guess_type(filename)
+    if content_type:
+        return content_type
+    else:
+        if filename.endswith('.yaml'):
+            # Should be application/yaml but that doesn't display in current browsers
+            # See https://httptoolkit.com/blog/yaml-media-type-rfc/
+            return 'text/plain+yaml'
+        else:
+            return 'application/octet-stream'
 
 
 def _get_mounted_filestore(fsp):
@@ -168,9 +186,15 @@ class FileContentHandler(FileShareHandler):
         
         # Stream file contents
         file_name = subpath.split('/')[-1]
+        content_type = _guess_content_type(file_name)
+        
         self.set_status(200)
-        self.set_header('Content-Type', 'application/octet-stream')
-        self.set_header('Content-Disposition', f'attachment; filename="{file_name}"')
+        self.set_header('Content-Type', content_type)
+        
+        # Only add download header for binary/unknown files
+        # See https://github.com/JaneliaSciComp/x2s3/blob/main/x2s3/client_file.py#L57
+        if content_type == 'application/octet-stream':
+            self.set_header('Content-Disposition', f'attachment; filename="{file_name}"')
 
         try:
             for chunk in filestore.stream_file_contents(subpath):

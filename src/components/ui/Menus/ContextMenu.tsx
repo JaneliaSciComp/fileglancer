@@ -7,6 +7,7 @@ import type { FileOrFolder, Result } from '@/shared.types';
 import { makeMapKey } from '@/utils';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import { useHandleDownload } from '@/hooks/useHandleDownload';
 
 type ContextMenuProps = {
   x: number;
@@ -29,6 +30,7 @@ type ContextMenuActionProps = {
   handleContextMenuFavorite: (
     selectedFiles: FileOrFolder[]
   ) => Promise<Result<boolean>>;
+  handleDownload: (file: FileOrFolder) => void;
   togglePropertiesDrawer: () => void;
   setShowContextMenu: React.Dispatch<React.SetStateAction<boolean>>;
   setShowRenameDialog: React.Dispatch<React.SetStateAction<boolean>>;
@@ -52,6 +54,7 @@ export default function ContextMenu({
 }: ContextMenuProps): React.ReactNode {
   const { fileBrowserState } = useFileBrowserContext();
   const { folderPreferenceMap } = usePreferencesContext();
+  const { handleDownload } = useHandleDownload(selectedFiles[0]);
 
   const isFavorite: boolean = Boolean(
     folderPreferenceMap[
@@ -70,6 +73,14 @@ export default function ContextMenu({
         props.setShowContextMenu(false);
       },
       shouldShow: true
+    },
+    {
+      name: 'Download',
+      action: (props: ContextMenuActionProps) => {
+        handleDownload();
+        props.setShowContextMenu(false);
+      },
+      shouldShow: !selectedFiles[0].is_dir
     },
     {
       name: isFavorite ? 'Unset favorite' : 'Set favorite',
@@ -120,6 +131,7 @@ export default function ContextMenu({
 
   const actionProps = {
     selectedFiles,
+    handleDownload,
     handleContextMenuFavorite,
     togglePropertiesDrawer,
     setShowContextMenu,
