@@ -35,7 +35,11 @@ export default function useNewFolderDialog() {
       if (response.ok) {
         return await refreshFiles();
       } else {
-        throw toHttpError(response);
+        if (response.status === 403) {
+          return handleError(new Error('Permission denied'));
+        } else {
+          throw toHttpError(response);
+        }
       }
     } catch (error) {
       return handleError(error);

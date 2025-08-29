@@ -289,15 +289,21 @@ class FileMetadataHandler(FileShareHandler):
         if file_info is None:
             raise web.HTTPError(400, "JSON body missing")
 
-        file_type = file_info.get("type")
-        if file_type == "directory":
-            self.log.info(f"Creating {subpath} as a directory")
-            filestore.create_dir(subpath)
-        elif file_type == "file":
-            self.log.info(f"Creating {subpath} as a file")
-            filestore.create_empty_file(subpath)
-        else:
-            raise web.HTTPError(400, "Invalid file type")
+        try:
+            file_type = file_info.get("type")
+            if file_type == "directory":
+                self.log.info(f"Creating {subpath} as a directory")
+                filestore.create_dir(subpath)
+            elif file_type == "file":
+                self.log.info(f"Creating {subpath} as a file")
+                filestore.create_empty_file(subpath)
+            else:
+                raise web.HTTPError(400, "Invalid file type")
+        
+        except PermissionError as e:
+            self.set_status(403)
+            self.finish(json.dumps({"error": str(e)}))
+            return
 
         self.set_status(201)
         self.finish()
@@ -331,9 +337,14 @@ class FileMetadataHandler(FileShareHandler):
                 self.log.info(f"Renaming {old_file_info.path} to {new_path}")
                 filestore.rename_file_or_dir(old_file_info.path, new_path)
 
+        except PermissionError as e:
+            self.set_status(403)
+            self.finish(json.dumps({"error": str(e)}))
+            return
         except OSError as e:
             self.set_status(500)
             self.finish(json.dumps({"error": str(e)}))
+            return
 
         self.set_status(204)
         self.finish()
@@ -349,8 +360,15 @@ class FileMetadataHandler(FileShareHandler):
         filestore = self._get_filestore(path)
         if filestore is None:
             return
+            
+        try:
+            filestore.remove_file_or_dir(subpath)
 
-        filestore.remove_file_or_dir(subpath)
+        except PermissionError as e:
+            self.set_status(403)
+            self.finish(json.dumps({"error": str(e)}))
+            return
+
         self.set_status(204)
         self.finish()
 
