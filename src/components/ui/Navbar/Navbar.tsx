@@ -87,7 +87,9 @@ export default function FileglancerNavbar() {
   }, [setIsLightTheme]);
 
   return (
-    <Navbar className="mx-auto w-full rounded-none bg-background p-4 short:py-1 short:px-1 dark:shadow-surface min-h-[45px]">
+    <Navbar
+      className={`mx-auto w-full rounded-none bg-background p-4 dark:shadow-surface ${openNav ? 'min-h-[61px]' : 'h-[61px]'}`}
+    >
       <div className="flex items-center justify-between w-full ">
         {/* Logo */}
         <div className="flex items-center gap-1">
