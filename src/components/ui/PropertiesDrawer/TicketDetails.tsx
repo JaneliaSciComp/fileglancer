@@ -81,7 +81,7 @@ export default function TicketDetails() {
     : null;
 
   return (
-    <div className="mt-4 flex flex-col gap-6">
+    <div className="mt-4 flex flex-col gap-6 min-w-max w-full">
       {ticket?.link && (
         <Button
           as={Link}
@@ -90,7 +90,7 @@ export default function TicketDetails() {
           rel="noopener noreferrer"
           variant="outline"
           size="sm"
-          className="flex items-center justify-center gap-1 text-primary px-2 py-1"
+          className="flex items-center justify-center gap-1 text-primary px-2 py-1 !self-start"
         >
           View ticket in JIRA
           <HiExternalLink className="h-3.5 w-3.5" />

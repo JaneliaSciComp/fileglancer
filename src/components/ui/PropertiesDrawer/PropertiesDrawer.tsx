@@ -44,14 +44,14 @@ export default function PropertiesDrawer({
   const tooltipTriggerClasses = 'max-w-[calc(100%-2rem)] truncate';
 
   return (
-    <Card className="min-w-fit w-full h-full max-h-full overflow-auto p-3 rounded-none shadow-lg flex flex-col">
-      <div className="flex items-center justify-between gap-4 mb-1 min-w-full">
+    <Card className="overflow-auto w-full h-full max-h-full p-3 rounded-none shadow-none flex flex-col border-0">
+      <div className="flex items-center justify-between gap-4 mb-1 shrink-0">
         <Typography type="h6">Properties</Typography>
         <IconButton
           size="sm"
           variant="ghost"
           color="secondary"
-          className="h-8 w-8 rounded-full text-foreground hover:bg-secondary-light/20"
+          className="h-8 w-8 rounded-full text-foreground hover:bg-secondary-light/20 shrink-0"
           onClick={() => {
             togglePropertiesDrawer();
           }}
@@ -61,7 +61,7 @@ export default function PropertiesDrawer({
       </div>
 
       {fileBrowserState.propertiesTarget ? (
-        <div className="shrink-0 flex items-center gap-2 mt-3 mb-4 max-h-min min-w-full">
+        <div className="shrink-0 flex items-center gap-2 mt-3 mb-4 max-h-min">
           {fileBrowserState.propertiesTarget.is_dir ? (
             <HiOutlineFolder className="icon-default" />
           ) : (
@@ -71,7 +71,7 @@ export default function PropertiesDrawer({
             label={fileBrowserState.propertiesTarget.name}
             triggerClasses={tooltipTriggerClasses}
           >
-            <Typography className="font-semibold truncate max-w-full">
+            <Typography className="font-semibold truncate max-w-min">
               {fileBrowserState.propertiesTarget?.name}
             </Typography>
           </FgTooltip>
@@ -85,33 +85,30 @@ export default function PropertiesDrawer({
         <Tabs
           key="file-properties-tabs"
           defaultValue="overview"
-          className="min-w-full"
+          className="flex flex-col flex-1 min-h-0 "
         >
-          <Tabs.List className="min-w-full rounded-none border-b border-secondary-dark  bg-transparent dark:bg-transparent py-0">
-            <Tabs.Trigger className="w-full !text-foreground" value="overview">
+          <Tabs.List className="justify-start items-stretch shrink-0 min-w-fit w-full py-2 bg-surface dark:bg-surface-light">
+            <Tabs.Trigger className="!text-foreground h-full" value="overview">
               Overview
             </Tabs.Trigger>
 
             <Tabs.Trigger
-              className="w-full !text-foreground"
+              className="!text-foreground h-full"
               value="permissions"
             >
               Permissions
             </Tabs.Trigger>
 
-            <Tabs.Trigger className="w-full !text-foreground" value="convert">
+            <Tabs.Trigger className="!text-foreground h-full" value="convert">
               Convert
             </Tabs.Trigger>
-            <Tabs.TriggerIndicator className="rounded-none border-b-2 border-secondary bg-transparent dark:bg-transparent shadow-none" />
+            <Tabs.TriggerIndicator className="h-full" />
           </Tabs.List>
 
-          <Tabs.Panel value="overview" className="min-w-full">
-            <div className="group flex justify-between items-center overflow-x-hidden">
-              <FgTooltip
-                label={fullPath}
-                triggerClasses={tooltipTriggerClasses}
-              >
-                <Typography className="text-foreground font-medium text-sm truncate max-w-full">
+          <Tabs.Panel value="overview" className="flex-1 max-w-full p-2">
+            <div className="group flex justify-between items-center min-w-0 max-w-full">
+              <FgTooltip label={fullPath} triggerClasses="block truncate">
+                <Typography className="text-foreground text-sm truncate">
                   <span className="!font-bold">Path: </span>
                   {fullPath}
                 </Typography>
@@ -120,7 +117,7 @@ export default function PropertiesDrawer({
               <IconButton
                 variant="ghost"
                 isCircular
-                className="text-transparent group-hover:text-foreground"
+                className="text-transparent group-hover:text-foreground shrink-0"
                 onClick={() => {
                   if (fileBrowserState.propertiesTarget) {
                     try {
@@ -141,7 +138,7 @@ export default function PropertiesDrawer({
 
           <Tabs.Panel
             value="permissions"
-            className="flex flex-col gap-2 min-w-full"
+            className="flex flex-col max-w-full gap-4 flex-1 p-2"
           >
             <PermissionsTable file={fileBrowserState.propertiesTarget} />
             <Button
@@ -149,7 +146,7 @@ export default function PropertiesDrawer({
               onClick={() => {
                 setShowPermissionsDialog(true);
               }}
-              className="!rounded-md"
+              className="!rounded-md !text-primary !text-nowrap !self-start"
             >
               Change Permissions
             </Button>
@@ -157,13 +154,13 @@ export default function PropertiesDrawer({
 
           <Tabs.Panel
             value="convert"
-            className="flex flex-col gap-2 min-w-full"
+            className="flex flex-col gap-4 flex-1 w-full p-2"
           >
             {ticket ? (
               <TicketDetails />
             ) : (
               <>
-                <Typography variant="small" className="font-medium">
+                <Typography className="min-w-64">
                   Scientific Computing can help you convert images to OME-Zarr
                   format, suitable for viewing in external viewers like
                   Neuroglancer.

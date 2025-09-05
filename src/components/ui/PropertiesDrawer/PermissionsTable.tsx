@@ -18,8 +18,8 @@ export default function PermissionsTable({
     );
 
   return (
-    <div className="w-full overflow-hidden rounded-lg border border-surface mt-4">
-      <table className="w-full">
+    <div className="w-full min-w-max overflow-hidden rounded-lg border border-surface mt-4">
+      <table className="w-full min-w-max">
         <thead className="border-b border-surface bg-surface-dark text-sm font-medium">
           <tr>
             <th className="px-3 py-2 text-start font-medium">

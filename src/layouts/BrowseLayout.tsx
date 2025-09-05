@@ -86,6 +86,7 @@ export const BrowsePageLayout = () => {
                 minSize={15}
                 defaultSize={24}
                 style={{ overflowX: 'auto' }}
+                className="bg-background"
               >
                 <PropertiesDrawer
                   togglePropertiesDrawer={togglePropertiesDrawer}
