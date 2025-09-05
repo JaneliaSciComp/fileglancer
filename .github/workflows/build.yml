@@ -38,8 +38,7 @@ jobs:
     - name: Lint the extension
       run: |
         set -eux
-        npm install
-        npx prettier --write "**/*.{ts,tsx,js,jsx,json,md}" && npm run lint:check
+        pixi run node-prettier-write && pixi run node-prettier-check && pixi run node-eslint-check
 
     - name: Test the extension frontend
       run: |

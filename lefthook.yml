@@ -1,8 +1,8 @@
 pre-push:
   parallel: true
   jobs:
-    - name: Enforce Prettier formatting
-      run: pixi run npx prettier --write "**/*.{ts,tsx,js,jsx,json,md}"
+    - name: Run Prettier check; fix if check fails
+      run: pixi run prettier-check-and-fix.sh
 
     - name: Run ESLint check
-      run: pixi run npx eslint . --cache --ext .ts,.tsx
+      run: pixi run node-eslint-check

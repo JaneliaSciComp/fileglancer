@@ -88,7 +88,7 @@ skip-if-exists = ["fileglancer/labextension/static/style.js"]
 build_cmd = "build:prod"
 
 [tool.hatch.build.hooks.jupyter-builder.editable-build-kwargs]
-build_cmd = "install:extension"
+build_cmd = "build"
 source_dir = "src"
 build_dir = "fileglancer/labextension"
 
@@ -135,8 +135,9 @@ pip-install = { cmd = "pip install -e .", depends-on = ["ext-clean"] }
 pip-uninstall = "pip uninstall -y fileglancer"
 node-install = "npm install"
 node-build = "npm run build"
-node-lint = "npm run lint || echo 'Run `pixi run node-lint-write` to fix issues.'"
-node-lint-write = "npx prettier --write '**/*.{ts,tsx,js,jsx,json,md}'"
+node-eslint-check = "npx eslint . --cache --ext .ts,.tsx"
+node-prettier-check =  "npx prettier \"**/*{.ts,.tsx,.js,.jsx,.css,.json,.md}\" --check"
+node-prettier-write = "npx prettier --write '**/*.{ts,tsx,js,jsx,json,md}'"
 node-check = "npx tsc --noEmit -p tsconfig.app.json"
 ext-overwrite = { cmd = "jupyter labextension develop . --overwrite" }
 ext-enable = { cmd = "jupyter server extension enable fileglancer", depends-on = ["ext-overwrite"] }
