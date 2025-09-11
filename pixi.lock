@@ -2289,7 +2289,7 @@ packages:
 - pypi: ./
   name: fileglancer
   version: 0.6.1
-  sha256: 89da73b66c2fd7b3adfa88baaa2de887da90b6154da1b7a9548cadd29ad1b372
+  sha256: 639f6d1e2e924fefbbb6cdb4a88475f867589128d5916b10b590793587ca93e2
   requires_dist:
   - jupyter-server>=2.4.0,<3
   - jupyterlab>=4.3.0,<5

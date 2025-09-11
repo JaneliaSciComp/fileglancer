@@ -142,9 +142,9 @@ test = { features = ["test"], solve-group = "default" }
 release = { features = ["release"], solve-group = "default" }
 
 [tool.pixi.tasks]
-ext-clean = "pixi reinstall"
-pip-install = { depends-on = ["ext-clean"] }
-pip-uninstall = { depends-on = ["ext-clean"] }
+ext-clean = "rm -rf fileglancer/labextension && rm -rf .pixi/envs/default/share/jupyter/labextensions/fileglancer"
+pip-install = { cmd = "pixi reinstall", depends-on = ["ext-clean"] }
+pip-uninstall = { cmd = "pixi clean", depends-on = ["ext-clean"] }
 node-install = "npm install"
 node-build = "npm run build"
 node-eslint-check = "npx eslint . --cache --ext .ts,.tsx"
