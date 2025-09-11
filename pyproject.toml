@@ -44,7 +44,6 @@ test = [
     "requests-mock"
 ]
 release = [
-    "build",
     "twine",
     "hatch"
 ]
@@ -119,10 +118,23 @@ platforms = ["osx-arm64", "osx-64", "linux-64"]
 test-backend = "pytest"
 test-frontend = "npm test"
 
+[tool.pixi.feature.test.dependencies]
+coverage = ">=7.10.6,<8"
+pytest = ">=8.4.2,<9"
+pytest-asyncio = ">=1.1.0,<2"
+pytest-cov = ">=7.0.0,<8"
+pytest-jupyter = ">=0.10.1,<0.11"
+requests-mock = ">=1.12.1,<2"
+pytest-jupyter-server = ">=0.6.0"
+
 [tool.pixi.feature.release.tasks]
 set-version = "hatch version"
 pypi-build = "pip install build && python -m build"
 pypi-upload = "twine upload dist/*"
+
+[tool.pixi.feature.release.dependencies]
+twine = ">=6.2.0,<7"
+hatch = ">=1.14.1,<2"
 
 [tool.pixi.environments]
 default = { solve-group = "default" }
@@ -152,3 +164,9 @@ ui-test = { cmd = "npm --prefix ui-tests run test", depends-on = ["node-install-
 python = ">=3.13.2,<4"
 pip = ">=25.0.1,<26"
 nodejs = ">=22.12.0,<23"
+jupyterlab = ">=4.3.0,<5"
+jupyter_server = ">=2.4.0,<3"
+pydantic = ">=2.10.6,<3"
+
+[dependency-groups]
+release = ["build>=1.3.0,<2"]
