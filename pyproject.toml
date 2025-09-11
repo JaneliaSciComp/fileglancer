@@ -162,7 +162,6 @@ ui-test = { cmd = "npm --prefix ui-tests run test", depends-on = ["node-install-
 
 [tool.pixi.dependencies]
 python = ">=3.13.2,<4"
-pip = ">=25.0.1,<26"
 nodejs = ">=22.12.0,<23"
 jupyterlab = ">=4.3.0,<5"
 jupyter_server = ">=2.4.0,<3"
