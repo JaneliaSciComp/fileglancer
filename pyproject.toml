@@ -142,9 +142,9 @@ test = { features = ["test"], solve-group = "default" }
 release = { features = ["release"], solve-group = "default" }
 
 [tool.pixi.tasks]
-ext-clean = "rm -rf fileglancer/labextension && rm -rf .pixi/envs/default/share/jupyter/labextensions/fileglancer"
-pip-install = { cmd = "pip install -e .", depends-on = ["ext-clean"] }
-pip-uninstall = "pip uninstall -y fileglancer"
+ext-clean = "pixi reinstall"
+pip-install = { depends-on = ["ext-clean"] }
+pip-uninstall = { depends-on = ["ext-clean"] }
 node-install = "npm install"
 node-build = "npm run build"
 node-eslint-check = "npx eslint . --cache --ext .ts,.tsx"
@@ -167,6 +167,9 @@ nodejs = ">=22.12.0,<23"
 jupyterlab = ">=4.3.0,<5"
 jupyter_server = ">=2.4.0,<3"
 pydantic = ">=2.10.6,<3"
+
+[tool.pixi.pypi-dependencies]
+fileglancer = { path = ".", editable = true }
 
 [dependency-groups]
 release = ["build>=1.3.0,<2"]
