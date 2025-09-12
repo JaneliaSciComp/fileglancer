@@ -238,7 +238,7 @@ export default function DataLinkDialog({
             />
             <Typography className="text-foreground">
               If you share the data link with internal collaborators, they will
-              be able to view this data.
+              be able to view these data.
             </Typography>
             {type === 'zarr' ? (
               <div className="flex flex-col gap-2">
