@@ -60,6 +60,21 @@ class HTTPError extends Error {
   }
 }
 
+async function checkSessionValidity(xrsfCookie: string): Promise<boolean> {
+  try {
+    const response = await fetch(getFullPath('/api/fileglancer/profile'), {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'X-Xsrftoken': xrsfCookie
+      }
+    });
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
+}
+
 async function sendFetchRequest(
   apiPath: string,
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
@@ -78,7 +93,22 @@ async function sendFetchRequest(
       method !== 'DELETE' &&
       body && { body: JSON.stringify(body) })
   };
-  return await fetch(getFullPath(apiPath), options);
+
+  const response = await fetch(getFullPath(apiPath), options);
+
+  // Check for 403 Forbidden - could be permission denied or session expired
+  if (response.status === 403) {
+    // Check if session is still valid by testing a stable endpoint
+    const sessionValid = await checkSessionValidity(xrsfCookie);
+    if (!sessionValid) {
+      // Session has expired, redirect to logout
+      window.location.href = `${window.location.origin}/logout`;
+      throw new HTTPError('Session expired', 401);
+    }
+    // If session is valid, this is just a permission denied for this specific resource
+  }
+
+  return response;
 }
 
 // Parse the Unix-style permissions string (e.g., "drwxr-xr-x")
@@ -177,6 +207,7 @@ async function fetchFileWithTextDetection(
 }
 
 export {
+  checkSessionValidity,
   escapePathForUrl,
   fetchFileAsJson,
   fetchFileAsText,
