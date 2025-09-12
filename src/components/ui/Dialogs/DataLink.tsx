@@ -17,6 +17,7 @@ import AutomaticLinksToggle from '@/components/ui/PreferencesPage/AutomaticLinks
 
 type DataLinkDialogProps = {
   action: 'create' | 'delete';
+  type: 'zarr' | 'other';
   showDataLinkDialog: boolean;
   setShowDataLinkDialog: React.Dispatch<React.SetStateAction<boolean>>;
   proxiedPath: ProxiedPath | null;
@@ -172,6 +173,7 @@ function BtnContainer({
 }
 
 export default function DataLinkDialog({
+  type,
   action,
   showDataLinkDialog,
   setShowDataLinkDialog,
@@ -212,7 +214,7 @@ export default function DataLinkDialog({
     targetPath
   );
 
-  if (action === 'create' && localAutomaticDataLinks) {
+  if (action === 'create' && type === 'zarr' && localAutomaticDataLinks) {
     return <></>;
   }
 
@@ -227,7 +229,8 @@ export default function DataLinkDialog({
       }}
     >
       <div className="flex flex-col gap-4 my-4">
-        {action === 'create' && !localAutomaticDataLinks ? (
+        {action === 'create' &&
+        (type === 'other' || (type === 'zarr' && !localAutomaticDataLinks)) ? (
           <>
             <TextWithFilePath
               text="Are you sure you want to create a data link for this path?"
@@ -237,12 +240,14 @@ export default function DataLinkDialog({
               If you share the data link with internal collaborators, they will
               be able to view this data.
             </Typography>
-            <div className="flex flex-col gap-2">
-              <Typography className="font-semibold text-foreground">
-                Don't ask me this again:
-              </Typography>
-              <AutomaticLinksToggle />
-            </div>
+            {type === 'zarr' ? (
+              <div className="flex flex-col gap-2">
+                <Typography className="font-semibold text-foreground">
+                  Don't ask me this again:
+                </Typography>
+                <AutomaticLinksToggle />
+              </div>
+            ) : null}
             <BtnContainer>
               <CreateLinkBtn
                 displayPath={displayPath}
