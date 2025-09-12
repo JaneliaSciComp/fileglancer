@@ -261,7 +261,7 @@ export default function DataLinkDialog({
               />
             </BtnContainer>
           </>
-        ) : action === 'delete' && localAutomaticDataLinks ? (
+        ) : action === 'delete' ? (
           <>
             <TextWithFilePath
               text="Are you sure you want to delete the data link for this path?"
@@ -269,39 +269,9 @@ export default function DataLinkDialog({
             />
             <Typography className="text-foreground">
               <span className="font-semibold">Warning:</span> The existing data
-              link to this data will be deleted. Collaborators who previously
-              received the link will no longer be able to access it.
-            </Typography>
-            <BtnContainer>
-              <DeleteLinkBtn
-                proxiedPath={proxiedPath}
-                displayPath={displayPath}
-                setShowDataLinkDialog={setShowDataLinkDialog}
-              />
-              <CancelBtn
-                setPendingNavigationUrl={setPendingNavigationUrl}
-                setShowDataLinkDialog={setShowDataLinkDialog}
-              />
-            </BtnContainer>
-            <Typography className="text-foreground">
-              <span className="font-semibold">Note:</span> Automatic data links
-              are currently enabled. To disable this feature, click the checkbox
-              below before deleting this data link.
-            </Typography>
-            <AutomaticLinksToggle />
-          </>
-        ) : action === 'delete' && !localAutomaticDataLinks ? (
-          <>
-            <TextWithFilePath
-              text="Are you sure you want to delete the data link for this path?"
-              path={displayPath}
-            />
-            <Typography className="text-foreground">
-              <span className="font-semibold">Warning:</span> The existing data
-              link to this data will be deleted. Collaborators who previously
-              received the link will no longer be able to access it. You can
-              create a new data link at any time by navigating to the file path
-              and clicking on one of the data viewers.
+              link will be deleted. Collaborators who previously received the
+              link will no longer be able to use it to access these data. You
+              can create a new data link at any time.
             </Typography>
             <BtnContainer>
               <DeleteLinkBtn
