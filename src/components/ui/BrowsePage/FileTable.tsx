@@ -13,7 +13,6 @@ import {
   HiOutlineEllipsisHorizontalCircle,
   HiOutlineFolder
 } from 'react-icons/hi2';
-import { HiSortAscending, HiSortDescending } from 'react-icons/hi';
 
 import type { FileOrFolder } from '@/shared.types';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
@@ -22,8 +21,9 @@ import {
   formatFileSize,
   makeBrowseLink
 } from '@/utils/index';
-import FgTooltip from '../widgets/FgTooltip';
-import { FgStyledLink } from '../widgets/FgLink';
+import FgTooltip from '@/components/ui/widgets/FgTooltip';
+import { FgStyledLink } from '@/components/ui/widgets/FgLink';
+import { HeaderIcons } from '@/components/ui/Table/TableCard';
 
 type TableProps = {
   data: FileOrFolder[];
@@ -160,7 +160,8 @@ export default function Table({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     columnResizeMode: 'onChange', // Note - if users experience lag with resizing, might need to memoize table body https://tanstack.com/table/latest/docs/framework/react/examples/column-resizing-performant
-    enableColumnResizing: true
+    enableColumnResizing: true,
+    enableColumnFilters: false
   });
 
   return (
@@ -188,14 +189,7 @@ export default function Table({
                         header.column.columnDef.header,
                         header.getContext()
                       )}
-                      {{
-                        asc: (
-                          <HiSortAscending className="icon-default text-foreground" />
-                        ),
-                        desc: (
-                          <HiSortDescending className="icon-default text-foreground" />
-                        )
-                      }[header.column.getIsSorted() as string] ?? null}
+                      <HeaderIcons header={header} />
                     </div>
                   )}
                   {header.column.getCanResize() && (

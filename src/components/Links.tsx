@@ -1,8 +1,8 @@
 import { Typography } from '@material-tailwind/react';
 
 import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
-import ProxiedPathRow from './ui/LinksPage/ProxiedPathRow';
-import { TableCard } from './ui/widgets/TableCard';
+import { TableCard } from '@/components/ui/Table/TableCard';
+import { linksColumns } from '@/components/ui/Table/linksColumns';
 
 export default function Links() {
   const { allProxiedPaths, loadingProxiedPaths } = useProxiedPathContext();
@@ -18,12 +18,12 @@ export default function Links() {
         share data links with internal collaborators.
       </Typography>
       <TableCard
-        gridColsClass="grid-cols-[1.5fr_2.5fr_1.5fr_1fr]"
-        rowTitles={['Name', 'File Path', 'Date Created', 'Actions']}
-        rowContent={ProxiedPathRow}
-        items={allProxiedPaths}
+        columns={linksColumns}
+        data={allProxiedPaths || []}
+        gridColsClass="grid-cols-[1.5fr_2.5fr_1.5fr_1fr_1fr]"
         loadingState={loadingProxiedPaths}
         emptyText="No shared paths."
+        enableColumnSearch={true}
       />
     </>
   );

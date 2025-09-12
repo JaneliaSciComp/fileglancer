@@ -1,8 +1,8 @@
 import { Typography } from '@material-tailwind/react';
 
-import TicketRow from '@/components/ui/JobsPage/TicketRow';
 import { useTicketContext } from '@/contexts/TicketsContext';
-import { TableCard } from './ui/widgets/TableCard';
+import { TableCard } from './ui/Table/TableCard';
+import { jobsColumns } from './ui/Table/jobsColumns';
 
 export default function Jobs() {
   const { allTickets, loadingTickets } = useTicketContext();
@@ -18,10 +18,9 @@ export default function Jobs() {
         <strong>Convert</strong> button.
       </Typography>
       <TableCard
+        columns={jobsColumns}
+        data={allTickets || []}
         gridColsClass="grid-cols-[2fr_3fr_1fr_1fr]"
-        rowTitles={['File Path', 'Job Description', 'Status', 'Last Updated']}
-        rowContent={TicketRow}
-        items={allTickets}
         loadingState={loadingTickets}
         emptyText="You have not made any conversion requests."
       />
