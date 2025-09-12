@@ -12,7 +12,7 @@ import {
 import { useCookiesContext } from './CookiesContext';
 import { useZoneAndFspMapContext } from './ZonesAndFspMapContext';
 import { normalizePosixStylePath } from '@/utils/pathHandling';
-import { createSuccess, handleError, toHttpError } from '@/utils/errorHandling';
+import { createSuccess, handleError } from '@/utils/errorHandling';
 
 type FileBrowserResponse = {
   info: FileOrFolder;
@@ -242,13 +242,13 @@ export const FileBrowserContextProvider = ({
       const url = getFileBrowsePath(fspName, folderName);
 
       const response = await sendFetchRequest(url, 'GET', cookies['_xsrf']);
-      const data = await response.json();
+      const body = await response.json();
 
       if (!response.ok) {
         if (response.status === 403) {
-          if (data.info && data.info.owner) {
+          if (body.info && body.info.owner) {
             throw new Error(
-              `You do not have permission to list this folder. Contact the owner (${data.info.owner}) for access.`
+              `You do not have permission to list this folder. Contact the owner (${body.info.owner}) for access.`
             );
           } else {
             throw new Error(
@@ -258,11 +258,13 @@ export const FileBrowserContextProvider = ({
         } else if (response.status === 404) {
           throw new Error('Folder not found');
         } else {
-          throw await toHttpError(response);
+          throw new Error(
+            `Error: ${response.status}: ${body.error ? body.error : 'Unknown error'}`
+          );
         }
       }
 
-      return data as FileBrowserResponse;
+      return body as FileBrowserResponse;
     },
     [cookies]
   );
@@ -380,10 +382,12 @@ export const FileBrowserContextProvider = ({
 
   // Effect to update currentFolder and propertiesTarget when URL params change
   React.useEffect(() => {
-    log.debug('URL changed: fspName=', fspName, 'filePath=', filePath);
     let cancelled = false;
     const updateCurrentFileSharePathAndFolder = async () => {
-      if (!isZonesMapReady || !zonesAndFileSharePathsMap || !fspName) {
+      if (!isZonesMapReady || !zonesAndFileSharePathsMap) {
+        return;
+      }
+      if (!fspName) {
         if (cancelled) {
           return;
         }
@@ -393,7 +397,7 @@ export const FileBrowserContextProvider = ({
           [],
           null,
           [],
-          'Invalid file share path name'
+          'No file share path name in URL'
         );
         return;
       }
