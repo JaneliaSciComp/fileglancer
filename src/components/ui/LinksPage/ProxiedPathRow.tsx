@@ -140,7 +140,7 @@ export default function ProxiedPathRow({ item }: ProxiedPathRowProps) {
       {/* Sharing dialog */}
       {showDataLinkDialog ? (
         <DataLinkDialog
-          isImageShared={true}
+          action="delete"
           showDataLinkDialog={showDataLinkDialog}
           setShowDataLinkDialog={setShowDataLinkDialog}
           proxiedPath={item}

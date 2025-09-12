@@ -5,27 +5,21 @@ import { http, HttpResponse } from 'msw';
 export const handlers = [
   // Proxied paths
   http.get('http://localhost:3000/api/fileglancer/proxied-path', () => {
+    return HttpResponse.json({ paths: [] }, { status: 200 });
+  }),
+
+  http.post('http://localhost:3000/api/fileglancer/proxied-path', () => {
     return HttpResponse.json({
-      paths: [
-        {
-          username: 'testuser',
-          sharing_key: 'testkey',
-          sharing_name: 'testshare',
-          path: '/test/path',
-          fsp_name: 'test_fsp',
-          created_at: '2025-07-08T15:56:42.588942',
-          updated_at: '2025-07-08T15:56:42.588942',
-          url: 'http://127.0.0.1:7878/files/testkey/test/path'
-        }
-      ]
+      username: 'testuser',
+      sharing_key: 'testkey',
+      sharing_name: 'testshare',
+      path: '/test/path',
+      fsp_name: 'test_fsp',
+      created_at: '2025-07-08T15:56:42.588942',
+      updated_at: '2025-07-08T15:56:42.588942',
+      url: 'http://127.0.0.1:7878/files/testkey/test/path'
     });
   }),
-  http.post(
-    'http://localhost:3000/api/fileglancer/proxied-path',
-    ({ request }) => {
-      return HttpResponse.json(null, { status: 200 });
-    }
-  ),
 
   // Preferences
   http.get(
