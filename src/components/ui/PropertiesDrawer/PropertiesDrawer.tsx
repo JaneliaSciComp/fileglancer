@@ -15,7 +15,7 @@ import PermissionsTable from '@/components/ui/PropertiesDrawer/PermissionsTable'
 import OverviewTable from '@/components/ui/PropertiesDrawer/OverviewTable';
 import TicketDetails from '@/components/ui/PropertiesDrawer/TicketDetails';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
-import { DataLinkDialog } from '@/components/ui/Dialogs/DataLink';
+import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
 import { getPreferredPathForDisplay } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
