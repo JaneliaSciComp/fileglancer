@@ -3,6 +3,7 @@ import { Card, Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
+import AutomaticLinksToggle from '@/components/ui/PreferencesPage/AutomaticLinksToggle';
 
 export default function Preferences() {
   const {
@@ -148,6 +149,10 @@ export default function Preferences() {
             >
               Hide dot files (files and folders starting with ".")
             </Typography>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <AutomaticLinksToggle />
           </div>
 
           <div className="flex items-center gap-2">

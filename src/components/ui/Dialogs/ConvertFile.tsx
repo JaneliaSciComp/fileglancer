@@ -78,7 +78,7 @@ export default function ConvertFileDialog({
         }}
       >
         <TextWithFilePath text="Source Folder" path={displayPath} />
-        <div className="flex flex-col gap-2 mb-4">
+        <div className="flex flex-col gap-2 my-4">
           <Typography
             as="label"
             htmlFor="destination_folder"

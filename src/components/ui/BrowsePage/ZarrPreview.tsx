@@ -1,5 +1,5 @@
 import React from 'react';
-import { Switch, Typography } from '@material-tailwind/react';
+import { Typography } from '@material-tailwind/react';
 
 import zarrLogo from '@/assets/zarr.jpg';
 import ZarrMetadataTable from '@/components/ui/BrowsePage/ZarrMetadataTable';
@@ -26,14 +26,12 @@ export default function ZarrPreview({
   metadata,
   thumbnailError
 }: ZarrPreviewProps): React.ReactNode {
-  const [isImageShared, setIsImageShared] = React.useState(false);
+  const [pendingNavigationUrl, setPendingNavigationUrl] = React.useState<
+    string | null
+  >(null);
   const { showDataLinkDialog, setShowDataLinkDialog } = useDataLinkDialog();
   const { proxiedPath } = useProxiedPathContext();
   const { externalDataUrl } = useExternalBucketContext();
-
-  React.useEffect(() => {
-    setIsImageShared(proxiedPath !== null);
-  }, [proxiedPath]);
 
   return (
     <div className="my-4 p-4 shadow-sm rounded-md bg-primary-light/30">
@@ -68,52 +66,24 @@ export default function ZarrPreview({
             ) : null}
           </div>
 
-          <div className="flex items-center gap-2">
-            <Switch
-              id="share-switch"
-              className="mt-2 bg-secondary-light border-secondary-light hover:!bg-secondary-light/80 hover:!border-secondary-light/80"
-              onChange={() => {
-                setShowDataLinkDialog(true);
-              }}
-              checked={externalDataUrl ? true : isImageShared}
-              disabled={externalDataUrl ? true : false}
-            />
-            <label
-              htmlFor="share-switch"
-              className="-translate-y-0.5 flex flex-col gap-1"
-            >
-              <Typography
-                as="label"
-                htmlFor="share-switch"
-                className={`${externalDataUrl ? 'cursor-default' : 'cursor-pointer'} text-foreground font-semibold`}
-              >
-                Data Link
-              </Typography>
-              <Typography
-                type="small"
-                className="text-foreground whitespace-normal max-w-[300px]"
-              >
-                {externalDataUrl
-                  ? 'Public data link already exists since this data is on s3.janelia.org.'
-                  : 'Creating a data link for this image allows you to open it in external viewers like Neuroglancer.'}
-              </Typography>
-            </label>
-          </div>
-
-          {showDataLinkDialog ? (
-            <DataLinkDialog
-              isImageShared={isImageShared}
-              setIsImageShared={setIsImageShared}
-              showDataLinkDialog={showDataLinkDialog}
-              setShowDataLinkDialog={setShowDataLinkDialog}
+          {openWithToolUrls || externalDataUrl ? (
+            <DataToolLinks
+              title="Open with:"
               proxiedPath={proxiedPath}
+              urls={openWithToolUrls as OpenWithToolUrls}
+              setShowDataLinkDialog={setShowDataLinkDialog}
+              setPendingNavigationUrl={setPendingNavigationUrl}
             />
           ) : null}
 
-          {openWithToolUrls && (externalDataUrl || isImageShared) ? (
-            <DataToolLinks
-              title="Open with:"
-              urls={openWithToolUrls as OpenWithToolUrls}
+          {showDataLinkDialog ? (
+            <DataLinkDialog
+              action="create"
+              showDataLinkDialog={showDataLinkDialog}
+              setShowDataLinkDialog={setShowDataLinkDialog}
+              proxiedPath={proxiedPath}
+              pendingNavigationUrl={pendingNavigationUrl}
+              setPendingNavigationUrl={setPendingNavigationUrl}
             />
           ) : null}
         </div>
