@@ -12,7 +12,7 @@ describe('Data Link dialog', () => {
 
     render(
       <DataLinkDialog
-        isImageShared={false}
+        action="create"
         showDataLinkDialog={true}
         setShowDataLinkDialog={setShowDataLinkDialog}
         proxiedPath={null}
