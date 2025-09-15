@@ -5,7 +5,7 @@ import { formatUnixTimestamp, formatFileSize } from '@/utils';
 
 export default function OverviewTable({ file }: { file: FileOrFolder | null }) {
   return (
-    <div className="w-full min-w-max overflow-hidden rounded-lg border border-surface mt-4">
+    <div className="w-full min-w-max overflow-hidden rounded-lg border border-surface">
       <table className="w-full min-w-max">
         <tbody className="text-sm text-nowrap">
           <tr className="border-b border-surface">

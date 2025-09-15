@@ -130,7 +130,8 @@ function ActionsCell({ item }: { item: ProxiedPath }) {
       {/* Sharing dialog */}
       {showDataLinkDialog ? (
         <DataLinkDialog
-          isImageShared={true}
+          type="other"
+          action="delete"
           showDataLinkDialog={showDataLinkDialog}
           setShowDataLinkDialog={setShowDataLinkDialog}
           proxiedPath={item}

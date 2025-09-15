@@ -58,32 +58,40 @@ export const getNotificationStyles = (type: string) => {
   switch (type) {
     case 'warning':
       return {
-        container: 'bg-warning-light border border-warning-dark',
+        container:
+          'bg-warning-light dark:bg-warning-dark border border-warning-dark dark:border-warning',
         icon: 'text-warning',
-        text: 'text-warning-foreground',
-        close: 'text-warning hover:text-warning-foreground'
+        text: 'text-warning-dark dark:text-warning-light',
+        close:
+          'text-warning dark:text-warning-light hover:text-warning-dark dark:hover:text-warning-foreground'
       };
     case 'success':
       return {
-        container: 'bg-success-light border border-success-dark',
+        container:
+          'bg-success-light dark:bg-success-dark border border-success-dark dark:border-success',
         icon: 'text-success',
-        text: 'text-success-foreground',
-        close: 'text-success hover:text-success-foreground'
+        text: 'text-success-dark dark:text-success-light',
+        close:
+          'text-success dark:text-success-light hover:text-success-dark dark:hover:text-success-foreground'
       };
     case 'error':
       return {
-        container: 'bg-error-light border border-error-dark',
+        container:
+          'bg-error-light dark:bg-error-dark border border-error-dark dark:border-error',
         icon: 'text-error',
-        text: 'text-error-foreground',
-        close: 'text-error hover:text-error-foreground'
+        text: 'text-error-dark dark:text-error-light',
+        close:
+          'text-error dark:text-error-light hover:text-error-dark dark:hover:text-error-foreground'
       };
     case 'info':
     default:
       return {
-        container: 'bg-info-light border border-info-dark',
+        container:
+          'bg-info-light dark:bg-info-dark border border-info-dark dark:border-info',
         icon: 'text-info',
-        text: 'text-info-foreground',
-        close: 'text-info hover:text-info-foreground'
+        text: 'text-info-dark dark:text-info-light',
+        close:
+          'text-info dark:text-info-light hover:text-info-dark dark:hover:text-info-foreground'
       };
   }
 };

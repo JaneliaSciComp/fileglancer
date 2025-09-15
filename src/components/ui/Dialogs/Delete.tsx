@@ -47,7 +47,7 @@ export default function DeleteDialog({
       />
       <Button
         color="error"
-        className="!rounded-md"
+        className="!rounded-md mt-4"
         onClick={async () => {
           const result = await handleDelete(fileBrowserState.propertiesTarget!);
           if (!result.success) {

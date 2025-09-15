@@ -41,6 +41,7 @@ export default defineConfig({
         '**/dist/**',
         '**/ui-tests/**'
       ]
-    }
+    },
+    silent: 'passed-only'
   }
 });

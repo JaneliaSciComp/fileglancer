@@ -3,7 +3,7 @@ import { waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { render, screen } from '@/__tests__/test-utils';
 import toast from 'react-hot-toast';
-import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
+import { DataLinkDialog } from '@/components/ui/Dialogs/DataLink';
 
 describe('Data Link dialog', () => {
   beforeEach(async () => {
@@ -12,7 +12,8 @@ describe('Data Link dialog', () => {
 
     render(
       <DataLinkDialog
-        isImageShared={false}
+        type="zarr"
+        action="create"
         showDataLinkDialog={true}
         setShowDataLinkDialog={setShowDataLinkDialog}
         proxiedPath={null}

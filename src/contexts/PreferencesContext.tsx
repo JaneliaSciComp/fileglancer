@@ -31,6 +31,8 @@ type PreferencesContextType = {
   ) => Promise<Result<void>>;
   hideDotFiles: boolean;
   toggleHideDotFiles: () => Promise<Result<void>>;
+  automaticDataLinks: boolean;
+  toggleAutomaticDataLinks: () => Promise<Result<void>>;
   disableNeuroglancerStateGeneration: boolean;
   toggleDisableNeuroglancerStateGeneration: () => Promise<Result<void>>;
   disableHeuristicalLayerTypeDetection: boolean;
@@ -77,6 +79,8 @@ export const PreferencesProvider = ({
     ['linux_path'] | ['windows_path'] | ['mac_path']
   >(['linux_path']);
   const [hideDotFiles, setHideDotFiles] = React.useState<boolean>(false);
+  const [automaticDataLinks, setAutomaticDataLinks] =
+    React.useState<boolean>(false);
   const [
     disableNeuroglancerStateGeneration,
     setDisableNeuroglancerStateGeneration
@@ -230,39 +234,44 @@ export const PreferencesProvider = ({
     [savePreferencesToBackend]
   );
 
-  const toggleHideDotFiles = React.useCallback(async (): Promise<
-    Result<void>
-  > => {
-    try {
-      setHideDotFiles(prevHideDotFiles => {
-        const newValue = !prevHideDotFiles;
-        savePreferencesToBackend('hideDotFiles', newValue);
-        return newValue;
-      });
-    } catch (error) {
-      return handleError(error);
-    }
-    return createSuccess(undefined);
-  }, [savePreferencesToBackend]);
-
-  const toggleDisableNeuroglancerStateGeneration =
-    React.useCallback(async (): Promise<Result<void>> => {
+  const togglePreference = React.useCallback(
+    async <T extends boolean>(
+      key: string,
+      setter: React.Dispatch<React.SetStateAction<T>>
+    ): Promise<Result<void>> => {
       try {
-        setDisableNeuroglancerStateGeneration(
-          prevDisableNeuroglancerStateGeneration => {
-            const newValue = !prevDisableNeuroglancerStateGeneration;
-            savePreferencesToBackend(
-              'disableNeuroglancerStateGeneration',
-              newValue
-            );
-            return newValue;
-          }
-        );
+        setter((prevValue: T) => {
+          const newValue = !prevValue as T;
+          savePreferencesToBackend(key, newValue);
+          return newValue;
+        });
       } catch (error) {
         return handleError(error);
       }
       return createSuccess(undefined);
-    }, [savePreferencesToBackend]);
+    },
+    [savePreferencesToBackend]
+  );
+
+  const toggleHideDotFiles = React.useCallback(async (): Promise<
+    Result<void>
+  > => {
+    return togglePreference('hideDotFiles', setHideDotFiles);
+  }, [togglePreference]);
+
+  const toggleAutomaticDataLinks = React.useCallback(async (): Promise<
+    Result<void>
+  > => {
+    return togglePreference('automaticDataLinks', setAutomaticDataLinks);
+  }, [togglePreference]);
+
+  const toggleDisableNeuroglancerStateGeneration =
+    React.useCallback(async (): Promise<Result<void>> => {
+      return togglePreference(
+        'disableNeuroglancerStateGeneration',
+        setDisableNeuroglancerStateGeneration
+      );
+    }, [togglePreference]);
 
   const toggleDisableHeuristicalLayerTypeDetection =
     React.useCallback(async (): Promise<Result<void>> => {
@@ -520,6 +529,20 @@ export const PreferencesProvider = ({
 
   React.useEffect(() => {
     (async function () {
+      const rawAutomaticDataLinks =
+        await fetchPreferences('automaticDataLinks');
+      if (rawAutomaticDataLinks !== null) {
+        log.debug(
+          'setting initial automaticDataLinks preference:',
+          rawAutomaticDataLinks
+        );
+        setAutomaticDataLinks(rawAutomaticDataLinks);
+      }
+    })();
+  }, [fetchPreferences]);
+
+  React.useEffect(() => {
+    (async function () {
       const rawDisableNeuroglancerStateGeneration = await fetchPreferences(
         'disableNeuroglancerStateGeneration'
       );
@@ -699,6 +722,8 @@ export const PreferencesProvider = ({
         handlePathPreferenceSubmit,
         hideDotFiles,
         toggleHideDotFiles,
+        automaticDataLinks,
+        toggleAutomaticDataLinks,
         disableNeuroglancerStateGeneration,
         toggleDisableNeuroglancerStateGeneration,
         disableHeuristicalLayerTypeDetection,
