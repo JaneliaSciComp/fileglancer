@@ -112,11 +112,10 @@ export default defineConfig([
       'react/react-in-jsx-scope': 'off',
       'react/jsx-one-expression-per-line': 'off',
       'react/prop-types': 'off',
+      'react/display-name': 'warn',
       // Turn off less critical warnings for now
       // TODO: revisit these later
-      'react/function-component-definition': 'off',
       'react/jsx-sort-props': 'off',
-      'react/display-name': 'off',
       'react/no-array-index-key': 'off',
       'react/jsx-no-bind': 'off',
       'react/prefer-read-only-props': 'off'

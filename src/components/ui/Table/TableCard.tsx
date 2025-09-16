@@ -44,6 +44,7 @@ const TableRow = ({
     </div>
   );
 };
+TableRow.displayName = 'TableRow';
 
 const HeaderIcons = <TData, TValue>({
   header
@@ -67,6 +68,7 @@ const HeaderIcons = <TData, TValue>({
     </div>
   );
 };
+HeaderIcons.displayName = 'HeaderIcons';
 
 // Follows example here: https://tanstack.com/table/latest/docs/framework/react/examples/filters
 const DebouncedInput = React.forwardRef<
@@ -91,6 +93,7 @@ const DebouncedInput = React.forwardRef<
     </div>
   );
 });
+DebouncedInput.displayName = 'DebouncedInput';
 
 const SearchPopover = <TData, TValue>({
   header
@@ -227,6 +230,7 @@ const SearchPopover = <TData, TValue>({
     </Tooltip>
   );
 };
+SearchPopover.displayName = 'SearchPopover';
 
 function Table<TData>({
   columns,
