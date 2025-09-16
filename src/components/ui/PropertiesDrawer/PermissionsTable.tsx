@@ -3,23 +3,23 @@ import { HiCheck, HiMinus } from 'react-icons/hi';
 import { FileOrFolder } from '@/shared.types';
 import { parsePermissions } from '@/utils/index';
 
+const PermissionIcon = ({
+  hasPermission
+}: {
+  readonly hasPermission: boolean;
+}) =>
+  hasPermission ? (
+    <HiCheck className="icon-default" />
+  ) : (
+    <HiMinus className="icon-default" />
+  );
+
 export default function PermissionsTable({
   file
 }: {
   readonly file: FileOrFolder | null;
 }) {
   const permissions = file ? parsePermissions(file.permissions) : null;
-
-  const PermissionIcon = ({
-    hasPermission
-  }: {
-    readonly hasPermission: boolean;
-  }) =>
-    hasPermission ? (
-      <HiCheck className="icon-default" />
-    ) : (
-      <HiMinus className="icon-default" />
-    );
 
   return (
     <div className="w-full min-w-max overflow-hidden rounded-lg border border-surface mt-4">

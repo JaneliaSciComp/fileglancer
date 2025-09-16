@@ -42,7 +42,7 @@ export default function Notifications() {
                     notification={notification}
                     onDismiss={dismissNotification}
                     showDismissButton={
-                      notification.active ? !isClientDismissed : null
+                      notification.active ? !isClientDismissed : false
                     }
                   />
                 </Card>

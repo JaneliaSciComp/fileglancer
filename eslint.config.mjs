@@ -61,18 +61,12 @@ export default defineConfig([
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
     plugins: { react },
+    settings: {
+      react: {
+        version: 'detect'
+      }
+    },
     rules: {
-      /* '@typescript-eslint/naming-convention': [
-        'error',
-        {
-          selector: 'interface',
-          format: ['PascalCase'],
-          custom: {
-            regex: '^I[A-Z]',
-            match: true
-          }
-        }
-      ], */
       '@typescript-eslint/no-unused-vars': [
         'warn',
         {
@@ -82,18 +76,50 @@ export default defineConfig([
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-namespace': 'off',
       '@typescript-eslint/no-use-before-define': 'off',
-      /* '@typescript-eslint/quotes': [
-        'error',
-        'single',
-        {
-          avoidEscape: true,
-          allowTemplateLiterals: false
-        }
-      ], */
       curly: ['error', 'all'],
       eqeqeq: 'error',
       'prefer-arrow-callback': 'error',
-      'react/react-in-jsx-scope': 'off'
+      // Below config adapted from https://timjames.dev/blog/the-best-eslint-rules-for-react-projects-30i8
+      'react/prefer-stateless-function': 'error',
+      'react/button-has-type': 'error',
+      'react/no-unused-prop-types': 'error',
+      'react/jsx-pascal-case': 'error',
+      'react/jsx-no-script-url': 'error',
+      'react/no-children-prop': 'error',
+      'react/no-danger': 'error',
+      'react/no-danger-with-children': 'error',
+      'react/no-unstable-nested-components': ['error', { allowAsProps: true }],
+      'react/jsx-fragments': 'error',
+      'react/destructuring-assignment': [
+        'error',
+        'always',
+        { destructureInSignature: 'always' }
+      ],
+      'react/jsx-no-leaked-render': ['error', { validStrategies: ['ternary'] }],
+      'react/jsx-max-depth': ['error', { max: 5 }],
+      'react/jsx-key': [
+        'error',
+        {
+          checkFragmentShorthand: true,
+          checkKeyMustBeforeSpread: true,
+          warnOnDuplicates: true
+        }
+      ],
+      'react/jsx-no-useless-fragment': 'warn',
+      'react/jsx-curly-brace-presence': 'warn',
+      'react/no-typos': 'warn',
+      'react/self-closing-comp': 'warn',
+      'react/react-in-jsx-scope': 'off',
+      'react/jsx-one-expression-per-line': 'off',
+      'react/prop-types': 'off',
+      // Turn off less critical warnings for now
+      // TODO: revisit these later
+      'react/function-component-definition': 'off',
+      'react/jsx-sort-props': 'off',
+      'react/display-name': 'off',
+      'react/no-array-index-key': 'off',
+      'react/jsx-no-bind': 'off',
+      'react/prefer-read-only-props': 'off'
     }
   }
 ]);

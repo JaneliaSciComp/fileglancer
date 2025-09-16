@@ -9,7 +9,6 @@ type StyledLinkProps = {
   readonly target?: string;
   readonly rel?: string;
   readonly textSize?: 'default' | 'large' | 'small';
-  readonly block?: boolean;
 };
 
 export const FgStyledLink = ({

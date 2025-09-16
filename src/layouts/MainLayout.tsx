@@ -1,3 +1,4 @@
+/* eslint-disable react/jsx-max-depth */
 import { Outlet, useParams } from 'react-router';
 import { Toaster } from 'react-hot-toast';
 import { ErrorBoundary } from 'react-error-boundary';

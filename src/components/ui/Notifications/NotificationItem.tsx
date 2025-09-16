@@ -132,6 +132,7 @@ export const NotificationItem = ({
           aria-label="Dismiss notification"
           className={`${styles.close} flex-shrink-0 ml-3 p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors`}
           onClick={() => onDismiss(notification.id)}
+          type="button"
         >
           <HiOutlineX className="h-4 w-4" />
         </button>
