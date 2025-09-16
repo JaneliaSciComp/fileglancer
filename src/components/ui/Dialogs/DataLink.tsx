@@ -15,11 +15,11 @@ import FgDialog from './FgDialog';
 import TextWithFilePath from './TextWithFilePath';
 
 type DataLinkDialogProps = {
-  isImageShared: boolean;
-  setIsImageShared?: React.Dispatch<React.SetStateAction<boolean>>;
-  showDataLinkDialog: boolean;
-  setShowDataLinkDialog: React.Dispatch<React.SetStateAction<boolean>>;
-  proxiedPath: ProxiedPath | null;
+  readonly isImageShared: boolean;
+  readonly setIsImageShared?: React.Dispatch<React.SetStateAction<boolean>>;
+  readonly showDataLinkDialog: boolean;
+  readonly setShowDataLinkDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  readonly proxiedPath: ProxiedPath | null;
 };
 
 export default function DataLinkDialog({
@@ -64,15 +64,15 @@ export default function DataLinkDialog({
 
   return (
     <FgDialog
-      open={showDataLinkDialog}
       onClose={() => setShowDataLinkDialog(false)}
+      open={showDataLinkDialog}
     >
       {/* TODO: Move Janelia-specific text elsewhere */}
       {isImageShared ? (
         <div className="my-8 text-foreground">
           <TextWithFilePath
-            text="Are you sure you want to delete the data link for this path?"
             path={displayPath}
+            text="Are you sure you want to delete the data link for this path?"
           />
           <Typography className="mt-4">
             Warning: The existing data link to this data will be deleted.
@@ -84,8 +84,8 @@ export default function DataLinkDialog({
       ) : (
         <div className="my-8 text-foreground">
           <TextWithFilePath
-            text="Are you sure you want to create a data link for this path?"
             path={displayPath}
+            text="Are you sure you want to create a data link for this path?"
           />
           <Typography className="mt-4">
             If you share the data link with internal collaborators, they will be
@@ -97,9 +97,8 @@ export default function DataLinkDialog({
       <div className="flex gap-2">
         {!isImageShared ? (
           <Button
-            variant="outline"
-            color="error"
             className="!rounded-md flex items-center gap-2"
+            color="error"
             onClick={async () => {
               const createProxiedPathResult = await createProxiedPath();
               if (createProxiedPathResult.success) {
@@ -125,15 +124,15 @@ export default function DataLinkDialog({
                 setIsImageShared(true);
               }
             }}
+            variant="outline"
           >
             Create Data Link
           </Button>
         ) : null}
         {isImageShared ? (
           <Button
-            variant="outline"
-            color="error"
             className="!rounded-md flex items-center gap-2"
+            color="error"
             onClick={async () => {
               if (!proxiedPath) {
                 toast.error('Proxied path not found');
@@ -163,16 +162,17 @@ export default function DataLinkDialog({
                 setIsImageShared(false);
               }
             }}
+            variant="outline"
           >
             Delete Data Link
           </Button>
         ) : null}
         <Button
-          variant="outline"
           className="!rounded-md flex items-center gap-2"
           onClick={() => {
             setShowDataLinkDialog(false);
           }}
+          variant="outline"
         >
           Cancel
         </Button>

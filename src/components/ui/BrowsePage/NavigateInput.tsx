@@ -12,10 +12,12 @@ export default function NavigationInput({
   initialValue = '',
   onDialogClose
 }: {
-  location: 'dashboard' | 'dialog';
-  setShowNavigationDialog?: React.Dispatch<React.SetStateAction<boolean>>;
-  initialValue?: string;
-  onDialogClose?: () => void;
+  readonly location: 'dashboard' | 'dialog';
+  readonly setShowNavigationDialog?: React.Dispatch<
+    React.SetStateAction<boolean>
+  >;
+  readonly initialValue?: string;
+  readonly onDialogClose?: () => void;
 }): JSX.Element {
   const { inputValue, handleInputChange, handleNavigationInputSubmit } =
     useNavigationInput(initialValue);
@@ -41,12 +43,14 @@ export default function NavigationInput({
     >
       <Typography
         as="label"
-        htmlFor="navigation-input-form"
         className="font-semibold text-foreground"
+        htmlFor="navigation-input-form"
       >
         Navigate to path
       </Typography>
       <form
+        className="flex items-center justify-center gap-2 bg-surface-light"
+        id="navigation-input-form"
         onSubmit={(event: React.FormEvent<HTMLFormElement>) => {
           event.preventDefault();
           const result = handleNavigationInputSubmit();
@@ -60,18 +64,16 @@ export default function NavigationInput({
             onDialogClose();
           }
         }}
-        className="flex items-center justify-center gap-2 bg-surface-light"
-        id="navigation-input-form"
       >
         <Input
-          ref={inputRef}
-          value={inputValue}
-          onChange={handleInputChange}
-          type="text"
-          placeholder={placeholderText}
           className="bg-background text-lg"
+          onChange={handleInputChange}
+          placeholder={placeholderText}
+          ref={inputRef}
+          type="text"
+          value={inputValue}
         />
-        <Button type="submit" className="max-h-full flex-1 gap-1">
+        <Button className="max-h-full flex-1 gap-1" type="submit">
           Go
           <HiChevronRight className="icon-small stroke-2" />
         </Button>

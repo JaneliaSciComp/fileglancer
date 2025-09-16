@@ -3,7 +3,11 @@ import React from 'react';
 import { FileOrFolder } from '@/shared.types';
 import { formatUnixTimestamp, formatFileSize } from '@/utils';
 
-export default function OverviewTable({ file }: { file: FileOrFolder | null }) {
+export default function OverviewTable({
+  file
+}: {
+  readonly file: FileOrFolder | null;
+}) {
   return (
     <div className="w-full min-w-max overflow-hidden rounded-lg border border-surface mt-4">
       <table className="w-full min-w-max">

@@ -71,7 +71,7 @@ export const usePreferencesContext = () => {
 export const PreferencesProvider = ({
   children
 }: {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }) => {
   const [pathPreference, setPathPreference] = React.useState<
     ['linux_path'] | ['windows_path'] | ['mac_path']

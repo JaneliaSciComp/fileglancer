@@ -13,7 +13,7 @@ export default function Notifications() {
   return (
     <>
       <div className="flex justify-between items-center mb-6">
-        <Typography type="h5" className="text-foreground font-bold">
+        <Typography className="text-foreground font-bold" type="h5">
           Notifications ({notifications.length})
         </Typography>
       </div>
@@ -34,16 +34,16 @@ export default function Notifications() {
 
               return (
                 <Card
-                  key={notification.id}
                   className={`${styles.container} p-4 ${isDismissed ? 'opacity-60' : ''}`}
+                  key={notification.id}
                 >
                   <NotificationItem
+                    isDismissed={isDismissed}
                     notification={notification}
                     onDismiss={dismissNotification}
                     showDismissButton={
-                      notification.active && !isClientDismissed
+                      notification.active ? !isClientDismissed : null
                     }
-                    isDismissed={isDismissed}
                   />
                 </Card>
               );
@@ -53,7 +53,7 @@ export default function Notifications() {
       ) : notifications.length === 0 ? (
         <Card className="p-8 text-center">
           <HiOutlineInformationCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <Typography type="h6" className="text-foreground mb-2">
+          <Typography className="text-foreground mb-2" type="h6">
             No notifications
           </Typography>
           <Typography className="text-muted-foreground">

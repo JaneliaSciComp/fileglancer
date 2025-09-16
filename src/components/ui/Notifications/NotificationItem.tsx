@@ -38,7 +38,7 @@ const formatNotificationDate = (dateString?: string): string => {
   }
 };
 
-export const NotificationIcon = ({ type }: { type: string }) => {
+export const NotificationIcon = ({ type }: { readonly type: string }) => {
   const iconClass = 'h-5 w-5';
 
   switch (type) {
@@ -89,17 +89,17 @@ export const getNotificationStyles = (type: string) => {
 };
 
 export interface NotificationItemProps {
-  notification: {
+  readonly notification: {
     id: number;
     type: string;
     title: string;
     message: string;
     created_at?: string;
   };
-  onDismiss?: (id: number) => void;
-  showDismissButton?: boolean;
-  className?: string;
-  isDismissed?: boolean;
+  readonly onDismiss?: (id: number) => void;
+  readonly showDismissButton?: boolean;
+  readonly className?: string;
+  readonly isDismissed?: boolean;
 }
 
 export const NotificationItem = ({
@@ -119,28 +119,28 @@ export const NotificationItem = ({
       <div className={`${styles.text} flex-1 min-w-0`}>
         <div className="flex items-center justify-between">
           <div className="font-medium text-sm">{notification.title}</div>
-          {notification.created_at && (
+          {notification.created_at ? (
             <div className="text-xs text-gray-500 dark:text-gray-400 ml-2 flex-shrink-0">
               {formatNotificationDate(notification.created_at)}
             </div>
-          )}
+          ) : null}
         </div>
         <div className="text-sm opacity-90 mt-1">{notification.message}</div>
       </div>
-      {showDismissButton && onDismiss && (
+      {showDismissButton && onDismiss ? (
         <button
-          onClick={() => onDismiss(notification.id)}
-          className={`${styles.close} flex-shrink-0 ml-3 p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors`}
           aria-label="Dismiss notification"
+          className={`${styles.close} flex-shrink-0 ml-3 p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors`}
+          onClick={() => onDismiss(notification.id)}
         >
           <HiOutlineX className="h-4 w-4" />
         </button>
-      )}
-      {isDismissed && (
+      ) : null}
+      {isDismissed ? (
         <div className="flex-shrink-0 ml-3 text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
           Dismissed
         </div>
-      )}
+      ) : null}
     </div>
   );
 };

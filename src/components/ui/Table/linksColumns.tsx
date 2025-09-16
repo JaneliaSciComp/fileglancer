@@ -29,7 +29,7 @@ type ProxiedPathRowActionProps = {
   pathFsp: FileSharePath | undefined;
 };
 
-function PathCell({ item }: { item: ProxiedPath }) {
+const PathCell = ({ item }: { readonly item: ProxiedPath }) => {
   const { pathPreference } = usePreferencesContext();
   const { zonesAndFileSharePathsMap } = useZoneAndFspMapContext();
   const tooltipTriggerClasses = 'max-w-full truncate';
@@ -51,17 +51,17 @@ function PathCell({ item }: { item: ProxiedPath }) {
       <FgTooltip label={displayPath} triggerClasses={tooltipTriggerClasses}>
         <Typography
           as={FgStyledLink}
-          to={browseLink}
           className="text-left truncate block"
+          to={browseLink}
         >
           {displayPath}
         </Typography>
       </FgTooltip>
     </div>
   );
-}
+};
 
-function ActionsCell({ item }: { item: ProxiedPath }) {
+const ActionsCell = ({ item }: { readonly item: ProxiedPath }) => {
   const { showDataLinkDialog, setShowDataLinkDialog } = useDataLinkDialog();
   const { pathPreference } = usePreferencesContext();
   const { zonesAndFileSharePathsMap } = useZoneAndFspMapContext();
@@ -123,22 +123,22 @@ function ActionsCell({ item }: { item: ProxiedPath }) {
     <div className="min-w-0">
       <div onClick={e => e.stopPropagation()}>
         <DataLinksActionsMenu<ProxiedPathRowActionProps>
-          menuItems={menuItems}
           actionProps={actionProps}
+          menuItems={menuItems}
         />
       </div>
       {/* Sharing dialog */}
       {showDataLinkDialog ? (
         <DataLinkDialog
           isImageShared={true}
-          showDataLinkDialog={showDataLinkDialog}
-          setShowDataLinkDialog={setShowDataLinkDialog}
           proxiedPath={item}
+          setShowDataLinkDialog={setShowDataLinkDialog}
+          showDataLinkDialog={showDataLinkDialog}
         />
       ) : null}
     </div>
   );
-}
+};
 
 const tooltipTriggerClasses = 'max-w-full truncate';
 
@@ -206,8 +206,8 @@ export const linksColumns: ColumnDef<ProxiedPath>[] = [
             triggerClasses={tooltipTriggerClasses}
           >
             <Typography
-              variant="small"
               className="text-left text-foreground truncate"
+              variant="small"
             >
               {formatDateString(dateString)}
             </Typography>

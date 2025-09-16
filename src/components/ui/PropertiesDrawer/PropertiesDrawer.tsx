@@ -21,9 +21,13 @@ import { useTicketContext } from '@/contexts/TicketsContext';
 import FgTooltip from '../widgets/FgTooltip';
 
 type PropertiesDrawerProps = {
-  togglePropertiesDrawer: () => void;
-  setShowPermissionsDialog: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowConvertFileDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  readonly togglePropertiesDrawer: () => void;
+  readonly setShowPermissionsDialog: React.Dispatch<
+    React.SetStateAction<boolean>
+  >;
+  readonly setShowConvertFileDialog: React.Dispatch<
+    React.SetStateAction<boolean>
+  >;
 };
 
 export default function PropertiesDrawer({
@@ -48,13 +52,13 @@ export default function PropertiesDrawer({
       <div className="flex items-center justify-between gap-4 mb-1 shrink-0">
         <Typography type="h6">Properties</Typography>
         <IconButton
-          size="sm"
-          variant="ghost"
-          color="secondary"
           className="h-8 w-8 rounded-full text-foreground hover:bg-secondary-light/20 shrink-0"
+          color="secondary"
           onClick={() => {
             togglePropertiesDrawer();
           }}
+          size="sm"
+          variant="ghost"
         >
           <HiX className="icon-default" />
         </IconButton>
@@ -83,9 +87,9 @@ export default function PropertiesDrawer({
       )}
       {fileBrowserState.propertiesTarget ? (
         <Tabs
-          key="file-properties-tabs"
-          defaultValue="overview"
           className="flex flex-col flex-1 min-h-0 "
+          defaultValue="overview"
+          key="file-properties-tabs"
         >
           <Tabs.List className="justify-start items-stretch shrink-0 min-w-fit w-full py-2 bg-surface dark:bg-surface-light">
             <Tabs.Trigger className="!text-foreground h-full" value="overview">
@@ -105,7 +109,7 @@ export default function PropertiesDrawer({
             <Tabs.TriggerIndicator className="h-full" />
           </Tabs.List>
 
-          <Tabs.Panel value="overview" className="flex-1 max-w-full p-2">
+          <Tabs.Panel className="flex-1 max-w-full p-2" value="overview">
             <div className="group flex justify-between items-center min-w-0 max-w-full">
               <FgTooltip label={fullPath} triggerClasses="block truncate">
                 <Typography className="text-foreground text-sm truncate">
@@ -115,9 +119,8 @@ export default function PropertiesDrawer({
               </FgTooltip>
 
               <IconButton
-                variant="ghost"
-                isCircular
                 className="text-transparent group-hover:text-foreground shrink-0"
+                isCircular
                 onClick={() => {
                   if (fileBrowserState.propertiesTarget) {
                     try {
@@ -128,6 +131,7 @@ export default function PropertiesDrawer({
                     }
                   }
                 }}
+                variant="ghost"
               >
                 <HiOutlineDuplicate className="icon-small" />
               </IconButton>
@@ -137,24 +141,24 @@ export default function PropertiesDrawer({
           </Tabs.Panel>
 
           <Tabs.Panel
-            value="permissions"
             className="flex flex-col max-w-full gap-4 flex-1 p-2"
+            value="permissions"
           >
             <PermissionsTable file={fileBrowserState.propertiesTarget} />
             <Button
-              variant="outline"
+              className="!rounded-md !text-primary !text-nowrap !self-start"
               onClick={() => {
                 setShowPermissionsDialog(true);
               }}
-              className="!rounded-md !text-primary !text-nowrap !self-start"
+              variant="outline"
             >
               Change Permissions
             </Button>
           </Tabs.Panel>
 
           <Tabs.Panel
-            value="convert"
             className="flex flex-col gap-4 flex-1 w-full p-2"
+            value="convert"
           >
             {ticket ? (
               <TicketDetails />
@@ -166,10 +170,10 @@ export default function PropertiesDrawer({
                   Neuroglancer.
                 </Typography>
                 <Button
-                  variant="outline"
                   onClick={() => {
                     setShowConvertFileDialog(true);
                   }}
+                  variant="outline"
                 >
                   Open conversion request
                 </Button>

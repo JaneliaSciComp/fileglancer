@@ -26,7 +26,7 @@ export const MainLayout = () => {
     <CookiesProvider>
       <ZonesAndFspMapContextProvider>
         <OpenFavoritesProvider>
-          <FileBrowserContextProvider fspName={fspName} filePath={filePath}>
+          <FileBrowserContextProvider filePath={filePath} fspName={fspName}>
             <PreferencesProvider>
               <ProxiedPathProvider>
                 <ExternalBucketProvider>

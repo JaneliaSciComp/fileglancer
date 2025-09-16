@@ -8,8 +8,10 @@ import usePermissionsDialog from '@/hooks/usePermissionsDialog';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 
 type ChangePermissionsProps = {
-  showPermissionsDialog: boolean;
-  setShowPermissionsDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  readonly showPermissionsDialog: boolean;
+  readonly setShowPermissionsDialog: React.Dispatch<
+    React.SetStateAction<boolean>
+  >;
 };
 
 export default function ChangePermissions({
@@ -27,8 +29,8 @@ export default function ChangePermissions({
 
   return (
     <FgDialog
-      open={showPermissionsDialog}
       onClose={() => setShowPermissionsDialog(false)}
+      open={showPermissionsDialog}
     >
       {fileBrowserState.propertiesTarget ? (
         <form
@@ -56,8 +58,8 @@ export default function ChangePermissions({
           }}
         >
           <TextWithFilePath
-            text="Change permissions for file:"
             path={fileBrowserState.propertiesTarget.name}
+            text="Change permissions for file:"
           />
           <table className="w-full my-4 border border-surface dark:border-surface-light text-foreground">
             <thead className="border-b border-surface dark:border-surface-light bg-surface-dark text-sm font-medium">
@@ -79,21 +81,21 @@ export default function ChangePermissions({
                   {/* Owner read/write */}
                   <td className="p-3">
                     <input
-                      type="checkbox"
-                      name="r_1"
+                      aria-label="r_1"
                       checked={localPermissions[1] === 'r'}
                       disabled
-                      aria-label="r_1"
+                      name="r_1"
+                      type="checkbox"
                     />
                   </td>
                   <td className="p-3">
                     <input
-                      type="checkbox"
-                      name="w_2"
-                      checked={localPermissions[2] === 'w'}
-                      onChange={event => handleLocalPermissionChange(event)}
-                      className="accent-secondary-light hover:cursor-pointer"
                       aria-label="w_2"
+                      checked={localPermissions[2] === 'w'}
+                      className="accent-secondary-light hover:cursor-pointer"
+                      name="w_2"
+                      onChange={event => handleLocalPermissionChange(event)}
+                      type="checkbox"
                     />
                   </td>
                 </tr>
@@ -105,22 +107,22 @@ export default function ChangePermissions({
                   {/* Group read/write */}
                   <td className="p-3">
                     <input
-                      type="checkbox"
-                      name="r_4"
-                      checked={localPermissions[4] === 'r'}
-                      onChange={event => handleLocalPermissionChange(event)}
-                      className="accent-secondary-light hover:cursor-pointer"
                       aria-label="r_4"
+                      checked={localPermissions[4] === 'r'}
+                      className="accent-secondary-light hover:cursor-pointer"
+                      name="r_4"
+                      onChange={event => handleLocalPermissionChange(event)}
+                      type="checkbox"
                     />
                   </td>
                   <td className="p-3">
                     <input
-                      type="checkbox"
-                      name="w_5"
-                      checked={localPermissions[5] === 'w'}
-                      onChange={event => handleLocalPermissionChange(event)}
-                      className="accent-secondary-light hover:cursor-pointer"
                       aria-label="w_5"
+                      checked={localPermissions[5] === 'w'}
+                      className="accent-secondary-light hover:cursor-pointer"
+                      name="w_5"
+                      onChange={event => handleLocalPermissionChange(event)}
+                      type="checkbox"
                     />
                   </td>
                 </tr>
@@ -130,22 +132,22 @@ export default function ChangePermissions({
                   {/* Everyone else read/write */}
                   <td className="p-3">
                     <input
-                      type="checkbox"
-                      name="r_7"
-                      checked={localPermissions[7] === 'r'}
-                      onChange={event => handleLocalPermissionChange(event)}
-                      className="accent-secondary-light hover:cursor-pointer"
                       aria-label="r_7"
+                      checked={localPermissions[7] === 'r'}
+                      className="accent-secondary-light hover:cursor-pointer"
+                      name="r_7"
+                      onChange={event => handleLocalPermissionChange(event)}
+                      type="checkbox"
                     />
                   </td>
                   <td className="p-3">
                     <input
-                      type="checkbox"
-                      name="w_8"
-                      checked={localPermissions[8] === 'w'}
-                      onChange={event => handleLocalPermissionChange(event)}
-                      className="accent-secondary-light hover:cursor-pointer"
                       aria-label="w_8"
+                      checked={localPermissions[8] === 'w'}
+                      className="accent-secondary-light hover:cursor-pointer"
+                      name="w_8"
+                      onChange={event => handleLocalPermissionChange(event)}
+                      type="checkbox"
                     />
                   </td>
                 </tr>
@@ -154,12 +156,12 @@ export default function ChangePermissions({
           </table>
           <Button
             className="!rounded-md"
-            type="submit"
             disabled={Boolean(
               isLoading ||
                 localPermissions ===
                   fileBrowserState.propertiesTarget.permissions
             )}
+            type="submit"
           >
             Change Permissions
           </Button>

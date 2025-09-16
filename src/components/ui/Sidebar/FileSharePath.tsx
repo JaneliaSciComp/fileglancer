@@ -14,8 +14,8 @@ import {
 } from '@/utils';
 
 type FileSharePathComponentProps = {
-  fsp: FileSharePath;
-  isFavoritable?: boolean;
+  readonly fsp: FileSharePath;
+  readonly isFavoritable?: boolean;
 };
 
 export default function FileSharePathComponent({
@@ -34,8 +34,8 @@ export default function FileSharePathComponent({
   return (
     <List.Item className="file-share-path pl-6 w-full flex items-center justify-between rounded-md cursor-pointer text-foreground hover:!bg-primary-light/30 focus:!bg-primary-light/30">
       <Link
-        to={link}
         className="max-w-[calc(100%-1rem)] grow flex flex-col gap-1 !text-foreground hover:!text-black focus:!text-black dark:hover:!text-white dark:focus:!text-white"
+        to={link}
       >
         <div className="flex gap-1 items-center max-w-full">
           <HiOutlineRectangleStack className="icon-small short:icon-xsmall stroke-2" />
@@ -49,7 +49,7 @@ export default function FileSharePathComponent({
         </Typography>
       </Link>
 
-      {isFavoritable && (
+      {isFavoritable ? (
         <div
           onClick={e => {
             e.stopPropagation();
@@ -58,7 +58,6 @@ export default function FileSharePathComponent({
         >
           <IconButton
             className="min-w-0 min-h-0"
-            variant="ghost"
             isCircular
             onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
               e.stopPropagation();
@@ -71,6 +70,7 @@ export default function FileSharePathComponent({
                 toast.error(`Error adding favorite: ${result.error}`);
               }
             }}
+            variant="ghost"
           >
             {isFavoritePath ? (
               <HiStar className="icon-small short:icon-xsmall mb-[2px]" />
@@ -79,7 +79,7 @@ export default function FileSharePathComponent({
             )}
           </IconButton>
         </div>
-      )}
+      ) : null}
     </List.Item>
   );
 }

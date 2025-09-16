@@ -1,8 +1,8 @@
 import { Typography } from '@material-tailwind/react';
 
 type TagProps = {
-  children: React.ReactNode;
-  classProps: string;
+  readonly children: React.ReactNode;
+  readonly classProps: string;
 };
 
 export default function Tag({ children, classProps }: TagProps) {

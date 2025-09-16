@@ -13,7 +13,7 @@ import {
 import { FileSharePath } from '@/shared.types';
 import { FgStyledLink } from '../widgets/FgLink';
 
-function FilePathCell({ item }: { item: Ticket }) {
+const FilePathCell = ({ item }: { readonly item: Ticket }) => {
   const { zonesAndFileSharePathsMap } = useZoneAndFspMapContext();
   const { pathPreference } = usePreferencesContext();
 
@@ -33,9 +33,9 @@ function FilePathCell({ item }: { item: Ticket }) {
       </FgStyledLink>
     </div>
   );
-}
+};
 
-function StatusCell({ status }: { status: string }) {
+const StatusCell = ({ status }: { readonly status: string }) => {
   return (
     <div className="text-sm">
       <span
@@ -55,7 +55,7 @@ function StatusCell({ status }: { status: string }) {
       </span>
     </div>
   );
-}
+};
 
 export const jobsColumns: ColumnDef<Ticket>[] = [
   {

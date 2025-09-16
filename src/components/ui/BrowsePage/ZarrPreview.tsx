@@ -12,12 +12,12 @@ import { useExternalBucketContext } from '@/contexts/ExternalBucketContext';
 import { Metadata } from '@/omezarr-helper';
 
 type ZarrPreviewProps = {
-  thumbnailSrc: string | null;
-  loadingThumbnail: boolean;
-  openWithToolUrls: OpenWithToolUrls | null;
-  metadata: ZarrMetadata;
-  thumbnailError: string | null;
-  layerType: 'auto' | 'image' | 'segmentation' | null;
+  readonly thumbnailSrc: string | null;
+  readonly loadingThumbnail: boolean;
+  readonly openWithToolUrls: OpenWithToolUrls | null;
+  readonly metadata: ZarrMetadata;
+  readonly thumbnailError: string | null;
+  readonly layerType: 'auto' | 'image' | 'segmentation' | null;
 };
 
 export default function ZarrPreview({
@@ -51,17 +51,17 @@ export default function ZarrPreview({
             ) : null}
             {!loadingThumbnail && metadata && thumbnailSrc ? (
               <img
-                id="thumbnail"
-                src={thumbnailSrc}
                 alt="Thumbnail"
                 className="max-h-72 max-w-max rounded-md"
+                id="thumbnail"
+                src={thumbnailSrc}
               />
             ) : !loadingThumbnail && metadata && !thumbnailSrc ? (
               <div className="p-2">
                 <img
-                  src={zarrLogo}
                   alt="Zarr logo"
                   className="max-h-44 rounded-md"
+                  src={zarrLogo}
                 />
                 {thumbnailError ? (
                   <Typography className="text-error text-xs pt-3">{`${thumbnailError}`}</Typography>
@@ -72,28 +72,28 @@ export default function ZarrPreview({
 
           <div className="flex items-center gap-2">
             <Switch
-              id="share-switch"
+              checked={externalDataUrl ? true : isImageShared}
               className="mt-2 bg-secondary-light border-secondary-light hover:!bg-secondary-light/80 hover:!border-secondary-light/80"
+              disabled={externalDataUrl ? true : false}
+              id="share-switch"
               onChange={() => {
                 setShowDataLinkDialog(true);
               }}
-              checked={externalDataUrl ? true : isImageShared}
-              disabled={externalDataUrl ? true : false}
             />
             <label
-              htmlFor="share-switch"
               className="-translate-y-0.5 flex flex-col gap-1"
+              htmlFor="share-switch"
             >
               <Typography
                 as="label"
-                htmlFor="share-switch"
                 className={`${externalDataUrl ? 'cursor-default' : 'cursor-pointer'} text-foreground font-semibold`}
+                htmlFor="share-switch"
               >
                 Data Link
               </Typography>
               <Typography
-                type="small"
                 className="text-foreground whitespace-normal max-w-[300px]"
+                type="small"
               >
                 {externalDataUrl
                   ? 'Public data link already exists since this data is on s3.janelia.org.'
@@ -105,10 +105,10 @@ export default function ZarrPreview({
           {showDataLinkDialog ? (
             <DataLinkDialog
               isImageShared={isImageShared}
-              setIsImageShared={setIsImageShared}
-              showDataLinkDialog={showDataLinkDialog}
-              setShowDataLinkDialog={setShowDataLinkDialog}
               proxiedPath={proxiedPath}
+              setIsImageShared={setIsImageShared}
+              setShowDataLinkDialog={setShowDataLinkDialog}
+              showDataLinkDialog={showDataLinkDialog}
             />
           ) : null}
 
@@ -119,12 +119,12 @@ export default function ZarrPreview({
             />
           ) : null}
         </div>
-        {metadata && 'arr' in metadata && (
+        {metadata && 'arr' in metadata ? (
           <ZarrMetadataTable
-            metadata={metadata as Metadata}
             layerType={layerType}
+            metadata={metadata as Metadata}
           />
-        )}
+        ) : null}
       </div>
     </div>
   );

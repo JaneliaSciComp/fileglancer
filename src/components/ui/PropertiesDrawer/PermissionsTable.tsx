@@ -6,11 +6,15 @@ import { parsePermissions } from '@/utils/index';
 export default function PermissionsTable({
   file
 }: {
-  file: FileOrFolder | null;
+  readonly file: FileOrFolder | null;
 }) {
   const permissions = file ? parsePermissions(file.permissions) : null;
 
-  const PermissionIcon = ({ hasPermission }: { hasPermission: boolean }) =>
+  const PermissionIcon = ({
+    hasPermission
+  }: {
+    readonly hasPermission: boolean;
+  }) =>
     hasPermission ? (
       <HiCheck className="icon-default" />
     ) : (

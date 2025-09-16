@@ -29,10 +29,10 @@ import { copyToClipboard } from '@/utils/copyText';
 import useFavoriteToggle from '@/hooks/useFavoriteToggle';
 
 type ToolbarProps = {
-  showPropertiesDrawer: boolean;
-  togglePropertiesDrawer: () => void;
-  showSidebar: boolean;
-  toggleSidebar: () => void;
+  readonly showPropertiesDrawer: boolean;
+  readonly togglePropertiesDrawer: () => void;
+  readonly showSidebar: boolean;
+  readonly toggleSidebar: () => void;
 };
 
 export default function Toolbar({
@@ -94,12 +94,12 @@ export default function Toolbar({
         <ButtonGroup className="gap-1">
           {/* Show/hide favorites and zone browser sidebar */}
           <FgTooltip
+            icon={showSidebar ? GoSidebarExpand : GoSidebarCollapse}
             label={
               showSidebar
                 ? 'Hide favorites and zone browser'
                 : 'View favorites and zone browser'
             }
-            icon={showSidebar ? GoSidebarExpand : GoSidebarCollapse}
             onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
               toggleSidebar();
               e.currentTarget.blur();
@@ -110,12 +110,12 @@ export default function Toolbar({
           {/* Go to home folder */}
           <FgTooltip
             as={Link}
+            icon={HiHome}
+            label="Go to home folder"
             link={makeBrowseLink(
               profile?.homeFileSharePathName,
               profile?.homeDirectoryName
             )}
-            icon={HiHome}
-            label="Go to home folder"
             triggerClasses={triggerClasses}
           />
 

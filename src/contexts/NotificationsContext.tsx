@@ -39,7 +39,7 @@ export const useNotificationContext = () => {
 export const NotificationProvider = ({
   children
 }: {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }) => {
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
   const [dismissedNotifications, setDismissedNotifications] = React.useState<

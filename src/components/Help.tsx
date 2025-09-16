@@ -36,10 +36,10 @@ export default function Help() {
   return (
     <>
       <div className="flex justify-between mb-6">
-        <Typography type="h5" className="text-foreground font-bold">
+        <Typography className="text-foreground font-bold" type="h5">
           Help
         </Typography>
-        <Typography type="lead" className="text-foreground font-bold">
+        <Typography className="text-foreground font-bold" type="lead">
           {`Fileglancer Version ${versionNo}`}
         </Typography>
       </div>
@@ -47,16 +47,16 @@ export default function Help() {
         <List className="w-fit gap-2 p-4">
           {helpLinks.map(({ icon: Icon, title, url }) => (
             <List.Item
-              key={url}
               className="hover:bg-transparent focus:bg-transparent"
+              key={url}
             >
               <List.ItemStart>
                 <Icon className="icon-large" />
               </List.ItemStart>
               <Typography
                 as={FgStyledLink}
-                target="_blank"
                 rel="noopener noreferrer"
+                target="_blank"
                 textSize="large"
                 to={url}
               >

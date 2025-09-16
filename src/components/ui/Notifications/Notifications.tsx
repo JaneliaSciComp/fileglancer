@@ -22,8 +22,8 @@ export default function Notifications() {
         const styles = getNotificationStyles(notification.type);
         return (
           <div
-            key={notification.id}
             className={`${styles.container} rounded-lg p-4 mb-2 mx-4 relative shadow-sm`}
+            key={notification.id}
           >
             <NotificationItem
               notification={notification}

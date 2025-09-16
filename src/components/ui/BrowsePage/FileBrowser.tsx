@@ -13,12 +13,16 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
 
 type FileBrowserProps = {
-  showPropertiesDrawer: boolean;
-  togglePropertiesDrawer: () => void;
-  setShowRenameDialog: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowDeleteDialog: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowPermissionsDialog: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowConvertFileDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  readonly showPropertiesDrawer: boolean;
+  readonly togglePropertiesDrawer: () => void;
+  readonly setShowRenameDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  readonly setShowDeleteDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  readonly setShowPermissionsDialog: React.Dispatch<
+    React.SetStateAction<boolean>
+  >;
+  readonly setShowConvertFileDialog: React.Dispatch<
+    React.SetStateAction<boolean>
+  >;
 };
 
 export default function FileBrowser({
@@ -62,12 +66,12 @@ export default function FileBrowser({
       <Crumbs />
       {metadata ? (
         <ZarrPreview
-          metadata={metadata}
-          thumbnailSrc={thumbnailSrc}
+          layerType={layerType}
           loadingThumbnail={loadingThumbnail}
+          metadata={metadata}
           openWithToolUrls={openWithToolUrls}
           thumbnailError={thumbnailError}
-          layerType={layerType}
+          thumbnailSrc={thumbnailSrc}
         />
       ) : null}
 
@@ -81,8 +85,8 @@ export default function FileBrowser({
       ) : !areFileDataLoading && displayFiles.length > 0 ? (
         <Table
           data={displayFiles}
-          showPropertiesDrawer={showPropertiesDrawer}
           handleContextMenuClick={handleContextMenuClick}
+          showPropertiesDrawer={showPropertiesDrawer}
         />
       ) : !areFileDataLoading &&
         displayFiles.length === 0 &&
@@ -100,16 +104,16 @@ export default function FileBrowser({
       ) : null}
       {showContextMenu ? (
         <ContextMenu
-          x={contextMenuCoords.x}
-          y={contextMenuCoords.y}
           menuRef={menuRef}
-          togglePropertiesDrawer={togglePropertiesDrawer}
-          showPropertiesDrawer={showPropertiesDrawer}
           setShowContextMenu={setShowContextMenu}
-          setShowRenameDialog={setShowRenameDialog}
+          setShowConvertFileDialog={setShowConvertFileDialog}
           setShowDeleteDialog={setShowDeleteDialog}
           setShowPermissionsDialog={setShowPermissionsDialog}
-          setShowConvertFileDialog={setShowConvertFileDialog}
+          setShowRenameDialog={setShowRenameDialog}
+          showPropertiesDrawer={showPropertiesDrawer}
+          togglePropertiesDrawer={togglePropertiesDrawer}
+          x={contextMenuCoords.x}
+          y={contextMenuCoords.y}
         />
       ) : null}
     </>

@@ -20,9 +20,9 @@ import {
 } from '@/utils';
 
 type MissingFolderFavoriteDialogProps = {
-  folderFavorite: FolderFavorite;
-  showMissingFolderFavoriteDialog: boolean;
-  setShowMissingFolderFavoriteDialog: React.Dispatch<
+  readonly folderFavorite: FolderFavorite;
+  readonly showMissingFolderFavoriteDialog: boolean;
+  readonly setShowMissingFolderFavoriteDialog: React.Dispatch<
     React.SetStateAction<boolean>
   >;
 };
@@ -46,14 +46,14 @@ export default function MissingFolderFavoriteDialog({
       <Dialog.Overlay>
         <Dialog.Content>
           <IconButton
-            size="sm"
-            variant="outline"
-            color="secondary"
             className="absolute right-2 top-2 text-secondary hover:text-background"
+            color="secondary"
             isCircular
             onClick={() => {
               setShowMissingFolderFavoriteDialog(false);
             }}
+            size="sm"
+            variant="outline"
           >
             <HiX className="icon-default" />
           </IconButton>
@@ -63,9 +63,8 @@ export default function MissingFolderFavoriteDialog({
           </Typography>
           <div className="flex gap-2">
             <Button
-              variant="outline"
-              color="error"
               className="!rounded-md flex items-center gap-2"
+              color="error"
               onClick={async () => {
                 const result = await handleFavoriteChange(
                   folderFavorite,
@@ -83,15 +82,16 @@ export default function MissingFolderFavoriteDialog({
                   toast.error(`Error deleting favorite: ${result.error}`);
                 }
               }}
+              variant="outline"
             >
               Delete
             </Button>
             <Button
-              variant="outline"
               className="!rounded-md flex items-center gap-2"
               onClick={() => {
                 setShowMissingFolderFavoriteDialog(false);
               }}
+              variant="outline"
             >
               Cancel
             </Button>
