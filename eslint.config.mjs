@@ -108,17 +108,13 @@ export default defineConfig([
       'react/jsx-no-useless-fragment': 'warn',
       'react/jsx-curly-brace-presence': 'warn',
       'react/no-typos': 'warn',
+      'react/display-name': 'warn',
       'react/self-closing-comp': 'warn',
+      'react/jsx-sort-props': 'warn',
       'react/react-in-jsx-scope': 'off',
       'react/jsx-one-expression-per-line': 'off',
       'react/prop-types': 'off',
-      'react/display-name': 'warn',
-      // Turn off less critical warnings for now
-      // TODO: revisit these later
-      'react/jsx-sort-props': 'off',
-      'react/no-array-index-key': 'off',
-      'react/jsx-no-bind': 'off',
-      'react/prefer-read-only-props': 'off'
+      'react/prefer-read-only-props': 'warn'
     }
   }
 ]);
