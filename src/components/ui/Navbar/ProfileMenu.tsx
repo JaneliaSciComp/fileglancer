@@ -22,10 +22,10 @@ export default function ProfileMenu() {
     <Menu>
       <Menu.Trigger
         as={IconButton}
+        className="text-foreground hover:!text-foreground focus:!text-foreground hover:bg-hover-gradient hover:dark:bg-hover-gradient-dark focus:bg-hover-gradient focus:dark:bg-hover-gradient-dark"
+        color="secondary"
         size="sm"
         variant="ghost"
-        color="secondary"
-        className="text-foreground hover:!text-foreground focus:!text-foreground hover:bg-hover-gradient hover:dark:bg-hover-gradient-dark focus:bg-hover-gradient focus:dark:bg-hover-gradient-dark"
       >
         <HiOutlineUserCircle className="stroke-2 icon-large short:icon-default" />
       </Menu.Trigger>
@@ -39,24 +39,24 @@ export default function ProfileMenu() {
         <hr className="!my-1 -mx-1 border-surface" />
         <Menu.Item
           as={Link}
-          to="/preferences"
           className="text-foreground hover:!text-foreground focus:!text-foreground hover:bg-hover-gradient hover:dark:bg-hover-gradient-dark focus:bg-hover-gradient focus:dark:bg-hover-gradient-dark"
+          to="/preferences"
         >
           <HiOutlineAdjustmentsHorizontal className="mr-2 icon-default" />
           Preferences
         </Menu.Item>
         <Menu.Item
           as={Link}
-          to="/notifications"
           className="text-foreground hover:!text-foreground focus:!text-foreground hover:bg-hover-gradient hover:dark:bg-hover-gradient-dark focus:bg-hover-gradient focus:dark:bg-hover-gradient-dark"
+          to="/notifications"
         >
           <HiOutlineBell className="mr-2 icon-default" />
           Notifications
         </Menu.Item>
         <Menu.Item
           as={Link}
-          to={`${origin}/logout`}
           className="text-error hover:bg-error/10 hover:!text-error focus:bg-error/10 focus:!text-error"
+          to={`${origin}/logout`}
         >
           <HiOutlineLogout className="mr-2 h-[18px] w-[18px]" /> Logout
         </Menu.Item>

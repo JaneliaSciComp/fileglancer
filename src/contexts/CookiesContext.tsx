@@ -19,7 +19,7 @@ export const useCookiesContext = () => {
 export const CookiesProvider = ({
   children
 }: {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }) => {
   const [cookies] = useCookies(['_xsrf']);
 

@@ -17,7 +17,7 @@ export const useOpenFavoritesContext = () => {
 export const OpenFavoritesProvider = ({
   children
 }: {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }) => {
   const [openFavorites, setOpenFavorites] = React.useState<
     Record<string, boolean>

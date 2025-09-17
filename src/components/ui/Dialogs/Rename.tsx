@@ -7,8 +7,8 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import toast from 'react-hot-toast';
 
 type ItemNamingDialogProps = {
-  showRenameDialog: boolean;
-  setShowRenameDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  readonly showRenameDialog: boolean;
+  readonly setShowRenameDialog: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
 export default function RenameDialog({
@@ -20,8 +20,8 @@ export default function RenameDialog({
 
   return (
     <FgDialog
-      open={showRenameDialog}
       onClose={() => setShowRenameDialog(false)}
+      open={showRenameDialog}
     >
       <form
         onSubmit={async event => {
@@ -47,21 +47,21 @@ export default function RenameDialog({
         <div className="mt-8 flex flex-col gap-2">
           <Typography
             as="label"
-            htmlFor="new_name"
             className="text-foreground font-semibold"
+            htmlFor="new_name"
           >
             Rename Item
           </Typography>
           <input
-            type="text"
-            id="new_name"
             autoFocus
-            value={newName}
-            placeholder="Enter name"
+            className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background"
+            id="new_name"
             onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
               setNewName(event.target.value);
             }}
-            className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background"
+            placeholder="Enter name"
+            type="text"
+            value={newName}
           />
         </div>
         <Button className="!rounded-md" type="submit">

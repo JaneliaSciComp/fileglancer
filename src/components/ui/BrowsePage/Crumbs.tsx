@@ -66,8 +66,8 @@ export default function Crumbs(): ReactNode {
                 <React.Fragment key={pathSegment + '-' + index}>
                   <BreadcrumbLink as={FgStyledLink} to={link}>
                     <Typography
-                      variant="small"
                       className="font-medium text-primary-light"
+                      variant="small"
                     >
                       {pathSegment}
                     </Typography>
@@ -102,7 +102,6 @@ export default function Crumbs(): ReactNode {
           }
         })}
         <IconButton
-          variant="ghost"
           className="text-transparent group-hover:text-foreground"
           onClick={() => {
             try {
@@ -112,6 +111,7 @@ export default function Crumbs(): ReactNode {
               toast.error(`Failed to copy path. Error: ${error}`);
             }
           }}
+          variant="ghost"
         >
           <HiOutlineDuplicate className="icon-small" />
         </IconButton>

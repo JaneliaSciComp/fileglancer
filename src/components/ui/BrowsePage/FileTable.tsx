@@ -26,9 +26,9 @@ import { FgStyledLink } from '@/components/ui/widgets/FgLink';
 import { HeaderIcons } from '@/components/ui/Table/TableCard';
 
 type TableProps = {
-  data: FileOrFolder[];
-  showPropertiesDrawer: boolean;
-  handleContextMenuClick: (
+  readonly data: FileOrFolder[];
+  readonly showPropertiesDrawer: boolean;
+  readonly handleContextMenuClick: (
     e: React.MouseEvent<HTMLDivElement>,
     file: FileOrFolder
   ) => void;
@@ -73,7 +73,7 @@ export default function Table({
               )}
               <FgTooltip label={name} triggerClasses="max-w-full truncate">
                 {file.is_dir ? (
-                  <Typography as={FgStyledLink} to={link} className="truncate">
+                  <Typography as={FgStyledLink} className="truncate" to={link}>
                     {name}
                   </Typography>
                 ) : (
@@ -105,7 +105,7 @@ export default function Table({
         accessorKey: 'last_modified',
         header: 'Last Modified',
         cell: ({ getValue }) => (
-          <Typography variant="small" className="truncate">
+          <Typography className="truncate" variant="small">
             {formatUnixTimestamp(getValue() as number)}
           </Typography>
         ),
@@ -132,12 +132,12 @@ export default function Table({
         cell: ({ row }) => (
           <div className="flex items-start">
             <IconButton
-              variant="ghost"
+              className="min-w-fit min-h-fit"
               onClick={e => {
                 e.stopPropagation();
                 handleContextMenuClick(e as any, row.original);
               }}
-              className="min-w-fit min-h-fit"
+              variant="ghost"
             >
               <HiOutlineEllipsisHorizontalCircle className="icon-default text-foreground" />
             </IconButton>
@@ -169,11 +169,11 @@ export default function Table({
       <table className="w-full">
         <thead>
           {table.getHeaderGroups().map(headerGroup => (
-            <tr key={headerGroup.id} className="border-b border-surface">
+            <tr className="border-b border-surface" key={headerGroup.id}>
               {headerGroup.headers.map(header => (
                 <th
-                  key={header.id}
                   className="text-left p-3 font-bold text-sm relative"
+                  key={header.id}
                   style={{ width: header.getSize() }}
                 >
                   {header.isPlaceholder ? null : (
@@ -192,15 +192,15 @@ export default function Table({
                       <HeaderIcons header={header} />
                     </div>
                   )}
-                  {header.column.getCanResize() && (
+                  {header.column.getCanResize() ? (
                     <div
+                      className="cursor-col-resize absolute z-10 -right-1 top-0 h-full w-3 bg-transparent group"
                       onMouseDown={header.getResizeHandler()}
                       onTouchStart={header.getResizeHandler()}
-                      className="cursor-col-resize absolute z-10 -right-1 top-0 h-full w-3 bg-transparent group"
                     >
-                      <div className="absolute left-1/2 top-0 h-full w-[1px] bg-surface group-hover:bg-primary group-hover:w-[2px] group-focus:bg-primary group-focus:w-[2px] -translate-x-1/2"></div>
+                      <div className="absolute left-1/2 top-0 h-full w-[1px] bg-surface group-hover:bg-primary group-hover:w-[2px] group-focus:bg-primary group-focus:w-[2px] -translate-x-1/2" />
                     </div>
-                  )}
+                  ) : null}
                 </th>
               ))}
             </tr>
@@ -211,8 +211,8 @@ export default function Table({
             const isSelected = selectedFileNames.has(row.original.name);
             return (
               <tr
-                key={row.id}
                 className={`cursor-pointer hover:bg-primary-light/30 focus:bg-primary-light/30 ${isSelected && 'bg-primary-light/30'} ${index % 2 === 0 && !isSelected && 'bg-surface/50'}`}
+                key={row.id}
                 onClick={() =>
                   handleLeftClick(row.original, showPropertiesDrawer)
                 }
@@ -220,8 +220,8 @@ export default function Table({
               >
                 {row.getVisibleCells().map(cell => (
                   <td
-                    key={cell.id}
                     className="p-3 text-grey-700"
+                    key={cell.id}
                     style={{ width: cell.column.getSize() }}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

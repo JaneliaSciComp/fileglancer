@@ -20,9 +20,9 @@ type FileBrowserResponse = {
 };
 
 type FileBrowserContextProviderProps = {
-  children: React.ReactNode;
-  fspName: string | undefined;
-  filePath: string | undefined;
+  readonly children: React.ReactNode;
+  readonly fspName: string | undefined;
+  readonly filePath: string | undefined;
 };
 
 interface FileBrowserState {

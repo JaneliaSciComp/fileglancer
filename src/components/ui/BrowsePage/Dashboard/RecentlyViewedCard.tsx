@@ -30,19 +30,19 @@ export default function RecentlyViewedCard() {
             if (item.folderPath === '.') {
               return (
                 <FileSharePathComponent
-                  key={`${item.fspName}-${index}`}
                   fsp={fsp}
                   isFavoritable={false}
+                  key={`${item.fspName}-${index}`}
                 />
               );
             } else {
               // Otherwise, it's a folder
               return (
                 <Folder
-                  key={`${item.fspName}-${item.folderPath}-${index}`}
-                  fsp={fsp}
                   folderPath={item.folderPath}
+                  fsp={fsp}
                   isFavoritable={false}
+                  key={`${item.fspName}-${item.folderPath}-${index}`}
                 />
               );
             }

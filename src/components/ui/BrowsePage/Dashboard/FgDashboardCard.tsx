@@ -4,8 +4,8 @@ export default function DashboardCard({
   title,
   children
 }: {
-  title: string;
-  children: React.ReactNode;
+  readonly title: string;
+  readonly children: React.ReactNode;
 }) {
   return (
     <Card className="w-full border bg-background border-surface overflow-y-auto min-h-32 max-h-full">

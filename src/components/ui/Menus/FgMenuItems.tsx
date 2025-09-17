@@ -11,8 +11,8 @@ export default function FgMenuItems<T>({
   menuItems,
   actionProps
 }: {
-  menuItems: MenuItem<T>[];
-  actionProps: T;
+  readonly menuItems: MenuItem<T>[];
+  readonly actionProps: T;
 }) {
   return (
     <>

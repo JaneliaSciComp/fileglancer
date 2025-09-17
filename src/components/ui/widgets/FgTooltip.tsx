@@ -1,16 +1,16 @@
 import { Tooltip, Typography } from '@material-tailwind/react';
 
 type FgTooltipProps = {
-  as?: React.ElementType;
-  variant?: 'outline' | 'ghost';
-  link?: string;
-  disabledCondition?: boolean;
-  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
-  icon?: React.ElementType;
-  label: string;
-  triggerClasses?: string;
-  openCondition?: boolean;
-  children?: React.ReactNode;
+  readonly as?: React.ElementType;
+  readonly variant?: 'outline' | 'ghost';
+  readonly link?: string;
+  readonly disabledCondition?: boolean;
+  readonly onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  readonly icon?: React.ElementType;
+  readonly label: string;
+  readonly triggerClasses?: string;
+  readonly openCondition?: boolean;
+  readonly children?: React.ReactNode;
 };
 
 export default function FgTooltip({
@@ -29,19 +29,19 @@ export default function FgTooltip({
   const Icon = icon || null;
 
   return (
-    <Tooltip placement="top" open={openCondition}>
+    <Tooltip open={openCondition} placement="top">
       <Tooltip.Trigger
         as={Component}
-        variant={variant || null}
-        to={link}
         className={triggerClasses || ''}
         disabled={Boolean(disabledCondition || false)}
         onClick={onClick ? onClick : undefined}
+        to={link}
+        variant={variant || null}
       >
         {Icon ? <Icon className="icon-default" /> : null}
         {children}
         <Tooltip.Content className="px-2.5 py-1.5 text-primary-foreground z-10">
-          <Typography type="small" className="opacity-90">
+          <Typography className="opacity-90" type="small">
             {label}
           </Typography>
           <Tooltip.Arrow />

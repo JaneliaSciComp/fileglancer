@@ -14,13 +14,13 @@ import Links from '@/components/Links';
 import Notifications from '@/components/Notifications';
 import ErrorFallback from '@/components/ErrorFallback';
 
-function Login() {
+const Login = () => {
   return (
     <div className="p-4">
       <h2 className="text-foreground text-lg">Login Page</h2>
     </div>
   );
-}
+};
 
 function getBasename() {
   const { pathname } = window.location;
@@ -48,20 +48,20 @@ const AppComponent = () => {
   return (
     <BrowserRouter basename={basename}>
       <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/*" element={<MainLayout />}>
+        <Route element={<Login />} path="/login" />
+        <Route element={<MainLayout />} path="/*">
           <Route element={<OtherPagesLayout />}>
-            <Route path="links" element={<Links />} />
-            <Route path="jobs" element={<Jobs />} />
-            <Route path="help" element={<Help />} />
-            <Route path="preferences" element={<Preferences />} />
-            <Route path="notifications" element={<Notifications />} />
+            <Route element={<Links />} path="links" />
+            <Route element={<Jobs />} path="jobs" />
+            <Route element={<Help />} path="help" />
+            <Route element={<Preferences />} path="preferences" />
+            <Route element={<Notifications />} path="notifications" />
           </Route>
           <Route element={<BrowsePageLayout />}>
-            <Route path="browse" element={<Browse />} />
-            <Route path="browse/:fspName" element={<Browse />} />
-            <Route path="browse/:fspName/*" element={<Browse />} />
-            <Route index path="*" element={<Home />} />
+            <Route element={<Browse />} path="browse" />
+            <Route element={<Browse />} path="browse/:fspName" />
+            <Route element={<Browse />} path="browse/:fspName/*" />
+            <Route element={<Home />} index path="*" />
           </Route>
         </Route>
       </Routes>

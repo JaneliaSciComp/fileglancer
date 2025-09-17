@@ -18,7 +18,7 @@ import type { FileOrFolder } from '@/shared.types';
 import logger from '@/logger';
 
 type FileViewerProps = {
-  file: FileOrFolder;
+  readonly file: FileOrFolder;
 };
 
 // Map file extensions to syntax highlighter languages
@@ -165,15 +165,15 @@ export default function FileViewer({ file }: FileViewerProps): React.ReactNode {
     return (
       <div className="h-full overflow-y-auto">
         <SyntaxHighlighter
-          language={language}
-          style={isDarkMode ? materialDark : coy}
           customStyle={{
             margin: 0,
             padding: '1rem',
             fontSize: '14px',
             lineHeight: '1.5'
           }}
+          language={language}
           showLineNumbers={false}
+          style={isDarkMode ? materialDark : coy}
           wrapLines={true}
           wrapLongLines={true}
         >
@@ -192,7 +192,7 @@ export default function FileViewer({ file }: FileViewerProps): React.ReactNode {
 
       {/* File info header */}
       <div className="px-4 py-2 bg-surface-light border-b border-surface">
-        <Typography type="h6" className="text-foreground">
+        <Typography className="text-foreground" type="h6">
           {file.name}
         </Typography>
         <Typography className="text-foreground">

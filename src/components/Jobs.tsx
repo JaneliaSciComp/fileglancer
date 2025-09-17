@@ -8,7 +8,7 @@ export default function Jobs() {
   const { allTickets, loadingTickets } = useTicketContext();
   return (
     <>
-      <Typography type="h5" className="mb-6 text-foreground font-bold">
+      <Typography className="mb-6 text-foreground font-bold" type="h5">
         Tasks
       </Typography>
       <Typography className="mb-6 text-foreground">
@@ -20,9 +20,9 @@ export default function Jobs() {
       <TableCard
         columns={jobsColumns}
         data={allTickets || []}
+        emptyText="You have not made any conversion requests."
         gridColsClass="grid-cols-[2fr_3fr_1fr_1fr]"
         loadingState={loadingTickets}
-        emptyText="You have not made any conversion requests."
       />
     </>
   );

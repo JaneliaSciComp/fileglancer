@@ -9,7 +9,7 @@ import useNewFolderDialog from '@/hooks/useNewFolderDialog';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 
 type NewFolderButtonProps = {
-  triggerClasses: string;
+  readonly triggerClasses: string;
 };
 
 export default function NewFolderButton({
@@ -25,19 +25,19 @@ export default function NewFolderButton({
   return (
     <>
       <FgTooltip
+        disabledCondition={!fileBrowserState.currentFileSharePath}
         icon={HiFolderAdd}
         label="New folder"
-        disabledCondition={!fileBrowserState.currentFileSharePath}
         onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
           setShowNewFolderDialog(true);
           e.currentTarget.blur();
         }}
         triggerClasses={triggerClasses}
       />
-      {showNewFolderDialog && (
+      {showNewFolderDialog ? (
         <FgDialog
-          open={showNewFolderDialog}
           onClose={() => setShowNewFolderDialog(false)}
+          open={showNewFolderDialog}
         >
           <form
             onSubmit={async event => {
@@ -55,28 +55,28 @@ export default function NewFolderButton({
             <div className="mt-8 flex flex-col gap-2">
               <Typography
                 as="label"
-                htmlFor="new_name"
                 className="text-foreground font-semibold"
+                htmlFor="new_name"
               >
                 Create a New Folder
               </Typography>
               <input
-                type="text"
-                id="new_name"
                 autoFocus
-                value={newName}
-                placeholder="Folder name ..."
+                className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background"
+                id="new_name"
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
                   setNewName(event.target.value);
                 }}
-                className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background"
+                placeholder="Folder name ..."
+                type="text"
+                value={newName}
               />
             </div>
             <div className="flex items-center gap-2">
               <Button
                 className="!rounded-md"
-                type="submit"
                 disabled={isSubmitDisabled}
+                type="submit"
               >
                 Submit
               </Button>
@@ -92,7 +92,7 @@ export default function NewFolderButton({
             </div>
           </form>
         </FgDialog>
-      )}
+      ) : null}
     </>
   );
 }

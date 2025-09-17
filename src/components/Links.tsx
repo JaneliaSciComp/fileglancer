@@ -9,7 +9,7 @@ export default function Links() {
 
   return (
     <>
-      <Typography type="h5" className="mb-6 text-foreground font-bold">
+      <Typography className="mb-6 text-foreground font-bold" type="h5">
         Data Links
       </Typography>
       <Typography className="mb-6 text-foreground">
@@ -20,10 +20,10 @@ export default function Links() {
       <TableCard
         columns={linksColumns}
         data={allProxiedPaths || []}
-        gridColsClass="grid-cols-[1.5fr_2.5fr_1.5fr_1fr_1fr]"
-        loadingState={loadingProxiedPaths}
         emptyText="No shared paths."
         enableColumnSearch={true}
+        gridColsClass="grid-cols-[1.5fr_2.5fr_1.5fr_1fr_1fr]"
+        loadingState={loadingProxiedPaths}
       />
     </>
   );

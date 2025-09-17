@@ -10,8 +10,8 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 
 type DeleteDialogProps = {
-  showDeleteDialog: boolean;
-  setShowDeleteDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  readonly showDeleteDialog: boolean;
+  readonly setShowDeleteDialog: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
 export default function DeleteDialog({
@@ -38,16 +38,16 @@ export default function DeleteDialog({
 
   return (
     <FgDialog
-      open={showDeleteDialog}
       onClose={() => setShowDeleteDialog(false)}
+      open={showDeleteDialog}
     >
       <TextWithFilePath
-        text="Are you sure you want to delete this item?"
         path={displayPath}
+        text="Are you sure you want to delete this item?"
       />
       <Button
-        color="error"
         className="!rounded-md"
+        color="error"
         onClick={async () => {
           const result = await handleDelete(fileBrowserState.propertiesTarget!);
           if (!result.success) {

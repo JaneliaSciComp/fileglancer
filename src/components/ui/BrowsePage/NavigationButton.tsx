@@ -6,7 +6,7 @@ import NavigationInput from '@/components/ui/BrowsePage/NavigateInput';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 
 type NavigationButtonProps = {
-  triggerClasses: string;
+  readonly triggerClasses: string;
 };
 
 export default function NavigationButton({
@@ -25,17 +25,17 @@ export default function NavigationButton({
         }}
         triggerClasses={triggerClasses}
       />
-      {showNavigationDialog && (
+      {showNavigationDialog ? (
         <FgDialog
-          open={showNavigationDialog}
           onClose={() => setShowNavigationDialog(false)}
+          open={showNavigationDialog}
         >
           <NavigationInput
             location="dialog"
             setShowNavigationDialog={setShowNavigationDialog}
           />
         </FgDialog>
-      )}
+      ) : null}
     </>
   );
 }

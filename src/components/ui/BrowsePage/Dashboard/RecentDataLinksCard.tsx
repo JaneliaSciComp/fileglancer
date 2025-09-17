@@ -31,9 +31,9 @@ export default function RecentDataLinksCard() {
         <Table
           columns={linksColumns}
           data={recentDataLinks || []}
+          emptyText="No shared paths."
           gridColsClass="grid-cols-[1.5fr_2.5fr_1.5fr_1fr_1fr]"
           loadingState={loadingProxiedPaths}
-          emptyText="No shared paths."
         />
       )}
     </DashboardCard>

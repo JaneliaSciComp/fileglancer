@@ -1,3 +1,4 @@
+/* eslint-disable react/jsx-max-depth */
 import { Outlet, useParams } from 'react-router';
 import { Toaster } from 'react-hot-toast';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -26,7 +27,7 @@ export const MainLayout = () => {
     <CookiesProvider>
       <ZonesAndFspMapContextProvider>
         <OpenFavoritesProvider>
-          <FileBrowserContextProvider fspName={fspName} filePath={filePath}>
+          <FileBrowserContextProvider filePath={filePath} fspName={fspName}>
             <PreferencesProvider>
               <ProxiedPathProvider>
                 <ExternalBucketProvider>

@@ -7,8 +7,8 @@ import {
 } from '../../../omezarr-helper';
 
 type ZarrMetadataTableProps = {
-  metadata: Metadata;
-  layerType: 'auto' | 'image' | 'segmentation' | null;
+  readonly metadata: Metadata;
+  readonly layerType: 'auto' | 'image' | 'segmentation' | null;
 };
 
 function getSizeString(shapes: number[][] | undefined) {
@@ -98,12 +98,10 @@ export default function ZarrMetadataTable({
             </tr>
           ) : null}
           {!metadata.multiscale && metadata.arr ? (
-            <>
-              <tr className="border-b border-surface-dark">
-                <td className="p-3 font-semibold">Chunk Size</td>
-                <td className="p-3">{getChunkSizeString(metadata.arr)}</td>
-              </tr>
-            </>
+            <tr className="border-b border-surface-dark">
+              <td className="p-3 font-semibold">Chunk Size</td>
+              <td className="p-3">{getChunkSizeString(metadata.arr)}</td>
+            </tr>
           ) : null}
           {metadata.multiscale && shapes ? (
             <tr className="border-b border-surface-dark">
@@ -115,7 +113,7 @@ export default function ZarrMetadataTable({
       </table>
 
       {/* Second table - Axis-specific metadata */}
-      {axisData?.length > 0 && (
+      {axisData?.length > 0 ? (
         <table className="bg-background/90">
           <thead className="text-sm">
             <tr className="border-y border-surface-dark">
@@ -128,7 +126,7 @@ export default function ZarrMetadataTable({
           </thead>
           <tbody className="text-sm">
             {axisData.map((axis, index) => (
-              <tr key={axis.name} className="border-b border-surface-dark">
+              <tr className="border-b border-surface-dark" key={axis.name}>
                 <td className="p-3 text-center">{axis.name}</td>
                 <td className="p-3 text-right">{axis.shape}</td>
                 <td className="p-3 text-right">{axis.chunkSize}</td>
@@ -138,7 +136,7 @@ export default function ZarrMetadataTable({
             ))}
           </tbody>
         </table>
-      )}
+      ) : null}
     </div>
   );
 }

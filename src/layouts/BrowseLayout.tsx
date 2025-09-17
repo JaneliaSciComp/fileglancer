@@ -51,20 +51,20 @@ export const BrowsePageLayout = () => {
     >
       {!isLayoutLoadedFromDB ? (
         <>
-          <div className="bg-surface rounded h-full w-1/4"></div>
-          <div className="bg-surface rounded h-full w-1/2"></div>
-          <div className="bg-surface rounded h-full w-1/4"></div>
+          <div className="bg-surface rounded h-full w-1/4" />
+          <div className="bg-surface rounded h-full w-1/2" />
+          <div className="bg-surface rounded h-full w-1/4" />
         </>
       ) : (
         <PanelGroup
-          key={`layout-${isLayoutLoadedFromDB}`}
           autoSaveId="layout"
           direction="horizontal"
+          key={`layout-${isLayoutLoadedFromDB}`}
           storage={layoutPrefsStorage}
         >
           {showSidebar ? (
             <>
-              <Panel id="sidebar" order={1} minSize={10} defaultSize={24}>
+              <Panel defaultSize={24} id="sidebar" minSize={10} order={1}>
                 <Sidebar />
               </Panel>
               <PanelResizeHandle className="group relative w-3 bg-surface border-r border-surface hover:border-secondary/60">
@@ -81,17 +81,17 @@ export const BrowsePageLayout = () => {
                 <PiDotsSixVerticalBold className="icon-default stroke-2 absolute -left-1 top-1/2 stroke-black dark:stroke-white pointer-events-none" />
               </PanelResizeHandle>
               <Panel
-                id="properties"
-                order={3}
-                minSize={15}
-                defaultSize={24}
-                style={{ overflowX: 'auto' }}
                 className="bg-background"
+                defaultSize={24}
+                id="properties"
+                minSize={15}
+                order={3}
+                style={{ overflowX: 'auto' }}
               >
                 <PropertiesDrawer
-                  togglePropertiesDrawer={togglePropertiesDrawer}
-                  setShowPermissionsDialog={setShowPermissionsDialog}
                   setShowConvertFileDialog={setShowConvertFileDialog}
+                  setShowPermissionsDialog={setShowPermissionsDialog}
+                  togglePropertiesDrawer={togglePropertiesDrawer}
                 />
               </Panel>
             </>

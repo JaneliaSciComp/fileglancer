@@ -32,7 +32,7 @@ export const useExternalBucketContext = () => {
 export const ExternalBucketProvider = ({
   children
 }: {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }) => {
   const [externalBucket, setExternalBucket] =
     React.useState<ExternalBucket | null>(null);

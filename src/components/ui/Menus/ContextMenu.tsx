@@ -10,16 +10,20 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { useHandleDownload } from '@/hooks/useHandleDownload';
 
 type ContextMenuProps = {
-  x: number;
-  y: number;
-  menuRef: React.RefObject<HTMLDivElement | null>;
-  showPropertiesDrawer: boolean;
-  togglePropertiesDrawer: () => void;
-  setShowContextMenu: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowRenameDialog: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowDeleteDialog: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowPermissionsDialog: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowConvertFileDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  readonly x: number;
+  readonly y: number;
+  readonly menuRef: React.RefObject<HTMLDivElement | null>;
+  readonly showPropertiesDrawer: boolean;
+  readonly togglePropertiesDrawer: () => void;
+  readonly setShowContextMenu: React.Dispatch<React.SetStateAction<boolean>>;
+  readonly setShowRenameDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  readonly setShowDeleteDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  readonly setShowPermissionsDialog: React.Dispatch<
+    React.SetStateAction<boolean>
+  >;
+  readonly setShowConvertFileDialog: React.Dispatch<
+    React.SetStateAction<boolean>
+  >;
 };
 
 type ContextMenuActionProps = {
@@ -144,16 +148,16 @@ export default function ContextMenu({
 
   return ReactDOM.createPortal(
     <div
-      ref={menuRef}
       className="fixed z-[9999] min-w-40 rounded-lg space-y-0.5 border border-surface bg-background p-1"
+      ref={menuRef}
       style={{
         left: `${x}px`,
         top: `${y}px`
       }}
     >
       <FgMenuItems<ContextMenuActionProps>
-        menuItems={menuItems}
         actionProps={actionProps}
+        menuItems={menuItems}
       />
     </div>,
 

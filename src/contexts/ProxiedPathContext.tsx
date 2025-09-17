@@ -52,7 +52,7 @@ export const useProxiedPathContext = () => {
 export const ProxiedPathProvider = ({
   children
 }: {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }) => {
   const [allProxiedPaths, setAllProxiedPaths] = React.useState<ProxiedPath[]>(
     []

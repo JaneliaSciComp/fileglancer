@@ -15,8 +15,8 @@ export default function DataToolLinks({
   title,
   urls
 }: {
-  title: string;
-  urls: OpenWithToolUrls;
+  readonly title: string;
+  readonly urls: OpenWithToolUrls;
 }): React.ReactNode {
   const [showCopiedTooltip, setShowCopiedTooltip] = React.useState(false);
 
@@ -42,20 +42,20 @@ export default function DataToolLinks({
         {urls.neuroglancer ? (
           <FgTooltip
             as={Button}
-            variant="ghost"
-            triggerClasses={tooltipTriggerClasses}
             label="View in Neuroglancer"
+            triggerClasses={tooltipTriggerClasses}
+            variant="ghost"
           >
             {' '}
             <Link
-              to={urls.neuroglancer}
-              target="_blank"
               rel="noopener noreferrer"
+              target="_blank"
+              to={urls.neuroglancer}
             >
               <img
-                src={neuroglancer_logo}
                 alt="Neuroglancer logo"
                 className="max-h-8 max-w-8 m-1 rounded-sm"
+                src={neuroglancer_logo}
               />
             </Link>
           </FgTooltip>
@@ -64,16 +64,16 @@ export default function DataToolLinks({
         {urls.vole ? (
           <FgTooltip
             as={Button}
-            variant="ghost"
-            triggerClasses={tooltipTriggerClasses}
             label="View in Vol-E"
+            triggerClasses={tooltipTriggerClasses}
+            variant="ghost"
           >
             {' '}
-            <Link to={urls.vole} target="_blank" rel="noopener noreferrer">
+            <Link rel="noopener noreferrer" target="_blank" to={urls.vole}>
               <img
-                src={volE_logo}
                 alt="Vol-E logo"
                 className="max-h-8 max-w-8 m-1 rounded-sm"
+                src={volE_logo}
               />
             </Link>
           </FgTooltip>
@@ -82,16 +82,16 @@ export default function DataToolLinks({
         {urls.avivator ? (
           <FgTooltip
             as={Button}
-            variant="ghost"
-            triggerClasses={tooltipTriggerClasses}
             label="View in Avivator"
+            triggerClasses={tooltipTriggerClasses}
+            variant="ghost"
           >
             {' '}
-            <Link to={urls.avivator} target="_blank" rel="noopener noreferrer">
+            <Link rel="noopener noreferrer" target="_blank" to={urls.avivator}>
               <img
-                src={avivator_logo}
                 alt="Avivator logo"
                 className="max-h-8 max-w-8 m-1 rounded-sm"
+                src={avivator_logo}
               />
             </Link>
           </FgTooltip>
@@ -100,15 +100,15 @@ export default function DataToolLinks({
         {urls.validator ? (
           <FgTooltip
             as={Button}
-            variant="ghost"
-            triggerClasses={tooltipTriggerClasses}
             label="View in OME-Zarr Validator"
+            triggerClasses={tooltipTriggerClasses}
+            variant="ghost"
           >
-            <Link to={urls.validator} target="_blank" rel="noopener noreferrer">
+            <Link rel="noopener noreferrer" target="_blank" to={urls.validator}>
               <img
-                src={validator_logo}
                 alt="OME-Zarr Validator logo"
                 className="max-h-8 max-w-8 m-1 rounded-sm"
+                src={validator_logo}
               />
             </Link>
           </FgTooltip>
@@ -117,16 +117,16 @@ export default function DataToolLinks({
         {urls.copy ? (
           <FgTooltip
             as={Button}
-            variant="ghost"
-            triggerClasses={tooltipTriggerClasses}
             label={showCopiedTooltip ? 'Copied!' : 'Copy data URL'}
             onClick={handleCopyUrl}
             openCondition={showCopiedTooltip ? true : undefined}
+            triggerClasses={tooltipTriggerClasses}
+            variant="ghost"
           >
             <img
-              src={copy_logo}
               alt="Copy URL icon"
               className="max-h-8 max-w-8 m-1 rounded-sm"
+              src={copy_logo}
             />
           </FgTooltip>
         ) : null}

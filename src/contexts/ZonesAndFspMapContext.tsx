@@ -27,7 +27,7 @@ export const useZoneAndFspMapContext = () => {
 export const ZonesAndFspMapContextProvider = ({
   children
 }: {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }) => {
   const [isZonesMapReady, setIsZonesMapReady] = React.useState(false);
   const [areZoneDataLoading, setAreZoneDataLoading] = React.useState(false);

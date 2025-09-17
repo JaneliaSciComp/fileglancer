@@ -5,8 +5,8 @@ import FgMenuItems from './FgMenuItems';
 import type { MenuItem } from './FgMenuItems';
 
 type SharedActionsMenuProps<T = unknown> = {
-  menuItems: MenuItem<T>[];
-  actionProps: T;
+  readonly menuItems: MenuItem<T>[];
+  readonly actionProps: T;
 };
 
 export default function DataLinksActionsMenu<T>({
@@ -17,14 +17,14 @@ export default function DataLinksActionsMenu<T>({
     <Menu>
       <Menu.Trigger
         as={IconButton}
-        variant="ghost"
         className="p-1 max-w-fit"
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        variant="ghost"
       >
         <HiOutlineEllipsisHorizontalCircle className="icon-default text-foreground" />
       </Menu.Trigger>
       <Menu.Content>
-        <FgMenuItems<T> menuItems={menuItems} actionProps={actionProps} />
+        <FgMenuItems<T> actionProps={actionProps} menuItems={menuItems} />
       </Menu.Content>
     </Menu>
   );

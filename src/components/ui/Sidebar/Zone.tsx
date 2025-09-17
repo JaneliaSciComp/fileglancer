@@ -19,9 +19,9 @@ export default function Zone({
   openZones,
   toggleOpenZones
 }: {
-  zone: Zone;
-  openZones: Record<string, boolean>;
-  toggleOpenZones: (zone: string) => void;
+  readonly zone: Zone;
+  readonly openZones: Record<string, boolean>;
+  readonly toggleOpenZones: (zone: string) => void;
 }) {
   const { zonePreferenceMap, handleFavoriteChange } = usePreferencesContext();
 
@@ -31,10 +31,10 @@ export default function Zone({
   );
 
   return (
-    <React.Fragment>
+    <>
       <List.Item
-        onClick={() => toggleOpenZones(zone.name)}
         className="pl-6 w-full flex items-center justify-between rounded-md cursor-pointer text-foreground hover:!bg-primary-light/30 focus:!bg-primary-light/30"
+        onClick={() => toggleOpenZones(zone.name)}
       >
         <List.ItemStart>
           <HiOutlineSquares2X2 className="icon-small short:icon-xsmall stroke-2" />
@@ -46,7 +46,6 @@ export default function Zone({
 
           <div className="flex items-center" onClick={e => e.stopPropagation()}>
             <IconButton
-              variant="ghost"
               isCircular
               onClick={async () => {
                 const result = await handleFavoriteChange(zone, 'zone');
@@ -58,6 +57,7 @@ export default function Zone({
                   toast.error(`Error adding favorite: ${result.error}`);
                 }
               }}
+              variant="ghost"
             >
               {isFavoriteZone ? (
                 <HiStar className="icon-small short:icon-xsmall mb-[2px]" />
@@ -76,10 +76,10 @@ export default function Zone({
       <Collapse open={isOpen}>
         <List className="file-share-path-list bg-background w-full !gap-0">
           {zone.fileSharePaths.map((fsp, index) => {
-            return <FileSharePathComponent key={fsp.name} fsp={fsp} />;
+            return <FileSharePathComponent fsp={fsp} key={fsp.name} />;
           })}
         </List>
       </Collapse>
-    </React.Fragment>
+    </>
   );
 }

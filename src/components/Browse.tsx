@@ -46,7 +46,6 @@ export default function Browse() {
   return (
     <div
       className="flex flex-col h-full min-w-fit max-h-full"
-      tabIndex={0}
       data-browse-container
       onPaste={async event => {
         log.debug('React paste event fired!', event);
@@ -85,11 +84,12 @@ export default function Browse() {
           log.debug('Text input is focused, ignoring paste');
         }
       }}
+      tabIndex={0}
     >
       <Toolbar
         showPropertiesDrawer={showPropertiesDrawer}
-        togglePropertiesDrawer={togglePropertiesDrawer}
         showSidebar={showSidebar}
+        togglePropertiesDrawer={togglePropertiesDrawer}
         toggleSidebar={toggleSidebar}
       />
       <div
@@ -105,52 +105,52 @@ export default function Browse() {
           </>
         ) : (
           <FileBrowser
-            showPropertiesDrawer={showPropertiesDrawer}
-            togglePropertiesDrawer={togglePropertiesDrawer}
-            setShowRenameDialog={setShowRenameDialog}
+            setShowConvertFileDialog={setShowConvertFileDialog}
             setShowDeleteDialog={setShowDeleteDialog}
             setShowPermissionsDialog={setShowPermissionsDialog}
-            setShowConvertFileDialog={setShowConvertFileDialog}
+            setShowRenameDialog={setShowRenameDialog}
+            showPropertiesDrawer={showPropertiesDrawer}
+            togglePropertiesDrawer={togglePropertiesDrawer}
           />
         )}
       </div>
       {showRenameDialog ? (
         <RenameDialog
-          showRenameDialog={showRenameDialog}
           setShowRenameDialog={setShowRenameDialog}
+          showRenameDialog={showRenameDialog}
         />
       ) : null}
       {showDeleteDialog ? (
         <Delete
-          showDeleteDialog={showDeleteDialog}
           setShowDeleteDialog={setShowDeleteDialog}
+          showDeleteDialog={showDeleteDialog}
         />
       ) : null}
       {showPermissionsDialog ? (
         <ChangePermissions
-          showPermissionsDialog={showPermissionsDialog}
           setShowPermissionsDialog={setShowPermissionsDialog}
+          showPermissionsDialog={showPermissionsDialog}
         />
       ) : null}
       {showConvertFileDialog ? (
         <ConvertFileDialog
-          showConvertFileDialog={showConvertFileDialog}
           setShowConvertFileDialog={setShowConvertFileDialog}
+          showConvertFileDialog={showConvertFileDialog}
         />
       ) : null}
       {showNavigationDialog ? (
         <FgDialog
-          open={showNavigationDialog}
           onClose={() => {
             setShowNavigationDialog(false);
             setPastedPath('');
           }}
+          open={showNavigationDialog}
         >
           <NavigationInput
-            location="dialog"
-            setShowNavigationDialog={setShowNavigationDialog}
             initialValue={pastedPath}
+            location="dialog"
             onDialogClose={() => setPastedPath('')}
+            setShowNavigationDialog={setShowNavigationDialog}
           />
         </FgDialog>
       ) : null}

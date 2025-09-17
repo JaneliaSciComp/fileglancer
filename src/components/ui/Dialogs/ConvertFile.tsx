@@ -12,8 +12,10 @@ import { useTicketContext } from '@/contexts/TicketsContext';
 import { getPreferredPathForDisplay } from '@/utils/pathHandling';
 
 type ItemNamingDialogProps = {
-  showConvertFileDialog: boolean;
-  setShowConvertFileDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  readonly showConvertFileDialog: boolean;
+  readonly setShowConvertFileDialog: React.Dispatch<
+    React.SetStateAction<boolean>
+  >;
 };
 
 export default function ConvertFileDialog({
@@ -41,12 +43,12 @@ export default function ConvertFileDialog({
 
   return (
     <FgDialog
-      open={showConvertFileDialog}
       onClose={() => setShowConvertFileDialog(false)}
+      open={showConvertFileDialog}
     >
       <Typography
-        variant="h4"
         className="mb-4 text-foreground font-bold text-2xl"
+        variant="h4"
       >
         Convert images to OME-Zarr format
       </Typography>
@@ -77,31 +79,31 @@ export default function ConvertFileDialog({
           setShowConvertFileDialog(false);
         }}
       >
-        <TextWithFilePath text="Source Folder" path={displayPath} />
+        <TextWithFilePath path={displayPath} text="Source Folder" />
         <div className="flex flex-col gap-2 mb-4">
           <Typography
             as="label"
-            htmlFor="destination_folder"
             className="text-foreground font-semibold"
+            htmlFor="destination_folder"
           >
             Destination Folder
           </Typography>
           <input
-            type="text"
-            id="destination_folder"
             autoFocus
-            value={destinationFolder}
-            placeholder={placeholderText}
+            className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background"
+            id="destination_folder"
             onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
               setDestinationFolder(event.target.value);
             }}
-            className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background"
+            placeholder={placeholderText}
+            type="text"
+            value={destinationFolder}
           />
         </div>
         <Button
           className="!rounded-md"
-          type="submit"
           disabled={!destinationFolder}
+          type="submit"
         >
           {waitingForTicketResponse ? (
             <Spinner customClasses="border-white" text="Processing..." />

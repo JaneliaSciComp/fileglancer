@@ -4,8 +4,8 @@ export default function TextWithFilePath({
   text,
   path
 }: {
-  text: string;
-  path: string;
+  readonly text: string;
+  readonly path: string;
 }): JSX.Element {
   return (
     <div className="flex flex-col gap-2 mb-4">
