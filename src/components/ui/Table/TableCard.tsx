@@ -4,14 +4,27 @@ import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
   type Header,
   type SortingState
 } from '@tanstack/react-table';
-import { Card, Input, Tooltip } from '@material-tailwind/react';
 import {
+  ButtonGroup,
+  Card,
+  IconButton,
+  Input,
+  Select,
+  Tooltip,
+  Typography
+} from '@material-tailwind/react';
+import {
+  HiChevronDoubleLeft,
+  HiChevronLeft,
+  HiChevronDoubleRight,
+  HiChevronRight,
   HiSortAscending,
   HiSortDescending,
   HiOutlineSwitchVertical,
@@ -253,13 +266,14 @@ function Table<TData>({
     onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel()
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel()
   });
 
   return (
-    <>
+    <div className="flex flex-col h-full">
       <div
-        className={`grid ${gridColsClass} gap-4 px-4 py-2 border-b border-surface dark:border-foreground`}
+        className={`shrink-0 grid ${gridColsClass} gap-4 px-4 py-2 border-b border-surface dark:border-foreground`}
       >
         {table
           .getHeaderGroups()
@@ -271,20 +285,21 @@ function Table<TData>({
             )
           )}
       </div>
-
       {/* Body */}
       {loadingState ? (
         <TableRowSkeleton gridColsClass={gridColsClass} />
       ) : data && data.length > 0 ? (
-        table.getRowModel().rows.map(row => (
-          <TableRow key={row.id} gridColsClass={gridColsClass}>
-            {row.getVisibleCells().map(cell => (
-              <div key={cell.id}>
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </div>
-            ))}
-          </TableRow>
-        ))
+        <div className="max-h-full overflow-y-auto">
+          {table.getRowModel().rows.map(row => (
+            <TableRow key={row.id} gridColsClass={gridColsClass}>
+              {row
+                .getVisibleCells()
+                .map(cell =>
+                  flexRender(cell.column.columnDef.cell, cell.getContext())
+                )}
+            </TableRow>
+          ))}
+        </div>
       ) : !data || data.length === 0 ? (
         <div className="px-4 py-8 text-center text-foreground">
           {emptyText || 'No data available'}
@@ -294,7 +309,62 @@ function Table<TData>({
           There was an error loading the data.
         </div>
       )}
-    </>
+      {/* https://tanstack.com/table/latest/docs/framework/react/examples/pagination */}
+      <div className="shrink-0 flex items-center gap-2 py-2 px-4">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <Typography variant="small">Page</Typography>
+            <Typography variant="small" className="font-bold">
+              {table.getPageCount() === 0
+                ? 0
+                : table.getState().pagination.pageIndex + 1}{' '}
+              of {table.getPageCount().toLocaleString()}
+            </Typography>
+          </div>
+          <ButtonGroup variant="ghost">
+            <IconButton
+              onClick={() => table.firstPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <HiChevronDoubleLeft className="icon-default" />
+            </IconButton>
+            <IconButton
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <HiChevronLeft className="icon-default" />
+            </IconButton>
+            <IconButton
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              <HiChevronRight className="icon-default" />
+            </IconButton>
+            <IconButton
+              onClick={() => table.lastPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              <HiChevronDoubleRight className="icon-default" />
+            </IconButton>
+          </ButtonGroup>
+        </div>
+        <div>
+          <Select
+            value={table.getState().pagination.pageSize.toString()}
+            onValueChange={(value: string) => {
+              table.setPageSize(Number(value));
+            }}
+          >
+            <Select.Trigger placeholder="Page size" />
+            <Select.List>
+              {['10', '20', '30', '40', '50'].map(pageSize => (
+                <Select.Option value={pageSize}>{pageSize}/page</Select.Option>
+              ))}
+            </Select.List>
+          </Select>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -307,7 +377,7 @@ function TableCard<TData>({
   enableColumnSearch
 }: TableProps<TData>) {
   return (
-    <Card className="min-h-32 overflow-y-auto">
+    <Card className="min-h-48">
       <Table
         columns={columns}
         data={data}
