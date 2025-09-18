@@ -63,7 +63,7 @@ export default function Folder({
   const link = makeBrowseLink(fsp.name, folderPath);
 
   async function checkFavFolderExists() {
-    if (!folderFavorite || !isFavoritable) {
+    if (!folderFavorite) {
       return;
     }
     try {
@@ -92,21 +92,17 @@ export default function Folder({
     <>
       <List.Item
         key={mapKey}
-        onClick={
-          isFavoritable
-            ? async () => {
-                let folderExists;
-                try {
-                  folderExists = await checkFavFolderExists();
-                } catch (error) {
-                  log.error('Error checking folder existence:', error);
-                }
-                if (folderExists === false) {
-                  setShowMissingFolderFavoriteDialog(true);
-                }
-              }
-            : undefined
-        }
+        onClick={async () => {
+          let folderExists;
+          try {
+            folderExists = await checkFavFolderExists();
+          } catch (error) {
+            log.error('Error checking folder existence:', error);
+          }
+          if (folderExists === false) {
+            setShowMissingFolderFavoriteDialog(true);
+          }
+        }}
         className="pl-6 w-full flex gap-2 items-center justify-between rounded-md cursor-pointer text-foreground hover:bg-primary-light/30 focus:bg-primary-light/30 "
       >
         <Link
