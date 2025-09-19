@@ -267,7 +267,6 @@ function makeBrowseLink(
   filePath?: string
 ): string {
   if (!fspName) {
-    logger.warn('FSP name is required to create a browse link.');
     return '/browse';
   }
   const escapedFspName = encodeURIComponent(fspName);

@@ -87,7 +87,6 @@ export const FileBrowserContextProvider = ({
   // Function to update fileBrowserState with complete, consistent data
   const updateFileBrowserState = React.useCallback(
     (newState: Partial<FileBrowserState>) => {
-      log.debug('Updating fileBrowserState:', newState);
       setFileBrowserState(prev => ({
         ...prev,
         ...newState
@@ -227,12 +226,6 @@ export const FileBrowserContextProvider = ({
   const fetchAndUpdateFileBrowserState = React.useCallback(
     async (fsp: FileSharePath, targetPath: string): Promise<void> => {
       setAreFileDataLoading(true);
-      log.debug(
-        'Fetching metadata for FSP:',
-        fsp.name,
-        'and path:',
-        targetPath
-      );
       let fileOrFolder: FileOrFolder | null = null;
 
       try {
@@ -313,7 +306,6 @@ export const FileBrowserContextProvider = ({
         new Error('File share path and file/folder required to refresh')
       );
     }
-    log.debug('Refreshing file list');
     try {
       await fetchAndUpdateFileBrowserState(
         fileBrowserState.currentFileSharePath,
@@ -327,7 +319,6 @@ export const FileBrowserContextProvider = ({
 
   // Function to trigger a refresh of file content in FileViewer
   const triggerFileContentRefresh = React.useCallback(() => {
-    log.debug('Triggering file content refresh');
     setFileBrowserState(prev => ({
       ...prev,
       fileContentRefreshTrigger: prev.fileContentRefreshTrigger + 1
@@ -359,7 +350,6 @@ export const FileBrowserContextProvider = ({
       const fspKey = makeMapKey('fsp', fspName);
       const urlFsp = zonesAndFileSharePathsMap[fspKey] as FileSharePath;
       if (!urlFsp) {
-        log.error(`File share path not found for fspName: ${fspName}`);
         if (cancelled) {
           return;
         }

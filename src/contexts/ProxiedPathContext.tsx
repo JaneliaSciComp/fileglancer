@@ -3,6 +3,8 @@ import React from 'react';
 import { default as log } from '@/logger';
 import { useCookiesContext } from '@/contexts/CookiesContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
+import { useExternalBucketContext } from './ExternalBucketContext';
 import { sendFetchRequest } from '@/utils';
 import type { Result } from '@/shared.types';
 import { createSuccess, handleError, toHttpError } from '@/utils/errorHandling';
@@ -26,6 +28,7 @@ type ProxiedPathContextType = {
   createProxiedPath: () => Promise<Result<ProxiedPath | void>>;
   deleteProxiedPath: (proxiedPath: ProxiedPath) => Promise<Result<void>>;
   refreshProxiedPaths: () => Promise<Result<ProxiedPath[] | void>>;
+  fetchProxiedPath: () => Promise<Result<ProxiedPath | void>>;
 };
 
 function sortProxiedPathsByDate(paths: ProxiedPath[]): ProxiedPath[] {
@@ -65,10 +68,11 @@ export const ProxiedPathProvider = ({
   const [dataUrl, setDataUrl] = React.useState<string | null>(null);
   const { cookies } = useCookiesContext();
   const { fileBrowserState } = useFileBrowserContext();
+  const { areDataLinksAutomatic } = usePreferencesContext();
+  const { externalDataUrl } = useExternalBucketContext();
 
   const updateProxiedPath = React.useCallback(
     (proxiedPath: ProxiedPath | null) => {
-      log.debug('updateProxiedPath', proxiedPath);
       setProxiedPath(proxiedPath);
       if (proxiedPath) {
         setDataUrl(proxiedPath.url);
@@ -100,7 +104,9 @@ export const ProxiedPathProvider = ({
     }
   }, [cookies]);
 
-  const refreshProxiedPaths = async (): Promise<Result<void>> => {
+  const refreshProxiedPaths = React.useCallback(async (): Promise<
+    Result<void>
+  > => {
     setLoadingProxiedPaths(true);
     try {
       const result = await fetchAllProxiedPaths();
@@ -113,7 +119,7 @@ export const ProxiedPathProvider = ({
     } finally {
       setLoadingProxiedPaths(false);
     }
-  };
+  }, [fetchAllProxiedPaths]);
 
   const fetchProxiedPath = React.useCallback(async (): Promise<
     Result<ProxiedPath | void>
@@ -122,9 +128,6 @@ export const ProxiedPathProvider = ({
       !fileBrowserState.currentFileSharePath ||
       !fileBrowserState.currentFileOrFolder
     ) {
-      log.debug(
-        'fetchProxiedPath - no current file share path or file/folder selected'
-      );
       return createSuccess(undefined);
     }
     try {
@@ -134,9 +137,6 @@ export const ProxiedPathProvider = ({
         cookies['_xsrf']
       );
       if (!response.ok && response.status !== 404) {
-        log.warn(
-          `No proxied path found for fsp ${fileBrowserState.currentFileSharePath.name} and path ${fileBrowserState.currentFileOrFolder.path}: ${response.status} ${response.statusText}`
-        );
         // This is not an error, just no proxied path found for this fsp/path
         return createSuccess(undefined);
       } else if (!response.ok) {
@@ -157,7 +157,9 @@ export const ProxiedPathProvider = ({
     cookies
   ]);
 
-  async function createProxiedPath(): Promise<Result<ProxiedPath | void>> {
+  const createProxiedPath = React.useCallback(async (): Promise<
+    Result<ProxiedPath | void>
+  > => {
     if (!fileBrowserState.currentFileSharePath) {
       return handleError(new Error('No file share path selected'));
     } else if (!fileBrowserState.currentFileOrFolder) {
@@ -185,7 +187,12 @@ export const ProxiedPathProvider = ({
     } catch (error) {
       return handleError(error);
     }
-  }
+  }, [
+    fileBrowserState.currentFileSharePath,
+    fileBrowserState.currentFileOrFolder,
+    cookies,
+    updateProxiedPath
+  ]);
 
   const deleteProxiedPath = React.useCallback(
     async (proxiedPath: ProxiedPath): Promise<Result<void>> => {
@@ -246,7 +253,8 @@ export const ProxiedPathProvider = ({
         loadingProxiedPaths,
         createProxiedPath,
         deleteProxiedPath,
-        refreshProxiedPaths
+        refreshProxiedPaths,
+        fetchProxiedPath
       }}
     >
       {children}

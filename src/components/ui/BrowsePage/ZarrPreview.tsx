@@ -1,15 +1,20 @@
 import React from 'react';
-import { Switch, Typography } from '@material-tailwind/react';
+import { Typography } from '@material-tailwind/react';
 
 import zarrLogo from '@/assets/zarr.jpg';
 import ZarrMetadataTable from '@/components/ui/BrowsePage/ZarrMetadataTable';
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
 import DataToolLinks from './DataToolLinks';
-import type { OpenWithToolUrls, ZarrMetadata } from '@/hooks/useZarrMetadata';
-import useDataLinkDialog from '@/hooks/useDataLinkDialog';
+import type {
+  OpenWithToolUrls,
+  ZarrMetadata,
+  PendingToolUrl
+} from '@/hooks/useZarrMetadata';
+import useDataToolLinks from '@/hooks/useDataToolLinks';
 import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
 import { useExternalBucketContext } from '@/contexts/ExternalBucketContext';
 import { Metadata } from '@/omezarr-helper';
+import useCopiedTooltip from '@/hooks/useCopiedTooltip';
 
 type ZarrPreviewProps = {
   thumbnailSrc: string | null;
@@ -28,14 +33,17 @@ export default function ZarrPreview({
   thumbnailError,
   layerType
 }: ZarrPreviewProps): React.ReactNode {
-  const [isImageShared, setIsImageShared] = React.useState(false);
-  const { showDataLinkDialog, setShowDataLinkDialog } = useDataLinkDialog();
+  const [pendingToolUrl, setPendingToolUrl] =
+    React.useState<PendingToolUrl>(null);
+  const {
+    showDataLinkDialog,
+    setShowDataLinkDialog,
+    handleCreateDataLink,
+    handleDeleteDataLink
+  } = useDataToolLinks();
   const { proxiedPath } = useProxiedPathContext();
   const { externalDataUrl } = useExternalBucketContext();
-
-  React.useEffect(() => {
-    setIsImageShared(proxiedPath !== null);
-  }, [proxiedPath]);
+  const { showCopiedTooltip, handleCopyUrl } = useCopiedTooltip();
 
   return (
     <div className="my-4 p-4 shadow-sm rounded-md bg-primary-light/30">
@@ -70,52 +78,30 @@ export default function ZarrPreview({
             ) : null}
           </div>
 
-          <div className="flex items-center gap-2">
-            <Switch
-              id="share-switch"
-              className="mt-2 bg-secondary-light border-secondary-light hover:!bg-secondary-light/80 hover:!border-secondary-light/80"
-              onChange={() => {
-                setShowDataLinkDialog(true);
-              }}
-              checked={externalDataUrl ? true : isImageShared}
-              disabled={externalDataUrl ? true : false}
-            />
-            <label
-              htmlFor="share-switch"
-              className="-translate-y-0.5 flex flex-col gap-1"
-            >
-              <Typography
-                as="label"
-                htmlFor="share-switch"
-                className={`${externalDataUrl ? 'cursor-default' : 'cursor-pointer'} text-foreground font-semibold`}
-              >
-                Data Link
-              </Typography>
-              <Typography
-                type="small"
-                className="text-foreground whitespace-normal max-w-[300px]"
-              >
-                {externalDataUrl
-                  ? 'Public data link already exists since this data is on s3.janelia.org.'
-                  : 'Creating a data link for this image allows you to open it in external viewers like Neuroglancer.'}
-              </Typography>
-            </label>
-          </div>
-
-          {showDataLinkDialog ? (
-            <DataLinkDialog
-              isImageShared={isImageShared}
-              setIsImageShared={setIsImageShared}
-              showDataLinkDialog={showDataLinkDialog}
-              setShowDataLinkDialog={setShowDataLinkDialog}
-              proxiedPath={proxiedPath}
-            />
-          ) : null}
-
-          {openWithToolUrls && (externalDataUrl || isImageShared) ? (
+          {openWithToolUrls || externalDataUrl ? (
             <DataToolLinks
               title="Open with:"
               urls={openWithToolUrls as OpenWithToolUrls}
+              setShowDataLinkDialog={setShowDataLinkDialog}
+              setPendingToolUrl={setPendingToolUrl}
+              showCopiedTooltip={showCopiedTooltip}
+              handleCopyUrl={handleCopyUrl}
+              handleCreateDataLink={handleCreateDataLink}
+            />
+          ) : null}
+
+          {showDataLinkDialog ? (
+            <DataLinkDialog
+              action="create"
+              showDataLinkDialog={showDataLinkDialog}
+              setShowDataLinkDialog={setShowDataLinkDialog}
+              proxiedPath={proxiedPath}
+              urls={openWithToolUrls as OpenWithToolUrls}
+              pendingToolUrl={pendingToolUrl}
+              setPendingToolUrl={setPendingToolUrl}
+              handleCopyUrl={handleCopyUrl}
+              handleCreateDataLink={handleCreateDataLink}
+              handleDeleteDataLink={handleDeleteDataLink}
             />
           ) : null}
         </div>

@@ -13,6 +13,7 @@ import { ProxiedPathProvider } from '@/contexts/ProxiedPathContext';
 import { OpenFavoritesProvider } from '@/contexts/OpenFavoritesContext';
 import { TicketProvider } from '@/contexts/TicketsContext';
 import { ProfileContextProvider } from '@/contexts/ProfileContext';
+import { ExternalBucketProvider } from '@/contexts/ExternalBucketContext';
 import ErrorFallback from '@/components/ErrorFallback';
 
 interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
@@ -42,11 +43,13 @@ const Browse = ({ children }: { children: React.ReactNode }) => {
         <OpenFavoritesProvider>
           <FileBrowserTestingWrapper>
             <PreferencesProvider>
-              <ProxiedPathProvider>
-                <ProfileContextProvider>
-                  <TicketProvider>{children}</TicketProvider>
-                </ProfileContextProvider>
-              </ProxiedPathProvider>
+              <ExternalBucketProvider>
+                <ProxiedPathProvider>
+                  <ProfileContextProvider>
+                    <TicketProvider>{children}</TicketProvider>
+                  </ProfileContextProvider>
+                </ProxiedPathProvider>
+              </ExternalBucketProvider>
             </PreferencesProvider>
           </FileBrowserTestingWrapper>
         </OpenFavoritesProvider>

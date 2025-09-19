@@ -13,7 +13,7 @@ import {
   makeMapKey,
   makeBrowseLink
 } from '@/utils';
-import useDataLinkDialog from '@/hooks/useDataLinkDialog';
+import useDataToolLinks from '@/hooks/useDataToolLinks';
 import type { ProxiedPath } from '@/contexts/ProxiedPathContext';
 import type { FileSharePath, Result } from '@/shared.types';
 import type { MenuItem } from '@/components/ui/Menus/FgMenuItems';
@@ -47,7 +47,7 @@ function PathCell({ item }: { item: ProxiedPath }) {
   const browseLink = makeBrowseLink(item.fsp_name, item.path);
 
   return (
-    <div className="min-w-0 max-w-full">
+    <div key={`path-${item.sharing_key}`} className="min-w-0 max-w-full flex">
       <FgTooltip label={displayPath} triggerClasses={tooltipTriggerClasses}>
         <Typography
           as={FgStyledLink}
@@ -62,7 +62,8 @@ function PathCell({ item }: { item: ProxiedPath }) {
 }
 
 function ActionsCell({ item }: { item: ProxiedPath }) {
-  const { showDataLinkDialog, setShowDataLinkDialog } = useDataLinkDialog();
+  const { showDataLinkDialog, setShowDataLinkDialog, handleDeleteDataLink } =
+    useDataToolLinks();
   const { pathPreference } = usePreferencesContext();
   const { zonesAndFileSharePathsMap } = useZoneAndFspMapContext();
 
@@ -120,7 +121,7 @@ function ActionsCell({ item }: { item: ProxiedPath }) {
   };
 
   return (
-    <div className="min-w-0">
+    <div key={`action-${item.sharing_key}`} className="min-w-0 flex">
       <div onClick={e => e.stopPropagation()}>
         <DataLinksActionsMenu<ProxiedPathRowActionProps>
           menuItems={menuItems}
@@ -130,10 +131,12 @@ function ActionsCell({ item }: { item: ProxiedPath }) {
       {/* Sharing dialog */}
       {showDataLinkDialog ? (
         <DataLinkDialog
-          isImageShared={true}
+          action="delete"
           showDataLinkDialog={showDataLinkDialog}
           setShowDataLinkDialog={setShowDataLinkDialog}
           proxiedPath={item}
+          urls={null}
+          handleDeleteDataLink={handleDeleteDataLink}
         />
       ) : null}
     </div>
@@ -167,10 +170,10 @@ export const linksColumns: ColumnDef<ProxiedPath>[] = [
   {
     accessorKey: 'sharing_name',
     header: 'Name',
-    cell: ({ row }) => {
+    cell: ({ cell, row }) => {
       const item = row.original;
       return (
-        <div className="min-w-0 max-w-full">
+        <div className="flex min-w-0 max-w-full" key={cell.id}>
           <FgTooltip
             label={item.sharing_name}
             triggerClasses={tooltipTriggerClasses}
@@ -197,10 +200,10 @@ export const linksColumns: ColumnDef<ProxiedPath>[] = [
   {
     accessorKey: 'created_at',
     header: 'Date Created',
-    cell: ({ getValue }) => {
+    cell: ({ cell, getValue }) => {
       const dateString = getValue() as string;
       return (
-        <div className="min-w-0 max-w-full">
+        <div className="flex min-w-0 max-w-full" key={cell.id}>
           <FgTooltip
             label={formatDateString(dateString)}
             triggerClasses={tooltipTriggerClasses}
@@ -222,10 +225,10 @@ export const linksColumns: ColumnDef<ProxiedPath>[] = [
   {
     accessorKey: 'sharing_key',
     header: 'Key',
-    cell: ({ getValue }) => {
+    cell: ({ cell, getValue }) => {
       const key = getValue() as string;
       return (
-        <div className="min-w-0 max-w-full">
+        <div className="flex min-w-0 max-w-full" key={cell.id}>
           <FgTooltip label={key} triggerClasses={tooltipTriggerClasses}>
             <Typography className="text-foreground truncate">{key}</Typography>
           </FgTooltip>

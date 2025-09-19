@@ -1,5 +1,4 @@
 import React from 'react';
-import logger, { default as log } from '@/logger';
 import { useCookiesContext } from '@/contexts/CookiesContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { useProfileContext } from './ProfileContext';
@@ -72,7 +71,6 @@ export const TicketProvider = ({ children }: { children: React.ReactNode }) => {
         // Not an error, just no tickets available
         return createSuccess(null);
       } else if (response.status === 404) {
-        log.warn('No ticket found for the current file share path and target');
         // This is not an error, just no tickets available
         return createSuccess(null);
       } else {
@@ -102,9 +100,6 @@ export const TicketProvider = ({ children }: { children: React.ReactNode }) => {
       !fileBrowserState.currentFileSharePath ||
       !fileBrowserState.propertiesTarget
     ) {
-      log.debug(
-        'fetchTicket - no current file share path or file/folder selected'
-      );
       // This is probably not an error, just the state before the file browser is ready
       return createSuccess(undefined);
     }
@@ -120,9 +115,6 @@ export const TicketProvider = ({ children }: { children: React.ReactNode }) => {
         throw await toHttpError(response);
       } else {
         if (response.status === 404) {
-          log.warn(
-            'No ticket found for the current file share path and target'
-          );
           // This is not an error, just no ticket available
           return createSuccess(undefined);
         } else {
@@ -130,7 +122,6 @@ export const TicketProvider = ({ children }: { children: React.ReactNode }) => {
           if (data?.tickets) {
             return createSuccess(data.tickets[0] as Ticket);
           } else {
-            log.warn('No ticket data found in response');
             return createSuccess(undefined);
           }
         }
@@ -175,8 +166,6 @@ export const TicketProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     const ticketData = await createTicketResponse.json();
-
-    logger.info('Ticket created successfully:', ticketData);
     setTicket(ticketData);
   }
 

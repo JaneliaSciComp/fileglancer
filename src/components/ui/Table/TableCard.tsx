@@ -38,7 +38,7 @@ function TableRow({
 }) {
   return (
     <div
-      className={`grid ${gridColsClass} justify-items-start gap-4 px-4 py-4 border-b border-surface last:border-0 items-start`}
+      className={`grid ${gridColsClass} justify-items-start items-center gap-4 px-4 py-4 border-b border-surface last:border-0 items-start`}
     >
       {children}
     </div>
@@ -278,11 +278,11 @@ function Table<TData>({
       ) : data && data.length > 0 ? (
         table.getRowModel().rows.map(row => (
           <TableRow key={row.id} gridColsClass={gridColsClass}>
-            {row.getVisibleCells().map(cell => (
-              <div key={cell.id}>
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </div>
-            ))}
+            {row
+              .getVisibleCells()
+              .map(cell =>
+                flexRender(cell.column.columnDef.cell, cell.getContext())
+              )}
           </TableRow>
         ))
       ) : !data || data.length === 0 ? (

@@ -61,14 +61,17 @@ export const jobsColumns: ColumnDef<Ticket>[] = [
   {
     accessorKey: 'path',
     header: 'File Path',
-    cell: ({ row }) => <FilePathCell item={row.original} />,
+    cell: ({ cell, row }) => <FilePathCell item={row.original} key={cell.id} />,
     enableSorting: true
   },
   {
     accessorKey: 'description',
     header: 'Job Description',
-    cell: ({ getValue }) => (
-      <Typography className="line-clamp-2 text-foreground max-w-full">
+    cell: ({ cell, getValue }) => (
+      <Typography
+        className="line-clamp-2 text-foreground max-w-full"
+        key={cell.id}
+      >
         {getValue() as string}
       </Typography>
     )
@@ -76,14 +79,16 @@ export const jobsColumns: ColumnDef<Ticket>[] = [
   {
     accessorKey: 'status',
     header: 'Status',
-    cell: ({ getValue }) => <StatusCell status={getValue() as string} />,
+    cell: ({ cell, getValue }) => (
+      <StatusCell status={getValue() as string} key={cell.id} />
+    ),
     enableSorting: true
   },
   {
     accessorKey: 'updated',
     header: 'Last Updated',
-    cell: ({ getValue }) => (
-      <div className="text-sm text-foreground-muted">
+    cell: ({ cell, getValue }) => (
+      <div className="text-sm text-foreground-muted" key={cell.id}>
         {formatDateString(getValue() as string)}
       </div>
     ),

@@ -4,21 +4,44 @@ import { userEvent } from '@testing-library/user-event';
 import { render, screen } from '@/__tests__/test-utils';
 import toast from 'react-hot-toast';
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
+import type { OpenWithToolUrls } from '@/hooks/useZarrMetadata';
+import useDataToolLinks from '@/hooks/useDataToolLinks';
+
+const mockOpenWithToolUrls: OpenWithToolUrls = {
+  copy: 'http://localhost:3000/test/copy/url',
+  validator: 'http://localhost:3000/test/validator/url',
+  neuroglancer: 'http://localhost:3000/test/neuroglancer/url',
+  vole: 'http://localhost:3000/test/vole/url',
+  avivator: 'http://localhost:3000/test/avivator/url'
+};
+
+// Test component that integrates the real hook with the dialog
+function TestDataLinkComponent() {
+  const { handleCreateDataLink, handleDeleteDataLink } = useDataToolLinks();
+
+  return (
+    <DataLinkDialog
+      action="create"
+      showDataLinkDialog={true}
+      setShowDataLinkDialog={vi.fn()}
+      proxiedPath={null}
+      urls={mockOpenWithToolUrls}
+      handleDeleteDataLink={handleDeleteDataLink}
+      handleCreateDataLink={handleCreateDataLink}
+      pendingToolUrl="copy"
+      setPendingToolUrl={vi.fn()}
+      handleCopyUrl={vi.fn()}
+    />
+  );
+}
 
 describe('Data Link dialog', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    const setShowDataLinkDialog = vi.fn();
 
-    render(
-      <DataLinkDialog
-        isImageShared={false}
-        showDataLinkDialog={true}
-        setShowDataLinkDialog={setShowDataLinkDialog}
-        proxiedPath={null}
-      />,
-      { initialEntries: ['/browse/test_fsp/my_folder/my_zarr'] }
-    );
+    render(<TestDataLinkComponent />, {
+      initialEntries: ['/browse/test_fsp/my_folder/my_zarr']
+    });
 
     await waitFor(() => {
       expect(screen.getByText('my_zarr', { exact: false })).toBeInTheDocument();
