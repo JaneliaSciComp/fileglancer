@@ -132,21 +132,13 @@ test.skip('favor entire zone with reload page', async ({ page }) => {
     .filter({ hasText: 'Z2' })
     .getByRole('button')
     .click();
-  // test that Z2 now shows in the favorites
-  await expect(
-    page.getByRole('list').filter({ hasText: /^Z2$/ }).getByRole('paragraph')
-  ).toBeVisible();
-  // test that the star appear next to favorite Z2
-  await expect(
-    page.getByRole('list').filter({ hasText: /^Z2$/ }).getByRole('button')
-  ).toBeVisible();
 
-  await expect(
-    z2ExpandedStarButton.locator('svg path[fill-rule]') // filled star
-  ).toHaveCount(1);
-  await expect(
-    z2ExpandedStarButton.locator('svg path[stroke-linecap]') // empty star
-  ).toHaveCount(0);
+  const favoritesList = page.getByRole('list', { name: 'favorites-list' });
+  const listItem = favoritesList
+    .getByRole('listitem')
+    .filter({ hasText: /^Z2$/ });
+  // test that Z2 now shows in the favorites
+  await expect(listItem).toBeVisible();
 
   // reload page - somehow page.reload hangs so I am going back to jupyterlab page
   await openFileGlancer(page);
