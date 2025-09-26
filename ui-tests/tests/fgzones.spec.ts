@@ -1,6 +1,12 @@
 import { expect, test } from '@jupyterlab/galata';
 import { openFileGlancer } from './testutils';
 
+/**
+ * Don't load JupyterLab webpage before running the tests.
+ * This is required to ensure we capture all log messages.
+ */
+test.use({ autoGoto: false });
+
 const TEST_USER = 'testUser';
 const TEST_SHARED_PATHS = [
   {
