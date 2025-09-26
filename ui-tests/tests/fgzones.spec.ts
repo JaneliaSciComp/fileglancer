@@ -1,12 +1,6 @@
 import { expect, test } from '@jupyterlab/galata';
 import { openFileGlancer } from './testutils';
 
-/**
- * Don't load JupyterLab webpage before running the tests.
- * This is required to ensure we capture all log messages.
- */
-test.use({ autoGoto: false });
-
 const TEST_USER = 'testUser';
 const TEST_SHARED_PATHS = [
   {
@@ -35,7 +29,7 @@ test.beforeEach('Open fileglancer', async ({ page }) => {
 
 test.beforeEach('setup API endpoints', async ({ page }) => {
   // mock API calls
-  await page.route('/api/fileglancer/profile', async route => {
+  await page.route('**/api/fileglancer/profile', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -45,7 +39,7 @@ test.beforeEach('setup API endpoints', async ({ page }) => {
     });
   });
 
-  await page.route('/api/fileglancer/file-share-paths', async route => {
+  await page.route('**/api/fileglancer/file-share-paths', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
