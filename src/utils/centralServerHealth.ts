@@ -145,7 +145,8 @@ export async function checkCentralServerHealth(
  */
 export function shouldTriggerHealthCheck(
   apiPath: string,
-  responseStatus?: number
+  responseStatus?: number,
+  responseBody?: unknown
 ): boolean {
   // Skip health check for the health check endpoint itself to avoid infinite loops
   if (apiPath.includes('/central-version')) {
@@ -183,6 +184,20 @@ export function shouldTriggerHealthCheck(
 
   if (!isCentralServerEndpoint) {
     return false;
+  }
+
+  // Check if this is a central server configuration error
+  if (
+    responseStatus === 500 &&
+    responseBody &&
+    isApiErrorResponse(responseBody)
+  ) {
+    if (responseBody.code === ERROR_CODES.CENTRAL_SERVER_NOT_CONFIGURED) {
+      logger.debug(
+        `Skipping health check for central server configuration error on endpoint: ${apiPath}`
+      );
+      return false; // Don't trigger health check if central server url is not configured
+    }
   }
 
   // Trigger health check for network errors or server errors

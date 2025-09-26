@@ -1,7 +1,6 @@
 import os
 import json
 import requests
-import re
 from datetime import datetime, timezone
 from abc import ABC
 from mimetypes import guess_type
@@ -96,6 +95,26 @@ class BaseHandler(APIHandler):
 
         self._home_file_share_path_cache[key] = None
         return None
+
+    def check_central_server_configured(self):
+        """
+        Check if central server is configured. If not, returns a structured error response
+        and finishes the request.
+
+        Returns:
+            str|None: The central_url if configured, None if request was finished with error response
+        """
+        central_url = self.settings['fileglancer'].central_url
+        if not central_url:
+            self.log.info("Central server URL not configured")
+            self.set_status(500)
+            self.finish(json.dumps({
+                "code": "CENTRAL_SERVER_NOT_CONFIGURED",
+                "message": "Central server not configured",
+                "details": {"central_url": None}
+            }))
+            return None
+        return central_url
 
 
 class StreamingProxy(BaseHandler):
@@ -619,6 +638,10 @@ class ProxiedPathHandler(BaseHandler):
         key = self.get_argument("sharing_key", None)
         fsp_name = self.get_argument("fsp_name", None)
         path = self.get_argument("path", None)
+
+        central_url = self.check_central_server_configured()
+        if central_url is None:
+            return 
         try:
             proxied_path_manager = get_proxiedpath_manager(self.settings)
             if key:
@@ -664,6 +687,11 @@ class ProxiedPathHandler(BaseHandler):
         fsp_name = data.get("fsp_name", None)
         path = data.get("path", None)
         self.log.info(f"POST /api/fileglancer/proxied-path username={username} fsp_name={fsp_name} path={path}")
+
+        central_url = self.check_central_server_configured()
+        if central_url is None:
+            return
+
         try:
             if fsp_name is None or path is None:
                 self.log.warning("fsp and path are required to create a proxied path")
@@ -711,6 +739,11 @@ class ProxiedPathHandler(BaseHandler):
             "PATCH /api/fileglancer/proxied-path"
             f"username={username} fsp_name={fsp_name} path={path} sharing_name={sharing_name}"
         ))
+
+        central_url = self.check_central_server_configured()
+        if central_url is None:
+            return
+
         try:
             if key is None:
                 self.log.warning("sharing_key is required to update a proxied path")
@@ -747,6 +780,11 @@ class ProxiedPathHandler(BaseHandler):
         username = self.get_current_user()
         sharing_key = self.get_argument("sharing_key", None)
         self.log.info(f"DELETE /api/fileglancer/proxied-path username={username} sharing_key={sharing_key}")
+
+        central_url = self.check_central_server_configured()
+        if central_url is None:
+            return
+
         if sharing_key is None:
             self.log.warning("Sharing key is required to delete a proxied path")
             self.set_status(400)
@@ -786,6 +824,11 @@ class TicketHandler(BaseHandler):
         username = self.get_current_user()
         fsp_name = self.get_argument("fsp_name", None)
         path = self.get_argument("path", None)
+
+        central_url = self.check_central_server_configured()
+        if central_url is None:
+            return 
+        
         try:
             tickets_manager = get_tickets_manager(self.settings)
             if fsp_name and path:
@@ -840,6 +883,10 @@ class TicketHandler(BaseHandler):
                 self.finish(json.dumps({"error": "fsp_name, path, project_key, issue_type, summary, and description are required to create a JIRA ticket"}))
                 return
 
+        central_url = self.check_central_server_configured()
+        if central_url is None:
+            return
+
         try:
             tickets_manager = get_tickets_manager(self.settings)
             response = tickets_manager.create_ticket(username, fsp_name, path, project_key, issue_type, summary, description)
@@ -858,8 +905,12 @@ class TicketHandler(BaseHandler):
         """Delete a ticket"""
         ticket_key = self.get_argument("ticket_key")
         try:
+            central_url = self.check_central_server_configured()
+            if central_url is None:
+                return
+
             response = requests.delete(
-                f"{self.settings['fileglancer'].central_url}/ticket/{ticket_key}"
+                f"{central_url}/ticket/{ticket_key}"
             )
             if response.status_code == 404:
                 self.set_status(404)
@@ -969,6 +1020,11 @@ class ExternalBucketHandler(BaseHandler):
         Get all external buckets or the bucket for a given FSP.
         """
         fsp_name = self.get_argument("fsp_name", None)
+
+        central_url = self.check_central_server_configured()
+        if central_url is None:
+            return
+
         try:
             external_bucket_manager = get_externalbucket_manager(self.settings)
             if fsp_name:
@@ -1001,12 +1057,8 @@ class NotificationsHandler(BaseHandler):
     def get(self):
         """Get all active notifications from the central server"""
         try:
-            central_url = self.settings['fileglancer'].central_url
-
-            if not central_url:
-                self.log.error("Central server URL not configured")
-                self.set_status(500)
-                self.finish(json.dumps({"error": "Central server not configured"}))
+            central_url = self.check_central_server_configured()
+            if central_url is None:
                 return
 
             response = requests.get(f"{central_url}/notifications")
