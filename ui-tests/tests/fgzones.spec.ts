@@ -50,7 +50,7 @@ test.beforeEach('setup API endpoints', async ({ page }) => {
   });
 
   await page.route(
-    `api/fileglancer/files/${TEST_SHARED_PATHS[2].name}`,
+    `/api/fileglancer/files/${TEST_SHARED_PATHS[2].name}**`,
     async route => {
       await route.fulfill({
         status: 200,
