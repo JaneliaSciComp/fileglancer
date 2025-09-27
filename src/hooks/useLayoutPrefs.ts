@@ -118,6 +118,13 @@ export default function useLayoutPrefs() {
 
         try {
           const layoutObj = JSON.parse(layout);
+          if (
+            !layoutObj ||
+            typeof layoutObj !== 'object' ||
+            !(name in layoutObj)
+          ) {
+            return '';
+          }
           const storedLayout = JSON.stringify(layoutObj[name]);
 
           if (!storedLayout) {
@@ -173,10 +180,12 @@ export default function useLayoutPrefs() {
             showSidebar
           ) {
             newLayoutObj = {
-              [name]: {
-                [WITH_PROPERTIES_AND_SIDEBAR]:
-                  incomingLayout[WITH_PROPERTIES_AND_SIDEBAR]
-              }
+              ...(name && {
+                [name]: {
+                  [WITH_PROPERTIES_AND_SIDEBAR]:
+                    incomingLayout[WITH_PROPERTIES_AND_SIDEBAR]
+                }
+              })
             };
           } else if (
             key === ONLY_SIDEBAR &&
@@ -184,9 +193,11 @@ export default function useLayoutPrefs() {
             showSidebar
           ) {
             newLayoutObj = {
-              [name]: {
-                [ONLY_SIDEBAR]: incomingLayout[ONLY_SIDEBAR]
-              }
+              ...(name && {
+                [name]: {
+                  [ONLY_SIDEBAR]: incomingLayout[ONLY_SIDEBAR]
+                }
+              })
             };
           } else if (
             key === ONLY_PROPERTIES &&
@@ -194,15 +205,19 @@ export default function useLayoutPrefs() {
             !showSidebar
           ) {
             newLayoutObj = {
-              [name]: {
-                [ONLY_PROPERTIES]: incomingLayout[ONLY_PROPERTIES]
-              }
+              ...(name && {
+                [name]: {
+                  [ONLY_PROPERTIES]: incomingLayout[ONLY_PROPERTIES]
+                }
+              })
             };
           } else if (key === 'main' && !showPropertiesDrawer && !showSidebar) {
             newLayoutObj = {
-              [name]: {
-                main: incomingLayout['main']
-              }
+              ...(name && {
+                [name]: {
+                  main: incomingLayout['main']
+                }
+              })
             };
           } else {
             logger.debug('Invalid layout value:', value);
