@@ -159,7 +159,7 @@ async function sendFetchRequest(
   } catch (error) {
     // Report network errors to central server health monitoring if applicable
     const reporter = healthCheckRegistry.getReporter();
-    if (reporter && shouldTriggerHealthCheck(apiPath)) {
+    if (reporter && shouldTriggerHealthCheck(apiPath, undefined, undefined)) {
       try {
         await reporter(apiPath);
       } catch (healthError) {
@@ -188,7 +188,21 @@ async function sendFetchRequest(
   // Report failed requests to central server health monitoring if applicable
   if (!response.ok) {
     const reporter = healthCheckRegistry.getReporter();
-    if (reporter && shouldTriggerHealthCheck(apiPath, response.status)) {
+
+    // Try to parse response body - used to detect central server configuration errors
+    let responseBody: unknown = undefined;
+    try {
+      const responseClone = response.clone();
+      responseBody = await responseClone.json();
+    } catch (error) {
+      // Ignore parsing errors, health check will proceed without response body
+      log.debug('Could not parse response body for health check:', error);
+    }
+
+    if (
+      reporter &&
+      shouldTriggerHealthCheck(apiPath, response.status, responseBody)
+    ) {
       try {
         await reporter(apiPath, response.status);
       } catch (error) {
