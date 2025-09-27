@@ -11,8 +11,6 @@ const TEST_SHARED_PATHS = [
   }
 ];
 
-test.use({ autoGoto: false });
-
 test.beforeEach('Open fileglancer', async ({ page }) => {
   await openFileGlancer(page);
 });
@@ -38,6 +36,40 @@ test.beforeEach('setup API endpoints', async ({ page }) => {
       })
     });
   });
+
+  await page.route(
+    `/api/fileglancer/files/${TEST_SHARED_PATHS[0].name}**`,
+    async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          files: [
+            {
+              name: 'f1',
+              path: 'f1',
+              size: 10,
+              is_dir: false,
+              permissions: '-rw-r--r--',
+              owner: 'testuser',
+              group: 'test',
+              last_modified: 1747865213.768398
+            },
+            {
+              name: 'f2',
+              path: 'f2',
+              size: 10,
+              is_dir: false,
+              permissions: '-rw-r--r--',
+              owner: 'testuser',
+              group: 'test',
+              last_modified: 1758924043.768398
+            }
+          ]
+        })
+      });
+    }
+  );
 });
 
 test.afterAll('Close browser', ({ browser }) => {
