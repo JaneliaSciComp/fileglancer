@@ -1,18 +1,43 @@
 import { expect, test } from '@jupyterlab/galata';
 import { openFileGlancer } from './testutils';
 
+const TEST_USER = 'testUser';
+const TEST_SHARED_PATHS = [
+  {
+    name: 'groups_local_homezone',
+    zone: 'local',
+    storage: 'home',
+    mount_path: '/local/home'
+  }
+];
+
 test.use({ autoGoto: false });
 
 test.beforeEach('Open fileglancer', async ({ page }) => {
-  // Log API responses for debugging
-  page.on('response', async response => {
-    if (response.url().includes('/api/fileglancer/file-share-paths')) {
-      console.log('file-share-paths response status:', response.status());
-      console.log('file-share-paths response:', await response.text());
-    }
+  await openFileGlancer(page);
+});
+
+test.beforeEach('setup API endpoints', async ({ page }) => {
+  // mock API calls
+  await page.route('/api/fileglancer/profile', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        username: TEST_USER
+      })
+    });
   });
 
-  await openFileGlancer(page);
+  await page.route('/api/fileglancer/file-share-paths', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        paths: TEST_SHARED_PATHS
+      })
+    });
+  });
 });
 
 test.afterAll('Close browser', ({ browser }) => {
@@ -21,8 +46,8 @@ test.afterAll('Close browser', ({ browser }) => {
 
 test('Home becomes visible when Local is expanded', async ({ page }) => {
   const zonesLocator = page.getByText('Zones');
-  const homeLocator = page.getByRole('link', { name: 'home', exact: true });
-  const localZoneLocator = page.getByText('Local');
+  const homeLocator = page.getByText('home');
+  const localZoneLocator = page.getByText('local');
 
   await expect(zonesLocator).toBeVisible();
   // the home locator initially is not visible
