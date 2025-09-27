@@ -4,6 +4,14 @@ import { openFileGlancer } from './testutils';
 test.use({ autoGoto: false });
 
 test.beforeEach('Open fileglancer', async ({ page }) => {
+  // Log API responses for debugging
+  page.on('response', async response => {
+    if (response.url().includes('/api/fileglancer/file-share-paths')) {
+      console.log('file-share-paths response status:', response.status());
+      console.log('file-share-paths response:', await response.text());
+    }
+  });
+
   await openFileGlancer(page);
 });
 
