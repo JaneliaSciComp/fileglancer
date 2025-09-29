@@ -5,7 +5,6 @@ test.beforeEach('Open fileglancer', async ({ page }) => {
   await openFileGlancer(page);
 });
 
-
 test.afterAll('Close browser', ({ browser }) => {
   browser.close();
 });
