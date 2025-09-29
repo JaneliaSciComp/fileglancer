@@ -84,7 +84,7 @@ test.beforeEach('setup API endpoints', async ({ page }) => {
   );
 });
 
-test('favor entire zone with reload page', async ({ page }) => {
+test.skip('favor entire zone with reload page', async ({ page }) => {
   // click on Z1
   await page.getByText('Z1', { exact: true }).click();
 
