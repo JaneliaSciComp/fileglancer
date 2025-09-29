@@ -1,87 +1,21 @@
 import { expect, test } from '@jupyterlab/galata';
-import { openFileGlancer } from './testutils';
-
-const TEST_USER = 'testUser';
-const TEST_SHARED_PATHS = [
-  {
-    name: 'groups_z1_homezone',
-    zone: 'Z1',
-    storage: 'home',
-    mount_path: '/z1/home'
-  },
-  {
-    name: 'groups_z1_primaryzone',
-    zone: 'Z1',
-    storage: 'primary',
-    mount_path: '/z1/labarea'
-  },
-  {
-    name: 'groups_z2_scratchzone',
-    zone: 'Z2',
-    storage: 'scratch',
-    mount_path: '/z2/scratch'
-  }
-];
+import {
+  openFileGlancer,
+  mockAPI,
+  teardownMockAPI,
+  TEST_SHARED_PATHS
+} from './testutils';
 
 test.beforeEach('Open fileglancer', async ({ page }) => {
   await openFileGlancer(page);
 });
 
 test.beforeEach('setup API endpoints', async ({ page }) => {
-  // mock API calls
-  await page.route('/api/fileglancer/profile', async route => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        username: TEST_USER
-      })
-    });
-  });
+  await mockAPI(page);
+});
 
-  await page.route('/api/fileglancer/file-share-paths', async route => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        paths: TEST_SHARED_PATHS
-      })
-    });
-  });
-
-  await page.route(
-    `/api/fileglancer/files/${TEST_SHARED_PATHS[2].name}**`,
-    async route => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          files: [
-            {
-              name: 'f1',
-              path: 'f1',
-              size: 10,
-              is_dir: false,
-              permissions: '-rw-r--r--',
-              owner: 'testuser',
-              group: 'test',
-              last_modified: 1747865213.768398
-            },
-            {
-              name: 'f2',
-              path: 'f2',
-              size: 10,
-              is_dir: false,
-              permissions: '-rw-r--r--',
-              owner: 'testuser',
-              group: 'test',
-              last_modified: 1758924043.768398
-            }
-          ]
-        })
-      });
-    }
-  );
+test.afterEach(async ({ page }) => {
+  await teardownMockAPI(page);
 });
 
 test('favor entire zone with reload page', async ({ page }) => {
@@ -133,16 +67,16 @@ test('favor entire zone with reload page', async ({ page }) => {
     .getByRole('button')
     .click();
 
-  const favoritesList = page.getByRole('list', { name: 'favorites-list' });
-  const listItem = favoritesList
-    .getByRole('listitem')
-    .filter({ hasText: /^Z2$/ });
+  const Z2favorite = page
+    .getByRole('list')
+    .filter({ hasText: /^Z2$/ })
+    .getByRole('listitem');
   // test that Z2 now shows in the favorites
-  await expect(listItem).toBeVisible();
+  await expect(Z2favorite).toBeVisible();
 
   // reload page - somehow page.reload hangs so I am going back to jupyterlab page
   await openFileGlancer(page);
 
   // test Z2 still shows as favorite
-  await expect(listItem).toBeVisible();
+  await expect(Z2favorite).toBeVisible();
 });

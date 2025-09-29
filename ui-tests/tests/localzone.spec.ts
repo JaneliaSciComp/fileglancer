@@ -1,76 +1,10 @@
 import { expect, test } from '@jupyterlab/galata';
 import { openFileGlancer } from './testutils';
 
-const TEST_USER = 'testUser';
-const TEST_SHARED_PATHS = [
-  {
-    name: 'groups_local_homezone',
-    zone: 'local',
-    storage: 'home',
-    mount_path: '/local/home'
-  }
-];
-
 test.beforeEach('Open fileglancer', async ({ page }) => {
   await openFileGlancer(page);
 });
 
-test.beforeEach('setup API endpoints', async ({ page }) => {
-  // mock API calls
-  await page.route('/api/fileglancer/profile', async route => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        username: TEST_USER
-      })
-    });
-  });
-
-  await page.route('/api/fileglancer/file-share-paths', async route => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        paths: TEST_SHARED_PATHS
-      })
-    });
-  });
-
-  await page.route(
-    `/api/fileglancer/files/${TEST_SHARED_PATHS[0].name}**`,
-    async route => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          files: [
-            {
-              name: 'f1',
-              path: 'f1',
-              size: 10,
-              is_dir: false,
-              permissions: '-rw-r--r--',
-              owner: 'testuser',
-              group: 'test',
-              last_modified: 1747865213.768398
-            },
-            {
-              name: 'f2',
-              path: 'f2',
-              size: 10,
-              is_dir: false,
-              permissions: '-rw-r--r--',
-              owner: 'testuser',
-              group: 'test',
-              last_modified: 1758924043.768398
-            }
-          ]
-        })
-      });
-    }
-  );
-});
 
 test.afterAll('Close browser', ({ browser }) => {
   browser.close();
