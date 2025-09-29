@@ -108,16 +108,22 @@ To execute the UI integration test, run:
 pixi run ui-test
 ```
 
-You can also run these in headed or debug mode using:
+You can also run these in UI debug mode using:
 
 ```bash
-pixi run ui-test -- --headed --debug
+pixi run ui-test -- --ui --debug
 ```
 
-or to run only a specific test:
+If you are unable to use the UI mode, record a trace for inspecting in the [Playwright trace viewer](https://trace.playwright.dev):
 
 ```bash
-pixi run ui-test -- --headed tests/fgzones.spec.ts
+pixi run ui-test -- --trace on
+```
+
+To run only a specific test:
+
+```bash
+pixi run ui-test -- --<optional-flag> tests/fgzones.spec.ts
 ```
 
 You can also use the name of the test:
