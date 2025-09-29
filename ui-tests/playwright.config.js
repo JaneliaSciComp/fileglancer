@@ -14,6 +14,7 @@ export default defineConfig({
   timeout: process.env.CI ? 90_000 : 30_000,
   navigationTimeout: process.env.CI ? 90_000 : 30_000,
   workers: process.env.CI ? 1 : undefined,
+  fullyParallel: false,
   webServer: {
     command: 'npm start',
     url: 'http://localhost:8888/lab',
