@@ -104,6 +104,10 @@ export default function useSearchFilter() {
     setSearchQuery(searchQuery.trim().toLowerCase());
   };
 
+  const clearSearch = (): void => {
+    setSearchQuery('');
+  };
+
   React.useEffect(() => {
     if (searchQuery !== '') {
       filterZonesMap(searchQuery);
@@ -131,6 +135,7 @@ export default function useSearchFilter() {
     filteredZoneFavorites,
     filteredFileSharePathFavorites,
     filteredFolderFavorites,
-    handleSearchChange
+    handleSearchChange,
+    clearSearch
   };
 }

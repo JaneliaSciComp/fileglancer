@@ -69,33 +69,51 @@ export default function FavoritesBrowser({
         open={openFavorites['all'] ? true : false}
       >
         <List className="h-full py-0 gap-0 bg-background">
-          {/* Zone favorites */}
-          {displayZones.map(zone => {
-            return (
-              <ZoneComponent
-                key={zone.name}
-                openZones={openFavorites}
-                toggleOpenZones={toggleOpenFavorites}
-                zone={zone}
-              />
-            );
-          })}
+          {searchQuery.length > 0 &&
+          displayZones.length === 0 &&
+          displayFileSharePaths.length === 0 &&
+          displayFolders.length === 0 ? (
+            <div className="px-4 py-6 text-center">
+              <Typography className="text-sm text-gray-500">
+                No favorites match your filter.
+              </Typography>
+              <Typography className="text-xs text-gray-400 mt-1">
+                Try broadening your search to see more results.
+              </Typography>
+            </div>
+          ) : (
+            <>
+              {/* Zone favorites */}
+              {displayZones.map(zone => {
+                return (
+                  <ZoneComponent
+                    key={zone.name}
+                    zone={zone}
+                    openZones={openFavorites}
+                    toggleOpenZones={toggleOpenFavorites}
+                  />
+                );
+              })}
 
-          {/* File share path favorites */}
-          {displayFileSharePaths.map((fsp, index) => {
-            return <FileSharePathComponent fsp={fsp} key={fsp.name} />;
-          })}
+              {/* File share path favorites */}
+              {displayFileSharePaths.map((fsp, index) => {
+                return <FileSharePathComponent key={fsp.name} fsp={fsp} />;
+              })}
 
-          {/* Directory favorites */}
-          {displayFolders.map(folderFavorite => {
-            return (
-              <Folder
-                folderPath={folderFavorite.folderPath}
-                fsp={folderFavorite.fsp}
-                key={folderFavorite.fsp.name + '-' + folderFavorite.folderPath}
-              />
-            );
-          })}
+              {/* Directory favorites */}
+              {displayFolders.map(folderFavorite => {
+                return (
+                  <Folder
+                    key={
+                      folderFavorite.fsp.name + '-' + folderFavorite.folderPath
+                    }
+                    fsp={folderFavorite.fsp}
+                    folderPath={folderFavorite.folderPath}
+                  />
+                );
+              })}
+            </>
+          )}
         </List>
       </Collapse>
     </div>
