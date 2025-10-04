@@ -2,6 +2,8 @@ import os
 import json
 import requests
 import re
+import grp
+import pwd
 from datetime import datetime, timezone
 from abc import ABC
 from mimetypes import guess_type
@@ -54,8 +56,18 @@ def _get_mounted_filestore(fsp):
     return filestore
 
 
+def _should_show_fsp(fsp, user_groups):
+    """
+    Determine if a file share path should be shown to the user based on the user's groups.
+    """
+    if fsp.group == "public" or fsp.group == 'local' or fsp.group in user_groups:
+        return True
+    return False
+
+
 class BaseHandler(APIHandler):
     _home_file_share_path_cache = {}
+    _groups_cache = {}
 
     def get_current_user(self):
         """
@@ -98,6 +110,36 @@ class BaseHandler(APIHandler):
         return None
 
 
+    def get_user_groups(self):
+        """
+        Get the groups for the current user.
+        
+        Returns:
+            list: List of group names the user belongs to.
+        """
+        username = self.get_current_user()
+
+        if username in self._groups_cache:
+            return self._groups_cache[username]
+
+        try:
+            user_info = pwd.getpwnam(username)
+            user_groups = []
+            all_groups = grp.getgrall()  # Get all groups on the system
+            for group in all_groups:
+                if username in group.gr_mem:  # Check if user is a member of this group
+                    user_groups.append(group.gr_name)
+            primary_group = grp.getgrgid(user_info.pw_gid).gr_name
+            if primary_group not in user_groups: # Add primary group if not already included
+                user_groups.append(primary_group)
+            self._groups_cache[username] = user_groups
+            return user_groups
+        except Exception as e:
+            self.log.error(f"Error getting groups for user {username}: {str(e)}")
+            self._groups_cache[username] = []
+            return []
+
+
 class StreamingProxy(BaseHandler):
     """
     API handler for proxying responses from the central server
@@ -130,15 +172,34 @@ class FileSharePathsHandler(BaseHandler):
     """
     @web.authenticated
     def get(self):
-        self.log.info("GET /api/fileglancer/file-share-paths")
+        username = self.get_current_user()
+        self.log.info("GET /api/fileglancer/file-share-paths username={username}")
         file_share_paths = get_fsp_manager(self.settings).get_file_share_paths()
+        
+        # Check user preference for group filtering
+        preference_manager = get_preference_manager(self.settings)
+        
+        try:
+            filter_by_groups = preference_manager.get_preference(username, "filter_zones_by_group")
+        except KeyError:
+            filter_by_groups = True  # Default to True if preference not set
+        except Exception as e:
+            self.log.error(f"Error getting user preference: {str(e)}")
+            filter_by_groups = False # Default to False on an error other than KeyError. Better to show too many zones than too few.
+
+        if filter_by_groups:
+            user_groups = self.get_user_groups()
+            filtered_paths = [fsp for fsp in file_share_paths if _should_show_fsp(fsp, user_groups)]
+            # Convert Pydantic objects to dicts before JSON serialization
+            response_data = {"paths": [fsp.model_dump() for fsp in filtered_paths]}
+        else:
+            # Convert Pydantic objects to dicts before JSON serialization
+            response_data = {"paths": [fsp.model_dump() for fsp in file_share_paths]}
+
         self.set_header('Content-Type', 'application/json')
         self.set_status(200)
-        # Convert Pydantic objects to dicts before JSON serialization
-        file_share_paths_json = {"paths": [fsp.model_dump() for fsp in file_share_paths]}
-        self.write(json.dumps(file_share_paths_json))
+        self.write(json.dumps(response_data))
         self.finish()
-
 
 
 class FileShareHandler(BaseHandler, ABC):
