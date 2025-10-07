@@ -12,7 +12,7 @@ import { useProfileContext } from '@/contexts/ProfileContext';
 
 export default function ProfileMenu() {
   const [origin, setOrigin] = useState('');
-  const { profile } = useProfileContext();
+  const { profile, loading } = useProfileContext();
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -33,7 +33,7 @@ export default function ProfileMenu() {
         <div className="w-full flex items-center py-1.5 px-2.5 rounded align-middle select-none outline-none bg-transparent">
           <HiOutlineUserCircle className="mr-2 icon-default" />
           <Typography className="text-sm text-foreground font-sans font-semibold">
-            {profile ? profile.username : 'Loading...'}
+            {loading ? 'Loading...' : profile?.username}
           </Typography>
         </div>
         <hr className="!my-1 -mx-1 border-surface" />
