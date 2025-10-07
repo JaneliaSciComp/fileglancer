@@ -21,12 +21,12 @@ export default function Sidebar() {
       <div className="my-3 short:my-1 relative">
         <Input
           className="bg-background text-foreground short:text-xs [&::-webkit-search-cancel-button]:appearance-none"
-          type="search"
-          placeholder="Type to filter zones"
-          value={searchQuery}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
             handleSearchChange(e)
           }
+          placeholder="Type to filter zones"
+          type="search"
+          value={searchQuery}
         >
           <Input.Icon>
             <HiOutlineFunnel className="h-full w-full" />
@@ -34,10 +34,10 @@ export default function Sidebar() {
         </Input>
         {searchQuery ? (
           <button
-            type="button"
-            onClick={clearSearch}
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-primary hover:text-primary/80 transition-colors"
             aria-label="Clear search"
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-primary hover:text-primary/80 transition-colors"
+            onClick={clearSearch}
+            type="button"
           >
             <HiXMark className="h-5 w-5 font-bold" />
           </button>

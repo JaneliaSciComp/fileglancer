@@ -88,27 +88,27 @@ export default function FavoritesBrowser({
                 return (
                   <ZoneComponent
                     key={zone.name}
-                    zone={zone}
                     openZones={openFavorites}
                     toggleOpenZones={toggleOpenFavorites}
+                    zone={zone}
                   />
                 );
               })}
 
               {/* File share path favorites */}
               {displayFileSharePaths.map((fsp, index) => {
-                return <FileSharePathComponent key={fsp.name} fsp={fsp} />;
+                return <FileSharePathComponent fsp={fsp} key={fsp.name} />;
               })}
 
               {/* Directory favorites */}
               {displayFolders.map(folderFavorite => {
                 return (
                   <Folder
+                    folderPath={folderFavorite.folderPath}
+                    fsp={folderFavorite.fsp}
                     key={
                       folderFavorite.fsp.name + '-' + folderFavorite.folderPath
                     }
-                    fsp={folderFavorite.fsp}
-                    folderPath={folderFavorite.folderPath}
                   />
                 );
               })}

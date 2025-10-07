@@ -1,5 +1,4 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { default as log } from '@/logger';
 
 import { sendFetchRequest, makeMapKey } from '@/utils';
 import { removeTrailingSlashes } from '@/utils/pathHandling';
