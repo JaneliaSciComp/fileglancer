@@ -25,6 +25,12 @@ type Zone = { name: string; fileSharePaths: FileSharePath[] };
 
 type ZonesAndFileSharePathsMap = Record<string, FileSharePath | Zone>;
 
+type Profile = {
+  username: string;
+  homeFileSharePathName: string;
+  homeDirectoryName: string;
+};
+
 type Cookies = { [key: string]: string };
 
 type Success<T> = {
@@ -40,12 +46,13 @@ interface Failure {
 type Result<T> = Success<T> | Failure;
 
 export type {
+  Cookies,
   FileOrFolder,
   FileSharePath,
-  Zone,
-  ZonesAndFileSharePathsMap,
-  Cookies,
+  Failure,
+  Profile,
   Result,
   Success,
-  Failure
+  Zone,
+  ZonesAndFileSharePathsMap
 };
