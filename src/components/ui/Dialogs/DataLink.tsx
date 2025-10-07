@@ -138,7 +138,7 @@ export default function DataLinkDialog(
 ): JSX.Element {
   const { fileBrowserState } = useFileBrowserContext();
   const { pathPreference, areDataLinksAutomatic } = usePreferencesContext();
-  const { zonesAndFileSharePathsMap } = useZoneAndFspMapContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const [localAreDataLinksAutomatic] = React.useState(areDataLinksAutomatic);
 
   function getDisplayPath(): string {
@@ -149,9 +149,10 @@ export default function DataLinkDialog(
           ? makeMapKey('fsp', fileBrowserState.currentFileSharePath.name)
           : '';
 
-    const pathFsp = fspKey
-      ? (zonesAndFileSharePathsMap[fspKey] as FileSharePath)
-      : null;
+    const pathFsp =
+      fspKey && zonesAndFspQuery.isSuccess
+        ? (zonesAndFspQuery.data[fspKey] as FileSharePath)
+        : null;
     const targetPath =
       props.action === 'delete'
         ? props.proxiedPath.path

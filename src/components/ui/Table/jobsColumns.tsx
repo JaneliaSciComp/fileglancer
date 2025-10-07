@@ -14,12 +14,12 @@ import { FileSharePath } from '@/shared.types';
 import { FgStyledLink } from '../widgets/FgLink';
 
 function FilePathCell({ item }: { readonly item: Ticket }) {
-  const { zonesAndFileSharePathsMap } = useZoneAndFspMapContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const { pathPreference } = usePreferencesContext();
 
-  const itemFsp = zonesAndFileSharePathsMap[
-    makeMapKey('fsp', item.fsp_name)
-  ] as FileSharePath;
+  const itemFsp = zonesAndFspQuery.isSuccess
+    ? (zonesAndFspQuery.data[makeMapKey('fsp', item.fsp_name)] as FileSharePath)
+    : null;
   const displayPath = getPreferredPathForDisplay(
     pathPreference,
     itemFsp,

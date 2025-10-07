@@ -31,12 +31,12 @@ type ProxiedPathRowActionProps = {
 
 function PathCell({ item }: { readonly item: ProxiedPath }) {
   const { pathPreference } = usePreferencesContext();
-  const { zonesAndFileSharePathsMap } = useZoneAndFspMapContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const tooltipTriggerClasses = 'max-w-full truncate';
 
-  const pathFsp = zonesAndFileSharePathsMap[
-    makeMapKey('fsp', item.fsp_name)
-  ] as FileSharePath;
+  const pathFsp = zonesAndFspQuery.isSuccess
+    ? (zonesAndFspQuery.data[makeMapKey('fsp', item.fsp_name)] as FileSharePath)
+    : undefined;
 
   const displayPath = getPreferredPathForDisplay(
     pathPreference,
@@ -66,15 +66,15 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
     React.useState<boolean>(false);
   const { handleDeleteDataLink } = useDataToolLinks(setShowDataLinkDialog);
   const { pathPreference } = usePreferencesContext();
-  const { zonesAndFileSharePathsMap } = useZoneAndFspMapContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
 
   const { handleCopyPath, handleCopyUrl, handleUnshare } = useProxiedPathRow({
     setShowDataLinkDialog
   });
 
-  const pathFsp = zonesAndFileSharePathsMap[
-    makeMapKey('fsp', item.fsp_name)
-  ] as FileSharePath;
+  const pathFsp = zonesAndFspQuery.isSuccess
+    ? (zonesAndFspQuery.data[makeMapKey('fsp', item.fsp_name)] as FileSharePath)
+    : undefined;
 
   const displayPath = getPreferredPathForDisplay(
     pathPreference,

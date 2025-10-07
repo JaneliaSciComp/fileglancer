@@ -12,7 +12,7 @@ import {
 } from '@/contexts/PreferencesContext';
 
 export default function useSearchFilter() {
-  const { zonesAndFileSharePathsMap } = useZoneAndFspMapContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const { zoneFavorites, fileSharePathFavorites, folderFavorites } =
     usePreferencesContext();
 
@@ -30,7 +30,11 @@ export default function useSearchFilter() {
 
   const filterZonesMap = React.useCallback(
     (query: string) => {
-      const matches = Object.entries(zonesAndFileSharePathsMap)
+      if (!zonesAndFspQuery.isSuccess) {
+        setFilteredZonesMap({});
+        return;
+      }
+      const matches = Object.entries(zonesAndFspQuery.data)
         .map(([key, value]) => {
           if (key.startsWith('zone')) {
             const zone = value as Zone;
@@ -59,7 +63,7 @@ export default function useSearchFilter() {
 
       setFilteredZonesMap(Object.fromEntries(matches as [string, Zone][]));
     },
-    [zonesAndFileSharePathsMap]
+    [zonesAndFspQuery]
   );
 
   const filterAllFavorites = React.useCallback(
@@ -121,7 +125,7 @@ export default function useSearchFilter() {
     }
   }, [
     searchQuery,
-    zonesAndFileSharePathsMap,
+    zonesAndFspQuery,
     zoneFavorites,
     fileSharePathFavorites,
     folderFavorites,

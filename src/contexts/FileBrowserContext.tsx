@@ -128,8 +128,7 @@ export const FileBrowserContextProvider = ({
   );
 
   const { cookies } = useCookiesContext();
-  const { zonesAndFileSharePathsMap, isZonesMapReady } =
-    useZoneAndFspMapContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const navigate = useNavigate();
 
   const handleLeftClick = (
@@ -329,45 +328,44 @@ export const FileBrowserContextProvider = ({
   React.useEffect(() => {
     let cancelled = false;
     const updateCurrentFileSharePathAndFolder = async () => {
-      if (!isZonesMapReady || !zonesAndFileSharePathsMap) {
-        return;
-      }
-      if (!fspName) {
+      if (zonesAndFspQuery.isSuccess) {
+        if (!fspName) {
+          if (cancelled) {
+            return;
+          }
+          updateAllStates(
+            null,
+            null,
+            [],
+            null,
+            [],
+            'No file share path name in URL'
+          );
+          return;
+        }
+
+        const fspKey = makeMapKey('fsp', fspName);
+        const urlFsp = zonesAndFspQuery.data[fspKey] as FileSharePath;
+        if (!urlFsp) {
+          if (cancelled) {
+            return;
+          }
+          updateAllStates(
+            null,
+            null,
+            [],
+            null,
+            [],
+            'Invalid file share path name'
+          );
+          return;
+        }
+
+        await fetchAndUpdateFileBrowserState(urlFsp, filePath || '.');
+
         if (cancelled) {
           return;
         }
-        updateAllStates(
-          null,
-          null,
-          [],
-          null,
-          [],
-          'No file share path name in URL'
-        );
-        return;
-      }
-
-      const fspKey = makeMapKey('fsp', fspName);
-      const urlFsp = zonesAndFileSharePathsMap[fspKey] as FileSharePath;
-      if (!urlFsp) {
-        if (cancelled) {
-          return;
-        }
-        updateAllStates(
-          null,
-          null,
-          [],
-          null,
-          [],
-          'Invalid file share path name'
-        );
-        return;
-      }
-
-      await fetchAndUpdateFileBrowserState(urlFsp, filePath || '.');
-
-      if (cancelled) {
-        return;
       }
     };
     updateCurrentFileSharePathAndFolder();
@@ -377,12 +375,12 @@ export const FileBrowserContextProvider = ({
       cancelled = true;
     };
   }, [
-    isZonesMapReady,
-    zonesAndFileSharePathsMap,
     fspName,
     filePath,
     updateAllStates,
-    fetchAndUpdateFileBrowserState
+    fetchAndUpdateFileBrowserState,
+    zonesAndFspQuery.data,
+    zonesAndFspQuery.isSuccess
   ]);
 
   return (

@@ -119,8 +119,7 @@ export const PreferencesProvider = ({
   const [isLayoutLoadedFromDB, setIsLayoutLoadedFromDB] = React.useState(false);
 
   const { cookies } = useCookiesContext();
-  const { isZonesMapReady, zonesAndFileSharePathsMap } =
-    useZoneAndFspMapContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const { fileBrowserState } = useFileBrowserContext();
 
   const fetchPreferences = React.useCallback(
@@ -146,12 +145,15 @@ export const PreferencesProvider = ({
 
   const accessMapItems = React.useCallback(
     (keys: string[]) => {
+      if (!zonesAndFspQuery.isSuccess) {
+        return;
+      }
       const itemsArray = keys.map(key => {
-        return zonesAndFileSharePathsMap[key];
+        return zonesAndFspQuery.data[key];
       });
       return itemsArray;
     },
-    [zonesAndFileSharePathsMap]
+    [zonesAndFspQuery.data, zonesAndFspQuery.isSuccess]
   );
 
   const updateLocalZonePreferenceStates = React.useCallback(
@@ -182,11 +184,14 @@ export const PreferencesProvider = ({
 
   const updateLocalFolderPreferenceStates = React.useCallback(
     (updatedMap: Record<string, FolderPreference>) => {
+      if (!zonesAndFspQuery.isSuccess) {
+        return;
+      }
       setFolderPreferenceMap(updatedMap);
       const updatedFolderFavorites = Object.entries(updatedMap).map(
         ([_, value]) => {
           const fspKey = makeMapKey('fsp', value.fspName);
-          const fsp = zonesAndFileSharePathsMap[fspKey];
+          const fsp = zonesAndFspQuery.data[fspKey];
           return { type: 'folder', folderPath: value.folderPath, fsp: fsp };
         }
       );
@@ -198,7 +203,7 @@ export const PreferencesProvider = ({
       });
       setFolderFavorites(updatedFolderFavorites as FolderFavorite[]);
     },
-    [zonesAndFileSharePathsMap]
+    [zonesAndFspQuery.data, zonesAndFspQuery.isSuccess]
   );
 
   const savePreferencesToBackend = React.useCallback(
@@ -585,7 +590,7 @@ export const PreferencesProvider = ({
   }, [fetchPreferences]);
 
   React.useEffect(() => {
-    if (!isZonesMapReady) {
+    if (!zonesAndFspQuery.isSuccess) {
       return;
     }
 
@@ -601,10 +606,14 @@ export const PreferencesProvider = ({
         updateLocalZonePreferenceStates(zoneMap);
       }
     })();
-  }, [isZonesMapReady, fetchPreferences, updateLocalZonePreferenceStates]);
+  }, [
+    fetchPreferences,
+    updateLocalZonePreferenceStates,
+    zonesAndFspQuery.isSuccess
+  ]);
 
   React.useEffect(() => {
-    if (!isZonesMapReady) {
+    if (!zonesAndFspQuery.isSuccess) {
       return;
     }
 
@@ -620,10 +629,14 @@ export const PreferencesProvider = ({
         updateLocalFspPreferenceStates(fspMap);
       }
     })();
-  }, [isZonesMapReady, fetchPreferences, updateLocalFspPreferenceStates]);
+  }, [
+    fetchPreferences,
+    updateLocalFspPreferenceStates,
+    zonesAndFspQuery.isSuccess
+  ]);
 
   React.useEffect(() => {
-    if (!isZonesMapReady) {
+    if (!zonesAndFspQuery.isSuccess) {
       return;
     }
 
@@ -642,12 +655,16 @@ export const PreferencesProvider = ({
         updateLocalFolderPreferenceStates(folderMap);
       }
     })();
-  }, [isZonesMapReady, fetchPreferences, updateLocalFolderPreferenceStates]);
+  }, [
+    fetchPreferences,
+    updateLocalFolderPreferenceStates,
+    zonesAndFspQuery.isSuccess
+  ]);
 
   // Get initial recently viewed folders from backend
   React.useEffect(() => {
     setLoadingRecentlyViewedFolders(true);
-    if (!isZonesMapReady) {
+    if (!zonesAndFspQuery.isSuccess) {
       return;
     }
     (async function () {
@@ -659,7 +676,7 @@ export const PreferencesProvider = ({
       }
       setLoadingRecentlyViewedFolders(false);
     })();
-  }, [fetchPreferences, isZonesMapReady]);
+  }, [fetchPreferences, zonesAndFspQuery.isSuccess]);
 
   // Store last viewed folder path and FSP name to avoid duplicate updates
   const lastFolderPathRef = React.useRef<string | null>(null);

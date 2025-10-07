@@ -11,7 +11,7 @@ import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 
 export default function RecentDataLinksCard() {
-  const { zonesAndFileSharePathsMap } = useZoneAndFspMapContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const { allProxiedPaths, loadingProxiedPaths } = useProxiedPathContext();
 
   // Get the 10 most recent data links
@@ -19,7 +19,7 @@ export default function RecentDataLinksCard() {
 
   return (
     <DashboardCard title="Recently created data links">
-      {loadingProxiedPaths ? (
+      {loadingProxiedPaths || zonesAndFspQuery.isPending ? (
         Array(5)
           .fill(0)
           .map((_, index) => (
@@ -39,11 +39,18 @@ export default function RecentDataLinksCard() {
             browser and clicking the "Data Link" toggle.
           </Typography>
         </div>
+      ) : zonesAndFspQuery.isError ? (
+        <div className="px-4 pt-4 flex flex-col gap-4">
+          <Typography className="text-error">
+            Error loading zones and file share paths:{' '}
+            {zonesAndFspQuery.error.message}
+          </Typography>
+        </div>
       ) : recentDataLinks.length > 0 ? (
         <>
           {recentDataLinks.map((item: ProxiedPath) => {
             const fspKey = makeMapKey('fsp', item.fsp_name);
-            const fsp = zonesAndFileSharePathsMap[fspKey] as FileSharePath;
+            const fsp = zonesAndFspQuery.data[fspKey] as FileSharePath;
             if (!fsp) {
               return null;
             }

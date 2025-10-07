@@ -8,7 +8,7 @@ import { createSuccess, handleError } from '@/utils/errorHandling';
 
 export default function useNavigationInput(initialValue: string = '') {
   const [inputValue, setInputValue] = React.useState<string>(initialValue);
-  const { zonesAndFileSharePathsMap } = useZoneAndFspMapContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const navigate = useNavigate();
 
   // Update inputValue when initialValue changes
@@ -21,14 +21,29 @@ export default function useNavigationInput(initialValue: string = '') {
   };
 
   const handleNavigationInputSubmit = (): Result<void> => {
-    const keys = Object.keys(zonesAndFileSharePathsMap);
+    if (zonesAndFspQuery.isError) {
+      return handleError(
+        new Error(
+          `Cannot navigate: error loading zones and file share paths: ${zonesAndFspQuery.error.message}`
+        )
+      );
+    }
+    if (zonesAndFspQuery.isPending) {
+      return handleError(
+        new Error(
+          'Cannot navigate: zones and file share paths are still loading.'
+        )
+      );
+    }
+
+    const keys = Object.keys(zonesAndFspQuery);
     for (const key of keys) {
-      // Iterate through only the objects in zonesAndFileSharePathsMap that have a key that start with "fsp_"
+      // Iterate through only the objects in zonesAndFspQuery that have a key that start with "fsp_"
       if (key.startsWith('fsp_')) {
         const parts = key.split('_');
         // further narrow down the search by checking if the inputValue contains the last part of the key
         if (inputValue.includes(parts[parts.length - 1])) {
-          const fspObject = zonesAndFileSharePathsMap[key] as FileSharePath;
+          const fspObject = zonesAndFspQuery.data[key] as FileSharePath;
           // Check if the inputValue contains object.linux_path, object.mac_path, or object.windows_path,
           // and if it does, get the portion of the inputValue that does not match the mount path (i.e., get the subpath)
           const linuxPath = fspObject.linux_path;
