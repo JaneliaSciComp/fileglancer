@@ -61,7 +61,7 @@ type PreferencesContextType = {
   handleUpdateLayout: (layout: string) => Promise<void>;
   setLayoutWithPropertiesOpen: () => Promise<Result<void>>;
   loadingRecentlyViewedFolders: boolean;
-  isLayoutLoadedFromDB: boolean;
+  isPreferencesLoaded: boolean;
   handleContextMenuFavorite: () => Promise<Result<boolean>>;
   isFilteredByGroups: boolean;
   toggleFilterByGroups: () => Promise<Result<void>>;
@@ -125,7 +125,7 @@ export const PreferencesProvider = ({
   const [isFileSharePathFavoritesReady, setIsFileSharePathFavoritesReady] =
     React.useState(false);
   const [layout, setLayout] = React.useState<string>('');
-  const [isLayoutLoadedFromDB, setIsLayoutLoadedFromDB] = React.useState(false);
+  const [isPreferencesLoaded, setIsPreferencesLoaded] = React.useState(false);
 
   const { status } = useCentralServerHealthContext();
   // If Central Server status is 'ignore', default to false to skip filtering by groups
@@ -561,7 +561,7 @@ export const PreferencesProvider = ({
     if (!isZonesMapReady) {
       return;
     }
-    if (isLayoutLoadedFromDB) {
+    if (isPreferencesLoaded) {
       return; // Avoid re-fetching if already loaded
     }
     setLoadingRecentlyViewedFolders(true);
@@ -650,12 +650,12 @@ export const PreferencesProvider = ({
         );
       }
       setLoadingRecentlyViewedFolders(false);
-      setIsLayoutLoadedFromDB(true);
+      setIsPreferencesLoaded(true);
     })();
   }, [
     fetchPreferences,
     isZonesMapReady,
-    isLayoutLoadedFromDB,
+    isPreferencesLoaded,
     updateLocalZonePreferenceStates,
     updateLocalFspPreferenceStates,
     updateLocalFolderPreferenceStates
@@ -668,6 +668,11 @@ export const PreferencesProvider = ({
   // useEffect that runs when the current folder in fileBrowserState changes,
   // to update the recently viewed folder
   React.useEffect(() => {
+    // Don't attempt to update preferences until they are loaded from server
+    if (!isPreferencesLoaded) {
+      return;
+    }
+
     if (
       !fileBrowserState.currentFileSharePath ||
       !fileBrowserState.currentFileOrFolder
@@ -721,7 +726,8 @@ export const PreferencesProvider = ({
   }, [
     fileBrowserState, // Include the whole state object to satisfy ESLint
     updateRecentlyViewedFolders,
-    savePreferencesToBackend
+    savePreferencesToBackend,
+    isPreferencesLoaded
   ]);
 
   return (
@@ -752,7 +758,7 @@ export const PreferencesProvider = ({
         handleUpdateLayout,
         setLayoutWithPropertiesOpen,
         loadingRecentlyViewedFolders,
-        isLayoutLoadedFromDB,
+        isPreferencesLoaded,
         handleContextMenuFavorite,
         isFilteredByGroups,
         toggleFilterByGroups

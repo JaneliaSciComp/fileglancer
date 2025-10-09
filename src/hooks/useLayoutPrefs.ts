@@ -24,7 +24,7 @@ export default function useLayoutPrefs() {
   const [showPropertiesDrawer, setShowPropertiesDrawer] =
     React.useState<boolean>(false);
   const [showSidebar, setShowSidebar] = React.useState(true);
-  const { layout, handleUpdateLayout, isLayoutLoadedFromDB } =
+  const { layout, handleUpdateLayout, isPreferencesLoaded } =
     usePreferencesContext();
   const { status: centralServerStatus } = useCentralServerHealthContext();
 
@@ -56,7 +56,7 @@ export default function useLayoutPrefs() {
 
   // Initialize layouts from saved preferences
   React.useEffect(() => {
-    if (!isLayoutLoadedFromDB) {
+    if (!isPreferencesLoaded) {
       return;
     } else if (layout === '') {
       // If screen is small, default to no sidebar or properties drawer
@@ -92,13 +92,13 @@ export default function useLayoutPrefs() {
         logger.debug('Error parsing layout:', error);
       }
     }
-  }, [layout, isLayoutLoadedFromDB]);
+  }, [layout, isPreferencesLoaded]);
 
   const layoutPrefsStorage = React.useMemo(
     () => ({
       getItem(name: string): string {
         // Don't try to parse layout until it's loaded from the database
-        if (!isLayoutLoadedFromDB) {
+        if (!isPreferencesLoaded) {
           return '';
         }
         // If layout is empty, return default layout based on screen size
@@ -125,7 +125,7 @@ export default function useLayoutPrefs() {
         }
       },
       setItem(name: string, value: string) {
-        if (!isLayoutLoadedFromDB) {
+        if (!isPreferencesLoaded) {
           return;
         }
         // This check is here, because if the central server is down, we don't want to
@@ -216,7 +216,7 @@ export default function useLayoutPrefs() {
     [
       layout,
       debouncedUpdateLayout,
-      isLayoutLoadedFromDB,
+      isPreferencesLoaded,
       showPropertiesDrawer,
       showSidebar,
       centralServerStatus
