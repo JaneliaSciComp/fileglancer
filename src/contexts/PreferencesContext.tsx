@@ -505,8 +505,12 @@ export const PreferencesProvider = ({
   };
 
   const updateRecentlyViewedFolders = React.useCallback(
-    (folderPath: string, fspName: string): FolderPreference[] => {
-      const updatedFolders = [...recentlyViewedFolders];
+    (
+      folderPath: string,
+      fspName: string,
+      currentFolders: FolderPreference[]
+    ): FolderPreference[] => {
+      const updatedFolders = [...currentFolders];
 
       // Do not save file share paths in the recently viewed folders
       if (folderPath === '.') {
@@ -553,7 +557,7 @@ export const PreferencesProvider = ({
         return updatedFolders;
       }
     },
-    [recentlyViewedFolders]
+    []
   );
 
   // Fetch all preferences on mount
@@ -705,12 +709,23 @@ export const PreferencesProvider = ({
       }
 
       try {
-        const updatedFolders = updateRecentlyViewedFolders(folderPath, fspName);
-        // Check again if cancelled before updating state
+        // Use functional state update to avoid stale closure issues
+        let updatedFolders: FolderPreference[] = [];
+        setRecentlyViewedFolders(prevFolders => {
+          updatedFolders = updateRecentlyViewedFolders(
+            folderPath,
+            fspName,
+            prevFolders
+          );
+          return updatedFolders;
+        });
+
+        // Check again if cancelled before saving to backend
         if (isCancelled) {
           return;
         }
-        setRecentlyViewedFolders(updatedFolders);
+
+        // Save to backend after state update
         await savePreferencesToBackend('recentlyViewedFolders', updatedFolders);
       } catch (error) {
         if (!isCancelled) {
