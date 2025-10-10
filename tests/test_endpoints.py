@@ -5,9 +5,9 @@ import shutil
 import pytest
 from fastapi.testclient import TestClient
 
-from fileglancer_central.settings import Settings
-from fileglancer_central.app import create_app
-from fileglancer_central.database import *
+from fileglancer.settings import Settings
+from fileglancer.app import create_app
+from fileglancer.database import *
 
 @pytest.fixture
 def temp_dir():

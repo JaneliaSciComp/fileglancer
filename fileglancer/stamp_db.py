@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from alembic.config import Config
 from alembic import command
-from fileglancer_central.settings import get_settings
+from fileglancer.settings import get_settings
 
 
 def stamp_database(revision: str) -> None:

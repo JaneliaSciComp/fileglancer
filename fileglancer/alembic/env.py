@@ -8,8 +8,8 @@ import sys
 # Add the project root to the path so we can import our models
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fileglancer_central.database import Base
-from fileglancer_central.settings import get_settings
+from fileglancer.database import Base
+from fileglancer.settings import get_settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

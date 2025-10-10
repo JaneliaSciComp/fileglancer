@@ -7,8 +7,8 @@ import pytest
 import pandas as pd
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from fileglancer_central.database import *
-from fileglancer_central.utils import slugify_path
+from fileglancer.database import *
+from fileglancer.utils import slugify_path
 
 def create_file_share_path_dicts(df):
     """Helper function to create file share path dictionaries from DataFrame"""

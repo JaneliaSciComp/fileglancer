@@ -5,7 +5,7 @@ from datetime import datetime
 from loguru import logger
 from atlassian import Jira
 
-from fileglancer_central.settings import get_settings
+from fileglancer.settings import get_settings
 
 settings = get_settings()
 DEBUG = False

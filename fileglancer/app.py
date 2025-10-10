@@ -20,12 +20,12 @@ from fastapi.responses import RedirectResponse, Response,JSONResponse, PlainText
 from fastapi.exceptions import RequestValidationError, StarletteHTTPException
 from urllib.parse import quote
 
-from fileglancer_central import database as db
-from fileglancer_central.model import FileSharePath, FileSharePathResponse, Ticket, ProxiedPath, ProxiedPathResponse, ExternalBucket, ExternalBucketResponse, Notification, NotificationResponse
-from fileglancer_central.settings import get_settings
-from fileglancer_central.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
-from fileglancer_central.utils import slugify_path
-from fileglancer_central.proxy_context import ProxyContext, AccessFlagsProxyContext
+from fileglancer import database as db
+from fileglancer.model import FileSharePath, FileSharePathResponse, Ticket, ProxiedPath, ProxiedPathResponse, ExternalBucket, ExternalBucketResponse, Notification, NotificationResponse
+from fileglancer.settings import get_settings
+from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
+from fileglancer.utils import slugify_path
+from fileglancer.proxy_context import ProxyContext, AccessFlagsProxyContext
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response
 from x2s3.client_file import FileProxyClient
