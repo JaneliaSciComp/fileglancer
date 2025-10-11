@@ -14,11 +14,6 @@ authors = [
 license = { file = "LICENSE" }
 requires-python = ">=3.12"
 classifiers = [
-    "Framework :: Jupyter",
-    "Framework :: Jupyter :: JupyterLab",
-    "Framework :: Jupyter :: JupyterLab :: 4",
-    "Framework :: Jupyter :: JupyterLab :: Extensions",
-    "Framework :: Jupyter :: JupyterLab :: Extensions :: Prebuilt",
     "License :: OSI Approved :: BSD License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
@@ -89,11 +84,6 @@ path = "fileglancer/_version.py"
 [tool.check-wheel-contents]
 ignore = ["W002"]
 
-[tool.pytest.ini_options]
-filterwarnings = [
-    "ignore:.*Jupyter is migrating.*:DeprecationWarning",
-]
-
 [tool.pixi.project]
 channels = ["conda-forge"]
 platforms = ["osx-arm64", "osx-64", "linux-64"]
@@ -116,14 +106,14 @@ release = { features = ["release"], solve-group = "default" }
 pip-install = "pip install -e ."
 pip-uninstall = "pip uninstall -y fileglancer"
 node-install = "npm install"
-node-build = "npm run build"
+node-build = { cmd = "npm run build", depends-on = ["node-install"] }
 node-eslint-check = "npx eslint . --cache --ext .ts,.tsx"
 node-prettier-check =  "npx prettier \"**/*{.ts,.tsx,.js,.jsx,.css,.json,.md}\" \"!package-lock.json\" --check"
 node-prettier-write = "npx prettier --list-different --write '**/*.{ts,tsx,js,jsx,json,md}' '!package-lock.json'"
 node-check = "npx tsc --noEmit -p tsconfig.app.json"
 node-install-ui-test = "npm --prefix ui-tests install"
 ui-test = { cmd = "npm --prefix ui-tests run test", depends-on = ["node-install-ui-test"] }
-dev-install = { depends-on = ["pip-install", "node-install"] }
+dev-install = { depends-on = ["node-build", "pip-install"] }
 dev-watch = { cmd = "NODE_ENV=development npm run watch" }
 dev-launch = "pixi run uvicorn fileglancer.app:app --port 7878 --reload"
 dev-launch-remote = "pixi run uvicorn fileglancer.app:app --host 0.0.0.0 --port 7878 --reload --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"

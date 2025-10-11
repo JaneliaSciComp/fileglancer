@@ -4,9 +4,9 @@
     "version": "1.1.1",
     "description": "Browse, share, and publish files on the Janelia file system",
     "keywords": [
-        "jupyter",
-        "jupyterlab",
-        "jupyterlab-extension"
+        "ngff",
+        "file browser",
+        "scientific imaging"
     ],
     "homepage": "https://github.com/JaneliaSciComp/fileglancer",
     "bugs": {
@@ -25,26 +25,16 @@
     "types": "lib/src/index.d.ts",
     "scripts": {
         "dev": "vite",
-        "build": "tsc -p tsconfig.extension.json && vite build && npm run build:labextension:dev",
-        "build:prod": "tsc -p tsconfig.extension.json && vite build --mode production && npm run build:labextension",
-        "build:labextension": "jupyter labextension build .",
-        "build:labextension:dev": "jupyter labextension build --development True .",
+        "build": "tsc -p tsconfig.extension.json && vite build",
+        "build:prod": "tsc -p tsconfig.extension.json && vite build --mode production",
         "clean:lib": "rimraf lib tsconfig.tsbuildinfo",
         "clean:lintcache": "rimraf .eslintcache .stylelintcache",
-        "clean:labextension": "rimraf fileglancer/labextension fileglancer/_version.py",
-        "clean:all": "npm run clean:lib && npm run clean:labextension && npm run clean:lintcache",
-        "watch": "run-p watch:src watch:labextension",
+        "clean:all": "npm run clean:lib && npm run clean:lintcache",
+        "watch": "run-p watch:src",
         "watch:src": "vite build --watch",
-        "watch:labextension": "jupyter labextension watch .",
         "test": "vitest"
     },
     "dependencies": {
-        "@jupyterlab/application": "^4.0.0",
-        "@jupyterlab/apputils": "^4.4.4",
-        "@jupyterlab/coreutils": "^6.0.0",
-        "@jupyterlab/launcher": "^4.3.4",
-        "@jupyterlab/services": "^7.0.0",
-        "@jupyterlab/ui-components": "^4.3.4",
         "@material-tailwind/react": "^3.0.0-beta.24",
         "@tanstack/react-table": "^8.21.3",
         "@types/react-syntax-highlighter": "^15.5.13",
@@ -72,8 +62,6 @@
         "@eslint/js": "^9.26.0",
         "@eslint/json": "^0.12.0",
         "@eslint/markdown": "^6.4.0",
-        "@jupyterlab/builder": "^4.0.0",
-        "@jupyterlab/testutils": "^4.4.2",
         "@testing-library/dom": "^10.4.0",
         "@testing-library/jest-dom": "^6.6.3",
         "@testing-library/react": "^16.3.0",
@@ -104,19 +92,5 @@
     },
     "publishConfig": {
         "access": "public"
-    },
-    "jupyterlab": {
-        "discovery": {
-            "server": {
-                "managers": [
-                    "pip"
-                ],
-                "base": {
-                    "name": "fileglancer"
-                }
-            }
-        },
-        "extension": true,
-        "outputDir": "fileglancer/labextension"
     }
 }
