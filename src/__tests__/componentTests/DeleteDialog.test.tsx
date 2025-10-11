@@ -76,7 +76,7 @@ describe('Delete dialog', () => {
 
     server.use(
       http.delete(
-        'http://localhost:3000/api/fileglancer/files/test_fsp',
+        'http://localhost:3000/api/files/test_fsp',
         () => {
           return HttpResponse.json(
             { error: 'Could not delete item' },

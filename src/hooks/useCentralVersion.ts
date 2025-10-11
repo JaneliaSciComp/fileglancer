@@ -31,7 +31,7 @@ export default function useCentralVersion(): UseCentralVersionReturn {
         setState({ status: 'loading', version: 'unknown' });
 
         const response = await sendFetchRequest(
-          '/api/fileglancer/central-version',
+          '/api/central-version',
           'GET',
           cookies['_xsrf']
         );

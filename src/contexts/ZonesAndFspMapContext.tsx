@@ -42,7 +42,7 @@ export const ZonesAndFspMapContextProvider = ({
     let rawData: { paths: FileSharePath[] } = { paths: [] };
     try {
       const response = await sendFetchRequest(
-        '/api/fileglancer/file-share-paths',
+        '/api/file-share-paths',
         'GET',
         cookies['_xsrf']
       );

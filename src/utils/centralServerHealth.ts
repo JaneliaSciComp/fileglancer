@@ -101,7 +101,7 @@ export async function checkCentralServerHealth(
 ): Promise<CentralServerStatus> {
   try {
     const response = await sendFetchRequest(
-      '/api/fileglancer/central-version',
+      '/api/central-version',
       'GET',
       xsrfToken
     );
@@ -154,10 +154,10 @@ export function shouldTriggerHealthCheck(
 
   // Skip health check for local/non-central server endpoints
   const localEndpoints = [
-    '/api/fileglancer/profile', // User profile is local
-    '/api/fileglancer/version', // Local server version
-    '/api/fileglancer/files', // File system access
-    '/api/fileglancer/content' // File content access
+    '/api/profile', // User profile is local
+    '/api/version', // Local server version
+    '/api/files', // File system access
+    '/api/content' // File content access
   ];
 
   const isLocalEndpoint = localEndpoints.some(endpoint =>
@@ -170,11 +170,11 @@ export function shouldTriggerHealthCheck(
 
   // Only trigger health check for central server related endpoints
   const centralServerEndpoints = [
-    '/api/fileglancer/notifications',
-    '/api/fileglancer/proxied-path',
-    '/api/fileglancer/file-share-paths',
-    '/api/fileglancer/external-buckets',
-    '/api/fileglancer/preference' // Preferences are stored on central server when configured
+    '/api/notifications',
+    '/api/proxied-path',
+    '/api/file-share-paths',
+    '/api/external-buckets',
+    '/api/preference' // Preferences are stored on central server when configured
   ];
 
   const isCentralServerEndpoint = centralServerEndpoints.some(endpoint =>

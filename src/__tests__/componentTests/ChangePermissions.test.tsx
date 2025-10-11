@@ -105,7 +105,7 @@ describe('Change Permissions dialog', () => {
     const { http, HttpResponse } = await import('msw');
 
     server.use(
-      http.patch('http://localhost:3000/api/fileglancer/files/:fspName', () => {
+      http.patch('http://localhost:3000/api/files/:fspName', () => {
         return HttpResponse.json(
           { error: 'Permission denied' },
           { status: 403 }

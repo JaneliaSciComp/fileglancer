@@ -141,7 +141,7 @@ export const PreferencesProvider = ({
   const fetchPreferences = React.useCallback(async () => {
     try {
       const data = await sendFetchRequest(
-        `/api/fileglancer/preference`,
+        `/api/preference`,
         'GET',
         cookies['_xsrf']
       ).then(response => response.json());
@@ -216,7 +216,7 @@ export const PreferencesProvider = ({
   const savePreferencesToBackend = React.useCallback(
     async <T,>(key: string, value: T): Promise<Response> => {
       const response = await sendFetchRequest(
-        `/api/fileglancer/preference?key=${key}`,
+        `/api/preference?key=${key}`,
         'PUT',
         cookies['_xsrf'],
         { value: value }

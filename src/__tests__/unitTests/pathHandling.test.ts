@@ -96,15 +96,15 @@ describe('joinPaths', () => {
 describe('getFileBrowsePath', () => {
   test('returns correct API path for normal path', () => {
     expect(getFileBrowsePath('fsp_name', 'file.zarr')).toBe(
-      '/api/fileglancer/files/fsp_name?subpath=file.zarr'
+      '/api/files/fsp_name?subpath=file.zarr'
     );
   });
   test('handles empty string', () => {
-    expect(getFileBrowsePath('')).toBe('/api/fileglancer/files/');
+    expect(getFileBrowsePath('')).toBe('/api/files/');
   });
   test('encodes filePath', () => {
     expect(getFileBrowsePath('fsp', 'a/b c')).toBe(
-      '/api/fileglancer/files/fsp?subpath=a%2Fb%20c'
+      '/api/files/fsp?subpath=a%2Fb%20c'
     );
   });
 });
@@ -133,7 +133,7 @@ describe('getFileURL', () => {
 
   test('returns correctly formatted URL', () => {
     expect(getFileURL('file-share-path', 'file.zarr')).toBe(
-      'https://fileglancer-int.janelia.org/api/fileglancer/content/file-share-path/file.zarr'
+      'https://fileglancer-int.janelia.org/api/content/file-share-path/file.zarr'
     );
   });
 });

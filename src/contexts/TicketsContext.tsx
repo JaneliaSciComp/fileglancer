@@ -63,7 +63,7 @@ export const TicketProvider = ({
     setLoadingTickets(true);
     try {
       const response = await sendFetchRequest(
-        '/api/fileglancer/ticket',
+        '/api/ticket',
         'GET',
         cookies['_xsrf']
       );
@@ -110,7 +110,7 @@ export const TicketProvider = ({
 
     try {
       const response = await sendFetchRequest(
-        `/api/fileglancer/ticket?fsp_name=${fileBrowserState.currentFileSharePath.name}&path=${fileBrowserState.propertiesTarget.path}`,
+        `/api/ticket?fsp_name=${fileBrowserState.currentFileSharePath.name}&path=${fileBrowserState.propertiesTarget.path}`,
         'GET',
         cookies['_xsrf']
       );
@@ -152,7 +152,7 @@ export const TicketProvider = ({
     );
 
     const createTicketResponse = await sendFetchRequest(
-      '/api/fileglancer/ticket',
+      '/api/ticket',
       'POST',
       cookies['_xsrf'],
       {

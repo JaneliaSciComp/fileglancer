@@ -43,7 +43,7 @@ export const ProfileContextProvider = ({
     const fetchProfile = async () => {
       try {
         const response = await sendFetchRequest(
-          '/api/fileglancer/profile',
+          '/api/profile',
           'GET',
           cookies['_xsrf']
         );

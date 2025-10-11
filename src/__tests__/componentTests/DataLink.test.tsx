@@ -66,7 +66,7 @@ describe('Data Link dialog', () => {
     const { http, HttpResponse } = await import('msw');
 
     server.use(
-      http.post('http://localhost:3000/api/fileglancer/proxied-path', () => {
+      http.post('http://localhost:3000/api/proxied-path', () => {
         return HttpResponse.json(
           { error: 'Could not create data link' },
           { status: 500 }
