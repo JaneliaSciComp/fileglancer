@@ -34,26 +34,27 @@ from x2s3.client_file import FileProxyClient
 
 # Read version once at module load time
 def _read_version() -> str:
-    """Read version from package metadata or pyproject.toml file"""
+    """Read version from package metadata or package.json file"""
     try:
         # First try to get version from installed package metadata
         from importlib.metadata import version
-        return version("fileglancer-central")
+        return version("fileglancer")
     except Exception:
-        # Fallback to reading from pyproject.toml during development
+        # Fallback to reading from package.json during development
         try:
+            import json
             # Use os.path instead of Path to avoid any Path-related issues
             current_file = os.path.abspath(__file__)
             current_dir = os.path.dirname(current_file)
             project_root = os.path.dirname(current_dir)
-            pyproject_path = os.path.join(project_root, "pyproject.toml")
+            package_json_path = os.path.join(project_root, "package.json")
 
-            with open(pyproject_path, "rb") as f:
-                data = tomllib.load(f)
+            with open(package_json_path, "r") as f:
+                data = json.load(f)
 
-            return data["project"]["version"]
+            return data["version"]
         except Exception as e:
-            logger.warning(f"Could not read version from package metadata or pyproject.toml: {e}")
+            logger.warning(f"Could not read version from package metadata or package.json: {e}")
             return "unknown"
 
 APP_VERSION = _read_version()
