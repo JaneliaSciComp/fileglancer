@@ -2,7 +2,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from functools import cache
-from pathlib import Path
+from pathlib import Path as PathLib
 from typing import List, Optional, Dict, Tuple
 
 try:
@@ -18,6 +18,7 @@ from fastapi import FastAPI, HTTPException, Request, Query, Path
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response,JSONResponse, PlainTextResponse
 from fastapi.exceptions import RequestValidationError, StarletteHTTPException
+from fastapi.staticfiles import StaticFiles
 from urllib.parse import quote
 
 from fileglancer import database as db
@@ -176,6 +177,13 @@ def create_app(settings):
         expose_headers=["Range", "Content-Range"],
     )
 
+    # Mount the static UI files
+    ui_dir = PathLib(__file__).parent / "ui"
+    if ui_dir.exists():
+        app.mount("/fg", StaticFiles(directory=str(ui_dir), html=True), name="ui")
+        logger.info(f"Mounted UI at /fg from {ui_dir}")
+    else:
+        logger.warning(f"UI directory not found at {ui_dir}")
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request, exc):
@@ -185,12 +193,7 @@ def create_app(settings):
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request, exc):
         return JSONResponse({"error":str(exc)}, status_code=400)
-
-
-    @app.get("/", include_in_schema=False)
-    async def docs_redirect():
-        return RedirectResponse("/docs")
-
+    
 
     @app.get('/robots.txt', response_class=PlainTextResponse)
     def robots():

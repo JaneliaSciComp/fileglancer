@@ -18,20 +18,15 @@
         "url": "https://github.com/JaneliaSciComp/fileglancer.git"
     },
     "files": [
-        "lib/**/*.{d.ts,eot,gif,html,jpg,js,js.map,json,png,svg,woff2,ttf}",
         "src/**/*.{ts,tsx}"
     ],
-    "main": "lib/src/index.js",
-    "types": "lib/src/index.d.ts",
     "scripts": {
         "dev": "vite",
-        "build": "tsc -p tsconfig.extension.json && vite build",
-        "build:prod": "tsc -p tsconfig.extension.json && vite build --mode production",
-        "clean:lib": "rimraf lib tsconfig.tsbuildinfo",
+        "build": "vite build",
+        "build:prod": "vite build --mode production",
         "clean:lintcache": "rimraf .eslintcache .stylelintcache",
-        "clean:all": "npm run clean:lib && npm run clean:lintcache",
-        "watch": "run-p watch:src",
-        "watch:src": "vite build --watch",
+        "clean:all": "npm run clean:lintcache",
+        "watch": "vite build --watch",
         "test": "vitest"
     },
     "dependencies": {
