@@ -14,7 +14,7 @@ import yaml
 from loguru import logger
 from pydantic import HttpUrl
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Request, Query, Path
+from fastapi import FastAPI, HTTPException, Request, Query, Path, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response,JSONResponse, PlainTextResponse
 from fastapi.exceptions import RequestValidationError, StarletteHTTPException
@@ -193,20 +193,22 @@ def create_app(settings):
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request, exc):
         return JSONResponse({"error":str(exc)}, status_code=400)
-    
+
 
     @app.get('/robots.txt', response_class=PlainTextResponse)
     def robots():
         return """User-agent: *\nDisallow: /"""
 
+    # Create API router for all API endpoints
+    api = APIRouter(prefix="/api")
 
-    @app.get("/version", response_model=dict,
+    @api.get("/version", response_model=dict,
              description="Get the current version of the server")
     async def version_endpoint():
         return {"version": APP_VERSION}
 
 
-    @app.get("/file-share-paths", response_model=FileSharePathResponse,
+    @api.get("/file-share-paths", response_model=FileSharePathResponse,
              description="Get all file share paths from the database")
     async def get_file_share_paths() -> List[FileSharePath]:
         file_share_mounts = settings.file_share_mounts
@@ -236,21 +238,21 @@ def create_app(settings):
 
         return FileSharePathResponse(paths=paths)
 
-    @app.get("/external-buckets", response_model=ExternalBucketResponse,
+    @api.get("/external-buckets", response_model=ExternalBucketResponse,
              description="Get all external buckets from the database")
     async def get_external_buckets() -> ExternalBucketResponse:
         buckets = _get_external_buckets(settings.db_url)
         return ExternalBucketResponse(buckets=buckets)
 
 
-    @app.get("/external-buckets/{fsp_name}", response_model=ExternalBucketResponse,
+    @api.get("/external-buckets/{fsp_name}", response_model=ExternalBucketResponse,
              description="Get the external buckets for a given FSP name")
     async def get_external_buckets(fsp_name: str) -> ExternalBucket:
         buckets = _get_external_buckets(settings.db_url, fsp_name)
         return ExternalBucketResponse(buckets=buckets)
 
 
-    @app.get("/notifications", response_model=NotificationResponse,
+    @api.get("/notifications", response_model=NotificationResponse,
              description="Get all active notifications")
     async def get_notifications() -> NotificationResponse:
         try:
@@ -306,7 +308,7 @@ def create_app(settings):
             return NotificationResponse(notifications=[])
 
 
-    @app.post("/ticket", response_model=Ticket,
+    @api.post("/ticket", response_model=Ticket,
               description="Create a new ticket and return the key")
     async def create_ticket(
         username: str,
@@ -354,7 +356,7 @@ def create_app(settings):
             raise HTTPException(status_code=500, detail=str(e))
 
 
-    @app.get("/ticket/{username}", response_model=List[Ticket],
+    @api.get("/ticket/{username}", response_model=List[Ticket],
              description="Retrieve tickets for a user")
     async def get_tickets(username: str = Path(..., description="The username of the user who created the tickets"),
                           fsp_name: Optional[str] = Query(None, description="The name of the file share path that the ticket is associated with"),
@@ -381,7 +383,7 @@ def create_app(settings):
             return tickets
 
 
-    @app.delete("/ticket/{ticket_key}",
+    @api.delete("/ticket/{ticket_key}",
                 description="Delete a ticket by its key")
     async def delete_ticket(ticket_key: str):
         try:
@@ -397,14 +399,14 @@ def create_app(settings):
                 raise HTTPException(status_code=500, detail=str(e))
 
 
-    @app.get("/preference/{username}", response_model=Dict[str, Dict],
+    @api.get("/preference/{username}", response_model=Dict[str, Dict],
              description="Get all preferences for a user")
     async def get_preferences(username: str):
         with db.get_db_session(settings.db_url) as session:
             return db.get_all_user_preferences(session, username)
 
 
-    @app.get("/preference/{username}/{key}", response_model=Optional[Dict],
+    @api.get("/preference/{username}/{key}", response_model=Optional[Dict],
              description="Get a specific preference for a user")
     async def get_preference(username: str, key: str):
         with db.get_db_session(settings.db_url) as session:
@@ -414,7 +416,7 @@ def create_app(settings):
             return pref
 
 
-    @app.put("/preference/{username}/{key}",
+    @api.put("/preference/{username}/{key}",
              description="Set a preference for a user")
     async def set_preference(username: str, key: str, value: Dict):
         with db.get_db_session(settings.db_url) as session:
@@ -422,7 +424,7 @@ def create_app(settings):
             return {"message": f"Preference {key} set for user {username}"}
 
 
-    @app.delete("/preference/{username}/{key}",
+    @api.delete("/preference/{username}/{key}",
                 description="Delete a preference for a user")
     async def delete_preference(username: str, key: str):
         with db.get_db_session(settings.db_url) as session:
@@ -432,7 +434,7 @@ def create_app(settings):
             return {"message": f"Preference {key} deleted for user {username}"}
 
 
-    @app.post("/proxied-path/{username}", response_model=ProxiedPath,
+    @api.post("/proxied-path/{username}", response_model=ProxiedPath,
               description="Create a new proxied path")
     async def create_proxied_path(username: str = Path(..., description="The username of the user who owns this proxied path"),
                                   fsp_name: str = Query(..., description="The name of the file share path that this proxied path is associated with"),
@@ -449,7 +451,7 @@ def create_app(settings):
                 raise HTTPException(status_code=400, detail=str(e))
 
 
-    @app.get("/proxied-path/{username}", response_model=ProxiedPathResponse,
+    @api.get("/proxied-path/{username}", response_model=ProxiedPathResponse,
              description="Query proxied paths for a user")
     async def get_proxied_paths(username: str = Path(..., description="The username of the user who owns the proxied paths"),
                                 fsp_name: str = Query(None, description="The name of the file share path that this proxied path is associated with"),
@@ -460,7 +462,7 @@ def create_app(settings):
             return ProxiedPathResponse(paths=proxied_paths)
 
 
-    @app.get("/proxied-path/{username}/{sharing_key}", response_model=ProxiedPath,
+    @api.get("/proxied-path/{username}/{sharing_key}", response_model=ProxiedPath,
              description="Retrieve a proxied path by sharing key")
     async def get_proxied_path(username: str = Path(..., description="The username of the user who owns the proxied paths"),
                                sharing_key: str = Path(..., description="The sharing key of the proxied path")):
@@ -473,7 +475,7 @@ def create_app(settings):
             return _convert_proxied_path(path, settings.external_proxy_url)
 
 
-    @app.put("/proxied-path/{username}/{sharing_key}", description="Update a proxied path by sharing key")
+    @api.put("/proxied-path/{username}/{sharing_key}", description="Update a proxied path by sharing key")
     async def update_proxied_path(username: str = Path(..., description="The username of the user who owns the proxied paths"),
                                   sharing_key: str = Path(..., description="The sharing key of the proxied path"),
                                   fsp_name: Optional[str] = Query(default=None, description="The name of the file share path that this proxied path is associated with"),
@@ -488,7 +490,7 @@ def create_app(settings):
                 raise HTTPException(status_code=400, detail=str(e))
 
 
-    @app.delete("/proxied-path/{username}/{sharing_key}", description="Delete a proxied path by sharing key")
+    @api.delete("/proxied-path/{username}/{sharing_key}", description="Delete a proxied path by sharing key")
     async def delete_proxied_path(username: str = Path(..., description="The username of the user who owns the proxied paths"),
                                   sharing_key: str = Path(..., description="The sharing key of the proxied path")):
         with db.get_db_session(settings.db_url) as session:
@@ -498,8 +500,8 @@ def create_app(settings):
             return {"message": f"Proxied path {sharing_key} deleted for user {username}"}
 
 
-    @app.get("/files/{sharing_key}/{sharing_name}")
-    @app.get("/files/{sharing_key}/{sharing_name}/{path:path}")
+    @api.get("/files/{sharing_key}/{sharing_name}")
+    @api.get("/files/{sharing_key}/{sharing_name}/{path:path}")
     async def target_dispatcher(request: Request,
                                 sharing_key: str,
                                 sharing_name: str,
@@ -533,7 +535,7 @@ def create_app(settings):
                 return await client.get_object(path, range_header)
 
 
-    @app.head("/files/{sharing_key}/{sharing_name}/{path:path}")
+    @api.head("/files/{sharing_key}/{sharing_name}/{path:path}")
     async def head_object(sharing_key: str, sharing_name: str, path: str):
         try:
             client, ctx = _get_file_proxy_client(sharing_key, sharing_name)
@@ -544,6 +546,9 @@ def create_app(settings):
         except:
             logger.opt(exception=sys.exc_info()).info("Error requesting head")
             return get_error_response(500, "InternalError", "Error requesting HEAD", path)
+
+    # Include the API router
+    app.include_router(api)
 
     return app
 
