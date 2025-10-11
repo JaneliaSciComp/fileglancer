@@ -4,18 +4,16 @@ rooted at a specific directory.
 """
 
 import os
-
-from pydantic import BaseModel
-from typing import Optional, Generator
 import stat
 import pwd
 import grp
-import logging
 import shutil
 
-from fileglancer.paths import FileSharePath
+from pydantic import BaseModel
+from typing import Optional, Generator
+from loguru import logger
 
-log = logging.getLogger("tornado.application")
+from .model import FileSharePath
 
 # Default buffer size for streaming file contents
 DEFAULT_BUFFER_SIZE = 8192
@@ -230,7 +228,7 @@ class Filestore:
             try:
                 yield self._get_file_info_from_path(entry_path, current_user)
             except (FileNotFoundError, PermissionError, OSError) as e:
-                log.error(f"Error accessing entry: {entry_path}: {e}")
+                logger.error(f"Error accessing entry: {entry_path}: {e}")
                 continue
 
 
