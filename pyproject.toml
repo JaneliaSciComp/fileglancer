@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling>=1.5.0", "jupyterlab>=4.0.0,<5", "hatch-nodejs-version>=0.3.2"]
+requires = ["hatchling>=1.5.0", "hatch-nodejs-version>=0.3.2"]
 build-backend = "hatchling.build"
 
 [project]
@@ -12,7 +12,7 @@ authors = [
     { name = "Konrad Rokicki", email = "rokickik@janelia.hhmi.org" }
 ]
 license = { file = "LICENSE" }
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 classifiers = [
     "Framework :: Jupyter",
     "Framework :: Jupyter :: JupyterLab",
@@ -29,18 +29,31 @@ classifiers = [
 ]
 dynamic = ["version", "description", "urls", "keywords"]
 dependencies = [
-    "jupyterlab>=4.3.0,<5",
-    "jupyter_server>=2.4.0,<3",
-    "pydantic>=2.10.6,<3"
+    "fastapi >=0.115",
+    "uvicorn >=0.34",
+    "sqlalchemy >=2.0",
+    "aiosqlite >=0.21.0",
+    "alembic >=1.13.0",
+    "pandas >=2.2.3",
+    "pydantic >=2.10",
+    "pydantic-settings >=2.8",
+    "pydantic-settings[yaml]",
+    "loguru >=0.7.2",
+    "atlassian-python-api >=3.41",
+    "lxml >=5.3.1",
+    "x2s3 >=0.9.1",
+    "psycopg2-binary >=2.9.9,<3",
+    "cachetools >=5.0.0"
 ]
 
 [project.optional-dependencies]
 test = [
     "coverage",
+    "httpx >=0.28",
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
-    "pytest-jupyter[server]>=0.6.0",
+    "pytest-html",
     "requests-mock"
 ]
 release = [
@@ -57,51 +70,21 @@ fields = ["description", "urls", "keywords"]
 
 [tool.hatch.build.targets.sdist]
 artifacts = [
-  "fileglancer/labextension",
-  "fileglancer/ui"
+  "fileglancer/ui",
+  "fileglancer/alembic.ini",
+  "fileglancer/alembic/**/*"
 ]
 exclude = [".github"]
 
 [tool.hatch.build.targets.wheel]
 artifacts = [
-  "fileglancer/ui"
+  "fileglancer/ui",
+  "fileglancer/alembic.ini",
+  "fileglancer/alembic/**/*"
 ]
-
-[tool.hatch.build.targets.wheel.shared-data]
-"fileglancer/labextension" = "share/jupyter/labextensions/fileglancer"
-"install.json" = "share/jupyter/labextensions/fileglancer/install.json"
-"jupyter-config/server-config" = "etc/jupyter/jupyter_server_config.d"
 
 [tool.hatch.build.hooks.version]
 path = "fileglancer/_version.py"
-
-[tool.hatch.build.hooks.jupyter-builder]
-dependencies = ["hatch-jupyter-builder>=0.5"]
-build-function = "hatch_jupyter_builder.npm_builder"
-ensured-targets = [
-    "fileglancer/labextension/static/style.js",
-    "fileglancer/labextension/package.json",
-]
-skip-if-exists = ["fileglancer/labextension/static/style.js"]
-
-[tool.hatch.build.hooks.jupyter-builder.build-kwargs]
-build_cmd = "build:prod"
-
-[tool.hatch.build.hooks.jupyter-builder.editable-build-kwargs]
-build_cmd = "build"
-source_dir = "src"
-build_dir = "fileglancer/labextension"
-
-[tool.jupyter-releaser.options]
-version_cmd = "hatch version"
-
-[tool.jupyter-releaser.hooks]
-before-build-npm = [
-    "python -m pip install 'jupyterlab>=4.0.0,<5'",
-    "npm install",
-    "npm run build:prod"
-]
-before-build-python = ["npm run clean:all"]
 
 [tool.check-wheel-contents]
 ignore = ["W002"]
@@ -130,8 +113,7 @@ test = { features = ["test"], solve-group = "default" }
 release = { features = ["release"], solve-group = "default" }
 
 [tool.pixi.tasks]
-ext-clean = "rm -rf fileglancer/labextension && rm -rf .pixi/envs/default/share/jupyter/labextensions/fileglancer"
-pip-install = { cmd = "pip install -e .", depends-on = ["ext-clean"] }
+pip-install = "pip install -e ."
 pip-uninstall = "pip uninstall -y fileglancer"
 node-install = "npm install"
 node-build = "npm run build"
@@ -139,14 +121,15 @@ node-eslint-check = "npx eslint . --cache --ext .ts,.tsx"
 node-prettier-check =  "npx prettier \"**/*{.ts,.tsx,.js,.jsx,.css,.json,.md}\" \"!package-lock.json\" --check"
 node-prettier-write = "npx prettier --list-different --write '**/*.{ts,tsx,js,jsx,json,md}' '!package-lock.json'"
 node-check = "npx tsc --noEmit -p tsconfig.app.json"
-ext-overwrite = { cmd = "jupyter labextension develop . --overwrite" }
-ext-enable = { cmd = "jupyter server extension enable fileglancer", depends-on = ["ext-overwrite"] }
-dev-install = { depends-on = ["pip-install", "node-install", "ext-enable"] }
-dev-watch = { cmd = "NODE_ENV=development npm run watch" }
-dev-launch = { cmd = "NODE_ENV=development jupyter lab --autoreload" }
-dev-launch-remote = { cmd = "NODE_ENV=development jupyter lab --autoreload --ip=0.0.0.0 --no-browser" }
 node-install-ui-test = "npm --prefix ui-tests install"
 ui-test = { cmd = "npm --prefix ui-tests run test", depends-on = ["node-install-ui-test"] }
+dev-install = { depends-on = ["pip-install", "node-install"] }
+dev-watch = { cmd = "NODE_ENV=development npm run watch" }
+dev-launch = "pixi run uvicorn fileglancer.app:app --port 7878 --reload"
+dev-launch-remote = "pixi run uvicorn fileglancer.app:app --host 0.0.0.0 --port 7878 --reload --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
+migrate = "alembic upgrade head"
+migrate-create = "alembic revision --autogenerate"
+stamp-db = "python -m fileglancer.stamp_db"
 
 [tool.pixi.dependencies]
 python = ">=3.13.2,<4"
