@@ -1,9 +1,13 @@
 import os
 import sys
+import pwd
+import grp
+import json
 from datetime import datetime, timezone
 from functools import cache
 from pathlib import Path as PathLib
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Dict, Tuple, Generator
+from mimetypes import guess_type
 
 try:
     import tomllib
@@ -14,9 +18,9 @@ import yaml
 from loguru import logger
 from pydantic import HttpUrl
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Request, Query, Path, APIRouter
+from fastapi import FastAPI, HTTPException, Request, Query, Path, APIRouter, Body
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, Response,JSONResponse, PlainTextResponse
+from fastapi.responses import RedirectResponse, Response, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.exceptions import RequestValidationError, StarletteHTTPException
 from fastapi.staticfiles import StaticFiles
 from urllib.parse import quote
@@ -27,6 +31,7 @@ from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
 from fileglancer.utils import slugify_path
 from fileglancer.proxy_context import ProxyContext, AccessFlagsProxyContext
+from fileglancer.filestore import Filestore
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response
 from x2s3.client_file import FileProxyClient
@@ -547,6 +552,394 @@ def create_app(settings):
         except:
             logger.opt(exception=sys.exc_info()).info("Error requesting head")
             return get_error_response(500, "InternalError", "Error requesting HEAD", path)
+
+    # Helper functions for file handlers
+    def _format_timestamp(timestamp):
+        """Format the given timestamp to ISO date format compatible with HTTP."""
+        dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        return dt.isoformat()
+
+    def _guess_content_type(filename):
+        """A wrapper for guess_type which deals with unknown MIME types"""
+        content_type, _ = guess_type(filename)
+        if content_type:
+            return content_type
+        else:
+            if filename.endswith('.yaml'):
+                return 'text/plain+yaml'
+            else:
+                return 'application/octet-stream'
+
+    def _get_mounted_filestore(fsp: FileSharePath):
+        """Constructs a filestore for the given file share path, checking to make sure it is mounted."""
+        filestore = Filestore(fsp)
+        try:
+            filestore.get_file_info(None)
+        except FileNotFoundError:
+            return None
+        return filestore
+
+    def _get_filestore(path_name: str):
+        """Get a filestore for the given path name."""
+        # Get file share path from database or settings
+        file_share_mounts = settings.file_share_mounts
+        fsp = None
+
+        if file_share_mounts:
+            for mount in file_share_mounts:
+                name = slugify_path(mount.mount_path)
+                if name == path_name:
+                    fsp = FileSharePath(
+                        name=name,
+                        zone='Local',
+                        group='local',
+                        storage='local',
+                        mount_path=mount.mount_path,
+                        mac_path=mount.mount_path,
+                        windows_path=mount.mount_path,
+                        linux_path=mount.mount_path,
+                    )
+                    break
+        else:
+            with db.get_db_session(settings.db_url) as session:
+                db_paths = db.get_all_paths(session)
+                for path in db_paths:
+                    if path.name == path_name:
+                        fsp = FileSharePath(
+                            name=path.name,
+                            zone=path.zone,
+                            group=path.group,
+                            storage=path.storage,
+                            mount_path=path.mount_path,
+                            mac_path=path.mac_path,
+                            windows_path=path.windows_path,
+                            linux_path=path.linux_path,
+                        )
+                        break
+
+        if fsp is None:
+            return None, f"File share path '{path_name}' not found"
+
+        # Create a filestore for the file share path
+        filestore = _get_mounted_filestore(fsp)
+        if filestore is None:
+            return None, f"File share path '{path_name}' is not mounted"
+
+        return filestore, None
+
+    def _parse_range_header(range_header: str, file_size: int):
+        """Parse HTTP Range header and return start and end byte positions."""
+        if not range_header or not range_header.startswith('bytes='):
+            return None
+
+        try:
+            range_spec = range_header[6:]  # Remove 'bytes=' prefix
+
+            if ',' in range_spec:
+                range_spec = range_spec.split(',')[0].strip()
+
+            if '-' not in range_spec:
+                return None
+
+            start_str, end_str = range_spec.split('-', 1)
+
+            if start_str and end_str:
+                start = int(start_str)
+                end = int(end_str)
+            elif start_str and not end_str:
+                start = int(start_str)
+                end = file_size - 1
+            elif not start_str and end_str:
+                suffix_length = int(end_str)
+                start = max(0, file_size - suffix_length)
+                end = file_size - 1
+            else:
+                return None
+
+            if start < 0 or end < 0 or start >= file_size or start > end:
+                return None
+
+            end = min(end, file_size - 1)
+            return (start, end)
+
+        except (ValueError, IndexError):
+            return None
+
+    # Profile endpoint
+    @api.get("/profile", description="Get the current user's profile")
+    async def get_profile():
+        """Get the current user's profile"""
+        username = os.getenv("USER", "unknown")
+        home_directory_path = os.path.expanduser(f"~{username}")
+        home_directory_name = os.path.basename(home_directory_path)
+        home_parent = os.path.dirname(home_directory_path)
+
+        # Find matching file share path for home directory
+        home_fsp_name = None
+        file_share_mounts = settings.file_share_mounts
+        if file_share_mounts:
+            for mount in file_share_mounts:
+                if mount.mount_path == home_parent:
+                    home_fsp_name = slugify_path(mount.mount_path)
+                    break
+        else:
+            with db.get_db_session(settings.db_url) as session:
+                paths = db.get_all_paths(session)
+                for fsp in paths:
+                    if fsp.mount_path == home_parent:
+                        home_fsp_name = fsp.name
+                        break
+
+        # Get user groups
+        user_groups = []
+        try:
+            user_info = pwd.getpwnam(username)
+            all_groups = grp.getgrall()
+            for group in all_groups:
+                if username in group.gr_mem:
+                    user_groups.append(group.gr_name)
+            primary_group = grp.getgrgid(user_info.pw_gid).gr_name
+            if primary_group not in user_groups:
+                user_groups.append(primary_group)
+        except Exception as e:
+            logger.error(f"Error getting groups for user {username}: {str(e)}")
+
+        return {
+            "username": username,
+            "homeFileSharePathName": home_fsp_name,
+            "homeDirectoryName": home_directory_name,
+            "groups": user_groups,
+        }
+
+    # File content endpoint
+    @api.head("/content/{path_name:path}")
+    async def head_file_content(path_name: str, subpath: Optional[str] = Query('')):
+        """Handle HEAD requests to get file metadata without content"""
+        logger.info(f"HEAD /api/content/{path_name} subpath={subpath}")
+
+        if subpath:
+            filestore_name = path_name
+        else:
+            filestore_name, _, subpath = path_name.partition('/')
+
+        filestore, error = _get_filestore(filestore_name)
+        if filestore is None:
+            raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
+
+        file_name = subpath.split('/')[-1] if subpath else ''
+        content_type = _guess_content_type(file_name)
+
+        try:
+            file_info = filestore.get_file_info(subpath)
+
+            headers = {
+                'Accept-Ranges': 'bytes',
+            }
+
+            if content_type == 'application/octet-stream' and file_name:
+                headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+
+            if hasattr(file_info, 'size') and file_info.size is not None:
+                headers['Content-Length'] = str(file_info.size)
+
+            if hasattr(file_info, 'last_modified') and file_info.last_modified is not None:
+                headers['Last-Modified'] = _format_timestamp(file_info.last_modified)
+
+            return Response(status_code=200, headers=headers, media_type=content_type)
+
+        except FileNotFoundError:
+            logger.error(f"File not found in {filestore_name}: {subpath}")
+            raise HTTPException(status_code=404, detail="File not found")
+        except PermissionError:
+            raise HTTPException(status_code=403, detail="Permission denied")
+
+    @api.get("/content/{path_name:path}")
+    async def get_file_content(request: Request, path_name: str, subpath: Optional[str] = Query('')):
+        """Handle GET requests to get file content, with HTTP Range header support"""
+        logger.info(f"GET /api/content/{path_name} subpath={subpath}")
+
+        if subpath:
+            filestore_name = path_name
+        else:
+            filestore_name, _, subpath = path_name.partition('/')
+
+        filestore, error = _get_filestore(filestore_name)
+        if filestore is None:
+            raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
+
+        file_name = subpath.split('/')[-1] if subpath else ''
+        content_type = _guess_content_type(file_name)
+
+        try:
+            file_info = filestore.get_file_info(subpath)
+            if file_info.is_dir:
+                raise HTTPException(status_code=400, detail="Cannot download directory content")
+
+            file_size = file_info.size
+            range_header = request.headers.get('Range')
+
+            if range_header:
+                range_result = _parse_range_header(range_header, file_size)
+                if range_result is None:
+                    return Response(
+                        status_code=416,
+                        headers={'Content-Range': f'bytes */{file_size}'}
+                    )
+
+                start, end = range_result
+                content_length = end - start + 1
+
+                headers = {
+                    'Accept-Ranges': 'bytes',
+                    'Content-Length': str(content_length),
+                    'Content-Range': f'bytes {start}-{end}/{file_size}',
+                }
+
+                if content_type == 'application/octet-stream' and file_name:
+                    headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+
+                return StreamingResponse(
+                    filestore.stream_file_range(subpath, start, end),
+                    status_code=206,
+                    headers=headers,
+                    media_type=content_type
+                )
+            else:
+                headers = {
+                    'Accept-Ranges': 'bytes',
+                    'Content-Length': str(file_size),
+                }
+
+                if content_type == 'application/octet-stream' and file_name:
+                    headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+
+                return StreamingResponse(
+                    filestore.stream_file_contents(subpath),
+                    status_code=200,
+                    headers=headers,
+                    media_type=content_type
+                )
+
+        except FileNotFoundError:
+            logger.error(f"File not found in {filestore_name}: {subpath}")
+            raise HTTPException(status_code=404, detail="File or directory not found")
+        except PermissionError:
+            raise HTTPException(status_code=403, detail="Permission denied")
+
+    # File metadata endpoint (browsing)
+    @api.get("/files/{path_name}")
+    async def get_file_metadata(path_name: str, subpath: Optional[str] = Query('')):
+        """Handle GET requests to list directory contents or return info for the file/folder itself"""
+        logger.info(f"GET /api/files/{path_name} subpath={subpath}")
+
+        if subpath:
+            filestore_name = path_name
+        else:
+            filestore_name, _, subpath = path_name.partition('/')
+
+        filestore, error = _get_filestore(filestore_name)
+        if filestore is None:
+            raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
+
+        try:
+            current_user = os.getenv("USER", "unknown")
+            file_info = filestore.get_file_info(subpath, current_user)
+            logger.info(f"File info: {file_info}")
+
+            result = {"info": json.loads(file_info.model_dump_json())}
+
+            if file_info.is_dir:
+                try:
+                    files = list(filestore.yield_file_infos(subpath, current_user))
+                    result["files"] = [json.loads(f.model_dump_json()) for f in files]
+                except PermissionError:
+                    logger.error(f"Permission denied when listing files in directory: {subpath}")
+                    result["files"] = []
+                    result["error"] = "Permission denied when listing directory contents"
+                    return JSONResponse(content=result, status_code=403)
+                except FileNotFoundError:
+                    logger.error(f"Directory not found during listing: {subpath}")
+                    result["files"] = []
+                    result["error"] = "Directory contents not found"
+                    return JSONResponse(content=result, status_code=404)
+
+            return result
+
+        except FileNotFoundError:
+            logger.error(f"File or directory not found: {subpath}")
+            raise HTTPException(status_code=404, detail="File or directory not found")
+        except PermissionError:
+            raise HTTPException(status_code=403, detail="Permission denied")
+
+    @api.post("/files/{path_name}")
+    async def create_file_or_dir(path_name: str, subpath: Optional[str] = Query(''), body: Dict = Body(...)):
+        """Handle POST requests to create a new file or directory"""
+        logger.info(f"POST /api/files/{path_name} subpath={subpath}")
+        filestore, error = _get_filestore(path_name)
+        if filestore is None:
+            raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
+
+        try:
+            file_type = body.get("type")
+            if file_type == "directory":
+                logger.info(f"Creating {subpath} as a directory")
+                filestore.create_dir(subpath)
+            elif file_type == "file":
+                logger.info(f"Creating {subpath} as a file")
+                filestore.create_empty_file(subpath)
+            else:
+                raise HTTPException(status_code=400, detail="Invalid file type")
+
+        except FileExistsError:
+            raise HTTPException(status_code=409, detail="A file or directory with this name already exists")
+        except PermissionError as e:
+            raise HTTPException(status_code=403, detail=str(e))
+
+        return Response(status_code=201)
+
+    @api.patch("/files/{path_name}")
+    async def update_file_or_dir(path_name: str, subpath: Optional[str] = Query(''), body: Dict = Body(...)):
+        """Handle PATCH requests to rename or update file permissions"""
+        logger.info(f"PATCH /api/files/{path_name} subpath={subpath}")
+        filestore, error = _get_filestore(path_name)
+        if filestore is None:
+            raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
+
+        current_user = os.getenv("USER", "unknown")
+        old_file_info = filestore.get_file_info(subpath, current_user)
+        new_path = body.get("path")
+        new_permissions = body.get("permissions")
+
+        try:
+            if new_permissions is not None and new_permissions != old_file_info.permissions:
+                logger.info(f"Changing permissions of {old_file_info.path} to {new_permissions}")
+                filestore.change_file_permissions(subpath, new_permissions)
+
+            if new_path is not None and new_path != old_file_info.path:
+                logger.info(f"Renaming {old_file_info.path} to {new_path}")
+                filestore.rename_file_or_dir(old_file_info.path, new_path)
+
+        except PermissionError as e:
+            raise HTTPException(status_code=403, detail=str(e))
+        except OSError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+        return Response(status_code=204)
+
+    @api.delete("/files/{path_name}")
+    async def delete_file_or_dir(path_name: str, subpath: Optional[str] = Query('')):
+        """Handle DELETE requests to remove a file or (empty) directory"""
+        logger.info(f"DELETE /api/files/{path_name} subpath={subpath}")
+        filestore, error = _get_filestore(path_name)
+        if filestore is None:
+            raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
+
+        try:
+            filestore.remove_file_or_dir(subpath)
+        except PermissionError as e:
+            raise HTTPException(status_code=403, detail=str(e))
+
+        return Response(status_code=204)
 
     # Include the API router
     app.include_router(api)

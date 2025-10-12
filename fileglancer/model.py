@@ -154,8 +154,9 @@ class ProxiedPath(BaseModel):
     updated_at: datetime = Field(
         description="When this proxied path was last updated"
     )
-    url: HttpUrl = Field(
-        description="The URL for accessing the data via the proxy"
+    url: Optional[HttpUrl] = Field(
+        description="The URL for accessing the data via the proxy",
+        default=None
     )
 
 class ProxiedPathResponse(BaseModel):

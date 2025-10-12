@@ -4,7 +4,7 @@ import pytest
 import tempfile
 import shutil
 from fileglancer.filestore import Filestore, FileInfo
-from fileglancer.uimodels import FileSharePath
+from fileglancer.model import FileSharePath
 
 @pytest.fixture
 def test_dir():
