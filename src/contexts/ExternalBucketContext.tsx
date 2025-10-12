@@ -92,7 +92,7 @@ export const ExternalBucketProvider = ({
     }
     try {
       const response = await sendFetchRequest(
-        `/api/external-bucket?fsp_name=${fileBrowserState.currentFileSharePath.name}`,
+        `/api/external-buckets/${fileBrowserState.currentFileSharePath.name}`,
         'GET',
         cookies['_xsrf']
       );

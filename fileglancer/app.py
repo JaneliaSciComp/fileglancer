@@ -68,17 +68,14 @@ APP_VERSION = _read_version()
 def get_current_user():
     return os.getenv("USER", "unknown")
 
-
-def _get_external_buckets(db_url, fsp_name: Optional[str] = None):
-    with db.get_db_session(db_url) as session:
-        return [ExternalBucket(
-            id=bucket.id,
-            full_path=bucket.full_path,
-            external_url=bucket.external_url,
-            fsp_name=bucket.fsp_name,
-            relative_path=bucket.relative_path
-        ) for bucket in db.get_all_external_buckets(session, fsp_name)]
-
+def _convert_external_bucket(db_bucket: db.ExternalBucketDB) -> ExternalBucket:
+    return ExternalBucket(
+        id=db_bucket.id,
+        full_path=db_bucket.full_path,
+        external_url=db_bucket.external_url,
+        fsp_name=db_bucket.fsp_name,
+        relative_path=db_bucket.relative_path
+    )
 
 def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optional[HttpUrl]) -> ProxiedPath:
     """Convert a database ProxiedPathDB model to a Pydantic ProxiedPath model"""
@@ -253,14 +250,16 @@ def create_app(settings):
     @api.get("/external-buckets", response_model=ExternalBucketResponse,
              description="Get all external buckets from the database")
     async def get_external_buckets() -> ExternalBucketResponse:
-        buckets = _get_external_buckets(settings.db_url)
+        with db.get_db_session(settings.db_url) as session:
+            buckets = [_convert_external_bucket(bucket) for bucket in db.get_external_buckets(session)]
         return ExternalBucketResponse(buckets=buckets)
 
 
     @api.get("/external-buckets/{fsp_name}", response_model=ExternalBucketResponse,
              description="Get the external buckets for a given FSP name")
     async def get_external_buckets(fsp_name: str) -> ExternalBucket:
-        buckets = _get_external_buckets(settings.db_url, fsp_name)
+        with db.get_db_session(settings.db_url) as session:
+            buckets = [_convert_external_bucket(bucket) for bucket in db.get_external_buckets(session, fsp_name)]
         return ExternalBucketResponse(buckets=buckets)
 
 

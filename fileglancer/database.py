@@ -268,7 +268,7 @@ def get_all_paths(session):
     return session.query(FileSharePathDB).all()
 
 
-def get_all_external_buckets(session, fsp_name: Optional[str] = None):
+def get_external_buckets(session, fsp_name: Optional[str] = None):
     """Get all external buckets from the database"""
     query = session.query(ExternalBucketDB)
     if fsp_name:
