@@ -25,8 +25,9 @@ type ServerHealthContextType = {
   nextRetrySeconds: number | null;
 };
 
-const ServerHealthContext =
-  React.createContext<ServerHealthContextType | null>(null);
+const ServerHealthContext = React.createContext<ServerHealthContextType | null>(
+  null
+);
 
 // Health check retry configuration constants
 const MAX_RETRY_ATTEMPTS = 100; // Limit total retry attempts to prevent infinite loops

@@ -18,8 +18,7 @@ export const ERROR_CODES = {
   SERVER_INVALID_RESPONSE: 'SERVER_INVALID_RESPONSE'
 } as const;
 
-export type ServerErrorCode =
-  (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
+export type ServerErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
 
 /**
  * Type guard to check if an object is a valid ApiErrorResponse
@@ -36,7 +35,6 @@ export function isApiErrorResponse(obj: unknown): obj is ApiErrorResponse {
       (obj as Record<string, unknown>).details !== undefined)
   );
 }
-
 
 /**
  * Safely parse error response with proper typing
@@ -87,11 +85,7 @@ export async function checkServerHealth(
   xsrfToken: string
 ): Promise<ServerStatus> {
   try {
-    const response = await sendFetchRequest(
-      '/api/version',
-      'GET',
-      xsrfToken
-    );
+    const response = await sendFetchRequest('/api/version', 'GET', xsrfToken);
 
     // If we get a successful response, server connection is working
     if (response.ok) {

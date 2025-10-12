@@ -4,22 +4,19 @@ import { http, HttpResponse } from 'msw';
 
 export const handlers = [
   // Proxied paths
-  http.get(
-    'http://localhost:3000/api/proxied-path',
-    ({ request }) => {
-      const url = new URL(request.url);
-      const fspName = url.searchParams.get('fsp_name');
-      const path = url.searchParams.get('path');
+  http.get('http://localhost:3000/api/proxied-path', ({ request }) => {
+    const url = new URL(request.url);
+    const fspName = url.searchParams.get('fsp_name');
+    const path = url.searchParams.get('path');
 
-      // If query params are provided, simulate no existing proxied path (for fetchProxiedPath)
-      if (fspName && path) {
-        return HttpResponse.json({ paths: [] }, { status: 200 });
-      }
-
-      // Default case for fetching all proxied paths
+    // If query params are provided, simulate no existing proxied path (for fetchProxiedPath)
+    if (fspName && path) {
       return HttpResponse.json({ paths: [] }, { status: 200 });
     }
-  ),
+
+    // Default case for fetching all proxied paths
+    return HttpResponse.json({ paths: [] }, { status: 200 });
+  }),
 
   http.post('http://localhost:3000/api/proxied-path', () => {
     return HttpResponse.json({
@@ -35,46 +32,40 @@ export const handlers = [
   }),
 
   // Preferences
-  http.get(
-    'http://localhost:3000/api/preference',
-    ({ request }) => {
-      const url = new URL(request.url);
-      const queryParam = url.searchParams.get('key');
-      if (queryParam === 'path') {
-        return HttpResponse.json({
-          value: ['linux_path']
-        });
-      } else if (queryParam === 'areDataLinksAutomatic') {
-        return HttpResponse.json({
-          value: false
-        });
-      } else if (
-        queryParam === 'fileSharePath' ||
-        queryParam === 'zone' ||
-        queryParam === 'folder' ||
-        queryParam === 'recentlyViewedFolders'
-      ) {
-        return HttpResponse.json({
-          value: []
-        });
-      } else {
-        // Fallback for any unhandled preferences
-        return HttpResponse.json({
-          value: null
-        });
-      }
+  http.get('http://localhost:3000/api/preference', ({ request }) => {
+    const url = new URL(request.url);
+    const queryParam = url.searchParams.get('key');
+    if (queryParam === 'path') {
+      return HttpResponse.json({
+        value: ['linux_path']
+      });
+    } else if (queryParam === 'areDataLinksAutomatic') {
+      return HttpResponse.json({
+        value: false
+      });
+    } else if (
+      queryParam === 'fileSharePath' ||
+      queryParam === 'zone' ||
+      queryParam === 'folder' ||
+      queryParam === 'recentlyViewedFolders'
+    ) {
+      return HttpResponse.json({
+        value: []
+      });
+    } else {
+      // Fallback for any unhandled preferences
+      return HttpResponse.json({
+        value: null
+      });
     }
-  ),
-  http.put(
-    'http://localhost:3000/api/preference',
-    ({ request }) => {
-      const url = new URL(request.url);
-      const queryParam = url.searchParams.get('key');
-      if (queryParam === 'recentlyViewedFolders') {
-        return HttpResponse.json(null, { status: 204 });
-      }
+  }),
+  http.put('http://localhost:3000/api/preference', ({ request }) => {
+    const url = new URL(request.url);
+    const queryParam = url.searchParams.get('key');
+    if (queryParam === 'recentlyViewedFolders') {
+      return HttpResponse.json(null, { status: 204 });
     }
-  ),
+  }),
 
   // File share paths
   http.get('http://localhost:3000/api/file-share-paths', () => {

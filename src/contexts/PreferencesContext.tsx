@@ -129,7 +129,8 @@ export const PreferencesProvider = ({
 
   const { status } = useServerHealthContext();
   // Default to true for filtering by groups
-  const [isFilteredByGroups, setIsFilteredByGroups] = React.useState<boolean>(true);
+  const [isFilteredByGroups, setIsFilteredByGroups] =
+    React.useState<boolean>(true);
 
   const { cookies } = useCookiesContext();
   const { isZonesMapReady, zonesAndFileSharePathsMap } =

@@ -21,7 +21,7 @@ See the [documentation](https://janeliascicomp.github.io/fileglancer-docs/) for 
 
 ## Deployment @ Janelia Research Campus
 
-If you are on the internal Janelia network navigate to "fileglancer.int.janelia.org" in your web browser and login with your Okta credentials. If you are outside of Janelia, you'll need to ask your System Administrator to install Fileglancer on a server on your institution's network. 
+If you are on the internal Janelia network navigate to "fileglancer.int.janelia.org" in your web browser and login with your Okta credentials. If you are outside of Janelia, you'll need to ask your System Administrator to install Fileglancer on a server on your institution's network.
 
 ## Software Architecture
 
