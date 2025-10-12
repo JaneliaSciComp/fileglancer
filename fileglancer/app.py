@@ -26,7 +26,7 @@ from fastapi.staticfiles import StaticFiles
 from urllib.parse import quote
 
 from fileglancer import database as db
-from fileglancer.model import FileSharePath, FileSharePathResponse, Ticket, ProxiedPath, ProxiedPathResponse, ExternalBucket, ExternalBucketResponse, Notification, NotificationResponse
+from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
 from fileglancer.utils import slugify_path
@@ -369,7 +369,7 @@ def create_app(settings):
             raise HTTPException(status_code=500, detail=str(e))
 
 
-    @api.get("/ticket", response_model=List[Ticket],
+    @api.get("/ticket", response_model=TicketResponse,
              description="Retrieve tickets for a user")
     async def get_tickets(fsp_name: Optional[str] = Query(None, description="The name of the file share path that the ticket is associated with"),
                           path: Optional[str] = Query(None, description="The path that the ticket is associated with")):
@@ -392,7 +392,7 @@ def create_app(settings):
                     ticket.description = f"Ticket {db_ticket.ticket_key} is no longer available in JIRA"
                     ticket.status = "Deleted"
                 
-            return tickets
+            return TicketResponse(tickets=tickets)
 
 
     @api.delete("/ticket/{ticket_key}",

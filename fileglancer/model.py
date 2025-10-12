@@ -121,6 +121,12 @@ class Ticket(BaseModel):
         self.updated = ticket_details.get('updated')
     
 
+class TicketResponse(BaseModel):
+    tickets: List[Ticket] = Field(
+        description="A list of tickets"
+    )
+
+
 class UserPreference(BaseModel):
     """A user preference"""
     key: str = Field(
@@ -189,7 +195,6 @@ class ExternalBucketResponse(BaseModel):
     buckets: List[ExternalBucket] = Field(
         description="A list of external buckets"
     )
-
 
 class Notification(BaseModel):
     """A notification message for users"""
