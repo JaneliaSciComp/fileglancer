@@ -323,13 +323,14 @@ def create_app(settings):
     @api.post("/ticket", response_model=Ticket,
               description="Create a new ticket and return the key")
     async def create_ticket(
-        fsp_name: str,
-        path: str,
-        project_key: str,
-        issue_type: str,
-        summary: str,
-        description: str
-    ) -> str:
+        body: dict
+    ):
+        fsp_name = body.get("fsp_name")
+        path = body.get("path")
+        project_key = body.get("project_key")
+        issue_type = body.get("issue_type")
+        summary = body.get("summary")
+        description = body.get("description")
         try:
             username = get_current_user()
             # Create ticket in JIRA
