@@ -1,10 +1,10 @@
 import React from 'react';
 import { useCookiesContext } from '@/contexts/CookiesContext';
 import {
-  checkCentralServerHealth,
-  CentralServerStatus,
+  checkServerHealth,
+  ServerStatus,
   shouldTriggerHealthCheck
-} from '@/utils/centralServerHealth';
+} from '@/utils/serverHealth';
 import {
   setHealthCheckReporter,
   clearHealthCheckReporter,
@@ -13,8 +13,8 @@ import {
 } from '@/utils';
 import logger from '@/logger';
 
-type CentralServerHealthContextType = {
-  status: CentralServerStatus;
+type ServerHealthContextType = {
+  status: ServerStatus;
   checkHealth: () => Promise<void>;
   reportFailedRequest: (
     apiPath: string,
@@ -25,8 +25,8 @@ type CentralServerHealthContextType = {
   nextRetrySeconds: number | null;
 };
 
-const CentralServerHealthContext =
-  React.createContext<CentralServerHealthContextType | null>(null);
+const ServerHealthContext =
+  React.createContext<ServerHealthContextType | null>(null);
 
 // Health check retry configuration constants
 const MAX_RETRY_ATTEMPTS = 100; // Limit total retry attempts to prevent infinite loops
@@ -34,22 +34,22 @@ const RETRY_BASE_DELAY_MS = 6000; // Start with 6 seconds
 const RETRY_MAX_DELAY_MS = 300000; // Cap at 5 minutes
 const HEALTH_CHECK_DEBOUNCE_MS = 1000; // Wait 1 second before checking
 
-export const useCentralServerHealthContext = () => {
-  const context = React.useContext(CentralServerHealthContext);
+export const useServerHealthContext = () => {
+  const context = React.useContext(ServerHealthContext);
   if (!context) {
     throw new Error(
-      'useCentralServerHealthContext must be used within a CentralServerHealthProvider'
+      'useServerHealthContext must be used within a ServerHealthProvider'
     );
   }
   return context;
 };
 
-export const CentralServerHealthProvider = ({
+export const ServerHealthProvider = ({
   children
 }: {
   readonly children: React.ReactNode;
 }) => {
-  const [status, setStatus] = React.useState<CentralServerStatus>('healthy');
+  const [status, setStatus] = React.useState<ServerStatus>('healthy');
   const [showWarningOverlay, setShowWarningOverlay] = React.useState(false);
   const [isChecking, setIsChecking] = React.useState(false);
   const [nextRetrySeconds, setNextRetrySeconds] = React.useState<number | null>(
@@ -99,7 +99,7 @@ export const CentralServerHealthProvider = ({
         setIsChecking(true);
         setStatus('checking');
 
-        const healthStatus = await checkCentralServerHealth(cookies['_xsrf']);
+        const healthStatus = await checkServerHealth(cookies['_xsrf']);
 
         // Check if this request was aborted
         if (abortControllerRef.current?.signal.aborted) {
@@ -110,7 +110,7 @@ export const CentralServerHealthProvider = ({
 
         if (healthStatus === 'healthy') {
           setShowWarningOverlay(false);
-          logger.debug('Central server detected as healthy during retry');
+          logger.debug('Server detected as healthy during retry');
           // reload the page to ensure full recovery
           window.location.reload();
           return true; // Success - stop retrying
@@ -138,7 +138,7 @@ export const CentralServerHealthProvider = ({
       {
         onRetryAttempt: (attemptNumber, totalAttempts) => {
           logger.warn(
-            `Central server still down during retry (attempt ${attemptNumber}/${totalAttempts})`
+            `Server still down during retry (attempt ${attemptNumber}/${totalAttempts})`
           );
         },
         onCountdownUpdate: secondsRemaining => {
@@ -169,7 +169,7 @@ export const CentralServerHealthProvider = ({
     setStatus('checking');
 
     try {
-      const healthStatus = await checkCentralServerHealth(cookies['_xsrf']);
+      const healthStatus = await checkServerHealth(cookies['_xsrf']);
 
       // Check if this request was aborted
       if (abortControllerRef.current?.signal.aborted) {
@@ -180,22 +180,16 @@ export const CentralServerHealthProvider = ({
 
       if (healthStatus === 'down') {
         setShowWarningOverlay(true);
-        logger.warn('Central server detected as down');
+        logger.warn('Server detected as down');
         // Start exponential backoff retries
         startRetrying();
       } else if (healthStatus === 'healthy') {
         setShowWarningOverlay(false);
-        logger.debug('Central server detected as healthy');
+        logger.debug('Server detected as healthy');
         // Stop retrying since server is healthy
         stopRetrying();
         // reload the page to ensure full recovery
         window.location.reload();
-      } else if (healthStatus === 'ignore') {
-        // Configuration issue, not connectivity issue
-        setShowWarningOverlay(false);
-        logger.info('Central server configuration issue detected, ignoring');
-        // Stop retrying since this is not a connectivity issue
-        stopRetrying();
       }
     } catch (error) {
       logger.error('Error during health check:', error);
@@ -210,7 +204,7 @@ export const CentralServerHealthProvider = ({
 
   const reportFailedRequest = React.useCallback(
     async (apiPath: string, responseStatus?: number) => {
-      // Only trigger health check if this looks like a central server issue
+      // Only trigger health check if this looks like a server issue
       if (!shouldTriggerHealthCheck(apiPath, responseStatus)) {
         return;
       }
@@ -269,7 +263,7 @@ export const CentralServerHealthProvider = ({
   }, []);
 
   return (
-    <CentralServerHealthContext.Provider
+    <ServerHealthContext.Provider
       value={{
         status,
         checkHealth,
@@ -280,8 +274,8 @@ export const CentralServerHealthProvider = ({
       }}
     >
       {children}
-    </CentralServerHealthContext.Provider>
+    </ServerHealthContext.Provider>
   );
 };
 
-export default CentralServerHealthContext;
+export default ServerHealthContext;

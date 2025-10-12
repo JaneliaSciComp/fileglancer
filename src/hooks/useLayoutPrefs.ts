@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
-import { useCentralServerHealthContext } from '@/contexts/CentralServerHealthContext';
+import { useServerHealthContext } from '@/contexts/ServerHealthContext';
 import logger from '@/logger';
 import {
   LAYOUT_NAME,
@@ -26,7 +26,7 @@ export default function useLayoutPrefs() {
   const [showSidebar, setShowSidebar] = React.useState(true);
   const { layout, handleUpdateLayout, isLayoutLoadedFromDB } =
     usePreferencesContext();
-  const { status: centralServerStatus } = useCentralServerHealthContext();
+  const { status: serverStatus } = useServerHealthContext();
 
   const timerRef = React.useRef<number | null>(null);
 
@@ -128,13 +128,13 @@ export default function useLayoutPrefs() {
         if (!isLayoutLoadedFromDB) {
           return;
         }
-        // This check is here, because if the central server is down, we don't want to
+        // This check is here, because if the server is down, we don't want to
         // attempt to send additional requests to update the layout preference to a server
         // that may be experiencing issues. The layout requests occur every time the site
-        // tries to check if the central server is back up, which can lead to a lot of
+        // tries to check if the server is back up, which can lead to a lot of
         // unnecessary requests if the server is down for an extended period of time.
-        if (centralServerStatus === 'down') {
-          logger.debug('Central server is down, skipping layout update');
+        if (serverStatus === 'down') {
+          logger.debug('Server is down, skipping layout update');
           return;
         }
 
@@ -219,7 +219,7 @@ export default function useLayoutPrefs() {
       isLayoutLoadedFromDB,
       showPropertiesDrawer,
       showSidebar,
-      centralServerStatus
+      serverStatus
     ]
   );
 

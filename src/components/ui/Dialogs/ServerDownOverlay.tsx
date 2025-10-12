@@ -3,7 +3,7 @@ import { Dialog, Button, Typography } from '@material-tailwind/react';
 import { HiOutlineExclamationTriangle } from 'react-icons/hi2';
 import { HiRefresh } from 'react-icons/hi';
 
-type CentralServerDownOverlayProps = {
+type ServerDownOverlayProps = {
   readonly open: boolean;
   readonly onRetry: () => void;
   readonly countdownSeconds: number | null;
@@ -54,11 +54,11 @@ function RetryButton({
   );
 }
 
-export function CentralServerDownOverlay({
+export function ServerDownOverlay({
   open,
   onRetry,
   countdownSeconds
-}: CentralServerDownOverlayProps): JSX.Element {
+}: ServerDownOverlayProps): JSX.Element {
   const [localCountdown, setLocalCountdown] = React.useState<number | null>(
     null
   );
@@ -102,10 +102,10 @@ export function CentralServerDownOverlay({
                 className="text-surface-foreground font-bold"
                 type="h5"
               >
-                Central Server Unavailable
+                Server Unavailable
               </Typography>
               <Typography className="text-foreground" type="p">
-                The Fileglancer Central server is currently down or unreachable.
+                The Fileglancer server is currently down or unreachable.
               </Typography>
             </div>
 

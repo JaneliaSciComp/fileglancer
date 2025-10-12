@@ -12,7 +12,7 @@ import {
   makePathSegmentArray,
   removeLastSegmentFromPath
 } from './pathHandling';
-import { shouldTriggerHealthCheck } from './centralServerHealth';
+import { shouldTriggerHealthCheck } from './serverHealth';
 
 // Health check reporter registry with robust type safety
 export type HealthCheckReporter = (
