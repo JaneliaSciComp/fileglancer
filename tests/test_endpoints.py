@@ -63,9 +63,10 @@ def test_client(test_app):
 
 
 def test_root_endpoint(test_client):
-    """Test root endpoint - should return 404 since UI is at /fg"""
+    """Test root endpoint - should serve SPA index.html"""
     response = test_client.get("/", follow_redirects=False)
-    assert response.status_code == 404
+    assert response.status_code == 200
+    assert 'text/html' in response.headers.get('content-type', '')
 
 
 def test_get_preferences(test_client):

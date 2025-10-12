@@ -20,7 +20,7 @@ from pydantic import HttpUrl
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, Query, Path, APIRouter, Body
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, Response, JSONResponse, PlainTextResponse, StreamingResponse
+from fastapi.responses import RedirectResponse, Response, JSONResponse, PlainTextResponse, StreamingResponse, FileResponse
 from fastapi.exceptions import RequestValidationError, StarletteHTTPException
 from fastapi.staticfiles import StaticFiles
 from urllib.parse import quote
@@ -183,13 +183,14 @@ def create_app(settings):
         expose_headers=["Range", "Content-Range"],
     )
 
-    # Mount the static UI files
+    # Mount static assets (CSS, JS, images) at /assets
     ui_dir = PathLib(__file__).parent / "ui"
-    if ui_dir.exists():
-        app.mount("/fg", StaticFiles(directory=str(ui_dir), html=True), name="ui")
-        logger.info(f"Mounted UI at /fg from {ui_dir}")
+    assets_dir = ui_dir / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+        logger.info(f"Mounted static assets at /assets from {assets_dir}")
     else:
-        logger.warning(f"UI directory not found at {ui_dir}")
+        logger.warning(f"Assets directory not found at {assets_dir}")
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request, exc):
@@ -943,6 +944,23 @@ def create_app(settings):
 
     # Include the API router
     app.include_router(api)
+
+    # Catch-all route to serve SPA index.html for any unmatched routes
+    # This must be the LAST route registered
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        """Serve index.html for all SPA routes (client-side routing)"""
+        # Serve logo.svg and other root-level static files
+        if full_path and not full_path.startswith("api/"):
+            file_path = ui_dir / full_path
+            if file_path.exists() and file_path.is_file():
+                return FileResponse(file_path)
+
+        # Otherwise serve index.html for SPA routing
+        index_path = ui_dir / "index.html"
+        if index_path.exists():
+            return FileResponse(index_path, media_type="text/html")
+        raise HTTPException(status_code=404, detail="Not found")
 
     return app
 
