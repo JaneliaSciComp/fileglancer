@@ -5,7 +5,6 @@ import type { FileSharePath, Zone } from '@/shared.types';
 import { useCookiesContext } from '@/contexts/CookiesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-import { useServerHealthContext } from '@/contexts/ServerHealthContext';
 import { sendFetchRequest, makeMapKey, HTTPError } from '@/utils';
 import { createSuccess, handleError, toHttpError } from '@/utils/errorHandling';
 import type { Result } from '@/shared.types';
@@ -127,7 +126,6 @@ export const PreferencesProvider = ({
   const [layout, setLayout] = React.useState<string>('');
   const [isLayoutLoadedFromDB, setIsLayoutLoadedFromDB] = React.useState(false);
 
-  const { status } = useServerHealthContext();
   // Default to true for filtering by groups
   const [isFilteredByGroups, setIsFilteredByGroups] =
     React.useState<boolean>(true);

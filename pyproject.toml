@@ -108,6 +108,7 @@ pip-uninstall = "pip uninstall -y fileglancer"
 node-install = "npm install"
 node-build = { cmd = "npm run build", depends-on = ["node-install"] }
 node-eslint-check = "npx eslint . --cache --ext .ts,.tsx"
+node-eslint-write = "npx eslint . --cache --fix --ext .ts,.tsx"
 node-prettier-check =  "npx prettier \"**/*{.ts,.tsx,.js,.jsx,.css,.json,.md}\" \"!package-lock.json\" --check"
 node-prettier-write = "npx prettier --list-different --write '**/*.{ts,tsx,js,jsx,json,md}' '!package-lock.json'"
 node-check = "npx tsc --noEmit -p tsconfig.app.json"

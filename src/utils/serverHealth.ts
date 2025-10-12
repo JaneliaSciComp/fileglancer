@@ -37,32 +37,6 @@ export function isApiErrorResponse(obj: unknown): obj is ApiErrorResponse {
 }
 
 /**
- * Safely parse error response with proper typing
- */
-async function parseErrorResponse(
-  response: Response
-): Promise<ApiErrorResponse | null> {
-  try {
-    const errorData = await response.json();
-
-    // Validate the response has the expected structure using type guard
-    if (isApiErrorResponse(errorData)) {
-      return errorData;
-    }
-
-    // If it doesn't match our structured format, return null
-    logger.debug(
-      'Error response does not match expected ApiErrorResponse structure:',
-      errorData
-    );
-    return null;
-  } catch (parseError) {
-    logger.debug('Failed to parse error response as JSON:', parseError);
-    return null;
-  }
-}
-
-/**
  * Create a structured error response
  */
 export function createApiError(
