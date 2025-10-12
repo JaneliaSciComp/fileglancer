@@ -216,7 +216,7 @@ export const PreferencesProvider = ({
   const savePreferencesToBackend = React.useCallback(
     async <T,>(key: string, value: T): Promise<Response> => {
       const response = await sendFetchRequest(
-        `/api/preference?key=${key}`,
+        `/api/preference/${key}`,
         'PUT',
         cookies['_xsrf'],
         { value: value }

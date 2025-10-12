@@ -65,6 +65,10 @@ def _read_version() -> str:
 APP_VERSION = _read_version()
 
 
+def get_current_user():
+    return os.getenv("USER", "unknown")
+
+
 def _get_external_buckets(db_url, fsp_name: Optional[str] = None):
     with db.get_db_session(db_url) as session:
         return [ExternalBucket(
@@ -363,12 +367,11 @@ def create_app(settings):
             raise HTTPException(status_code=500, detail=str(e))
 
 
-    @api.get("/ticket/{username}", response_model=List[Ticket],
+    @api.get("/ticket", response_model=List[Ticket],
              description="Retrieve tickets for a user")
-    async def get_tickets(username: str = Path(..., description="The username of the user who created the tickets"),
-                          fsp_name: Optional[str] = Query(None, description="The name of the file share path that the ticket is associated with"),
+    async def get_tickets(fsp_name: Optional[str] = Query(None, description="The name of the file share path that the ticket is associated with"),
                           path: Optional[str] = Query(None, description="The path that the ticket is associated with")):
-        
+        username = get_current_user()
         with db.get_db_session(settings.db_url) as session:
             
             db_tickets = db.get_tickets(session, username, fsp_name, path)
@@ -406,16 +409,18 @@ def create_app(settings):
                 raise HTTPException(status_code=500, detail=str(e))
 
 
-    @api.get("/preference/{username}", response_model=Dict[str, Dict],
+    @api.get("/preference", response_model=Dict[str, Dict],
              description="Get all preferences for a user")
-    async def get_preferences(username: str):
+    async def get_preferences():
+        username = get_current_user()
         with db.get_db_session(settings.db_url) as session:
             return db.get_all_user_preferences(session, username)
 
 
-    @api.get("/preference/{username}/{key}", response_model=Optional[Dict],
+    @api.get("/preference/{key}", response_model=Optional[Dict],
              description="Get a specific preference for a user")
-    async def get_preference(username: str, key: str):
+    async def get_preference(key: str):
+        username = get_current_user()
         with db.get_db_session(settings.db_url) as session:
             pref = db.get_user_preference(session, username, key)
             if pref is None:
@@ -423,17 +428,19 @@ def create_app(settings):
             return pref
 
 
-    @api.put("/preference/{username}/{key}",
+    @api.put("/preference/{key}",
              description="Set a preference for a user")
-    async def set_preference(username: str, key: str, value: Dict):
+    async def set_preference(key: str, value: Dict):
+        username = get_current_user()
         with db.get_db_session(settings.db_url) as session:
             db.set_user_preference(session, username, key, value)
             return {"message": f"Preference {key} set for user {username}"}
 
 
-    @api.delete("/preference/{username}/{key}",
+    @api.delete("/preference/{key}",
                 description="Delete a preference for a user")
-    async def delete_preference(username: str, key: str):
+    async def delete_preference(key: str):
+        username = get_current_user()
         with db.get_db_session(settings.db_url) as session:
             deleted = db.delete_user_preference(session, username, key)
             if not deleted:
@@ -441,12 +448,12 @@ def create_app(settings):
             return {"message": f"Preference {key} deleted for user {username}"}
 
 
-    @api.post("/proxied-path/{username}", response_model=ProxiedPath,
+    @api.post("/proxied-path", response_model=ProxiedPath,
               description="Create a new proxied path")
-    async def create_proxied_path(username: str = Path(..., description="The username of the user who owns this proxied path"),
-                                  fsp_name: str = Query(..., description="The name of the file share path that this proxied path is associated with"),
+    async def create_proxied_path(fsp_name: str = Query(..., description="The name of the file share path that this proxied path is associated with"),
                                   path: str = Query(..., description="The path relative to the file share path mount point")):
 
+        username = get_current_user()
         sharing_name = os.path.basename(path)
         logger.info(f"Creating proxied path for {username} with sharing name {sharing_name} and fsp_name {fsp_name} and path {path}")
         with db.get_db_session(settings.db_url) as session:
@@ -458,36 +465,36 @@ def create_app(settings):
                 raise HTTPException(status_code=400, detail=str(e))
 
 
-    @api.get("/proxied-path/{username}", response_model=ProxiedPathResponse,
+    @api.get("/proxied-path", response_model=ProxiedPathResponse,
              description="Query proxied paths for a user")
-    async def get_proxied_paths(username: str = Path(..., description="The username of the user who owns the proxied paths"),
-                                fsp_name: str = Query(None, description="The name of the file share path that this proxied path is associated with"),
+    async def get_proxied_paths(fsp_name: str = Query(None, description="The name of the file share path that this proxied path is associated with"),
                                 path: str = Query(None, description="The path being proxied")):
+        username = get_current_user()
         with db.get_db_session(settings.db_url) as session:
             db_proxied_paths = db.get_proxied_paths(session, username, fsp_name, path)
             proxied_paths = [_convert_proxied_path(db_path, settings.external_proxy_url) for db_path in db_proxied_paths]
             return ProxiedPathResponse(paths=proxied_paths)
 
 
-    @api.get("/proxied-path/{username}/{sharing_key}", response_model=ProxiedPath,
+    @api.get("/proxied-path/{sharing_key}", response_model=ProxiedPath,
              description="Retrieve a proxied path by sharing key")
-    async def get_proxied_path(username: str = Path(..., description="The username of the user who owns the proxied paths"),
-                               sharing_key: str = Path(..., description="The sharing key of the proxied path")):
+    async def get_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path")):
+        username = get_current_user()
         with db.get_db_session(settings.db_url) as session:
             path = db.get_proxied_path_by_sharing_key(session, sharing_key)
             if not path:
-                raise HTTPException(status_code=404, detail="Proxied path not found")
+                raise HTTPException(status_code=404, detail="Proxied path not found for sharing key {sharing_key}")
             if path.username != username:
-                raise HTTPException(status_code=404, detail="Proxied path not found for user {username}")
+                raise HTTPException(status_code=404, detail="Proxied path not found for username {username} and sharing key {sharing_key}")
             return _convert_proxied_path(path, settings.external_proxy_url)
 
 
-    @api.put("/proxied-path/{username}/{sharing_key}", description="Update a proxied path by sharing key")
-    async def update_proxied_path(username: str = Path(..., description="The username of the user who owns the proxied paths"),
-                                  sharing_key: str = Path(..., description="The sharing key of the proxied path"),
+    @api.put("/proxied-path/{sharing_key}", description="Update a proxied path by sharing key")
+    async def update_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path"),
                                   fsp_name: Optional[str] = Query(default=None, description="The name of the file share path that this proxied path is associated with"),
                                   path: Optional[str] = Query(default=None, description="The path relative to the file share path mount point"),
                                   sharing_name: Optional[str] = Query(default=None, description="The sharing path of the proxied path")):
+        username = get_current_user()
         with db.get_db_session(settings.db_url) as session:
             try:
                 updated = db.update_proxied_path(session, username, sharing_key, new_path=path, new_sharing_name=sharing_name, new_fsp_name=fsp_name)
@@ -497,9 +504,9 @@ def create_app(settings):
                 raise HTTPException(status_code=400, detail=str(e))
 
 
-    @api.delete("/proxied-path/{username}/{sharing_key}", description="Delete a proxied path by sharing key")
-    async def delete_proxied_path(username: str = Path(..., description="The username of the user who owns the proxied paths"),
-                                  sharing_key: str = Path(..., description="The sharing key of the proxied path")):
+    @api.delete("/proxied-path/{sharing_key}", description="Delete a proxied path by sharing key")
+    async def delete_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path")):
+        username = get_current_user()
         with db.get_db_session(settings.db_url) as session:
             deleted = db.delete_proxied_path(session, username, sharing_key)
             if deleted == 0:
@@ -670,7 +677,7 @@ def create_app(settings):
     @api.get("/profile", description="Get the current user's profile")
     async def get_profile():
         """Get the current user's profile"""
-        username = os.getenv("USER", "unknown")
+        username = get_current_user()
         home_directory_path = os.path.expanduser(f"~{username}")
         home_directory_name = os.path.basename(home_directory_path)
         home_parent = os.path.dirname(home_directory_path)
@@ -950,8 +957,12 @@ def create_app(settings):
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
         """Serve index.html for all SPA routes (client-side routing)"""
+        # Don't handle /api/* or /assets/* - let them 404 properly
+        if full_path.startswith("api/") or full_path.startswith("assets/"):
+            raise HTTPException(status_code=404, detail="Not found")
+
         # Serve logo.svg and other root-level static files
-        if full_path and not full_path.startswith("api/"):
+        if full_path:
             file_path = ui_dir / full_path
             if file_path.exists() and file_path.is_file():
                 return FileResponse(file_path)
