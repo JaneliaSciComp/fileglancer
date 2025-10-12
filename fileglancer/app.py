@@ -85,6 +85,7 @@ def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optiona
     if external_proxy_url:
         url = f"{external_proxy_url}/{db_path.sharing_key}/{quote(db_path.sharing_name)}"
     else:
+        logger.warning(f"No external proxy URL was provided, proxy links will not be available.")
         url = None
     return ProxiedPath(
         username=db_path.username,
@@ -514,8 +515,8 @@ def create_app(settings):
             return {"message": f"Proxied path {sharing_key} deleted for user {username}"}
 
 
-    @api.get("/files/{sharing_key}/{sharing_name}")
-    @api.get("/files/{sharing_key}/{sharing_name}/{path:path}")
+    @app.get("/files/{sharing_key}/{sharing_name}")
+    @app.get("/files/{sharing_key}/{sharing_name}/{path:path}")
     async def target_dispatcher(request: Request,
                                 sharing_key: str,
                                 sharing_name: str,
@@ -549,7 +550,7 @@ def create_app(settings):
                 return await client.get_object(path, range_header)
 
 
-    @api.head("/files/{sharing_key}/{sharing_name}/{path:path}")
+    @app.head("/files/{sharing_key}/{sharing_name}/{path:path}")
     async def head_object(sharing_key: str, sharing_name: str, path: str):
         try:
             client, ctx = _get_file_proxy_client(sharing_key, sharing_name)

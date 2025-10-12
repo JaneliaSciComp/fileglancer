@@ -1,0 +1,55 @@
+#
+# Loguru logging level (ERROR, WARNING, INFO, DEBUG, TRACE)
+#
+log_level: INFO
+
+#
+# Database URL (runtime - unprivileged user)
+# For SQLite: sqlite:///fileglancer.db
+# For PostgreSQL: postgresql://username:password@hostname:port/database_name
+#
+db_url: sqlite:///fileglancer.db
+
+#
+# Database admin URL (migrations - privileged user)
+# If not specified, db_url will be used for migrations
+# For PostgreSQL: postgresql://admin_user:admin_password@hostname:port/database_name
+#
+# db_admin_url: postgresql://admin_user:admin_password@localhost/fileglancer
+
+#
+# Database connection pool settings (applies to non-SQLite databases)
+# These settings control the connection pool size for database connections
+#
+# db_pool_size: 5          # Number of connections to keep in the pool
+# db_max_overflow: 0       # Number of additional connections allowed beyond pool_size
+
+# If true, use seteuid/setegid for file access
+# Set to False for local testing
+#
+use_access_flags: True
+
+#
+# File share mount paths to view in the UI. 
+# (this setting will override atlassian_url, set below)
+#
+# file_share_mounts:
+#   - /tmp
+
+#
+# Atlassian Cloud URL. Used for retrieving file share paths and tickets.
+#
+#atlassian_url: https://YOURID.atlassian.net
+
+#
+# External URL for proxied paths
+#
+external_proxy_url: http://localhost:7878/files
+
+#
+# Maximum size of the sharing key LRU cache
+# This controls how many sharing key lookups are cached in memory
+# Higher values use more memory but reduce database queries
+#
+sharing_key_cache_size: 1000
+
