@@ -188,12 +188,12 @@ def create_app(settings):
         expose_headers=["Range", "Content-Range"],
     )
 
-    # Mount static assets (CSS, JS, images) at /assets
+    # Mount static assets (CSS, JS, images) at /fg/assets
     ui_dir = PathLib(__file__).parent / "ui"
     assets_dir = ui_dir / "assets"
     if assets_dir.exists():
-        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
-        logger.info(f"Mounted static assets at /assets from {assets_dir}")
+        app.mount("/fg/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+        logger.info(f"Mounted static assets at /fg/assets from {assets_dir}")
     else:
         logger.warning(f"Assets directory not found at {assets_dir}")
 
@@ -323,7 +323,6 @@ def create_app(settings):
     @api.post("/ticket", response_model=Ticket,
               description="Create a new ticket and return the key")
     async def create_ticket(
-        username: str,
         fsp_name: str,
         path: str,
         project_key: str,
@@ -332,6 +331,7 @@ def create_app(settings):
         description: str
     ) -> str:
         try:
+            username = get_current_user()
             # Create ticket in JIRA
             jira_ticket = create_jira_ticket(
                 project_key=project_key,
@@ -953,17 +953,19 @@ def create_app(settings):
     # Include the API router
     app.include_router(api)
 
-    # Catch-all route to serve SPA index.html for any unmatched routes
-    # This must be the LAST route registered
-    @app.get("/{full_path:path}", include_in_schema=False)
-    async def serve_spa(full_path: str):
-        """Serve index.html for all SPA routes (client-side routing)"""
-        # Don't handle /api/* or /assets/* - let them 404 properly
-        if full_path.startswith("api/") or full_path.startswith("assets/"):
-            raise HTTPException(status_code=404, detail="Not found")
+    # Redirect root to /fg/
+    @app.get("/", include_in_schema=False)
+    async def redirect_root():
+        return RedirectResponse(url="/fg/")
 
-        # Serve logo.svg and other root-level static files
-        if full_path:
+    # Serve SPA at /fg/* for client-side routing
+    # This must be the LAST route registered
+    @app.get("/fg/{full_path:path}", include_in_schema=False)
+    @app.get("/fg", include_in_schema=False)
+    async def serve_spa(full_path: str = ""):
+        """Serve index.html for all SPA routes under /fg/ (client-side routing)"""
+        # Serve logo.svg and other root-level static files from ui directory
+        if full_path and full_path != "/":
             file_path = ui_dir / full_path
             if file_path.exists() and file_path.is_file():
                 return FileResponse(file_path)

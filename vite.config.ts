@@ -5,7 +5,7 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/',
+  base: '/fg/',
   plugins: [react(), nodePolyfills({ include: ['path'] })],
   resolve: {
     alias: {
