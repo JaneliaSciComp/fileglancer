@@ -35,8 +35,8 @@ const TEST_SHARED_PATHS = [
 ];
 
 const mockAPI = async (page: Page) => {
-  // mock API calls
-  await page.route('/api/fileglancer/profile', async route => {
+  // mock API calls for standalone app
+  await page.route('/api/profile', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -46,7 +46,7 @@ const mockAPI = async (page: Page) => {
     });
   });
 
-  await page.route('/api/fileglancer/file-share-paths', async route => {
+  await page.route('/api/file-share-paths', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -56,46 +56,43 @@ const mockAPI = async (page: Page) => {
     });
   });
 
-  await page.route(
-    `/api/fileglancer/files/${TEST_SHARED_PATHS[2].name}**`,
-    async route => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          files: [
-            {
-              name: 'f1',
-              path: 'f1',
-              size: 10,
-              is_dir: false,
-              permissions: '-rw-r--r--',
-              owner: 'testuser',
-              group: 'test',
-              last_modified: 1747865213.768398
-            },
-            {
-              name: 'f2',
-              path: 'f2',
-              size: 10,
-              is_dir: false,
-              permissions: '-rw-r--r--',
-              owner: 'testuser',
-              group: 'test',
-              last_modified: 1758924043.768398
-            }
-          ]
-        })
-      });
-    }
-  );
+  await page.route(`/api/files/${TEST_SHARED_PATHS[2].name}**`, async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        files: [
+          {
+            name: 'f1',
+            path: 'f1',
+            size: 10,
+            is_dir: false,
+            permissions: '-rw-r--r--',
+            owner: 'testuser',
+            group: 'test',
+            last_modified: 1747865213.768398
+          },
+          {
+            name: 'f2',
+            path: 'f2',
+            size: 10,
+            is_dir: false,
+            permissions: '-rw-r--r--',
+            owner: 'testuser',
+            group: 'test',
+            last_modified: 1758924043.768398
+          }
+        ]
+      })
+    });
+  });
 };
 
-const teardownMockAPI = async page => {
+const teardownMockAPI = async (page: Page) => {
   // remove all route handlers
-  await page.unroute('/api/fileglancer/profile');
-  await page.unroute('/api/fileglancer/file-share-paths');
-  await page.unroute(`/api/fileglancer/files/${TEST_SHARED_PATHS[2].name}**`);
+  await page.unroute('/api/profile');
+  await page.unroute('/api/file-share-paths');
+  await page.unroute(`/api/files/${TEST_SHARED_PATHS[2].name}**`);
 };
 
 export {
