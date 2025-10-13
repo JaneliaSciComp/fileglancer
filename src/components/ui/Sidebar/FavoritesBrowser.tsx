@@ -107,7 +107,7 @@ export default function FavoritesBrowser({
                     folderPath={folderFavorite.folderPath}
                     fsp={folderFavorite.fsp}
                     key={
-                      folderFavorite.fsp.name + '-' + folderFavorite.folderPath
+                      folderFavorite.fsp?.name + '-' + folderFavorite.folderPath
                     }
                   />
                 );
