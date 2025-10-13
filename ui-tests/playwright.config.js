@@ -1,11 +1,9 @@
 /**
- * Configuration for Playwright using default from @jupyterlab/galata
+ * Configuration for Playwright for standalone Fileglancer app
  */
-import { baseConfig } from '@jupyterlab/galata/lib/playwright-config';
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  ...baseConfig,
   use: {
     trace: 'on-first-retry',
     video: 'on',
