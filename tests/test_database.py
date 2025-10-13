@@ -47,11 +47,14 @@ def db_session(temp_dir):
     yield session
 
     # Clean up after each test
-    session.query(FileSharePathDB).delete()
-    session.query(LastRefreshDB).delete()
-    session.query(UserPreferenceDB).delete()
-    session.commit()
-    session.close()
+    try:
+        session.query(FileSharePathDB).delete()
+        session.query(LastRefreshDB).delete()
+        session.query(UserPreferenceDB).delete()
+        session.commit()
+    finally:
+        session.close()
+        engine.dispose()
 
 
 @pytest.fixture
