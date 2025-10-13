@@ -13,9 +13,10 @@ export default defineConfig({
   navigationTimeout: process.env.CI ? 90_000 : 30_000,
   workers: process.env.CI ? 1 : undefined,
   webServer: {
-    command: 'npm start',
-    url: 'http://localhost:8888/lab',
-    reuseExistingServer: !process.env.CI
+    command: 'pixi run dev-launch',
+    url: 'http://localhost:7878/fg/',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000
   },
   projects: [
     {
