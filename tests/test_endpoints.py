@@ -203,7 +203,7 @@ def test_get_external_buckets(test_client):
     # Should contain external buckets from the database
     # The actual number depends on what's in the database
     assert len(data["buckets"]) >= 0
-    
+
     # Verify structure of returned buckets if any exist
     if data["buckets"]:
         bucket = data["buckets"][0]
@@ -215,4 +215,103 @@ def test_get_external_buckets(test_client):
         assert "external_url" in bucket
         assert bucket["external_url"] is not None
         assert "relative_path" in bucket  # This can still be None
+
+
+def test_get_file_share_paths(test_client):
+    """Test getting file share paths"""
+    response = test_client.get("/api/file-share-paths")
+    assert response.status_code == 200
+    data = response.json()
+    assert "paths" in data
+    assert isinstance(data["paths"], list)
+    # Should have at least the tempdir path we created in the fixture
+    assert len(data["paths"]) > 0
+
+    # Verify structure of returned paths
+    path = data["paths"][0]
+    assert "zone" in path
+    assert "name" in path
+    assert "mount_path" in path
+    assert path["zone"] == "testzone"
+    assert path["name"] == "tempdir"
+
+
+def test_get_files(test_client, temp_dir):
+    """Test getting files from a file share path"""
+    # Create a test file in the temp directory
+    test_file = os.path.join(temp_dir, "test_file.txt")
+    with open(test_file, "w") as f:
+        f.write("test content")
+
+    response = test_client.get("/api/files/tempdir")
+    assert response.status_code == 200
+    data = response.json()
+    assert "files" in data
+    assert isinstance(data["files"], list)
+
+    # Find our test file in the results
+    file_names = [f["name"] for f in data["files"]]
+    assert "test_file.txt" in file_names
+
+
+def test_create_directory(test_client, temp_dir):
+    """Test creating a directory"""
+    response = test_client.post(
+        "/api/files/tempdir?subpath=newdir",
+        json={"type": "directory"}
+    )
+    assert response.status_code == 201
+    assert os.path.exists(os.path.join(temp_dir, "newdir"))
+
+
+def test_create_file(test_client, temp_dir):
+    """Test creating an empty file"""
+    response = test_client.post(
+        "/api/files/tempdir?subpath=newfile.txt",
+        json={"type": "file"}
+    )
+    assert response.status_code == 201
+    assert os.path.exists(os.path.join(temp_dir, "newfile.txt"))
+
+
+def test_patch_file_permissions(test_client, temp_dir):
+    """Test changing file permissions"""
+    # Create a test file
+    test_file = os.path.join(temp_dir, "test_perms.txt")
+    with open(test_file, "w") as f:
+        f.write("test")
+
+    response = test_client.patch(
+        "/api/files/tempdir?subpath=test_perms.txt",
+        json={"permissions": "-rw-r--r--"}
+    )
+    assert response.status_code == 204
+
+
+def test_patch_file_move(test_client, temp_dir):
+    """Test moving a file"""
+    # Create a test file
+    test_file = os.path.join(temp_dir, "move_me.txt")
+    with open(test_file, "w") as f:
+        f.write("test")
+
+    response = test_client.patch(
+        "/api/files/tempdir?subpath=move_me.txt",
+        json={"path": "moved.txt"}
+    )
+    assert response.status_code == 204
+    assert not os.path.exists(test_file)
+    assert os.path.exists(os.path.join(temp_dir, "moved.txt"))
+
+
+def test_delete_file(test_client, temp_dir):
+    """Test deleting a file"""
+    # Create a test file
+    test_file = os.path.join(temp_dir, "delete_me.txt")
+    with open(test_file, "w") as f:
+        f.write("test")
+
+    response = test_client.delete("/api/files/tempdir?subpath=delete_me.txt")
+    assert response.status_code == 204
+    assert not os.path.exists(test_file)
 
