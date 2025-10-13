@@ -234,7 +234,7 @@ function getPreferredPathForDisplay(
     return '';
   }
 
-  const basePath = fsp[pathKey] ?? fsp.linux_path;
+  const basePath = fsp[pathKey] ?? fsp.linux_path ?? fsp.mount_path;
 
   if (!basePath) {
     return '';
