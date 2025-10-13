@@ -6,10 +6,12 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import HttpUrl
 
 from fileglancer.settings import Settings
 from fileglancer.app import create_app
 from fileglancer.database import *
+from fileglancer.model import TicketComment
 
 @pytest.fixture
 def temp_dir():
@@ -516,7 +518,7 @@ def test_create_ticket(mock_get_details, mock_create, test_client, temp_dir):
         'status': 'Open',
         'resolution': 'Unresolved',
         'description': 'Test ticket description',
-        'link': 'https://jira.example.com/browse/TEST-123',
+        'link': HttpUrl('https://jira.example.com/browse/TEST-123'),
         'comments': []
     }
 
@@ -584,6 +586,16 @@ def test_get_tickets(mock_get_details, mock_create, test_client, temp_dir):
     """Test retrieving tickets for a user"""
     # First create a ticket
     mock_create.return_value = {'key': 'TEST-456'}
+
+    # Create a proper TicketComment object
+    test_comment = TicketComment(
+        author_name='testuser',
+        author_display_name='Test User',
+        body='Test comment',
+        created=datetime.now(timezone.utc),
+        updated=datetime.now(timezone.utc)
+    )
+
     mock_get_details.return_value = {
         'key': 'TEST-456',
         'created': datetime.now(timezone.utc),
@@ -591,16 +603,8 @@ def test_get_tickets(mock_get_details, mock_create, test_client, temp_dir):
         'status': 'In Progress',
         'resolution': 'Unresolved',
         'description': 'Another test ticket',
-        'link': 'https://jira.example.com/browse/TEST-456',
-        'comments': [
-            {
-                'author_name': 'testuser',
-                'author_display_name': 'Test User',
-                'body': 'Test comment',
-                'created': datetime.now(timezone.utc),
-                'updated': datetime.now(timezone.utc)
-            }
-        ]
+        'link': HttpUrl('https://jira.example.com/browse/TEST-456'),
+        'comments': [test_comment]
     }
 
     test_path = os.path.join(temp_dir, "test_ticket_path2")
@@ -648,7 +652,7 @@ def test_get_tickets_with_filters(mock_get_details, mock_create, test_client, te
         'status': 'Resolved',
         'resolution': 'Fixed',
         'description': 'Filtered ticket',
-        'link': 'https://jira.example.com/browse/TEST-789',
+        'link': HttpUrl('https://jira.example.com/browse/TEST-789'),
         'comments': []
     }
 
