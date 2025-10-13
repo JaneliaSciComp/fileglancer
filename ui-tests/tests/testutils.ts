@@ -1,16 +1,15 @@
 import { Page } from '@playwright/test';
-import type { IJupyterLabPageFixture } from '@jupyterlab/galata';
 
 const sleepInSecs = (secs: number) =>
   new Promise(resolve => setTimeout(resolve, secs * 1000));
 
-const openFileGlancer = async (page: IJupyterLabPageFixture) => {
-  // open jupyter lab
-  await page.goto('http://localhost:8888/lab', {
+const openFileGlancer = async (page: Page) => {
+  // Navigate directly to Fileglancer standalone app
+  await page.goto('/fg/', {
     waitUntil: 'domcontentloaded'
   });
-  // click on Fileglancer icon
-  await page.getByText('Fileglancer', { exact: true }).click();
+  // Wait for the app to be ready
+  await page.waitForSelector('text=Browse', { timeout: 10000 });
 };
 
 const TEST_USER = 'testUser';
