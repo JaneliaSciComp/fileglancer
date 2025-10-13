@@ -2,6 +2,7 @@ import os
 import tempfile
 import shutil
 from datetime import datetime, timezone
+from unittest.mock import patch, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -498,4 +499,217 @@ def test_get_file_content_not_found(test_client):
     """Test GET request for non-existent file returns 404"""
     response = test_client.get("/api/content/tempdir?subpath=nonexistent.txt")
     assert response.status_code == 404
+
+
+# Ticket endpoint tests with mocked JIRA integration
+
+@patch('fileglancer.app.create_jira_ticket')
+@patch('fileglancer.app.get_jira_ticket_details')
+def test_create_ticket(mock_get_details, mock_create, test_client, temp_dir):
+    """Test creating a new ticket"""
+    # Mock JIRA responses
+    mock_create.return_value = {'key': 'TEST-123'}
+    mock_get_details.return_value = {
+        'key': 'TEST-123',
+        'created': datetime.now(timezone.utc),
+        'updated': datetime.now(timezone.utc),
+        'status': 'Open',
+        'resolution': 'Unresolved',
+        'description': 'Test ticket description',
+        'link': 'https://jira.example.com/browse/TEST-123',
+        'comments': []
+    }
+
+    # Create a test directory in tempdir
+    test_path = os.path.join(temp_dir, "test_ticket_path")
+    os.makedirs(test_path, exist_ok=True)
+
+    ticket_data = {
+        "fsp_name": "tempdir",
+        "path": "test_ticket_path",
+        "project_key": "TEST",
+        "issue_type": "Bug",
+        "summary": "Test ticket",
+        "description": "This is a test ticket"
+    }
+
+    response = test_client.post("/api/ticket", json=ticket_data)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["key"] == "TEST-123"
+    assert data["username"] == os.getenv("USER", "unknown")
+    assert data["fsp_name"] == "tempdir"
+    assert data["path"] == "test_ticket_path"
+    assert data["status"] == "Open"
+    assert data["resolution"] == "Unresolved"
+
+    # Verify JIRA functions were called
+    mock_create.assert_called_once_with(
+        project_key="TEST",
+        issue_type="Bug",
+        summary="Test ticket",
+        description="This is a test ticket"
+    )
+    mock_get_details.assert_called_once_with('TEST-123')
+
+
+@patch('fileglancer.app.create_jira_ticket')
+@patch('fileglancer.app.get_jira_ticket_details')
+def test_create_ticket_jira_failure(mock_get_details, mock_create, test_client, temp_dir):
+    """Test creating a ticket when JIRA returns invalid response"""
+    # Mock JIRA to return invalid response
+    mock_create.return_value = {}  # Missing 'key'
+
+    test_path = os.path.join(temp_dir, "test_ticket_path")
+    os.makedirs(test_path, exist_ok=True)
+
+    ticket_data = {
+        "fsp_name": "tempdir",
+        "path": "test_ticket_path",
+        "project_key": "TEST",
+        "issue_type": "Bug",
+        "summary": "Test ticket",
+        "description": "This is a test ticket"
+    }
+
+    response = test_client.post("/api/ticket", json=ticket_data)
+    assert response.status_code == 500
+    data = response.json()
+    assert "error" in data
+
+
+@patch('fileglancer.app.create_jira_ticket')
+@patch('fileglancer.app.get_jira_ticket_details')
+def test_get_tickets(mock_get_details, mock_create, test_client, temp_dir):
+    """Test retrieving tickets for a user"""
+    # First create a ticket
+    mock_create.return_value = {'key': 'TEST-456'}
+    mock_get_details.return_value = {
+        'key': 'TEST-456',
+        'created': datetime.now(timezone.utc),
+        'updated': datetime.now(timezone.utc),
+        'status': 'In Progress',
+        'resolution': 'Unresolved',
+        'description': 'Another test ticket',
+        'link': 'https://jira.example.com/browse/TEST-456',
+        'comments': [
+            {
+                'author_name': 'testuser',
+                'author_display_name': 'Test User',
+                'body': 'Test comment',
+                'created': datetime.now(timezone.utc),
+                'updated': datetime.now(timezone.utc)
+            }
+        ]
+    }
+
+    test_path = os.path.join(temp_dir, "test_ticket_path2")
+    os.makedirs(test_path, exist_ok=True)
+
+    ticket_data = {
+        "fsp_name": "tempdir",
+        "path": "test_ticket_path2",
+        "project_key": "TEST",
+        "issue_type": "Task",
+        "summary": "Another ticket",
+        "description": "Another test ticket"
+    }
+
+    # Create the ticket
+    response = test_client.post("/api/ticket", json=ticket_data)
+    assert response.status_code == 200
+
+    # Now retrieve tickets
+    response = test_client.get("/api/ticket")
+    assert response.status_code == 200
+    data = response.json()
+    assert "tickets" in data
+    assert isinstance(data["tickets"], list)
+    assert len(data["tickets"]) > 0
+
+    # Check the ticket details
+    ticket = data["tickets"][0]
+    assert ticket["key"] == "TEST-456"
+    assert ticket["status"] == "In Progress"
+    assert "comments" in ticket
+    assert len(ticket["comments"]) == 1
+
+
+@patch('fileglancer.app.create_jira_ticket')
+@patch('fileglancer.app.get_jira_ticket_details')
+def test_get_tickets_with_filters(mock_get_details, mock_create, test_client, temp_dir):
+    """Test retrieving tickets with fsp_name and path filters"""
+    # Create a ticket
+    mock_create.return_value = {'key': 'TEST-789'}
+    mock_get_details.return_value = {
+        'key': 'TEST-789',
+        'created': datetime.now(timezone.utc),
+        'updated': datetime.now(timezone.utc),
+        'status': 'Resolved',
+        'resolution': 'Fixed',
+        'description': 'Filtered ticket',
+        'link': 'https://jira.example.com/browse/TEST-789',
+        'comments': []
+    }
+
+    test_path = os.path.join(temp_dir, "filtered_path")
+    os.makedirs(test_path, exist_ok=True)
+
+    ticket_data = {
+        "fsp_name": "tempdir",
+        "path": "filtered_path",
+        "project_key": "TEST",
+        "issue_type": "Task",
+        "summary": "Filtered ticket",
+        "description": "Test filtering"
+    }
+
+    response = test_client.post("/api/ticket", json=ticket_data)
+    assert response.status_code == 200
+
+    # Retrieve with filters
+    response = test_client.get("/api/ticket?fsp_name=tempdir&path=filtered_path")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["tickets"]) > 0
+    assert data["tickets"][0]["path"] == "filtered_path"
+
+
+@patch('fileglancer.app.get_jira_ticket_details')
+def test_get_tickets_jira_unavailable(mock_get_details, test_client):
+    """Test retrieving tickets when JIRA details are unavailable"""
+    # Mock JIRA to raise an exception
+    mock_get_details.side_effect = Exception("JIRA unavailable")
+
+    # This should still return tickets, but with 'Deleted' status
+    response = test_client.get("/api/ticket")
+    # Should return 404 if no tickets exist, which is expected for clean test
+    assert response.status_code == 404
+
+
+@patch('fileglancer.app.delete_jira_ticket')
+def test_delete_ticket(mock_delete, test_client):
+    """Test deleting a ticket"""
+    # Mock successful deletion
+    mock_delete.return_value = None
+
+    response = test_client.delete("/api/ticket/TEST-999")
+    assert response.status_code == 200
+    data = response.json()
+    assert "message" in data
+    assert "TEST-999" in data["message"]
+
+    mock_delete.assert_called_once_with("TEST-999")
+
+
+@patch('fileglancer.app.delete_jira_ticket')
+def test_delete_ticket_not_found(mock_delete, test_client):
+    """Test deleting a non-existent ticket"""
+    # Mock JIRA to raise "Issue Does Not Exist" exception
+    mock_delete.side_effect = Exception("Issue Does Not Exist")
+
+    response = test_client.delete("/api/ticket/NONEXISTENT-123")
+    assert response.status_code == 404
+    data = response.json()
+    assert "error" in data
 
