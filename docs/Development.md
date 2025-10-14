@@ -33,6 +33,76 @@ If everything has worked so far, you should see the Fileglancer widget on the La
 
 ![Screenshot of the JupyterLab Launcher panel. In the bottom section, titled "Other", the square tile with the title "Fileglancer" is circled](../assets/img/launcher.png)
 
+### Running with SSL/HTTPS (Secure Mode)
+
+By default, `pixi run dev-launch` runs the server in insecure HTTP mode on port 7878. This is suitable for most local development scenarios.
+
+If you need to run the server with SSL/HTTPS (for example, to test CORS, OAuth callbacks, or secure cookies), you can use `pixi run dev-launch-secure`. This requires valid SSL certificates to be installed.
+
+#### Installing SSL Certificates
+
+The secure launch mode expects SSL certificates to be located at:
+- Private key: `/opt/certs/cert.key`
+- Certificate: `/opt/certs/cert.crt`
+
+**Important:** Do not use self-signed certificates, as they don't work properly with CORS and JavaScript fetch operations. You should obtain valid SSL certificates from your organization's certificate authority or use certificates from a trusted CA like Let's Encrypt.
+
+To install your certificates:
+
+```bash
+# Create the certs directory (requires sudo)
+sudo mkdir -p /opt/certs
+
+# Copy your certificate files
+sudo cp /path/to/your/cert.key /opt/certs/cert.key
+sudo cp /path/to/your/cert.crt /opt/certs/cert.crt
+
+# Set appropriate permissions
+sudo chmod 600 /opt/certs/cert.key
+sudo chmod 644 /opt/certs/cert.crt
+```
+
+Once the certificates are installed, you can launch in secure mode:
+
+```bash
+# Launch with HTTPS on port 443 (requires sudo for privileged port)
+sudo pixi run dev-launch-secure
+```
+
+**Note:** Running on port 443 requires root privileges. Make sure your certificates match the hostname you'll be accessing the server from.
+
+#### Spoofing the Domain Name for Testing
+
+If your SSL certificate is issued for a specific domain name (e.g., `fileglancer-dev.int.janelia.org`), you'll need to configure your local machine to resolve that domain to your development server's IP address. This is done by modifying the `/etc/hosts` file.
+
+On the machine where you're running your web browser (the test host):
+
+```bash
+# Edit the hosts file (requires sudo)
+sudo nano /etc/hosts
+
+# Add an entry mapping the domain to your server's IP address
+# For local development on the same machine:
+127.0.0.1    fileglancer-dev.int.janelia.org
+
+# Or if the dev server is on a different machine:
+192.168.1.100    fileglancer-dev.int.janelia.org
+```
+
+After saving the file, you can verify the configuration:
+
+```bash
+# Test that the domain resolves correctly
+ping fileglancer-dev.int.janelia.org
+```
+
+Now you can access your development server using the certificate's domain name in your browser:
+```
+https://fileglancer-dev.int.janelia.org/
+```
+
+**Important:** Remember to remove or comment out this entry from `/etc/hosts` when you're done testing, especially if the domain is used in production.
+
 ### Troubleshooting the extension
 
 If you run into any build issues, the first thing to try is to clear the build directories and start from scratch:
