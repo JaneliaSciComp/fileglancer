@@ -61,7 +61,7 @@ export default function Home() {
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] p-8">
       <div className="max-w-4xl w-full">
         <h1 className="text-4xl font-bold text-foreground mb-4">
-          Welcome to FileGlancer
+          Welcome to Fileglancer
         </h1>
         <p className="text-lg text-muted-foreground mb-12">
           {isAuthenticated
@@ -126,7 +126,7 @@ export default function Home() {
                   Preferences
                 </h2>
                 <p className="text-muted-foreground">
-                  Customize your FileGlancer settings
+                  Customize your Fileglancer settings
                 </p>
               </div>
             </Link>
@@ -143,7 +143,7 @@ export default function Home() {
                   Help & Documentation
                 </h2>
                 <p className="text-muted-foreground">
-                  Learn more about FileGlancer and how to use it
+                  Learn more about Fileglancer and how to use it
                 </p>
               </div>
             </Link>

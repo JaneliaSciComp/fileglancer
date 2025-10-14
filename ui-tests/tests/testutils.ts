@@ -4,7 +4,7 @@ import type { IJupyterLabPageFixture } from '@jupyterlab/galata';
 const sleepInSecs = (secs: number) =>
   new Promise(resolve => setTimeout(resolve, secs * 1000));
 
-const openFileGlancer = async (page: IJupyterLabPageFixture) => {
+const openFileglancer = async (page: IJupyterLabPageFixture) => {
   // open jupyter lab
   await page.goto('http://localhost:8888/lab', {
     waitUntil: 'domcontentloaded'
@@ -101,7 +101,7 @@ const teardownMockAPI = async page => {
 
 export {
   sleepInSecs,
-  openFileGlancer,
+  openFileglancer,
   mockAPI,
   teardownMockAPI,
   TEST_SHARED_PATHS
