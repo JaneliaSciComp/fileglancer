@@ -42,6 +42,7 @@ If you need to run the server with SSL/HTTPS (for example, to test CORS, OAuth c
 #### Installing SSL Certificates
 
 The secure launch mode expects SSL certificates to be located at:
+
 - Private key: `/opt/certs/cert.key`
 - Certificate: `/opt/certs/cert.crt`
 
@@ -97,6 +98,7 @@ ping fileglancer-dev.int.janelia.org
 ```
 
 Now you can access your development server using the certificate's domain name in your browser:
+
 ```
 https://fileglancer-dev.int.janelia.org/
 ```

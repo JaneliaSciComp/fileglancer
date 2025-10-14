@@ -42,7 +42,7 @@ export default function Home() {
         setLoginError(data.detail || 'Login failed');
         setIsSubmitting(false);
       }
-    } catch (err) {
+    } catch {
       setLoginError('Network error. Please try again.');
       setIsSubmitting(false);
     }
@@ -71,8 +71,8 @@ export default function Home() {
         {isAuthenticated ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Link
-              to="/browse"
               className="flex items-start p-6 border rounded-lg hover:bg-accent hover:border-accent-foreground transition-colors group"
+              to="/browse"
             >
               <HiFolderOpen className="w-8 h-8 mr-4 text-primary flex-shrink-0" />
               <div>
@@ -86,8 +86,8 @@ export default function Home() {
             </Link>
 
             <Link
-              to="/links"
               className="flex items-start p-6 border rounded-lg hover:bg-accent hover:border-accent-foreground transition-colors group"
+              to="/links"
             >
               <HiLink className="w-8 h-8 mr-4 text-primary flex-shrink-0" />
               <div>
@@ -101,8 +101,8 @@ export default function Home() {
             </Link>
 
             <Link
-              to="/jobs"
               className="flex items-start p-6 border rounded-lg hover:bg-accent hover:border-accent-foreground transition-colors group"
+              to="/jobs"
             >
               <HiBriefcase className="w-8 h-8 mr-4 text-primary flex-shrink-0" />
               <div>
@@ -116,8 +116,8 @@ export default function Home() {
             </Link>
 
             <Link
-              to="/preferences"
               className="flex items-start p-6 border rounded-lg hover:bg-accent hover:border-accent-foreground transition-colors group"
+              to="/preferences"
             >
               <HiCog className="w-8 h-8 mr-4 text-primary flex-shrink-0" />
               <div>
@@ -133,8 +133,8 @@ export default function Home() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Link
-              to="/help"
               className="flex items-start p-6 border rounded-lg hover:bg-accent hover:border-accent-foreground transition-colors group"
+              to="/help"
             >
               <HiQuestionMarkCircle className="w-8 h-8 mr-4 text-primary flex-shrink-0" />
               <div>
@@ -155,31 +155,31 @@ export default function Home() {
                 <p className="text-muted-foreground mb-4">
                   Enter your username to access your files
                 </p>
-                <form onSubmit={handleLogin} className="space-y-4">
+                <form className="space-y-4 " onSubmit={handleLogin}>
                   <div>
                     <label
-                      htmlFor="username"
                       className="block text-sm font-medium text-foreground mb-2"
+                      htmlFor="username"
                     >
                       Username
                     </label>
                     <input
-                      type="text"
+                      autoFocus
+                      className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+                      disabled={isSubmitting}
                       id="username"
                       name="username"
                       required
-                      disabled={isSubmitting}
-                      className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
-                      autoFocus
+                      type="text"
                     />
                   </div>
                   {loginError ? (
                     <div className="text-sm text-error">{loginError}</div>
                   ) : null}
                   <button
-                    type="submit"
-                    disabled={isSubmitting}
                     className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    disabled={isSubmitting}
+                    type="submit"
                   >
                     {isSubmitting ? 'Logging in...' : 'Log In'}
                   </button>
@@ -187,8 +187,8 @@ export default function Home() {
               </div>
             ) : (
               <a
-                href="/api/auth/login"
                 className="flex items-start p-6 border-2 border-primary rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors group"
+                href="/api/auth/login"
               >
                 <div className="w-full text-center">
                   <h2 className="text-xl font-semibold mb-2 text-primary group-hover:text-primary-foreground">

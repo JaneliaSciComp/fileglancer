@@ -44,7 +44,7 @@ function RequireAuth({ children }: { readonly children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return children;
 }
 
 function getBasename() {
