@@ -30,7 +30,7 @@ db_url: sqlite:///fileglancer.db
 use_access_flags: True
 
 #
-# File share mount paths to view in the UI. 
+# File share mount paths to view in the UI.
 # (this setting will override atlassian_url, set below)
 #
 # file_share_mounts:

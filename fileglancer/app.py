@@ -110,7 +110,7 @@ def create_app(settings):
     @cache
     def _get_fsp_names_to_mount_paths() -> Dict[str, str]:
         if settings.file_share_mounts:
-            return {fsp.name: fsp.mount_path for fsp in settings.file_share_mounts}
+            return {slugify_path(path): path for path in settings.file_share_mounts}
         else:
             with db.get_db_session(settings.db_url) as session:
                 return {fsp.name: fsp.mount_path for fsp in db.get_all_paths(session)}
@@ -592,18 +592,18 @@ def create_app(settings):
         fsp = None
 
         if file_share_mounts:
-            for mount in file_share_mounts:
-                name = slugify_path(mount.mount_path)
+            for path in file_share_mounts:
+                name = slugify_path(path)
                 if name == path_name:
                     fsp = FileSharePath(
                         name=name,
                         zone='Local',
                         group='local',
                         storage='local',
-                        mount_path=mount.mount_path,
-                        mac_path=mount.mount_path,
-                        windows_path=mount.mount_path,
-                        linux_path=mount.mount_path,
+                        mount_path=path,
+                        mac_path=path,
+                        windows_path=path,
+                        linux_path=path,
                     )
                     break
         else:
@@ -684,9 +684,9 @@ def create_app(settings):
         home_fsp_name = None
         file_share_mounts = settings.file_share_mounts
         if file_share_mounts:
-            for mount in file_share_mounts:
-                if mount.mount_path == home_parent:
-                    home_fsp_name = slugify_path(mount.mount_path)
+            for path in file_share_mounts:
+                if path == home_parent:
+                    home_fsp_name = slugify_path(path)
                     break
         else:
             with db.get_db_session(settings.db_url) as session:
