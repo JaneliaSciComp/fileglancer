@@ -162,14 +162,12 @@ export const ProxiedPathProvider = ({
     }
 
     try {
+      const fspName = fileBrowserState.currentFileSharePath.name;
+      const pathValue = fileBrowserState.currentFileOrFolder.path;
       const response = await sendFetchRequest(
-        '/api/proxied-path',
+        `/api/proxied-path?fsp_name=${encodeURIComponent(fspName)}&path=${encodeURIComponent(pathValue)}`,
         'POST',
-        cookies['_xsrf'],
-        {
-          fsp_name: fileBrowserState.currentFileSharePath.name,
-          path: fileBrowserState.currentFileOrFolder.path
-        }
+        cookies['_xsrf']
       );
 
       if (response.ok) {

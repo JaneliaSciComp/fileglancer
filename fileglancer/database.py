@@ -400,13 +400,28 @@ def _clear_sharing_key_cache():
 
 def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
     """Validate a proxied path exists and is accessible"""
-    # Validate that the fsp_name exists in file_share_paths
+    # First check database for file share path
     fsp = session.query(FileSharePathDB).filter_by(name=fsp_name).first()
-    if not fsp:
+    mount_path = None
+
+    if fsp:
+        mount_path = fsp.mount_path
+    else:
+        # Check if using local file_share_mounts configuration
+        settings = get_settings()
+        if settings.file_share_mounts:
+            from fileglancer.utils import slugify_path
+            # Check if fsp_name matches any slugified local path
+            for local_path in settings.file_share_mounts:
+                if slugify_path(local_path) == fsp_name:
+                    mount_path = local_path
+                    break
+
+    if not mount_path:
         raise ValueError(f"File share path {fsp_name} does not exist")
 
     # Validate path exists and is accessible
-    absolute_path = os.path.join(fsp.mount_path, path.lstrip('/'))
+    absolute_path = os.path.join(mount_path, path.lstrip('/'))
     try:
         os.listdir(absolute_path)
     except FileNotFoundError:
