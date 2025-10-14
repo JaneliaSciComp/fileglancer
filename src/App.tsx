@@ -15,14 +15,6 @@ import Links from '@/components/Links';
 import Notifications from '@/components/Notifications';
 import ErrorFallback from '@/components/ErrorFallback';
 
-function Login() {
-  return (
-    <div className="p-4">
-      <h2 className="text-foreground text-lg">Login Page</h2>
-    </div>
-  );
-}
-
 function RequireAuth({ children }: { readonly children: React.ReactNode }) {
   const { loading, authStatus } = useAuthContext();
 
@@ -73,7 +65,6 @@ const AppComponent = () => {
   return (
     <BrowserRouter basename={basename}>
       <Routes>
-        <Route element={<Login />} path="/login" />
         <Route element={<MainLayout />} path="/*">
           <Route element={<OtherPagesLayout />}>
             <Route element={<Home />} index />
