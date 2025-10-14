@@ -6,12 +6,13 @@ import {
   TEST_SHARED_PATHS
 } from '../testutils.ts';
 
-test.beforeEach('Open fileglancer', async ({ page }) => {
-  await openFileGlancer(page);
+test.beforeEach('setup API endpoints BEFORE opening page', async ({ page }) => {
+  // CRITICAL: Set up mocks BEFORE navigating to make sure they are registered before any requests are made
+  await mockAPI(page);
 });
 
-test.beforeEach('setup API endpoints', async ({ page }) => {
-  await mockAPI(page);
+test.beforeEach('Open fileglancer', async ({ page }) => {
+  await openFileGlancer(page);
 });
 
 test.afterEach(async ({ page }) => {
