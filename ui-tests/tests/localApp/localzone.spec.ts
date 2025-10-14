@@ -9,10 +9,7 @@ test('Local file share becomes visible when Local zone is expanded', async ({
   page
 }) => {
   const zonesLocator = page.getByText('Zones', { exact: true });
-  const localFspLocator = page.getByRole('link', {
-    name: 'local',
-    exact: true
-  });
+  const localFspLocator = page.getByRole('link', { name: 'local ~/' });
   const localZoneLocator = page.getByText('Local');
 
   await expect(zonesLocator).toBeVisible();

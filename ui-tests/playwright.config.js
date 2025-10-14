@@ -21,7 +21,7 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       FGC_DB_URL: 'sqlite:///:memory:',
-      FGC_FILE_SHARE_MOUNTS: '[""]'
+      FGC_FILE_SHARE_MOUNTS: '["~/"]'
     }
   },
   projects: [
