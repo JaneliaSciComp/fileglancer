@@ -111,31 +111,16 @@ const AppComponent = () => {
               path="notifications"
             />
           </Route>
-          <Route element={<BrowsePageLayout />}>
-            <Route
-              element={
-                <RequireAuth>
-                  <Browse />
-                </RequireAuth>
-              }
-              path="browse"
-            />
-            <Route
-              element={
-                <RequireAuth>
-                  <Browse />
-                </RequireAuth>
-              }
-              path="browse/:fspName"
-            />
-            <Route
-              element={
-                <RequireAuth>
-                  <Browse />
-                </RequireAuth>
-              }
-              path="browse/:fspName/*"
-            />
+          <Route
+            element={
+              <RequireAuth>
+                <BrowsePageLayout />
+              </RequireAuth>
+            }
+          >
+            <Route element={<Browse />} path="browse" />
+            <Route element={<Browse />} path="browse/:fspName" />
+            <Route element={<Browse />} path="browse/:fspName/*" />
           </Route>
         </Route>
       </Routes>

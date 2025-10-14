@@ -4,7 +4,8 @@ import {
   HiLink,
   HiBriefcase,
   HiCog,
-  HiQuestionMarkCircle
+  HiQuestionMarkCircle,
+  HiLogin
 } from 'react-icons/hi';
 import { useAuthContext } from '@/contexts/AuthContext';
 import React from 'react';
@@ -186,19 +187,25 @@ export default function Home() {
                 </form>
               </div>
             ) : (
-              <a
-                className="flex items-start p-6 border-2 border-primary rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors group"
-                href="/api/auth/login"
-              >
-                <div className="w-full text-center">
-                  <h2 className="text-xl font-semibold mb-2 text-primary group-hover:text-primary-foreground">
-                    Log In with OKTA
-                  </h2>
-                  <p className="text-muted-foreground group-hover:text-primary-foreground/90">
-                    Sign in to access your files and manage settings
-                  </p>
+              <div className="p-6 border-2 border-primary rounded-lg">
+                <div className="flex items-start mb-4">
+                  <HiLogin className="w-8 h-8 mr-4 text-primary flex-shrink-0 scale-x-[-1]" />
+                  <div>
+                    <h2 className="text-xl font-semibold mb-2 text-primary">
+                      Log In with OKTA
+                    </h2>
+                    <p className="text-muted-foreground">
+                      Sign in to access your files and manage settings
+                    </p>
+                  </div>
                 </div>
-              </a>
+                <a
+                  className="block w-full px-4 py-2 bg-primary text-primary-foreground rounded-md font-medium text-center hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors"
+                  href="/api/auth/login"
+                >
+                  Log In
+                </a>
+              </div>
             )}
           </div>
         )}
