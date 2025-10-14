@@ -17,7 +17,11 @@ export default defineConfig({
     command: 'pixi run dev-launch',
     url: 'http://localhost:7878/fg/',
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000
+    timeout: 120_000,
+    env: {
+      FGC_DB_URL: 'sqlite:///:memory:',
+      FGC_FILE_SHARE_MOUNTS: '[""]'
+    }
   },
   projects: [
     {

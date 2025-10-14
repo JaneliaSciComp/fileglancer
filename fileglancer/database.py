@@ -124,6 +124,16 @@ def run_alembic_upgrade(db_url):
     if _migrations_run:
         logger.debug("Migrations already run, skipping")
         return
+    
+    # For in-memory databases, we MUST create and cache the engine first
+    # before running migrations, otherwise Alembic will create a separate
+    # in-memory database that gets discarded
+    url = make_url(db_url)
+    is_memory_db = url.drivername.startswith("sqlite") and url.database in (None, "", ":memory:")
+
+    if is_memory_db:
+        logger.info("In-memory database detected - creating engine before migrations")
+        engine = _get_engine(db_url)
 
     try:
         from alembic.config import Config
@@ -159,7 +169,15 @@ def run_alembic_upgrade(db_url):
                 if os.path.exists(pkg_alembic_dir):
                     alembic_cfg.set_main_option("script_location", pkg_alembic_dir)
 
-            command.upgrade(alembic_cfg, "head")
+            # For in-memory databases, pass the engine directly to ensure
+            # Alembic uses the same in-memory database instance
+            if is_memory_db:
+                logger.info("Running Alembic migrations with cached engine for in-memory database")
+                with engine.begin() as connection:
+                    alembic_cfg.attributes['connection'] = connection
+                    command.upgrade(alembic_cfg, "head")
+            else:
+                command.upgrade(alembic_cfg, "head")
             logger.info("Alembic migrations completed successfully")
         else:
             logger.warning("Alembic configuration not found, falling back to create_all")
