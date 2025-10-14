@@ -52,18 +52,6 @@ class TicketComment(BaseModel):
     body: str = Field(
         description="The body of the comment"
     )
-    
-class TicketComment(BaseModel):
-    """A comment on a ticket"""
-    author_name: str = Field(
-        description="The author of the comment"
-    )
-    author_display_name: str = Field(
-        description="The display name of the author"
-    )
-    body: str = Field(
-        description="The body of the comment"
-    )
     created: datetime = Field(
         description="The date and time the comment was created"
     )

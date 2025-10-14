@@ -4,8 +4,10 @@ from datetime import datetime
 
 from loguru import logger
 from atlassian import Jira
+from pydantic import HttpUrl
 
 from fileglancer.settings import get_settings
+from fileglancer.model import TicketComment
 
 settings = get_settings()
 DEBUG = False
@@ -79,6 +81,9 @@ def get_jira_ticket_details(ticket_key: str) -> dict:
     resolution = issue.get('resolution', {}).get('name', 'Unresolved') if issue.get('resolution') else "Unresolved"
     description = issue.get('description', '')
 
+    # Create properly typed link using HttpUrl
+    link_url = HttpUrl(f"{settings.jira_browse_url}/{ticket_key}")
+
     issue_details = {
         'key': ticket_key,
         'created': created,
@@ -86,21 +91,21 @@ def get_jira_ticket_details(ticket_key: str) -> dict:
         'status': status, # E.g. "Waiting for support", "In Progress", "Resolved"
         'resolution': resolution, # E.g. "Unresolved", "Fixed"
         'description': description,
-        'link': f"{settings.jira_browse_url}/{ticket_key}",
+        'link': link_url,
         'comments': []
     }
 
-    # Safely handle comments
+    # Safely handle comments and create TicketComment objects
     comments_data = issue.get('comment', {}).get('comments', [])
     for c in comments_data:
         try:
-            comment = {
-                'author_name': c.get('author', {}).get('name', 'Unknown'),
-                'author_display_name': c.get('author', {}).get('displayName', 'Unknown'),
-                'body': c.get('body', ''),
-                'created': parse_datetime(c['created']) if 'created' in c else None,
-                'updated': parse_datetime(c['updated']) if 'updated' in c else None
-            }
+            comment = TicketComment(
+                author_name=c.get('author', {}).get('name', 'Unknown'),
+                author_display_name=c.get('author', {}).get('displayName', 'Unknown'),
+                body=c.get('body', ''),
+                created=parse_datetime(c['created']) if 'created' in c else None,
+                updated=parse_datetime(c['updated']) if 'updated' in c else None
+            )
             issue_details['comments'].append(comment)
         except Exception as e:
             logger.warning(f"Error parsing comment for ticket {ticket_key}: {e}")

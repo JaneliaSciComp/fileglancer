@@ -89,7 +89,7 @@ channels = ["conda-forge"]
 platforms = ["osx-arm64", "osx-64", "linux-64"]
 
 [tool.pixi.feature.test.tasks]
-test-backend = "pytest"
+test-backend = "pytest --cov=fileglancer --cov-report=html --cov-report=term"
 test-frontend = "npm test"
 
 [tool.pixi.feature.release.tasks]
