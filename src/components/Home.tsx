@@ -1,5 +1,11 @@
 import { Link } from 'react-router';
-import { HiFolderOpen, HiLink, HiBriefcase, HiCog, HiQuestionMarkCircle } from 'react-icons/hi';
+import {
+  HiFolderOpen,
+  HiLink,
+  HiBriefcase,
+  HiCog,
+  HiQuestionMarkCircle
+} from 'react-icons/hi';
 import { useAuthContext } from '@/contexts/AuthContext';
 import React from 'react';
 
@@ -22,10 +28,10 @@ export default function Home() {
       const response = await fetch('/api/auth/simple-login', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ username }),
-        credentials: 'include',
+        credentials: 'include'
       });
 
       if (response.ok) {
@@ -53,9 +59,13 @@ export default function Home() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] p-8">
       <div className="max-w-4xl w-full">
-        <h1 className="text-4xl font-bold text-foreground mb-4">Welcome to FileGlancer</h1>
+        <h1 className="text-4xl font-bold text-foreground mb-4">
+          Welcome to FileGlancer
+        </h1>
         <p className="text-lg text-muted-foreground mb-12">
-          {isAuthenticated ? 'Browse and manage your files with ease' : 'A powerful file browser and management tool'}
+          {isAuthenticated
+            ? 'Browse and manage your files with ease'
+            : 'A powerful file browser and management tool'}
         </p>
 
         {isAuthenticated ? (
@@ -66,7 +76,9 @@ export default function Home() {
             >
               <HiFolderOpen className="w-8 h-8 mr-4 text-primary flex-shrink-0" />
               <div>
-                <h2 className="text-xl font-semibold mb-2 group-hover:text-accent-foreground">Browse Files</h2>
+                <h2 className="text-xl font-semibold mb-2 group-hover:text-accent-foreground">
+                  Browse Files
+                </h2>
                 <p className="text-muted-foreground">
                   Navigate through your file shares and directories
                 </p>
@@ -79,7 +91,9 @@ export default function Home() {
             >
               <HiLink className="w-8 h-8 mr-4 text-primary flex-shrink-0" />
               <div>
-                <h2 className="text-xl font-semibold mb-2 group-hover:text-accent-foreground">Shared Links</h2>
+                <h2 className="text-xl font-semibold mb-2 group-hover:text-accent-foreground">
+                  Shared Links
+                </h2>
                 <p className="text-muted-foreground">
                   Manage your shared file links and proxied paths
                 </p>
@@ -92,7 +106,9 @@ export default function Home() {
             >
               <HiBriefcase className="w-8 h-8 mr-4 text-primary flex-shrink-0" />
               <div>
-                <h2 className="text-xl font-semibold mb-2 group-hover:text-accent-foreground">Jobs & Tickets</h2>
+                <h2 className="text-xl font-semibold mb-2 group-hover:text-accent-foreground">
+                  Jobs & Tickets
+                </h2>
                 <p className="text-muted-foreground">
                   View and manage your support tickets
                 </p>
@@ -105,7 +121,9 @@ export default function Home() {
             >
               <HiCog className="w-8 h-8 mr-4 text-primary flex-shrink-0" />
               <div>
-                <h2 className="text-xl font-semibold mb-2 group-hover:text-accent-foreground">Preferences</h2>
+                <h2 className="text-xl font-semibold mb-2 group-hover:text-accent-foreground">
+                  Preferences
+                </h2>
                 <p className="text-muted-foreground">
                   Customize your FileGlancer settings
                 </p>
@@ -120,7 +138,9 @@ export default function Home() {
             >
               <HiQuestionMarkCircle className="w-8 h-8 mr-4 text-primary flex-shrink-0" />
               <div>
-                <h2 className="text-xl font-semibold mb-2 group-hover:text-accent-foreground">Help & Documentation</h2>
+                <h2 className="text-xl font-semibold mb-2 group-hover:text-accent-foreground">
+                  Help & Documentation
+                </h2>
                 <p className="text-muted-foreground">
                   Learn more about FileGlancer and how to use it
                 </p>
@@ -129,13 +149,18 @@ export default function Home() {
 
             {isSimpleAuth ? (
               <div className="p-6 border-2 border-primary rounded-lg">
-                <h2 className="text-xl font-semibold mb-4 text-primary">Log In</h2>
+                <h2 className="text-xl font-semibold mb-4 text-primary">
+                  Log In
+                </h2>
                 <p className="text-muted-foreground mb-4">
                   Enter your username to access your files
                 </p>
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div>
-                    <label htmlFor="username" className="block text-sm font-medium text-foreground mb-2">
+                    <label
+                      htmlFor="username"
+                      className="block text-sm font-medium text-foreground mb-2"
+                    >
                       Username
                     </label>
                     <input
@@ -166,7 +191,9 @@ export default function Home() {
                 className="flex items-start p-6 border-2 border-primary rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors group"
               >
                 <div className="w-full text-center">
-                  <h2 className="text-xl font-semibold mb-2 text-primary group-hover:text-primary-foreground">Log In with OKTA</h2>
+                  <h2 className="text-xl font-semibold mb-2 text-primary group-hover:text-primary-foreground">
+                    Log In with OKTA
+                  </h2>
                   <p className="text-muted-foreground group-hover:text-primary-foreground/90">
                     Sign in to access your files and manage settings
                   </p>

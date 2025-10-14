@@ -1,4 +1,3 @@
-import React from 'react';
 import { IconButton, Menu, Typography } from '@material-tailwind/react';
 import {
   HiOutlineLogout,
@@ -21,7 +20,8 @@ export default function ProfileMenu() {
   };
 
   const isAuthenticated = authStatus?.authenticated;
-  const loginUrl = authStatus?.auth_method === 'okta' ? '/api/auth/login' : '/fg/';
+  const loginUrl =
+    authStatus?.auth_method === 'okta' ? '/api/auth/login' : '/fg/';
 
   return (
     <Menu>
@@ -81,7 +81,8 @@ export default function ProfileMenu() {
               className="text-primary hover:!text-primary focus:!text-primary hover:bg-primary/10 focus:bg-primary/10"
               href={loginUrl}
             >
-              <HiOutlineLogout className="mr-2 h-[18px] w-[18px] rotate-180" /> Login
+              <HiOutlineLogout className="mr-2 h-[18px] w-[18px] rotate-180" />{' '}
+              Login
             </Menu.Item>
           </>
         )}

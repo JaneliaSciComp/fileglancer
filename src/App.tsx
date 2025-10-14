@@ -77,16 +77,65 @@ const AppComponent = () => {
         <Route element={<MainLayout />} path="/*">
           <Route element={<OtherPagesLayout />}>
             <Route element={<Home />} index />
-            <Route element={<RequireAuth><Links /></RequireAuth>} path="links" />
-            <Route element={<RequireAuth><Jobs /></RequireAuth>} path="jobs" />
+            <Route
+              element={
+                <RequireAuth>
+                  <Links />
+                </RequireAuth>
+              }
+              path="links"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <Jobs />
+                </RequireAuth>
+              }
+              path="jobs"
+            />
             <Route element={<Help />} path="help" />
-            <Route element={<RequireAuth><Preferences /></RequireAuth>} path="preferences" />
-            <Route element={<RequireAuth><Notifications /></RequireAuth>} path="notifications" />
+            <Route
+              element={
+                <RequireAuth>
+                  <Preferences />
+                </RequireAuth>
+              }
+              path="preferences"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <Notifications />
+                </RequireAuth>
+              }
+              path="notifications"
+            />
           </Route>
           <Route element={<BrowsePageLayout />}>
-            <Route element={<RequireAuth><Browse /></RequireAuth>} path="browse" />
-            <Route element={<RequireAuth><Browse /></RequireAuth>} path="browse/:fspName" />
-            <Route element={<RequireAuth><Browse /></RequireAuth>} path="browse/:fspName/*" />
+            <Route
+              element={
+                <RequireAuth>
+                  <Browse />
+                </RequireAuth>
+              }
+              path="browse"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <Browse />
+                </RequireAuth>
+              }
+              path="browse/:fspName"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <Browse />
+                </RequireAuth>
+              }
+              path="browse/:fspName/*"
+            />
           </Route>
         </Route>
       </Routes>

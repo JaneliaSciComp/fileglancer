@@ -21,7 +21,9 @@ const AuthContext = React.createContext<AuthContextType | null>(null);
 export const useAuthContext = () => {
   const context = React.useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuthContext must be used within an AuthContextProvider');
+    throw new Error(
+      'useAuthContext must be used within an AuthContextProvider'
+    );
   }
   return context;
 };
