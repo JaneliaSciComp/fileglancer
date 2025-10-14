@@ -9,14 +9,26 @@ import { HiOutlineAdjustmentsHorizontal } from 'react-icons/hi2';
 import { Link } from 'react-router-dom';
 
 import { useProfileContext } from '@/contexts/ProfileContext';
+import { useAuthContext } from '@/contexts/AuthContext';
 
 export default function ProfileMenu() {
   const [origin, setOrigin] = useState('');
   const { profile } = useProfileContext();
+  const { authStatus, logout } = useAuthContext();
 
   useEffect(() => {
     setOrigin(window.location.origin);
   }, []);
+
+  const handleLogout = async () => {
+    // Only use OKTA logout if OKTA is enabled
+    if (authStatus?.auth_method === 'okta') {
+      await logout();
+    } else {
+      // For environment-based auth, just redirect to logout
+      window.location.href = `${origin}/logout`;
+    }
+  };
 
   return (
     <Menu>
@@ -54,9 +66,8 @@ export default function ProfileMenu() {
           Notifications
         </Menu.Item>
         <Menu.Item
-          as={Link}
           className="text-error hover:bg-error/10 hover:!text-error focus:bg-error/10 focus:!text-error"
-          to={`${origin}/logout`}
+          onClick={handleLogout}
         >
           <HiOutlineLogout className="mr-2 h-[18px] w-[18px]" /> Logout
         </Menu.Item>

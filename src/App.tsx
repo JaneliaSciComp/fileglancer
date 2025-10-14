@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from 'react-router';
 import { CookiesProvider } from 'react-cookie';
 import { ErrorBoundary } from 'react-error-boundary';
 
+import { AuthContextProvider, useAuthContext } from '@/contexts/AuthContext';
 import { MainLayout } from './layouts/MainLayout';
 import { BrowsePageLayout } from './layouts/BrowseLayout';
 import { OtherPagesLayout } from './layouts/OtherPagesLayout';
@@ -20,6 +21,30 @@ function Login() {
       <h2 className="text-foreground text-lg">Login Page</h2>
     </div>
   );
+}
+
+function AuthGate({ children }: { readonly children: React.ReactNode }) {
+  const { loading, authStatus } = useAuthContext();
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-foreground">Loading...</div>
+      </div>
+    );
+  }
+
+  // If not authenticated and OKTA is enabled, don't render children
+  // (AuthContext will redirect to login)
+  if (authStatus?.auth_method === 'okta' && !authStatus?.authenticated) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-foreground">Redirecting to login...</div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
 }
 
 function getBasename() {
@@ -46,35 +71,39 @@ function getBasename() {
 const AppComponent = () => {
   const basename = getBasename();
   return (
-    <BrowserRouter basename={basename}>
-      <Routes>
-        <Route element={<Login />} path="/login" />
-        <Route element={<MainLayout />} path="/*">
-          <Route element={<OtherPagesLayout />}>
-            <Route element={<Links />} path="links" />
-            <Route element={<Jobs />} path="jobs" />
-            <Route element={<Help />} path="help" />
-            <Route element={<Preferences />} path="preferences" />
-            <Route element={<Notifications />} path="notifications" />
+    <AuthGate>
+      <BrowserRouter basename={basename}>
+        <Routes>
+          <Route element={<Login />} path="/login" />
+          <Route element={<MainLayout />} path="/*">
+            <Route element={<OtherPagesLayout />}>
+              <Route element={<Links />} path="links" />
+              <Route element={<Jobs />} path="jobs" />
+              <Route element={<Help />} path="help" />
+              <Route element={<Preferences />} path="preferences" />
+              <Route element={<Notifications />} path="notifications" />
+            </Route>
+            <Route element={<BrowsePageLayout />}>
+              <Route element={<Browse />} path="browse" />
+              <Route element={<Browse />} path="browse/:fspName" />
+              <Route element={<Browse />} path="browse/:fspName/*" />
+              <Route element={<Home />} index path="*" />
+            </Route>
           </Route>
-          <Route element={<BrowsePageLayout />}>
-            <Route element={<Browse />} path="browse" />
-            <Route element={<Browse />} path="browse/:fspName" />
-            <Route element={<Browse />} path="browse/:fspName/*" />
-            <Route element={<Home />} index path="*" />
-          </Route>
-        </Route>
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </AuthGate>
   );
 };
 
 export default function App() {
   return (
     <CookiesProvider>
-      <ErrorBoundary FallbackComponent={ErrorFallback}>
-        <AppComponent />
-      </ErrorBoundary>
+      <AuthContextProvider>
+        <ErrorBoundary FallbackComponent={ErrorFallback}>
+          <AppComponent />
+        </ErrorBoundary>
+      </AuthContextProvider>
     </CookiesProvider>
   );
 }

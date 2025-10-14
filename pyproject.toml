@@ -38,7 +38,11 @@ dependencies = [
     "lxml >=5.3.1",
     "x2s3 >=0.9.1",
     "psycopg2-binary >=2.9.9,<3",
-    "cachetools >=5.0.0"
+    "cachetools >=5.0.0",
+    "authlib >=1.3.0",
+    "httpx >=0.28",
+    "python-jose[cryptography] >=3.3.0",
+    "itsdangerous >=2.1.2"
 ]
 
 [project.optional-dependencies]
@@ -116,7 +120,8 @@ node-install-ui-test = "npm --prefix ui-tests install"
 ui-test = { cmd = "npm --prefix ui-tests run test", depends-on = ["node-install-ui-test"] }
 dev-install = { depends-on = ["node-build", "pip-install"] }
 dev-watch = { cmd = "NODE_ENV=development npm run watch" }
-dev-launch = "pixi run uvicorn fileglancer.app:app --port 7878 --reload"
+dev-launch = "python fileglancer/dev_launch.py"
+dev-launch-insecure = "pixi run uvicorn fileglancer.app:app --port 7878 --reload"
 dev-launch-remote = "pixi run uvicorn fileglancer.app:app --host 0.0.0.0 --port 7878 --reload --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
 migrate = "alembic upgrade head"
 migrate-create = "alembic revision --autogenerate"
