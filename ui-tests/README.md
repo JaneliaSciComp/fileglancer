@@ -25,7 +25,7 @@ pixi run npx --prefix ui-tests playwright install
 To execute the UI integration test, run:
 
 ```bash
-pixi run ui-test
+pixi run test-ui
 ```
 
 For more information, please refer to the [Development](../docs/Development.md#integration-tests) documentation.
