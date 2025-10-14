@@ -3,7 +3,7 @@ import { Page } from '@playwright/test';
 const sleepInSecs = (secs: number) =>
   new Promise(resolve => setTimeout(resolve, secs * 1000));
 
-const openFileGlancer = async (page: Page) => {
+const openFileglancer = async (page: Page) => {
   // Navigate directly to Fileglancer standalone app
   await page.goto('/fg/', {
     waitUntil: 'domcontentloaded'
@@ -97,7 +97,7 @@ const teardownMockAPI = async (page: Page) => {
 
 export {
   sleepInSecs,
-  openFileGlancer,
+  openFileglancer,
   mockAPI,
   teardownMockAPI,
   TEST_SHARED_PATHS

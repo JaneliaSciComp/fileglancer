@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { openFileGlancer } from '../testutils.ts';
+import { openFileglancer } from '../testutils.ts';
 
 test.beforeEach('Open fileglancer', async ({ page }) => {
-  await openFileGlancer(page);
+  await openFileglancer(page);
 });
 
 test('Local file share becomes visible when Local zone is expanded', async ({

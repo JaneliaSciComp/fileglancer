@@ -38,7 +38,11 @@ dependencies = [
     "lxml >=5.3.1",
     "x2s3 >=0.9.1",
     "psycopg2-binary >=2.9.9,<3",
-    "cachetools >=5.0.0"
+    "cachetools >=5.0.0",
+    "authlib >=1.3.0",
+    "httpx >=0.28",
+    "python-jose[cryptography] >=3.3.0",
+    "itsdangerous >=2.1.2"
 ]
 
 [project.optional-dependencies]
@@ -89,7 +93,7 @@ channels = ["conda-forge"]
 platforms = ["osx-arm64", "osx-64", "linux-64"]
 
 [tool.pixi.feature.test.tasks]
-test-backend = "pytest"
+test-backend = "pytest --cov=fileglancer --cov-report=html --cov-report=term"
 test-frontend = "npm test"
 
 [tool.pixi.feature.release.tasks]
@@ -117,6 +121,7 @@ test-ui = { cmd = "npm --prefix ui-tests run test ", depends-on = ["node-install
 dev-install = { depends-on = ["node-build", "pip-install"] }
 dev-watch = { cmd = "NODE_ENV=development npm run watch" }
 dev-launch = "pixi run uvicorn fileglancer.app:app --port 7878 --reload"
+dev-launch-secure = "python fileglancer/dev_launch.py"
 dev-launch-remote = "pixi run uvicorn fileglancer.app:app --host 0.0.0.0 --port 7878 --reload --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
 migrate = "alembic upgrade head"
 migrate-create = "alembic revision --autogenerate"

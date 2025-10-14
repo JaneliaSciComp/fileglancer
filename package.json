@@ -26,7 +26,7 @@
         "build:prod": "vite build --mode production",
         "clean:lintcache": "rimraf .eslintcache .stylelintcache",
         "clean:all": "npm run clean:lintcache",
-        "watch": "vite build --watch",
+        "watch": "vite build --watch --minify=false",
         "test": "vitest"
     },
     "dependencies": {

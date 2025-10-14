@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { openFileGlancer } from '../testutils.ts';
+import { openFileglancer } from '../testutils.ts';
 
 test('should load fileglancer app', async ({ page }) => {
-  await openFileGlancer(page);
+  await openFileglancer(page);
 
   // Verify main app elements are visible
   await expect(page.getByText('Browse')).toBeVisible();
@@ -10,7 +10,7 @@ test('should load fileglancer app', async ({ page }) => {
 });
 
 test('should display dashboard on initial load', async ({ page }) => {
-  await openFileGlancer(page);
+  await openFileglancer(page);
 
   // The Browse page should be the default view
   await expect(page.getByText('Browse')).toBeVisible();

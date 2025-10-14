@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
-  openFileGlancer,
+  openFileglancer,
   mockAPI,
   teardownMockAPI,
   TEST_SHARED_PATHS
@@ -11,8 +11,8 @@ test.beforeEach('setup API endpoints BEFORE opening page', async ({ page }) => {
   await mockAPI(page);
 });
 
-test.beforeEach('Open fileglancer', async ({ page }) => {
-  await openFileGlancer(page);
+test.beforeEach('Open Fileglancer', async ({ page }) => {
+  await openFileglancer(page);
 });
 
 test.afterEach(async ({ page }) => {

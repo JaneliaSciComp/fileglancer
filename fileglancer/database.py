@@ -117,6 +117,21 @@ class TicketDB(Base):
     # )
 
 
+class SessionDB(Base):
+    """Database model for storing user sessions"""
+    __tablename__ = 'sessions'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String, nullable=False, unique=True, index=True)
+    username = Column(String, nullable=False, index=True)
+    email = Column(String, nullable=True)
+    okta_access_token = Column(String, nullable=True)
+    okta_id_token = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    expires_at = Column(DateTime, nullable=False)
+    last_accessed_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+
+
 def run_alembic_upgrade(db_url):
     """Run Alembic migrations to upgrade database to latest version"""
     global _migrations_run
@@ -403,13 +418,28 @@ def _clear_sharing_key_cache():
 
 def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
     """Validate a proxied path exists and is accessible"""
-    # Validate that the fsp_name exists in file_share_paths
+    # First check database for file share path
     fsp = session.query(FileSharePathDB).filter_by(name=fsp_name).first()
-    if not fsp:
+    mount_path = None
+
+    if fsp:
+        mount_path = fsp.mount_path
+    else:
+        # Check if using local file_share_mounts configuration
+        settings = get_settings()
+        if settings.file_share_mounts:
+            from fileglancer.utils import slugify_path
+            # Check if fsp_name matches any slugified local path
+            for local_path in settings.file_share_mounts:
+                if slugify_path(local_path) == fsp_name:
+                    mount_path = local_path
+                    break
+
+    if not mount_path:
         raise ValueError(f"File share path {fsp_name} does not exist")
 
     # Validate path exists and is accessible
-    absolute_path = os.path.join(fsp.mount_path, path.lstrip('/'))
+    absolute_path = os.path.join(mount_path, path.lstrip('/'))
     try:
         os.listdir(absolute_path)
     except FileNotFoundError:
@@ -517,3 +547,52 @@ def delete_ticket(session: Session, ticket_key: str):
     """Delete a ticket from the database"""
     session.query(TicketDB).filter_by(ticket_key=ticket_key).delete()
     session.commit()
+
+
+def create_session(session: Session, username: str, email: Optional[str],
+                   expires_at: datetime, okta_access_token: Optional[str] = None,
+                   okta_id_token: Optional[str] = None) -> SessionDB:
+    """Create a new session for a user"""
+    session_id = secrets.token_urlsafe(32)
+    now = datetime.now(UTC)
+
+    user_session = SessionDB(
+        session_id=session_id,
+        username=username,
+        email=email,
+        okta_access_token=okta_access_token,
+        okta_id_token=okta_id_token,
+        created_at=now,
+        expires_at=expires_at,
+        last_accessed_at=now
+    )
+    session.add(user_session)
+    session.commit()
+    return user_session
+
+
+def get_session_by_id(session: Session, session_id: str) -> Optional[SessionDB]:
+    """Get a session by session ID"""
+    return session.query(SessionDB).filter_by(session_id=session_id).first()
+
+
+def update_session_access_time(session: Session, session_id: str):
+    """Update the last accessed time for a session"""
+    user_session = get_session_by_id(session, session_id)
+    if user_session:
+        user_session.last_accessed_at = datetime.now(UTC)
+        session.commit()
+
+
+def delete_session(session: Session, session_id: str):
+    """Delete a session (logout)"""
+    session.query(SessionDB).filter_by(session_id=session_id).delete()
+    session.commit()
+
+
+def delete_expired_sessions(session: Session):
+    """Delete all expired sessions"""
+    now = datetime.now(UTC)
+    deleted = session.query(SessionDB).filter(SessionDB.expires_at < now).delete()
+    session.commit()
+    return deleted
