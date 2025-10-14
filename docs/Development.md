@@ -46,7 +46,7 @@ The secure launch mode expects SSL certificates to be located at:
 - Private key: `/opt/certs/cert.key`
 - Certificate: `/opt/certs/cert.crt`
 
-**Important:** Do not use self-signed certificates, as they don't work properly with CORS and JavaScript fetch operations. You should obtain valid SSL certificates from your organization's certificate authority or use certificates from a trusted CA like Let's Encrypt.
+**Important:** Do not use self-signed certificates, as they don't work properly with CORS and JavaScript fetch operations. You should obtain valid SSL certificates from your organization's certificate authority.
 
 To install your certificates:
 
