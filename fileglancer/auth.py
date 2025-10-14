@@ -103,16 +103,9 @@ def get_current_user(request: Request, settings: Settings) -> str:
     """
     Get the current authenticated user
 
-    If OKTA auth is enabled, validates session from cookie
-    If OKTA auth is disabled, falls back to $USER environment variable
-
-    Raises HTTPException(401) if authentication fails when OKTA is enabled
+    Always validates session from cookie (for both OKTA and simple auth)
+    Raises HTTPException(401) if authentication fails
     """
-    if not settings.enable_okta_auth:
-        # Fallback to environment variable for backward compatibility
-        return get_current_user_from_env()
-
-    # OKTA authentication is enabled - require valid session
     user_session = get_session_from_cookie(request, settings)
 
     if not user_session:

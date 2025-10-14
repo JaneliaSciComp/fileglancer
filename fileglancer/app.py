@@ -290,7 +290,7 @@ def create_app(settings):
                 session_id = user_session.session_id
 
             # Create redirect response
-            redirect_response = RedirectResponse(url="/fg/")
+            redirect_response = RedirectResponse(url="/fg/browse")
 
             # Set session cookie on the redirect response
             auth.create_session_cookie(redirect_response, session_id, settings)
@@ -305,15 +305,10 @@ def create_app(settings):
             raise HTTPException(status_code=401, detail="Authentication failed")
 
 
-    @app.get("/api/auth/logout", include_in_schema=settings.enable_okta_auth,
-             description="Logout and clear session")
-    @app.post("/api/auth/logout", include_in_schema=settings.enable_okta_auth,
-              description="Logout and clear session")
+    @app.get("/api/auth/logout", description="Logout and clear session")
+    @app.post("/api/auth/logout", description="Logout and clear session")
     async def logout(request: Request):
         """Logout user and delete session"""
-        if not settings.enable_okta_auth:
-            raise HTTPException(status_code=404, detail="OKTA authentication not enabled")
-
         session_id = request.cookies.get(settings.session_cookie_name)
 
         if session_id:
@@ -333,25 +328,19 @@ def create_app(settings):
     @app.get("/api/auth/status", description="Check authentication status")
     async def auth_status(request: Request):
         """Check if user is authenticated"""
-        if not settings.enable_okta_auth:
-            # When OKTA is disabled, always return authenticated with env user
-            return {
-                "authenticated": True,
-                "username": auth.get_current_user_from_env(),
-                "auth_method": "environment"
-            }
-
         user_session = auth.get_session_from_cookie(request, settings)
 
         if user_session:
+            auth_method = "okta" if settings.enable_okta_auth else "simple"
             return {
                 "authenticated": True,
                 "username": user_session.username,
                 "email": user_session.email,
-                "auth_method": "okta"
+                "auth_method": auth_method
             }
 
-        return {"authenticated": False, "auth_method": "okta"}
+        auth_method = "okta" if settings.enable_okta_auth else "simple"
+        return {"authenticated": False, "auth_method": auth_method}
 
 
     @app.get("/api/file-share-paths", response_model=FileSharePathResponse,
@@ -1082,27 +1071,25 @@ def create_app(settings):
 
         return Response(status_code=204)
 
-    # Home page - doesn't require authentication
-    @app.get("/", include_in_schema=False)
-    async def home_page(request: Request):
-        """Serve home page with login option"""
-        # Check if user is already authenticated
-        user_session = None
+    # Simple login page for non-OKTA authentication
+    @app.get("/login", include_in_schema=not settings.enable_okta_auth)
+    async def simple_login_page(request: Request):
+        """Show simple login form when OKTA is disabled"""
         if settings.enable_okta_auth:
-            user_session = auth.get_session_from_cookie(request, settings)
+            raise HTTPException(status_code=404, detail="Use OKTA authentication")
 
-        # If authenticated, redirect to the app
-        if user_session or not settings.enable_okta_auth:
-            return RedirectResponse(url="/fg/")
+        # Check if already authenticated
+        user_session = auth.get_session_from_cookie(request, settings)
+        if user_session:
+            return RedirectResponse(url="/fg/browse")
 
-        # Otherwise show home page with login button
         html_content = """
         <!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>FileGlancer</title>
+            <title>Login - FileGlancer</title>
             <style>
                 body {
                     margin: 0;
@@ -1115,48 +1102,174 @@ def create_app(settings):
                     justify-content: center;
                 }
                 .container {
-                    text-align: center;
-                    color: white;
-                    padding: 2rem;
+                    background: white;
+                    padding: 3rem;
+                    border-radius: 12px;
+                    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+                    max-width: 400px;
+                    width: 100%;
                 }
                 h1 {
-                    font-size: 3rem;
-                    margin-bottom: 1rem;
-                    font-weight: 700;
+                    color: #667eea;
+                    font-size: 2rem;
+                    margin-bottom: 0.5rem;
+                    text-align: center;
                 }
                 p {
-                    font-size: 1.25rem;
+                    color: #666;
+                    text-align: center;
                     margin-bottom: 2rem;
-                    opacity: 0.9;
                 }
-                .login-button {
-                    display: inline-block;
-                    padding: 1rem 2rem;
-                    background-color: white;
-                    color: #667eea;
-                    text-decoration: none;
+                form {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1rem;
+                }
+                label {
+                    color: #333;
+                    font-weight: 500;
+                    margin-bottom: 0.25rem;
+                }
+                input {
+                    padding: 0.75rem;
+                    border: 2px solid #e0e0e0;
                     border-radius: 8px;
-                    font-weight: 600;
-                    font-size: 1.1rem;
-                    transition: transform 0.2s, box-shadow 0.2s;
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                    font-size: 1rem;
+                    transition: border-color 0.2s;
                 }
-                .login-button:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+                input:focus {
+                    outline: none;
+                    border-color: #667eea;
+                }
+                button {
+                    padding: 0.875rem;
+                    background-color: #667eea;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 1rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: background-color 0.2s, transform 0.1s;
+                }
+                button:hover {
+                    background-color: #5568d3;
+                }
+                button:active {
+                    transform: scale(0.98);
+                }
+                button:disabled {
+                    background-color: #ccc;
+                    cursor: not-allowed;
+                }
+                .error {
+                    color: #d32f2f;
+                    text-align: center;
+                    margin-top: 1rem;
+                    font-size: 0.875rem;
                 }
             </style>
         </head>
         <body>
             <div class="container">
                 <h1>FileGlancer</h1>
-                <p>Browse and manage your files with ease</p>
-                <a href="/api/auth/login" class="login-button">Log In</a>
+                <p>Enter your username to continue</p>
+                <form id="loginForm">
+                    <div>
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" required autofocus>
+                    </div>
+                    <button type="submit" id="submitBtn">Log In</button>
+                    <div id="error" class="error" style="display: none;"></div>
+                </form>
             </div>
+            <script>
+                document.getElementById('loginForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const username = document.getElementById('username').value;
+                    const submitBtn = document.getElementById('submitBtn');
+                    const errorDiv = document.getElementById('error');
+
+                    submitBtn.disabled = true;
+                    errorDiv.style.display = 'none';
+
+                    try {
+                        const response = await fetch('/api/auth/simple-login', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ username }),
+                            credentials: 'include',
+                            redirect: 'manual'
+                        });
+
+                        if (response.ok || response.type === 'opaqueredirect') {
+                            const data = await response.json();
+                            window.location.href = data.redirect || '/fg/browse';
+                        } else {
+                            const data = await response.json();
+                            errorDiv.textContent = data.detail || 'Login failed';
+                            errorDiv.style.display = 'block';
+                            submitBtn.disabled = false;
+                        }
+                    } catch (err) {
+                        errorDiv.textContent = 'Network error. Please try again.';
+                        errorDiv.style.display = 'block';
+                        submitBtn.disabled = false;
+                    }
+                });
+            </script>
         </body>
         </html>
         """
         return Response(content=html_content, media_type="text/html")
+
+
+    @app.post("/api/auth/simple-login", include_in_schema=not settings.enable_okta_auth)
+    async def simple_login_handler(request: Request, body: dict = Body(...)):
+        """Handle simple login JSON submission"""
+        if settings.enable_okta_auth:
+            raise HTTPException(status_code=404, detail="Use OKTA authentication")
+
+        # Parse JSON body
+        username = body.get("username")
+
+        if not username or not username.strip():
+            raise HTTPException(status_code=400, detail="Username is required")
+
+        username = username.strip()
+
+        # Create session in database
+        expires_at = datetime.now(UTC) + timedelta(hours=settings.session_expiry_hours)
+
+        with db.get_db_session(settings.db_url) as session:
+            user_session = db.create_session(
+                session=session,
+                username=username,
+                email=None,  # No email for simple auth
+                expires_at=expires_at,
+                okta_access_token=None,
+                okta_id_token=None
+            )
+            session_id = user_session.session_id
+
+        # Create JSON response
+        response = JSONResponse(content={"success": True, "username": username, "redirect": "/fg/browse"})
+
+        # Set session cookie
+        auth.create_session_cookie(response, session_id, settings)
+
+        logger.info(f"User {username} logged in via simple authentication")
+
+        return response
+
+
+    # Home page - redirect to /fg
+    @app.get("/", include_in_schema=False)
+    async def home_page():
+        """Redirect root to /fg"""
+        return RedirectResponse(url="/fg/")
 
     # Serve SPA at /fg/* for client-side routing
     # This must be the LAST route registered

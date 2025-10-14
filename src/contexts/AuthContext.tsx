@@ -5,7 +5,7 @@ type AuthStatus = {
   authenticated: boolean;
   username?: string;
   email?: string;
-  auth_method?: 'environment' | 'okta';
+  auth_method?: 'simple' | 'okta';
 };
 
 type AuthContextType = {
@@ -49,11 +49,8 @@ export const AuthContextProvider = ({
       const status: AuthStatus = await response.json();
       setAuthStatus(status);
 
-      // If OKTA auth is enabled and user is not authenticated, redirect to login
-      if (status.auth_method === 'okta' && !status.authenticated) {
-        logger.info('User not authenticated, redirecting to login');
-        window.location.href = '/api/auth/login';
-      }
+      // Don't auto-redirect on auth status check
+      // Individual routes will handle requiring authentication
     } catch (err) {
       logger.error('Error fetching auth status:', err);
       setError(err as Error);
