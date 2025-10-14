@@ -23,6 +23,7 @@ const TEST_SHARED_PATHS = [
   {
     name: 'groups_z1_primaryzone',
     zone: 'Z1',
+
     storage: 'primary',
     mount_path: '/z1/labarea'
   },
@@ -35,7 +36,6 @@ const TEST_SHARED_PATHS = [
 ];
 
 const mockAPI = async (page: Page) => {
-  // mock API calls for standalone app
   await page.route('/api/profile', async route => {
     await route.fulfill({
       status: 200,
