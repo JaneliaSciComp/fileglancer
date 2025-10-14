@@ -4,6 +4,7 @@
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
+  reporter: [['html', { open: process.env.CI ? 'never' : 'on-failure' }]],
   use: {
     baseURL: 'http://localhost:7878',
     trace: 'on-first-retry',
