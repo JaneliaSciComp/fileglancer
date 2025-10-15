@@ -13,6 +13,7 @@ concurrency:
 
 jobs:
   build:
+    name: Build
     runs-on: ubuntu-latest
 
     steps:
@@ -110,7 +111,7 @@ jobs:
           ui-tests/playwright-report
 
   check_links:
-    name: Check Links in README
+    name: Check README links
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
