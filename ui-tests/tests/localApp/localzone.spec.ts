@@ -13,7 +13,7 @@ test('Local file share becomes visible when Local zone is expanded', async ({
   const localZoneLocator = page.getByText('Local');
 
   await expect(zonesLocator).toBeVisible();
-  // the home locator initially is not visible
+  // the local fsp initially is not visible
   await expect(localFspLocator).toHaveCount(0);
 
   // assume local is visible so click on zones and hide all zones (including local)
@@ -24,7 +24,7 @@ test('Local file share becomes visible when Local zone is expanded', async ({
   await zonesLocator.click();
   // expect the local zone to be visible
   await expect(localZoneLocator).toBeVisible();
-  // click on it to view home
+  // click on it to expand
   await localZoneLocator.click();
 
   await expect(localFspLocator).toBeVisible();
