@@ -47,6 +47,21 @@ class Settings(BaseSettings):
     # Maximum size of the sharing key LRU cache
     sharing_key_cache_size: int = 1000
 
+    # OKTA OAuth/OIDC settings for authentication
+    okta_domain: Optional[str] = None
+    okta_client_id: Optional[str] = None
+    okta_client_secret: Optional[str] = None
+    okta_redirect_uri: Optional[HttpUrl] = None
+
+    # Session management settings
+    session_secret_key: str = 'change-me-in-production'
+    session_expiry_hours: int = 24
+    session_cookie_name: str = 'fg_session'
+    session_cookie_secure: bool = True  # Set to False for development with self-signed certs
+
+    # Authentication toggle - if False, falls back to $USER environment variable
+    enable_okta_auth: bool = False
+
     model_config = SettingsConfigDict(
         yaml_file="config.yaml",
         env_file='.env',

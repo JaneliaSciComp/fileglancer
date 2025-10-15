@@ -3,7 +3,7 @@ import sys
 import pwd
 import grp
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from functools import cache
 from pathlib import Path as PathLib
 from typing import List, Optional, Dict, Tuple, Generator
@@ -18,14 +18,16 @@ import yaml
 from loguru import logger
 from pydantic import HttpUrl
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Request, Query, Path, Body
+from fastapi import FastAPI, HTTPException, Request, Query, Path, Body, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response, JSONResponse, PlainTextResponse, StreamingResponse, FileResponse
 from fastapi.exceptions import RequestValidationError, StarletteHTTPException
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 from urllib.parse import quote
 
 from fileglancer import database as db
+from fileglancer import auth
 from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
@@ -65,8 +67,14 @@ def _read_version() -> str:
 APP_VERSION = _read_version()
 
 
-def get_current_user():
-    return os.getenv("USER", "unknown")
+def get_current_user(request: Request):
+    """
+    FastAPI dependency to get the current authenticated user
+
+    If OKTA auth is enabled, validates session from cookie
+    If OKTA auth is disabled, falls back to $USER environment variable
+    """
+    return auth.get_current_user(request, get_settings())
 
 def _convert_external_bucket(db_bucket: db.ExternalBucketDB) -> ExternalBucket:
     return ExternalBucket(
@@ -106,6 +114,9 @@ def _convert_ticket(db_ticket: db.TicketDB) -> Ticket:
     )
 
 def create_app(settings):
+
+    # Initialize OAuth client for OKTA
+    oauth = auth.setup_oauth(settings)
 
     @cache
     def _get_fsp_names_to_mount_paths() -> Dict[str, str]:
@@ -176,11 +187,23 @@ def create_app(settings):
         pass
 
     app = FastAPI(lifespan=lifespan)
+
+    # Add SessionMiddleware for OAuth state management
+    # This is required by authlib for the OAuth flow
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=settings.session_secret_key,
+        session_cookie="oauth_session",
+        max_age=3600,  # 1 hour for OAuth flow
+        same_site="lax",
+        https_only=settings.session_cookie_secure  # Match session cookie security setting
+    )
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
         allow_credentials=True,
-        allow_methods=["GET","HEAD"],
+        allow_methods=["GET","HEAD","POST","PUT","PATCH","DELETE"],
         allow_headers=["*"],
         expose_headers=["Range", "Content-Range"],
     )
@@ -212,6 +235,115 @@ def create_app(settings):
              description="Get the current version of the server")
     async def version_endpoint():
         return {"version": APP_VERSION}
+
+
+    # Authentication routes
+    @app.get("/api/auth/login", include_in_schema=settings.enable_okta_auth,
+             description="Initiate OKTA OAuth login flow")
+    async def login(request: Request):
+        """Redirect to OKTA for authentication"""
+        if not settings.enable_okta_auth:
+            raise HTTPException(status_code=404, detail="OKTA authentication not enabled")
+
+        redirect_uri = str(settings.okta_redirect_uri)
+        return await oauth.okta.authorize_redirect(request, redirect_uri)
+
+
+    @app.get("/api/oauth_callback", include_in_schema=settings.enable_okta_auth,
+             description="OKTA OAuth callback endpoint")
+    # the hub url is legacy from jupyterhub. Kept here for backwards compatibility with existing okta config.
+    @app.get("/hub/oauth_callback", include_in_schema=settings.enable_okta_auth,
+             description="OKTA OAuth callback endpoint")
+    async def auth_callback(request: Request, response: Response):
+        """Handle OKTA OAuth callback"""
+        if not settings.enable_okta_auth:
+            raise HTTPException(status_code=404, detail="OKTA authentication not enabled")
+
+        try:
+            # Exchange authorization code for tokens
+            token = await oauth.okta.authorize_access_token(request)
+
+            # Extract user info from ID token
+            id_token = token.get('id_token')
+            user_info = token.get('userinfo')
+
+            if not user_info:
+                # Decode ID token if userinfo not provided
+                user_info = auth.verify_id_token(id_token, settings)
+
+            username = user_info.get('preferred_username') or user_info.get('email')
+            email = user_info.get('email')
+
+            if not username:
+                raise HTTPException(status_code=400, detail="Unable to extract username from OKTA response")
+
+            # Create session in database
+            expires_at = datetime.now(UTC) + timedelta(hours=settings.session_expiry_hours)
+
+            with db.get_db_session(settings.db_url) as session:
+                user_session = db.create_session(
+                    session=session,
+                    username=username,
+                    email=email,
+                    expires_at=expires_at,
+                    okta_access_token=token.get('access_token'),
+                    okta_id_token=id_token
+                )
+                # Extract session_id while still in database session context
+                session_id = user_session.session_id
+
+            # Create redirect response
+            redirect_response = RedirectResponse(url="/fg/browse")
+
+            # Set session cookie on the redirect response
+            auth.create_session_cookie(redirect_response, session_id, settings)
+
+            logger.info(f"User {username} authenticated successfully via OKTA")
+
+            # Return the redirect with the cookie
+            return redirect_response
+
+        except Exception as e:
+            logger.exception(f"Authentication callback failed: {e}")
+            raise HTTPException(status_code=401, detail="Authentication failed")
+
+
+    @app.get("/api/auth/logout", description="Logout and clear session")
+    @app.post("/api/auth/logout", description="Logout and clear session")
+    async def logout(request: Request):
+        """Logout user and delete session"""
+        session_id = request.cookies.get(settings.session_cookie_name)
+
+        if session_id:
+            with db.get_db_session(settings.db_url) as session:
+                db.delete_session(session, session_id)
+                logger.info(f"Session {session_id} deleted")
+
+        # Create redirect response to home page
+        redirect_response = RedirectResponse(url="/", status_code=303)
+
+        # Delete cookie on the redirect response
+        auth.delete_session_cookie(redirect_response, settings)
+
+        return redirect_response
+
+
+    @app.get("/api/auth/status", description="Check authentication status")
+    async def auth_status(request: Request):
+        """Check if user is authenticated"""
+        user_session = auth.get_session_from_cookie(request, settings)
+
+        if user_session:
+            auth_method = "okta" if settings.enable_okta_auth else "simple"
+            return {
+                "authenticated": True,
+                "username": user_session.username,
+                "email": user_session.email,
+                "auth_method": auth_method
+            }
+
+        auth_method = "okta" if settings.enable_okta_auth else "simple"
+        return {"authenticated": False, "auth_method": auth_method}
 
 
     @app.get("/api/file-share-paths", response_model=FileSharePathResponse,
@@ -319,7 +451,8 @@ def create_app(settings):
     @app.post("/api/ticket", response_model=Ticket,
               description="Create a new ticket and return the key")
     async def create_ticket(
-        body: dict
+        body: dict,
+        username: str = Depends(get_current_user)
     ):
         fsp_name = body.get("fsp_name")
         path = body.get("path")
@@ -328,7 +461,6 @@ def create_app(settings):
         summary = body.get("summary")
         description = body.get("description")
         try:
-            username = get_current_user()
             # Create ticket in JIRA
             jira_ticket = create_jira_ticket(
                 project_key=project_key,
@@ -368,8 +500,9 @@ def create_app(settings):
     @app.get("/api/ticket", response_model=TicketResponse,
              description="Retrieve tickets for a user")
     async def get_tickets(fsp_name: Optional[str] = Query(None, description="The name of the file share path that the ticket is associated with"),
-                          path: Optional[str] = Query(None, description="The path that the ticket is associated with")):
-        username = get_current_user()
+                          path: Optional[str] = Query(None, description="The path that the ticket is associated with"),
+                          username: str = Depends(get_current_user)):
+
         with db.get_db_session(settings.db_url) as session:
             
             db_tickets = db.get_tickets(session, username, fsp_name, path)
@@ -409,16 +542,14 @@ def create_app(settings):
 
     @app.get("/api/preference", response_model=Dict[str, Dict],
              description="Get all preferences for a user")
-    async def get_preferences():
-        username = get_current_user()
+    async def get_preferences(username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
             return db.get_all_user_preferences(session, username)
 
 
     @app.get("/api/preference/{key}", response_model=Optional[Dict],
              description="Get a specific preference for a user")
-    async def get_preference(key: str):
-        username = get_current_user()
+    async def get_preference(key: str, username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
             pref = db.get_user_preference(session, username, key)
             if pref is None:
@@ -428,8 +559,7 @@ def create_app(settings):
 
     @app.put("/api/preference/{key}",
              description="Set a preference for a user")
-    async def set_preference(key: str, value: Dict):
-        username = get_current_user()
+    async def set_preference(key: str, value: Dict, username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
             db.set_user_preference(session, username, key, value)
             return {"message": f"Preference {key} set for user {username}"}
@@ -437,8 +567,7 @@ def create_app(settings):
 
     @app.delete("/api/preference/{key}",
                 description="Delete a preference for a user")
-    async def delete_preference(key: str):
-        username = get_current_user()
+    async def delete_preference(key: str, username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
             deleted = db.delete_user_preference(session, username, key)
             if not deleted:
@@ -449,9 +578,9 @@ def create_app(settings):
     @app.post("/api/proxied-path", response_model=ProxiedPath,
               description="Create a new proxied path")
     async def create_proxied_path(fsp_name: str = Query(..., description="The name of the file share path that this proxied path is associated with"),
-                                  path: str = Query(..., description="The path relative to the file share path mount point")):
+                                  path: str = Query(..., description="The path relative to the file share path mount point"),
+                                  username: str = Depends(get_current_user)):
 
-        username = get_current_user()
         sharing_name = os.path.basename(path)
         logger.info(f"Creating proxied path for {username} with sharing name {sharing_name} and fsp_name {fsp_name} and path {path}")
         with db.get_db_session(settings.db_url) as session:
@@ -466,8 +595,8 @@ def create_app(settings):
     @app.get("/api/proxied-path", response_model=ProxiedPathResponse,
              description="Query proxied paths for a user")
     async def get_proxied_paths(fsp_name: str = Query(None, description="The name of the file share path that this proxied path is associated with"),
-                                path: str = Query(None, description="The path being proxied")):
-        username = get_current_user()
+                                path: str = Query(None, description="The path being proxied"),
+                                username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
             db_proxied_paths = db.get_proxied_paths(session, username, fsp_name, path)
             proxied_paths = [_convert_proxied_path(db_path, settings.external_proxy_url) for db_path in db_proxied_paths]
@@ -476,8 +605,8 @@ def create_app(settings):
 
     @app.get("/api/proxied-path/{sharing_key}", response_model=ProxiedPath,
              description="Retrieve a proxied path by sharing key")
-    async def get_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path")):
-        username = get_current_user()
+    async def get_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path"),
+                               username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
             path = db.get_proxied_path_by_sharing_key(session, sharing_key)
             if not path:
@@ -491,8 +620,8 @@ def create_app(settings):
     async def update_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path"),
                                   fsp_name: Optional[str] = Query(default=None, description="The name of the file share path that this proxied path is associated with"),
                                   path: Optional[str] = Query(default=None, description="The path relative to the file share path mount point"),
-                                  sharing_name: Optional[str] = Query(default=None, description="The sharing path of the proxied path")):
-        username = get_current_user()
+                                  sharing_name: Optional[str] = Query(default=None, description="The sharing path of the proxied path"),
+                                  username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
             try:
                 updated = db.update_proxied_path(session, username, sharing_key, new_path=path, new_sharing_name=sharing_name, new_fsp_name=fsp_name)
@@ -503,8 +632,8 @@ def create_app(settings):
 
 
     @app.delete("/api/proxied-path/{sharing_key}", description="Delete a proxied path by sharing key")
-    async def delete_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path")):
-        username = get_current_user()
+    async def delete_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path"),
+                                  username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
             deleted = db.delete_proxied_path(session, username, sharing_key)
             if deleted == 0:
@@ -673,9 +802,8 @@ def create_app(settings):
 
     # Profile endpoint
     @app.get("/api/profile", description="Get the current user's profile")
-    async def get_profile():
+    async def get_profile(username: str = Depends(get_current_user)):
         """Get the current user's profile"""
-        username = get_current_user()
         home_directory_path = os.path.expanduser(f"~{username}")
         home_directory_name = os.path.basename(home_directory_path)
         home_parent = os.path.dirname(home_directory_path)
@@ -834,7 +962,8 @@ def create_app(settings):
 
     # File metadata endpoint (browsing)
     @app.get("/api/files/{path_name}")
-    async def get_file_metadata(path_name: str, subpath: Optional[str] = Query('')):
+    async def get_file_metadata(path_name: str, subpath: Optional[str] = Query(''),
+                                current_user: str = Depends(get_current_user)):
         """Handle GET requests to list directory contents or return info for the file/folder itself"""
         logger.info(f"GET /api/files/{path_name} subpath={subpath}")
 
@@ -848,7 +977,6 @@ def create_app(settings):
             raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
 
         try:
-            current_user = os.getenv("USER", "unknown")
             file_info = filestore.get_file_info(subpath, current_user)
             logger.info(f"File info: {file_info}")
 
@@ -904,14 +1032,13 @@ def create_app(settings):
         return Response(status_code=201)
 
     @app.patch("/api/files/{path_name}")
-    async def update_file_or_dir(path_name: str, subpath: Optional[str] = Query(''), body: Dict = Body(...)):
+    async def update_file_or_dir(path_name: str, subpath: Optional[str] = Query(''), body: Dict = Body(...),
+                                 current_user: str = Depends(get_current_user)):
         """Handle PATCH requests to rename or update file permissions"""
         logger.info(f"PATCH /api/files/{path_name} subpath={subpath}")
         filestore, error = _get_filestore(path_name)
         if filestore is None:
             raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
-
-        current_user = os.getenv("USER", "unknown")
         old_file_info = filestore.get_file_info(subpath, current_user)
         new_path = body.get("path")
         new_permissions = body.get("permissions")
@@ -947,9 +1074,49 @@ def create_app(settings):
 
         return Response(status_code=204)
 
-    # Redirect root to /fg/
+    @app.post("/api/auth/simple-login", include_in_schema=not settings.enable_okta_auth)
+    async def simple_login_handler(request: Request, body: dict = Body(...)):
+        """Handle simple login JSON submission"""
+        if settings.enable_okta_auth:
+            raise HTTPException(status_code=404, detail="Use OKTA authentication")
+
+        # Parse JSON body
+        username = body.get("username")
+
+        if not username or not username.strip():
+            raise HTTPException(status_code=400, detail="Username is required")
+
+        username = username.strip()
+
+        # Create session in database
+        expires_at = datetime.now(UTC) + timedelta(hours=settings.session_expiry_hours)
+
+        with db.get_db_session(settings.db_url) as session:
+            user_session = db.create_session(
+                session=session,
+                username=username,
+                email=None,  # No email for simple auth
+                expires_at=expires_at,
+                okta_access_token=None,
+                okta_id_token=None
+            )
+            session_id = user_session.session_id
+
+        # Create JSON response
+        response = JSONResponse(content={"success": True, "username": username, "redirect": "/fg/browse"})
+
+        # Set session cookie
+        auth.create_session_cookie(response, session_id, settings)
+
+        logger.info(f"User {username} logged in via simple authentication")
+
+        return response
+
+
+    # Home page - redirect to /fg
     @app.get("/", include_in_schema=False)
-    async def redirect_root():
+    async def home_page():
+        """Redirect root to /fg"""
         return RedirectResponse(url="/fg/")
 
     # Serve SPA at /fg/* for client-side routing

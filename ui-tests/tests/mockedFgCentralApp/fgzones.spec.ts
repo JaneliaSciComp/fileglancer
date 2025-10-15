@@ -1,13 +1,13 @@
 import { expect, test } from '@jupyterlab/galata';
 import {
-  openFileGlancer,
+  openFileglancer,
   mockAPI,
   teardownMockAPI,
   TEST_SHARED_PATHS
 } from '../testutils.ts';
 
 test.beforeEach('Open fileglancer', async ({ page }) => {
-  await openFileGlancer(page);
+  await openFileglancer(page);
 });
 
 test.beforeEach('setup API endpoints', async ({ page }) => {
@@ -75,7 +75,7 @@ test('favor entire zone with reload page', async ({ page }) => {
   await expect(Z2favorite).toBeVisible();
 
   // reload page - somehow page.reload hangs so I am going back to jupyterlab page
-  await openFileGlancer(page);
+  await openFileglancer(page);
 
   const z2CollapsedStarButton = page.getByRole('button').nth(4);
   // test Z2 still shows as favorite

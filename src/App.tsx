@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from 'react-router';
 import { CookiesProvider } from 'react-cookie';
 import { ErrorBoundary } from 'react-error-boundary';
 
+import { AuthContextProvider, useAuthContext } from '@/contexts/AuthContext';
 import { MainLayout } from './layouts/MainLayout';
 import { BrowsePageLayout } from './layouts/BrowseLayout';
 import { OtherPagesLayout } from './layouts/OtherPagesLayout';
@@ -14,12 +15,28 @@ import Links from '@/components/Links';
 import Notifications from '@/components/Notifications';
 import ErrorFallback from '@/components/ErrorFallback';
 
-function Login() {
-  return (
-    <div className="p-4">
-      <h2 className="text-foreground text-lg">Login Page</h2>
-    </div>
-  );
+function RequireAuth({ children }: { readonly children: React.ReactNode }) {
+  const { loading, authStatus } = useAuthContext();
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-foreground">Loading...</div>
+      </div>
+    );
+  }
+
+  // If not authenticated, redirect to home page
+  if (!authStatus?.authenticated) {
+    window.location.href = '/fg/';
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-foreground">Redirecting to login...</div>
+      </div>
+    );
+  }
+
+  return children;
 }
 
 function getBasename() {
@@ -48,20 +65,53 @@ const AppComponent = () => {
   return (
     <BrowserRouter basename={basename}>
       <Routes>
-        <Route element={<Login />} path="/login" />
         <Route element={<MainLayout />} path="/*">
           <Route element={<OtherPagesLayout />}>
-            <Route element={<Links />} path="links" />
-            <Route element={<Jobs />} path="jobs" />
+            <Route element={<Home />} index />
+            <Route
+              element={
+                <RequireAuth>
+                  <Links />
+                </RequireAuth>
+              }
+              path="links"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <Jobs />
+                </RequireAuth>
+              }
+              path="jobs"
+            />
             <Route element={<Help />} path="help" />
-            <Route element={<Preferences />} path="preferences" />
-            <Route element={<Notifications />} path="notifications" />
+            <Route
+              element={
+                <RequireAuth>
+                  <Preferences />
+                </RequireAuth>
+              }
+              path="preferences"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <Notifications />
+                </RequireAuth>
+              }
+              path="notifications"
+            />
           </Route>
-          <Route element={<BrowsePageLayout />}>
+          <Route
+            element={
+              <RequireAuth>
+                <BrowsePageLayout />
+              </RequireAuth>
+            }
+          >
             <Route element={<Browse />} path="browse" />
             <Route element={<Browse />} path="browse/:fspName" />
             <Route element={<Browse />} path="browse/:fspName/*" />
-            <Route element={<Home />} index path="*" />
           </Route>
         </Route>
       </Routes>
@@ -72,9 +122,11 @@ const AppComponent = () => {
 export default function App() {
   return (
     <CookiesProvider>
-      <ErrorBoundary FallbackComponent={ErrorFallback}>
-        <AppComponent />
-      </ErrorBoundary>
+      <AuthContextProvider>
+        <ErrorBoundary FallbackComponent={ErrorFallback}>
+          <AppComponent />
+        </ErrorBoundary>
+      </AuthContextProvider>
     </CookiesProvider>
   );
 }

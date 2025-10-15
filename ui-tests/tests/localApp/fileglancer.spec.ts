@@ -1,5 +1,5 @@
 import { expect, test } from '@jupyterlab/galata';
-import { openFileGlancer } from '../testutils.ts';
+import { openFileglancer } from '../testutils.ts';
 import type { IJupyterLabPageFixture } from '@jupyterlab/galata';
 
 /**
@@ -31,6 +31,6 @@ test('when fg icon clicked should open fileglancer extension', async ({
     logs.push(message.text());
   });
 
-  await openFileGlancer(page);
+  await openFileglancer(page);
   await expect(page.getByText('Browse')).toBeVisible();
 });
