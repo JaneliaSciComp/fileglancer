@@ -1,21 +1,26 @@
 import os
 import pwd
+from contextlib import AbstractContextManager
 
 from loguru import logger
 
 
-class ProxyContext:
+class UserContext(AbstractContextManager):
     """
     Base no-op proxy context that does nothing.
     """
-    def __enter__(self):
-        return self
-
     def __exit__(self, exc_type, exc_val, exc_tb):
         return False
 
 
-class AccessFlagsProxyContext(ProxyContext):
+class CurrentUserContext(UserContext):
+    """
+    A context manager the keeps the current user context.
+    """
+    pass
+
+
+class EffectiveUserContext(UserContext):
     """
     A context manager for setting the user and group context for a process using seteuid/setegid access flags.
     """

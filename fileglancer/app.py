@@ -32,7 +32,7 @@ from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
 from fileglancer.utils import slugify_path
-from fileglancer.proxy_context import ProxyContext, AccessFlagsProxyContext
+from fileglancer.proxy_context import UserContext, EffectiveUserContext, CurrentUserContext
 from fileglancer.filestore import Filestore
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response
@@ -131,14 +131,14 @@ def create_app(settings):
                 return {fsp.name: fsp.mount_path for fsp in db.get_all_paths(session)}
 
 
-    def _get_proxy_context(username: str) -> ProxyContext:
+    def _get_proxy_context(username: str) -> UserContext:
         if settings.use_access_flags:
-            return AccessFlagsProxyContext(username)
+            return EffectiveUserContext(username)
         else:
-            return ProxyContext()
+            return CurrentUserContext()
 
 
-    def _get_file_proxy_client(sharing_key: str, sharing_name: str) -> Tuple[FileProxyClient, ProxyContext] | Tuple[Response, None]:
+    def _get_file_proxy_client(sharing_key: str, sharing_name: str) -> Tuple[FileProxyClient, UserContext] | Tuple[Response, None]:
         with db.get_db_session(settings.db_url) as session:
 
             proxied_path = db.get_proxied_path_by_sharing_key(session, sharing_key)
