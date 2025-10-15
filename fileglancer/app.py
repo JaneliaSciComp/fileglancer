@@ -7,7 +7,6 @@ from datetime import datetime, timedelta, timezone, UTC
 from functools import cache
 from pathlib import Path as PathLib
 from typing import List, Optional, Dict, Tuple, Generator
-from mimetypes import guess_type
 
 try:
     import tomllib
@@ -31,7 +30,7 @@ from fileglancer import auth
 from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
-from fileglancer.utils import slugify_path
+from fileglancer.utils import slugify_path, format_timestamp, guess_content_type, parse_range_header
 from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext
 from fileglancer.filestore import Filestore
 
@@ -694,25 +693,6 @@ def create_app(settings):
             return get_error_response(500, "InternalError", "Error requesting HEAD", path)
 
 
-    # Helper functions for file handlers
-    def _format_timestamp(timestamp):
-        """Format the given timestamp to ISO date format compatible with HTTP."""
-        dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-        return dt.isoformat()
-
-
-    def _guess_content_type(filename):
-        """A wrapper for guess_type which deals with unknown MIME types"""
-        content_type, _ = guess_type(filename)
-        if content_type:
-            return content_type
-        else:
-            if filename.endswith('.yaml'):
-                return 'text/plain+yaml'
-            else:
-                return 'application/octet-stream'
-
-
     def _get_mounted_filestore(fsp: FileSharePath):
         """Constructs a filestore for the given file share path, checking to make sure it is mounted."""
         filestore = Filestore(fsp)
@@ -770,45 +750,6 @@ def create_app(settings):
             return None, f"File share path '{path_name}' is not mounted"
 
         return filestore, None
-
-
-    def _parse_range_header(range_header: str, file_size: int):
-        """Parse HTTP Range header and return start and end byte positions."""
-        if not range_header or not range_header.startswith('bytes='):
-            return None
-
-        try:
-            range_spec = range_header[6:]  # Remove 'bytes=' prefix
-
-            if ',' in range_spec:
-                range_spec = range_spec.split(',')[0].strip()
-
-            if '-' not in range_spec:
-                return None
-
-            start_str, end_str = range_spec.split('-', 1)
-
-            if start_str and end_str:
-                start = int(start_str)
-                end = int(end_str)
-            elif start_str and not end_str:
-                start = int(start_str)
-                end = file_size - 1
-            elif not start_str and end_str:
-                suffix_length = int(end_str)
-                start = max(0, file_size - suffix_length)
-                end = file_size - 1
-            else:
-                return None
-
-            if start < 0 or end < 0 or start >= file_size or start > end:
-                return None
-
-            end = min(end, file_size - 1)
-            return (start, end)
-
-        except (ValueError, IndexError):
-            return None
 
 
     # Profile endpoint
@@ -875,7 +816,7 @@ def create_app(settings):
                 raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
 
             file_name = subpath.split('/')[-1] if subpath else ''
-            content_type = _guess_content_type(file_name)
+            content_type = guess_content_type(file_name)
 
             try:
                 file_info = filestore.get_file_info(subpath)
@@ -891,7 +832,7 @@ def create_app(settings):
                     headers['Content-Length'] = str(file_info.size)
 
                 if hasattr(file_info, 'last_modified') and file_info.last_modified is not None:
-                    headers['Last-Modified'] = _format_timestamp(file_info.last_modified)
+                    headers['Last-Modified'] = format_timestamp(file_info.last_modified)
 
                 return Response(status_code=200, headers=headers, media_type=content_type)
 
@@ -917,7 +858,7 @@ def create_app(settings):
                 raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
 
             file_name = subpath.split('/')[-1] if subpath else ''
-            content_type = _guess_content_type(file_name)
+            content_type = guess_content_type(file_name)
 
             try:
                 file_info = filestore.get_file_info(subpath)
@@ -928,7 +869,7 @@ def create_app(settings):
                 range_header = request.headers.get('Range')
 
                 if range_header:
-                    range_result = _parse_range_header(range_header, file_size)
+                    range_result = parse_range_header(range_header, file_size)
                     if range_result is None:
                         return Response(
                             status_code=416,
