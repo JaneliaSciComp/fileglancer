@@ -83,29 +83,17 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    # Check if a connection was passed via attributes (for in-memory databases)
-    connection = config.attributes.get('connection', None)
+    # Override the sqlalchemy.url from the alembic.ini file
+    configuration = config.get_section(config.config_ini_section)
+    configuration['sqlalchemy.url'] = get_database_url()
 
-    if connection is None:
-        # Override the sqlalchemy.url from the alembic.ini file
-        configuration = config.get_section(config.config_ini_section)
-        configuration['sqlalchemy.url'] = get_database_url()
+    connectable = engine_from_config(
+        configuration,
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
 
-        connectable = engine_from_config(
-            configuration,
-            prefix="sqlalchemy.",
-            poolclass=pool.NullPool,
-        )
-
-        with connectable.connect() as connection:
-            context.configure(
-                connection=connection, target_metadata=target_metadata
-            )
-
-            with context.begin_transaction():
-                context.run_migrations()
-    else:
-        # Connection was provided, use it directly
+    with connectable.connect() as connection:
         context.configure(
             connection=connection, target_metadata=target_metadata
         )
