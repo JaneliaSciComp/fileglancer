@@ -255,6 +255,9 @@ def create_app(settings):
         return await oauth.okta.authorize_redirect(request, redirect_uri)
 
 
+    @app.get("/api/oauth_callback", include_in_schema=settings.enable_okta_auth,
+             description="OKTA OAuth callback endpoint")
+    # the hub url is legacy from jupyterhub. Kept here for backwards compatibility with existing okta config.
     @app.get("/hub/oauth_callback", include_in_schema=settings.enable_okta_auth,
              description="OKTA OAuth callback endpoint")
     async def auth_callback(request: Request, response: Response):

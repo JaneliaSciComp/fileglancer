@@ -117,8 +117,8 @@ node-eslint-write = "npx eslint . --cache --fix --ext .ts,.tsx"
 node-prettier-check =  "npx prettier \"**/*{.ts,.tsx,.js,.jsx,.css,.json,.md}\" \"!package-lock.json\" --check"
 node-prettier-write = "npx prettier --list-different --write '**/*.{ts,tsx,js,jsx,json,md}' '!package-lock.json'"
 node-check = "npx tsc --noEmit -p tsconfig.app.json"
-node-install-ui-test = "npm --prefix ui-tests install"
-ui-test = { cmd = "npm --prefix ui-tests run test", depends-on = ["node-install-ui-test"] }
+node-install-ui-tests = "npm --prefix ui-tests install"
+test-ui = { cmd = "npm --prefix ui-tests run test ", depends-on = ["node-install-ui-tests"] }
 dev-install = { depends-on = ["node-build", "pip-install"] }
 dev-watch = { cmd = "NODE_ENV=development npm run watch" }
 dev-launch = "pixi run uvicorn fileglancer.app:app --port 7878 --reload"

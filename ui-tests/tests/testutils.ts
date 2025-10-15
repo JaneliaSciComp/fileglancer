@@ -1,16 +1,24 @@
 import { Page } from '@playwright/test';
-import type { IJupyterLabPageFixture } from '@jupyterlab/galata';
 
 const sleepInSecs = (secs: number) =>
   new Promise(resolve => setTimeout(resolve, secs * 1000));
 
-const openFileglancer = async (page: IJupyterLabPageFixture) => {
-  // open jupyter lab
-  await page.goto('http://localhost:8888/lab', {
+const openFileglancer = async (page: Page) => {
+  // Navigate directly to Fileglancer standalone app
+  await page.goto('/fg/', {
     waitUntil: 'domcontentloaded'
   });
-  // click on Fileglancer icon
-  await page.getByText('Fileglancer', { exact: true }).click();
+  // Wait for the app to be ready
+  await page.waitForSelector('text=Log In', { timeout: 10000 });
+
+  // Perform login
+  const loginForm = page.getByRole('textbox', { name: 'Username' });
+  const loginSubmitBtn = page.getByRole('button', { name: 'Log In' });
+  await loginForm.fill('testUser');
+  await loginSubmitBtn.click();
+
+  // Wait for the main UI to load
+  await page.waitForSelector('text=Zones', { timeout: 10000 });
 };
 
 const TEST_USER = 'testUser';
@@ -24,6 +32,7 @@ const TEST_SHARED_PATHS = [
   {
     name: 'groups_z1_primaryzone',
     zone: 'Z1',
+
     storage: 'primary',
     mount_path: '/z1/labarea'
   },
@@ -36,8 +45,7 @@ const TEST_SHARED_PATHS = [
 ];
 
 const mockAPI = async (page: Page) => {
-  // mock API calls
-  await page.route('/api/fileglancer/profile', async route => {
+  await page.route('/api/profile', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -47,7 +55,7 @@ const mockAPI = async (page: Page) => {
     });
   });
 
-  await page.route('/api/fileglancer/file-share-paths', async route => {
+  await page.route('/api/file-share-paths', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -57,46 +65,43 @@ const mockAPI = async (page: Page) => {
     });
   });
 
-  await page.route(
-    `/api/fileglancer/files/${TEST_SHARED_PATHS[2].name}**`,
-    async route => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          files: [
-            {
-              name: 'f1',
-              path: 'f1',
-              size: 10,
-              is_dir: false,
-              permissions: '-rw-r--r--',
-              owner: 'testuser',
-              group: 'test',
-              last_modified: 1747865213.768398
-            },
-            {
-              name: 'f2',
-              path: 'f2',
-              size: 10,
-              is_dir: false,
-              permissions: '-rw-r--r--',
-              owner: 'testuser',
-              group: 'test',
-              last_modified: 1758924043.768398
-            }
-          ]
-        })
-      });
-    }
-  );
+  await page.route(`/api/files/${TEST_SHARED_PATHS[2].name}**`, async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        files: [
+          {
+            name: 'f1',
+            path: 'f1',
+            size: 10,
+            is_dir: false,
+            permissions: '-rw-r--r--',
+            owner: 'testuser',
+            group: 'test',
+            last_modified: 1747865213.768398
+          },
+          {
+            name: 'f2',
+            path: 'f2',
+            size: 10,
+            is_dir: false,
+            permissions: '-rw-r--r--',
+            owner: 'testuser',
+            group: 'test',
+            last_modified: 1758924043.768398
+          }
+        ]
+      })
+    });
+  });
 };
 
-const teardownMockAPI = async page => {
+const teardownMockAPI = async (page: Page) => {
   // remove all route handlers
-  await page.unroute('/api/fileglancer/profile');
-  await page.unroute('/api/fileglancer/file-share-paths');
-  await page.unroute(`/api/fileglancer/files/${TEST_SHARED_PATHS[2].name}**`);
+  await page.unroute('/api/profile');
+  await page.unroute('/api/file-share-paths');
+  await page.unroute(`/api/files/${TEST_SHARED_PATHS[2].name}**`);
 };
 
 export {

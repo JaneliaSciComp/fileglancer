@@ -92,7 +92,7 @@ enable_okta_auth: false
 # OKTA OAuth redirect URI (callback URL)
 # This must match the redirect URI configured in your OKTA application
 #
-# okta_redirect_uri: http://localhost:7878/api/auth/callback
+# okta_redirect_uri: https://<your_domain>/api/oauth_callback
 
 #
 # Session Management Settings
