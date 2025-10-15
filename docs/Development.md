@@ -21,17 +21,21 @@ You can build the frontend extension in watch mode - it will automatically rebui
 pixi run dev-watch
 ```
 
-In new terminal, run JupyterLab in autoreload mode - it will automatically rebuild when there are file changes to the backend:
+In new terminal, launch the server - it will automatically rebuild when there are file changes to the backend:
 
 ```bash
 pixi run dev-launch
 ```
 
-Saved changes in your directory should now be automatically built locally and available in your running JupyterLab. Refresh JupyterLab to load the change in your browser (you may need to wait several seconds for the extension to be rebuilt).
+View the app in the browser at localhost:7878.
 
-If everything has worked so far, you should see the Fileglancer widget on the Launcher pane:
+## Configuration
 
-![Screenshot of the JupyterLab Launcher panel. In the bottom section, titled "Other", the square tile with the title "Fileglancer" is circled](../assets/img/launcher.png)
+Copy the configuration file and edit as desired.
+
+```
+cp config.yaml.template config.yaml
+```
 
 ### Running with SSL/HTTPS (Secure Mode)
 
@@ -105,7 +109,7 @@ https://fileglancer-dev.int.janelia.org/
 
 **Important:** Remember to remove or comment out this entry from `/etc/hosts` when you're done testing, especially if the domain is used in production.
 
-### Troubleshooting the extension
+### Troubleshooting
 
 If you run into any build issues, the first thing to try is to clear the build directories and start from scratch:
 
@@ -114,35 +118,6 @@ If you run into any build issues, the first thing to try is to clear the build d
 ```
 
 If you're still having issues, try manually deleting the symlink at `.pixi/envs/share/jupyter/labextensions/fileglancer` inside the fileglancer repo directory. Then, reinstall the extension using `pixi run dev-install`, and follow the steps above from there.
-
-## Configuration
-
-By default, no [Fileglancer Central](https://github.com/JaneliaSciComp/fileglancer-central) server will be used.
-You can configure the URL of a Fileglancer Central server with traitlets, in several ways:
-
-### Command line
-
-```bash
-pixi run dev-launch --Fileglancer.central_url=http://0.0.0.0:7878
-```
-
-### Config file
-
-You can create a file at `~/.jupyter/jupyter_server_config.py` (or in any of the paths reported by `pixi run jupyter --paths`) and add your configuration there, e.g.:
-
-```python
-c.Fileglancer.central_url='http://0.0.0.0:7878'
-```
-
-## Development Uninstall
-
-```bash
-pixi run pip-uninstall
-```
-
-In development mode, you will also need to remove the symlink created by `jupyter labextension develop`
-command. To find its location, you can run `jupyter labextension list` to figure out where the `labextensions`
-folder is located. Then you can remove the symlink named `fileglancer` within that folder.
 
 ## Testing
 
@@ -166,8 +141,7 @@ pixi run test-frontend
 
 ### Integration tests
 
-This extension uses [Playwright](https://playwright.dev/docs/intro) for the integration tests (aka user level tests).
-More precisely, the JupyterLab helper [Galata](https://github.com/jupyterlab/jupyterlab/tree/master/galata) is used to handle testing the extension in JupyterLab.
+This extension uses [Playwright](https://playwright.dev/docs/intro) for the integration tests (aka ui tests).
 
 To execute the UI integration tests:
 
@@ -180,31 +154,31 @@ pixi run npm --prefix ui-tests npx playwright install
 Then run the tests with:
 
 ```bash
-pixi run ui-test
+pixi run test-ui
 ```
 
 You can also run these in UI debug mode using:
 
 ```bash
-pixi run ui-test -- --ui --debug
+pixi run test-ui -- --ui --debug
 ```
 
 If you are unable to use the UI mode, record a trace for inspecting in the [Playwright trace viewer](https://trace.playwright.dev):
 
 ```bash
-pixi run ui-test -- --trace on
+pixi run test-ui -- --trace on
 ```
 
 To run only a specific test:
 
 ```bash
-pixi run ui-test -- --<optional-flag> tests/fgzones.spec.ts
+pixi run test-ui -- --<optional-flag> tests/fgzones.spec.ts
 ```
 
 You can also use the name of the test:
 
 ```bash
-pixi run ui-test -- -g "the test description"
+pixi run test-ui -- -g "the test description"
 ```
 
 ## Other documentation
