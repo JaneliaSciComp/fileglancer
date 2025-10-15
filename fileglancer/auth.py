@@ -54,14 +54,6 @@ def verify_id_token(id_token: str, settings: Settings) -> dict:
         raise HTTPException(status_code=401, detail="Invalid authentication token")
 
 
-def get_current_user_from_env() -> str:
-    """
-    Fallback authentication method using environment variable
-    Used when OKTA auth is disabled
-    """
-    return os.getenv("USER", "unknown")
-
-
 def get_session_from_cookie(request: Request, settings: Settings) -> Optional[db.SessionDB]:
     """
     Extract and validate session from cookie
