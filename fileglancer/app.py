@@ -131,7 +131,7 @@ def create_app(settings):
                 return {fsp.name: fsp.mount_path for fsp in db.get_all_paths(session)}
 
 
-    def _get_proxy_context(username: str) -> UserContext:
+    def _get_user_context(username: str) -> UserContext:
         if settings.use_access_flags:
             return EffectiveUserContext(username)
         else:
@@ -152,7 +152,7 @@ def create_app(settings):
                 return get_error_response(400, "InvalidArgument", f"File share path {proxied_path.fsp_name} not found", sharing_name), None
             fsp_mount_path = fsp_names_to_mount_paths[proxied_path.fsp_name]
             mount_path = f"{fsp_mount_path}/{proxied_path.path}"
-            return FileProxyClient(proxy_kwargs={'target_name': sharing_name}, path=mount_path), _get_proxy_context(proxied_path.username)
+            return FileProxyClient(proxy_kwargs={'target_name': sharing_name}, path=mount_path), _get_user_context(proxied_path.username)
 
 
     @asynccontextmanager
@@ -815,7 +815,7 @@ def create_app(settings):
     @app.get("/api/profile", description="Get the current user's profile")
     async def get_profile(username: str = Depends(get_current_user)):
         """Get the current user's profile"""
-        with _get_proxy_context(username):
+        with _get_user_context(username):
             home_directory_path = os.path.expanduser(f"~{username}")
             home_directory_name = os.path.basename(home_directory_path)
             home_parent = os.path.dirname(home_directory_path)
@@ -869,7 +869,7 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
-        with _get_proxy_context(username):
+        with _get_user_context(username):
             filestore, error = _get_filestore(filestore_name)
             if filestore is None:
                 raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
@@ -911,7 +911,7 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
-        with _get_proxy_context(username):
+        with _get_user_context(username):
             filestore, error = _get_filestore(filestore_name)
             if filestore is None:
                 raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
@@ -986,7 +986,7 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
-        with _get_proxy_context(username):
+        with _get_user_context(username):
             filestore, error = _get_filestore(filestore_name)
             if filestore is None:
                 raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
@@ -1027,7 +1027,7 @@ def create_app(settings):
                                  body: Dict = Body(...), 
                                  username: str = Depends(get_current_user)):
         """Handle POST requests to create a new file or directory"""
-        with _get_proxy_context(username):
+        with _get_user_context(username):
             filestore, error = _get_filestore(path_name)
             if filestore is None:
                 raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
@@ -1057,7 +1057,7 @@ def create_app(settings):
                                  body: Dict = Body(...),
                                  username: str = Depends(get_current_user)):
         """Handle PATCH requests to rename or update file permissions"""
-        with _get_proxy_context(username):
+        with _get_user_context(username):
             filestore, error = _get_filestore(path_name)
             if filestore is None:
                 raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
@@ -1087,7 +1087,7 @@ def create_app(settings):
                                  subpath: Optional[str] = Query(''),
                                  username: str = Depends(get_current_user)):
         """Handle DELETE requests to remove a file or (empty) directory"""
-        with _get_proxy_context(username):
+        with _get_user_context(username):
             filestore, error = _get_filestore(path_name)
             if filestore is None:
                 raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
