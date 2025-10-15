@@ -32,7 +32,7 @@ from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
 from fileglancer.utils import slugify_path
-from fileglancer.proxy_context import UserContext, EffectiveUserContext, CurrentUserContext
+from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext
 from fileglancer.filestore import Filestore
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response
