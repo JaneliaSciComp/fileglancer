@@ -43,7 +43,6 @@ jobs:
     - name: Test the backend
       run: |
         set -eux
-        pixi run --environment test pip install -e .
         pixi run test-backend
 
     - name: Build the frontend
