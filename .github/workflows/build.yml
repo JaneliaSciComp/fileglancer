@@ -131,7 +131,7 @@ jobs:
     - name: Install dependencies
       run: |
         pixi run dev-install
-        pixi run node-install-ui-test
+        pixi run node-install-ui-tests
 
     - name: Install browser
       run: npx playwright install chromium
@@ -146,7 +146,7 @@ jobs:
 
     - name: Execute integration tests
       run: |
-        pixi run ui-test
+        pixi run test-ui
 
     - name: Upload Playwright Test report
       if: ${{ !cancelled() }}

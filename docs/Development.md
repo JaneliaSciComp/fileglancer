@@ -180,31 +180,31 @@ pixi run npm --prefix ui-tests npx playwright install
 Then run the tests with:
 
 ```bash
-pixi run ui-test
+pixi run test-ui
 ```
 
 You can also run these in UI debug mode using:
 
 ```bash
-pixi run ui-test -- --ui --debug
+pixi run test-ui -- --ui --debug
 ```
 
 If you are unable to use the UI mode, record a trace for inspecting in the [Playwright trace viewer](https://trace.playwright.dev):
 
 ```bash
-pixi run ui-test -- --trace on
+pixi run test-ui -- --trace on
 ```
 
 To run only a specific test:
 
 ```bash
-pixi run ui-test -- --<optional-flag> tests/fgzones.spec.ts
+pixi run test-ui -- --<optional-flag> tests/fgzones.spec.ts
 ```
 
 You can also use the name of the test:
 
 ```bash
-pixi run ui-test -- -g "the test description"
+pixi run test-ui -- -g "the test description"
 ```
 
 ## Other documentation

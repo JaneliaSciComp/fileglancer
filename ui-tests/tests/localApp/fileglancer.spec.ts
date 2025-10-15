@@ -1,36 +1,17 @@
-import { expect, test } from '@jupyterlab/galata';
+import { expect, test } from '@playwright/test';
 import { openFileglancer } from '../testutils.ts';
-import type { IJupyterLabPageFixture } from '@jupyterlab/galata';
 
-/**
- * Don't load JupyterLab webpage before running the tests.
- * This is required to ensure we capture all log messages.
- */
-test.use({ autoGoto: false });
+test('should load fileglancer app', async ({ page }) => {
+  await openFileglancer(page);
 
-test('should emit an activation console message', async ({ page }) => {
-  const logs: string[] = [];
-
-  page.on('console', message => {
-    logs.push(message.text());
-  });
-
-  await page.goto();
-
-  expect(
-    logs.filter(s => s === 'JupyterLab extension fileglancer is activated!')
-  ).toHaveLength(1);
+  // Verify main app elements are visible
+  await expect(page.getByText('Browse Files')).toBeVisible();
+  await expect(page.getByText('Zones', { exact: true })).toBeVisible();
 });
 
-test('when fg icon clicked should open fileglancer extension', async ({
-  page
-}) => {
-  const logs: string[] = [];
-
-  page.on('console', message => {
-    logs.push(message.text());
-  });
-
+test('should display dashboard on initial load', async ({ page }) => {
   await openFileglancer(page);
-  await expect(page.getByText('Browse')).toBeVisible();
+
+  // The Browse page should be the default view
+  await expect(page.getByText('Recently Viewed')).toBeVisible();
 });

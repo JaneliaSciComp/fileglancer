@@ -1,18 +1,20 @@
-import { expect, test } from '@jupyterlab/galata';
+import { expect, test } from '@playwright/test';
 import { openFileglancer } from '../testutils.ts';
 
 test.beforeEach('Open fileglancer', async ({ page }) => {
   await openFileglancer(page);
 });
 
-test('Home becomes visible when Local is expanded', async ({ page }) => {
+test('Local file share becomes visible when Local zone is expanded', async ({
+  page
+}) => {
   const zonesLocator = page.getByText('Zones', { exact: true });
-  const homeLocator = page.getByRole('link', { name: 'home', exact: true });
+  const localFspLocator = page.getByRole('link', { name: 'local' });
   const localZoneLocator = page.getByText('Local');
 
   await expect(zonesLocator).toBeVisible();
-  // the home locator initially is not visible
-  await expect(homeLocator).toHaveCount(0);
+  // the local fsp initially is not visible
+  await expect(localFspLocator).toHaveCount(0);
 
   // assume local is visible so click on zones and hide all zones (including local)
   await zonesLocator.click();
@@ -22,8 +24,8 @@ test('Home becomes visible when Local is expanded', async ({ page }) => {
   await zonesLocator.click();
   // expect the local zone to be visible
   await expect(localZoneLocator).toBeVisible();
-  // click on it to view home
+  // click on it to expand
   await localZoneLocator.click();
 
-  await expect(homeLocator).toBeVisible();
+  await expect(localFspLocator).toBeVisible();
 });
