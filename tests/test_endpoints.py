@@ -13,6 +13,9 @@ from fileglancer.app import create_app
 from fileglancer.database import *
 from fileglancer.model import TicketComment
 
+# Test user constant for authentication override
+TEST_USERNAME = "testuser"
+
 @pytest.fixture
 def temp_dir():
     temp_dir = tempfile.mkdtemp()
@@ -70,8 +73,20 @@ def test_app(temp_dir):
 
 @pytest.fixture
 def test_client(test_app):
-    """Create test client"""
-    return TestClient(test_app)
+    """Create test client with authentication bypass"""
+    # Override the get_current_user dependency to return a test user
+    from fileglancer.app import get_current_user
+
+    def override_get_current_user():
+        return TEST_USERNAME
+
+    test_app.dependency_overrides[get_current_user] = override_get_current_user
+    client = TestClient(test_app)
+
+    yield client
+
+    # Clean up the override after tests
+    test_app.dependency_overrides.clear()
 
 
 def test_robots_txt(test_client):
@@ -168,7 +183,7 @@ def test_create_proxied_path(test_client, temp_dir):
     response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path={path}")
     assert response.status_code == 200
     data = response.json()
-    assert data["username"] == os.getenv("USER", "unknown")
+    assert data["username"] == TEST_USERNAME
     assert data["path"] == path
     assert "sharing_key" in data
     assert "sharing_name" in data
@@ -539,7 +554,7 @@ def test_create_ticket(mock_get_details, mock_create, test_client, temp_dir):
     assert response.status_code == 200
     data = response.json()
     assert data["key"] == "TEST-123"
-    assert data["username"] == os.getenv("USER", "unknown")
+    assert data["username"] == TEST_USERNAME
     assert data["fsp_name"] == "tempdir"
     assert data["path"] == "test_ticket_path"
     assert data["status"] == "Open"

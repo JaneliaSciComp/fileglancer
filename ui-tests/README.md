@@ -1,14 +1,10 @@
 # Integration Testing
 
-This folder contains the integration tests of the extension.
+This folder contains the UI integration tests for Fileglancer.
 
-They are defined using [Playwright](https://playwright.dev/docs/intro) test runner
-and [Galata](https://github.com/jupyterlab/jupyterlab/tree/main/galata) helper.
+They are defined using [Playwright](https://playwright.dev/docs/intro) test runner.
 
 The Playwright configuration is defined in [playwright.config.js](./playwright.config.js).
-
-The JupyterLab server configuration to use for the integration test is defined
-in [jupyter_server_test_config.py](./jupyter_server_test_config.py).
 
 ## Run the tests
 
