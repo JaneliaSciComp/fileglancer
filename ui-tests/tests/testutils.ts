@@ -1,7 +1,49 @@
 import { Page } from '@playwright/test';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as os from 'os';
 
 const sleepInSecs = (secs: number) =>
   new Promise(resolve => setTimeout(resolve, secs * 1000));
+
+async function getTestTempDir(): Promise<string> {
+  const tempDir = os.tmpdir();
+  const entries = await fs.readdir(tempDir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    if (entry.isDirectory() && entry.name.startsWith('fg-playwright-')) {
+      return path.join(tempDir, entry.name);
+    }
+  }
+  throw new Error('Test temp directory not found');
+}
+
+async function createTestFilesInScratchDir(): Promise<void> {
+  const testTempDir = await getTestTempDir();
+  const scratchDir = path.join(testTempDir, 'scratch');
+  await writeFiles(scratchDir);
+}
+
+const TEST_FILES = [
+  { name: 'f1', content: 'test content for f1' },
+  { name: 'f2', content: 'test content for f2' },
+  { name: 'f3', content: 'test content for f3' }
+] as const;
+
+// Async, for use in tests
+async function writeFiles(dir: string): Promise<void> {
+  for (const file of TEST_FILES) {
+    await fs.writeFile(path.join(dir, file.name), file.content);
+  }
+}
+
+// Sync, for use in playwright.config.js (runs synchronously during initial setup)
+function writeFilesSync(dir: string): void {
+  const fsSync = require('fs');
+  for (const file of TEST_FILES) {
+    fsSync.writeFileSync(path.join(dir, file.name), file.content);
+  }
+}
 
 const openFileglancer = async (page: Page) => {
   // Navigate directly to Fileglancer standalone app
@@ -22,27 +64,6 @@ const openFileglancer = async (page: Page) => {
 };
 
 const TEST_USER = 'testUser';
-const TEST_SHARED_PATHS = [
-  {
-    name: 'groups_z1_homezone',
-    zone: 'Z1',
-    storage: 'home',
-    mount_path: '/z1/home'
-  },
-  {
-    name: 'groups_z1_primaryzone',
-    zone: 'Z1',
-
-    storage: 'primary',
-    mount_path: '/z1/labarea'
-  },
-  {
-    name: 'groups_z2_scratchzone',
-    zone: 'Z2',
-    storage: 'scratch',
-    mount_path: '/z2/scratch'
-  }
-];
 
 const mockAPI = async (page: Page) => {
   await page.route('/api/profile', async route => {
@@ -54,54 +75,10 @@ const mockAPI = async (page: Page) => {
       })
     });
   });
-
-  await page.route('/api/file-share-paths', async route => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        paths: TEST_SHARED_PATHS
-      })
-    });
-  });
-
-  await page.route(`/api/files/${TEST_SHARED_PATHS[2].name}**`, async route => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        files: [
-          {
-            name: 'f1',
-            path: 'f1',
-            size: 10,
-            is_dir: false,
-            permissions: '-rw-r--r--',
-            owner: 'testuser',
-            group: 'test',
-            last_modified: 1747865213.768398
-          },
-          {
-            name: 'f2',
-            path: 'f2',
-            size: 10,
-            is_dir: false,
-            permissions: '-rw-r--r--',
-            owner: 'testuser',
-            group: 'test',
-            last_modified: 1758924043.768398
-          }
-        ]
-      })
-    });
-  });
 };
 
 const teardownMockAPI = async (page: Page) => {
-  // remove all route handlers
   await page.unroute('/api/profile');
-  await page.unroute('/api/file-share-paths');
-  await page.unroute(`/api/files/${TEST_SHARED_PATHS[2].name}**`);
 };
 
 export {
@@ -109,5 +86,6 @@ export {
   openFileglancer,
   mockAPI,
   teardownMockAPI,
-  TEST_SHARED_PATHS
+  createTestFilesInScratchDir,
+  writeFilesSync
 };
