@@ -25,13 +25,11 @@ If you are on the internal Janelia network navigate to "fileglancer.int.janelia.
 
 ## Software Architecture
 
-Fileglancer is built on top of [JupyterHub](https://jupyter.org/hub), which provides the infrastructure for allowing users to login and interact directly with their files on mounted network file systems. JupyterHub runs a "single user server" for each user who logs in, in a process owned by that user. The Fileglancer plugin for JupyterHub replaces the UI with a new SPA webapp that connects back to a custom backend running inside the single user server. We also added a "central server" to serve shared data and to manage connections to a shared database for saving preferences, data links, and other persistent information.
+Fileglancer has a React front-end and a FastAPI backend. Inspired by JupyterHub's method of spinning up individual user servers using setuid, we use seteuid to change the effective user of each request as necessary. This allows each logged in user to access their resources on the network file systems. 
 
 <p align="center">
-<img alt="Fileglancer architecture diagram" width="800" align="center" src="https://github.com/user-attachments/assets/fd39361d-ee62-422c-912a-5668c5ffdfb9" />
+<img alt="Fileglancer architecture diagram" width="800" align="center" src="[https://github.com/user-attachments/assets/fd39361d-ee62-422c-912a-5668c5ffdfb9](https://github.com/user-attachments/assets/31b30b01-f313-4295-8536-bac8c3bdde73)" />
 </p>
-
-The current code base is geared towards a Janelia deployment, but we are working towards decoupling it. Please reach out to us if you are interested in deploying Fileglancer at your institution. We've be happy to consider pull requests (PRs) with the goal of making Fileglancer more useful outside of the Janelia.
 
 ## Documentation
 
@@ -40,7 +38,6 @@ The current code base is geared towards a Janelia deployment, but we are working
 
 ## Related repositories
 
-- [fileglancer-central](https://github.com/JaneliaSciComp/fileglancer-central) - Backend API managing access to shared resources
-- [fileglancer-hub](https://github.com/JaneliaSciComp/fileglancer-hub) - Deployment of Fileglancer into JupyterHub
+- [fileglancer-hub](https://github.com/JaneliaSciComp/fileglancer-hub) - Production deployment files
 - [fileglancer-janelia](https://github.com/JaneliaSciComp/fileglancer-janelia) - Janelia-specific customizations
 - [fileglancer-docs](https://github.com/JaneliaSciComp/fileglancer-docs) - Documentation website
