@@ -45,17 +45,6 @@ export default defineConfig({
       FGC_FILE_SHARE_MOUNTS: JSON.stringify([homeDir, primaryDir, scratchDir])
     }
   },
-  projects: [
-    {
-      name: 'local-app',
-      testDir: './tests/localApp'
-    },
-    {
-      name: 'mocked-fg-central-app',
-      testDir: './tests/mockedFgCentralApp'
-    }
-  ],
-
   // Clean up temp directory after all tests complete
   globalTeardown: './global-teardown.js'
 });
