@@ -2,13 +2,27 @@
  * Configuration for Playwright for standalone Fileglancer app
  */
 import { defineConfig } from '@playwright/test';
-import { mkdtempSync } from 'fs';
+import { mkdtempSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { writeFilesSync } from './tests/testutils';
 
 // Create a unique temp directory for this test run
 const testTempDir = mkdtempSync(join(tmpdir(), 'fg-playwright-'));
 const testDbPath = join(testTempDir, 'test.db');
+
+const homeDir = join(testTempDir, 'home');
+const primaryDir = join(testTempDir, 'primary');
+const scratchDir = join(testTempDir, 'scratch');
+
+mkdirSync(homeDir, { recursive: true });
+mkdirSync(primaryDir, { recursive: true });
+mkdirSync(scratchDir, { recursive: true });
+
+writeFilesSync(scratchDir);
+
+// Export temp directory path for global teardown
+global.testTempDir = testTempDir;
 
 export default defineConfig({
   reporter: [['html', { open: process.env.CI ? 'never' : 'on-failure' }]],
@@ -28,7 +42,7 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       FGC_DB_URL: `sqlite:///${testDbPath}`,
-      FGC_FILE_SHARE_MOUNTS: '[""]'
+      FGC_FILE_SHARE_MOUNTS: JSON.stringify([homeDir, primaryDir, scratchDir])
     }
   },
   projects: [

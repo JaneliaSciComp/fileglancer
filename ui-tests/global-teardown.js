@@ -1,6 +1,6 @@
 /**
  * Global teardown script for Playwright tests
- * Cleans up temporary test database directory
+ * Cleans up temporary test database directory and test files
  */
 import { rmSync } from 'fs';
 import { tmpdir } from 'os';
@@ -17,7 +17,9 @@ export default async function globalTeardown() {
       if (entry.isDirectory() && entry.name.startsWith('fg-playwright-')) {
         const fullPath = join(tempDir, entry.name);
         rmSync(fullPath, { recursive: true, force: true });
-        console.log(`Cleaned up test database directory: ${fullPath}`);
+        console.log(
+          `Cleaned up test directory (database + file shares): ${fullPath}`
+        );
       }
     }
   } catch (error) {
