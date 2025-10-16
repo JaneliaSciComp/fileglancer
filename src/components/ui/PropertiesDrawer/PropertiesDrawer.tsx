@@ -267,7 +267,7 @@ export default function PropertiesDrawer({
                   </Typography>
                   <Button
                     disabled={
-                      fileBrowserState.propertiesTarget.hasWrite === false
+                      fileBrowserState.propertiesTarget.hasRead === false
                     }
                     onClick={() => {
                       setShowConvertFileDialog(true);
