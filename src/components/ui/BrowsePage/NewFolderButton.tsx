@@ -25,6 +25,7 @@ export default function NewFolderButton({
   return (
     <>
       <FgTooltip
+        as="button"
         disabledCondition={!fileBrowserState.currentFileSharePath}
         icon={HiFolderAdd}
         label="New folder"

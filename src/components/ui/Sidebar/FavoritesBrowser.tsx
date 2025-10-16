@@ -50,6 +50,8 @@ export default function FavoritesBrowser({
         <List.Item
           className="cursor-pointer rounded-md py-2 short:py-1 hover:!bg-surface-light focus:!bg-surface-light"
           onClick={() => toggleOpenFavorites('all')}
+          role="button"
+          tabIndex={0}
         >
           <List.ItemStart>
             <HiStar className="icon-default short:icon-small text-surface-foreground" />
