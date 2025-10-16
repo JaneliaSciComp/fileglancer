@@ -70,7 +70,10 @@ export default function FavoritesBrowser({
         className="overflow-x-hidden flex-grow w-full"
         open={openFavorites['all'] ? true : false}
       >
-        <List className="h-full py-0 gap-0 bg-background">
+        <List
+          aria-label="Favorites list"
+          className="h-full py-0 gap-0 bg-background"
+        >
           {searchQuery.length > 0 &&
           displayZones.length === 0 &&
           displayFileSharePaths.length === 0 &&
