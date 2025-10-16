@@ -11,7 +11,7 @@ type NavigationButtonProps = {
 
 export default function NavigationButton({
   triggerClasses
-}: NavigationButtonProps): JSX.Element {
+}: NavigationButtonProps): React.JSX.Element {
   const [showNavigationDialog, setShowNavigationDialog] = React.useState(false);
 
   return (
