@@ -4,24 +4,21 @@ import { http, HttpResponse } from 'msw';
 
 export const handlers = [
   // Proxied paths
-  http.get(
-    'http://localhost:3000/api/fileglancer/proxied-path',
-    ({ request }) => {
-      const url = new URL(request.url);
-      const fspName = url.searchParams.get('fsp_name');
-      const path = url.searchParams.get('path');
+  http.get('http://localhost:3000/api/proxied-path', ({ request }) => {
+    const url = new URL(request.url);
+    const fspName = url.searchParams.get('fsp_name');
+    const path = url.searchParams.get('path');
 
-      // If query params are provided, simulate no existing proxied path (for fetchProxiedPath)
-      if (fspName && path) {
-        return HttpResponse.json({ paths: [] }, { status: 200 });
-      }
-
-      // Default case for fetching all proxied paths
+    // If query params are provided, simulate no existing proxied path (for fetchProxiedPath)
+    if (fspName && path) {
       return HttpResponse.json({ paths: [] }, { status: 200 });
     }
-  ),
 
-  http.post('http://localhost:3000/api/fileglancer/proxied-path', () => {
+    // Default case for fetching all proxied paths
+    return HttpResponse.json({ paths: [] }, { status: 200 });
+  }),
+
+  http.post('http://localhost:3000/api/proxied-path', () => {
     return HttpResponse.json({
       username: 'testuser',
       sharing_key: 'testkey',
@@ -35,49 +32,43 @@ export const handlers = [
   }),
 
   // Preferences
-  http.get(
-    'http://localhost:3000/api/fileglancer/preference',
-    ({ request }) => {
-      const url = new URL(request.url);
-      const queryParam = url.searchParams.get('key');
-      if (queryParam === 'path') {
-        return HttpResponse.json({
-          value: ['linux_path']
-        });
-      } else if (queryParam === 'areDataLinksAutomatic') {
-        return HttpResponse.json({
-          value: false
-        });
-      } else if (
-        queryParam === 'fileSharePath' ||
-        queryParam === 'zone' ||
-        queryParam === 'folder' ||
-        queryParam === 'recentlyViewedFolders'
-      ) {
-        return HttpResponse.json({
-          value: []
-        });
-      } else {
-        // Fallback for any unhandled preferences
-        return HttpResponse.json({
-          value: null
-        });
-      }
+  http.get('http://localhost:3000/api/preference', ({ request }) => {
+    const url = new URL(request.url);
+    const queryParam = url.searchParams.get('key');
+    if (queryParam === 'path') {
+      return HttpResponse.json({
+        value: ['linux_path']
+      });
+    } else if (queryParam === 'areDataLinksAutomatic') {
+      return HttpResponse.json({
+        value: false
+      });
+    } else if (
+      queryParam === 'fileSharePath' ||
+      queryParam === 'zone' ||
+      queryParam === 'folder' ||
+      queryParam === 'recentlyViewedFolders'
+    ) {
+      return HttpResponse.json({
+        value: []
+      });
+    } else {
+      // Fallback for any unhandled preferences
+      return HttpResponse.json({
+        value: null
+      });
     }
-  ),
-  http.put(
-    'http://localhost:3000/api/fileglancer/preference',
-    ({ request }) => {
-      const url = new URL(request.url);
-      const queryParam = url.searchParams.get('key');
-      if (queryParam === 'recentlyViewedFolders') {
-        return HttpResponse.json(null, { status: 204 });
-      }
+  }),
+  http.put('http://localhost:3000/api/preference', ({ request }) => {
+    const url = new URL(request.url);
+    const queryParam = url.searchParams.get('key');
+    if (queryParam === 'recentlyViewedFolders') {
+      return HttpResponse.json(null, { status: 204 });
     }
-  ),
+  }),
 
   // File share paths
-  http.get('http://localhost:3000/api/fileglancer/file-share-paths', () => {
+  http.get('http://localhost:3000/api/file-share-paths', () => {
     return HttpResponse.json({
       paths: [
         {
@@ -106,7 +97,7 @@ export const handlers = [
 
   // Files
   http.get(
-    'http://localhost:3000/api/fileglancer/files/:fspName',
+    'http://localhost:3000/api/files/:fspName',
     ({ params, request }) => {
       const url = new URL(request.url);
       const subpath = url.searchParams.get('subpath');
@@ -132,15 +123,15 @@ export const handlers = [
   ),
   // Default to successful PATCH request for permission changes
   // 204 = successful, no content in response
-  http.patch('http://localhost:3000/api/fileglancer/files/:fspName', () => {
+  http.patch('http://localhost:3000/api/files/:fspName', () => {
     return HttpResponse.json(null, { status: 204 });
   }),
-  http.delete('http://localhost:3000/api/fileglancer/files/:fspName', () => {
+  http.delete('http://localhost:3000/api/files/:fspName', () => {
     return HttpResponse.json(null, { status: 200 });
   }),
 
   // Tickets
-  http.get('http://localhost:3000/api/fileglancer/ticket', () => {
+  http.get('http://localhost:3000/api/ticket', () => {
     return HttpResponse.json({
       tickets: [
         {
@@ -174,7 +165,7 @@ export const handlers = [
       ]
     });
   }),
-  http.post('http://localhost:3000/api/fileglancer/ticket', () => {
+  http.post('http://localhost:3000/api/ticket', () => {
     return HttpResponse.json({
       username: 'testuser',
       path: '/test/path',
@@ -190,12 +181,12 @@ export const handlers = [
   }),
 
   // External bucket
-  http.get('http://localhost:3000/api/fileglancer/external-bucket', () => {
+  http.get('http://localhost:3000/api/external-bucket', () => {
     return HttpResponse.json({ buckets: [] }, { status: 200 });
   }),
 
   //Profile
-  http.get('http://localhost:3000/api/fileglancer/profile', () => {
+  http.get('http://localhost:3000/api/profile', () => {
     return HttpResponse.json({ username: 'testuser' });
   })
 ];

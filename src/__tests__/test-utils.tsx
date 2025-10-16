@@ -14,7 +14,7 @@ import { OpenFavoritesProvider } from '@/contexts/OpenFavoritesContext';
 import { TicketProvider } from '@/contexts/TicketsContext';
 import { ProfileContextProvider } from '@/contexts/ProfileContext';
 import { ExternalBucketProvider } from '@/contexts/ExternalBucketContext';
-import { CentralServerHealthProvider } from '@/contexts/CentralServerHealthContext';
+import { ServerHealthProvider } from '@/contexts/ServerHealthContext';
 import ErrorFallback from '@/components/ErrorFallback';
 
 interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
@@ -40,7 +40,7 @@ const FileBrowserTestingWrapper = ({
 const Browse = ({ children }: { children: React.ReactNode }) => {
   return (
     <CookiesProvider>
-      <CentralServerHealthProvider>
+      <ServerHealthProvider>
         <ZonesAndFspMapContextProvider>
           <OpenFavoritesProvider>
             <FileBrowserTestingWrapper>
@@ -56,7 +56,7 @@ const Browse = ({ children }: { children: React.ReactNode }) => {
             </FileBrowserTestingWrapper>
           </OpenFavoritesProvider>
         </ZonesAndFspMapContextProvider>
-      </CentralServerHealthProvider>
+      </ServerHealthProvider>
     </CookiesProvider>
   );
 };

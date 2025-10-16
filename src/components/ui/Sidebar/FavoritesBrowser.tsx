@@ -50,6 +50,8 @@ export default function FavoritesBrowser({
         <List.Item
           className="cursor-pointer rounded-md py-2 short:py-1 hover:!bg-surface-light focus:!bg-surface-light"
           onClick={() => toggleOpenFavorites('all')}
+          role="button"
+          tabIndex={0}
         >
           <List.ItemStart>
             <HiStar className="icon-default short:icon-small text-surface-foreground" />
@@ -68,7 +70,10 @@ export default function FavoritesBrowser({
         className="overflow-x-hidden flex-grow w-full"
         open={openFavorites['all'] ? true : false}
       >
-        <List className="h-full py-0 gap-0 bg-background">
+        <List
+          aria-label="Favorites list"
+          className="h-full py-0 gap-0 bg-background"
+        >
           {searchQuery.length > 0 &&
           displayZones.length === 0 &&
           displayFileSharePaths.length === 0 &&
@@ -107,7 +112,7 @@ export default function FavoritesBrowser({
                     folderPath={folderFavorite.folderPath}
                     fsp={folderFavorite.fsp}
                     key={
-                      folderFavorite.fsp.name + '-' + folderFavorite.folderPath
+                      folderFavorite.fsp?.name + '-' + folderFavorite.folderPath
                     }
                   />
                 );

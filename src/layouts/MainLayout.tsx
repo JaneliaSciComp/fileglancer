@@ -15,16 +15,16 @@ import { ProxiedPathProvider } from '@/contexts/ProxiedPathContext';
 import { ExternalBucketProvider } from '@/contexts/ExternalBucketContext';
 import { ProfileContextProvider } from '@/contexts/ProfileContext';
 import { NotificationProvider } from '@/contexts/NotificationsContext';
-import { CentralServerHealthProvider } from '@/contexts/CentralServerHealthContext';
+import { ServerHealthProvider } from '@/contexts/ServerHealthContext';
 import FileglancerNavbar from '@/components/ui/Navbar/Navbar';
 import Notifications from '@/components/ui/Notifications/Notifications';
 import ErrorFallback from '@/components/ErrorFallback';
-import { CentralServerDownOverlay } from '@/components/ui/Dialogs/CentralServerDownOverlay';
-import { useCentralServerHealthContext } from '@/contexts/CentralServerHealthContext';
+import { ServerDownOverlay } from '@/components/ui/Dialogs/ServerDownOverlay';
+import { useServerHealthContext } from '@/contexts/ServerHealthContext';
 
 const MainLayoutContent = () => {
   const { showWarningOverlay, checkHealth, nextRetrySeconds } =
-    useCentralServerHealthContext();
+    useServerHealthContext();
 
   return (
     <>
@@ -46,7 +46,7 @@ const MainLayoutContent = () => {
           </ErrorBoundary>
         </div>
       </div>
-      <CentralServerDownOverlay
+      <ServerDownOverlay
         countdownSeconds={nextRetrySeconds}
         onRetry={checkHealth}
         open={showWarningOverlay}
@@ -62,7 +62,7 @@ export const MainLayout = () => {
 
   return (
     <CookiesProvider>
-      <CentralServerHealthProvider>
+      <ServerHealthProvider>
         <ZonesAndFspMapContextProvider>
           <OpenFavoritesProvider>
             <FileBrowserContextProvider filePath={filePath} fspName={fspName}>
@@ -82,7 +82,7 @@ export const MainLayout = () => {
             </FileBrowserContextProvider>
           </OpenFavoritesProvider>
         </ZonesAndFspMapContextProvider>
-      </CentralServerHealthProvider>
+      </ServerHealthProvider>
     </CookiesProvider>
   );
 };

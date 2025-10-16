@@ -75,15 +75,12 @@ describe('Delete dialog', () => {
     const { http, HttpResponse } = await import('msw');
 
     server.use(
-      http.delete(
-        'http://localhost:3000/api/fileglancer/files/test_fsp',
-        () => {
-          return HttpResponse.json(
-            { error: 'Could not delete item' },
-            { status: 500 }
-          );
-        }
-      )
+      http.delete('http://localhost:3000/api/files/test_fsp', () => {
+        return HttpResponse.json(
+          { error: 'Could not delete item' },
+          { status: 500 }
+        );
+      })
     );
 
     const user = userEvent.setup();

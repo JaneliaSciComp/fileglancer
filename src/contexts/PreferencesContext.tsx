@@ -5,7 +5,6 @@ import type { FileSharePath, Zone } from '@/shared.types';
 import { useCookiesContext } from '@/contexts/CookiesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-import { useCentralServerHealthContext } from '@/contexts/CentralServerHealthContext';
 import { sendFetchRequest, makeMapKey, HTTPError } from '@/utils';
 import { createSuccess, handleError, toHttpError } from '@/utils/errorHandling';
 import type { Result } from '@/shared.types';
@@ -127,11 +126,9 @@ export const PreferencesProvider = ({
   const [layout, setLayout] = React.useState<string>('');
   const [isLayoutLoadedFromDB, setIsLayoutLoadedFromDB] = React.useState(false);
 
-  const { status } = useCentralServerHealthContext();
-  // If Central Server status is 'ignore', default to false to skip filtering by groups
-  const [isFilteredByGroups, setIsFilteredByGroups] = React.useState<boolean>(
-    status === 'ignore' ? false : true
-  );
+  // Default to true for filtering by groups
+  const [isFilteredByGroups, setIsFilteredByGroups] =
+    React.useState<boolean>(true);
 
   const { cookies } = useCookiesContext();
   const { isZonesMapReady, zonesAndFileSharePathsMap } =
@@ -141,7 +138,7 @@ export const PreferencesProvider = ({
   const fetchPreferences = React.useCallback(async () => {
     try {
       const data = await sendFetchRequest(
-        `/api/fileglancer/preference`,
+        `/api/preference`,
         'GET',
         cookies['_xsrf']
       ).then(response => response.json());
@@ -216,7 +213,7 @@ export const PreferencesProvider = ({
   const savePreferencesToBackend = React.useCallback(
     async <T,>(key: string, value: T): Promise<Response> => {
       const response = await sendFetchRequest(
-        `/api/fileglancer/preference?key=${key}`,
+        `/api/preference/${key}`,
         'PUT',
         cookies['_xsrf'],
         { value: value }
@@ -300,13 +297,8 @@ export const PreferencesProvider = ({
   const toggleFilterByGroups = React.useCallback(async (): Promise<
     Result<void>
   > => {
-    if (status === 'ignore') {
-      return handleError(
-        new Error('Cannot filter by groups; central server configuration issue')
-      );
-    }
     return await togglePreference('isFilteredByGroups', setIsFilteredByGroups);
-  }, [togglePreference, status]);
+  }, [togglePreference]);
 
   const toggleHideDotFiles = React.useCallback(async (): Promise<
     Result<void>

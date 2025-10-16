@@ -82,7 +82,7 @@ export const ProxiedPathProvider = ({
     Result<ProxiedPath[] | void>
   > => {
     const response = await sendFetchRequest(
-      '/api/fileglancer/proxied-path',
+      '/api/proxied-path',
       'GET',
       cookies['_xsrf']
     );
@@ -127,7 +127,7 @@ export const ProxiedPathProvider = ({
     }
     try {
       const response = await sendFetchRequest(
-        `/api/fileglancer/proxied-path?fsp_name=${fileBrowserState.currentFileSharePath.name}&path=${fileBrowserState.currentFileOrFolder.path}`,
+        `/api/proxied-path?fsp_name=${fileBrowserState.currentFileSharePath.name}&path=${fileBrowserState.currentFileOrFolder.path}`,
         'GET',
         cookies['_xsrf']
       );
@@ -162,14 +162,12 @@ export const ProxiedPathProvider = ({
     }
 
     try {
+      const fspName = fileBrowserState.currentFileSharePath.name;
+      const pathValue = fileBrowserState.currentFileOrFolder.path;
       const response = await sendFetchRequest(
-        '/api/fileglancer/proxied-path',
+        `/api/proxied-path?fsp_name=${encodeURIComponent(fspName)}&path=${encodeURIComponent(pathValue)}`,
         'POST',
-        cookies['_xsrf'],
-        {
-          fsp_name: fileBrowserState.currentFileSharePath.name,
-          path: fileBrowserState.currentFileOrFolder.path
-        }
+        cookies['_xsrf']
       );
 
       if (response.ok) {
@@ -193,7 +191,7 @@ export const ProxiedPathProvider = ({
     async (proxiedPath: ProxiedPath): Promise<Result<void>> => {
       try {
         const response = await sendFetchRequest(
-          `/api/fileglancer/proxied-path?sharing_key=${proxiedPath.sharing_key}`,
+          `/api/proxied-path?sharing_key=${proxiedPath.sharing_key}`,
           'DELETE',
           cookies['_xsrf']
         );

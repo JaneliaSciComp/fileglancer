@@ -12,7 +12,7 @@ import {
   makePathSegmentArray,
   removeLastSegmentFromPath
 } from './pathHandling';
-import { shouldTriggerHealthCheck } from './centralServerHealth';
+import { shouldTriggerHealthCheck } from './serverHealth';
 
 // Health check reporter registry with robust type safety
 export type HealthCheckReporter = (
@@ -117,7 +117,7 @@ class HTTPError extends Error {
 
 async function checkSessionValidity(xrsfCookie: string): Promise<boolean> {
   try {
-    const response = await fetch(getFullPath('/api/fileglancer/profile'), {
+    const response = await fetch(getFullPath('/api/profile'), {
       method: 'GET',
       credentials: 'include',
       headers: {

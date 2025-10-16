@@ -20,7 +20,12 @@ export default defineConfig({
   build: {
     sourcemap: true,
     outDir: 'fileglancer/ui',
-    chunkSizeWarningLimit: 1024
+    chunkSizeWarningLimit: 1024,
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html')
+      }
+    }
   },
   test: {
     exclude: [

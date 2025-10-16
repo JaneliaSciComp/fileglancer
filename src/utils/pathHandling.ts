@@ -64,7 +64,7 @@ function normalizePosixStylePath(pathString: string): string {
  * Joins multiple path segments into a single POSIX-style path, trimming any whitespace first.
  * This is useful for constructing API endpoints or file paths.
  * Example:
- * joinPaths('/api', 'fileglancer', 'files'); // Returns '/api/fileglancer/files'
+ * joinPaths('/api', 'fileglancer', 'files'); // Returns '/api/files'
  */
 function joinPaths(...paths: string[]): string {
   return path.posix.join(...paths.map(path => path?.trim() ?? ''));
@@ -99,11 +99,11 @@ function getAPIPathRoot() {
  * If no filePath is provided, it returns the endpoint URL with the FSP path appended - this is the base URL.
  * If filePath is provided, it appends it as a URL param with key "subpath" to the base URL.
  * Example:
- * getFileBrowsePath('myFSP'); // Returns '/api/fileglancer/files/myFSP'
- * getFileBrowsePath('myFSP', 'path/to/folder'); // Returns '/api/fileglancer/files/myFSP?subpath=path%2Fto%2Ffolder'
+ * getFileBrowsePath('myFSP'); // Returns '/api/files/myFSP'
+ * getFileBrowsePath('myFSP', 'path/to/folder'); // Returns '/api/files/myFSP?subpath=path%2Fto%2Ffolder'
  */
 function getFileBrowsePath(fspName: string, filePath?: string): string {
-  let fetchPath = joinPaths('/api/fileglancer/files/', fspName);
+  let fetchPath = joinPaths('/api/files/', fspName);
 
   const params: string[] = [];
   if (filePath) {
@@ -121,11 +121,11 @@ function getFileBrowsePath(fspName: string, filePath?: string): string {
  * If no filePath is provided, it returns the endpoint URL with the FSP path appended - this is the base URL.
  * If filePath is provided, it appends it as a URL param with key "subpath" to the base URL.
  * Example:
- * getFileContentPath('myFSP'); // Returns '/api/fileglancer/content/myFSP'
- * getFileContentPath('myFSP', 'path/to/file.txt'); // Returns '/api/fileglancer/content/myFSP?subpath=path%2Fto%2Ffile.txt'
+ * getFileContentPath('myFSP'); // Returns '/api/content/myFSP'
+ * getFileContentPath('myFSP', 'path/to/file.txt'); // Returns '/api/content/myFSP?subpath=path%2Fto%2Ffile.txt'
  */
 function getFileContentPath(fspName: string, filePath: string): string {
-  let fetchPath = joinPaths('/api/fileglancer/content/', fspName);
+  let fetchPath = joinPaths('/api/content/', fspName);
 
   if (filePath) {
     fetchPath += `?subpath=${encodeURIComponent(filePath)}`;
@@ -139,13 +139,13 @@ function getFileContentPath(fspName: string, filePath: string): string {
  * If no filePath is provided, it returns the endpoint URL with the FSP path appended - this is the base URL.
  * If filePath is provided, this is appended to the base URL with proper URL escaping.
  * Example:
- * getFileURL('myFSP'); // Returns 'http://localhost:8888/api/fileglancer/content/myFSP'
- * getFileURL('myFSP', 'path/to/file.txt'); // Returns 'http://localhost:8888/api/fileglancer/content/myFSP/path/to/file.txt'
- * getFileURL('myFSP', 'path with%/file.txt'); // Returns 'http://localhost:8888/api/fileglancer/content/myFSP/path%20with%25/file.txt'
+ * getFileURL('myFSP'); // Returns 'http://localhost:8888/api/content/myFSP'
+ * getFileURL('myFSP', 'path/to/file.txt'); // Returns 'http://localhost:8888/api/content/myFSP/path/to/file.txt'
+ * getFileURL('myFSP', 'path with%/file.txt'); // Returns 'http://localhost:8888/api/content/myFSP/path%20with%25/file.txt'
  */
 function getFileURL(fspName: string, filePath?: string): string {
   const escapedFspName = encodeURIComponent(fspName);
-  const fspPath = joinPaths('/api/fileglancer/content/', escapedFspName);
+  const fspPath = joinPaths('/api/content/', escapedFspName);
   const apiPath = getFullPath(fspPath);
 
   if (filePath) {
@@ -234,7 +234,7 @@ function getPreferredPathForDisplay(
     return '';
   }
 
-  const basePath = fsp[pathKey] ?? fsp.linux_path;
+  const basePath = fsp[pathKey] ?? fsp.linux_path ?? fsp.mount_path;
 
   if (!basePath) {
     return '';

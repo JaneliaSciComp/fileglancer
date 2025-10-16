@@ -31,6 +31,7 @@ export default function FgTooltip({
   return (
     <Tooltip open={openCondition} placement="top">
       <Tooltip.Trigger
+        aria-label={label}
         as={Component || 'div'}
         className={triggerClasses || ''}
         disabled={Boolean(disabledCondition || false)}

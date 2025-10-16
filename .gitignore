@@ -138,6 +138,14 @@ dmypy.json
 # Converted Tailwind CSS
 style/tailwind_converted.css
 
+# Sqlite
+**/*.db
+
+# Configs
+config.yaml
+
 # Claude Code
 .claude
 CLAUDE.md
+
+notifications.yaml

@@ -58,13 +58,13 @@ export default function Folder({
     folderPath
   );
 
-  const mapKey = makeMapKey('folder', `${fsp.name}_${folderPath}`) as string;
-
-  const link = makeBrowseLink(fsp.name, folderPath);
-
   if (!fsp) {
     return null;
   }
+
+  const mapKey = makeMapKey('folder', `${fsp.name}_${folderPath}`) as string;
+
+  const link = makeBrowseLink(fsp.name, folderPath);
 
   async function checkFavFolderExists() {
     if (!folderFavorite || !isFavoritable) {

@@ -70,7 +70,7 @@ export const NotificationProvider = ({
 
     try {
       const response = await sendFetchRequest(
-        '/api/fileglancer/notifications',
+        '/api/notifications',
         'GET',
         cookies['_xsrf']
       );

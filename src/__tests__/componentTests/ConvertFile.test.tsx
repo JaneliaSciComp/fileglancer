@@ -82,7 +82,7 @@ describe('Convert File dialog', () => {
     const { http, HttpResponse } = await import('msw');
 
     server.use(
-      http.post('http://localhost:3000/api/fileglancer/ticket', () => {
+      http.post('http://localhost:3000/api/ticket', () => {
         return HttpResponse.json(
           { error: 'Could not create ticket' },
           { status: 500 }

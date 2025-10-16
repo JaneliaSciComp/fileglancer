@@ -7,7 +7,6 @@ import { LuBookOpenText } from 'react-icons/lu';
 import { HiExternalLink } from 'react-icons/hi';
 
 import useVersionNo from '@/hooks/useVersionState';
-import useCentralVersion from '@/hooks/useCentralVersion';
 
 type HelpLink = {
   icon: IconType;
@@ -18,7 +17,6 @@ type HelpLink = {
 
 export default function Help() {
   const { versionNo } = useVersionNo();
-  const { centralVersionState } = useCentralVersion();
 
   const helpLinks: HelpLink[] = [
     {
@@ -54,28 +52,9 @@ export default function Help() {
         <Typography className="text-foreground font-bold" type="h5">
           Help
         </Typography>
-        <div className="text-right">
-          <Typography className="text-foreground font-bold" type="lead">
-            {`Fileglancer Version ${versionNo}`}
-          </Typography>
-          {centralVersionState.status === 'loaded' ? (
-            <Typography className="text-muted-foreground" type="small">
-              {`Fileglancer Central Version ${centralVersionState.version}`}
-            </Typography>
-          ) : centralVersionState.status === 'loading' ? (
-            <Typography className="text-muted-foreground" type="small">
-              Loading Fileglancer Central version...
-            </Typography>
-          ) : centralVersionState.status === 'error' ? (
-            <Typography className="text-muted-foreground" type="small">
-              Fileglancer Central version unavailable
-            </Typography>
-          ) : centralVersionState.status === 'not-configured' ? (
-            <Typography className="text-muted-foreground" type="small">
-              Fileglancer Central server not configured
-            </Typography>
-          ) : null}
-        </div>
+        <Typography className="text-foreground font-bold" type="lead">
+          {`Fileglancer Version ${versionNo}`}
+        </Typography>
       </div>
       <div className="grid grid-cols-2 gap-10">
         {helpLinks.map(({ icon: Icon, title, description, url }, index) => (

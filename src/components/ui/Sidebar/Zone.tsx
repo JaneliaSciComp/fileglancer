@@ -35,6 +35,7 @@ export default function Zone({
       <List.Item
         className="pl-6 w-full flex items-center justify-between rounded-md cursor-pointer text-foreground hover:!bg-primary-light/30 focus:!bg-primary-light/30"
         onClick={() => toggleOpenZones(zone.name)}
+        role="button"
       >
         <List.ItemStart>
           <HiOutlineSquares2X2 className="icon-small short:icon-xsmall stroke-2" />

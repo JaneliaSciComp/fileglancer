@@ -12,7 +12,7 @@ export default function useVersionNo() {
     async function getVersionNo() {
       try {
         const response = await sendFetchRequest(
-          '/api/fileglancer/version',
+          '/api/version',
           'GET',
           cookies['_xsrf']
         );

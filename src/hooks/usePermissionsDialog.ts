@@ -21,7 +21,7 @@ export default function usePermissionsDialog() {
   /**
    * Handles local permission state changes based on user input to the form.
    * This local state is necessary to track the user's changes before the form is submitted,
-   * which causes the state in the fileglancer_central db to update.
+   * which causes the state in the fileglancer db to update.
    * @param event - The change event from the input field.
    * @returns void - Nothing is returned; the local permission state is updated.
    */

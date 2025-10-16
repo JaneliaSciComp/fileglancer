@@ -14,6 +14,7 @@ export default defineConfig([
     'node_modules/*',
     'dist/*',
     'coverage/*',
+    'htmlcov/*',
     '**/*.d.ts',
     'tests/*',
     '**/__tests__',

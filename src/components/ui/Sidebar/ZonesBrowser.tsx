@@ -33,6 +33,8 @@ export default function ZonesBrowser({
         <List.Item
           className="cursor-pointer rounded-md py-2 short:py-1 hover:!bg-surface-light focus:!bg-surface-light"
           onClick={() => toggleOpenZones('all')}
+          role="button"
+          tabIndex={0}
         >
           <List.ItemStart>
             <HiSquares2X2 className="icon-default short:icon-small text-surface-foreground" />
@@ -56,7 +58,10 @@ export default function ZonesBrowser({
             <SidebarItemSkeleton key={index} />
           ))
         ) : (
-          <List className="h-full py-0 gap-0 bg-background">
+          <List
+            aria-label="List of file share paths within zone"
+            className="h-full py-0 gap-0 bg-background"
+          >
             {searchQuery.length > 0 &&
             Object.keys(displayZones).length === 0 ? (
               <div className="px-4 py-6 text-center">
