@@ -3,7 +3,7 @@
 [![Github Actions Status](https://github.com/JaneliaSciComp/fileglancer/workflows/Build/badge.svg)](https://github.com/JaneliaSciComp/fileglancer/actions/workflows/build.yml)
 [![DOI](https://zenodo.org/badge/918344432.svg)](https://doi.org/10.5281/zenodo.17314767)
 
-Fileglancer is a web application designed to allow researchers to easily browse, share, and manage large scientific imaging data using [OME-NGFF](https://github.com/ome/ngff) (i.e. OME-Zarr). Our goal is to reduce the friction experienced by users who want to easily share their data with their colleagues. Simply browse to your data, click on the Neuroglancer link, and send that link to your collaborator.
+Fileglancer is an intranet web application designed to allow researchers to easily browse, share, and manage large scientific imaging data using [OME-NGFF](https://github.com/ome/ngff) (i.e. OME-Zarr). Our goal is to reduce the friction experienced by users who want to easily share their data with colleagues at their institution. Simply browse to your data, click on the Neuroglancer link, and send that link to your collaborator. 
 
 Core features:
 
@@ -11,7 +11,7 @@ Core features:
 - Create a "data link" for any file share path, allowing web-based anonymous access to your data
 - Shareable links to Neuroglancer and other viewers
 - Integration with our help desk (JIRA) for file conversion requests
-- Integration with our [x2s3](https://github.com/JaneliaSciComp/x2s3) proxy service, to easily share data on the internet
+- Integration with the [x2s3](https://github.com/JaneliaSciComp/x2s3) proxy service, to easily share data on the internet
 
 See the [documentation](https://janeliascicomp.github.io/fileglancer-docs/) for more information.
 
