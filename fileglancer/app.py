@@ -33,6 +33,7 @@ from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, dele
 from fileglancer.utils import slugify_path, format_timestamp, guess_content_type, parse_range_header
 from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext
 from fileglancer.filestore import Filestore
+from fileglancer.log import AccessLogMiddleware
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response
 from x2s3.client_file import FileProxyClient
@@ -191,6 +192,10 @@ def create_app(settings):
         pass
 
     app = FastAPI(lifespan=lifespan)
+
+    # Add custom access log middleware
+    # This logs HTTP access information with authenticated username
+    app.add_middleware(AccessLogMiddleware, settings=settings)
 
     # Add SessionMiddleware for OAuth state management
     # This is required by authlib for the OAuth flow
@@ -448,7 +453,7 @@ def create_app(settings):
             return NotificationResponse(notifications=notifications)
 
         except FileNotFoundError:
-            logger.debug("Notifications file not found")
+            logger.trace("Notifications file not found")
             return NotificationResponse(notifications=[])
         except Exception as e:
             logger.exception(f"Error loading notifications: {e}")
@@ -840,8 +845,8 @@ def create_app(settings):
                 return Response(status_code=200, headers=headers, media_type=content_type)
 
             except FileNotFoundError:
-                logger.error(f"File not found in {filestore_name}: {subpath}")
-                raise HTTPException(status_code=404, detail="File not found")
+                logger.warning(f"File not found in {filestore_name}: {subpath}")
+                return Response(status_code=404, headers=headers, media_type=content_type)
             except PermissionError:
                 raise HTTPException(status_code=403, detail="Permission denied")
 
@@ -979,10 +984,10 @@ def create_app(settings):
             try:
                 file_type = body.get("type")
                 if file_type == "directory":
-                    logger.info(f"{username} creating {subpath} as a directory")
+                    logger.info(f"User {username} creating directory {path_name}/{subpath}")
                     filestore.create_dir(subpath)
                 elif file_type == "file":
-                    logger.info(f"{username} creating {subpath} as a file")
+                    logger.info(f"User {username} creating file {path_name}/{subpath}")
                     filestore.create_empty_file(subpath)
                 else:
                     raise HTTPException(status_code=400, detail="Invalid file type")
@@ -1011,11 +1016,11 @@ def create_app(settings):
 
             try:
                 if new_permissions is not None and new_permissions != old_file_info.permissions:
-                    logger.info(f"{username} changing permissions of {old_file_info.path} to {new_permissions}")
+                    logger.info(f"User {username} changing permissions of {old_file_info.absolute_path} to {new_permissions}")
                     filestore.change_file_permissions(subpath, new_permissions)
 
                 if new_path is not None and new_path != old_file_info.path:
-                    logger.info(f"{username} renaming {old_file_info.path} to {new_path}")
+                    logger.info(f"User {username} renaming {old_file_info.absolute_path} to {new_path}")
                     filestore.rename_file_or_dir(old_file_info.path, new_path)
 
             except PermissionError as e:
@@ -1026,17 +1031,18 @@ def create_app(settings):
             return Response(status_code=204)
 
 
-    @app.delete("/api/files/{path_name}")
-    async def delete_file_or_dir(path_name: str, 
+    @app.delete("/api/files/{fsp_name}")
+    async def delete_file_or_dir(fsp_name: str, 
                                  subpath: Optional[str] = Query(''),
                                  username: str = Depends(get_current_user)):
         """Handle DELETE requests to remove a file or (empty) directory"""
         with _get_user_context(username):
-            filestore, error = _get_filestore(path_name)
+            filestore, error = _get_filestore(fsp_name)
             if filestore is None:
                 raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
 
             try:
+                logger.info(f"User {username} deleting {filestore.get_root_path()}/{subpath}")
                 filestore.remove_file_or_dir(subpath)
             except PermissionError as e:
                 raise HTTPException(status_code=403, detail=str(e))
@@ -1115,4 +1121,5 @@ app = create_app(get_settings())
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, lifespan="on")
+    # Disable Uvicorn's default access logger since we use custom middleware
+    uvicorn.run(app, host="0.0.0.0", port=8000, lifespan="on", access_log=False)

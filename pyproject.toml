@@ -121,9 +121,9 @@ node-install-ui-tests = "npm --prefix ui-tests install"
 test-ui = { cmd = "npm --prefix ui-tests run test ", depends-on = ["node-install-ui-tests"] }
 dev-install = { depends-on = ["node-build", "pip-install"] }
 dev-watch = { cmd = "NODE_ENV=development npm run watch" }
-dev-launch = "pixi run uvicorn fileglancer.app:app --port 7878 --reload"
+dev-launch = "pixi run uvicorn fileglancer.app:app --no-access-log --port 7878 --reload"
+dev-launch-remote = "pixi run uvicorn fileglancer.app:app --no-access-log --host 0.0.0.0 --port 7878 --reload --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
 dev-launch-secure = "python fileglancer/dev_launch.py"
-dev-launch-remote = "pixi run uvicorn fileglancer.app:app --host 0.0.0.0 --port 7878 --reload --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
 migrate = "alembic upgrade head"
 migrate-create = "alembic revision --autogenerate"
 stamp-db = "python -m fileglancer.stamp_db"
