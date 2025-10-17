@@ -1,45 +1,15 @@
-import { expect, test } from '@playwright/test';
-import {
-  openFileglancer,
-  mockAPI,
-  teardownMockAPI,
-  createTestFilesInScratchDir
-} from './testutils.ts';
-
-test.beforeEach('Recreate test files before each test', async () => {
-  // Recreate test files before each test (since operations may modify/delete them)
-  await createTestFilesInScratchDir();
-});
-
-test.beforeEach('setup API endpoints BEFORE opening page', async ({ page }) => {
-  // CRITICAL: Set up mocks BEFORE navigating
-  await mockAPI(page);
-});
-
-test.beforeEach('Open Fileglancer', async ({ page }) => {
-  await openFileglancer(page);
-});
-
-test.afterEach(async ({ page }) => {
-  await teardownMockAPI(page);
-});
+import { expect, test } from '../fixtures/fileglancer-fixture';
 
 test.describe('File Operations', () => {
-  test.beforeEach('Navigate to test directory', async ({ page }) => {
-    // Navigate to Local zone - find it under Zones, not in Favorites
-    const localZone = page
-      .getByLabel('List of file share paths')
-      .getByRole('button', { name: 'Local' });
-    await localZone.click();
+  test.beforeEach(
+    'Navigate to test directory',
+    async ({ fileglancerPage: page }) => {
+      // Wait for files to load - verify f1 is visible
+      await expect(page.getByText('f1')).toBeVisible();
+    }
+  );
 
-    await expect(page.getByRole('link', { name: /scratch/i })).toBeVisible();
-    await page.getByRole('link', { name: /scratch/i }).click();
-
-    // Wait for files to load - verify f1 is visible
-    await expect(page.getByText('f1')).toBeVisible();
-  });
-
-  test('rename file via context menu', async ({ page }) => {
+  test('rename file via context menu', async ({ fileglancerPage: page }) => {
     // Right-click to open context menu, select Rename. Wait for dialog.
     await page.getByText('f3').click({ button: 'right' });
     await page.getByRole('menuitem', { name: /rename/i }).click();
@@ -58,7 +28,7 @@ test.describe('File Operations', () => {
     ).not.toBeVisible();
   });
 
-  test('delete file via context menu', async ({ page }) => {
+  test('delete file via context menu', async ({ fileglancerPage: page }) => {
     // Right-click to open context menu, select Delete. Wait for dialog.
     await page.getByText('f2').click({ button: 'right' });
     await page.getByRole('menuitem', { name: /delete/i }).click();
@@ -73,7 +43,7 @@ test.describe('File Operations', () => {
     await expect(page.getByText('f1')).toBeVisible();
   });
 
-  test('create new folder via toolbar', async ({ page }) => {
+  test('create new folder via toolbar', async ({ fileglancerPage: page }) => {
     const newFolderName = 'new_test_folder';
 
     // Click on "New Folder" button in toolbar. Wait for dialog.
