@@ -871,9 +871,16 @@ def create_app(settings):
                 file_size = file_info.size
                 range_header = request.headers.get('Range')
 
+                # Open file handle within user context before creating StreamingResponse
+                # This ensures proper permissions are set on the file handle before it
+                # is passed to the response generator
+                full_path = filestore._check_path_in_root(subpath)
+                file_handle = open(full_path, 'rb')
+
                 if range_header:
                     range_result = parse_range_header(range_header, file_size)
                     if range_result is None:
+                        file_handle.close()
                         return Response(
                             status_code=416,
                             headers={'Content-Range': f'bytes */{file_size}'}
@@ -892,7 +899,7 @@ def create_app(settings):
                         headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
 
                     return StreamingResponse(
-                        filestore.stream_file_range(subpath, start, end),
+                        filestore.stream_file_range(start=start, end=end, file_handle=file_handle),
                         status_code=206,
                         headers=headers,
                         media_type=content_type
@@ -907,7 +914,7 @@ def create_app(settings):
                         headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
 
                     return StreamingResponse(
-                        filestore.stream_file_contents(subpath),
+                        filestore.stream_file_contents(file_handle=file_handle),
                         status_code=200,
                         headers=headers,
                         media_type=content_type
