@@ -28,12 +28,12 @@ export default function useNavigationInput(initialValue: string = '') {
       // Trim white space and, if necessary, convert backslashes to forward slashes
       const normalizedInput = convertBackToForwardSlash(inputValue.trim());
 
-    // Collect all potential matches with their mount paths
-    const potentialMatches: Array<{
-      fspObject: FileSharePath;
-      matchedPath: string;
-      subpath: string;
-    }> = [];
+      // Collect all potential matches with their mount paths
+      const potentialMatches: Array<{
+        fspObject: FileSharePath;
+        matchedPath: string;
+        subpath: string;
+      }> = [];
 
       const keys = Object.keys(zonesAndFileSharePathsMap);
       for (const key of keys) {
@@ -60,34 +60,33 @@ export default function useNavigationInput(initialValue: string = '') {
             subpath = normalizedInput.replace(windowsPath, '');
           }
 
-        if (matchedPath) {
-          potentialMatches.push({ fspObject, matchedPath, subpath });
+          if (matchedPath) {
+            potentialMatches.push({ fspObject, matchedPath, subpath });
+          }
         }
       }
+
+      // If we have matches, use the one with the longest matched path (most specific)
+      if (potentialMatches.length > 0) {
+        potentialMatches.sort(
+          (a, b) => b.matchedPath.length - a.matchedPath.length
+        );
+        const bestMatch = potentialMatches[0];
+
+        const browseLink = makeBrowseLink(
+          bestMatch.fspObject.name,
+          bestMatch.subpath
+        );
+        navigate(browseLink);
+        // Clear the inputValue
+        setInputValue('');
+        return createSuccess(undefined);
+      } else {
+        throw new Error('No matching mount path found for the provided input.');
+      }
+    } catch (error) {
+      return handleError(error);
     }
-
-    // If we have matches, use the one with the longest matched path (most specific)
-    if (potentialMatches.length > 0) {
-      potentialMatches.sort(
-        (a, b) => b.matchedPath.length - a.matchedPath.length
-      );
-      const bestMatch = potentialMatches[0];
-
-      // The subpath is already in POSIX style from earlier normalization
-      // Use makeBrowseLink to construct a properly escaped browse URL
-      const browseLink = makeBrowseLink(
-        bestMatch.fspObject.name,
-        bestMatch.subpath
-      );
-      navigate(browseLink);
-      // Clear the inputValue
-      setInputValue('');
-      return createSuccess(undefined);
-    }
-
-    return handleError(
-      new Error('No matching file share path found for the input value.')
-    );
   };
 
   return { inputValue, handleInputChange, handleNavigationInputSubmit };
