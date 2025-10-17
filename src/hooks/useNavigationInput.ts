@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router';
 
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { FileSharePath, Result } from '@/shared.types';
-import { convertPathToPosixStyle, makeBrowseLink } from '@/utils/pathHandling';
+import {
+  convertBackToForwardSlash,
+  makeBrowseLink
+} from '@/utils/pathHandling';
 import { createSuccess, handleError } from '@/utils/errorHandling';
 
 export default function useNavigationInput(initialValue: string = '') {
@@ -21,8 +24,9 @@ export default function useNavigationInput(initialValue: string = '') {
   };
 
   const handleNavigationInputSubmit = (): Result<void> => {
-    // Normalize the input: convert backslashes to forward slashes
-    const normalizedInput = convertPathToPosixStyle(inputValue.trim());
+    try {
+      // Trim white space and, if necessary, convert backslashes to forward slashes
+      const normalizedInput = convertBackToForwardSlash(inputValue.trim());
 
     // Collect all potential matches with their mount paths
     const potentialMatches: Array<{
