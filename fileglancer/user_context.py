@@ -32,7 +32,7 @@ class EffectiveUserContext(UserContext):
         self._user = None
 
     def __enter__(self):
-        logger.debug(f"Prepare user context for {self.username}")
+        logger.trace(f"Entering user context for {self.username}")
         user = pwd.getpwnam(self.username)
 
         uid = user.pw_uid
@@ -74,7 +74,7 @@ class EffectiveUserContext(UserContext):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        logger.debug("Release user context")
+        logger.trace(f"Exiting user context for {self.username}")
         os.seteuid(self._uid)
         os.setegid(self._gid)
         if len(self._gids) > os.sysconf("SC_NGROUPS_MAX"):
