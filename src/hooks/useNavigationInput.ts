@@ -28,12 +28,12 @@ export default function useNavigationInput(initialValue: string = '') {
       // Trim white space and, if necessary, convert backslashes to forward slashes
       const normalizedInput = convertBackToForwardSlash(inputValue.trim());
 
-      // Collect all potential matches with their mount paths
-      const potentialMatches: Array<{
+      // Track best match
+      let bestMatch: {
         fspObject: FileSharePath;
         matchedPath: string;
         subpath: string;
-      }> = [];
+      } | null = null;
 
       const keys = Object.keys(zonesAndFileSharePathsMap);
       for (const key of keys) {
@@ -61,18 +61,22 @@ export default function useNavigationInput(initialValue: string = '') {
           }
 
           if (matchedPath) {
-            potentialMatches.push({ fspObject, matchedPath, subpath });
+            // The best match is the one with the longest matched path (most specific)
+            if (
+              !bestMatch ||
+              matchedPath.length > bestMatch.matchedPath.length
+            ) {
+              bestMatch = {
+                fspObject,
+                matchedPath,
+                subpath
+              };
+            }
           }
         }
       }
 
-      // If we have matches, use the one with the longest matched path (most specific)
-      if (potentialMatches.length > 0) {
-        potentialMatches.sort(
-          (a, b) => b.matchedPath.length - a.matchedPath.length
-        );
-        const bestMatch = potentialMatches[0];
-
+      if (bestMatch) {
         const browseLink = makeBrowseLink(
           bestMatch.fspObject.name,
           bestMatch.subpath
