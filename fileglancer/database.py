@@ -363,11 +363,11 @@ def get_proxied_path_by_sharing_key(session: Session, sharing_key: str) -> Optio
 
     # Check cache first
     if sharing_key in cache:
-        logger.debug(f"Cache HIT for sharing key: {sharing_key}")
+        logger.trace(f"Cache HIT for sharing key: {sharing_key}")
         return cache[sharing_key]
 
     # Query database if not in cache
-    logger.debug(f"Cache MISS for sharing key: {sharing_key}, querying database")
+    logger.trace(f"Cache MISS for sharing key: {sharing_key}, querying database")
     proxied_path = session.query(ProxiedPathDB).filter_by(sharing_key=sharing_key).first()
 
     # Only cache valid results (not None)
@@ -375,7 +375,7 @@ def get_proxied_path_by_sharing_key(session: Session, sharing_key: str) -> Optio
         cache[sharing_key] = proxied_path
         logger.debug(f"Cached result for sharing key: {sharing_key}, cache size: {len(cache)}")
     else:
-        logger.debug(f"Not caching None result for sharing key: {sharing_key}")
+        logger.trace(f"Not caching None result for sharing key: {sharing_key}")
 
     return proxied_path
 

@@ -24,6 +24,7 @@ class FileInfo(BaseModel):
     """
     name: str
     path: Optional[str] = None
+    absolute_path: Optional[str] = None
     size: int
     is_dir: bool
     permissions: str
@@ -34,14 +35,14 @@ class FileInfo(BaseModel):
     hasWrite: Optional[bool] = None
 
     @classmethod
-    def from_stat(cls, path: str, full_path: str, stat_result: os.stat_result, current_user: str = None):
+    def from_stat(cls, path: str, absolute_path: str, stat_result: os.stat_result, current_user: str = None):
         """Create FileInfo from os.stat_result"""
         if path is None or path == "":
             raise ValueError("Path cannot be None or empty")
         is_dir = stat.S_ISDIR(stat_result.st_mode)
         size = 0 if is_dir else stat_result.st_size
         # Do not expose the name of the root directory
-        name = '' if path=='.' else os.path.basename(full_path)
+        name = '' if path=='.' else os.path.basename(absolute_path)
         permissions = stat.filemode(stat_result.st_mode)
         last_modified = stat_result.st_mtime
 
@@ -67,6 +68,7 @@ class FileInfo(BaseModel):
         return cls(
             name=name,
             path=path,
+            absolute_path=absolute_path,
             size=size,
             is_dir=is_dir,
             permissions=permissions,
@@ -184,6 +186,22 @@ class Filestore:
         Get the root path of the Filestore.
         """
         return self.root_path
+
+
+    def get_absolute_path(self, relative_path: Optional[str] = None) -> str:
+        """
+        Get the absolute path of the Filestore.
+
+        Args:
+            relative_path (str): The relative path to the file or directory to get the absolute path for.
+                May be None, in which case the root path is returned.
+
+        Returns:
+            str: The absolute path of the Filestore.
+        """
+        if relative_path is None or relative_path == "":
+            return self.root_path
+        return os.path.abspath(os.path.join(self.root_path, relative_path))
 
 
     def get_file_info(self, path: Optional[str] = None, current_user: str = None) -> FileInfo:
