@@ -5,23 +5,25 @@ import { defineConfig } from '@playwright/test';
 import { mkdtempSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { writeFilesSync } from './tests/testutils';
+import { writeFilesSync } from './mocks/files.js';
+import { createZarrDirsSync } from './mocks/zarrDirs.js';
 
 // Create a unique temp directory for this test run
 const testTempDir = mkdtempSync(join(tmpdir(), 'fg-playwright-'));
 const testDbPath = join(testTempDir, 'test.db');
 
-const homeDir = join(testTempDir, 'home');
 const primaryDir = join(testTempDir, 'primary');
 const scratchDir = join(testTempDir, 'scratch');
-
-mkdirSync(homeDir, { recursive: true });
 mkdirSync(primaryDir, { recursive: true });
 mkdirSync(scratchDir, { recursive: true });
 
+// Create default test files (f1, f2, f3) for file-operations tests
 writeFilesSync(scratchDir);
 
-// Export temp directory path for global teardown
+// Create Zarr test directories for load-zarr-files tests
+createZarrDirsSync(scratchDir);
+
+// Export temp directory path and dirs for tests and global teardown
 global.testTempDir = testTempDir;
 
 export default defineConfig({
@@ -42,7 +44,7 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       FGC_DB_URL: `sqlite:///${testDbPath}`,
-      FGC_FILE_SHARE_MOUNTS: JSON.stringify([homeDir, primaryDir, scratchDir])
+      FGC_FILE_SHARE_MOUNTS: JSON.stringify([primaryDir, scratchDir])
     }
   },
   // Clean up temp directory after all tests complete
