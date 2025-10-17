@@ -191,7 +191,7 @@ export const ProxiedPathProvider = ({
     async (proxiedPath: ProxiedPath): Promise<Result<void>> => {
       try {
         const response = await sendFetchRequest(
-          `/api/proxied-path?sharing_key=${proxiedPath.sharing_key}`,
+          `/api/proxied-path/${proxiedPath.sharing_key}`,
           'DELETE',
           cookies['_xsrf']
         );
