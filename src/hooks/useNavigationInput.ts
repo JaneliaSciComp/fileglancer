@@ -21,41 +21,86 @@ export default function useNavigationInput(initialValue: string = '') {
   };
 
   const handleNavigationInputSubmit = (): Result<void> => {
+    // Normalize the input: convert backslashes to forward slashes
+    const normalizedInput = convertPathToPosixStyle(inputValue.trim());
+
+    // Collect all potential matches with their mount paths
+    const potentialMatches: Array<{
+      fspObject: FileSharePath;
+      matchedPath: string;
+      subpath: string;
+    }> = [];
+
     const keys = Object.keys(zonesAndFileSharePathsMap);
     for (const key of keys) {
       // Iterate through only the objects in zonesAndFileSharePathsMap that have a key that start with "fsp_"
       if (key.startsWith('fsp_')) {
-        const parts = key.split('_');
-        // further narrow down the search by checking if the inputValue contains the last part of the key
-        if (inputValue.includes(parts[parts.length - 1])) {
-          const fspObject = zonesAndFileSharePathsMap[key] as FileSharePath;
-          // Check if the inputValue contains object.linux_path, object.mac_path, or object.windows_path,
-          // and if it does, get the portion of the inputValue that does not match the mount path (i.e., get the subpath)
-          const linuxPath = fspObject.linux_path;
-          const macPath = fspObject.mac_path;
-          const windowsPath = fspObject.windows_path;
+        const fspObject = zonesAndFileSharePathsMap[key] as FileSharePath;
+        const linuxPath = fspObject.linux_path;
+        const macPath = fspObject.mac_path;
+        const windowsPath = fspObject.windows_path;
 
-          let subpath = '';
-          if (linuxPath && inputValue.includes(linuxPath)) {
-            subpath = inputValue.replace(linuxPath, '').trim();
-          } else if (macPath && inputValue.includes(macPath)) {
-            subpath = inputValue.replace(macPath, '').trim();
-          } else if (windowsPath && inputValue.includes(windowsPath)) {
-            subpath = inputValue.replace(windowsPath, '').trim();
-          } else {
-            continue; // Skip to the next key if no path matches
-          }
-          // normalize this portion to use POSIX/linux format
-          subpath = convertPathToPosixStyle(subpath);
-          // Use makeBrowseLink to construct a properly escaped browse URL
-          const browseLink = makeBrowseLink(fspObject.name, subpath);
-          navigate(browseLink);
-          // Clear the inputValue
-          setInputValue('');
-          return createSuccess(undefined);
+        // Convert mount paths to forward slashes for comparison
+        const normalizedLinuxPath = linuxPath
+          ? convertPathToPosixStyle(linuxPath)
+          : null;
+        const normalizedMacPath = macPath
+          ? convertPathToPosixStyle(macPath)
+          : null;
+        const normalizedWindowsPath = windowsPath
+          ? convertPathToPosixStyle(windowsPath)
+          : null;
+
+        let matchedPath: string | null = null;
+        let subpath = '';
+        // Check if the normalized input starts with any of the mount paths
+        // If a match is found, extract the subpath
+        // Collect all potential matches
+        if (
+          normalizedLinuxPath &&
+          normalizedInput.includes(normalizedLinuxPath)
+        ) {
+          matchedPath = normalizedLinuxPath;
+          subpath = normalizedInput.replace(normalizedLinuxPath, '').trim();
+        } else if (
+          normalizedMacPath &&
+          normalizedInput.includes(normalizedMacPath)
+        ) {
+          matchedPath = normalizedMacPath;
+          subpath = normalizedInput.replace(normalizedMacPath, '').trim();
+        } else if (
+          normalizedWindowsPath &&
+          normalizedInput.includes(normalizedWindowsPath)
+        ) {
+          matchedPath = normalizedWindowsPath;
+          subpath = normalizedInput.replace(normalizedWindowsPath, '').trim();
+        }
+
+        if (matchedPath) {
+          potentialMatches.push({ fspObject, matchedPath, subpath });
         }
       }
     }
+
+    // If we have matches, use the one with the longest matched path (most specific)
+    if (potentialMatches.length > 0) {
+      potentialMatches.sort(
+        (a, b) => b.matchedPath.length - a.matchedPath.length
+      );
+      const bestMatch = potentialMatches[0];
+
+      // The subpath is already in POSIX style from earlier normalization
+      // Use makeBrowseLink to construct a properly escaped browse URL
+      const browseLink = makeBrowseLink(
+        bestMatch.fspObject.name,
+        bestMatch.subpath
+      );
+      navigate(browseLink);
+      // Clear the inputValue
+      setInputValue('');
+      return createSuccess(undefined);
+    }
+
     return handleError(
       new Error('No matching file share path found for the input value.')
     );
