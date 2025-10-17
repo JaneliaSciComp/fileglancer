@@ -199,11 +199,15 @@ function removeLastSegmentFromPath(itemPath: string): string {
 }
 
 /**
- * Converts a Windows-style path string to a POSIX-style path string.
+ * Converts a Windows-style path string to a path string with single forward slashes.
  * Used for the navigation input to ensure paths match the expected format.
  */
-function convertPathToPosixStyle(pathString: string): string {
-  return pathString.replace(/\\/g, '/');
+function convertBackToForwardSlash(pathString: string | null): string {
+  if (!pathString) {
+    throw new Error('Path string cannot be null or undefined');
+  }
+  const convertedPath = pathString.replace(/\\/g, '/');
+  return convertedPath;
 }
 
 /**
@@ -277,7 +281,7 @@ function makeBrowseLink(
 }
 
 export {
-  convertPathToPosixStyle,
+  convertBackToForwardSlash,
   escapePathForUrl,
   getAPIPathRoot,
   getFileBrowsePath,
