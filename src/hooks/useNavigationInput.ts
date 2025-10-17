@@ -35,25 +35,14 @@ export default function useNavigationInput(initialValue: string = '') {
       subpath: string;
     }> = [];
 
-    const keys = Object.keys(zonesAndFileSharePathsMap);
-    for (const key of keys) {
-      // Iterate through only the objects in zonesAndFileSharePathsMap that have a key that start with "fsp_"
-      if (key.startsWith('fsp_')) {
-        const fspObject = zonesAndFileSharePathsMap[key] as FileSharePath;
-        const linuxPath = fspObject.linux_path;
-        const macPath = fspObject.mac_path;
-        const windowsPath = fspObject.windows_path;
-
-        // Convert mount paths to forward slashes for comparison
-        const normalizedLinuxPath = linuxPath
-          ? convertPathToPosixStyle(linuxPath)
-          : null;
-        const normalizedMacPath = macPath
-          ? convertPathToPosixStyle(macPath)
-          : null;
-        const normalizedWindowsPath = windowsPath
-          ? convertPathToPosixStyle(windowsPath)
-          : null;
+      const keys = Object.keys(zonesAndFileSharePathsMap);
+      for (const key of keys) {
+        // Iterate through only the objects in zonesAndFileSharePathsMap that have a key that start with "fsp_"
+        if (key.startsWith('fsp_')) {
+          const fspObject = zonesAndFileSharePathsMap[key] as FileSharePath;
+          const linuxPath = fspObject.linux_path || '';
+          const macPath = fspObject.mac_path || '';
+          const windowsPath = convertBackToForwardSlash(fspObject.windows_path);
 
         let matchedPath: string | null = null;
         let subpath = '';
