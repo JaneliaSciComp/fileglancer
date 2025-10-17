@@ -44,30 +44,21 @@ export default function useNavigationInput(initialValue: string = '') {
           const macPath = fspObject.mac_path || '';
           const windowsPath = convertBackToForwardSlash(fspObject.windows_path);
 
-        let matchedPath: string | null = null;
-        let subpath = '';
-        // Check if the normalized input starts with any of the mount paths
-        // If a match is found, extract the subpath
-        // Collect all potential matches
-        if (
-          normalizedLinuxPath &&
-          normalizedInput.includes(normalizedLinuxPath)
-        ) {
-          matchedPath = normalizedLinuxPath;
-          subpath = normalizedInput.replace(normalizedLinuxPath, '').trim();
-        } else if (
-          normalizedMacPath &&
-          normalizedInput.includes(normalizedMacPath)
-        ) {
-          matchedPath = normalizedMacPath;
-          subpath = normalizedInput.replace(normalizedMacPath, '').trim();
-        } else if (
-          normalizedWindowsPath &&
-          normalizedInput.includes(normalizedWindowsPath)
-        ) {
-          matchedPath = normalizedWindowsPath;
-          subpath = normalizedInput.replace(normalizedWindowsPath, '').trim();
-        }
+          let matchedPath: string | null = null;
+          let subpath = '';
+          // Check if the normalized input starts with any of the mount paths
+          // If a match is found, extract the subpath
+          // Collect all potential matches
+          if (normalizedInput.startsWith(linuxPath)) {
+            matchedPath = linuxPath;
+            subpath = normalizedInput.replace(linuxPath, '');
+          } else if (normalizedInput.startsWith(macPath)) {
+            matchedPath = macPath;
+            subpath = normalizedInput.replace(macPath, '');
+          } else if (normalizedInput.startsWith(windowsPath)) {
+            matchedPath = windowsPath;
+            subpath = normalizedInput.replace(windowsPath, '');
+          }
 
         if (matchedPath) {
           potentialMatches.push({ fspObject, matchedPath, subpath });
