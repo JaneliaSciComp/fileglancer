@@ -15,7 +15,7 @@ fileglancer/ui
 fileglancer/_version.py
 
 # Integration tests
-ui-tests/test-results/
+**/test-results/
 ui-tests/playwright-report/
 junit.xml
 
