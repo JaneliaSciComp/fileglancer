@@ -34,7 +34,7 @@ View the app in the browser at localhost:7878.
 Copy the configuration file and edit as desired.
 
 ```
-cp config.yaml.template config.yaml
+cp docs/config.yaml.template config.yaml
 ```
 
 ### Running with SSL/HTTPS (Secure Mode)
