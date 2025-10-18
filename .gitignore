@@ -15,8 +15,8 @@ fileglancer/ui
 fileglancer/_version.py
 
 # Integration tests
-ui-tests/test-results/
-ui-tests/playwright-report/
+frontend/ui-tests/test-results/
+frontend/ui-tests/playwright-report/
 junit.xml
 
 # Created by https://www.gitignore.io/api/python

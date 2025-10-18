@@ -19,7 +19,8 @@ export default defineConfig({
   },
   build: {
     sourcemap: true,
-    outDir: 'fileglancer/ui',
+    outDir: '../fileglancer/ui',
+    emptyOutDir: true,
     chunkSizeWarningLimit: 1024,
     rollupOptions: {
       input: {

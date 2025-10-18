@@ -24,4 +24,4 @@ To execute the UI integration test, run:
 pixi run test-ui
 ```
 
-For more information, please refer to the [Development](../docs/Development.md#integration-tests) documentation.
+For more information, please refer to the [Development](../../docs/Development.md#integration-tests) documentation.
