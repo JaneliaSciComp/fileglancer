@@ -29,7 +29,7 @@ global.testTempDir = testTempDir;
 export default defineConfig({
   reporter: [['html', { open: process.env.CI ? 'never' : 'on-failure' }]],
   use: {
-    baseURL: 'http://localhost:7878',
+    baseURL: 'http://localhost:7879',
     trace: 'on-first-retry',
     video: 'on',
     screenshot: 'only-on-failure'
@@ -38,8 +38,8 @@ export default defineConfig({
   navigationTimeout: process.env.CI ? 90_000 : 10_000,
   workers: process.env.CI ? 1 : undefined,
   webServer: {
-    command: 'pixi run dev-launch',
-    url: 'http://localhost:7878/fg/',
+    command: 'pixi run test-launch',
+    url: 'http://localhost:7879/fg/',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     env: {

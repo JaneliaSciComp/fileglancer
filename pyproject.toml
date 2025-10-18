@@ -119,8 +119,9 @@ node-eslint-write = "cd frontend && npx eslint . --cache --fix --ext .ts,.tsx"
 node-prettier-check =  "cd frontend && npx prettier \"**/*{.ts,.tsx,.js,.jsx,.css,.json,.md}\" \"!package-lock.json\" --check"
 node-prettier-write = "cd frontend && npx prettier --list-different --write '**/*.{ts,tsx,js,jsx,json,md}' '!package-lock.json'"
 node-check = "cd frontend && npx tsc --noEmit -p tsconfig.app.json"
-node-install-ui-tests = "cd frontend && npm --prefix ui-tests install"
-test-ui = { cmd = "cd frontend && npm --prefix ui-tests run test ", depends-on = ["node-install-ui-tests"] }
+node-install-ui-tests = "npm --prefix frontend/ui-tests install"
+test-ui = { cmd = "npm --prefix frontend/ui-tests run test ", depends-on = ["node-install-ui-tests"] }
+test-launch = "pixi run uvicorn fileglancer.app:app --no-access-log --port 7879"
 dev-install = { depends-on = ["node-build", "pip-install"] }
 dev-watch = { cmd = "cd frontend && NODE_ENV=development npm run watch" }
 dev-launch = "pixi run uvicorn fileglancer.app:app --no-access-log --port 7878 --reload"
