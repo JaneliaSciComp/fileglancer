@@ -97,7 +97,8 @@ export default function useZoneAndFileSharePathMapQuery(): UseQueryResult<
     {
       queryKey: ['fileSharePaths'],
       queryFn: getZones,
-      select: data => makeSortedZonesAndFspsMap(data)
+      select: (data: { paths: FileSharePath[] }) =>
+        makeSortedZonesAndFspsMap(data)
     }
   );
 }
