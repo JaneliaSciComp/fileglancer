@@ -1,0 +1,76 @@
+notifications:
+  - id: 1
+    type: info
+    title: Welcome to Fileglancer
+    message: Access and manage your scientific data files with ease
+    active: true
+    created_at: 2024-09-02T10:00:00Z
+    expires_at: null
+  - id: 2
+    type: warning
+    title: Maintenance Window
+    message: Scheduled maintenance on Sunday 2024-09-08 from 2:00-4:00 AM EST
+    active: true
+    created_at: 2024-09-02T10:15:00Z
+    expires_at: 2024-09-09T00:00:00Z
+  - id: 3
+    type: success
+    title: New Feature
+    message: Browse large datasets faster with our improved file loading
+    active: true
+    created_at: 2024-09-02T10:30:00Z
+    expires_at: 2024-09-16T00:00:00Z
+
+# Info notification (blue) - General information
+# - id: 4
+#   type: info
+#   title: System Update
+#   message: New features and improvements have been deployed
+#   active: true
+#   created_at: 2024-09-02T12:00:00Z
+#   expires_at: null
+#
+# Warning notification (amber) - Important notices
+# - id: 5
+#   type: warning
+#   title: Storage Quota Warning
+#   message: Your project is approaching its storage limit (85% used)
+#   active: true
+#   created_at: 2024-09-02T13:00:00Z
+#   expires_at: 2024-09-30T00:00:00Z
+#
+# Success notification (green) - Positive updates
+# - id: 6
+#   type: success
+#   title: Data Processing Complete
+#   message: Your large dataset analysis has finished successfully
+#   active: true
+#   created_at: 2024-09-02T14:00:00Z
+#   expires_at: 2024-09-05T00:00:00Z
+#
+# Error notification (red) - Critical issues
+# - id: 7
+#   type: error
+#   title: Service Disruption
+#   message: File access temporarily unavailable - our team is investigating
+#   active: true
+#   created_at: 2024-09-02T15:00:00Z
+#   expires_at: null
+#
+# Expired notification (will not be shown)
+# - id: 8
+#   type: info
+#   title: Past Event
+#   message: This notification has already expired
+#   active: true
+#   created_at: 2024-08-01T10:00:00Z
+#   expires_at: 2024-08-31T23:59:59Z
+#
+# Inactive notification (will not be shown)
+# - id: 9
+#   type: info
+#   title: Draft Notification
+#   message: This notification is inactive and won't be displayed
+#   active: false
+#   created_at: 2024-09-02T16:00:00Z
+#   expires_at: null
