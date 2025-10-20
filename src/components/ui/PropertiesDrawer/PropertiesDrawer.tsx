@@ -80,7 +80,7 @@ export default function PropertiesDrawer({
   togglePropertiesDrawer,
   setShowPermissionsDialog,
   setShowConvertFileDialog
-}: PropertiesDrawerProps): JSX.Element {
+}: PropertiesDrawerProps): React.JSX.Element {
   const location = useLocation();
   const [showDataLinkDialog, setShowDataLinkDialog] =
     React.useState<boolean>(false);

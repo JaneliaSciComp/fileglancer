@@ -23,7 +23,7 @@ const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
 export default function ConvertFileDialog({
   showConvertFileDialog,
   setShowConvertFileDialog
-}: ItemNamingDialogProps): JSX.Element {
+}: ItemNamingDialogProps): React.JSX.Element {
   const [waitingForTicketResponse, setWaitingForTicketResponse] =
     React.useState(false);
   const { destinationFolder, setDestinationFolder, handleTicketSubmit } =
