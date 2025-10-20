@@ -1,0 +1,14 @@
+{
+  "name": "fileglancer-ui-tests",
+  "version": "1.0.0",
+  "description": "Fileglancer Integration Tests",
+  "private": true,
+  "scripts": {
+    "test": "npx playwright test",
+    "test:report": "npx playwright show-report",
+    "test:update": "npx playwright test --update-snapshots"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0"
+  }
+}

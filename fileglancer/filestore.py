@@ -4,18 +4,16 @@ rooted at a specific directory.
 """
 
 import os
-
-from pydantic import BaseModel
-from typing import Optional, Generator
 import stat
 import pwd
 import grp
-import logging
 import shutil
 
-from fileglancer.paths import FileSharePath
+from pydantic import BaseModel
+from typing import Optional, Generator
+from loguru import logger
 
-log = logging.getLogger("tornado.application")
+from .model import FileSharePath
 
 # Default buffer size for streaming file contents
 DEFAULT_BUFFER_SIZE = 8192
@@ -26,6 +24,7 @@ class FileInfo(BaseModel):
     """
     name: str
     path: Optional[str] = None
+    absolute_path: Optional[str] = None
     size: int
     is_dir: bool
     permissions: str
@@ -36,14 +35,14 @@ class FileInfo(BaseModel):
     hasWrite: Optional[bool] = None
 
     @classmethod
-    def from_stat(cls, path: str, full_path: str, stat_result: os.stat_result, current_user: str = None):
+    def from_stat(cls, path: str, absolute_path: str, stat_result: os.stat_result, current_user: str = None):
         """Create FileInfo from os.stat_result"""
         if path is None or path == "":
             raise ValueError("Path cannot be None or empty")
         is_dir = stat.S_ISDIR(stat_result.st_mode)
         size = 0 if is_dir else stat_result.st_size
         # Do not expose the name of the root directory
-        name = '' if path=='.' else os.path.basename(full_path)
+        name = '' if path=='.' else os.path.basename(absolute_path)
         permissions = stat.filemode(stat_result.st_mode)
         last_modified = stat_result.st_mtime
 
@@ -69,6 +68,7 @@ class FileInfo(BaseModel):
         return cls(
             name=name,
             path=path,
+            absolute_path=absolute_path,
             size=size,
             is_dir=is_dir,
             permissions=permissions,
@@ -188,6 +188,22 @@ class Filestore:
         return self.root_path
 
 
+    def get_absolute_path(self, relative_path: Optional[str] = None) -> str:
+        """
+        Get the absolute path of the Filestore.
+
+        Args:
+            relative_path (str): The relative path to the file or directory to get the absolute path for.
+                May be None, in which case the root path is returned.
+
+        Returns:
+            str: The absolute path of the Filestore.
+        """
+        if relative_path is None or relative_path == "":
+            return self.root_path
+        return os.path.abspath(os.path.join(self.root_path, relative_path))
+
+
     def get_file_info(self, path: Optional[str] = None, current_user: str = None) -> FileInfo:
         """
         Get the FileInfo for a file or directory at the given path.
@@ -230,64 +246,91 @@ class Filestore:
             try:
                 yield self._get_file_info_from_path(entry_path, current_user)
             except (FileNotFoundError, PermissionError, OSError) as e:
-                log.error(f"Error accessing entry: {entry_path}: {e}")
+                logger.error(f"Error accessing entry: {entry_path}: {e}")
                 continue
 
 
-    def stream_file_contents(self, path: str, buffer_size: int = DEFAULT_BUFFER_SIZE) -> Generator[bytes, None, None]:
+    def stream_file_contents(self, path: str = None, buffer_size: int = DEFAULT_BUFFER_SIZE, file_handle = None) -> Generator[bytes, None, None]:
         """
-        Stream the contents of a file at the given path.
+        Stream the contents of a file at the given path or from an open file handle.
 
         Args:
-            path (str): The path to the file to stream.
+            path (str): The path to the file to stream (optional if file_handle is provided).
             buffer_size (int): The size of the buffer to use when reading the file.
                 Defaults to DEFAULT_BUFFER_SIZE, which is 8192 bytes.
+            file_handle: An open file handle to stream from (optional, takes precedence over path).
+                The handle will be closed when streaming completes.
 
         Raises:
-            ValueError: If path attempts to escape root directory
+            ValueError: If path attempts to escape root directory or neither path nor file_handle is provided
         """
-        if path is None or path == "":
-            raise ValueError("Path cannot be None or empty")
-        full_path = self._check_path_in_root(path)
-        with open(full_path, 'rb') as file:
-            while True:
-                chunk = file.read(buffer_size)
-                if not chunk:
-                    break
-                yield chunk
+        if file_handle is not None:
+            # Stream from the provided file handle and ensure it gets closed
+            try:
+                while True:
+                    chunk = file_handle.read(buffer_size)
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                file_handle.close()
+        else:
+            # Legacy behavior: open file from path
+            if path is None or path == "":
+                raise ValueError("Path cannot be None or empty")
+            full_path = self._check_path_in_root(path)
+            with open(full_path, 'rb') as file:
+                while True:
+                    chunk = file.read(buffer_size)
+                    if not chunk:
+                        break
+                    yield chunk
 
-    def stream_file_range(self, path: str, start: int, end: int, buffer_size: int = DEFAULT_BUFFER_SIZE) -> Generator[bytes, None, None]:
+    def stream_file_range(self, path: str = None, start: int = 0, end: int = 0, buffer_size: int = DEFAULT_BUFFER_SIZE, file_handle = None) -> Generator[bytes, None, None]:
         """
-        Stream a specific byte range of a file at the given path.
+        Stream a specific byte range of a file at the given path or from an open file handle.
 
         Args:
-            path (str): The path to the file to stream.
+            path (str): The path to the file to stream (optional if file_handle is provided).
             start (int): The starting byte position (inclusive).
             end (int): The ending byte position (inclusive).
             buffer_size (int): The size of the buffer to use when reading the file.
+            file_handle: An open file handle to stream from (optional, takes precedence over path).
+                The handle will be closed when streaming completes.
 
         Raises:
             ValueError: If path attempts to escape root directory or if range is invalid
         """
-        if path is None or path == "":
-            raise ValueError("Path cannot be None or empty")
         if start < 0:
             raise ValueError("Start position cannot be negative")
         if end < start:
             raise ValueError("End position cannot be less than start position")
 
-        full_path = self._check_path_in_root(path)
-        with open(full_path, 'rb') as file:
-            file.seek(start)
+        # Determine which file handle to use
+        should_close_handle = file_handle is not None
+        if file_handle is None:
+            # Legacy behavior: open file from path
+            if path is None or path == "":
+                raise ValueError("Path cannot be None or empty")
+            full_path = self._check_path_in_root(path)
+            file_handle = open(full_path, 'rb')
+            should_close_handle = True
+
+        # Stream from the file handle
+        try:
+            file_handle.seek(start)
             remaining = end - start + 1
 
             while remaining > 0:
                 chunk_size = min(buffer_size, remaining)
-                chunk = file.read(chunk_size)
+                chunk = file_handle.read(chunk_size)
                 if not chunk:
                     break
                 yield chunk
                 remaining -= len(chunk)
+        finally:
+            if should_close_handle:
+                file_handle.close()
 
 
     def rename_file_or_dir(self, old_path: str, new_path: str):

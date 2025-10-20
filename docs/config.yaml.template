@@ -1,0 +1,124 @@
+#
+# Loguru logging level (ERROR, WARNING, INFO, DEBUG, TRACE)
+#
+log_level: INFO
+
+#
+# Database URL (runtime - unprivileged user)
+# For SQLite: sqlite:///fileglancer.db
+# For PostgreSQL: postgresql://username:password@hostname:port/database_name
+#
+db_url: sqlite:///fileglancer.db
+
+#
+# Database admin URL (migrations - privileged user)
+# If not specified, db_url will be used for migrations
+# For PostgreSQL: postgresql://admin_user:admin_password@hostname:port/database_name
+#
+# db_admin_url: postgresql://admin_user:admin_password@localhost/fileglancer
+
+#
+# Database connection pool settings (applies to non-SQLite databases)
+# These settings control the connection pool size for database connections
+#
+# db_pool_size: 5          # Number of connections to keep in the pool
+# db_max_overflow: 0       # Number of additional connections allowed beyond pool_size
+
+# If true, use seteuid/setegid for file access
+# Set to False for local testing
+#
+use_access_flags: True
+
+#
+# File share mount paths to view in the UI.
+# (this setting will override atlassian_url, set below)
+#
+# file_share_mounts:
+#   - /tmp
+
+#
+# Atlassian Cloud URL. Used for retrieving file share paths and tickets.
+#
+#atlassian_url: https://YOURID.atlassian.net
+
+#
+# Atlassian username and API token for authenticating with JIRA
+#
+# atlassian_username: your_email@example.com
+# atlassian_token: your_api_token
+
+#
+# JIRA browse URL for constructing ticket links
+# If not specified, defaults to {atlassian_url}/browse
+#
+# jira_browse_url: https://YOURID.atlassian.net/browse
+
+#
+# External URL for proxied paths
+#
+external_proxy_url: http://localhost:7878/files
+
+#
+# Maximum size of the sharing key LRU cache
+# This controls how many sharing key lookups are cached in memory
+# Higher values use more memory but reduce database queries
+#
+sharing_key_cache_size: 1000
+
+#
+# OKTA OAuth/OIDC Authentication Settings
+# Set enable_okta_auth to true to require OKTA authentication
+# When false, the application uses the $USER environment variable
+#
+enable_okta_auth: false
+
+#
+# OKTA domain (e.g., your-domain.okta.com)
+#
+# okta_domain: your-domain.okta.com
+
+#
+# OKTA OAuth application client ID
+#
+# okta_client_id: your_client_id
+
+#
+# OKTA OAuth application client secret
+# IMPORTANT: Keep this secret! Consider using environment variables instead
+#
+# okta_client_secret: your_client_secret
+
+#
+# OKTA OAuth redirect URI (callback URL)
+# This must match the redirect URI configured in your OKTA application
+#
+# okta_redirect_uri: https://<your_domain>/api/oauth_callback
+
+#
+# Session Management Settings
+#
+
+#
+# Secret key for signing session cookies
+# IMPORTANT: Change this in production! Use a strong random string
+# Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+#
+session_secret_key: change-me-in-production
+
+#
+# Session expiry time in hours
+#
+session_expiry_hours: 24
+
+#
+# Name of the session cookie
+#
+session_cookie_name: fg_session
+
+#
+# Whether to use secure flag on session cookies
+# Set to false for development with self-signed certificates
+# Set to true for production with valid HTTPS certificates
+#
+session_cookie_secure: false
+
