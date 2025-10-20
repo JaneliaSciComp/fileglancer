@@ -11,8 +11,11 @@ from typing import Optional, Dict, List
 from loguru import logger
 from cachetools import LRUCache
 
-from .settings import get_settings
+from fileglancer.model import FileSharePath
+from fileglancer.settings import get_settings
+from fileglancer.utils import slugify_path
 
+# Constants
 SHARING_KEY_LENGTH = 12
 
 # Global flag to track if migrations have been run
@@ -254,12 +257,12 @@ def _get_engine(db_url):
     logger.info(f"Database engine created and cached for: {make_url(db_url).render_as_string(hide_password=True)}")
     return engine
 
+
 def get_db_session(db_url):
     """Create and return a database session using a cached engine"""
     engine = _get_engine(db_url)
     Session = sessionmaker(bind=engine)
     session = Session()
-
     return session
 
 
@@ -278,12 +281,15 @@ def dispose_engine(db_url=None):
         del _engine_cache[db_url]
 
 
-def get_all_paths(session):
+def get_all_paths(session, fsp_name: Optional[str] = None):
     """Get all file share paths from the database"""
-    return session.query(FileSharePathDB).all()
+    query = session.query(FileSharePathDB)
+    if fsp_name:
+        query = query.filter_by(name=fsp_name)
+    return query.all()
 
 
-def get_file_share_paths(db_url: str):
+def get_file_share_paths(session: Session, fsp_name: Optional[str] = None):
     """
     Get all file share paths from either local configuration or database.
 
@@ -300,16 +306,13 @@ def get_file_share_paths(db_url: str):
     Returns:
         List of FileSharePath objects ready to be used in responses
     """
-    from fileglancer.settings import get_settings
-    from fileglancer.utils import slugify_path
-    from fileglancer.model import FileSharePath
 
     settings = get_settings()
     file_share_mounts = settings.file_share_mounts
 
     if file_share_mounts:
         # Use local configuration
-        return [FileSharePath(
+        paths = [FileSharePath(
             name=slugify_path(path),
             zone='Local',
             group='local',
@@ -319,19 +322,21 @@ def get_file_share_paths(db_url: str):
             windows_path=path,
             linux_path=path,
         ) for path in file_share_mounts]
+        if fsp_name:
+            paths = [path for path in paths if path.name == fsp_name]
+        return paths
     else:
         # Fall back to database
-        with get_db_session(db_url) as session:
-            return [FileSharePath(
-                name=path.name,
-                zone=path.zone,
-                group=path.group,
-                storage=path.storage,
-                mount_path=path.mount_path,
-                mac_path=path.mac_path,
-                windows_path=path.windows_path,
-                linux_path=path.linux_path,
-            ) for path in get_all_paths(session)]
+        return [FileSharePath(
+            name=path.name,
+            zone=path.zone,
+            group=path.group,
+            storage=path.storage,
+            mount_path=path.mount_path,
+            mac_path=path.mac_path,
+            windows_path=path.windows_path,
+            linux_path=path.linux_path,
+        ) for path in get_all_paths(session, fsp_name)]
 
 
 def get_fsp_names_to_mount_paths(db_url: str) -> Dict[str, str]:

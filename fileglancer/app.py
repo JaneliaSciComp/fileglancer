@@ -122,11 +122,6 @@ def create_app(settings):
     # Initialize OAuth client for OKTA
     oauth = auth.setup_oauth(settings)
 
-    @cache
-    def _get_fsp_names_to_mount_paths() -> Dict[str, str]:
-        """Get mapping of file share path names to mount paths - delegates to database module"""
-        return db.get_fsp_names_to_mount_paths(settings.db_url)
-
 
     def _get_user_context(username: str) -> UserContext:
         if settings.use_access_flags:
@@ -144,7 +139,7 @@ def create_app(settings):
             if proxied_path.sharing_name != sharing_name:
                 return get_error_response(400, "InvalidArgument", f"Sharing name mismatch for sharing key {sharing_key}", sharing_name), None
 
-            fsp_names_to_mount_paths = _get_fsp_names_to_mount_paths()
+            fsp_names_to_mount_paths = db.get_fsp_names_to_mount_paths(session)
             if proxied_path.fsp_name not in fsp_names_to_mount_paths:
                 return get_error_response(400, "InvalidArgument", f"File share path {proxied_path.fsp_name} not found", sharing_name), None
             fsp_mount_path = fsp_names_to_mount_paths[proxied_path.fsp_name]
@@ -357,8 +352,9 @@ def create_app(settings):
     @app.get("/api/file-share-paths", response_model=FileSharePathResponse,
              description="Get all file share paths from the database")
     async def get_file_share_paths() -> List[FileSharePath]:
-        paths = db.get_file_share_paths(settings.db_url)
-        return FileSharePathResponse(paths=paths)
+        with db.get_db_session(settings.db_url) as session:
+            paths = db.get_file_share_paths(session)
+            return FileSharePathResponse(paths=paths)
 
 
     @app.get("/api/external-buckets", response_model=ExternalBucketResponse,
@@ -366,7 +362,7 @@ def create_app(settings):
     async def get_external_buckets() -> ExternalBucketResponse:
         with db.get_db_session(settings.db_url) as session:
             buckets = [_convert_external_bucket(bucket) for bucket in db.get_external_buckets(session)]
-        return ExternalBucketResponse(buckets=buckets)
+            return ExternalBucketResponse(buckets=buckets)
 
 
     @app.get("/api/external-buckets/{fsp_name}", response_model=ExternalBucketResponse,
@@ -374,7 +370,7 @@ def create_app(settings):
     async def get_external_buckets(fsp_name: str) -> ExternalBucket:
         with db.get_db_session(settings.db_url) as session:
             buckets = [_convert_external_bucket(bucket) for bucket in db.get_external_buckets(session, fsp_name)]
-        return ExternalBucketResponse(buckets=buckets)
+            return ExternalBucketResponse(buckets=buckets)
 
 
     @app.get("/api/notifications", response_model=NotificationResponse,
@@ -687,8 +683,9 @@ def create_app(settings):
     def _get_filestore(path_name: str):
         """Get a filestore for the given path name."""
         # Get file share path using centralized function and filter for the requested path
-        paths = db.get_file_share_paths(settings.db_url)
-        fsp = next((path for path in paths if path.name == path_name), None)
+        with db.get_db_session(settings.db_url) as session:
+            paths = db.get_file_share_paths(session, path_name)
+            fsp = paths[0] if paths else None
 
         if fsp is None:
             return None, f"File share path '{path_name}' not found"
@@ -711,9 +708,10 @@ def create_app(settings):
             home_parent = os.path.dirname(home_directory_path)
 
             # Find matching file share path for home directory
-            paths = db.get_file_share_paths(settings.db_url)
-            home_fsp = next((fsp for fsp in paths if fsp.mount_path == home_parent), None)
-            home_fsp_name = home_fsp.name if home_fsp else None
+            with db.get_db_session(settings.db_url) as session:
+                paths = db.get_file_share_paths(session)
+                home_fsp = next((fsp for fsp in paths if fsp.mount_path == home_parent), None)
+                home_fsp_name = home_fsp.name if home_fsp else None
 
             # Get user groups
             user_groups = []
