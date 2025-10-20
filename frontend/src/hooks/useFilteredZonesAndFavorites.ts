@@ -22,8 +22,6 @@ export default function useSearchFilter() {
   } = usePreferencesContext();
   const { profile } = useProfileContext();
 
-  const userGroups = profile?.groups || [];
-
   const [searchQuery, setSearchQuery] = React.useState<string>('');
   const [filteredZonesMap, setFilteredZonesMap] =
     React.useState<ZonesAndFileSharePathsMap>({});
@@ -42,6 +40,9 @@ export default function useSearchFilter() {
         setFilteredZonesMap({});
         return;
       }
+
+      const userGroups = profile?.groups || [];
+
       const matches = Object.entries(zonesAndFspQuery.data)
         .map(([key, value]) => {
           // Map through zones only
@@ -147,8 +148,15 @@ export default function useSearchFilter() {
       filterAllFavorites(searchQuery);
     } else if (searchQuery === '' && isFilteredByGroups && profile?.groups) {
       // When search query is empty but group filtering is enabled, apply group filter
+      if (!zonesAndFspQuery.isSuccess) {
+        setFilteredZonesMap({});
+        setFilteredZoneFavorites([]);
+        setFilteredFileSharePathFavorites([]);
+        setFilteredFolderFavorites([]);
+        return;
+      }
       const userGroups = profile.groups;
-      const groupFilteredMap = Object.entries(zonesAndFileSharePathsMap)
+      const groupFilteredMap = Object.entries(zonesAndFspQuery.data)
         .map(([key, value]) => {
           if (key.startsWith('zone')) {
             const zone = value as Zone;
