@@ -40,11 +40,6 @@ vi.mock(import('../../contexts/FileBrowserContext'), async importOriginal => {
   };
 });
 
-// Enable tasks for this test suite
-vi.stubGlobal('import.meta.env', {
-  VITE_ENABLE_TASKS: 'true'
-});
-
 describe('Convert File dialog', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
