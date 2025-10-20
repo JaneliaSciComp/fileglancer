@@ -54,7 +54,7 @@ def _read_version() -> str:
             current_file = os.path.abspath(__file__)
             current_dir = os.path.dirname(current_file)
             project_root = os.path.dirname(current_dir)
-            package_json_path = os.path.join(project_root, "package.json")
+            package_json_path = os.path.join(project_root, "frontend", "package.json")
 
             with open(package_json_path, "r") as f:
                 data = json.load(f)
