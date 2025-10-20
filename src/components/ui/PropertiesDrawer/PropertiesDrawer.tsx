@@ -176,11 +176,14 @@ export default function PropertiesDrawer({
                 Permissions
               </Tabs.Trigger>
 
-              {tasksEnabled && (
-                <Tabs.Trigger className="!text-foreground h-full" value="convert">
+              {tasksEnabled ? (
+                <Tabs.Trigger
+                  className="!text-foreground h-full"
+                  value="convert"
+                >
                   Convert
                 </Tabs.Trigger>
-              )}
+              ) : null}
               <Tabs.TriggerIndicator className="h-full" />
             </Tabs.List>
 
@@ -256,7 +259,7 @@ export default function PropertiesDrawer({
             </Tabs.Panel>
 
             {/*Task panel*/}
-            {tasksEnabled && (
+            {tasksEnabled ? (
               <Tabs.Panel
                 className="flex flex-col gap-4 flex-1 w-full p-2"
                 value="convert"
@@ -266,9 +269,9 @@ export default function PropertiesDrawer({
                 ) : (
                   <>
                     <Typography className="min-w-64">
-                      Scientific Computing can help you convert images to OME-Zarr
-                      format, suitable for viewing in external viewers like
-                      Neuroglancer.
+                      Scientific Computing can help you convert images to
+                      OME-Zarr format, suitable for viewing in external viewers
+                      like Neuroglancer.
                     </Typography>
                     <Button
                       disabled={
@@ -284,7 +287,7 @@ export default function PropertiesDrawer({
                   </>
                 )}
               </Tabs.Panel>
-            )}
+            ) : null}
           </Tabs>
         ) : null}
       </Card>

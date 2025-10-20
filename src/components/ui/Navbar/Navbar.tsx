@@ -83,7 +83,7 @@ function NavList() {
   const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
   const filteredLinks = tasksEnabled
     ? LINKS
-    : LINKS.filter((link) => link.href !== '/jobs');
+    : LINKS.filter(link => link.href !== '/jobs');
 
   return (
     <>

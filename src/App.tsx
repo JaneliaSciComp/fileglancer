@@ -78,7 +78,7 @@ const AppComponent = () => {
               }
               path="links"
             />
-            {tasksEnabled && (
+            {tasksEnabled ? (
               <Route
                 element={
                   <RequireAuth>
@@ -87,7 +87,7 @@ const AppComponent = () => {
                 }
                 path="jobs"
               />
-            )}
+            ) : null}
             <Route element={<Help />} path="help" />
             <Route
               element={
