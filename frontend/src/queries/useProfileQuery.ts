@@ -9,7 +9,7 @@ export const useProfileQuery = () => {
 
   const fetchProfile = async (): Promise<Profile> => {
     const response = await sendFetchRequest(
-      '/api/fileglancer/profile',
+      '/api/profile',
       'GET',
       cookies['_xsrf']
     );

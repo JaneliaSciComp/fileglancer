@@ -13,7 +13,7 @@ export default function useZoneAndFileSharePathMapQuery(): UseQueryResult<
 
   const getZones = async (): Promise<{ paths: FileSharePath[] }> => {
     const response = await sendFetchRequest(
-      '/api/fileglancer/file-share-paths',
+      '/api/file-share-paths',
       'GET',
       cookies['_xsrf']
     );
@@ -89,6 +89,7 @@ export default function useZoneAndFileSharePathMapQuery(): UseQueryResult<
 
   const makeSortedZonesAndFspsMap = (data: { paths: FileSharePath[] }) => {
     const zonesAndFileSharePathsMap = createZonesAndFileSharePathsMap(data);
+    console.log('Zones and File Share Paths Map:', zonesAndFileSharePathsMap);
     return alphabetizeZonesAndFsps(zonesAndFileSharePathsMap);
   };
 
