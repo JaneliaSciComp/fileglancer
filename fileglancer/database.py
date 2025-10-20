@@ -339,6 +339,12 @@ def get_file_share_paths(session: Session, fsp_name: Optional[str] = None):
         ) for path in get_all_paths(session, fsp_name)]
 
 
+def get_file_share_path(session: Session, name: str) -> Optional[FileSharePath]:
+    """Get a file share path by name"""
+    paths = get_file_share_paths(session, name)
+    return paths[0] if paths else None
+
+
 def get_fsp_names_to_mount_paths(db_url: str) -> Dict[str, str]:
     """
     Get a mapping of file share path names to their mount paths.
@@ -474,27 +480,12 @@ def _clear_sharing_key_cache():
 def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
     """Validate a proxied path exists and is accessible"""
     # Get mount path - check database first using existing session, then check local mounts
-    fsp = session.query(FileSharePathDB).filter_by(name=fsp_name).first()
-    mount_path = None
-
-    if fsp:
-        mount_path = fsp.mount_path
-    else:
-        # Check if using local file_share_mounts configuration
-        settings = get_settings()
-        if settings.file_share_mounts:
-            from fileglancer.utils import slugify_path
-            # Check if fsp_name matches any slugified local path
-            for local_path in settings.file_share_mounts:
-                if slugify_path(local_path) == fsp_name:
-                    mount_path = local_path
-                    break
-
-    if not mount_path:
+    fsp = get_file_share_path(session, fsp_name)
+    if not fsp:
         raise ValueError(f"File share path {fsp_name} does not exist")
 
     # Validate path exists and is accessible
-    absolute_path = os.path.join(mount_path, path.lstrip('/'))
+    absolute_path = os.path.join(fsp.mount_path, path.lstrip('/'))
     try:
         os.listdir(absolute_path)
     except FileNotFoundError:

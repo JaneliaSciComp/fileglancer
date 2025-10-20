@@ -139,11 +139,10 @@ def create_app(settings):
             if proxied_path.sharing_name != sharing_name:
                 return get_error_response(400, "InvalidArgument", f"Sharing name mismatch for sharing key {sharing_key}", sharing_name), None
 
-            fsp_names_to_mount_paths = db.get_fsp_names_to_mount_paths(session)
-            if proxied_path.fsp_name not in fsp_names_to_mount_paths:
+            fsp = db.get_file_share_path(session, proxied_path.fsp_name)
+            if not fsp:
                 return get_error_response(400, "InvalidArgument", f"File share path {proxied_path.fsp_name} not found", sharing_name), None
-            fsp_mount_path = fsp_names_to_mount_paths[proxied_path.fsp_name]
-            mount_path = f"{fsp_mount_path}/{proxied_path.path}"
+            mount_path = f"{fsp.mount_path}/{proxied_path.path}"
             return FileProxyClient(proxy_kwargs={'target_name': sharing_name}, path=mount_path), _get_user_context(proxied_path.username)
 
 
@@ -684,11 +683,9 @@ def create_app(settings):
         """Get a filestore for the given path name."""
         # Get file share path using centralized function and filter for the requested path
         with db.get_db_session(settings.db_url) as session:
-            paths = db.get_file_share_paths(session, path_name)
-            fsp = paths[0] if paths else None
-
-        if fsp is None:
-            return None, f"File share path '{path_name}' not found"
+            fsp = db.get_file_share_path(session, path_name)
+            if fsp is None:
+                return None, f"File share path '{path_name}' not found"
 
         # Create a filestore for the file share path
         filestore = _get_mounted_filestore(fsp)
