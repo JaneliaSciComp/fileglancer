@@ -14,11 +14,6 @@ import { useZoneAndFspMapContext } from './ZonesAndFspMapContext';
 import { normalizePosixStylePath } from '@/utils/pathHandling';
 import { createSuccess, handleError } from '@/utils/errorHandling';
 
-type FileBrowserResponse = {
-  info: FileOrFolder;
-  files: FileOrFolder[];
-};
-
 type FileBrowserContextProviderProps = {
   readonly children: React.ReactNode;
   readonly fspName: string | undefined;
