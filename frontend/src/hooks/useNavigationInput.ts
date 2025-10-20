@@ -54,7 +54,7 @@ export default function useNavigationInput(initialValue: string = '') {
       for (const key of keys) {
         // Iterate through only the objects in zonesAndFileSharePathsMap that have a key that start with "fsp_"
         if (key.startsWith('fsp_')) {
-          const fspObject = zonesAndFspQuery[key] as FileSharePath;
+          const fspObject = zonesAndFspQuery.data[key] as FileSharePath;
           const linuxPath = fspObject.linux_path || '';
           const macPath = fspObject.mac_path || '';
           const windowsPath = convertBackToForwardSlash(fspObject.windows_path);
