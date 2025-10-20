@@ -30,7 +30,7 @@ from fileglancer import auth
 from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
-from fileglancer.utils import slugify_path, format_timestamp, guess_content_type, parse_range_header
+from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header
 from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext
 from fileglancer.filestore import Filestore
 from fileglancer.log import AccessLogMiddleware
@@ -124,11 +124,8 @@ def create_app(settings):
 
     @cache
     def _get_fsp_names_to_mount_paths() -> Dict[str, str]:
-        if settings.file_share_mounts:
-            return {slugify_path(path): path for path in settings.file_share_mounts}
-        else:
-            with db.get_db_session(settings.db_url) as session:
-                return {fsp.name: fsp.mount_path for fsp in db.get_all_paths(session)}
+        """Get mapping of file share path names to mount paths - delegates to database module"""
+        return db.get_fsp_names_to_mount_paths(settings.db_url)
 
 
     def _get_user_context(username: str) -> UserContext:
@@ -360,31 +357,7 @@ def create_app(settings):
     @app.get("/api/file-share-paths", response_model=FileSharePathResponse,
              description="Get all file share paths from the database")
     async def get_file_share_paths() -> List[FileSharePath]:
-        file_share_mounts = settings.file_share_mounts
-        if file_share_mounts:
-            paths = [FileSharePath(
-                name=slugify_path(path),
-                zone='Local',
-                group='local',
-                storage='local',
-                mount_path=path,
-                mac_path=path,
-                windows_path=path,
-                linux_path=path,
-            ) for path in file_share_mounts]
-        else:
-            with db.get_db_session(settings.db_url) as session:
-                paths = [FileSharePath(
-                    name=path.name,
-                    zone=path.zone,
-                    group=path.group,
-                    storage=path.storage,
-                    mount_path=path.mount_path,
-                    mac_path=path.mac_path,
-                    windows_path=path.windows_path,
-                    linux_path=path.linux_path,
-                ) for path in db.get_all_paths(session)]
-
+        paths = db.get_file_share_paths(settings.db_url)
         return FileSharePathResponse(paths=paths)
 
 
@@ -713,41 +686,9 @@ def create_app(settings):
 
     def _get_filestore(path_name: str):
         """Get a filestore for the given path name."""
-        # Get file share path from database or settings
-        file_share_mounts = settings.file_share_mounts
-        fsp = None
-
-        if file_share_mounts:
-            for path in file_share_mounts:
-                name = slugify_path(path)
-                if name == path_name:
-                    fsp = FileSharePath(
-                        name=name,
-                        zone='Local',
-                        group='local',
-                        storage='local',
-                        mount_path=path,
-                        mac_path=path,
-                        windows_path=path,
-                        linux_path=path,
-                    )
-                    break
-        else:
-            with db.get_db_session(settings.db_url) as session:
-                db_paths = db.get_all_paths(session)
-                for path in db_paths:
-                    if path.name == path_name:
-                        fsp = FileSharePath(
-                            name=path.name,
-                            zone=path.zone,
-                            group=path.group,
-                            storage=path.storage,
-                            mount_path=path.mount_path,
-                            mac_path=path.mac_path,
-                            windows_path=path.windows_path,
-                            linux_path=path.linux_path,
-                        )
-                        break
+        # Get file share path using centralized function and filter for the requested path
+        paths = db.get_file_share_paths(settings.db_url)
+        fsp = next((path for path in paths if path.name == path_name), None)
 
         if fsp is None:
             return None, f"File share path '{path_name}' not found"
@@ -770,20 +711,9 @@ def create_app(settings):
             home_parent = os.path.dirname(home_directory_path)
 
             # Find matching file share path for home directory
-            home_fsp_name = None
-            file_share_mounts = settings.file_share_mounts
-            if file_share_mounts:
-                for path in file_share_mounts:
-                    if path == home_parent:
-                        home_fsp_name = slugify_path(path)
-                        break
-            else:
-                with db.get_db_session(settings.db_url) as session:
-                    paths = db.get_all_paths(session)
-                    for fsp in paths:
-                        if fsp.mount_path == home_parent:
-                            home_fsp_name = fsp.name
-                            break
+            paths = db.get_file_share_paths(settings.db_url)
+            home_fsp = next((fsp for fsp in paths if fsp.mount_path == home_parent), None)
+            home_fsp_name = home_fsp.name if home_fsp else None
 
             # Get user groups
             user_groups = []

@@ -283,6 +283,74 @@ def get_all_paths(session):
     return session.query(FileSharePathDB).all()
 
 
+def get_file_share_paths(db_url: str):
+    """
+    Get all file share paths from either local configuration or database.
+
+    This is the single source of truth for retrieving file share paths.
+    Returns a list of FileSharePath model objects (not database models).
+
+    Priority:
+    1. If file_share_mounts is configured in settings, use those paths
+    2. Otherwise, retrieve paths from the database
+
+    Args:
+        db_url: Database URL (only used if file_share_mounts is empty)
+
+    Returns:
+        List of FileSharePath objects ready to be used in responses
+    """
+    from fileglancer.settings import get_settings
+    from fileglancer.utils import slugify_path
+    from fileglancer.model import FileSharePath
+
+    settings = get_settings()
+    file_share_mounts = settings.file_share_mounts
+
+    if file_share_mounts:
+        # Use local configuration
+        return [FileSharePath(
+            name=slugify_path(path),
+            zone='Local',
+            group='local',
+            storage='local',
+            mount_path=path,
+            mac_path=path,
+            windows_path=path,
+            linux_path=path,
+        ) for path in file_share_mounts]
+    else:
+        # Fall back to database
+        with get_db_session(db_url) as session:
+            return [FileSharePath(
+                name=path.name,
+                zone=path.zone,
+                group=path.group,
+                storage=path.storage,
+                mount_path=path.mount_path,
+                mac_path=path.mac_path,
+                windows_path=path.windows_path,
+                linux_path=path.linux_path,
+            ) for path in get_all_paths(session)]
+
+
+def get_fsp_names_to_mount_paths(db_url: str) -> Dict[str, str]:
+    """
+    Get a mapping of file share path names to their mount paths.
+
+    This is a helper function that returns a dict for quick lookups.
+    Uses get_file_share_paths() as the single source of truth.
+
+    Args:
+        db_url: Database URL
+
+    Returns:
+        Dict mapping fsp names to mount paths
+    """
+    paths = get_file_share_paths(db_url)
+    return {fsp.name: fsp.mount_path for fsp in paths}
+
+
 def get_external_buckets(session, fsp_name: Optional[str] = None):
     """Get all external buckets from the database"""
     query = session.query(ExternalBucketDB)
@@ -400,7 +468,7 @@ def _clear_sharing_key_cache():
 
 def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
     """Validate a proxied path exists and is accessible"""
-    # First check database for file share path
+    # Get mount path - check database first using existing session, then check local mounts
     fsp = session.query(FileSharePathDB).filter_by(name=fsp_name).first()
     mount_path = None
 
