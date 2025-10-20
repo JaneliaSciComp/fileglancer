@@ -1,5 +1,4 @@
 import React from 'react';
-import { useCookiesContext } from '@/contexts/CookiesContext';
 import { sendFetchRequest } from '@/utils';
 import type { Result } from '@/shared.types';
 import { createSuccess, handleError, toHttpError } from '@/utils/errorHandling';
@@ -46,7 +45,6 @@ export const NotificationProvider = ({
     number[]
   >([]);
   const [error, setError] = React.useState<string | null>(null);
-  const { cookies } = useCookiesContext();
 
   // Load dismissed notifications from localStorage
   React.useEffect(() => {
@@ -69,11 +67,7 @@ export const NotificationProvider = ({
     setError(null);
 
     try {
-      const response = await sendFetchRequest(
-        '/api/notifications',
-        'GET',
-        cookies['_xsrf']
-      );
+      const response = await sendFetchRequest('/api/notifications', 'GET');
 
       if (response.ok) {
         const data = await response.json();
@@ -88,7 +82,7 @@ export const NotificationProvider = ({
     } catch (error) {
       return handleError(error);
     }
-  }, [cookies]);
+  }, []);
 
   const dismissNotification = React.useCallback(
     (id: number) => {

@@ -2,10 +2,8 @@
 import React from 'react';
 import { MemoryRouter, Route, Routes, useParams } from 'react-router';
 import { render, RenderOptions } from '@testing-library/react';
-import { CookiesProvider as ReactCookiesProvider } from 'react-cookie';
 import { ErrorBoundary } from 'react-error-boundary';
 
-import { CookiesProvider } from '@/contexts/CookiesContext';
 import { ZonesAndFspMapContextProvider } from '@/contexts/ZonesAndFspMapContext';
 import { FileBrowserContextProvider } from '@/contexts/FileBrowserContext';
 import { PreferencesProvider } from '@/contexts/PreferencesContext';
@@ -39,25 +37,23 @@ const FileBrowserTestingWrapper = ({
 
 const Browse = ({ children }: { children: React.ReactNode }) => {
   return (
-    <CookiesProvider>
-      <ServerHealthProvider>
-        <ZonesAndFspMapContextProvider>
-          <OpenFavoritesProvider>
-            <FileBrowserTestingWrapper>
-              <PreferencesProvider>
-                <ExternalBucketProvider>
-                  <ProxiedPathProvider>
-                    <ProfileContextProvider>
-                      <TicketProvider>{children}</TicketProvider>
-                    </ProfileContextProvider>
-                  </ProxiedPathProvider>
-                </ExternalBucketProvider>
-              </PreferencesProvider>
-            </FileBrowserTestingWrapper>
-          </OpenFavoritesProvider>
-        </ZonesAndFspMapContextProvider>
-      </ServerHealthProvider>
-    </CookiesProvider>
+    <ServerHealthProvider>
+      <ZonesAndFspMapContextProvider>
+        <OpenFavoritesProvider>
+          <FileBrowserTestingWrapper>
+            <PreferencesProvider>
+              <ExternalBucketProvider>
+                <ProxiedPathProvider>
+                  <ProfileContextProvider>
+                    <TicketProvider>{children}</TicketProvider>
+                  </ProfileContextProvider>
+                </ProxiedPathProvider>
+              </ExternalBucketProvider>
+            </PreferencesProvider>
+          </FileBrowserTestingWrapper>
+        </OpenFavoritesProvider>
+      </ZonesAndFspMapContextProvider>
+    </ServerHealthProvider>
   );
 };
 
@@ -69,23 +65,18 @@ const MockRouterAndProviders = ({
   initialEntries?: string[];
 }) => {
   return (
-    <ReactCookiesProvider>
-      <ErrorBoundary FallbackComponent={ErrorFallback}>
-        <MemoryRouter initialEntries={initialEntries}>
-          <Routes>
-            <Route path="browse" element={<Browse>{children}</Browse>} />
-            <Route
-              path="browse/:fspName"
-              element={<Browse>{children}</Browse>}
-            />
-            <Route
-              path="browse/:fspName/*"
-              element={<Browse>{children}</Browse>}
-            />
-          </Routes>
-        </MemoryRouter>
-      </ErrorBoundary>
-    </ReactCookiesProvider>
+    <ErrorBoundary FallbackComponent={ErrorFallback}>
+      <MemoryRouter initialEntries={initialEntries}>
+        <Routes>
+          <Route path="browse" element={<Browse>{children}</Browse>} />
+          <Route path="browse/:fspName" element={<Browse>{children}</Browse>} />
+          <Route
+            path="browse/:fspName/*"
+            element={<Browse>{children}</Browse>}
+          />
+        </Routes>
+      </MemoryRouter>
+    </ErrorBoundary>
   );
 };
 
