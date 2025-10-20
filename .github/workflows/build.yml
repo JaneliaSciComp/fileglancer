@@ -88,14 +88,14 @@ jobs:
 
     - name: Install browser
       run: npx playwright install chromium
-      working-directory: ui-tests
+      working-directory: frontend/ui-tests
 
     - name: Set up browser cache
       uses: actions/cache@v4
       with:
         path: |
           ${{ github.workspace }}/pw-browsers
-        key: ${{ runner.os }}-${{ hashFiles('ui-tests/yarn.lock') }}
+        key: ${{ runner.os }}-${{ hashFiles('frontend/ui-tests/yarn.lock') }}
 
     - name: Execute integration tests
       run: |
@@ -107,8 +107,8 @@ jobs:
       with:
         name: fileglancer-playwright-tests
         path: |
-          ui-tests/test-results
-          ui-tests/playwright-report
+          frontend/ui-tests/test-results
+          frontend/ui-tests/playwright-report
 
   check_links:
     name: Check README links

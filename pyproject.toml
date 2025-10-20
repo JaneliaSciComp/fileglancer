@@ -63,8 +63,10 @@ release = [
 
 [tool.hatch.version]
 source = "nodejs"
+path = "frontend/package.json"
 
 [tool.hatch.metadata.hooks.nodejs]
+path = "frontend/package.json"
 fields = ["description", "urls", "keywords"]
 
 [tool.hatch.build.targets.sdist]
@@ -95,7 +97,7 @@ platforms = ["osx-arm64", "osx-64", "linux-64"]
 [tool.pixi.feature.test.tasks]
 test-pip-install = "pip install -e ."
 test-backend = { cmd = "pytest --cov=fileglancer --cov-report=html --cov-report=term", depends-on = ["test-pip-install"] }
-test-frontend = "npm test"
+test-frontend = "cd frontend && npm test"
 
 [tool.pixi.feature.release.tasks]
 set-version = "hatch version"
@@ -110,17 +112,18 @@ release = { features = ["release"], solve-group = "default" }
 [tool.pixi.tasks]
 pip-install = "pip install -e ."
 pip-uninstall = "pip uninstall -y fileglancer"
-node-install = "npm install"
-node-build = { cmd = "npm run build", depends-on = ["node-install"] }
-node-eslint-check = "npx eslint . --cache --ext .ts,.tsx"
-node-eslint-write = "npx eslint . --cache --fix --ext .ts,.tsx"
-node-prettier-check =  "npx prettier \"**/*{.ts,.tsx,.js,.jsx,.css,.json,.md}\" \"!package-lock.json\" --check"
-node-prettier-write = "npx prettier --list-different --write '**/*.{ts,tsx,js,jsx,json,md}' '!package-lock.json'"
-node-check = "npx tsc --noEmit -p tsconfig.app.json"
-node-install-ui-tests = "npm --prefix ui-tests install"
-test-ui = { cmd = "npm --prefix ui-tests run test ", depends-on = ["node-install-ui-tests"] }
+node-install = "cd frontend && npm install"
+node-build = { cmd = "cd frontend && npm run build", depends-on = ["node-install"] }
+node-eslint-check = "cd frontend && npx eslint . --cache --ext .ts,.tsx"
+node-eslint-write = "cd frontend && npx eslint . --cache --fix --ext .ts,.tsx"
+node-prettier-check =  "cd frontend && npx prettier \"**/*{.ts,.tsx,.js,.jsx,.css,.json,.md}\" \"!package-lock.json\" --check"
+node-prettier-write = "cd frontend && npx prettier --list-different --write '**/*.{ts,tsx,js,jsx,json,md}' '!package-lock.json'"
+node-check = "cd frontend && npx tsc --noEmit -p tsconfig.app.json"
+node-install-ui-tests = "npm --prefix frontend/ui-tests install"
+test-ui = { cmd = "npm --prefix frontend/ui-tests run test ", depends-on = ["node-install-ui-tests"] }
+test-launch = "pixi run uvicorn fileglancer.app:app --no-access-log --port 7879"
 dev-install = { depends-on = ["node-build", "pip-install"] }
-dev-watch = { cmd = "NODE_ENV=development npm run watch" }
+dev-watch = { cmd = "cd frontend && NODE_ENV=development npm run watch" }
 dev-launch = "pixi run uvicorn fileglancer.app:app --no-access-log --port 7878 --reload"
 dev-launch-remote = "pixi run uvicorn fileglancer.app:app --no-access-log --host 0.0.0.0 --port 7878 --reload --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
 dev-launch-secure = "python fileglancer/dev_launch.py"
