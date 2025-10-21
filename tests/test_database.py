@@ -182,3 +182,49 @@ def test_delete_proxied_path(db_session, fsp):
     deleted_path = get_proxied_path_by_sharing_key(db_session, created_path.sharing_key)
     assert deleted_path is None
 
+
+def test_create_proxied_path_with_home_dir(db_session, temp_dir):
+    """Test creating a proxied path with ~/ home directory mount path"""
+    # Create a file share path using ~/ which should expand to current user's home
+    home_fsp = FileSharePathDB(
+        name="home",
+        zone="testzone",
+        group="testgroup",
+        storage="home",
+        mount_path="~/",  # Use tilde path
+        mac_path="~/",
+        windows_path="~/",
+        linux_path="~/"
+    )
+    db_session.add(home_fsp)
+    db_session.commit()
+
+    # Create a test directory in the actual home directory
+    import os
+    home_dir = os.path.expanduser("~/")
+    test_subpath = "test_fileglancer_proxied_path"
+    test_path = os.path.join(home_dir, test_subpath)
+
+    # Clean up if it exists from a previous run
+    if os.path.exists(test_path):
+        os.rmdir(test_path)
+
+    try:
+        os.makedirs(test_path, exist_ok=True)
+
+        # Test creating a proxied path with the ~/ mount point
+        username = "testuser"
+        sharing_name = "test_home_path"
+        proxied_path = create_proxied_path(db_session, username, sharing_name, home_fsp.name, test_subpath)
+
+        assert proxied_path.username == username
+        assert proxied_path.sharing_name == sharing_name
+        assert proxied_path.sharing_key is not None
+        assert proxied_path.fsp_name == "home"
+        assert proxied_path.path == test_subpath
+
+    finally:
+        # Clean up test directory
+        if os.path.exists(test_path):
+            os.rmdir(test_path)
+

@@ -145,7 +145,9 @@ def create_app(settings):
             fsp = db.get_file_share_path(session, proxied_path.fsp_name)
             if not fsp:
                 return get_error_response(400, "InvalidArgument", f"File share path {proxied_path.fsp_name} not found", sharing_name), None
-            mount_path = f"{fsp.mount_path}/{proxied_path.path}"
+            # Expand ~ to user's home directory before constructing the mount path
+            expanded_mount_path = os.path.expanduser(fsp.mount_path)
+            mount_path = f"{expanded_mount_path}/{proxied_path.path}"
             return FileProxyClient(proxy_kwargs={'target_name': sharing_name}, path=mount_path), _get_user_context(proxied_path.username)
 
 

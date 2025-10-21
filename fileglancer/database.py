@@ -489,8 +489,11 @@ def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
     if not fsp:
         raise ValueError(f"File share path {fsp_name} does not exist")
 
+    # Expand ~ to user's home directory before validation
+    expanded_mount_path = os.path.expanduser(fsp.mount_path)
+
     # Validate path exists and is accessible
-    absolute_path = os.path.join(fsp.mount_path, path.lstrip('/'))
+    absolute_path = os.path.join(expanded_mount_path, path.lstrip('/'))
     try:
         os.listdir(absolute_path)
     except FileNotFoundError:
