@@ -7,7 +7,7 @@ import uvicorn
 from pathlib import Path
 from loguru import logger
 
-@click.group()
+@click.group(epilog="Run 'fileglancer COMMAND --help' for more information on a command.")
 @click.version_option()
 def cli():
     """Fileglancer - File browsing and sharing platform"""
