@@ -145,8 +145,11 @@ class Filestore:
     def __init__(self, file_share_path: FileSharePath):
         """
         Create a Filestore with the given root path.
+        Expands ~ to the current user's home directory if present.
         """
-        self.root_path = os.path.abspath(file_share_path.mount_path)
+        # Expand ~/ to the user's home directory (within user context)
+        expanded_path = os.path.expanduser(file_share_path.mount_path)
+        self.root_path = os.path.abspath(expanded_path)
 
 
     def _check_path_in_root(self, path: Optional[str]) -> str:

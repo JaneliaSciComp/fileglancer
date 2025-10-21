@@ -291,42 +291,45 @@ def get_all_paths(session, fsp_name: Optional[str] = None):
 
 def get_file_share_paths(session: Session, fsp_name: Optional[str] = None):
     """
-    Get all file share paths from either local configuration or database.
+    Get all file share paths from either the local configuration or the database.
 
     This is the single source of truth for retrieving file share paths.
     Returns a list of FileSharePath model objects (not database models).
 
     Priority:
-    1. If file_share_mounts is configured in settings, use those paths
-    2. Otherwise, retrieve paths from the database
+    1. Check local configuration first - if paths exist in local configuration, use those
+    2. Otherwise, check the database
 
     Args:
-        db_url: Database URL (only used if file_share_mounts is empty)
+        session: Database session
+        fsp_name: Optional name to filter by
 
     Returns:
         List of FileSharePath objects ready to be used in responses
     """
-
     settings = get_settings()
     file_share_mounts = settings.file_share_mounts
 
     if file_share_mounts:
-        # Use local configuration
-        paths = [FileSharePath(
-            name=slugify_path(path),
-            zone='Local',
-            group='local',
-            storage='local',
-            mount_path=path,
-            mac_path=path,
-            windows_path=path,
-            linux_path=path,
-        ) for path in file_share_mounts]
+        paths = []
+        for path in file_share_mounts:
+            name = slugify_path(path)
+            paths.append(FileSharePath(
+                name=name,
+                zone='Local',
+                group='local',
+                storage = 'home' if path in ("~", "~/") else 'local',
+                mount_path=path,
+                mac_path=path,
+                windows_path=path,
+                linux_path=path,
+            ))
         if fsp_name:
             paths = [path for path in paths if path.name == fsp_name]
         return paths
     else:
-        # Fall back to database
+        # Use database paths
+        db_paths = get_all_paths(session, fsp_name)
         return [FileSharePath(
             name=path.name,
             zone=path.zone,
@@ -336,7 +339,7 @@ def get_file_share_paths(session: Session, fsp_name: Optional[str] = None):
             mac_path=path.mac_path,
             windows_path=path.windows_path,
             linux_path=path.linux_path,
-        ) for path in get_all_paths(session, fsp_name)]
+        ) for path in db_paths]
 
 
 def get_file_share_path(session: Session, name: str) -> Optional[FileSharePath]:
@@ -345,7 +348,7 @@ def get_file_share_path(session: Session, name: str) -> Optional[FileSharePath]:
     return paths[0] if paths else None
 
 
-def get_fsp_names_to_mount_paths(db_url: str) -> Dict[str, str]:
+def get_fsp_names_to_mount_paths(session: Session) -> Dict[str, str]:
     """
     Get a mapping of file share path names to their mount paths.
 
@@ -353,12 +356,12 @@ def get_fsp_names_to_mount_paths(db_url: str) -> Dict[str, str]:
     Uses get_file_share_paths() as the single source of truth.
 
     Args:
-        db_url: Database URL
+        session: Database session
 
     Returns:
         Dict mapping fsp names to mount paths
     """
-    paths = get_file_share_paths(db_url)
+    paths = get_file_share_paths(session)
     return {fsp.name: fsp.mount_path for fsp in paths}
 
 

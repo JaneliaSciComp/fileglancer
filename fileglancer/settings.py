@@ -37,8 +37,9 @@ class Settings(BaseSettings):
     jira_browse_url: Optional[HttpUrl] = None
 
     # If confluence settings are not provided, use a static list of paths to mount as file shares
-    # This can specify the home directory using a ~/ prefix.
-    file_share_mounts: List[str] = []
+    # This can specify the home directory using a ~/ prefix (will be expanded per-user).
+    # Example: file_share_mounts = ["~/", "/data/shared"]
+    file_share_mounts: List[str] = ["~/"]
     
     # The external URL of the proxy server for accessing proxied paths.
     # Maps to the /files/ end points of the fileglancer-central app.
