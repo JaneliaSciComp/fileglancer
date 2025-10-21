@@ -37,6 +37,8 @@ type ContextMenuActionProps = {
   setShowConvertFileDialog: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
+const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
+
 export default function ContextMenu({
   x,
   y,
@@ -105,7 +107,8 @@ export default function ContextMenu({
       action: (props: ContextMenuActionProps) => {
         setShowConvertFileDialog(true);
         props.setShowContextMenu(false);
-      }
+      },
+      shouldShow: tasksEnabled && fileBrowserState.propertiesTarget.is_dir
     },
     {
       name: 'Rename',

@@ -98,6 +98,8 @@ export default function PropertiesDrawer({
     handleDeleteDataLink
   } = useDataToolLinks(setShowDataLinkDialog);
 
+  const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
+
   // Set active tab to 'convert' when navigating from jobs page
   React.useEffect(() => {
     if (location.state?.openConvertTab) {
@@ -174,9 +176,14 @@ export default function PropertiesDrawer({
                 Permissions
               </Tabs.Trigger>
 
-              <Tabs.Trigger className="!text-foreground h-full" value="convert">
-                Convert
-              </Tabs.Trigger>
+              {tasksEnabled ? (
+                <Tabs.Trigger
+                  className="!text-foreground h-full"
+                  value="convert"
+                >
+                  Convert
+                </Tabs.Trigger>
+              ) : null}
               <Tabs.TriggerIndicator className="h-full" />
             </Tabs.List>
 
@@ -252,33 +259,35 @@ export default function PropertiesDrawer({
             </Tabs.Panel>
 
             {/*Task panel*/}
-            <Tabs.Panel
-              className="flex flex-col gap-4 flex-1 w-full p-2"
-              value="convert"
-            >
-              {ticket ? (
-                <TicketDetails />
-              ) : (
-                <>
-                  <Typography className="min-w-64">
-                    Scientific Computing can help you convert images to OME-Zarr
-                    format, suitable for viewing in external viewers like
-                    Neuroglancer.
-                  </Typography>
-                  <Button
-                    disabled={
-                      fileBrowserState.propertiesTarget.hasRead === false
-                    }
-                    onClick={() => {
-                      setShowConvertFileDialog(true);
-                    }}
-                    variant="outline"
-                  >
-                    Open conversion request
-                  </Button>
-                </>
-              )}
-            </Tabs.Panel>
+            {tasksEnabled ? (
+              <Tabs.Panel
+                className="flex flex-col gap-4 flex-1 w-full p-2"
+                value="convert"
+              >
+                {ticket ? (
+                  <TicketDetails />
+                ) : (
+                  <>
+                    <Typography className="min-w-64">
+                      Scientific Computing can help you convert images to
+                      OME-Zarr format, suitable for viewing in external viewers
+                      like Neuroglancer.
+                    </Typography>
+                    <Button
+                      disabled={
+                        fileBrowserState.propertiesTarget.hasRead === false
+                      }
+                      onClick={() => {
+                        setShowConvertFileDialog(true);
+                      }}
+                      variant="outline"
+                    >
+                      Open conversion request
+                    </Button>
+                  </>
+                )}
+              </Tabs.Panel>
+            ) : null}
           </Tabs>
         ) : null}
       </Card>

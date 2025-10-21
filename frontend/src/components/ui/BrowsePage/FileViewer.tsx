@@ -8,7 +8,6 @@ import {
 
 import Crumbs from './Crumbs';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-import { useCookiesContext } from '@/contexts/CookiesContext';
 import { formatFileSize, formatUnixTimestamp } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
 import { useFileContentQuery } from '@/queries/fileContentQueries';
@@ -78,15 +77,13 @@ const getLanguageFromExtension = (filename: string): string => {
 
 export default function FileViewer({ file }: FileViewerProps): React.ReactNode {
   const { fileQuery } = useFileBrowserContext();
-  const { cookies } = useCookiesContext();
 
   const [isDarkMode, setIsDarkMode] = React.useState<boolean>(false);
 
   // Use Tanstack Query for file content
   const contentQuery = useFileContentQuery(
     fileQuery.data?.currentFileSharePath?.name,
-    file.path,
-    cookies
+    file.path
   );
 
   // Detect dark mode from document

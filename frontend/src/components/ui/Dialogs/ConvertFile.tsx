@@ -18,6 +18,8 @@ type ItemNamingDialogProps = {
   >;
 };
 
+const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
+
 export default function ConvertFileDialog({
   showConvertFileDialog,
   setShowConvertFileDialog
@@ -90,7 +92,8 @@ export default function ConvertFileDialog({
           </Typography>
           <input
             autoFocus
-            className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background"
+            className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!tasksEnabled}
             id="destination_folder"
             onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
               setDestinationFolder(event.target.value);
@@ -99,10 +102,18 @@ export default function ConvertFileDialog({
             type="text"
             value={destinationFolder}
           />
+          {!tasksEnabled ? (
+            <Typography className="text-error -mt-2" type="small">
+              This functionality is disabled. If you think this is an error,
+              contact the app administrator.
+            </Typography>
+          ) : null}
         </div>
         <Button
           className="!rounded-md"
-          disabled={!destinationFolder}
+          disabled={
+            !destinationFolder || !tasksEnabled || waitingForTicketResponse
+          }
           type="submit"
         >
           {waitingForTicketResponse ? (

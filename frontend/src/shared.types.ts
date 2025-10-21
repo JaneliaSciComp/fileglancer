@@ -34,8 +34,6 @@ type Profile = {
   groups: string[];
 };
 
-type Cookies = { [key: string]: string };
-
 type Success<T> = {
   success: true;
   data: T;
@@ -49,7 +47,6 @@ interface Failure {
 type Result<T> = Success<T> | Failure;
 
 export type {
-  Cookies,
   FileOrFolder,
   FileSharePath,
   Failure,

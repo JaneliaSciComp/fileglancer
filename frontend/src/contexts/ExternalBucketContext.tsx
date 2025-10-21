@@ -1,6 +1,5 @@
 import React from 'react';
 import { default as log } from '@/logger';
-import { useCookiesContext } from '@/contexts/CookiesContext';
 import { sendFetchRequest } from '@/utils';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 
@@ -39,7 +38,6 @@ export const ExternalBucketProvider = ({
   const [externalDataUrl, setExternalDataUrl] = React.useState<string | null>(
     null
   );
-  const { cookies } = useCookiesContext();
   const { fileQuery } = useFileBrowserContext();
 
   const updateExternalBucket = React.useCallback(
@@ -90,8 +88,7 @@ export const ExternalBucketProvider = ({
     try {
       const response = await sendFetchRequest(
         `/api/external-buckets/${fileQuery.data.currentFileSharePath.name}`,
-        'GET',
-        cookies['_xsrf']
+        'GET'
       );
       if (!response.ok) {
         if (response.status === 404) {
@@ -114,7 +111,7 @@ export const ExternalBucketProvider = ({
       log.error('Error fetching external bucket:', error);
     }
     return null;
-  }, [fileQuery.data.currentFileSharePath, cookies]);
+  }, [fileQuery.data.currentFileSharePath]);
 
   React.useEffect(() => {
     (async function () {
