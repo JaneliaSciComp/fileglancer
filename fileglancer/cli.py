@@ -61,6 +61,12 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
 
     if ssl_keyfile:
         config_kwargs['ssl_keyfile'] = ssl_keyfile
+    else:
+        # If there is no SSL, we need to set FGC_SESSION_COOKIE_SECURE=false
+        # in the environment so that the session cookie is not marked as secure
+        import os
+        os.environ['FGC_SESSION_COOKIE_SECURE'] = 'false'
+        logger.debug("No SSL keyfile provided, setting FGC_SESSION_COOKIE_SECURE=false in environment")
 
     if ssl_certfile:
         config_kwargs['ssl_certfile'] = ssl_certfile
