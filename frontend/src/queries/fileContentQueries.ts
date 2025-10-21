@@ -1,5 +1,4 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import type { Cookies } from 'react-cookie';
 
 import { fetchFileWithTextDetection } from '@/utils';
 
@@ -11,8 +10,7 @@ export const fileContentQueryKeys = {
 
 export function useFileContentQuery(
   fspName: string | undefined,
-  filePath: string,
-  cookies: Cookies
+  filePath: string
 ): UseQueryResult<string, Error> {
   return useQuery<string, Error>({
     queryKey: fileContentQueryKeys.detail(fspName || '', filePath),
@@ -21,11 +19,7 @@ export function useFileContentQuery(
         throw new Error('No file share path selected');
       }
 
-      const { content } = await fetchFileWithTextDetection(
-        fspName,
-        filePath,
-        cookies
-      );
+      const { content } = await fetchFileWithTextDetection(fspName, filePath);
       return content;
     },
     enabled: !!fspName,

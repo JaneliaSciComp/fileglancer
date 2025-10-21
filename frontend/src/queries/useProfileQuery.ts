@@ -1,18 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { sendFetchRequest } from '@/utils';
-import { useCookiesContext } from '@/contexts/CookiesContext';
 import type { Profile } from '@/shared.types';
 
 export const useProfileQuery = () => {
-  const { cookies } = useCookiesContext();
-
   const fetchProfile = async (): Promise<Profile> => {
-    const response = await sendFetchRequest(
-      '/api/profile',
-      'GET',
-      cookies['_xsrf']
-    );
+    const response = await sendFetchRequest('/api/profile', 'GET');
     return response.json();
   };
 

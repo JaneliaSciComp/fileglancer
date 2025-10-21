@@ -4,7 +4,6 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { sendFetchRequest, getFileBrowsePath, makeMapKey } from '@/utils';
 import { normalizePosixStylePath } from '@/utils/pathHandling';
 import type { FileOrFolder, FileSharePath } from '@/shared.types';
-import { useCookiesContext } from '@/contexts/CookiesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 
 type FileBrowserResponse = {
@@ -30,7 +29,6 @@ export default function useFileQuery(
   fspName: string | undefined,
   folderName: string
 ): UseQueryResult<FileQueryData, Error> {
-  const { cookies } = useCookiesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
 
   // Function to fetch files for the current FSP and current folder
@@ -41,7 +39,7 @@ export default function useFileQuery(
 
     const url = getFileBrowsePath(fspName, folderName);
 
-    const response = await sendFetchRequest(url, 'GET', cookies['_xsrf']);
+    const response = await sendFetchRequest(url, 'GET');
     const body = await response.json();
 
     if (!response.ok) {

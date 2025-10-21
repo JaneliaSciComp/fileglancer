@@ -2,21 +2,14 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 
 import { sendFetchRequest, makeMapKey } from '@/utils';
 import { removeTrailingSlashes } from '@/utils/pathHandling';
-import { useCookiesContext } from '@/contexts/CookiesContext';
 import { Zone, FileSharePath, ZonesAndFileSharePathsMap } from '@/shared.types';
 
 export default function useZoneAndFileSharePathMapQuery(): UseQueryResult<
   ZonesAndFileSharePathsMap,
   Error
 > {
-  const { cookies } = useCookiesContext();
-
   const getZones = async (): Promise<{ paths: FileSharePath[] }> => {
-    const response = await sendFetchRequest(
-      '/api/file-share-paths',
-      'GET',
-      cookies['_xsrf']
-    );
+    const response = await sendFetchRequest('/api/file-share-paths', 'GET');
     return response.json();
   };
 
