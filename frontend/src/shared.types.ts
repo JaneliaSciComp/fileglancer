@@ -27,8 +27,6 @@ type Zone = { name: string; fileSharePaths: FileSharePath[] };
 
 type ZonesAndFileSharePathsMap = Record<string, FileSharePath | Zone>;
 
-type Cookies = { [key: string]: string };
-
 type Success<T> = {
   success: true;
   data: T;
@@ -46,7 +44,6 @@ export type {
   FileSharePath,
   Zone,
   ZonesAndFileSharePathsMap,
-  Cookies,
   Result,
   Success,
   Failure

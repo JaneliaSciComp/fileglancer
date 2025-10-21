@@ -13,7 +13,6 @@ import {
   getPreferredPathForDisplay,
   makeBrowseLink
 } from '@/utils';
-import { useCookiesContext } from '@/contexts/CookiesContext';
 import MissingFolderFavoriteDialog from './MissingFolderFavoriteDialog';
 import FgTooltip from '../widgets/FgTooltip';
 import type { FileSharePath } from '@/shared.types';
@@ -40,7 +39,6 @@ export default function Folder({
   const [showMissingFolderFavoriteDialog, setShowMissingFolderFavoriteDialog] =
     React.useState(false);
   const { pathPreference, handleFavoriteChange } = usePreferencesContext();
-  const { cookies } = useCookiesContext();
 
   const folderFavorite = React.useMemo(() => {
     if (isFavoritable) {
@@ -75,11 +73,7 @@ export default function Folder({
         folderFavorite.fsp.name,
         folderFavorite.folderPath
       );
-      const response = await sendFetchRequest(
-        fetchPath,
-        'GET',
-        cookies['_xsrf']
-      );
+      const response = await sendFetchRequest(fetchPath, 'GET');
 
       if (response.status === 200) {
         return true;

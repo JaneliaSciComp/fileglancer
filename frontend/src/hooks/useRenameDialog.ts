@@ -8,7 +8,6 @@ import {
 } from '@/utils';
 import { handleError, toHttpError } from '@/utils/errorHandling';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-import { useCookiesContext } from '@/contexts/CookiesContext';
 import { Result } from '@/shared.types';
 
 export default function useRenameDialog() {
@@ -16,7 +15,6 @@ export default function useRenameDialog() {
 
   const { fileBrowserState, refreshFiles } = useFileBrowserContext();
   const { currentFileSharePath } = fileBrowserState;
-  const { cookies } = useCookiesContext();
 
   async function handleRenameSubmit(path: string): Promise<Result<void>> {
     if (!currentFileSharePath) {
@@ -26,14 +24,9 @@ export default function useRenameDialog() {
     try {
       const newPath = joinPaths(removeLastSegmentFromPath(path), newName);
       const fetchPath = getFileBrowsePath(currentFileSharePath?.name, path);
-      const response = await sendFetchRequest(
-        fetchPath,
-        'PATCH',
-        cookies['_xsrf'],
-        {
-          path: newPath
-        }
-      );
+      const response = await sendFetchRequest(fetchPath, 'PATCH', {
+        path: newPath
+      });
 
       if (response.ok) {
         return await refreshFiles();

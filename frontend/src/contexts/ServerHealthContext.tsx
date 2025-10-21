@@ -1,5 +1,4 @@
 import React from 'react';
-import { useCookiesContext } from '@/contexts/CookiesContext';
 import {
   checkServerHealth,
   ServerStatus,
@@ -11,6 +10,7 @@ import {
   createRetryWithBackoff,
   type RetryState
 } from '@/utils';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 import logger from '@/logger';
 
 type ServerHealthContextType = {
@@ -56,7 +56,7 @@ export const ServerHealthProvider = ({
   const [nextRetrySeconds, setNextRetrySeconds] = React.useState<number | null>(
     null
   );
-  const { cookies } = useCookiesContext();
+  const isPageVisible = usePageVisibility();
 
   // Debounce health checks to avoid spam
   const healthCheckTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -100,7 +100,7 @@ export const ServerHealthProvider = ({
         setIsChecking(true);
         setStatus('checking');
 
-        const healthStatus = await checkServerHealth(cookies['_xsrf']);
+        const healthStatus = await checkServerHealth();
 
         // Check if this request was aborted
         if (abortControllerRef.current?.signal.aborted) {
@@ -113,7 +113,7 @@ export const ServerHealthProvider = ({
           setShowWarningOverlay(false);
           logger.debug('Server detected as healthy during retry');
           // reload the page to ensure full recovery
-          window.location.reload();
+          // window.location.reload();
           return true; // Success - stop retrying
         } else if (healthStatus === 'down') {
           return false; // Continue retrying
@@ -153,7 +153,7 @@ export const ServerHealthProvider = ({
         }
       }
     );
-  }, [stopRetrying, cookies]);
+  }, [stopRetrying]);
 
   const checkHealth = React.useCallback(async () => {
     if (isChecking) {
@@ -170,7 +170,7 @@ export const ServerHealthProvider = ({
     setStatus('checking');
 
     try {
-      const healthStatus = await checkServerHealth(cookies['_xsrf']);
+      const healthStatus = await checkServerHealth();
 
       // Check if this request was aborted
       if (abortControllerRef.current?.signal.aborted) {
@@ -189,8 +189,6 @@ export const ServerHealthProvider = ({
         logger.debug('Server detected as healthy');
         // Stop retrying since server is healthy
         stopRetrying();
-        // reload the page to ensure full recovery
-        window.location.reload();
       }
     } catch (error) {
       logger.error('Error during health check:', error);
@@ -201,7 +199,7 @@ export const ServerHealthProvider = ({
     } finally {
       setIsChecking(false);
     }
-  }, [cookies, isChecking, startRetrying, stopRetrying]);
+  }, [isChecking, startRetrying, stopRetrying]);
 
   const reportFailedRequest = React.useCallback(
     async (apiPath: string, responseStatus?: number) => {
@@ -238,6 +236,8 @@ export const ServerHealthProvider = ({
 
   const dismissWarning = React.useCallback(() => {
     setShowWarningOverlay(false);
+    // reload the page to ensure full recovery
+    window.location.reload();
   }, []);
 
   // Register health check reporter with global sendFetchRequest
@@ -247,6 +247,27 @@ export const ServerHealthProvider = ({
       clearHealthCheckReporter();
     };
   }, [reportFailedRequest]);
+
+  // Pause/resume retry mechanism based on page visibility
+  React.useEffect(() => {
+    if (!retryStateRef.current) {
+      return;
+    }
+
+    if (isPageVisible) {
+      // Resume retries when page becomes visible
+      if (retryStateRef.current.isPaused) {
+        logger.debug('Page visible - resuming server health retries');
+        retryStateRef.current.resume();
+      }
+    } else {
+      // Pause retries when page becomes hidden
+      if (retryStateRef.current.isRetrying && !retryStateRef.current.isPaused) {
+        logger.debug('Page hidden - pausing server health retries');
+        retryStateRef.current.pause();
+      }
+    }
+  }, [isPageVisible]);
 
   // Cleanup timeouts and abort controllers on unmount
   React.useEffect(() => {

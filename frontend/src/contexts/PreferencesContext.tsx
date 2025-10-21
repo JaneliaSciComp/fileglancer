@@ -2,7 +2,6 @@ import React from 'react';
 import { default as log } from '@/logger';
 
 import type { FileSharePath, Zone } from '@/shared.types';
-import { useCookiesContext } from '@/contexts/CookiesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { sendFetchRequest, makeMapKey, HTTPError } from '@/utils';
@@ -130,18 +129,15 @@ export const PreferencesProvider = ({
   const [isFilteredByGroups, setIsFilteredByGroups] =
     React.useState<boolean>(true);
 
-  const { cookies } = useCookiesContext();
   const { isZonesMapReady, zonesAndFileSharePathsMap } =
     useZoneAndFspMapContext();
   const { fileBrowserState } = useFileBrowserContext();
 
   const fetchPreferences = React.useCallback(async () => {
     try {
-      const data = await sendFetchRequest(
-        `/api/preference`,
-        'GET',
-        cookies['_xsrf']
-      ).then(response => response.json());
+      const data = await sendFetchRequest(`/api/preference`, 'GET').then(
+        response => response.json()
+      );
       return data;
     } catch (error) {
       if (error instanceof HTTPError && error.responseCode === 404) {
@@ -151,7 +147,7 @@ export const PreferencesProvider = ({
       }
       return {};
     }
-  }, [cookies]);
+  }, []);
 
   const accessMapItems = React.useCallback(
     (keys: string[]) => {
@@ -212,19 +208,16 @@ export const PreferencesProvider = ({
 
   const savePreferencesToBackend = React.useCallback(
     async <T,>(key: string, value: T): Promise<Response> => {
-      const response = await sendFetchRequest(
-        `/api/preference/${key}`,
-        'PUT',
-        cookies['_xsrf'],
-        { value: value }
-      );
+      const response = await sendFetchRequest(`/api/preference/${key}`, 'PUT', {
+        value: value
+      });
       if (!response.ok) {
         throw await toHttpError(response);
       } else {
         return response;
       }
     },
-    [cookies]
+    []
   );
 
   const handleUpdateLayout = async (layout: string): Promise<void> => {
