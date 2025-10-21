@@ -574,12 +574,13 @@ def create_app(settings):
         sharing_name = os.path.basename(path)
         logger.info(f"Creating proxied path for {username} with sharing name {sharing_name} and fsp_name {fsp_name} and path {path}")
         with db.get_db_session(settings.db_url) as session:
-            try:
-                new_path = db.create_proxied_path(session, username, sharing_name, fsp_name, path)
-                return _convert_proxied_path(new_path, settings.external_proxy_url)
-            except ValueError as e:
-                logger.error(f"Error creating proxied path: {e}")
-                raise HTTPException(status_code=400, detail=str(e))
+            with _get_user_context(username): # Necessary to validate the user can access the proxied path
+                try:
+                    new_path = db.create_proxied_path(session, username, sharing_name, fsp_name, path)
+                    return _convert_proxied_path(new_path, settings.external_proxy_url)
+                except ValueError as e:
+                    logger.error(f"Error creating proxied path: {e}")
+                    raise HTTPException(status_code=400, detail=str(e))
 
 
     @app.get("/api/proxied-path", response_model=ProxiedPathResponse,
@@ -613,12 +614,13 @@ def create_app(settings):
                                   sharing_name: Optional[str] = Query(default=None, description="The sharing path of the proxied path"),
                                   username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
-            try:
-                updated = db.update_proxied_path(session, username, sharing_key, new_path=path, new_sharing_name=sharing_name, new_fsp_name=fsp_name)
-                return _convert_proxied_path(updated, settings.external_proxy_url)
-            except ValueError as e:
-                logger.error(f"Error updating proxied path: {e}")
-                raise HTTPException(status_code=400, detail=str(e))
+            with _get_user_context(username): # Necessary to validate the user can access the proxied path
+                try:
+                    updated = db.update_proxied_path(session, username, sharing_key, new_path=path, new_sharing_name=sharing_name, new_fsp_name=fsp_name)
+                    return _convert_proxied_path(updated, settings.external_proxy_url)
+                except ValueError as e:
+                    logger.error(f"Error updating proxied path: {e}")
+                    raise HTTPException(status_code=400, detail=str(e))
 
 
     @app.delete("/api/proxied-path/{sharing_key}", description="Delete a proxied path by sharing key")
