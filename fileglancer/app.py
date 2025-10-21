@@ -700,14 +700,22 @@ def create_app(settings):
     async def get_profile(username: str = Depends(get_current_user)):
         """Get the current user's profile"""
         with _get_user_context(username):
-            home_directory_path = os.path.expanduser(f"~{username}")
-            home_directory_name = os.path.basename(home_directory_path)
-            home_parent = os.path.dirname(home_directory_path)
-
+            
             # Find matching file share path for home directory
             with db.get_db_session(settings.db_url) as session:
                 paths = db.get_file_share_paths(session)
-                home_fsp = next((fsp for fsp in paths if fsp.mount_path == home_parent), None)
+
+                # First, check if there's a "home" FSP (for ~/ paths)
+                home_fsp = next((fsp for fsp in paths if fsp.mount_path in ('~', '~/')), None)
+                if home_fsp:
+                    home_directory_name = "."
+                else:
+                    # If no "home" FSP exists, fall back to finding by mount path
+                    home_directory_path = os.path.expanduser(f"~{username}")
+                    home_parent = os.path.dirname(home_directory_path)
+                    home_fsp = next((fsp for fsp in paths if fsp.mount_path == home_parent), None)
+                    home_directory_name = os.path.basename(home_directory_path)
+
                 home_fsp_name = home_fsp.name if home_fsp else None
 
             # Get user groups
