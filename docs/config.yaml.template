@@ -100,10 +100,11 @@ enable_okta_auth: false
 
 #
 # Secret key for signing session cookies
-# IMPORTANT: Change this in production! Use a strong random string
+# If not set, a random key will be generated on each server start (sessions won't persist across restarts)
+# For production, set this to a strong random string to maintain sessions across restarts
 # Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
 #
-session_secret_key: change-me-in-production
+# session_secret_key: your-generated-secret-key-here
 
 #
 # Session expiry time in hours
