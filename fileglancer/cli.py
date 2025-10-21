@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Command-line interface for Fileglancer using Click.
+Command-line interface for Fileglancer
 """
 import os
 import click
@@ -12,7 +12,7 @@ from loguru import logger
 @click.group(epilog="Run 'fileglancer COMMAND --help' for more information on a command.")
 @click.version_option()
 def cli():
-    """Fileglancer - File browsing and sharing platform"""
+    """Fileglancer - NGFF browsing and sharing platform"""
     pass
 
 
@@ -51,6 +51,15 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
     log_level = settings.log_level
     logger.remove()
     logger.add(lambda msg: click.echo(msg, nl=False), level=log_level, colorize=True)
+
+    # Set up default database location if not already configured
+    if 'FGC_DB_URL' not in os.environ:
+        # Create data directory in user's home
+        data_dir = Path.home() / '.local' / 'share' / 'fileglancer'
+        data_dir.mkdir(parents=True, exist_ok=True)
+        db_path = data_dir / 'fileglancer.db'
+        os.environ['FGC_DB_URL'] = f'sqlite:///{db_path}'
+        logger.debug(f"Setting FGC_DB_URL=sqlite:///{db_path}")
 
     # Find available port if auto_port is enabled
     if auto_port:

@@ -33,7 +33,7 @@ pip install fileglancer
 fileglancer start
 ```
 
-The server will start on `http://localhost:7878` by default. By default, users can browse their home directory (`~/`) without any additional configuration.
+The server will start on `http://localhost:8000` by default. By default, users can browse their home directory (`~/`) without any additional configuration. Note that by default the database will be saved to the current directory as `fileglancer.db`. 
 
 ### Configuration
 
