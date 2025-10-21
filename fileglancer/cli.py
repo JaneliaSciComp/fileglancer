@@ -39,8 +39,10 @@ def cli():
               help='Ciphers to use.')
 @click.option('--timeout-keep-alive', default=5, show_default=True, type=int,
               help='Close Keep-Alive connections if no new data is received within this timeout.')
+@click.option('--auto-port', default=True,
+              help='Automatically find an available port if the specified port is in use.')
 def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
-          ssl_ca_certs, ssl_version, ssl_cert_reqs, ssl_ciphers, timeout_keep_alive):
+          ssl_ca_certs, ssl_version, ssl_cert_reqs, ssl_ciphers, timeout_keep_alive, auto_port):
     """Start the Fileglancer server using uvicorn."""
 
     # Configure loguru logger based on settings (if present)
@@ -49,6 +51,24 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
     log_level = settings.log_level
     logger.remove()
     logger.add(lambda msg: click.echo(msg, nl=False), level=log_level, colorize=True)
+
+    # Find available port if auto_port is enabled
+    if auto_port:
+        import socket
+        original_port = port
+        max_attempts = 100
+        for attempt in range(max_attempts):
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                try:
+                    s.bind((host, port))
+                    if port != original_port:
+                        logger.info(f"Port {original_port} in use, trying port {port} instead")
+                    break
+                except OSError:
+                    port += 1
+        else:
+            logger.error(f"Could not find an available port after {max_attempts} attempts starting from {original_port}")
+            return
 
     # Build uvicorn config
     config_kwargs = {
