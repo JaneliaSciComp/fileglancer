@@ -5,6 +5,7 @@ Command-line interface for Fileglancer using Click.
 import os
 import click
 import uvicorn
+import json
 from pathlib import Path
 from loguru import logger
 
@@ -41,6 +42,13 @@ def cli():
 def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
           ssl_ca_certs, ssl_version, ssl_cert_reqs, ssl_ciphers, timeout_keep_alive):
     """Start the Fileglancer server using uvicorn."""
+
+    # Configure loguru logger based on settings (if present)
+    from fileglancer.settings import get_settings
+    settings = get_settings()
+    log_level = settings.log_level
+    logger.remove()
+    logger.add(lambda msg: click.echo(msg, nl=False), level=log_level, colorize=True)
 
     # Build uvicorn config
     config_kwargs = {
@@ -92,7 +100,7 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
         config_kwargs['ssl_ciphers'] = ssl_ciphers
 
     # Run uvicorn
-    import json
+    logger.info(f"Starting Fileglancer server on {host}:{port}")
     logger.trace(f"Starting Uvicorn with args:\n{json.dumps(config_kwargs, indent=2, sort_keys=True)}")
     uvicorn.run(**config_kwargs)
 
