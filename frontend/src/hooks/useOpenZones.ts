@@ -20,13 +20,16 @@ export default function useOpenZones() {
   );
 
   React.useEffect(() => {
-    if (fileQuery.data.currentFileSharePath) {
+    if (fileQuery.isPending) {
+      return;
+    }
+    if (fileQuery.data?.currentFileSharePath) {
       setOpenZones(prev => ({
         ...prev,
         [fileQuery.data.currentFileSharePath!.zone]: true
       }));
     }
-  }, [fileQuery.data.currentFileSharePath]);
+  }, [fileQuery]);
 
   return {
     openZones,

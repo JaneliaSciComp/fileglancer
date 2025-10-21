@@ -54,7 +54,7 @@ export default function FileBrowser({
   } = useZarrMetadata();
 
   const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
-  const isLoading = fileQuery.isLoading;
+  const isLoading = fileQuery.isPending;
   const error = fileQuery.error;
 
   // If current item is a file, render the FileViewer instead of the file browser

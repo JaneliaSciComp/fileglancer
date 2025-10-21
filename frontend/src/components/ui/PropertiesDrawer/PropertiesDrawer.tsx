@@ -109,7 +109,7 @@ export default function PropertiesDrawer({
 
   const fullPath = getPreferredPathForDisplay(
     pathPreference,
-    fileQuery.data.currentFileSharePath,
+    fileQuery.data?.currentFileSharePath,
     fileBrowserState.propertiesTarget?.path
   );
 

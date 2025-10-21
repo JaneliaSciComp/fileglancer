@@ -94,12 +94,15 @@ export const TicketProvider = ({
   const fetchTicket = React.useCallback(async (): Promise<
     Result<Ticket | void>
   > => {
-    if (
-      !fileQuery.data.currentFileSharePath ||
-      !fileBrowserState.propertiesTarget
-    ) {
-      // This is probably not an error, just the state before the file browser is ready
+    if (fileQuery.isPending) {
+      // Not an error, just the state before the file browser is ready
       return createSuccess(undefined);
+    }
+    if (!fileQuery.data?.currentFileSharePath) {
+      return handleError(new Error('No file share path selected'));
+    }
+    if (!fileBrowserState.propertiesTarget) {
+      return handleError(new Error('No properties target selected'));
     }
 
     try {
@@ -126,7 +129,7 @@ export const TicketProvider = ({
     } catch (error) {
       return handleError(error);
     }
-  }, [fileQuery.data.currentFileSharePath, fileBrowserState.propertiesTarget]);
+  }, [fileQuery, fileBrowserState.propertiesTarget]);
 
   async function createTicket(destinationFolder: string): Promise<void> {
     if (!fileQuery.data.currentFileSharePath) {

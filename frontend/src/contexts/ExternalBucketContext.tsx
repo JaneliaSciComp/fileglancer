@@ -77,11 +77,15 @@ export const ExternalBucketProvider = ({
         setExternalDataUrl(null);
       }
     },
-    [fileQuery.data.currentFileOrFolder, fileQuery.data.currentFileSharePath]
+    [fileQuery]
   );
 
   const fetchExternalBucket = React.useCallback(async () => {
-    if (!fileQuery.data.currentFileSharePath) {
+    if (
+      fileQuery.isPending ||
+      !fileQuery.data ||
+      !fileQuery.data.currentFileSharePath
+    ) {
       log.trace('No current file share path selected');
       return null;
     }
@@ -111,7 +115,7 @@ export const ExternalBucketProvider = ({
       log.error('Error fetching external bucket:', error);
     }
     return null;
-  }, [fileQuery.data.currentFileSharePath]);
+  }, [fileQuery]);
 
   React.useEffect(() => {
     (async function () {
@@ -123,12 +127,7 @@ export const ExternalBucketProvider = ({
         updateExternalBucket(null);
       }
     })();
-  }, [
-    fileQuery.data.currentFileSharePath,
-    fileQuery.data.currentFileOrFolder,
-    fetchExternalBucket,
-    updateExternalBucket
-  ]);
+  }, [fileQuery, fetchExternalBucket, updateExternalBucket]);
 
   return (
     <ExternalBucketContext.Provider

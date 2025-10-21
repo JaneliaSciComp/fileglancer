@@ -664,6 +664,8 @@ export const PreferencesProvider = ({
   // to update the recently viewed folder
   React.useEffect(() => {
     if (
+      fileQuery.isPending ||
+      !fileQuery.data ||
       !fileQuery.data.currentFileSharePath ||
       !fileQuery.data.currentFileOrFolder
     ) {
@@ -725,8 +727,7 @@ export const PreferencesProvider = ({
     recentlyViewedFolders,
     savePreferencesToBackend,
     loadingRecentlyViewedFolders,
-    fileQuery.data.currentFileSharePath,
-    fileQuery.data.currentFileOrFolder
+    fileQuery
   ]);
 
   return (

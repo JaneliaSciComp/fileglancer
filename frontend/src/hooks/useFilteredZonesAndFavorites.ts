@@ -93,7 +93,7 @@ export default function useSearchFilter() {
 
       setFilteredZonesMap(Object.fromEntries(matches as [string, Zone][]));
     },
-    [zonesAndFspQuery, isFilteredByGroups, userGroups]
+    [zonesAndFspQuery, isFilteredByGroups, profile]
   );
 
   const filterAllFavorites = React.useCallback(

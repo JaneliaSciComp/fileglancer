@@ -62,7 +62,7 @@ export const ProxiedPathProvider = ({
     null
   );
   const [dataUrl, setDataUrl] = React.useState<string | null>(null);
-  const { fileQuery, fileBrowserState } = useFileBrowserContext();
+  const { fileQuery } = useFileBrowserContext();
 
   const updateProxiedPath = React.useCallback(
     (proxiedPath: ProxiedPath | null) => {
@@ -113,11 +113,12 @@ export const ProxiedPathProvider = ({
   const fetchProxiedPath = React.useCallback(async (): Promise<
     Result<ProxiedPath | void>
   > => {
-    if (
-      !fileQuery.data.currentFileSharePath ||
-      !fileQuery.data.currentFileOrFolder
-    ) {
+    if (fileQuery.isPending) {
       return createSuccess(undefined);
+    } else if (!fileQuery.data?.currentFileSharePath) {
+      return handleError(new Error('No file share path selected'));
+    } else if (!fileQuery.data?.currentFileOrFolder) {
+      return handleError(new Error('No file or folder selected'));
     }
     try {
       const response = await sendFetchRequest(
@@ -139,7 +140,7 @@ export const ProxiedPathProvider = ({
     } catch (error) {
       return handleError(error);
     }
-  }, [fileQuery.data.currentFileSharePath, fileQuery.data.currentFileOrFolder]);
+  }, [fileQuery]);
 
   const createProxiedPath = React.useCallback(async (): Promise<
     Result<ProxiedPath | void>
@@ -168,11 +169,7 @@ export const ProxiedPathProvider = ({
     } catch (error) {
       return handleError(error);
     }
-  }, [
-    fileQuery.data.currentFileSharePath,
-    fileQuery.data.currentFileOrFolder,
-    updateProxiedPath
-  ]);
+  }, [fileQuery, updateProxiedPath]);
 
   const deleteProxiedPath = React.useCallback(
     async (proxiedPath: ProxiedPath): Promise<Result<void>> => {
@@ -216,12 +213,7 @@ export const ProxiedPathProvider = ({
         updateProxiedPath(null);
       }
     })();
-  }, [
-    fileQuery.data.currentFileSharePath,
-    fileQuery.data.currentFileOrFolder,
-    fetchProxiedPath,
-    updateProxiedPath
-  ]);
+  }, [fileQuery, fetchProxiedPath, updateProxiedPath]);
 
   return (
     <ProxiedPathContext.Provider
