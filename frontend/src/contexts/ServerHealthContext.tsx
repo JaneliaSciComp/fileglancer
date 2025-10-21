@@ -10,6 +10,7 @@ import {
   createRetryWithBackoff,
   type RetryState
 } from '@/utils';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 import logger from '@/logger';
 
 type ServerHealthContextType = {
@@ -55,6 +56,7 @@ export const ServerHealthProvider = ({
   const [nextRetrySeconds, setNextRetrySeconds] = React.useState<number | null>(
     null
   );
+  const isPageVisible = usePageVisibility();
 
   // Debounce health checks to avoid spam
   const healthCheckTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -245,6 +247,27 @@ export const ServerHealthProvider = ({
       clearHealthCheckReporter();
     };
   }, [reportFailedRequest]);
+
+  // Pause/resume retry mechanism based on page visibility
+  React.useEffect(() => {
+    if (!retryStateRef.current) {
+      return;
+    }
+
+    if (isPageVisible) {
+      // Resume retries when page becomes visible
+      if (retryStateRef.current.isPaused) {
+        logger.debug('Page visible - resuming server health retries');
+        retryStateRef.current.resume();
+      }
+    } else {
+      // Pause retries when page becomes hidden
+      if (retryStateRef.current.isRetrying && !retryStateRef.current.isPaused) {
+        logger.debug('Page hidden - pausing server health retries');
+        retryStateRef.current.pause();
+      }
+    }
+  }, [isPageVisible]);
 
   // Cleanup timeouts and abort controllers on unmount
   React.useEffect(() => {
