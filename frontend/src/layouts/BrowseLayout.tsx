@@ -86,6 +86,7 @@ export const BrowsePageLayout = () => {
                 id="properties"
                 minSize={15}
                 order={3}
+                role="complementary"
                 style={{ overflowX: 'auto' }}
               >
                 <PropertiesDrawer
