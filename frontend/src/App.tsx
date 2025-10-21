@@ -61,6 +61,8 @@ function getBasename() {
  */
 const AppComponent = () => {
   const basename = getBasename();
+  const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
+
   return (
     <BrowserRouter basename={basename}>
       <Routes>
@@ -75,14 +77,16 @@ const AppComponent = () => {
               }
               path="links"
             />
-            <Route
-              element={
-                <RequireAuth>
-                  <Jobs />
-                </RequireAuth>
-              }
-              path="jobs"
-            />
+            {tasksEnabled ? (
+              <Route
+                element={
+                  <RequireAuth>
+                    <Jobs />
+                  </RequireAuth>
+                }
+                path="jobs"
+              />
+            ) : null}
             <Route element={<Help />} path="help" />
             <Route
               element={
