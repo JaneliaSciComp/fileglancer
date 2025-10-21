@@ -54,7 +54,7 @@ export const TicketProvider = ({
   const [loadingTickets, setLoadingTickets] = React.useState<boolean>(true);
   const [ticket, setTicket] = React.useState<Ticket | null>(null);
   const { cookies } = useCookiesContext();
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const { profile } = useProfileContext();
 
   const fetchAllTickets = React.useCallback(async (): Promise<
@@ -101,7 +101,7 @@ export const TicketProvider = ({
     Result<Ticket | void>
   > => {
     if (
-      !fileBrowserState.currentFileSharePath ||
+      !fileQuery.data.currentFileSharePath ||
       !fileBrowserState.propertiesTarget
     ) {
       // This is probably not an error, just the state before the file browser is ready
@@ -110,7 +110,7 @@ export const TicketProvider = ({
 
     try {
       const response = await sendFetchRequest(
-        `/api/ticket?fsp_name=${fileBrowserState.currentFileSharePath.name}&path=${fileBrowserState.propertiesTarget.path}`,
+        `/api/ticket?fsp_name=${fileQuery.data.currentFileSharePath.name}&path=${fileBrowserState.propertiesTarget.path}`,
         'GET',
         cookies['_xsrf']
       );
@@ -134,20 +134,20 @@ export const TicketProvider = ({
       return handleError(error);
     }
   }, [
-    fileBrowserState.currentFileSharePath,
+    fileQuery.data.currentFileSharePath,
     fileBrowserState.propertiesTarget,
     cookies
   ]);
 
   async function createTicket(destinationFolder: string): Promise<void> {
-    if (!fileBrowserState.currentFileSharePath) {
+    if (!fileQuery.data.currentFileSharePath) {
       throw new Error('No file share path selected');
     } else if (!fileBrowserState.propertiesTarget) {
       throw new Error('No properties target selected');
     }
 
     const messagePath = joinPaths(
-      fileBrowserState.currentFileSharePath.mount_path,
+      fileQuery.data.currentFileSharePath.mount_path,
       fileBrowserState.propertiesTarget.path
     );
 
@@ -156,7 +156,7 @@ export const TicketProvider = ({
       'POST',
       cookies['_xsrf'],
       {
-        fsp_name: fileBrowserState.currentFileSharePath.name,
+        fsp_name: fileQuery.data.currentFileSharePath.name,
         path: fileBrowserState.propertiesTarget.path,
         project_key: 'FT',
         issue_type: 'Task',

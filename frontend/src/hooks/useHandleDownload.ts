@@ -4,18 +4,18 @@ import { createSuccess, handleError } from '@/utils/errorHandling';
 import { getFileURL } from '@/utils/index';
 
 export function useHandleDownload() {
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
 
   const handleDownload = (): Result<void> => {
     if (
-      !fileBrowserState.currentFileSharePath ||
+      !fileQuery.data.currentFileSharePath ||
       !fileBrowserState.propertiesTarget
     ) {
       return handleError(new Error('No file selected for download'));
     }
     try {
       const downloadUrl = getFileURL(
-        fileBrowserState.currentFileSharePath.name,
+        fileQuery.data.currentFileSharePath.name,
         fileBrowserState.propertiesTarget.path
       );
       const link = document.createElement('a');

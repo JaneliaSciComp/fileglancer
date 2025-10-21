@@ -132,7 +132,7 @@ export const PreferencesProvider = ({
 
   const { cookies } = useCookiesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
 
   const fetchPreferences = React.useCallback(async () => {
     try {
@@ -159,7 +159,7 @@ export const PreferencesProvider = ({
       }
       const itemsArray = keys
         .map(key => {
-          zonesAndFspQuery.data[key];
+          return zonesAndFspQuery.data[key];
         })
         .filter(item => item !== undefined);
 
@@ -490,12 +490,12 @@ export const PreferencesProvider = ({
   );
 
   const handleContextMenuFavorite = async (): Promise<Result<boolean>> => {
-    if (fileBrowserState.currentFileSharePath) {
+    if (fileQuery.data.currentFileSharePath) {
       return await handleFavoriteChange(
         {
           type: 'folder',
           folderPath: fileBrowserState.selectedFiles[0].path,
-          fsp: fileBrowserState.currentFileSharePath
+          fsp: fileQuery.data.currentFileSharePath
         },
         'folder'
       );
@@ -671,8 +671,8 @@ export const PreferencesProvider = ({
   // to update the recently viewed folder
   React.useEffect(() => {
     if (
-      !fileBrowserState.currentFileSharePath ||
-      !fileBrowserState.currentFileOrFolder
+      !fileQuery.data.currentFileSharePath ||
+      !fileQuery.data.currentFileOrFolder
     ) {
       return;
     }
@@ -681,8 +681,8 @@ export const PreferencesProvider = ({
       return;
     }
 
-    const fspName = fileBrowserState.currentFileSharePath.name;
-    const folderPath = fileBrowserState.currentFileOrFolder.path;
+    const fspName = fileQuery.data.currentFileSharePath.name;
+    const folderPath = fileQuery.data.currentFileOrFolder.path;
 
     // Skip if this is the same folder we just processed
     if (
@@ -729,10 +729,11 @@ export const PreferencesProvider = ({
       isCancelled = true;
     };
   }, [
-    fileBrowserState, // Include the whole state object to satisfy ESLint
     recentlyViewedFolders,
     savePreferencesToBackend,
-    loadingRecentlyViewedFolders
+    loadingRecentlyViewedFolders,
+    fileQuery.data.currentFileSharePath,
+    fileQuery.data.currentFileOrFolder
   ]);
 
   return (

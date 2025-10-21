@@ -64,7 +64,7 @@ export const ProxiedPathProvider = ({
   );
   const [dataUrl, setDataUrl] = React.useState<string | null>(null);
   const { cookies } = useCookiesContext();
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
 
   const updateProxiedPath = React.useCallback(
     (proxiedPath: ProxiedPath | null) => {
@@ -120,14 +120,14 @@ export const ProxiedPathProvider = ({
     Result<ProxiedPath | void>
   > => {
     if (
-      !fileBrowserState.currentFileSharePath ||
-      !fileBrowserState.currentFileOrFolder
+      !fileQuery.data.currentFileSharePath ||
+      !fileQuery.data.currentFileOrFolder
     ) {
       return createSuccess(undefined);
     }
     try {
       const response = await sendFetchRequest(
-        `/api/proxied-path?fsp_name=${fileBrowserState.currentFileSharePath.name}&path=${fileBrowserState.currentFileOrFolder.path}`,
+        `/api/proxied-path?fsp_name=${fileQuery.data.currentFileSharePath.name}&path=${fileQuery.data.currentFileOrFolder.path}`,
         'GET',
         cookies['_xsrf']
       );
@@ -147,23 +147,23 @@ export const ProxiedPathProvider = ({
       return handleError(error);
     }
   }, [
-    fileBrowserState.currentFileSharePath,
-    fileBrowserState.currentFileOrFolder,
+    fileQuery.data.currentFileSharePath,
+    fileQuery.data.currentFileOrFolder,
     cookies
   ]);
 
   const createProxiedPath = React.useCallback(async (): Promise<
     Result<ProxiedPath | void>
   > => {
-    if (!fileBrowserState.currentFileSharePath) {
+    if (!fileQuery.data.currentFileSharePath) {
       return handleError(new Error('No file share path selected'));
-    } else if (!fileBrowserState.currentFileOrFolder) {
+    } else if (!fileQuery.data.currentFileOrFolder) {
       return handleError(new Error('No folder selected'));
     }
 
     try {
-      const fspName = fileBrowserState.currentFileSharePath.name;
-      const pathValue = fileBrowserState.currentFileOrFolder.path;
+      const fspName = fileQuery.data.currentFileSharePath.name;
+      const pathValue = fileQuery.data.currentFileOrFolder.path;
       const response = await sendFetchRequest(
         `/api/proxied-path?fsp_name=${encodeURIComponent(fspName)}&path=${encodeURIComponent(pathValue)}`,
         'POST',
@@ -181,8 +181,8 @@ export const ProxiedPathProvider = ({
       return handleError(error);
     }
   }, [
-    fileBrowserState.currentFileSharePath,
-    fileBrowserState.currentFileOrFolder,
+    fileQuery.data.currentFileSharePath,
+    fileQuery.data.currentFileOrFolder,
     cookies,
     updateProxiedPath
   ]);
@@ -231,8 +231,8 @@ export const ProxiedPathProvider = ({
       }
     })();
   }, [
-    fileBrowserState.currentFileSharePath,
-    fileBrowserState.currentFileOrFolder,
+    fileQuery.data.currentFileSharePath,
+    fileQuery.data.currentFileOrFolder,
     fetchProxiedPath,
     updateProxiedPath
   ]);

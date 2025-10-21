@@ -42,7 +42,7 @@ function CopyPathButton({
 }: {
   readonly path: string;
   readonly isDataLink?: boolean;
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <div className="group flex justify-between items-center min-w-0 max-w-full">
       <FgTooltip label={path} triggerClasses="block truncate">
@@ -80,13 +80,13 @@ export default function PropertiesDrawer({
   togglePropertiesDrawer,
   setShowPermissionsDialog,
   setShowConvertFileDialog
-}: PropertiesDrawerProps): JSX.Element {
+}: PropertiesDrawerProps): React.JSX.Element {
   const location = useLocation();
   const [showDataLinkDialog, setShowDataLinkDialog] =
     React.useState<boolean>(false);
   const [activeTab, setActiveTab] = React.useState<string>('overview');
 
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const { pathPreference, areDataLinksAutomatic } = usePreferencesContext();
   const { ticket } = useTicketContext();
   const { proxiedPath, dataUrl } = useProxiedPathContext();
@@ -107,7 +107,7 @@ export default function PropertiesDrawer({
 
   const fullPath = getPreferredPathForDisplay(
     pathPreference,
-    fileBrowserState.currentFileSharePath,
+    fileQuery.data.currentFileSharePath,
     fileBrowserState.propertiesTarget?.path
   );
 

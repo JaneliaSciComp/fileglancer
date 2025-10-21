@@ -22,9 +22,11 @@ import {
 import { copyToClipboard } from '@/utils/copyText';
 
 export default function Crumbs(): ReactNode {
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fileQuery } = useFileBrowserContext();
   const { pathPreference } = usePreferencesContext();
-  const { currentFileSharePath, currentFileOrFolder } = fileBrowserState;
+
+  const currentFileSharePath = fileQuery.data?.currentFileSharePath;
+  const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
   const dirArray = makePathSegmentArray(currentFileOrFolder?.path || '');
 
   // Add the current file share path name as the first segment in the array

@@ -1,18 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router';
-import { default as log } from '@/logger';
+import { useQueryClient } from '@tanstack/react-query';
 
-import type { FileOrFolder, FileSharePath, Result } from '@/shared.types';
-import {
-  getFileBrowsePath,
-  makeMapKey,
-  sendFetchRequest,
-  makeBrowseLink
-} from '@/utils';
-import { useCookiesContext } from './CookiesContext';
-import { useZoneAndFspMapContext } from './ZonesAndFspMapContext';
-import { normalizePosixStylePath } from '@/utils/pathHandling';
+import type { FileOrFolder, Result } from '@/shared.types';
+import { makeBrowseLink } from '@/utils';
 import { createSuccess, handleError } from '@/utils/errorHandling';
+import useFileQuery, { fileQueryKeys } from '@/queries/fileQueries';
 
 type FileBrowserContextProviderProps = {
   readonly children: React.ReactNode;
@@ -20,30 +13,30 @@ type FileBrowserContextProviderProps = {
   readonly filePath: string | undefined;
 };
 
+// Client-only state (UI state that's not fetched from server)
 interface FileBrowserState {
-  currentFileSharePath: FileSharePath | null;
-  currentFileOrFolder: FileOrFolder | null;
-  files: FileOrFolder[];
   propertiesTarget: FileOrFolder | null;
   selectedFiles: FileOrFolder[];
-  uiErrorMsg: string | null;
-  fileContentRefreshTrigger: number;
 }
 
 type FileBrowserContextType = {
+  // Client state (UI-only)
   fileBrowserState: FileBrowserState;
+
+  // URL params
   fspName: string | undefined;
   filePath: string | undefined;
 
-  areFileDataLoading: boolean;
+  // Server state query (single source of truth)
+  fileQuery: ReturnType<typeof useFileQuery>;
+
+  // Actions
   refreshFiles: () => Promise<Result<void>>;
-  triggerFileContentRefresh: () => void;
   handleLeftClick: (
     file: FileOrFolder,
     showFilePropertiesDrawer: boolean
   ) => void;
   updateFilesWithContextMenuClick: (file: FileOrFolder) => void;
-  setCurrentFileSharePath: (sharePath: FileSharePath | null) => void;
 };
 
 const FileBrowserContext = React.createContext<FileBrowserContextType | null>(
@@ -66,18 +59,18 @@ export const FileBrowserContextProvider = ({
   fspName,
   filePath
 }: FileBrowserContextProviderProps) => {
-  // Unified state that keeps a consistent view of the file browser
+  // Client-only state for UI interactions
   const [fileBrowserState, setFileBrowserState] =
     React.useState<FileBrowserState>({
-      currentFileSharePath: null,
-      currentFileOrFolder: null,
-      files: [],
       propertiesTarget: null,
-      selectedFiles: [],
-      uiErrorMsg: null,
-      fileContentRefreshTrigger: 0
+      selectedFiles: []
     });
-  const [areFileDataLoading, setAreFileDataLoading] = React.useState(false);
+
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  // Fetch file data using Tanstack Query (includes 403 fallback handling)
+  const fileQuery = useFileQuery(fspName, filePath || '.');
 
   // Function to update fileBrowserState with complete, consistent data
   const updateFileBrowserState = React.useCallback(
@@ -90,50 +83,14 @@ export const FileBrowserContextProvider = ({
     []
   );
 
-  // Function to update all states consistently
-  const updateAllStates = React.useCallback(
-    (
-      sharePath: FileSharePath | null,
-      fileOrFolder: FileOrFolder | null,
-      fileList: FileOrFolder[],
-      targetItem: FileOrFolder | null,
-      selectedItems: FileOrFolder[] = [],
-      msg: string | null
-    ) => {
-      // Update fileBrowserState with complete, consistent data
-      updateFileBrowserState({
-        currentFileSharePath: sharePath,
-        currentFileOrFolder: fileOrFolder,
-        files: fileList,
-        propertiesTarget: targetItem,
-        selectedFiles: selectedItems,
-        uiErrorMsg: msg
-      });
-    },
-    [updateFileBrowserState]
-  );
-
-  const setCurrentFileSharePath = React.useCallback(
-    (sharePath: FileSharePath | null) => {
-      updateFileBrowserState({
-        currentFileSharePath: sharePath
-      });
-    },
-    [updateFileBrowserState]
-  );
-
-  const { cookies } = useCookiesContext();
-  const { zonesAndFspQuery } = useZoneAndFspMapContext();
-  const navigate = useNavigate();
-
   const handleLeftClick = (
     file: FileOrFolder,
     showFilePropertiesDrawer: boolean
   ) => {
     // If clicking on a file (not directory), navigate to the file URL
-    if (!file.is_dir && fileBrowserState.currentFileSharePath) {
+    if (!file.is_dir && fileQuery.data?.currentFileSharePath) {
       const fileLink = makeBrowseLink(
-        fileBrowserState.currentFileSharePath.name,
+        fileQuery.data.currentFileSharePath.name,
         file.path
       );
       navigate(fileLink);
@@ -155,14 +112,10 @@ export const FileBrowserContextProvider = ({
         ? file
         : null;
 
-    updateAllStates(
-      fileBrowserState.currentFileSharePath,
-      fileBrowserState.currentFileOrFolder,
-      fileBrowserState.files,
-      newPropertiesTarget,
-      newSelectedFiles,
-      fileBrowserState.uiErrorMsg
-    );
+    updateFileBrowserState({
+      propertiesTarget: newPropertiesTarget,
+      selectedFiles: newSelectedFiles
+    });
   };
 
   const updateFilesWithContextMenuClick = (file: FileOrFolder) => {
@@ -170,240 +123,54 @@ export const FileBrowserContextProvider = ({
     const newSelectedFiles =
       currentIndex === -1 ? [file] : [...fileBrowserState.selectedFiles];
 
-    updateAllStates(
-      fileBrowserState.currentFileSharePath,
-      fileBrowserState.currentFileOrFolder,
-      fileBrowserState.files,
-      file, // Set as properties target
-      newSelectedFiles,
-      fileBrowserState.uiErrorMsg
-    );
+    updateFileBrowserState({
+      propertiesTarget: file,
+      selectedFiles: newSelectedFiles
+    });
   };
-
-  // Function to fetch files for the current FSP and current folder
-  const fetchFileInfo = React.useCallback(
-    async (
-      fspName: string,
-      folderName: string
-    ): Promise<FileBrowserResponse> => {
-      const url = getFileBrowsePath(fspName, folderName);
-
-      const response = await sendFetchRequest(url, 'GET', cookies['_xsrf']);
-      const body = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 403) {
-          const errorMessage =
-            body.info && body.info.owner
-              ? `You do not have permission to list this folder. Contact the owner (${body.info.owner}) for access.`
-              : 'You do not have permission to list this folder. Contact the owner for access.';
-
-          // Create custom error with additional info for fallback object
-          const error = new Error(errorMessage) as Error & { info?: any };
-          error.info = body.info;
-          throw error;
-        } else if (response.status === 404) {
-          throw new Error('Folder not found');
-        } else {
-          throw new Error(
-            body.error ? body.error : `Unknown error (${response.status})`
-          );
-        }
-      }
-
-      return body as FileBrowserResponse;
-    },
-    [cookies]
-  );
-
-  // Fetch metadata for the given FSP and path, and update the fileBrowserState
-  const fetchAndUpdateFileBrowserState = React.useCallback(
-    async (fsp: FileSharePath, targetPath: string): Promise<void> => {
-      setAreFileDataLoading(true);
-      let fileOrFolder: FileOrFolder | null = null;
-
-      try {
-        // Fetch the metadata for the target path
-        const response = await fetchFileInfo(fsp.name, targetPath);
-        fileOrFolder = response.info as FileOrFolder;
-
-        if (fileOrFolder) {
-          fileOrFolder = {
-            ...fileOrFolder,
-            path: normalizePosixStylePath(fileOrFolder.path)
-          };
-        }
-
-        // Normalize the file paths in POSIX style, assuming POSIX-style paths
-        // For files, response.files will be empty array or undefined
-        let files = (response.files || []).map(file => ({
-          ...file,
-          path: normalizePosixStylePath(file.path)
-        })) as FileOrFolder[];
-
-        // Sort: directories first, then files; alphabetically within each type
-        files = files.sort((a: FileOrFolder, b: FileOrFolder) => {
-          if (a.is_dir === b.is_dir) {
-            return a.name.localeCompare(b.name);
-          }
-          return a.is_dir ? -1 : 1;
-        });
-
-        // Update all states consistently
-        // If it's a file, it becomes both the current item and the properties target
-        const propertiesTarget = fileOrFolder;
-        const selectedFiles = fileOrFolder ? [fileOrFolder] : [];
-
-        updateAllStates(
-          fsp,
-          fileOrFolder,
-          files,
-          propertiesTarget,
-          selectedFiles,
-          null
-        );
-      } catch (error) {
-        log.error(error);
-
-        // Check if error contains body.info from 403 response
-        const errorWithInfo = error as Error & { info?: any };
-        const bodyInfo = errorWithInfo.info;
-
-        // Create a minimal FileOrFolder object with the target path information
-        // Use body.info if available from 403 response, otherwise use fallback values
-        const fallbackFileOrFolder: FileOrFolder = {
-          name:
-            bodyInfo?.name ||
-            (targetPath === '.' ? '' : targetPath.split('/').pop() || ''),
-          path: normalizePosixStylePath(bodyInfo?.path || targetPath),
-          is_dir: bodyInfo?.is_dir ?? true,
-          size: bodyInfo?.size || 0,
-          last_modified: bodyInfo?.last_modified || 0,
-          owner: bodyInfo?.owner || '',
-          group: bodyInfo?.group || '',
-          hasRead: bodyInfo?.hasRead || false,
-          hasWrite: bodyInfo?.haswrite || false,
-          permissions: bodyInfo?.permissions || ''
-        };
-
-        const errorMessage =
-          error instanceof Error ? error.message : 'An unknown error occurred';
-
-        updateAllStates(
-          fsp,
-          fallbackFileOrFolder,
-          [],
-          fallbackFileOrFolder,
-          [],
-          errorMessage
-        );
-      } finally {
-        setAreFileDataLoading(false);
-      }
-    },
-    [updateAllStates, fetchFileInfo]
-  );
 
   // Function to refresh files for the current FSP and current file or folder
   const refreshFiles = async (): Promise<Result<void>> => {
-    if (
-      !fileBrowserState.currentFileSharePath ||
-      !fileBrowserState.currentFileOrFolder
-    ) {
+    if (!fspName || !filePath) {
       return handleError(
         new Error('File share path and file/folder required to refresh')
       );
     }
     try {
-      await fetchAndUpdateFileBrowserState(
-        fileBrowserState.currentFileSharePath,
-        fileBrowserState.currentFileOrFolder.path
-      );
+      await queryClient.invalidateQueries({
+        queryKey: fileQueryKeys.filePath(fspName, filePath)
+      });
       return createSuccess(undefined);
     } catch (error) {
       return handleError(error);
     }
   };
 
-  // Function to trigger a refresh of file content in FileViewer
-  const triggerFileContentRefresh = React.useCallback(() => {
-    setFileBrowserState(prev => ({
-      ...prev,
-      fileContentRefreshTrigger: prev.fileContentRefreshTrigger + 1
-    }));
-  }, []);
-
-  // Effect to update currentFolder and propertiesTarget when URL params change
+  // Clear client state when URL changes (navigation to different file/folder)
   React.useEffect(() => {
-    let cancelled = false;
-    const updateCurrentFileSharePathAndFolder = async () => {
-      if (zonesAndFspQuery.isSuccess) {
-        if (!fspName) {
-          if (cancelled) {
-            return;
-          }
-          updateAllStates(
-            null,
-            null,
-            [],
-            null,
-            [],
-            'No file share path name in URL'
-          );
-          return;
-        }
-
-        const fspKey = makeMapKey('fsp', fspName);
-        const urlFsp = zonesAndFspQuery.data[fspKey] as FileSharePath;
-        if (!urlFsp) {
-          if (cancelled) {
-            return;
-          }
-          updateAllStates(
-            null,
-            null,
-            [],
-            null,
-            [],
-            'Invalid file share path name'
-          );
-          return;
-        }
-
-        await fetchAndUpdateFileBrowserState(urlFsp, filePath || '.');
-
-        if (cancelled) {
-          return;
-        }
-      }
-    };
-    updateCurrentFileSharePathAndFolder();
-    return () => {
-      // Cleanup function to prevent state updates if a dependency changes
-      // in an asynchronous operation
-      cancelled = true;
-    };
-  }, [
-    fspName,
-    filePath,
-    updateAllStates,
-    fetchAndUpdateFileBrowserState,
-    zonesAndFspQuery.data,
-    zonesAndFspQuery.isSuccess
-  ]);
+    setFileBrowserState({
+      propertiesTarget: null,
+      selectedFiles: []
+    });
+  }, [fspName, filePath]);
 
   return (
     <FileBrowserContext.Provider
       value={{
+        // Client state
         fileBrowserState,
+
+        // URL params
         fspName,
         filePath,
+
+        // Server state query
+        fileQuery,
+
+        // Actions
         refreshFiles,
-        triggerFileContentRefresh,
         handleLeftClick,
-        updateFilesWithContextMenuClick,
-        areFileDataLoading,
-        setCurrentFileSharePath
+        updateFilesWithContextMenuClick
       }}
     >
       {children}

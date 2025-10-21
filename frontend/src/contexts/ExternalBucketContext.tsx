@@ -40,29 +40,29 @@ export const ExternalBucketProvider = ({
     null
   );
   const { cookies } = useCookiesContext();
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fileQuery } = useFileBrowserContext();
 
   const updateExternalBucket = React.useCallback(
     (bucket: ExternalBucket | null) => {
       setExternalBucket(bucket);
 
       if (bucket) {
-        if (!fileBrowserState.currentFileSharePath) {
+        if (!fileQuery.data.currentFileSharePath) {
           throw new Error('No file share path selected');
         }
-        if (!fileBrowserState.currentFileOrFolder) {
+        if (!fileQuery.data.currentFileOrFolder) {
           throw new Error('No folder selected');
         }
         // Check if current path is an ancestor of the bucket path
         if (
-          fileBrowserState.currentFileSharePath.name === bucket.fsp_name &&
-          fileBrowserState.currentFileOrFolder.path.startsWith(
+          fileQuery.data.currentFileSharePath.name === bucket.fsp_name &&
+          fileQuery.data.currentFileOrFolder.path.startsWith(
             bucket.relative_path
           )
         ) {
           // Create data URL with relative path from bucket
           const relativePath =
-            fileBrowserState.currentFileOrFolder.path.substring(
+            fileQuery.data.currentFileOrFolder.path.substring(
               bucket.relative_path.length
             );
           const cleanRelativePath = relativePath.startsWith('/')
@@ -79,20 +79,17 @@ export const ExternalBucketProvider = ({
         setExternalDataUrl(null);
       }
     },
-    [
-      fileBrowserState.currentFileOrFolder,
-      fileBrowserState.currentFileSharePath
-    ]
+    [fileQuery.data.currentFileOrFolder, fileQuery.data.currentFileSharePath]
   );
 
   const fetchExternalBucket = React.useCallback(async () => {
-    if (!fileBrowserState.currentFileSharePath) {
+    if (!fileQuery.data.currentFileSharePath) {
       log.trace('No current file share path selected');
       return null;
     }
     try {
       const response = await sendFetchRequest(
-        `/api/external-buckets/${fileBrowserState.currentFileSharePath.name}`,
+        `/api/external-buckets/${fileQuery.data.currentFileSharePath.name}`,
         'GET',
         cookies['_xsrf']
       );
@@ -117,7 +114,7 @@ export const ExternalBucketProvider = ({
       log.error('Error fetching external bucket:', error);
     }
     return null;
-  }, [fileBrowserState.currentFileSharePath, cookies]);
+  }, [fileQuery.data.currentFileSharePath, cookies]);
 
   React.useEffect(() => {
     (async function () {
@@ -130,8 +127,8 @@ export const ExternalBucketProvider = ({
       }
     })();
   }, [
-    fileBrowserState.currentFileSharePath,
-    fileBrowserState.currentFileOrFolder,
+    fileQuery.data.currentFileSharePath,
+    fileQuery.data.currentFileOrFolder,
     fetchExternalBucket,
     updateExternalBucket
   ]);

@@ -13,10 +13,10 @@ import {
 } from '@/omezarr-helper';
 import type { Metadata } from '@/omezarr-helper';
 import { fetchFileAsJson, getFileURL } from '@/utils';
-import { useCookies } from 'react-cookie';
 import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
 import { useExternalBucketContext } from '@/contexts/ExternalBucketContext';
 import * as zarr from 'zarrita';
+import { FileOrFolder } from '@/shared.types';
 
 export type OpenWithToolUrls = {
   copy: string;
@@ -49,7 +49,7 @@ export default function useZarrMetadata() {
   const neuroglancerBaseUrl = 'https://neuroglancer-demo.appspot.com/#!';
   const voleBaseUrl = 'https://volumeviewer.allencell.org/viewer?url=';
   const avivatorBaseUrl = 'https://janeliascicomp.github.io/viv/?image_url=';
-  const { fileBrowserState, areFileDataLoading } = useFileBrowserContext();
+  const { fileQuery } = useFileBrowserContext();
   const { dataUrl } = useProxiedPathContext();
   const { externalDataUrl } = useExternalBucketContext();
   const {
@@ -127,14 +127,16 @@ export default function useZarrMetadata() {
 
   const getFile = React.useCallback(
     (fileName: string) => {
-      return fileBrowserState.files.find(file => file.name === fileName);
+      return fileQuery.data.files.find(
+        (file: FileOrFolder) => file.name === fileName
+      );
     },
-    [fileBrowserState.files]
+    [fileQuery.data.files]
   );
 
   const checkZarrMetadata = React.useCallback(
     async (signal: AbortSignal) => {
-      if (areFileDataLoading) {
+      if (fileQuery.isPending) {
         return;
       }
 
@@ -148,18 +150,18 @@ export default function useZarrMetadata() {
       notifiedPathRef.current = null;
 
       if (
-        fileBrowserState.currentFileSharePath &&
-        fileBrowserState.currentFileOrFolder
+        fileQuery.data.currentFileSharePath &&
+        fileQuery.data.currentFileOrFolder
       ) {
         const imageUrl = getFileURL(
-          fileBrowserState.currentFileSharePath.name,
-          fileBrowserState.currentFileOrFolder.path
+          fileQuery.data.currentFileSharePath.name,
+          fileQuery.data.currentFileOrFolder.path
         );
 
         const zarrJsonFile = getFile('zarr.json');
         if (zarrJsonFile) {
           const attrs = (await fetchFileAsJson(
-            fileBrowserState.currentFileSharePath.name,
+            fileQuery.data.currentFileSharePath.name,
             zarrJsonFile.path,
             cookies
           )) as any;
@@ -185,7 +187,7 @@ export default function useZarrMetadata() {
             const zattrsFile = getFile('.zattrs');
             if (zattrsFile) {
               const attrs = (await fetchFileAsJson(
-                fileBrowserState.currentFileSharePath.name,
+                fileQuery.data.currentFileSharePath.name,
                 zattrsFile.path,
                 cookies
               )) as any;
@@ -204,8 +206,8 @@ export default function useZarrMetadata() {
       checkOmeZarrMetadata,
       checkZarrArray,
       areFileDataLoading,
-      fileBrowserState.currentFileSharePath,
-      fileBrowserState.currentFileOrFolder,
+      fileQuery.data.currentFileSharePath,
+      fileQuery.data.currentFileOrFolder,
       getFile,
       cookies
     ]

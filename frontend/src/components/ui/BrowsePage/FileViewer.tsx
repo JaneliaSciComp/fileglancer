@@ -9,13 +9,9 @@ import {
 import Crumbs from './Crumbs';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { useCookiesContext } from '@/contexts/CookiesContext';
-import {
-  formatFileSize,
-  formatUnixTimestamp,
-  fetchFileWithTextDetection
-} from '@/utils';
+import { formatFileSize, formatUnixTimestamp } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
-import logger from '@/logger';
+import { useFileContentQuery } from '@/queries/fileContentQueries';
 
 type FileViewerProps = {
   readonly file: FileOrFolder;
@@ -81,13 +77,17 @@ const getLanguageFromExtension = (filename: string): string => {
 };
 
 export default function FileViewer({ file }: FileViewerProps): React.ReactNode {
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fileQuery } = useFileBrowserContext();
   const { cookies } = useCookiesContext();
 
-  const [content, setContent] = React.useState<string>('');
-  const [loading, setLoading] = React.useState<boolean>(true);
-  const [error, setError] = React.useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = React.useState<boolean>(false);
+
+  // Use Tanstack Query for file content
+  const contentQuery = useFileContentQuery(
+    fileQuery.data?.currentFileSharePath?.name,
+    file.path,
+    cookies
+  );
 
   // Detect dark mode from document
   React.useEffect(() => {
@@ -105,44 +105,8 @@ export default function FileViewer({ file }: FileViewerProps): React.ReactNode {
     return () => observer.disconnect();
   }, []);
 
-  React.useEffect(() => {
-    const fetchFileContent = async () => {
-      if (!fileBrowserState.currentFileSharePath) {
-        setError('No file share path selected');
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        const { content: fileContent } = await fetchFileWithTextDetection(
-          fileBrowserState.currentFileSharePath.name,
-          file.path,
-          cookies
-        );
-        setContent(fileContent);
-      } catch (err) {
-        logger.error('Error fetching file content:', err);
-        setError(
-          err instanceof Error ? err.message : 'Failed to fetch file content'
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchFileContent();
-  }, [
-    file.path,
-    fileBrowserState.currentFileSharePath,
-    fileBrowserState.fileContentRefreshTrigger,
-    cookies
-  ]);
-
   const renderViewer = () => {
-    if (loading) {
+    if (contentQuery.isLoading) {
       return (
         <div className="flex items-center justify-center h-64">
           <Typography className="text-foreground">
@@ -152,15 +116,18 @@ export default function FileViewer({ file }: FileViewerProps): React.ReactNode {
       );
     }
 
-    if (error) {
+    if (contentQuery.error) {
       return (
         <div className="flex items-center justify-center h-64">
-          <Typography className="text-error">Error: {error}</Typography>
+          <Typography className="text-error">
+            Error: {contentQuery.error.message}
+          </Typography>
         </div>
       );
     }
 
     const language = getLanguageFromExtension(file.name);
+    const content = contentQuery.data ?? '';
 
     return (
       <div className="h-full overflow-y-auto">

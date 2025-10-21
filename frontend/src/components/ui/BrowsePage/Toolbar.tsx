@@ -2,6 +2,7 @@ import * as React from 'react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router';
 import { ButtonGroup } from '@material-tailwind/react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   HiRefresh,
   HiEye,
@@ -27,6 +28,8 @@ import {
 } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
 import useFavoriteToggle from '@/hooks/useFavoriteToggle';
+import { fileQueryKeys } from '@/queries/fileQueries';
+import { fileContentQueryKeys } from '@/queries/fileContentQueries';
 
 type ToolbarProps = {
   readonly showPropertiesDrawer: boolean;
@@ -41,9 +44,11 @@ export default function Toolbar({
   showSidebar,
   toggleSidebar
 }: ToolbarProps): JSX.Element {
-  const { fileBrowserState, refreshFiles, triggerFileContentRefresh } =
-    useFileBrowserContext();
-  const { currentFileSharePath, currentFileOrFolder } = fileBrowserState;
+  const { fileQuery, fspName, filePath } = useFileBrowserContext();
+  const queryClient = useQueryClient();
+
+  const currentFileSharePath = fileQuery.data?.currentFileSharePath;
+  const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
   const { profile } = useProfileContext();
   const {
     folderPreferenceMap,
@@ -132,20 +137,18 @@ export default function Toolbar({
                 const isViewingFile =
                   currentFileOrFolder && !currentFileOrFolder.is_dir;
 
-                if (isViewingFile) {
-                  // If viewing a file, trigger file content refresh
-                  triggerFileContentRefresh();
+                if (isViewingFile && fspName && filePath) {
+                  // If viewing a file, invalidate file content query
+                  await queryClient.invalidateQueries({
+                    queryKey: fileContentQueryKeys.detail(fspName, filePath)
+                  });
                   toast.success('File content refreshed!');
-                } else {
-                  // If viewing a folder, refresh the file list
-                  const result = await refreshFiles();
-                  if (result.success) {
-                    toast.success('File browser refreshed!');
-                  } else {
-                    toast.error(
-                      `Error refreshing file browser: ${result.error}`
-                    );
-                  }
+                } else if (fspName && filePath) {
+                  // If viewing a folder, invalidate file list query
+                  await queryClient.invalidateQueries({
+                    queryKey: fileQueryKeys.filePath(fspName, filePath)
+                  });
+                  toast.success('File browser refreshed!');
                 }
               }}
               triggerClasses={triggerClasses}

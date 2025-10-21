@@ -49,7 +49,7 @@ export default function ContextMenu({
   setShowPermissionsDialog,
   setShowConvertFileDialog
 }: ContextMenuProps): React.ReactNode {
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const { folderPreferenceMap, handleContextMenuFavorite } =
     usePreferencesContext();
   const { handleDownload } = useHandleDownload();
@@ -62,7 +62,7 @@ export default function ContextMenu({
     folderPreferenceMap[
       makeMapKey(
         'folder',
-        `${fileBrowserState.currentFileSharePath?.name}_${fileBrowserState.propertiesTarget.path}`
+        `${fileQuery.data.currentFileSharePath.name}_${fileBrowserState.propertiesTarget.path}`
       )
     ]
   );

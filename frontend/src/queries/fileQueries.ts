@@ -1,3 +1,4 @@
+import React from 'react';
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 
 import { sendFetchRequest, getFileBrowsePath, makeMapKey } from '@/utils';
@@ -17,8 +18,16 @@ type FileQueryData = {
   files: FileOrFolder[];
 };
 
+// Query key factory for hierarchical cache management
+export const fileQueryKeys = {
+  all: ['files'] as const,
+  fspName: (fspName: string) => [...fileQueryKeys.all, fspName] as const,
+  filePath: (fspName: string, filePath: string) =>
+    [...fileQueryKeys.fspName(fspName), filePath] as const
+};
+
 export default function useFileQuery(
-  fspName: string,
+  fspName: string | undefined,
   folderName: string
 ): UseQueryResult<FileQueryData, Error> {
   const { cookies } = useCookiesContext();
@@ -26,6 +35,10 @@ export default function useFileQuery(
 
   // Function to fetch files for the current FSP and current folder
   const fetchFileInfo = async (): Promise<FileBrowserResponse> => {
+    if (!fspName) {
+      throw new Error('No file share path selected');
+    }
+
     const url = getFileBrowsePath(fspName, folderName);
 
     const response = await sendFetchRequest(url, 'GET', cookies['_xsrf']);
@@ -33,15 +46,15 @@ export default function useFileQuery(
 
     if (!response.ok) {
       if (response.status === 403) {
-        if (body.info && body.info.owner) {
-          throw new Error(
-            `You do not have permission to list this folder. Contact the owner (${body.info.owner}) for access.`
-          );
-        } else {
-          throw new Error(
-            'You do not have permission to list this folder. Contact the owner for access.'
-          );
-        }
+        const errorMessage =
+          body.info && body.info.owner
+            ? `You do not have permission to list this folder. Contact the owner (${body.info.owner}) for access.`
+            : 'You do not have permission to list this folder. Contact the owner for access.';
+
+        // Create custom error with additional info for fallback object
+        const error = new Error(errorMessage) as Error & { info?: any };
+        error.info = body.info;
+        throw error;
       } else if (response.status === 404) {
         throw new Error('Folder not found');
       } else {
@@ -55,6 +68,11 @@ export default function useFileQuery(
   };
 
   const transformData = (data: FileBrowserResponse): FileQueryData => {
+    // This should never happen because query is disabled when !fspName
+    if (!fspName) {
+      throw new Error('fspName is required for transforming file query data');
+    }
+
     const fspKey = makeMapKey('fsp', fspName);
     const currentFileSharePath =
       (zonesAndFspQuery.data?.[fspKey] as FileSharePath) || null;
@@ -88,9 +106,50 @@ export default function useFileQuery(
     };
   };
 
-  return useQuery<FileBrowserResponse, Error, FileQueryData>({
-    queryKey: ['files', fspName, folderName],
+  const query = useQuery<FileBrowserResponse, Error, FileQueryData>({
+    queryKey: fileQueryKeys.filePath(fspName || '', folderName),
     queryFn: fetchFileInfo,
-    select: (data: FileBrowserResponse) => transformData(data)
+    select: (data: FileBrowserResponse) => transformData(data),
+    enabled: !!fspName && !!zonesAndFspQuery.data,
+    staleTime: 5 * 60 * 1000 // 5 minutes - file listings don't change that often
   });
+
+  // Handle 403 errors with fallback currentFileOrFolder
+  const currentFileOrFolderWithFallback = React.useMemo(() => {
+    if (query.data?.currentFileOrFolder) {
+      return query.data.currentFileOrFolder;
+    }
+
+    // If there's a 403 error with body.info, create a fallback FileOrFolder
+    if (query.error && (query.error as any).info) {
+      const bodyInfo = (query.error as any).info;
+      return {
+        name:
+          bodyInfo?.name ||
+          (folderName === '.' ? '' : folderName.split('/').pop() || ''),
+        path: normalizePosixStylePath(bodyInfo?.path || folderName),
+        is_dir: bodyInfo?.is_dir ?? true,
+        size: bodyInfo?.size || 0,
+        last_modified: bodyInfo?.last_modified || 0,
+        owner: bodyInfo?.owner || '',
+        group: bodyInfo?.group || '',
+        hasRead: bodyInfo?.hasRead || false,
+        hasWrite: bodyInfo?.hasWrite || false,
+        permissions: bodyInfo?.permissions || ''
+      } as FileOrFolder;
+    }
+
+    return null;
+  }, [query.data?.currentFileOrFolder, query.error, folderName]);
+
+  // Return enhanced query with fallback data
+  return {
+    ...query,
+    data: query.data
+      ? {
+          ...query.data,
+          currentFileOrFolder: currentFileOrFolderWithFallback
+        }
+      : undefined
+  } as UseQueryResult<FileQueryData, Error>;
 }

@@ -21,13 +21,13 @@ type ItemNamingDialogProps = {
 export default function ConvertFileDialog({
   showConvertFileDialog,
   setShowConvertFileDialog
-}: ItemNamingDialogProps): JSX.Element {
+}: ItemNamingDialogProps): React.JSX.Element {
   const [waitingForTicketResponse, setWaitingForTicketResponse] =
     React.useState(false);
   const { destinationFolder, setDestinationFolder, handleTicketSubmit } =
     useConvertFileDialog();
   const { pathPreference } = usePreferencesContext();
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const { refreshTickets } = useTicketContext();
 
   const placeholderText =
@@ -37,7 +37,7 @@ export default function ConvertFileDialog({
 
   const displayPath = getPreferredPathForDisplay(
     pathPreference,
-    fileBrowserState.currentFileSharePath,
+    fileQuery.data.currentFileSharePath,
     fileBrowserState.propertiesTarget?.path
   );
 
