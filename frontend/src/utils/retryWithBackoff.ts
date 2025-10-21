@@ -82,7 +82,8 @@ export function createRetryWithBackoff(
   };
 
   const scheduleNextRetry = (customDelayMs?: number): void => {
-    const delay = customDelayMs ?? calculateExponentialBackoffDelay(attemptNumber);
+    const delay =
+      customDelayMs ?? calculateExponentialBackoffDelay(attemptNumber);
     logger.debug(
       `Scheduling next retry in ${delay}ms (attempt ${attemptNumber + 1})`
     );
@@ -200,7 +201,9 @@ export function createRetryWithBackoff(
     const pauseDuration = Date.now() - pausedAtMs;
     remainingDelayMs = Math.max(0, remainingDelayMs - pauseDuration);
 
-    logger.debug(`Retry mechanism resumed with ${remainingDelayMs}ms remaining`);
+    logger.debug(
+      `Retry mechanism resumed with ${remainingDelayMs}ms remaining`
+    );
 
     // Resume with remaining delay
     scheduleNextRetry(remainingDelayMs);

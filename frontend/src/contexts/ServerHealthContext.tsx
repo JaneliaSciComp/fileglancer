@@ -113,7 +113,7 @@ export const ServerHealthProvider = ({
           setShowWarningOverlay(false);
           logger.debug('Server detected as healthy during retry');
           // reload the page to ensure full recovery
-          window.location.reload();
+          // window.location.reload();
           return true; // Success - stop retrying
         } else if (healthStatus === 'down') {
           return false; // Continue retrying
@@ -189,8 +189,6 @@ export const ServerHealthProvider = ({
         logger.debug('Server detected as healthy');
         // Stop retrying since server is healthy
         stopRetrying();
-        // reload the page to ensure full recovery
-        window.location.reload();
       }
     } catch (error) {
       logger.error('Error during health check:', error);
@@ -238,6 +236,8 @@ export const ServerHealthProvider = ({
 
   const dismissWarning = React.useCallback(() => {
     setShowWarningOverlay(false);
+    // reload the page to ensure full recovery
+    window.location.reload();
   }, []);
 
   // Register health check reporter with global sendFetchRequest
