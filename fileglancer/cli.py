@@ -2,6 +2,7 @@
 """
 Command-line interface for Fileglancer using Click.
 """
+import os
 import click
 import uvicorn
 from pathlib import Path
@@ -59,12 +60,19 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
     if workers is not None:
         config_kwargs['workers'] = workers
 
+    # Set up external proxy URL based on host/port/SSL configuration
+    # This is only set if not already configured in the environment
+    if 'FGC_EXTERNAL_PROXY_URL' not in os.environ:
+        protocol = 'https' if ssl_keyfile else 'http'
+        external_proxy_url = f"{protocol}://{host}:{port}/files"
+        os.environ['FGC_EXTERNAL_PROXY_URL'] = external_proxy_url
+        logger.debug(f"Setting FGC_EXTERNAL_PROXY_URL={external_proxy_url}")
+
     if ssl_keyfile:
         config_kwargs['ssl_keyfile'] = ssl_keyfile
     else:
         # If there is no SSL, we need to set FGC_SESSION_COOKIE_SECURE=false
         # in the environment so that the session cookie is not marked as secure
-        import os
         os.environ['FGC_SESSION_COOKIE_SECURE'] = 'false'
         logger.debug("No SSL keyfile provided, setting FGC_SESSION_COOKIE_SECURE=false in environment")
 
