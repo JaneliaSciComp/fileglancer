@@ -1,19 +1,32 @@
 # Making a new release of Fileglancer
 
+## Bump the version number
+
+To view the current version:
+```bash
+pixi run version
+```
+
+To bump the minor version:
+```bash
+pixi run version minor
+```
+
+You can also specify "major", "patch", or a specific version like "2.1.0". See the docs on [hatch-nodejs-version](https://hatch.pypa.io/1.9/version/#supported-segments) for more details.
+
+## Clean build
+
 Make sure to do a clean build before building the package for release:
 
 ```bash
 ./clean.sh
 pixi run dev-install
-pixi run node-build
 ```
 
-Bump the version using `hatch`. The current version is visible in `package.json`. See the docs on [hatch-nodejs-version](https://github.com/agoose77/hatch-nodejs-version#semver) for details.<br/>
-**Note**: you will need to manually update the version in `package-lock.json`.
+The `version` command updated the `package.json` and the clean build updated the `package-lock.json` file. Make sure to check these changes into the main branch.
 
-```bash
-pixi run set-version <new-version>
-```
+
+## Package
 
 Build the distribution bundle:
 

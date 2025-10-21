@@ -9,12 +9,12 @@ def test_slugify_path_simple():
 
 def test_slugify_path_with_multiple_slashes():
     """Test slugifying path with multiple consecutive slashes"""
-    assert slugify_path("///home///user///") == "home_user_"
+    assert slugify_path("///home///user///") == "home_user"
 
 
 def test_slugify_path_with_special_characters():
     """Test slugifying path with various special characters"""
-    assert slugify_path("/path/with-special@chars!") == "path_with_special_chars_"
+    assert slugify_path("/path/with-special@chars!") == "path_with_special_chars"
 
 
 def test_slugify_path_with_spaces():
@@ -42,9 +42,9 @@ def test_slugify_path_only_special_chars():
     assert slugify_path("/@#$%^&*()") == ""
 
 
-def test_slugify_path_removes_leading_underscores():
-    """Test that leading underscores are removed but trailing are kept"""
-    assert slugify_path("___test___path___") == "test_path_"
+def test_slugify_path_removes_leading_and_trailing_underscores():
+    """Test that both leading and trailing underscores are removed"""
+    assert slugify_path("___test___path___") == "test_path"
 
 
 def test_slugify_path_windows_style():
@@ -59,7 +59,7 @@ def test_slugify_path_mixed_separators():
 
 def test_slugify_path_unicode_characters():
     """Test slugifying path with unicode characters (non-ASCII chars become underscores)"""
-    assert slugify_path("/path/with/émojis🎉") == "path_with_mojis_"
+    assert slugify_path("/path/with/émojis🎉") == "path_with_mojis"
 
 
 def test_slugify_path_long_path():
