@@ -37,6 +37,15 @@ def temp_dir():
 def db_session(temp_dir):
     """Create a test database session"""
 
+    # Mock get_settings to return empty file_share_mounts for database tests
+    from fileglancer.settings import get_settings, Settings
+    import fileglancer.database
+
+    original_get_settings = get_settings
+
+    test_settings = Settings(file_share_mounts=[])
+    fileglancer.database.get_settings = lambda: test_settings
+
     # Create temp directory for test database
     db_path = os.path.join(temp_dir, "test.db")
 
@@ -55,6 +64,9 @@ def db_session(temp_dir):
     finally:
         session.close()
         engine.dispose()
+
+    # Restore original get_settings
+    fileglancer.database.get_settings = original_get_settings
 
 
 @pytest.fixture
