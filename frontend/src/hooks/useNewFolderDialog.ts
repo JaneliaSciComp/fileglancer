@@ -3,7 +3,6 @@ import React from 'react';
 import { getFileBrowsePath, sendFetchRequest, joinPaths } from '@/utils';
 import { handleError, toHttpError } from '@/utils/errorHandling';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-import { useCookiesContext } from '@/contexts/CookiesContext';
 import type { Result } from '@/shared.types';
 
 export default function useNewFolderDialog() {
@@ -11,7 +10,6 @@ export default function useNewFolderDialog() {
 
   const { fileBrowserState, refreshFiles } = useFileBrowserContext();
   const { currentFileOrFolder, currentFileSharePath } = fileBrowserState;
-  const { cookies } = useCookiesContext();
 
   const isDuplicateName = React.useMemo(() => {
     if (!newName.trim()) {
@@ -36,7 +34,6 @@ export default function useNewFolderDialog() {
           joinPaths(currentFileOrFolder.path, newName)
         ),
         'POST',
-        cookies['_xsrf'],
         {
           type: 'directory'
         }

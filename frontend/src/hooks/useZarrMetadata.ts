@@ -13,7 +13,6 @@ import {
 } from '@/omezarr-helper';
 import type { Metadata } from '@/omezarr-helper';
 import { fetchFileAsJson, getFileURL } from '@/utils';
-import { useCookies } from 'react-cookie';
 import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
 import { useExternalBucketContext } from '@/contexts/ExternalBucketContext';
 import * as zarr from 'zarrita';
@@ -57,7 +56,6 @@ export default function useZarrMetadata() {
     disableHeuristicalLayerTypeDetection,
     useLegacyMultichannelApproach
   } = usePreferencesContext();
-  const [cookies] = useCookies(['_xsrf']);
 
   const checkZarrArray = React.useCallback(
     async (
@@ -73,7 +71,7 @@ export default function useZarrMetadata() {
       );
       setThumbnailError(null);
       try {
-        const arr = await getZarrArray(imageUrl, zarrVersion, cookies['_xsrf']);
+        const arr = await getZarrArray(imageUrl, zarrVersion);
         if (signal.aborted) {
           return;
         }
@@ -94,7 +92,7 @@ export default function useZarrMetadata() {
         setThumbnailError('Error fetching Zarr array');
       }
     },
-    [cookies]
+    []
   );
 
   const checkOmeZarrMetadata = React.useCallback(
@@ -108,7 +106,7 @@ export default function useZarrMetadata() {
       setThumbnailError(null);
       try {
         setOmeZarrUrl(imageUrl);
-        const metadata = await getOmeZarrMetadata(imageUrl, cookies['_xsrf']);
+        const metadata = await getOmeZarrMetadata(imageUrl);
         if (signal.aborted) {
           return;
         }
@@ -122,7 +120,7 @@ export default function useZarrMetadata() {
         setThumbnailError('Error fetching OME-Zarr metadata');
       }
     },
-    [cookies]
+    []
   );
 
   const getFile = React.useCallback(
@@ -160,8 +158,7 @@ export default function useZarrMetadata() {
         if (zarrJsonFile) {
           const attrs = (await fetchFileAsJson(
             fileBrowserState.currentFileSharePath.name,
-            zarrJsonFile.path,
-            cookies
+            zarrJsonFile.path
           )) as any;
           if (signal.aborted) {
             return;
@@ -186,8 +183,7 @@ export default function useZarrMetadata() {
             if (zattrsFile) {
               const attrs = (await fetchFileAsJson(
                 fileBrowserState.currentFileSharePath.name,
-                zattrsFile.path,
-                cookies
+                zattrsFile.path
               )) as any;
               if (signal.aborted) {
                 return;
@@ -206,8 +202,7 @@ export default function useZarrMetadata() {
       areFileDataLoading,
       fileBrowserState.currentFileSharePath,
       fileBrowserState.currentFileOrFolder,
-      getFile,
-      cookies
+      getFile
     ]
   );
 
@@ -230,7 +225,6 @@ export default function useZarrMetadata() {
       try {
         const [thumbnail, error] = await getOmeZarrThumbnail(
           omeZarrUrl,
-          cookies['_xsrf'],
           signal
         );
         if (signal.aborted) {
@@ -255,7 +249,7 @@ export default function useZarrMetadata() {
     return () => {
       controller.abort();
     };
-  }, [omeZarrUrl, cookies]);
+  }, [omeZarrUrl]);
 
   // Determine layer type when thumbnail becomes available
   React.useEffect(() => {

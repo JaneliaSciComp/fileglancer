@@ -1,11 +1,9 @@
 import type { FileOrFolder, Result } from '@/shared.types';
 import { getFileBrowsePath, sendFetchRequest } from '@/utils';
-import { useCookiesContext } from '@/contexts/CookiesContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { handleError, createSuccess, toHttpError } from '@/utils/errorHandling';
 
 export default function useDeleteDialog() {
-  const { cookies } = useCookiesContext();
   const { fileBrowserState, refreshFiles } = useFileBrowserContext();
 
   async function handleDelete(targetItem: FileOrFolder): Promise<Result<void>> {
@@ -21,11 +19,7 @@ export default function useDeleteDialog() {
     );
 
     try {
-      const response = await sendFetchRequest(
-        fetchPath,
-        'DELETE',
-        cookies['_xsrf']
-      );
+      const response = await sendFetchRequest(fetchPath, 'DELETE');
       if (!response.ok) {
         if (response.status === 403) {
           return handleError(new Error('Permission denied'));

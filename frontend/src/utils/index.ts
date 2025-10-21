@@ -115,14 +115,11 @@ class HTTPError extends Error {
   }
 }
 
-async function checkSessionValidity(xrsfCookie: string): Promise<boolean> {
+async function checkSessionValidity(): Promise<boolean> {
   try {
     const response = await fetch(getFullPath('/api/profile'), {
       method: 'GET',
-      credentials: 'include',
-      headers: {
-        'X-Xsrftoken': xrsfCookie
-      }
+      credentials: 'include'
     });
     return response.ok;
   } catch (error) {
@@ -137,14 +134,12 @@ type RequestBody = Record<string, unknown>;
 async function sendFetchRequest(
   apiPath: string,
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
-  xrsfCookie: string,
   body?: RequestBody
 ): Promise<Response> {
   const options: RequestInit = {
     method,
     credentials: 'include',
     headers: {
-      'X-Xsrftoken': xrsfCookie,
       ...(method !== 'GET' &&
         method !== 'DELETE' && { 'Content-Type': 'application/json' })
     },
@@ -176,7 +171,7 @@ async function sendFetchRequest(
   // Check for 403 Forbidden - could be permission denied or session expired
   if (response.status === 403) {
     // Check if session is still valid by testing a stable endpoint
-    const sessionValid = await checkSessionValidity(xrsfCookie);
+    const sessionValid = await checkSessionValidity();
     if (!sessionValid) {
       // Session has expired, redirect to logout
       window.location.href = `${window.location.origin}/logout`;
@@ -234,11 +229,10 @@ function makeMapKey(type: 'zone' | 'fsp' | 'folder', name: string): string {
 
 async function fetchFileContent(
   fspName: string,
-  path: string,
-  cookies: Record<string, string>
+  path: string
 ): Promise<Uint8Array> {
   const url = getFileContentPath(fspName, path);
-  const response = await sendFetchRequest(url, 'GET', cookies._xsrf);
+  const response = await sendFetchRequest(url, 'GET');
   if (!response.ok) {
     throw new Error(`Failed to fetch file: ${response.statusText}`);
   }
@@ -246,22 +240,14 @@ async function fetchFileContent(
   return new Uint8Array(fileBuffer);
 }
 
-async function fetchFileAsText(
-  fspName: string,
-  path: string,
-  cookies: Record<string, string>
-): Promise<string> {
-  const fileContent = await fetchFileContent(fspName, path, cookies);
+async function fetchFileAsText(fspName: string, path: string): Promise<string> {
+  const fileContent = await fetchFileContent(fspName, path);
   const decoder = new TextDecoder('utf-8');
   return decoder.decode(fileContent);
 }
 
-async function fetchFileAsJson(
-  fspName: string,
-  path: string,
-  cookies: Record<string, string>
-): Promise<object> {
-  const fileText = await fetchFileAsText(fspName, path, cookies);
+async function fetchFileAsJson(fspName: string, path: string): Promise<object> {
+  const fileText = await fetchFileAsText(fspName, path);
   return JSON.parse(fileText);
 }
 
@@ -280,10 +266,9 @@ function isLikelyTextFile(buffer: ArrayBuffer | Uint8Array): boolean {
 
 async function fetchFileWithTextDetection(
   fspName: string,
-  path: string,
-  cookies: Record<string, string>
+  path: string
 ): Promise<{ isText: boolean; content: string; rawData: Uint8Array }> {
-  const rawData = await fetchFileContent(fspName, path, cookies);
+  const rawData = await fetchFileContent(fspName, path);
   const isText = isLikelyTextFile(rawData);
 
   let content: string;

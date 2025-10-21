@@ -1,5 +1,4 @@
 import React from 'react';
-import { useCookiesContext } from '@/contexts/CookiesContext';
 import {
   checkServerHealth,
   ServerStatus,
@@ -56,7 +55,6 @@ export const ServerHealthProvider = ({
   const [nextRetrySeconds, setNextRetrySeconds] = React.useState<number | null>(
     null
   );
-  const { cookies } = useCookiesContext();
 
   // Debounce health checks to avoid spam
   const healthCheckTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -100,7 +98,7 @@ export const ServerHealthProvider = ({
         setIsChecking(true);
         setStatus('checking');
 
-        const healthStatus = await checkServerHealth(cookies['_xsrf']);
+        const healthStatus = await checkServerHealth();
 
         // Check if this request was aborted
         if (abortControllerRef.current?.signal.aborted) {
@@ -153,7 +151,7 @@ export const ServerHealthProvider = ({
         }
       }
     );
-  }, [stopRetrying, cookies]);
+  }, [stopRetrying]);
 
   const checkHealth = React.useCallback(async () => {
     if (isChecking) {
@@ -170,7 +168,7 @@ export const ServerHealthProvider = ({
     setStatus('checking');
 
     try {
-      const healthStatus = await checkServerHealth(cookies['_xsrf']);
+      const healthStatus = await checkServerHealth();
 
       // Check if this request was aborted
       if (abortControllerRef.current?.signal.aborted) {
@@ -201,7 +199,7 @@ export const ServerHealthProvider = ({
     } finally {
       setIsChecking(false);
     }
-  }, [cookies, isChecking, startRetrying, stopRetrying]);
+  }, [isChecking, startRetrying, stopRetrying]);
 
   const reportFailedRequest = React.useCallback(
     async (apiPath: string, responseStatus?: number) => {

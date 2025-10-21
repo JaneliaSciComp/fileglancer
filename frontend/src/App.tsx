@@ -1,5 +1,4 @@
 import { BrowserRouter, Route, Routes } from 'react-router';
-import { CookiesProvider } from 'react-cookie';
 import { ErrorBoundary } from 'react-error-boundary';
 
 import { AuthContextProvider, useAuthContext } from '@/contexts/AuthContext';
@@ -121,12 +120,10 @@ const AppComponent = () => {
 
 export default function App() {
   return (
-    <CookiesProvider>
-      <AuthContextProvider>
-        <ErrorBoundary FallbackComponent={ErrorFallback}>
-          <AppComponent />
-        </ErrorBoundary>
-      </AuthContextProvider>
-    </CookiesProvider>
+    <AuthContextProvider>
+      <ErrorBoundary FallbackComponent={ErrorFallback}>
+        <AppComponent />
+      </ErrorBoundary>
+    </AuthContextProvider>
   );
 }

@@ -1,6 +1,5 @@
 import React from 'react';
 
-import { useCookiesContext } from '@/contexts/CookiesContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { sendFetchRequest } from '@/utils';
 import type { Result } from '@/shared.types';
@@ -63,7 +62,6 @@ export const ProxiedPathProvider = ({
     null
   );
   const [dataUrl, setDataUrl] = React.useState<string | null>(null);
-  const { cookies } = useCookiesContext();
   const { fileBrowserState } = useFileBrowserContext();
 
   const updateProxiedPath = React.useCallback(
@@ -81,11 +79,7 @@ export const ProxiedPathProvider = ({
   const fetchAllProxiedPaths = React.useCallback(async (): Promise<
     Result<ProxiedPath[] | void>
   > => {
-    const response = await sendFetchRequest(
-      '/api/proxied-path',
-      'GET',
-      cookies['_xsrf']
-    );
+    const response = await sendFetchRequest('/api/proxied-path', 'GET');
 
     if (!response.ok) {
       throw await toHttpError(response);
@@ -97,7 +91,7 @@ export const ProxiedPathProvider = ({
     } else {
       return createSuccess(undefined);
     }
-  }, [cookies]);
+  }, []);
 
   const refreshProxiedPaths = React.useCallback(async (): Promise<
     Result<void>
@@ -128,8 +122,7 @@ export const ProxiedPathProvider = ({
     try {
       const response = await sendFetchRequest(
         `/api/proxied-path?fsp_name=${fileBrowserState.currentFileSharePath.name}&path=${fileBrowserState.currentFileOrFolder.path}`,
-        'GET',
-        cookies['_xsrf']
+        'GET'
       );
       if (!response.ok && response.status !== 404) {
         // This is not an error, just no proxied path found for this fsp/path
@@ -148,8 +141,7 @@ export const ProxiedPathProvider = ({
     }
   }, [
     fileBrowserState.currentFileSharePath,
-    fileBrowserState.currentFileOrFolder,
-    cookies
+    fileBrowserState.currentFileOrFolder
   ]);
 
   const createProxiedPath = React.useCallback(async (): Promise<
@@ -166,8 +158,7 @@ export const ProxiedPathProvider = ({
       const pathValue = fileBrowserState.currentFileOrFolder.path;
       const response = await sendFetchRequest(
         `/api/proxied-path?fsp_name=${encodeURIComponent(fspName)}&path=${encodeURIComponent(pathValue)}`,
-        'POST',
-        cookies['_xsrf']
+        'POST'
       );
 
       if (response.ok) {
@@ -183,7 +174,6 @@ export const ProxiedPathProvider = ({
   }, [
     fileBrowserState.currentFileSharePath,
     fileBrowserState.currentFileOrFolder,
-    cookies,
     updateProxiedPath
   ]);
 
@@ -192,8 +182,7 @@ export const ProxiedPathProvider = ({
       try {
         const response = await sendFetchRequest(
           `/api/proxied-path/${proxiedPath.sharing_key}`,
-          'DELETE',
-          cookies['_xsrf']
+          'DELETE'
         );
         if (!response.ok) {
           throw await toHttpError(response);
@@ -205,7 +194,7 @@ export const ProxiedPathProvider = ({
         return handleError(error);
       }
     },
-    [cookies, updateProxiedPath]
+    [updateProxiedPath]
   );
 
   React.useEffect(() => {

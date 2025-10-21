@@ -3,7 +3,6 @@ import { default as log } from '@/logger';
 import { Zone, FileSharePath, ZonesAndFileSharePathsMap } from '@/shared.types';
 import { sendFetchRequest, makeMapKey } from '@/utils';
 import { removeTrailingSlashes } from '@/utils/pathHandling';
-import { useCookiesContext } from './CookiesContext';
 
 type ZonesAndFspMapContextType = {
   isZonesMapReady: boolean;
@@ -34,18 +33,12 @@ export const ZonesAndFspMapContextProvider = ({
   const [zonesAndFileSharePathsMap, setZonesAndFileSharePathsMap] =
     React.useState<ZonesAndFileSharePathsMap>({});
 
-  const { cookies } = useCookiesContext();
-
   const getZones = React.useCallback(async (): Promise<{
     paths: FileSharePath[];
   }> => {
     let rawData: { paths: FileSharePath[] } = { paths: [] };
     try {
-      const response = await sendFetchRequest(
-        '/api/file-share-paths',
-        'GET',
-        cookies['_xsrf']
-      );
+      const response = await sendFetchRequest('/api/file-share-paths', 'GET');
       rawData = await response.json();
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -55,7 +48,7 @@ export const ZonesAndFspMapContextProvider = ({
       }
     }
     return rawData;
-  }, [cookies]);
+  }, []);
 
   function createZonesAndFileSharePathsMap(rawData: {
     paths: FileSharePath[];
