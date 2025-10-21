@@ -122,6 +122,8 @@ def create_app(settings):
     # Initialize OAuth client for OKTA
     oauth = auth.setup_oauth(settings)
 
+    # Define ui_dir for serving static files and SPA
+    ui_dir = PathLib(__file__).parent / "ui"
 
     def _get_user_context(username: str) -> UserContext:
         if settings.use_access_flags:
@@ -170,8 +172,7 @@ def create_app(settings):
         db.initialize_database(settings.db_url)
 
         # Mount static assets (CSS, JS, images) at /fg/assets
-        app.ui_dir = PathLib(__file__).parent / "ui"
-        assets_dir = app.ui_dir / "assets"
+        assets_dir = ui_dir / "assets"
         if assets_dir.exists():
             app.mount("/fg/assets", StaticFiles(directory=str(assets_dir)), name="assets")
             logger.debug(f"Mounted static assets at /fg/assets from {assets_dir}")
@@ -1043,12 +1044,12 @@ def create_app(settings):
         """Serve index.html for all SPA routes under /fg/ (client-side routing)"""
         # Serve logo.svg and other root-level static files from ui directory
         if full_path and full_path != "/":
-            file_path = app.ui_dir / full_path
+            file_path = ui_dir / full_path
             if file_path.exists() and file_path.is_file():
                 return FileResponse(file_path)
 
         # Otherwise serve index.html for SPA routing
-        index_path = app.ui_dir / "index.html"
+        index_path = ui_dir / "index.html"
         if index_path.exists():
             return FileResponse(index_path, media_type="text/html")
         raise HTTPException(status_code=404, detail="Not found")
