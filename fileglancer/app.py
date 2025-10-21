@@ -304,6 +304,7 @@ def create_app(settings):
                     username=username,
                     email=email,
                     expires_at=expires_at,
+                    session_secret_key=settings.session_secret_key,
                     okta_access_token=token.get('access_token'),
                     okta_id_token=id_token
                 )
@@ -1087,6 +1088,7 @@ def create_app(settings):
                 username=username,
                 email=None,  # No email for simple auth
                 expires_at=expires_at,
+                session_secret_key=settings.session_secret_key,
                 okta_access_token=None,
                 okta_id_token=None
             )
