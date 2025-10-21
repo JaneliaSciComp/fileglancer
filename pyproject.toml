@@ -112,7 +112,7 @@ requests-mock = ">=1.12.1,<2"
 pytest-jupyter-server = ">=0.6.0"
 
 [tool.pixi.feature.release.tasks]
-set-version = "hatch version"
+version = "hatch version"
 pypi-build = "pip install build && python -m build"
 pypi-upload = "twine upload dist/*"
 
