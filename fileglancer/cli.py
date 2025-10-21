@@ -6,6 +6,10 @@ import os
 import click
 import uvicorn
 import json
+import webbrowser
+import threading
+import time
+import socket
 from pathlib import Path
 from loguru import logger
 
@@ -41,8 +45,10 @@ def cli():
               help='Close Keep-Alive connections if no new data is received within this timeout.')
 @click.option('--auto-port', default=True,
               help='Automatically find an available port if the specified port is in use.')
+@click.option('--no-browser', is_flag=True, default=False,
+              help='Do not open web browser automatically.')
 def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
-          ssl_ca_certs, ssl_version, ssl_cert_reqs, ssl_ciphers, timeout_keep_alive, auto_port):
+          ssl_ca_certs, ssl_version, ssl_cert_reqs, ssl_ciphers, timeout_keep_alive, auto_port, no_browser):
     """Start the Fileglancer server using uvicorn."""
 
     # Configure loguru logger based on settings (if present)
@@ -128,8 +134,41 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
     if ssl_ciphers:
         config_kwargs['ssl_ciphers'] = ssl_ciphers
 
-    # Run uvicorn
-    logger.info(f"Starting Fileglancer server on {host}:{port}")
+    def wait_for_server_and_open_browser(url, host, port, max_attempts=30, check_interval=0.5):
+        """Wait for server to be ready, then open browser"""
+        for attempt in range(max_attempts):
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.settimeout(1)
+                    result = s.connect_ex((host if host != '0.0.0.0' else '127.0.0.1', port))
+                    if result == 0:
+                        # Server is ready, open browser
+                        webbrowser.open(url)
+                        logger.info(f"Opened browser at {url}")
+                        return
+            except Exception:
+                pass
+            time.sleep(check_interval)
+
+        logger.warning(f"Server did not become ready after {max_attempts * check_interval:.1f}s, could not open browser")
+
+    # Set up browser opening if not disabled
+    if not no_browser:
+        protocol = 'https' if ssl_keyfile else 'http'
+        browser_host = '127.0.0.1' if host == '0.0.0.0' else host
+        url = f"{protocol}://{browser_host}:{port}"
+
+        # Start browser opening in background thread
+        threading.Thread(
+            target=wait_for_server_and_open_browser,
+            args=(url, host, port),
+            daemon=True
+        ).start()
+
+        logger.info(f"Starting Fileglancer server on {host}:{port} (opening browser)")
+    else:
+        logger.info(f"Starting Fileglancer server on {host}:{port}")
+
     logger.trace(f"Starting Uvicorn with args:\n{json.dumps(config_kwargs, indent=2, sort_keys=True)}")
     uvicorn.run(**config_kwargs)
 
