@@ -146,13 +146,14 @@ export const FileBrowserContextProvider = ({
     }
   };
 
-  // Clear client state when URL changes (navigation to different file/folder)
+  // Update client state when URL changes (navigation to different file/folder)
+  // Set propertiesTarget to the current directory/file being viewed
   React.useEffect(() => {
     setFileBrowserState({
-      propertiesTarget: null,
+      propertiesTarget: fileQuery.data?.currentFileOrFolder || null,
       selectedFiles: []
     });
-  }, [fspName, filePath]);
+  }, [fspName, filePath, fileQuery.data?.currentFileOrFolder]);
 
   return (
     <FileBrowserContext.Provider
