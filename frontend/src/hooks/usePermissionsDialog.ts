@@ -1,13 +1,11 @@
 import React from 'react';
 
 import { sendFetchRequest, getFileBrowsePath } from '@/utils';
-import { useCookiesContext } from '@/contexts/CookiesContext';
 import type { Result } from '@/shared.types';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { handleError, toHttpError } from '@/utils/errorHandling';
 
 export default function usePermissionsDialog() {
-  const { cookies } = useCookiesContext();
   const { fileBrowserState, refreshFiles } = useFileBrowserContext();
 
   const [localPermissions, setLocalPermissions] = React.useState(
@@ -74,14 +72,9 @@ export default function usePermissionsDialog() {
     );
 
     try {
-      const response = await sendFetchRequest(
-        fetchPath,
-        'PATCH',
-        cookies['_xsrf'],
-        {
-          permissions: localPermissions
-        }
-      );
+      const response = await sendFetchRequest(fetchPath, 'PATCH', {
+        permissions: localPermissions
+      });
       if (response.ok) {
         return await refreshFiles();
       } else if (response.status === 403) {

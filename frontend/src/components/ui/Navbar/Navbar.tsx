@@ -80,9 +80,14 @@ function LogoSvg(): JSX.Element {
 
 // Links list component
 function NavList() {
+  const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
+  const filteredLinks = tasksEnabled
+    ? LINKS
+    : LINKS.filter(link => link.href !== '/jobs');
+
   return (
     <>
-      {LINKS.map(({ icon: Icon, title, href }) => (
+      {filteredLinks.map(({ icon: Icon, title, href }) => (
         <List.Item
           as={Link}
           className="flex items-center dark:!text-foreground hover:bg-hover-gradient hover:dark:bg-hover-gradient-dark focus:bg-hover-gradient focus:dark:bg-hover-gradient-dark hover:!text-foreground focus:!text-foreground"

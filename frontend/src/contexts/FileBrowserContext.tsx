@@ -9,7 +9,6 @@ import {
   sendFetchRequest,
   makeBrowseLink
 } from '@/utils';
-import { useCookiesContext } from './CookiesContext';
 import { useZoneAndFspMapContext } from './ZonesAndFspMapContext';
 import { normalizePosixStylePath } from '@/utils/pathHandling';
 import { createSuccess, handleError } from '@/utils/errorHandling';
@@ -127,7 +126,6 @@ export const FileBrowserContextProvider = ({
     [updateFileBrowserState]
   );
 
-  const { cookies } = useCookiesContext();
   const { zonesAndFileSharePathsMap, isZonesMapReady } =
     useZoneAndFspMapContext();
   const navigate = useNavigate();
@@ -194,7 +192,7 @@ export const FileBrowserContextProvider = ({
     ): Promise<FileBrowserResponse> => {
       const url = getFileBrowsePath(fspName, folderName);
 
-      const response = await sendFetchRequest(url, 'GET', cookies['_xsrf']);
+      const response = await sendFetchRequest(url, 'GET');
       const body = await response.json();
 
       if (!response.ok) {
@@ -219,7 +217,7 @@ export const FileBrowserContextProvider = ({
 
       return body as FileBrowserResponse;
     },
-    [cookies]
+    []
   );
 
   // Fetch metadata for the given FSP and path, and update the fileBrowserState

@@ -8,7 +8,6 @@ import {
 
 import Crumbs from './Crumbs';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-import { useCookiesContext } from '@/contexts/CookiesContext';
 import {
   formatFileSize,
   formatUnixTimestamp,
@@ -82,7 +81,6 @@ const getLanguageFromExtension = (filename: string): string => {
 
 export default function FileViewer({ file }: FileViewerProps): React.ReactNode {
   const { fileBrowserState } = useFileBrowserContext();
-  const { cookies } = useCookiesContext();
 
   const [content, setContent] = React.useState<string>('');
   const [loading, setLoading] = React.useState<boolean>(true);
@@ -119,8 +117,7 @@ export default function FileViewer({ file }: FileViewerProps): React.ReactNode {
 
         const { content: fileContent } = await fetchFileWithTextDetection(
           fileBrowserState.currentFileSharePath.name,
-          file.path,
-          cookies
+          file.path
         );
         setContent(fileContent);
       } catch (err) {
@@ -137,8 +134,7 @@ export default function FileViewer({ file }: FileViewerProps): React.ReactNode {
   }, [
     file.path,
     fileBrowserState.currentFileSharePath,
-    fileBrowserState.fileContentRefreshTrigger,
-    cookies
+    fileBrowserState.fileContentRefreshTrigger
   ]);
 
   const renderViewer = () => {

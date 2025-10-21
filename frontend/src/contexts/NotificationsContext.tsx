@@ -1,8 +1,8 @@
 import React from 'react';
-import { useCookiesContext } from '@/contexts/CookiesContext';
 import { sendFetchRequest } from '@/utils';
 import type { Result } from '@/shared.types';
 import { createSuccess, handleError, toHttpError } from '@/utils/errorHandling';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 import logger from '@/logger';
 
 export type Notification = {
@@ -46,7 +46,7 @@ export const NotificationProvider = ({
     number[]
   >([]);
   const [error, setError] = React.useState<string | null>(null);
-  const { cookies } = useCookiesContext();
+  const isPageVisible = usePageVisibility();
 
   // Load dismissed notifications from localStorage
   React.useEffect(() => {
@@ -69,11 +69,7 @@ export const NotificationProvider = ({
     setError(null);
 
     try {
-      const response = await sendFetchRequest(
-        '/api/notifications',
-        'GET',
-        cookies['_xsrf']
-      );
+      const response = await sendFetchRequest('/api/notifications', 'GET');
 
       if (response.ok) {
         const data = await response.json();
@@ -88,7 +84,7 @@ export const NotificationProvider = ({
     } catch (error) {
       return handleError(error);
     }
-  }, [cookies]);
+  }, []);
 
   const dismissNotification = React.useCallback(
     (id: number) => {
@@ -102,7 +98,7 @@ export const NotificationProvider = ({
     [dismissedNotifications]
   );
 
-  // Fetch notifications on mount and then every minute
+  // Fetch notifications on mount and then every minute (only when page is visible)
   React.useEffect(() => {
     const fetchAndSetNotifications = async () => {
       const result = await fetchNotifications();
@@ -113,15 +109,24 @@ export const NotificationProvider = ({
       }
     };
 
+    // Only fetch and set up polling if page is visible
+    if (!isPageVisible) {
+      logger.debug('Page hidden - skipping notification polling');
+      return;
+    }
+
     // Initial fetch
     fetchAndSetNotifications();
 
     // Set up interval to fetch every minute (60000ms)
     const interval = setInterval(fetchAndSetNotifications, 60000);
 
-    // Cleanup interval on unmount
-    return () => clearInterval(interval);
-  }, [fetchNotifications]);
+    // Cleanup interval on unmount or when page becomes hidden
+    return () => {
+      clearInterval(interval);
+      logger.debug('Notification polling stopped');
+    };
+  }, [fetchNotifications, isPageVisible]);
 
   return (
     <NotificationContext.Provider

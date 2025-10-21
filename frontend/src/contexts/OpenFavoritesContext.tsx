@@ -9,7 +9,9 @@ const OpenFavoritesContext = React.createContext<{
 export const useOpenFavoritesContext = () => {
   const context = React.useContext(OpenFavoritesContext);
   if (!context) {
-    throw new Error('useCookiesContext must be used within a CookiesProvider');
+    throw new Error(
+      'useOpenFavoritesContext must be used within a OpenFavoritesProvider'
+    );
   }
   return context;
 };
