@@ -117,4 +117,4 @@ session_cookie_name: fg_session
 # Set to false for development with self-signed certificates
 # Set to true for production with valid HTTPS certificates
 #
-session_cookie_secure: false
+session_cookie_secure: true
