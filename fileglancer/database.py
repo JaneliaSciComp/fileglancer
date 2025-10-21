@@ -1,4 +1,5 @@
 import secrets
+import hashlib
 from datetime import datetime, UTC
 import os
 from functools import lru_cache
@@ -127,6 +128,7 @@ class SessionDB(Base):
     email = Column(String, nullable=True)
     okta_access_token = Column(String, nullable=True)
     okta_id_token = Column(String, nullable=True)
+    session_secret_key_hash = Column(String, nullable=True)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     expires_at = Column(DateTime, nullable=False)
     last_accessed_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
@@ -531,12 +533,19 @@ def delete_ticket(session: Session, ticket_key: str):
     session.commit()
 
 
+def _hash_session_secret_key(session_secret_key: str) -> str:
+    """Hash the session secret key using SHA-256"""
+    return hashlib.sha256(session_secret_key.encode('utf-8')).hexdigest()
+
+
 def create_session(session: Session, username: str, email: Optional[str],
-                   expires_at: datetime, okta_access_token: Optional[str] = None,
+                   expires_at: datetime, session_secret_key: str,
+                   okta_access_token: Optional[str] = None,
                    okta_id_token: Optional[str] = None) -> SessionDB:
     """Create a new session for a user"""
     session_id = secrets.token_urlsafe(32)
     now = datetime.now(UTC)
+    session_secret_key_hash = _hash_session_secret_key(session_secret_key)
 
     user_session = SessionDB(
         session_id=session_id,
@@ -544,6 +553,7 @@ def create_session(session: Session, username: str, email: Optional[str],
         email=email,
         okta_access_token=okta_access_token,
         okta_id_token=okta_id_token,
+        session_secret_key_hash=session_secret_key_hash,
         created_at=now,
         expires_at=expires_at,
         last_accessed_at=now
