@@ -60,7 +60,6 @@ test = [
     "requests-mock"
 ]
 release = [
-    "build",
     "twine",
     "hatch"
 ]
@@ -103,10 +102,23 @@ test-pip-install = "pip install -e ."
 test-backend = { cmd = "pytest --cov=fileglancer --cov-report=html --cov-report=term", depends-on = ["test-pip-install"] }
 test-frontend = "cd frontend && npm test"
 
+[tool.pixi.feature.test.dependencies]
+coverage = ">=7.10.6,<8"
+pytest = ">=8.4.2,<9"
+pytest-asyncio = ">=1.1.0,<2"
+pytest-cov = ">=7.0.0,<8"
+pytest-jupyter = ">=0.10.1,<0.11"
+requests-mock = ">=1.12.1,<2"
+pytest-jupyter-server = ">=0.6.0"
+
 [tool.pixi.feature.release.tasks]
 set-version = "hatch version"
 pypi-build = "pip install build && python -m build"
 pypi-upload = "twine upload dist/*"
+
+[tool.pixi.feature.release.dependencies]
+twine = ">=6.2.0,<7"
+hatch = ">=1.14.1,<2"
 
 [tool.pixi.environments]
 default = { solve-group = "default" }
@@ -114,8 +126,8 @@ test = { features = ["test"], solve-group = "default" }
 release = { features = ["release"], solve-group = "default" }
 
 [tool.pixi.tasks]
-pip-install = "pip install -e ."
-pip-uninstall = "pip uninstall -y fileglancer"
+pip-install = { cmd = "pixi reinstall fileglancer" }
+pip-uninstall = { cmd = "pixi clean" }
 node-install = "cd frontend && npm install"
 node-build = { cmd = "cd frontend && npm run build", depends-on = ["node-install"] }
 node-eslint-check = "cd frontend && npx eslint . --cache --ext .ts,.tsx"
@@ -137,5 +149,32 @@ stamp-db = "python -m fileglancer.stamp_db"
 
 [tool.pixi.dependencies]
 python = ">=3.13.2,<4"
-pip = ">=25.0.1,<26"
 nodejs = ">=22.12.0,<23"
+jupyterlab = ">=4.3.0,<5"
+jupyter_server = ">=2.4.0,<3"
+pydantic = ">=2.10.6,<3"
+fastapi = ">=0.119.1,<0.120"
+uvicorn = ">=0.38.0,<0.39"
+sqlalchemy = ">=2.0.44,<3"
+aiosqlite = ">=0.21.0,<0.22"
+alembic = ">=1.17.0,<2"
+pandas = ">=2.3.3,<3"
+loguru = ">=0.7.3,<0.8"
+atlassian-python-api = ">=4.0.7,<5"
+aiobotocore = ">=2.25.0,<3"
+boto3 = ">=1.40.49,<2"
+rsa = ">=4.9.1,<5"
+pydantic-settings = ">=2.11.0,<3"
+pydantic-yaml = ">=1.6.0,<2"
+authlib = ">=1.6.5,<2"
+cachetools = ">=6.2.1,<7"
+itsdangerous = ">=2.2.0,<3"
+python-jose = ">=3.5.0,<4"
+python-jose-cryptodome = ">=1.3.2,<2"
+psycopg2-binary = ">=2.9.10,<3"
+
+[tool.pixi.pypi-dependencies]
+fileglancer = { path = ".", editable = true }
+
+[dependency-groups]
+release = ["build>=1.3.0,<2"]

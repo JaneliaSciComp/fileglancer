@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     okta_redirect_uri: Optional[HttpUrl] = None
 
     # Session management settings
-    session_secret_key: str = 'change-me-in-production'
+    session_secret_key: Optional[str] = None
     session_expiry_hours: int = 24
     session_cookie_name: str = 'fg_session'
     session_cookie_secure: bool = True  # Set to False for development with self-signed certs
