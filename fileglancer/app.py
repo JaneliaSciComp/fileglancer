@@ -158,24 +158,32 @@ def create_app(settings):
             import re
             return re.sub(r'(://[^:]+:)[^@]+(@)', r'\1****\2', url)
 
-        logger.info(f"Settings:")
-        logger.info(f"  log_level: {settings.log_level}")
-        logger.info(f"  db_url: {mask_password(settings.db_url)}")
+        logger.debug(f"Settings:")
+        logger.debug(f"  log_level: {settings.log_level}")
+        logger.debug(f"  db_url: {mask_password(settings.db_url)}")
         if settings.db_admin_url:
-            logger.info(f"  db_admin_url: {mask_password(settings.db_admin_url)}")
-        logger.info(f"  use_access_flags: {settings.use_access_flags}")
-        logger.info(f"  atlassian_url: {settings.atlassian_url}")
+            logger.debug(f"  db_admin_url: {mask_password(settings.db_admin_url)}")
+        logger.debug(f"  use_access_flags: {settings.use_access_flags}")
+        logger.debug(f"  atlassian_url: {settings.atlassian_url}")
 
         # Initialize database (run migrations once at startup)
-        logger.info("Initializing database...")
         db.initialize_database(settings.db_url)
+
+        # Mount static assets (CSS, JS, images) at /fg/assets
+        app.ui_dir = PathLib(__file__).parent / "ui"
+        assets_dir = app.ui_dir / "assets"
+        if assets_dir.exists():
+            app.mount("/fg/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+            logger.debug(f"Mounted static assets at /fg/assets from {assets_dir}")
+        else:
+            logger.warning(f"Assets directory not found at {assets_dir}")
 
         # Check for notifications file at startup
         notifications_file = os.path.join(os.getcwd(), "notifications.yaml")
         if os.path.exists(notifications_file):
-            logger.info(f"Notifications file found: {notifications_file}")
+            logger.debug(f"Notifications file found: {notifications_file}")
         else:
-            logger.info(f"No notifications file found at {notifications_file}")
+            logger.debug(f"No notifications file found at {notifications_file}")
 
         logger.info(f"Server ready")
         yield
@@ -207,15 +215,6 @@ def create_app(settings):
         allow_headers=["*"],
         expose_headers=["Range", "Content-Range"],
     )
-
-    # Mount static assets (CSS, JS, images) at /fg/assets
-    ui_dir = PathLib(__file__).parent / "ui"
-    assets_dir = ui_dir / "assets"
-    if assets_dir.exists():
-        app.mount("/fg/assets", StaticFiles(directory=str(assets_dir)), name="assets")
-        logger.info(f"Mounted static assets at /fg/assets from {assets_dir}")
-    else:
-        logger.warning(f"Assets directory not found at {assets_dir}")
 
 
     @app.exception_handler(StarletteHTTPException)
@@ -1044,12 +1043,12 @@ def create_app(settings):
         """Serve index.html for all SPA routes under /fg/ (client-side routing)"""
         # Serve logo.svg and other root-level static files from ui directory
         if full_path and full_path != "/":
-            file_path = ui_dir / full_path
+            file_path = app.ui_dir / full_path
             if file_path.exists() and file_path.is_file():
                 return FileResponse(file_path)
 
         # Otherwise serve index.html for SPA routing
-        index_path = ui_dir / "index.html"
+        index_path = app.ui_dir / "index.html"
         if index_path.exists():
             return FileResponse(index_path, media_type="text/html")
         raise HTTPException(status_code=404, detail="Not found")

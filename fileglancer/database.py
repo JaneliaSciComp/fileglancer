@@ -193,9 +193,9 @@ def run_alembic_upgrade(db_url):
 
 def initialize_database(db_url):
     """Initialize database by running migrations. Should be called once at startup."""
-    logger.info(f"Initializing database: {make_url(db_url).render_as_string(hide_password=True)}")
+    logger.debug(f"Initializing database: {make_url(db_url).render_as_string(hide_password=True)}")
     run_alembic_upgrade(db_url)
-    logger.info("Database initialization completed")
+    logger.debug("Database initialization completed")
 
 
 def _get_engine(db_url):

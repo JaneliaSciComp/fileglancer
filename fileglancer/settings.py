@@ -17,7 +17,7 @@ class Settings(BaseSettings):
         be passed in the environment or in a .env file. 
     """
 
-    log_level: str = 'DEBUG'
+    log_level: str = 'INFO'
     db_url: str = 'sqlite:///fileglancer.db'
     db_admin_url: Optional[str] = None
 
@@ -36,9 +36,9 @@ class Settings(BaseSettings):
     # The URL of JIRA's /browse/ API endpoint which can be used to construct a link to a ticket
     jira_browse_url: Optional[HttpUrl] = None
 
-    # If confluence settings are not provided, use a static list of paths to mount as file shares
-    # This can specify the home directory using a ~/ prefix (will be expanded per-user).
-    # Example: file_share_mounts = ["~/", "/data/shared"]
+    # By default, use a static list of paths to mount as file shares. 
+    # To use file share paths from the database, set this to an empty list.
+    # You can specify the home directory using a ~/ prefix (will be expanded per-user).
     file_share_mounts: List[str] = ["~/"]
     
     # The external URL of the proxy server for accessing proxied paths.

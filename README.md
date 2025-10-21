@@ -19,6 +19,49 @@ See the [documentation](https://janeliascicomp.github.io/fileglancer-docs/) for 
 <img alt="Fileglancer screenshot" width="800" src="https://github.com/user-attachments/assets/e17079a6-66ca-4064-8568-7770c5af33d5" />
 </p>
 
+## Installation
+
+### Quick Start with pip
+
+You can install and run Fileglancer using pip:
+
+```bash
+# Install from PyPI
+pip install fileglancer
+
+# Start the server
+fileglancer start
+```
+
+The server will start on `http://localhost:7878` by default. By default, users can browse their home directory (`~/`) without any additional configuration.
+
+### Configuration
+
+Fileglancer can be configured using a YAML configuration file or environment variables. Create a `config.yaml` file in your working directory:
+
+```yaml
+# Logging level
+log_level: DEBUG
+
+# Configure additional file share paths
+file_share_mounts:
+  - "~/"                    # User's home directory
+  - "/data/shared"          # Additional shared directory
+
+# Database configuration
+db_url: "sqlite:///fileglancer.db"
+```
+
+Alternatively, you can use environment variables with the `FGC_` prefix:
+
+```bash
+export FGC_LOG_LEVEL="DEBUG"
+export FGC_FILE_SHARE_MOUNTS='["~/", "/data/shared"]'
+export FGC_DB_URL="sqlite:///fileglancer.db"
+```
+
+For more configuration options, see the [development docs](docs/Development.md).
+
 ## Deployment @ Janelia Research Campus
 
 If you are on the internal Janelia network navigate to "fileglancer.int.janelia.org" in your web browser and login with your Okta credentials. If you are outside of Janelia, you'll need to ask your System Administrator to install Fileglancer on a server on your institution's network.
