@@ -32,7 +32,8 @@ const navigateToScratchDir = async (page: Page) => {
 
   const scratchFsp = page
     .getByRole('link', { name: /scratch/i })
-    .filter({ hasNotText: 'zarr' });
+    .filter({ hasNotText: 'zarr' })
+    .nth(0);
 
   await expect(scratchFsp).toBeVisible();
 
