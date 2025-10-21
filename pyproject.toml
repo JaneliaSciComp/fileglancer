@@ -32,7 +32,6 @@ dependencies = [
     "pandas >=2.2.3",
     "pydantic >=2.10",
     "pydantic-settings >=2.8",
-    "pydantic-settings[yaml]",
     "loguru >=0.7.2",
     "atlassian-python-api >=3.41",
     "lxml >=5.3.1",
@@ -41,7 +40,6 @@ dependencies = [
     "cachetools >=5.0.0",
     "authlib >=1.3.0",
     "httpx >=0.28",
-    "python-jose[cryptography] >=3.3.0",
     "itsdangerous >=2.1.2",
     "click >=8.0"
 ]
@@ -149,9 +147,8 @@ stamp-db = "python -m fileglancer.stamp_db"
 
 [tool.pixi.dependencies]
 python = ">=3.13.2,<4"
+pip = ">=25.0.1,<26"
 nodejs = ">=22.12.0,<23"
-jupyterlab = ">=4.3.0,<5"
-jupyter_server = ">=2.4.0,<3"
 pydantic = ">=2.10.6,<3"
 fastapi = ">=0.119.1,<0.120"
 uvicorn = ">=0.38.0,<0.39"
