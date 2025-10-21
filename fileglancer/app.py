@@ -3,6 +3,7 @@ import sys
 import pwd
 import grp
 import json
+import secrets
 from datetime import datetime, timedelta, timezone, UTC
 from functools import cache
 from pathlib import Path as PathLib
@@ -196,6 +197,12 @@ def create_app(settings):
     # Add custom access log middleware
     # This logs HTTP access information with authenticated username
     app.add_middleware(AccessLogMiddleware, settings=settings)
+
+    # Generate random session_secret_key if not configured
+    if settings.session_secret_key is None:
+        settings.session_secret_key = secrets.token_urlsafe(32)
+        logger.warning("session_secret_key was not configured. Generated a random key for this session.")
+        logger.warning("For production use, set session_secret_key in config.yaml or via environment variable.")
 
     # Add SessionMiddleware for OAuth state management
     # This is required by authlib for the OAuth flow
