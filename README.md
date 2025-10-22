@@ -1,6 +1,6 @@
 # Fileglancer
 
-[![Github Actions Status](https://github.com/JaneliaSciComp/fileglancer/workflows/Build/badge.svg)](https://github.com/JaneliaSciComp/fileglancer/actions/workflows/build.yml)
+![Github Actions Status](https://github.com/JaneliaSciComp/fileglancer/actions/workflows/build.yml/badge.svg?branch%3Amain)
 [![DOI](https://zenodo.org/badge/918344432.svg)](https://doi.org/10.5281/zenodo.17314767)
 
 Fileglancer is an intranet web application designed to allow researchers to easily browse, share, and manage large scientific imaging data using [OME-NGFF](https://github.com/ome/ngff) (i.e. OME-Zarr). Our goal is to reduce the friction experienced by users who want to easily share their data with colleagues at their institution. Simply browse to your data, click on the Neuroglancer link, and send that link to your collaborator.
@@ -18,6 +18,49 @@ See the [documentation](https://janeliascicomp.github.io/fileglancer-docs/) for 
 <p align="center">
 <img alt="Fileglancer screenshot" width="800" src="https://github.com/user-attachments/assets/e17079a6-66ca-4064-8568-7770c5af33d5" />
 </p>
+
+## Installation
+
+### Quick Start with pip
+
+You can install and run Fileglancer using pip:
+
+```bash
+# Install from PyPI
+pip install fileglancer
+
+# Start the server
+fileglancer start
+```
+
+The server will start on `http://localhost:7878` by default. By default, users can browse their home directory (`~/`) without any additional configuration.
+
+### Configuration
+
+Fileglancer can be configured using a YAML configuration file or environment variables. Create a `config.yaml` file in your working directory:
+
+```yaml
+# Logging level
+log_level: DEBUG
+
+# Configure additional file share paths
+file_share_mounts:
+  - "~/"                    # User's home directory
+  - "/data/shared"          # Additional shared directory
+
+# Database configuration
+db_url: "sqlite:///fileglancer.db"
+```
+
+Alternatively, you can use environment variables with the `FGC_` prefix:
+
+```bash
+export FGC_LOG_LEVEL="DEBUG"
+export FGC_FILE_SHARE_MOUNTS='["~/", "/data/shared"]'
+export FGC_DB_URL="sqlite:///fileglancer.db"
+```
+
+For more configuration options, see the [development docs](docs/Development.md).
 
 ## Deployment @ Janelia Research Campus
 

@@ -58,7 +58,19 @@ def test_app(temp_dir):
     test_proxied_path = os.path.join(temp_dir, "new_test_proxied_path")
     os.makedirs(test_proxied_path, exist_ok=True)
 
-    settings = Settings(db_url=db_url)
+    settings = Settings(db_url=db_url, file_share_mounts=[])
+
+    # Monkey-patch get_settings to return our test settings
+    import fileglancer.settings
+    import fileglancer.database
+
+    # Save original functions and clear cache
+    original_get_settings = fileglancer.settings.get_settings
+
+    # Replace with test settings
+    fileglancer.settings.get_settings = lambda: settings
+    fileglancer.database.get_settings = lambda: settings
+
     app = create_app(settings)
 
     yield app
@@ -69,6 +81,10 @@ def test_app(temp_dir):
     # Dispose the cached engine from the database module
     from fileglancer.database import dispose_engine
     dispose_engine(db_url)
+
+    # Restore original get_settings and clear cache
+    fileglancer.settings.get_settings = original_get_settings
+    fileglancer.database.get_settings = original_get_settings
 
 
 @pytest.fixture

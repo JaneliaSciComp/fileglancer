@@ -1,4 +1,5 @@
 import { test as base, Page, expect } from '@playwright/test';
+import { navigateToScratchDir } from '../utils';
 import { mockAPI, teardownMockAPI } from '../mocks/api';
 import { resetTestFiles } from './reset-files';
 
@@ -23,25 +24,6 @@ const openFileglancer = async (page: Page) => {
 
   // Wait for the main UI to load
   await page.waitForSelector('text=Zones', { timeout: 10000 });
-};
-
-const navigateToScratchDir = async (page: Page) => {
-  // Navigate to Local zone - find it under Zones, not in Favorites
-  const localZone = page
-    .getByLabel('List of file share paths')
-    .getByRole('button', { name: 'Local' });
-  await localZone.click();
-
-  const scratchFsp = page
-    .getByRole('link', { name: /scratch/i })
-    .filter({ hasNotText: 'zarr' })
-    .nth(0);
-
-  await expect(scratchFsp).toBeVisible();
-
-  // Wait for file directory to load
-  await scratchFsp.click();
-  await expect(page.getByText('Name', { exact: true })).toBeVisible();
 };
 
 /**

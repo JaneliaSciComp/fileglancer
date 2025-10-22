@@ -31,7 +31,7 @@ from fileglancer import auth
 from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
-from fileglancer.utils import slugify_path, format_timestamp, guess_content_type, parse_range_header
+from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header
 from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext
 from fileglancer.filestore import Filestore
 from fileglancer.log import AccessLogMiddleware
@@ -123,14 +123,8 @@ def create_app(settings):
     # Initialize OAuth client for OKTA
     oauth = auth.setup_oauth(settings)
 
-    @cache
-    def _get_fsp_names_to_mount_paths() -> Dict[str, str]:
-        if settings.file_share_mounts:
-            return {slugify_path(path): path for path in settings.file_share_mounts}
-        else:
-            with db.get_db_session(settings.db_url) as session:
-                return {fsp.name: fsp.mount_path for fsp in db.get_all_paths(session)}
-
+    # Define ui_dir for serving static files and SPA
+    ui_dir = PathLib(__file__).parent / "ui"
 
     def _get_user_context(username: str) -> UserContext:
         if settings.use_access_flags:
@@ -148,11 +142,12 @@ def create_app(settings):
             if proxied_path.sharing_name != sharing_name:
                 return get_error_response(400, "InvalidArgument", f"Sharing name mismatch for sharing key {sharing_key}", sharing_name), None
 
-            fsp_names_to_mount_paths = _get_fsp_names_to_mount_paths()
-            if proxied_path.fsp_name not in fsp_names_to_mount_paths:
+            fsp = db.get_file_share_path(session, proxied_path.fsp_name)
+            if not fsp:
                 return get_error_response(400, "InvalidArgument", f"File share path {proxied_path.fsp_name} not found", sharing_name), None
-            fsp_mount_path = fsp_names_to_mount_paths[proxied_path.fsp_name]
-            mount_path = f"{fsp_mount_path}/{proxied_path.path}"
+            # Expand ~ to user's home directory before constructing the mount path
+            expanded_mount_path = os.path.expanduser(fsp.mount_path)
+            mount_path = f"{expanded_mount_path}/{proxied_path.path}"
             return FileProxyClient(proxy_kwargs={'target_name': sharing_name}, path=mount_path), _get_user_context(proxied_path.username)
 
 
@@ -168,24 +163,31 @@ def create_app(settings):
             import re
             return re.sub(r'(://[^:]+:)[^@]+(@)', r'\1****\2', url)
 
-        logger.info(f"Settings:")
-        logger.info(f"  log_level: {settings.log_level}")
-        logger.info(f"  db_url: {mask_password(settings.db_url)}")
+        logger.debug(f"Settings:")
+        logger.debug(f"  log_level: {settings.log_level}")
+        logger.debug(f"  db_url: {mask_password(settings.db_url)}")
         if settings.db_admin_url:
-            logger.info(f"  db_admin_url: {mask_password(settings.db_admin_url)}")
-        logger.info(f"  use_access_flags: {settings.use_access_flags}")
-        logger.info(f"  atlassian_url: {settings.atlassian_url}")
+            logger.debug(f"  db_admin_url: {mask_password(settings.db_admin_url)}")
+        logger.debug(f"  use_access_flags: {settings.use_access_flags}")
+        logger.debug(f"  atlassian_url: {settings.atlassian_url}")
 
         # Initialize database (run migrations once at startup)
-        logger.info("Initializing database...")
         db.initialize_database(settings.db_url)
+
+        # Mount static assets (CSS, JS, images) at /fg/assets
+        assets_dir = ui_dir / "assets"
+        if assets_dir.exists():
+            app.mount("/fg/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+            logger.debug(f"Mounted static assets at /fg/assets from {assets_dir}")
+        else:
+            logger.warning(f"Assets directory not found at {assets_dir}")
 
         # Check for notifications file at startup
         notifications_file = os.path.join(os.getcwd(), "notifications.yaml")
         if os.path.exists(notifications_file):
-            logger.info(f"Notifications file found: {notifications_file}")
+            logger.debug(f"Notifications file found: {notifications_file}")
         else:
-            logger.info(f"No notifications file found at {notifications_file}")
+            logger.debug(f"No notifications file found at {notifications_file}")
 
         logger.info(f"Server ready")
         yield
@@ -223,15 +225,6 @@ def create_app(settings):
         allow_headers=["*"],
         expose_headers=["Range", "Content-Range"],
     )
-
-    # Mount static assets (CSS, JS, images) at /fg/assets
-    ui_dir = PathLib(__file__).parent / "ui"
-    assets_dir = ui_dir / "assets"
-    if assets_dir.exists():
-        app.mount("/fg/assets", StaticFiles(directory=str(assets_dir)), name="assets")
-        logger.info(f"Mounted static assets at /fg/assets from {assets_dir}")
-    else:
-        logger.warning(f"Assets directory not found at {assets_dir}")
 
 
     @app.exception_handler(StarletteHTTPException)
@@ -368,32 +361,9 @@ def create_app(settings):
     @app.get("/api/file-share-paths", response_model=FileSharePathResponse,
              description="Get all file share paths from the database")
     async def get_file_share_paths() -> List[FileSharePath]:
-        file_share_mounts = settings.file_share_mounts
-        if file_share_mounts:
-            paths = [FileSharePath(
-                name=slugify_path(path),
-                zone='Local',
-                group='local',
-                storage='local',
-                mount_path=path,
-                mac_path=path,
-                windows_path=path,
-                linux_path=path,
-            ) for path in file_share_mounts]
-        else:
-            with db.get_db_session(settings.db_url) as session:
-                paths = [FileSharePath(
-                    name=path.name,
-                    zone=path.zone,
-                    group=path.group,
-                    storage=path.storage,
-                    mount_path=path.mount_path,
-                    mac_path=path.mac_path,
-                    windows_path=path.windows_path,
-                    linux_path=path.linux_path,
-                ) for path in db.get_all_paths(session)]
-
-        return FileSharePathResponse(paths=paths)
+        with db.get_db_session(settings.db_url) as session:
+            paths = db.get_file_share_paths(session)
+            return FileSharePathResponse(paths=paths)
 
 
     @app.get("/api/external-buckets", response_model=ExternalBucketResponse,
@@ -401,7 +371,7 @@ def create_app(settings):
     async def get_external_buckets() -> ExternalBucketResponse:
         with db.get_db_session(settings.db_url) as session:
             buckets = [_convert_external_bucket(bucket) for bucket in db.get_external_buckets(session)]
-        return ExternalBucketResponse(buckets=buckets)
+            return ExternalBucketResponse(buckets=buckets)
 
 
     @app.get("/api/external-buckets/{fsp_name}", response_model=ExternalBucketResponse,
@@ -409,7 +379,7 @@ def create_app(settings):
     async def get_external_buckets(fsp_name: str) -> ExternalBucket:
         with db.get_db_session(settings.db_url) as session:
             buckets = [_convert_external_bucket(bucket) for bucket in db.get_external_buckets(session, fsp_name)]
-        return ExternalBucketResponse(buckets=buckets)
+            return ExternalBucketResponse(buckets=buckets)
 
 
     @app.get("/api/notifications", response_model=NotificationResponse,
@@ -604,12 +574,13 @@ def create_app(settings):
         sharing_name = os.path.basename(path)
         logger.info(f"Creating proxied path for {username} with sharing name {sharing_name} and fsp_name {fsp_name} and path {path}")
         with db.get_db_session(settings.db_url) as session:
-            try:
-                new_path = db.create_proxied_path(session, username, sharing_name, fsp_name, path)
-                return _convert_proxied_path(new_path, settings.external_proxy_url)
-            except ValueError as e:
-                logger.error(f"Error creating proxied path: {e}")
-                raise HTTPException(status_code=400, detail=str(e))
+            with _get_user_context(username): # Necessary to validate the user can access the proxied path
+                try:
+                    new_path = db.create_proxied_path(session, username, sharing_name, fsp_name, path)
+                    return _convert_proxied_path(new_path, settings.external_proxy_url)
+                except ValueError as e:
+                    logger.error(f"Error creating proxied path: {e}")
+                    raise HTTPException(status_code=400, detail=str(e))
 
 
     @app.get("/api/proxied-path", response_model=ProxiedPathResponse,
@@ -643,12 +614,13 @@ def create_app(settings):
                                   sharing_name: Optional[str] = Query(default=None, description="The sharing path of the proxied path"),
                                   username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
-            try:
-                updated = db.update_proxied_path(session, username, sharing_key, new_path=path, new_sharing_name=sharing_name, new_fsp_name=fsp_name)
-                return _convert_proxied_path(updated, settings.external_proxy_url)
-            except ValueError as e:
-                logger.error(f"Error updating proxied path: {e}")
-                raise HTTPException(status_code=400, detail=str(e))
+            with _get_user_context(username): # Necessary to validate the user can access the proxied path
+                try:
+                    updated = db.update_proxied_path(session, username, sharing_key, new_path=path, new_sharing_name=sharing_name, new_fsp_name=fsp_name)
+                    return _convert_proxied_path(updated, settings.external_proxy_url)
+                except ValueError as e:
+                    logger.error(f"Error updating proxied path: {e}")
+                    raise HTTPException(status_code=400, detail=str(e))
 
 
     @app.delete("/api/proxied-path/{sharing_key}", description="Delete a proxied path by sharing key")
@@ -721,44 +693,11 @@ def create_app(settings):
 
     def _get_filestore(path_name: str):
         """Get a filestore for the given path name."""
-        # Get file share path from database or settings
-        file_share_mounts = settings.file_share_mounts
-        fsp = None
-
-        if file_share_mounts:
-            for path in file_share_mounts:
-                name = slugify_path(path)
-                if name == path_name:
-                    fsp = FileSharePath(
-                        name=name,
-                        zone='Local',
-                        group='local',
-                        storage='local',
-                        mount_path=path,
-                        mac_path=path,
-                        windows_path=path,
-                        linux_path=path,
-                    )
-                    break
-        else:
-            with db.get_db_session(settings.db_url) as session:
-                db_paths = db.get_all_paths(session)
-                for path in db_paths:
-                    if path.name == path_name:
-                        fsp = FileSharePath(
-                            name=path.name,
-                            zone=path.zone,
-                            group=path.group,
-                            storage=path.storage,
-                            mount_path=path.mount_path,
-                            mac_path=path.mac_path,
-                            windows_path=path.windows_path,
-                            linux_path=path.linux_path,
-                        )
-                        break
-
-        if fsp is None:
-            return None, f"File share path '{path_name}' not found"
+        # Get file share path using centralized function and filter for the requested path
+        with db.get_db_session(settings.db_url) as session:
+            fsp = db.get_file_share_path(session, path_name)
+            if fsp is None:
+                return None, f"File share path '{path_name}' not found"
 
         # Create a filestore for the file share path
         filestore = _get_mounted_filestore(fsp)
@@ -773,25 +712,23 @@ def create_app(settings):
     async def get_profile(username: str = Depends(get_current_user)):
         """Get the current user's profile"""
         with _get_user_context(username):
-            home_directory_path = os.path.expanduser(f"~{username}")
-            home_directory_name = os.path.basename(home_directory_path)
-            home_parent = os.path.dirname(home_directory_path)
-
+            
             # Find matching file share path for home directory
-            home_fsp_name = None
-            file_share_mounts = settings.file_share_mounts
-            if file_share_mounts:
-                for path in file_share_mounts:
-                    if path == home_parent:
-                        home_fsp_name = slugify_path(path)
-                        break
-            else:
-                with db.get_db_session(settings.db_url) as session:
-                    paths = db.get_all_paths(session)
-                    for fsp in paths:
-                        if fsp.mount_path == home_parent:
-                            home_fsp_name = fsp.name
-                            break
+            with db.get_db_session(settings.db_url) as session:
+                paths = db.get_file_share_paths(session)
+
+                # First, check if there's a "home" FSP (for ~/ paths)
+                home_fsp = next((fsp for fsp in paths if fsp.mount_path in ('~', '~/')), None)
+                if home_fsp:
+                    home_directory_name = "."
+                else:
+                    # If no "home" FSP exists, fall back to finding by mount path
+                    home_directory_path = os.path.expanduser(f"~{username}")
+                    home_parent = os.path.dirname(home_directory_path)
+                    home_fsp = next((fsp for fsp in paths if fsp.mount_path == home_parent), None)
+                    home_directory_name = os.path.basename(home_directory_path)
+
+                home_fsp_name = home_fsp.name if home_fsp else None
 
             # Get user groups
             user_groups = []
