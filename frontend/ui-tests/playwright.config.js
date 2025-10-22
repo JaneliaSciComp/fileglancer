@@ -8,22 +8,31 @@ import { join } from 'path';
 import { writeFilesSync } from './mocks/files.js';
 import { createZarrDirsSync } from './mocks/zarrDirs.js';
 
-// Create a unique temp directory for this test run
-const testTempDir = mkdtempSync(join(tmpdir(), 'fg-playwright-'));
-const testDbPath = join(testTempDir, 'test.db');
+// Create a unique temp directory for this test run ONLY if not already set
+// This ensures all workers share the same temp directory
+let testTempDir = process.env.TEST_TEMP_DIR;
 
+if (!testTempDir) {
+  testTempDir = mkdtempSync(join(tmpdir(), 'fg-playwright-'));
+  process.env.TEST_TEMP_DIR = testTempDir;
+
+  const primaryDir = join(testTempDir, 'primary');
+  const scratchDir = join(testTempDir, 'scratch');
+  mkdirSync(primaryDir, { recursive: true });
+  mkdirSync(scratchDir, { recursive: true });
+
+  // Create default test files (f1, f2, f3) for file-operations tests
+  writeFilesSync(scratchDir);
+
+  // Create Zarr test directories for load-zarr-files tests
+  createZarrDirsSync(scratchDir);
+}
+
+const testDbPath = join(testTempDir, 'test.db');
 const primaryDir = join(testTempDir, 'primary');
 const scratchDir = join(testTempDir, 'scratch');
-mkdirSync(primaryDir, { recursive: true });
-mkdirSync(scratchDir, { recursive: true });
 
-// Create default test files (f1, f2, f3) for file-operations tests
-writeFilesSync(scratchDir);
-
-// Create Zarr test directories for load-zarr-files tests
-createZarrDirsSync(scratchDir);
-
-// Export temp directory path and dirs for tests and global teardown
+// Export temp directory path for tests and global teardown
 global.testTempDir = testTempDir;
 
 export default defineConfig({
