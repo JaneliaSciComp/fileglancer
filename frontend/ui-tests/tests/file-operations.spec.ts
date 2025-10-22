@@ -9,7 +9,10 @@ test.describe('File Operations', () => {
     }
   );
 
-  test('rename file via context menu', async ({ fileglancerPage: page }) => {
+  test('rename file via context menu', async ({
+    fileglancerPage: page,
+    freshFiles
+  }) => {
     // Right-click to open context menu, select Rename. Wait for dialog.
     await page.getByText('f3').click({ button: 'right' });
     await page.getByRole('menuitem', { name: /rename/i }).click();
@@ -28,7 +31,10 @@ test.describe('File Operations', () => {
     ).not.toBeVisible();
   });
 
-  test('delete file via context menu', async ({ fileglancerPage: page }) => {
+  test('delete file via context menu', async ({
+    fileglancerPage: page,
+    freshFiles
+  }) => {
     // Right-click to open context menu, select Delete. Wait for dialog.
     await page.getByText('f2').click({ button: 'right' });
     await page.getByRole('menuitem', { name: /delete/i }).click();
@@ -43,7 +49,10 @@ test.describe('File Operations', () => {
     await expect(page.getByText('f1')).toBeVisible();
   });
 
-  test('create new folder via toolbar', async ({ fileglancerPage: page }) => {
+  test('create new folder via toolbar', async ({
+    fileglancerPage: page,
+    freshFiles
+  }) => {
     const newFolderName = 'new_test_folder';
 
     // Click on "New Folder" button in toolbar. Wait for dialog.

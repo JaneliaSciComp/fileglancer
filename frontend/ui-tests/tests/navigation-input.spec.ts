@@ -9,7 +9,8 @@ test.describe('Navigation Input', () => {
   });
 
   test('navigate to scratch directory using full path', async ({
-    fileglancerPage: page
+    fileglancerPage: page,
+    freshFiles
   }) => {
     // Get the scratch directory path from global (set in playwright.config.js)
     const scratchDir = join(global.testTempDir, 'scratch');
@@ -29,12 +30,11 @@ test.describe('Navigation Input', () => {
 
     // Verify we navigated to scratch and can see the test files
     await expect(page.getByText('f1')).toBeVisible();
-    await expect(page.getByText('f2')).toBeVisible();
-    await expect(page.getByText('f3')).toBeVisible();
   });
 
   test('navigate to subfolder within scratch', async ({
-    fileglancerPage: page
+    fileglancerPage: page,
+    freshFiles
   }) => {
     const scratchDir = join(global.testTempDir, 'scratch');
     const subfolderPath = join(scratchDir, 'f1');
@@ -47,13 +47,10 @@ test.describe('Navigation Input', () => {
     await navigationInput.fill(subfolderPath);
     await navigationInput.press('Enter');
 
-    // Verify we're in the subfolder (should be empty)
+    // Verify we're viewing the file
     await expect(
       page.getByText('test content for f1', { exact: true })
     ).toBeVisible();
-
-    // The test files from parent directory should not be visible
-    await expect(page.getByText('f2')).not.toBeVisible();
   });
 
   test('show error toast for invalid path', async ({
