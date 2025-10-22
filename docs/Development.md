@@ -15,16 +15,16 @@ If this is your first time installing the extension in dev mode, install package
 pixi run dev-install
 ```
 
-You can build the frontend extension in watch mode - it will automatically rebuild when there are file changes to the frontend:
-
-```bash
-pixi run dev-watch
-```
-
-In new terminal, launch the server - it will automatically rebuild when there are file changes to the backend:
+Now you can launch the server. It will automatically rebuild when there are file changes to the backend.
 
 ```bash
 pixi run dev-launch
+```
+
+You can optionally also watch the frontend code in another terminal, to automatically rebuild it when there are changes:
+
+```bash
+pixi run dev-watch
 ```
 
 View the app in the browser at localhost:7878.
@@ -36,6 +36,35 @@ Copy the configuration file and edit as desired.
 ```
 cp docs/config.yaml.template config.yaml
 ```
+
+### File Share Paths
+
+By default, Fileglancer provides access to each user's home directory without requiring any configuration. The default configuration includes:
+
+```yaml
+file_share_mounts:
+  - "~/"    # User's home directory (default)
+```
+
+You can add additional file share paths by editing your `config.yaml`:
+
+```yaml
+file_share_mounts:
+  - "~/"                              # User's home directory
+  - "/groups/scicomp/data"            # Shared data directory
+  - "/opt/data"                       # Another shared directory
+```
+
+**How Home Directories Work:**
+
+- The special path `~/` is automatically expanded to each user's home directory
+- Expansion happens securely within each user's context (using `seteuid/setegid`)
+- Each user sees their own home directory when accessing the "home" file share path
+- The path name appears as "home" in the file browser
+
+**Alternative: Database Configuration**
+
+Instead of using the `file_share_mounts` setting, you can configure file share paths in the database. This is useful for production deployments where you want centralized management of file share paths. To use the paths in the database, set `file_share_mounts` to `[]`. See [fileglancer-janelia](https://github.com/JaneliaSciComp/fileglancer-janelia) for an example of populating the file share paths in the database, using a private wiki source. 
 
 ### Running with SSL/HTTPS (Secure Mode)
 

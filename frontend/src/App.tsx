@@ -1,5 +1,4 @@
 import { BrowserRouter, Route, Routes } from 'react-router';
-import { CookiesProvider } from 'react-cookie';
 import { ErrorBoundary } from 'react-error-boundary';
 
 import { AuthContextProvider, useAuthContext } from '@/contexts/AuthContext';
@@ -62,6 +61,8 @@ function getBasename() {
  */
 const AppComponent = () => {
   const basename = getBasename();
+  const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
+
   return (
     <BrowserRouter basename={basename}>
       <Routes>
@@ -76,14 +77,16 @@ const AppComponent = () => {
               }
               path="links"
             />
-            <Route
-              element={
-                <RequireAuth>
-                  <Jobs />
-                </RequireAuth>
-              }
-              path="jobs"
-            />
+            {tasksEnabled ? (
+              <Route
+                element={
+                  <RequireAuth>
+                    <Jobs />
+                  </RequireAuth>
+                }
+                path="jobs"
+              />
+            ) : null}
             <Route element={<Help />} path="help" />
             <Route
               element={
@@ -121,12 +124,10 @@ const AppComponent = () => {
 
 export default function App() {
   return (
-    <CookiesProvider>
-      <AuthContextProvider>
-        <ErrorBoundary FallbackComponent={ErrorFallback}>
-          <AppComponent />
-        </ErrorBoundary>
-      </AuthContextProvider>
-    </CookiesProvider>
+    <AuthContextProvider>
+      <ErrorBoundary FallbackComponent={ErrorFallback}>
+        <AppComponent />
+      </ErrorBoundary>
+    </AuthContextProvider>
   );
 }

@@ -2,7 +2,6 @@ import React from 'react';
 import logger from '@/logger';
 
 import { sendFetchRequest } from '@/utils';
-import { useCookiesContext } from '@/contexts/CookiesContext';
 
 type Profile = {
   username: string;
@@ -37,16 +36,11 @@ export const ProfileContextProvider = ({
   const [profile, setProfile] = React.useState<Profile | null>(null);
   const [loading, setLoading] = React.useState<boolean>(true);
   const [error, setError] = React.useState<Error | null>(null);
-  const { cookies } = useCookiesContext();
 
   React.useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const response = await sendFetchRequest(
-          '/api/profile',
-          'GET',
-          cookies['_xsrf']
-        );
+        const response = await sendFetchRequest('/api/profile', 'GET');
         if (!response.ok) {
           throw new Error('Failed to fetch profile data');
         }
@@ -61,7 +55,7 @@ export const ProfileContextProvider = ({
     };
 
     fetchProfile();
-  }, [cookies]);
+  }, []);
 
   return (
     <ProfileContext.Provider value={{ profile, loading, error }}>

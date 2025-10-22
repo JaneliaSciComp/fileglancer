@@ -2,6 +2,7 @@
 Authentication module for OKTA OAuth/OIDC integration
 """
 import os
+import hashlib
 from datetime import datetime, timedelta, UTC
 from typing import Optional
 
@@ -34,6 +35,11 @@ def setup_oauth(settings: Settings) -> OAuth:
         logger.info(f"OKTA OAuth client configured for domain: {settings.okta_domain}")
 
     return oauth
+
+
+def _hash_session_secret_key(session_secret_key: str) -> str:
+    """Hash the session secret key using SHA-256"""
+    return hashlib.sha256(session_secret_key.encode('utf-8')).hexdigest()
 
 
 def verify_id_token(id_token: str, settings: Settings) -> dict:
@@ -78,6 +84,14 @@ def get_session_from_cookie(request: Request, settings: Settings) -> Optional[db
             logger.info(f"Session expired for user {user_session.username}")
             db.delete_session(session, session_id)
             return None
+
+        # Check if session secret key has changed (if hash is stored)
+        if user_session.session_secret_key_hash:
+            current_key_hash = _hash_session_secret_key(settings.session_secret_key)
+            if user_session.session_secret_key_hash != current_key_hash:
+                logger.warning(f"Session secret key changed, revoking session for user {user_session.username}")
+                db.delete_session(session, session_id)
+                return None
 
         # Update last accessed time
         db.update_session_access_time(session, session_id)

@@ -1,4 +1,5 @@
 import secrets
+import hashlib
 from datetime import datetime, UTC
 import os
 from functools import lru_cache
@@ -11,8 +12,11 @@ from typing import Optional, Dict, List
 from loguru import logger
 from cachetools import LRUCache
 
-from .settings import get_settings
+from fileglancer.model import FileSharePath
+from fileglancer.settings import get_settings
+from fileglancer.utils import slugify_path
 
+# Constants
 SHARING_KEY_LENGTH = 12
 
 # Global flag to track if migrations have been run
@@ -127,6 +131,7 @@ class SessionDB(Base):
     email = Column(String, nullable=True)
     okta_access_token = Column(String, nullable=True)
     okta_id_token = Column(String, nullable=True)
+    session_secret_key_hash = Column(String, nullable=True)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     expires_at = Column(DateTime, nullable=False)
     last_accessed_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
@@ -190,9 +195,9 @@ def run_alembic_upgrade(db_url):
 
 def initialize_database(db_url):
     """Initialize database by running migrations. Should be called once at startup."""
-    logger.info(f"Initializing database: {make_url(db_url).render_as_string(hide_password=True)}")
+    logger.debug(f"Initializing database: {make_url(db_url).render_as_string(hide_password=True)}")
     run_alembic_upgrade(db_url)
-    logger.info("Database initialization completed")
+    logger.debug("Database initialization completed")
 
 
 def _get_engine(db_url):
@@ -254,12 +259,12 @@ def _get_engine(db_url):
     logger.info(f"Database engine created and cached for: {make_url(db_url).render_as_string(hide_password=True)}")
     return engine
 
+
 def get_db_session(db_url):
     """Create and return a database session using a cached engine"""
     engine = _get_engine(db_url)
     Session = sessionmaker(bind=engine)
     session = Session()
-
     return session
 
 
@@ -278,9 +283,88 @@ def dispose_engine(db_url=None):
         del _engine_cache[db_url]
 
 
-def get_all_paths(session):
+def get_all_paths(session, fsp_name: Optional[str] = None):
     """Get all file share paths from the database"""
-    return session.query(FileSharePathDB).all()
+    query = session.query(FileSharePathDB)
+    if fsp_name:
+        query = query.filter_by(name=fsp_name)
+    return query.all()
+
+
+def get_file_share_paths(session: Session, fsp_name: Optional[str] = None):
+    """
+    Get all file share paths from either the local configuration or the database.
+
+    This is the single source of truth for retrieving file share paths.
+    Returns a list of FileSharePath model objects (not database models).
+
+    Priority:
+    1. Check local configuration first - if paths exist in local configuration, use those
+    2. Otherwise, check the database
+
+    Args:
+        session: Database session
+        fsp_name: Optional name to filter by
+
+    Returns:
+        List of FileSharePath objects ready to be used in responses
+    """
+    settings = get_settings()
+    file_share_mounts = settings.file_share_mounts
+
+    if file_share_mounts:
+        paths = []
+        for path in file_share_mounts:
+            name = slugify_path(path)
+            paths.append(FileSharePath(
+                name=name,
+                zone='Local',
+                group='local',
+                storage = 'home' if path in ("~", "~/") else 'local',
+                mount_path=path,
+                mac_path=path,
+                windows_path=path,
+                linux_path=path,
+            ))
+        if fsp_name:
+            paths = [path for path in paths if path.name == fsp_name]
+        return paths
+    else:
+        # Use database paths
+        db_paths = get_all_paths(session, fsp_name)
+        return [FileSharePath(
+            name=path.name,
+            zone=path.zone,
+            group=path.group,
+            storage=path.storage,
+            mount_path=path.mount_path,
+            mac_path=path.mac_path,
+            windows_path=path.windows_path,
+            linux_path=path.linux_path,
+        ) for path in db_paths]
+
+
+def get_file_share_path(session: Session, name: str) -> Optional[FileSharePath]:
+    """Get a file share path by name"""
+    paths = get_file_share_paths(session, name)
+    return paths[0] if paths else None
+
+
+def get_fsp_names_to_mount_paths(session: Session) -> Dict[str, str]:
+    """
+    Get a mapping of file share path names to their mount paths.
+
+    This is a helper function that returns a dict for quick lookups.
+    Uses get_file_share_paths() as the single source of truth.
+
+    Args:
+        session: Database session
+
+    Returns:
+        Dict mapping fsp names to mount paths
+    """
+    paths = get_file_share_paths(session)
+    return {fsp.name: fsp.mount_path for fsp in paths}
 
 
 def get_external_buckets(session, fsp_name: Optional[str] = None):
@@ -400,28 +484,16 @@ def _clear_sharing_key_cache():
 
 def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
     """Validate a proxied path exists and is accessible"""
-    # First check database for file share path
-    fsp = session.query(FileSharePathDB).filter_by(name=fsp_name).first()
-    mount_path = None
-
-    if fsp:
-        mount_path = fsp.mount_path
-    else:
-        # Check if using local file_share_mounts configuration
-        settings = get_settings()
-        if settings.file_share_mounts:
-            from fileglancer.utils import slugify_path
-            # Check if fsp_name matches any slugified local path
-            for local_path in settings.file_share_mounts:
-                if slugify_path(local_path) == fsp_name:
-                    mount_path = local_path
-                    break
-
-    if not mount_path:
+    # Get mount path - check database first using existing session, then check local mounts
+    fsp = get_file_share_path(session, fsp_name)
+    if not fsp:
         raise ValueError(f"File share path {fsp_name} does not exist")
 
+    # Expand ~ to user's home directory before validation
+    expanded_mount_path = os.path.expanduser(fsp.mount_path)
+
     # Validate path exists and is accessible
-    absolute_path = os.path.join(mount_path, path.lstrip('/'))
+    absolute_path = os.path.join(expanded_mount_path, path.lstrip('/'))
     try:
         os.listdir(absolute_path)
     except FileNotFoundError:
@@ -531,12 +603,19 @@ def delete_ticket(session: Session, ticket_key: str):
     session.commit()
 
 
+def _hash_session_secret_key(session_secret_key: str) -> str:
+    """Hash the session secret key using SHA-256"""
+    return hashlib.sha256(session_secret_key.encode('utf-8')).hexdigest()
+
+
 def create_session(session: Session, username: str, email: Optional[str],
-                   expires_at: datetime, okta_access_token: Optional[str] = None,
+                   expires_at: datetime, session_secret_key: str,
+                   okta_access_token: Optional[str] = None,
                    okta_id_token: Optional[str] = None) -> SessionDB:
     """Create a new session for a user"""
     session_id = secrets.token_urlsafe(32)
     now = datetime.now(UTC)
+    session_secret_key_hash = _hash_session_secret_key(session_secret_key)
 
     user_session = SessionDB(
         session_id=session_id,
@@ -544,6 +623,7 @@ def create_session(session: Session, username: str, email: Optional[str],
         email=email,
         okta_access_token=okta_access_token,
         okta_id_token=okta_id_token,
+        session_secret_key_hash=session_secret_key_hash,
         created_at=now,
         expires_at=expires_at,
         last_accessed_at=now

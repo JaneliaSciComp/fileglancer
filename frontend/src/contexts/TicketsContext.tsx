@@ -1,5 +1,4 @@
 import React from 'react';
-import { useCookiesContext } from '@/contexts/CookiesContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { useProfileContext } from './ProfileContext';
 import { sendFetchRequest, joinPaths } from '@/utils';
@@ -53,7 +52,6 @@ export const TicketProvider = ({
   const [allTickets, setAllTickets] = React.useState<Ticket[]>([]);
   const [loadingTickets, setLoadingTickets] = React.useState<boolean>(true);
   const [ticket, setTicket] = React.useState<Ticket | null>(null);
-  const { cookies } = useCookiesContext();
   const { fileBrowserState } = useFileBrowserContext();
   const { profile } = useProfileContext();
 
@@ -62,11 +60,7 @@ export const TicketProvider = ({
   > => {
     setLoadingTickets(true);
     try {
-      const response = await sendFetchRequest(
-        '/api/ticket',
-        'GET',
-        cookies['_xsrf']
-      );
+      const response = await sendFetchRequest('/api/ticket', 'GET');
       if (response.ok) {
         const data = await response.json();
         if (data?.tickets) {
@@ -85,7 +79,7 @@ export const TicketProvider = ({
     } finally {
       setLoadingTickets(false);
     }
-  }, [cookies]);
+  }, []);
 
   const refreshTickets = async (): Promise<Result<void>> => {
     const result = await fetchAllTickets();
@@ -111,8 +105,7 @@ export const TicketProvider = ({
     try {
       const response = await sendFetchRequest(
         `/api/ticket?fsp_name=${fileBrowserState.currentFileSharePath.name}&path=${fileBrowserState.propertiesTarget.path}`,
-        'GET',
-        cookies['_xsrf']
+        'GET'
       );
 
       if (!response.ok) {
@@ -135,8 +128,7 @@ export const TicketProvider = ({
     }
   }, [
     fileBrowserState.currentFileSharePath,
-    fileBrowserState.propertiesTarget,
-    cookies
+    fileBrowserState.propertiesTarget
   ]);
 
   async function createTicket(destinationFolder: string): Promise<void> {
@@ -151,19 +143,14 @@ export const TicketProvider = ({
       fileBrowserState.propertiesTarget.path
     );
 
-    const createTicketResponse = await sendFetchRequest(
-      '/api/ticket',
-      'POST',
-      cookies['_xsrf'],
-      {
-        fsp_name: fileBrowserState.currentFileSharePath.name,
-        path: fileBrowserState.propertiesTarget.path,
-        project_key: 'FT',
-        issue_type: 'Task',
-        summary: 'Convert file to ZARR',
-        description: `Convert ${messagePath} to a ZARR file.\nDestination folder: ${destinationFolder}\nRequested by: ${profile?.username}`
-      }
-    );
+    const createTicketResponse = await sendFetchRequest('/api/ticket', 'POST', {
+      fsp_name: fileBrowserState.currentFileSharePath.name,
+      path: fileBrowserState.propertiesTarget.path,
+      project_key: 'FT',
+      issue_type: 'Task',
+      summary: 'Convert file to ZARR',
+      description: `Convert ${messagePath} to a ZARR file.\nDestination folder: ${destinationFolder}\nRequested by: ${profile?.username}`
+    });
 
     if (!createTicketResponse.ok) {
       throw await toHttpError(createTicketResponse);

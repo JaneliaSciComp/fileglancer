@@ -145,8 +145,11 @@ class Filestore:
     def __init__(self, file_share_path: FileSharePath):
         """
         Create a Filestore with the given root path.
+        Expands ~ to the current user's home directory if present.
         """
-        self.root_path = os.path.abspath(file_share_path.mount_path)
+        # Expand ~/ to the user's home directory (within user context)
+        expanded_path = os.path.expanduser(file_share_path.mount_path)
+        self.root_path = os.path.abspath(expanded_path)
 
 
     def _check_path_in_root(self, path: Optional[str]) -> str:
@@ -166,7 +169,7 @@ class Filestore:
             full_path = self.root_path
         else:
             full_path = os.path.abspath(os.path.join(self.root_path, path))
-            if not full_path.startswith(self.root_path):
+            if os.path.commonpath([full_path, self.root_path]) != self.root_path:
                 raise ValueError(f"Path ({full_path}) attempts to escape root directory ({self.root_path})")
         return full_path
 

@@ -55,11 +55,9 @@ export function createApiError(
  * Check if the server is healthy by hitting the version endpoint
  * This is a stable endpoint that should always return 200 when the server is working
  */
-export async function checkServerHealth(
-  xsrfToken: string
-): Promise<ServerStatus> {
+export async function checkServerHealth(): Promise<ServerStatus> {
   try {
-    const response = await sendFetchRequest('/api/version', 'GET', xsrfToken);
+    const response = await sendFetchRequest('/api/version', 'GET');
 
     // If we get a successful response, server connection is working
     if (response.ok) {

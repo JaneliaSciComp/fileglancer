@@ -31,19 +31,15 @@ use_access_flags: True
 
 #
 # File share mount paths to view in the UI.
-# (this setting will override atlassian_url, set below)
 #
 # file_share_mounts:
+#   - "~/"
 #   - /tmp
 
 #
-# Atlassian Cloud URL. Used for retrieving file share paths and tickets.
+# Atlassian Cloud info. Used for retrieving JIRA tickets.
 #
-#atlassian_url: https://YOURID.atlassian.net
-
-#
-# Atlassian username and API token for authenticating with JIRA
-#
+# atlassian_url: https://YOUR_ORG_ID.atlassian.net
 # atlassian_username: your_email@example.com
 # atlassian_token: your_api_token
 
@@ -51,7 +47,7 @@ use_access_flags: True
 # JIRA browse URL for constructing ticket links
 # If not specified, defaults to {atlassian_url}/browse
 #
-# jira_browse_url: https://YOURID.atlassian.net/browse
+# jira_browse_url: https://YOUR_ORG_ID.atlassian.net/browse
 
 #
 # External URL for proxied paths
@@ -70,7 +66,7 @@ sharing_key_cache_size: 1000
 # Set enable_okta_auth to true to require OKTA authentication
 # When false, the application uses the $USER environment variable
 #
-enable_okta_auth: false
+# enable_okta_auth: false
 
 #
 # OKTA domain (e.g., your-domain.okta.com)
@@ -100,10 +96,11 @@ enable_okta_auth: false
 
 #
 # Secret key for signing session cookies
-# IMPORTANT: Change this in production! Use a strong random string
+# If not set, a random key will be generated on each server start (sessions won't persist across restarts)
+# For production, set this to a strong random string to maintain sessions across restarts
 # Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
 #
-session_secret_key: change-me-in-production
+# session_secret_key: your-generated-secret-key-here
 
 #
 # Session expiry time in hours
@@ -120,5 +117,4 @@ session_cookie_name: fg_session
 # Set to false for development with self-signed certificates
 # Set to true for production with valid HTTPS certificates
 #
-session_cookie_secure: false
-
+session_cookie_secure: true

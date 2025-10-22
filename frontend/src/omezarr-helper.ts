@@ -516,15 +516,11 @@ function generateNeuroglancerStateForOmeZarr(
 
 async function getZarrArray(
   dataUrl: string,
-  zarrVersion: 2 | 3,
-  xrsfCookie: string
+  zarrVersion: 2 | 3
 ): Promise<zarr.Array<any>> {
   const store = new zarr.FetchStore(dataUrl, {
     overrides: {
-      credentials: 'include',
-      headers: {
-        'X-Xsrftoken': xrsfCookie
-      }
+      credentials: 'include'
     }
   });
   return await omezarr.getArray(store, '/', zarrVersion);
@@ -533,17 +529,11 @@ async function getZarrArray(
 /**
  * Process the given OME-Zarr array and return the metadata, thumbnail, and Neuroglancer link.
  */
-async function getOmeZarrMetadata(
-  dataUrl: string,
-  xrsfCookie: string
-): Promise<Metadata> {
+async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
   log.debug('Getting OME-Zarr metadata for', dataUrl);
   const store = new zarr.FetchStore(dataUrl, {
     overrides: {
-      credentials: 'include',
-      headers: {
-        'X-Xsrftoken': xrsfCookie
-      }
+      credentials: 'include'
     }
   });
   const { arr, shapes, multiscale, omero, scales, zarr_version } =
@@ -579,7 +569,6 @@ type ThumbnailResult = [thumbnail: string | null, errorMessage: string | null];
 
 async function getOmeZarrThumbnail(
   dataUrl: string,
-  xrsfCookie: string,
   signal: AbortSignal,
   thumbnailSize: number = 300,
   maxThumbnailSize: number = 1024,
@@ -589,9 +578,6 @@ async function getOmeZarrThumbnail(
   const store = new zarr.FetchStore(dataUrl, {
     overrides: {
       credentials: 'include',
-      headers: {
-        'X-Xsrftoken': xrsfCookie
-      },
       signal
     }
   });
