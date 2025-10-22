@@ -3,6 +3,7 @@
 Command-line interface for Fileglancer
 """
 import os
+import getpass
 import click
 import uvicorn
 import json
@@ -11,7 +12,10 @@ import threading
 import time
 import socket
 from pathlib import Path
+from datetime import datetime, timedelta, UTC
 from loguru import logger
+
+from fileglancer import database as db
 
 @click.group(epilog="Run 'fileglancer COMMAND --help' for more information on a command.")
 @click.version_option()
@@ -57,6 +61,9 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
     log_level = settings.log_level
     logger.remove()
     logger.add(lambda msg: click.echo(msg, nl=False), level=log_level, colorize=True)
+
+    # Enable CLI mode for auto-login functionality
+    settings.cli_mode = True
 
     # Set up default database location if not already configured
     if 'FGC_DB_URL' not in os.environ:
@@ -156,7 +163,23 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
     if not no_browser:
         protocol = 'https' if ssl_keyfile else 'http'
         browser_host = '127.0.0.1' if host == '0.0.0.0' else host
-        url = f"{protocol}://{browser_host}:{port}"
+
+        # Create auto-login session for the system user
+        system_username = getpass.getuser()
+        expires_at = datetime.now(UTC) + timedelta(hours=settings.session_expiry_hours)
+
+        with db.get_db_session(settings.db_url) as session:
+            user_session = db.create_session(
+                session=session,
+                username=system_username,
+                email=None,
+                expires_at=expires_at,
+                session_secret_key=settings.session_secret_key
+            )
+            session_id = user_session.session_id
+
+        # Create URL with session_id for auto-login
+        url = f"{protocol}://{browser_host}:{port}/api/auth/cli-login?session_id={session_id}"
 
         # Start browser opening in background thread
         threading.Thread(

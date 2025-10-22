@@ -339,6 +339,36 @@ def create_app(settings):
         return redirect_response
 
 
+    @app.get("/api/auth/cli-login", include_in_schema=False,
+             description="Auto-login endpoint for CLI users")
+    async def cli_login(request: Request, session_id: str):
+        """Auto-login for CLI users - sets session cookie and redirects to browse page"""
+
+        # Only allow this endpoint when running in CLI mode
+        if not settings.cli_mode:
+            raise HTTPException(status_code=404, detail="Not found")
+
+        # Verify session exists in database
+        with db.get_db_session(settings.db_url) as session:
+            user_session = db.get_session_by_id(session, session_id)
+
+            if not user_session:
+                raise HTTPException(status_code=401, detail="Invalid session")
+
+            # Access username while still in session context
+            username = user_session.username
+
+        # Create redirect response to browse page
+        redirect_response = RedirectResponse(url="/fg/browse")
+
+        # Set session cookie
+        auth.create_session_cookie(redirect_response, session_id, settings)
+
+        logger.info(f"User {username} auto-logged in via CLI")
+
+        return redirect_response
+
+
     @app.get("/api/auth/status", description="Check authentication status")
     async def auth_status(request: Request):
         """Check if user is authenticated"""
