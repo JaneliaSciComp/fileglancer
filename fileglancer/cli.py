@@ -4,6 +4,7 @@ Command-line interface for Fileglancer
 """
 import os
 import getpass
+import secrets
 import click
 import uvicorn
 import json
@@ -64,6 +65,10 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
 
     # Enable CLI mode for auto-login functionality
     settings.cli_mode = True
+
+    # Generate random session_secret_key if not configured
+    if settings.session_secret_key is None:
+        settings.session_secret_key = secrets.token_urlsafe(32)
 
     # Set up default database location if not already configured
     if 'FGC_DB_URL' not in os.environ:
