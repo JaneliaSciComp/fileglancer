@@ -165,6 +165,7 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
         logger.warning(f"Server did not become ready after {max_attempts * check_interval:.1f}s, could not open browser")
 
     # Set up browser opening if not disabled
+    cli_session_id = None
     if not no_browser:
         protocol = 'https' if ssl_keyfile else 'http'
         browser_host = '127.0.0.1' if host == '0.0.0.0' else host
@@ -181,10 +182,10 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
                 expires_at=expires_at,
                 session_secret_key=settings.session_secret_key
             )
-            session_id = user_session.session_id
+            cli_session_id = user_session.session_id
 
         # Create URL with session_id for auto-login
-        url = f"{protocol}://{browser_host}:{port}/api/auth/cli-login?session_id={session_id}"
+        url = f"{protocol}://{browser_host}:{port}/api/auth/cli-login?session_id={cli_session_id}"
 
         # Start browser opening in background thread
         threading.Thread(
@@ -198,7 +199,18 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
         logger.info(f"Starting Fileglancer server on {host}:{port}")
 
     logger.trace(f"Starting Uvicorn with args:\n{json.dumps(config_kwargs, indent=2, sort_keys=True)}")
-    uvicorn.run(**config_kwargs)
+
+    try:
+        uvicorn.run(**config_kwargs)
+    finally:
+        # Clean up CLI session when server is terminated
+        if cli_session_id:
+            try:
+                with db.get_db_session(settings.db_url) as session:
+                    db.delete_session(session, cli_session_id)
+                    logger.info(f"Cleaned up CLI auto-login session")
+            except Exception as e:
+                logger.warning(f"Failed to clean up CLI session: {e}")
 
 
 if __name__ == '__main__':
