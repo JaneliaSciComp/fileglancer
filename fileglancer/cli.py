@@ -79,6 +79,11 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
         os.environ['FGC_DB_URL'] = f'sqlite:///{db_path}'
         logger.debug(f"Setting FGC_DB_URL=sqlite:///{db_path}")
 
+    # Initialize database (run migrations) before creating session
+    # This is normally done in app.py lifespan, but we need it earlier for CLI session
+    db.initialize_database(settings.db_url)
+    logger.debug("Database initialized")
+
     # Find available port if auto_port is enabled
     if auto_port:
         import socket
