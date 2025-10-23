@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#leaned up CLI auto-login session
 """
 Command-line interface for Fileglancer
 """
@@ -161,7 +161,7 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
                     if result == 0:
                         # Server is ready, open browser
                         webbrowser.open(url)
-                        logger.info(f"Opened browser at {url}")
+                        logger.info(f"\nTo access the server, open this URL in a web browser:\n\n        {url}\n")
                         return
             except Exception:
                 pass
@@ -213,7 +213,7 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
             try:
                 with db.get_db_session(settings.db_url) as session:
                     db.delete_session(session, cli_session_id)
-                    logger.info(f"Cleaned up CLI auto-login session")
+                    logger.trace(f"Cleaned up CLI auto-login session")
             except Exception as e:
                 logger.warning(f"Failed to clean up CLI session: {e}")
 
