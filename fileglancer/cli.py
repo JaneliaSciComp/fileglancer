@@ -1,8 +1,13 @@
-#!/usr/bin/env python3
+#leaned up CLI auto-login session
 """
 Command-line interface for Fileglancer
 """
 import os
+import getpass
+import secrets
+import signal
+import sys
+import asyncio
 import click
 import uvicorn
 import json
@@ -11,7 +16,89 @@ import threading
 import time
 import socket
 from pathlib import Path
+from datetime import datetime, timedelta, UTC
 from loguru import logger
+
+from fileglancer import database as db
+
+
+def run_server_with_interrupt_handler(config, url, cleanup_callback=None):
+    """Run uvicorn server in a thread with custom interrupt handling in main thread"""
+
+    server = uvicorn.Server(config)
+    server_thread = None
+    interrupted = False
+    in_prompt = False
+
+    def run_server():
+        """Run server in thread - this disables signal handlers in the thread"""
+        # Disable signal handlers in this thread - they'll be handled in main thread
+        server.install_signal_handlers = lambda: None
+        server.run()
+
+    def handle_interrupt(signum, frame):
+        """Handle Ctrl-C with confirmation prompt"""
+        nonlocal interrupted, in_prompt
+
+        if interrupted and in_prompt:
+            # Second Ctrl-C during prompt - graceful shutdown
+            # Write newline to stderr to break out of input()
+            sys.stderr.write("\n")
+            sys.stderr.flush()
+            print("Shutting down server...")
+            if cleanup_callback:
+                cleanup_callback()
+            server.should_exit = True
+            # Raise KeyboardInterrupt to break out of input()
+            raise KeyboardInterrupt
+
+        if interrupted:
+            # Second Ctrl-C not during prompt
+            print("\nShutting down server...")
+            if cleanup_callback:
+                cleanup_callback()
+            server.should_exit = True
+            return
+
+        interrupted = True
+
+        print(f"\n\nTo access the server, open this URL in a web browser:\n\n        {url}\n")
+
+        # Prompt for confirmation
+        in_prompt = True
+        try:
+            response = input("Shut down this Fileglancer server (y/[n])? ")
+            in_prompt = False
+
+            if response.lower() in ['y', 'yes', '']:
+                print("\nShutting down server...")
+                if cleanup_callback:
+                    cleanup_callback()
+                server.should_exit = True
+            else:
+                print("Resuming server...")
+                interrupted = False
+        except (KeyboardInterrupt, EOFError):
+            # Ctrl-C during prompt or just Enter
+            in_prompt = False
+            # Only print if we haven't already printed above
+            if not server.should_exit:
+                print("\nShutting down server...")
+                if cleanup_callback:
+                    cleanup_callback()
+                server.should_exit = True
+
+    # Install signal handlers in main thread
+    signal.signal(signal.SIGINT, handle_interrupt)
+    signal.signal(signal.SIGTERM, handle_interrupt)
+
+    # Start server in background thread
+    server_thread = threading.Thread(target=run_server, daemon=False)
+    server_thread.start()
+
+    # Wait for server thread to finish
+    server_thread.join()
+
 
 @click.group(epilog="Run 'fileglancer COMMAND --help' for more information on a command.")
 @click.version_option()
@@ -58,6 +145,13 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
     logger.remove()
     logger.add(lambda msg: click.echo(msg, nl=False), level=log_level, colorize=True)
 
+    # Enable CLI mode for auto-login functionality
+    settings.cli_mode = True
+
+    # Generate random session_secret_key if not configured
+    if settings.session_secret_key is None:
+        settings.session_secret_key = secrets.token_urlsafe(32)
+
     # Set up default database location if not already configured
     if 'FGC_DB_URL' not in os.environ:
         # Create data directory in user's home
@@ -66,6 +160,11 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
         db_path = data_dir / 'fileglancer.db'
         os.environ['FGC_DB_URL'] = f'sqlite:///{db_path}'
         logger.debug(f"Setting FGC_DB_URL=sqlite:///{db_path}")
+
+    # Initialize database (run migrations) before creating session
+    # This is normally done in app.py lifespan, but we need it earlier for CLI session
+    db.initialize_database(settings.db_url)
+    logger.debug("Database initialized")
 
     # Find available port if auto_port is enabled
     if auto_port:
@@ -144,7 +243,7 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
                     if result == 0:
                         # Server is ready, open browser
                         webbrowser.open(url)
-                        logger.info(f"Opened browser at {url}")
+                        logger.info(f"\nTo access the server, open this URL in a web browser:\n\n        {url}\n")
                         return
             except Exception:
                 pass
@@ -153,10 +252,27 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
         logger.warning(f"Server did not become ready after {max_attempts * check_interval:.1f}s, could not open browser")
 
     # Set up browser opening if not disabled
+    cli_session_id = None
+    protocol = 'https' if ssl_keyfile else 'http'
+    browser_host = '127.0.0.1' if host == '0.0.0.0' else host
+
     if not no_browser:
-        protocol = 'https' if ssl_keyfile else 'http'
-        browser_host = '127.0.0.1' if host == '0.0.0.0' else host
-        url = f"{protocol}://{browser_host}:{port}"
+        # Create auto-login session for the system user
+        system_username = getpass.getuser()
+        expires_at = datetime.now(UTC) + timedelta(hours=settings.session_expiry_hours)
+
+        with db.get_db_session(settings.db_url) as session:
+            user_session = db.create_session(
+                session=session,
+                username=system_username,
+                email=None,
+                expires_at=expires_at,
+                session_secret_key=settings.session_secret_key
+            )
+            cli_session_id = user_session.session_id
+
+        # Create URL with session_id for auto-login
+        url = f"{protocol}://{browser_host}:{port}/api/auth/cli-login?session_id={cli_session_id}"
 
         # Start browser opening in background thread
         threading.Thread(
@@ -167,10 +283,29 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
 
         logger.info(f"Starting Fileglancer server on {host}:{port} (opening browser)")
     else:
+        # Create URL without session_id for display
+        url = f"{protocol}://{browser_host}:{port}"
         logger.info(f"Starting Fileglancer server on {host}:{port}")
 
     logger.trace(f"Starting Uvicorn with args:\n{json.dumps(config_kwargs, indent=2, sort_keys=True)}")
-    uvicorn.run(**config_kwargs)
+
+    def cleanup_session():
+        """Clean up CLI session when server is terminated"""
+        if cli_session_id:
+            try:
+                with db.get_db_session(settings.db_url) as session:
+                    db.delete_session(session, cli_session_id)
+                    logger.trace(f"Cleaned up CLI auto-login session")
+            except Exception as e:
+                logger.warning(f"Failed to clean up CLI session: {e}")
+
+    # Create uvicorn config and run server with custom interrupt handling
+    config = uvicorn.Config(**config_kwargs)
+
+    try:
+        run_server_with_interrupt_handler(config, url, cleanup_callback=cleanup_session)
+    finally:
+        cleanup_session()
 
 
 if __name__ == '__main__':

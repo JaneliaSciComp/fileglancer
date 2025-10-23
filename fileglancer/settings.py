@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     # Authentication toggle - if False, falls back to $USER environment variable
     enable_okta_auth: bool = False
 
+    # CLI mode - enables auto-login endpoint for standalone CLI usage
+    cli_mode: bool = False
+
     model_config = SettingsConfigDict(
         yaml_file="config.yaml",
         env_file='.env',
