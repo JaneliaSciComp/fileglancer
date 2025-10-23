@@ -33,13 +33,11 @@ pip install fileglancer
 fileglancer start
 ```
 
-This will start your personal server at `http://localhost:8000`. By default, your home directory (`~/`) will be browsable.
-
-For more configuration options and a secure production deployment see the [development docs](docs/Development.md).
+This will start your personal server locally and open a web browser with Fileglancer loaded. By default, only your home directory (`~/`) will be browsable. You can browse and view your own data this way, but links to data will only work as long as your server is running. To share data reliably with others, you will need a persistent shared deployment.
 
 ### Shared Deployments
 
-Although Fileglancer can be used as a personal server, it is intended for shared deployments on an intranet. This allows groups of users to share data easily. If you are on the internal Janelia network navigate to "fileglancer.int.janelia.org" in your web browser and login with your Okta credentials. If you are outside of Janelia, you'll need to ask your System Administrator to install Fileglancer on a server on your institution's network.
+Fileglancer is primarily intended for shared deployments on an intranet. This allows groups of users to share data easily. If you are on the internal Janelia network navigate to "fileglancer.int.janelia.org" in your web browser and login with your Okta credentials. If you are outside of Janelia, you'll need to ask your System Administrator to install Fileglancer on a server on your institution's network.
 
 ## Software Architecture
 
