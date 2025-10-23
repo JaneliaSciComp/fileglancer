@@ -169,6 +169,7 @@ def create_app(settings):
         if settings.db_admin_url:
             logger.debug(f"  db_admin_url: {mask_password(settings.db_admin_url)}")
         logger.debug(f"  use_access_flags: {settings.use_access_flags}")
+        logger.debug(f"  external_proxy_url: {settings.external_proxy_url}")
         logger.debug(f"  atlassian_url: {settings.atlassian_url}")
 
         # Initialize database (run migrations once at startup)

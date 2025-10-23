@@ -45,7 +45,6 @@ def run_server_with_interrupt_handler(config, url, cleanup_callback=None):
             # Write newline to stderr to break out of input()
             sys.stderr.write("\n")
             sys.stderr.flush()
-            print("Shutting down server...")
             if cleanup_callback:
                 cleanup_callback()
             server.should_exit = True
@@ -54,7 +53,6 @@ def run_server_with_interrupt_handler(config, url, cleanup_callback=None):
 
         if interrupted:
             # Second Ctrl-C not during prompt
-            print("\nShutting down server...")
             if cleanup_callback:
                 cleanup_callback()
             server.should_exit = True
@@ -71,7 +69,6 @@ def run_server_with_interrupt_handler(config, url, cleanup_callback=None):
             in_prompt = False
 
             if response.lower() in ['y', 'yes', '']:
-                print("\nShutting down server...")
                 if cleanup_callback:
                     cleanup_callback()
                 server.should_exit = True
@@ -83,7 +80,6 @@ def run_server_with_interrupt_handler(config, url, cleanup_callback=None):
             in_prompt = False
             # Only print if we haven't already printed above
             if not server.should_exit:
-                print("\nShutting down server...")
                 if cleanup_callback:
                     cleanup_callback()
                 server.should_exit = True
@@ -139,18 +135,11 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
     """Start the Fileglancer server using uvicorn."""
 
     # Configure loguru logger based on settings (if present)
-    from fileglancer.settings import get_settings
+    from fileglancer.settings import get_settings, reload_settings
     settings = get_settings()
     log_level = settings.log_level
     logger.remove()
     logger.add(lambda msg: click.echo(msg, nl=False), level=log_level, colorize=True)
-
-    # Enable CLI mode for auto-login functionality
-    settings.cli_mode = True
-
-    # Generate random session_secret_key if not configured
-    if settings.session_secret_key is None:
-        settings.session_secret_key = secrets.token_urlsafe(32)
 
     # Set up default database location if not already configured
     if 'FGC_DB_URL' not in os.environ:
@@ -160,11 +149,6 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
         db_path = data_dir / 'fileglancer.db'
         os.environ['FGC_DB_URL'] = f'sqlite:///{db_path}'
         logger.debug(f"Setting FGC_DB_URL=sqlite:///{db_path}")
-
-    # Initialize database (run migrations) before creating session
-    # This is normally done in app.py lifespan, but we need it earlier for CLI session
-    db.initialize_database(settings.db_url)
-    logger.debug("Database initialized")
 
     # Find available port if auto_port is enabled
     if auto_port:
@@ -217,6 +201,20 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
         # in the environment so that the session cookie is not marked as secure
         os.environ['FGC_SESSION_COOKIE_SECURE'] = 'false'
         logger.debug("No SSL keyfile provided, setting FGC_SESSION_COOKIE_SECURE=false in environment")
+
+    # Reload settings to pick up environment variables we set above
+    # This ensures the app will see the updated FGC_DB_URL, FGC_EXTERNAL_PROXY_URL, etc.
+    settings = reload_settings()
+
+    # Re-apply CLI mode and session secret key after reload
+    settings.cli_mode = True
+    if settings.session_secret_key is None:
+        settings.session_secret_key = secrets.token_urlsafe(32)
+
+    # Initialize database (run migrations) before creating session
+    # This is normally done in app.py lifespan, but we need it earlier for CLI session
+    db.initialize_database(settings.db_url)
+    logger.debug("Database initialized")
 
     if ssl_certfile:
         config_kwargs['ssl_certfile'] = ssl_certfile
