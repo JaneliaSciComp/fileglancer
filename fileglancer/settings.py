@@ -101,3 +101,10 @@ class Settings(BaseSettings):
 @cache
 def get_settings():
     return Settings()
+
+
+def reload_settings():
+    """Clear the settings cache and reload from environment/config files.
+    Useful when environment variables are set after initial settings load."""
+    get_settings.cache_clear()
+    return get_settings()
