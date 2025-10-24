@@ -1,6 +1,6 @@
 # Fileglancer
 
-[![Github Actions Status](https://github.com/JaneliaSciComp/fileglancer/workflows/Build/badge.svg)](https://github.com/JaneliaSciComp/fileglancer/actions/workflows/build.yml)
+![Github Actions Status](https://github.com/JaneliaSciComp/fileglancer/actions/workflows/build.yml/badge.svg?branch%3Amain)
 [![DOI](https://zenodo.org/badge/918344432.svg)](https://doi.org/10.5281/zenodo.17314767)
 
 Fileglancer is an intranet web application designed to allow researchers to easily browse, share, and manage large scientific imaging data using [OME-NGFF](https://github.com/ome/ngff) (i.e. OME-Zarr). Our goal is to reduce the friction experienced by users who want to easily share their data with colleagues at their institution. Simply browse to your data, click on the Neuroglancer link, and send that link to your collaborator.
@@ -19,9 +19,25 @@ See the [documentation](https://janeliascicomp.github.io/fileglancer-docs/) for 
 <img alt="Fileglancer screenshot" width="800" src="https://github.com/user-attachments/assets/e17079a6-66ca-4064-8568-7770c5af33d5" />
 </p>
 
-## Deployment @ Janelia Research Campus
+## Installation
 
-If you are on the internal Janelia network navigate to "fileglancer.int.janelia.org" in your web browser and login with your Okta credentials. If you are outside of Janelia, you'll need to ask your System Administrator to install Fileglancer on a server on your institution's network.
+### Personal Deployment
+
+Fileglancer can be run in a manner similar to Jupyter notebooks, by starting a web server from the command-line:
+
+```bash
+# Install from PyPI
+pip install fileglancer
+
+# Start the server
+fileglancer start
+```
+
+This will start your personal server locally and open a web browser with Fileglancer loaded. By default, only your home directory (`~/`) will be browsable. You can browse and view your own data this way, but links to data will only work as long as your server is running. To share data reliably with others, you will need a persistent shared deployment.
+
+### Shared Deployments
+
+Fileglancer is primarily intended for shared deployments on an intranet. This allows groups of users to share data easily. If you are on the internal Janelia network navigate to "fileglancer.int.janelia.org" in your web browser and login with your Okta credentials. If you are outside of Janelia, you'll need to ask your System Administrator to install Fileglancer on a server on your institution's network.
 
 ## Software Architecture
 

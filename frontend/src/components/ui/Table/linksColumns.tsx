@@ -112,7 +112,11 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
   };
 
   return (
-    <div className="min-w-0 flex" key={`action-${item.sharing_key}`}>
+    <div
+      className="min-w-0 flex"
+      data-testid="data-link-actions-cell"
+      key={`action-${item.sharing_key}`}
+    >
       <div onClick={e => e.stopPropagation()}>
         <DataLinksActionsMenu<ProxiedPathRowActionProps>
           actionProps={actionProps}

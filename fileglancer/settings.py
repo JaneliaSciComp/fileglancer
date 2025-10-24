@@ -17,7 +17,7 @@ class Settings(BaseSettings):
         be passed in the environment or in a .env file. 
     """
 
-    log_level: str = 'DEBUG'
+    log_level: str = 'INFO'
     db_url: str = 'sqlite:///fileglancer.db'
     db_admin_url: Optional[str] = None
 
@@ -36,9 +36,10 @@ class Settings(BaseSettings):
     # The URL of JIRA's /browse/ API endpoint which can be used to construct a link to a ticket
     jira_browse_url: Optional[HttpUrl] = None
 
-    # If confluence settings are not provided, use a static list of paths to mount as file shares
-    # This can specify the home directory using a ~/ prefix.
-    file_share_mounts: List[str] = []
+    # By default, use a static list of paths to mount as file shares. 
+    # To use file share paths from the database, set this to an empty list.
+    # You can specify the home directory using a ~/ prefix (will be expanded per-user).
+    file_share_mounts: List[str] = ["~/"]
     
     # The external URL of the proxy server for accessing proxied paths.
     # Maps to the /files/ end points of the fileglancer-central app.
@@ -61,6 +62,9 @@ class Settings(BaseSettings):
 
     # Authentication toggle - if False, falls back to $USER environment variable
     enable_okta_auth: bool = False
+
+    # CLI mode - enables auto-login endpoint for standalone CLI usage
+    cli_mode: bool = False
 
     model_config = SettingsConfigDict(
         yaml_file="config.yaml",
@@ -97,3 +101,10 @@ class Settings(BaseSettings):
 @cache
 def get_settings():
     return Settings()
+
+
+def reload_settings():
+    """Clear the settings cache and reload from environment/config files.
+    Useful when environment variables are set after initial settings load."""
+    get_settings.cache_clear()
+    return get_settings()

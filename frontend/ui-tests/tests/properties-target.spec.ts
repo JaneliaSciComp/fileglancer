@@ -14,9 +14,9 @@ test.describe('Properties Panel Navigation', () => {
   }) => {
     await expect(page.getByText('zarr_v3_ome.zarr')).toBeVisible();
     // Verify properties panel is visible
-    const propertiesPanel = page.locator('[role="complementary"]').filter({
-      has: page.getByText('Properties')
-    });
+    const propertiesPanel = page
+      .locator('[role="complementary"]')
+      .filter({ hasText: 'Properties' });
     await expect(propertiesPanel).toBeVisible();
 
     // Click on the zarr_v3_ome.zarr row (but not the link) to populate properties panel
