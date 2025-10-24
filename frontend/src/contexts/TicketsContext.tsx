@@ -1,9 +1,13 @@
 import React from 'react';
+
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { useProfileContext } from './ProfileContext';
-import { sendFetchRequest, joinPaths } from '@/utils';
-import type { Result } from '@/shared.types';
-import { createSuccess, handleError, toHttpError } from '@/utils/errorHandling';
+import { joinPaths } from '@/utils';
+import {
+  useAllTicketsQuery,
+  useTicketByPathQuery,
+  useCreateTicketMutation
+} from '@/queries/ticketsQueries';
 
 export type Ticket = {
   username: string;
@@ -20,19 +24,12 @@ export type Ticket = {
 };
 
 type TicketContextType = {
-  ticket: Ticket | null;
-  allTickets?: Ticket[];
-  loadingTickets?: boolean;
+  allTicketsQuery: ReturnType<typeof useAllTicketsQuery>;
+  ticketByPathQuery: ReturnType<typeof useTicketByPathQuery>;
+  createTicketMutation: ReturnType<typeof useCreateTicketMutation>;
   createTicket: (destination: string) => Promise<void>;
-  fetchAllTickets: () => Promise<Result<Ticket[] | null>>;
-  refreshTickets: () => Promise<Result<void>>;
+  tasksEnabled: boolean;
 };
-
-function sortTicketsByDate(tickets: Ticket[]): Ticket[] {
-  return tickets.sort(
-    (a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
-  );
-}
 
 const TicketContext = React.createContext<TicketContextType | null>(null);
 
@@ -49,96 +46,29 @@ export const TicketProvider = ({
 }: {
   readonly children: React.ReactNode;
 }) => {
-  const [allTickets, setAllTickets] = React.useState<Ticket[]>([]);
-  const [loadingTickets, setLoadingTickets] = React.useState<boolean>(true);
-  const [ticket, setTicket] = React.useState<Ticket | null>(null);
   const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const { profile } = useProfileContext();
 
-  const fetchAllTickets = React.useCallback(async (): Promise<
-    Result<Ticket[] | null>
-  > => {
-    setLoadingTickets(true);
-    try {
-      const response = await sendFetchRequest('/api/ticket', 'GET');
-      if (response.ok) {
-        const data = await response.json();
-        if (data?.tickets) {
-          return createSuccess(sortTicketsByDate(data.tickets) as Ticket[]);
-        }
-        // Not an error, just no tickets available
-        return createSuccess(null);
-      } else if (response.status === 404) {
-        // This is not an error, just no tickets available
-        return createSuccess(null);
-      } else {
-        throw await toHttpError(response);
-      }
-    } catch (error) {
-      return handleError(error);
-    } finally {
-      setLoadingTickets(false);
-    }
-  }, []);
+  const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
 
-  const refreshTickets = async (): Promise<Result<void>> => {
-    const result = await fetchAllTickets();
-    if (result.success) {
-      setAllTickets(result.data || []);
-      return createSuccess(undefined);
-    } else {
-      return handleError(result.error);
-    }
-  };
+  // Initialize all queries and mutations (only enabled if tasksEnabled)
+  const allTicketsQuery = useAllTicketsQuery(tasksEnabled);
+  const ticketByPathQuery = useTicketByPathQuery(
+    fileBrowserState.uiFileSharePath?.name,
+    fileBrowserState.propertiesTarget?.path,
+    tasksEnabled && !fileQuery.isPending
+  );
+  const createTicketMutation = useCreateTicketMutation();
 
-  const fetchTicket = React.useCallback(async (): Promise<
-    Result<Ticket | void>
-  > => {
-    if (fileQuery.isPending) {
-      // Not an error, just the state before the file browser is ready
-      return createSuccess(undefined);
+  // Helper function for creating tickets with validation
+  const createTicket = async (destinationFolder: string): Promise<void> => {
+    if (!tasksEnabled) {
+      throw new Error('Task functionality is disabled.');
     }
-    if (!fileBrowserState.uiFileSharePath) {
-      return handleError(new Error('No file share path selected'));
-    }
-    if (!fileBrowserState.propertiesTarget) {
-      return handleError(new Error('No properties target selected'));
-    }
-
-    try {
-      const response = await sendFetchRequest(
-        `/api/ticket?fsp_name=${fileBrowserState.uiFileSharePath.name}&path=${fileBrowserState.propertiesTarget.path}`,
-        'GET'
-      );
-
-      if (!response.ok) {
-        throw await toHttpError(response);
-      } else {
-        if (response.status === 404) {
-          // This is not an error, just no ticket available
-          return createSuccess(undefined);
-        } else {
-          const data = (await response.json()) as any;
-          if (data?.tickets) {
-            return createSuccess(data.tickets[0] as Ticket);
-          } else {
-            return createSuccess(undefined);
-          }
-        }
-      }
-    } catch (error) {
-      return handleError(error);
-    }
-  }, [
-    fileQuery,
-    fileBrowserState.propertiesTarget,
-    fileBrowserState.uiFileSharePath
-  ]);
-
-  async function createTicket(destinationFolder: string): Promise<void> {
     if (!fileBrowserState.uiFileSharePath) {
       throw new Error('No file share path selected');
-    } else if (!fileBrowserState.propertiesTarget) {
+    }
+    if (!fileBrowserState.propertiesTarget) {
       throw new Error('No properties target selected');
     }
 
@@ -147,7 +77,7 @@ export const TicketProvider = ({
       fileBrowserState.propertiesTarget.path
     );
 
-    const createTicketResponse = await sendFetchRequest('/api/ticket', 'POST', {
+    await createTicketMutation.mutateAsync({
       fsp_name: fileBrowserState.uiFileSharePath.name,
       path: fileBrowserState.propertiesTarget.path,
       project_key: 'FT',
@@ -155,48 +85,18 @@ export const TicketProvider = ({
       summary: 'Convert file to ZARR',
       description: `Convert ${messagePath} to a ZARR file.\nDestination folder: ${destinationFolder}\nRequested by: ${profile?.username}`
     });
+  };
 
-    if (!createTicketResponse.ok) {
-      throw await toHttpError(createTicketResponse);
-    }
-
-    const ticketData = await createTicketResponse.json();
-    setTicket(ticketData);
-  }
-
-  React.useEffect(() => {
-    (async function () {
-      const result = await fetchAllTickets();
-      if (result.success) {
-        setAllTickets(result.data || []);
-      }
-    })();
-  }, [fetchAllTickets]);
-
-  React.useEffect(() => {
-    (async function () {
-      const result = await fetchTicket();
-      if (result.success && result.data) {
-        setTicket(result.data);
-      } else {
-        setTicket(null);
-      }
-    })();
-  }, [fetchTicket]);
+  const value: TicketContextType = {
+    allTicketsQuery,
+    ticketByPathQuery,
+    createTicketMutation,
+    createTicket,
+    tasksEnabled
+  };
 
   return (
-    <TicketContext.Provider
-      value={{
-        ticket,
-        allTickets,
-        loadingTickets,
-        createTicket,
-        fetchAllTickets,
-        refreshTickets
-      }}
-    >
-      {children}
-    </TicketContext.Provider>
+    <TicketContext.Provider value={value}>{children}</TicketContext.Provider>
   );
 };
 

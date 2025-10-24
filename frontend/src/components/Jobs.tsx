@@ -5,7 +5,7 @@ import { TableCard } from './ui/Table/TableCard';
 import { jobsColumns } from './ui/Table/jobsColumns';
 
 export default function Jobs() {
-  const { allTickets, loadingTickets } = useTicketContext();
+  const { allTicketsQuery } = useTicketContext();
   return (
     <>
       <Typography className="mb-6 text-foreground font-bold" type="h5">
@@ -19,10 +19,10 @@ export default function Jobs() {
       </Typography>
       <TableCard
         columns={jobsColumns}
-        data={allTickets || []}
+        data={allTicketsQuery.data || []}
         emptyText="You have not made any conversion requests."
         gridColsClass="grid-cols-[2fr_3fr_1fr_1fr]"
-        loadingState={loadingTickets}
+        loadingState={allTicketsQuery.isPending}
       />
     </>
   );
