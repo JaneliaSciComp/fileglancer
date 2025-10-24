@@ -11,12 +11,11 @@ import type { FileSharePath } from '@/shared.types';
 
 export default function RecentlyViewedCard() {
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
-  const { recentlyViewedFolders, loadingRecentlyViewedFolders } =
-    usePreferencesContext();
+  const { recentlyViewedFolders, preferenceQuery } = usePreferencesContext();
 
   return (
     <DashboardCard title="Recently viewed">
-      {loadingRecentlyViewedFolders || zonesAndFspQuery.isPending ? (
+      {preferenceQuery.isPending || zonesAndFspQuery.isPending ? (
         Array(5)
           .fill(0)
           .map((_, index) => (
