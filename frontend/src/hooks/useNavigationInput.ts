@@ -50,7 +50,7 @@ export default function useNavigationInput(initialValue: string = '') {
         subpath: string;
       } | null = null;
 
-      const keys = Object.keys(zonesAndFspQuery);
+      const keys = Object.keys(zonesAndFspQuery.data);
       for (const key of keys) {
         // Iterate through only the objects in zonesAndFileSharePathsMap that have a key that start with "fsp_"
         if (key.startsWith('fsp_')) {

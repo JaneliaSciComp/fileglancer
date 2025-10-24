@@ -22,12 +22,11 @@ import {
 import { copyToClipboard } from '@/utils/copyText';
 
 export default function Crumbs(): ReactNode {
-  const { fileQuery } = useFileBrowserContext();
+  const { filePath, fileQuery, fileBrowserState } = useFileBrowserContext();
   const { pathPreference } = usePreferencesContext();
 
-  const currentFileSharePath = fileQuery.data?.currentFileSharePath;
-  const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
-  const dirArray = makePathSegmentArray(currentFileOrFolder?.path || '');
+  const currentFileSharePath = fileBrowserState.uiFileSharePath;
+  const dirArray = makePathSegmentArray(filePath || '');
 
   // Add the current file share path name as the first segment in the array
   if (currentFileSharePath) {
@@ -41,7 +40,7 @@ export default function Crumbs(): ReactNode {
   const fullPath = getPreferredPathForDisplay(
     pathPreference,
     currentFileSharePath,
-    currentFileOrFolder?.path
+    filePath
   );
 
   return (
@@ -56,8 +55,8 @@ export default function Crumbs(): ReactNode {
         {dirArray.map((pathSegment, index) => {
           if (currentFileSharePath) {
             const isFile =
-              currentFileOrFolder &&
-              !currentFileOrFolder.is_dir &&
+              fileQuery.data?.currentFileOrFolder &&
+              !fileQuery.data.currentFileOrFolder.is_dir &&
               index === dirDepth - 1;
 
             if (index < dirDepth - 1) {

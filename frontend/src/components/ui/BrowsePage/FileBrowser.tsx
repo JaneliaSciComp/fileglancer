@@ -33,7 +33,7 @@ export default function FileBrowser({
   setShowPermissionsDialog,
   setShowConvertFileDialog
 }: FileBrowserProps): React.ReactNode {
-  const { fileBrowserState, fileQuery } = useFileBrowserContext();
+  const { fileQuery } = useFileBrowserContext();
   const { displayFiles } = useHideDotFiles();
 
   const {

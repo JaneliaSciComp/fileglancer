@@ -51,7 +51,7 @@ export default function ContextMenu({
   setShowPermissionsDialog,
   setShowConvertFileDialog
 }: ContextMenuProps): React.ReactNode {
-  const { fileQuery, fileBrowserState } = useFileBrowserContext();
+  const { fileBrowserState } = useFileBrowserContext();
   const { folderPreferenceMap, handleContextMenuFavorite } =
     usePreferencesContext();
   const { handleDownload } = useHandleDownload();
@@ -61,12 +61,13 @@ export default function ContextMenu({
   }
 
   const isFavorite: boolean = Boolean(
-    folderPreferenceMap[
-      makeMapKey(
-        'folder',
-        `${fileQuery.data.currentFileSharePath.name}_${fileBrowserState.propertiesTarget.path}`
-      )
-    ]
+    fileBrowserState.uiFileSharePath &&
+      folderPreferenceMap[
+        makeMapKey(
+          'folder',
+          `${fileBrowserState.uiFileSharePath.name}_${fileBrowserState.propertiesTarget.path}`
+        )
+      ]
   );
 
   const menuItems: MenuItem<ContextMenuActionProps>[] = [

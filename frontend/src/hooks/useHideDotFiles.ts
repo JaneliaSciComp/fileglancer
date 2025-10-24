@@ -8,6 +8,9 @@ export default function useHideDotFiles() {
   const { fileQuery } = useFileBrowserContext();
 
   const displayFiles = React.useMemo(() => {
+    if (!fileQuery.data?.files) {
+      return [];
+    }
     return hideDotFiles
       ? fileQuery.data.files.filter(
           (file: FileOrFolder) => !file.name.startsWith('.')

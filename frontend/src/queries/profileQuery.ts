@@ -6,7 +6,7 @@ import type { Profile } from '@/shared.types';
 export const useProfileQuery = () => {
   const fetchProfile = async (): Promise<Profile> => {
     const response = await sendFetchRequest('/api/profile', 'GET');
-    return response.json();
+    return await response.json();
   };
 
   return useQuery<Profile, Error>({

@@ -38,14 +38,14 @@ export const ExternalBucketProvider = ({
   const [externalDataUrl, setExternalDataUrl] = React.useState<string | null>(
     null
   );
-  const { fileQuery } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
 
   const updateExternalBucket = React.useCallback(
     (bucket: ExternalBucket | null) => {
       setExternalBucket(bucket);
 
-      if (bucket) {
-        if (!fileQuery.data.currentFileSharePath) {
+      if (bucket && fileQuery.data) {
+        if (!fileBrowserState.uiFileSharePath) {
           throw new Error('No file share path selected');
         }
         if (!fileQuery.data.currentFileOrFolder) {
@@ -53,7 +53,7 @@ export const ExternalBucketProvider = ({
         }
         // Check if current path is an ancestor of the bucket path
         if (
-          fileQuery.data.currentFileSharePath.name === bucket.fsp_name &&
+          fileBrowserState.uiFileSharePath.name === bucket.fsp_name &&
           fileQuery.data.currentFileOrFolder.path.startsWith(
             bucket.relative_path
           )
@@ -77,21 +77,21 @@ export const ExternalBucketProvider = ({
         setExternalDataUrl(null);
       }
     },
-    [fileQuery]
+    [fileQuery, fileBrowserState.uiFileSharePath]
   );
 
   const fetchExternalBucket = React.useCallback(async () => {
     if (
       fileQuery.isPending ||
       !fileQuery.data ||
-      !fileQuery.data.currentFileSharePath
+      !fileBrowserState.uiFileSharePath
     ) {
       log.trace('No current file share path selected');
       return null;
     }
     try {
       const response = await sendFetchRequest(
-        `/api/external-buckets/${fileQuery.data.currentFileSharePath.name}`,
+        `/api/external-buckets/${fileBrowserState.uiFileSharePath.name}`,
         'GET'
       );
       if (!response.ok) {
@@ -115,7 +115,7 @@ export const ExternalBucketProvider = ({
       log.error('Error fetching external bucket:', error);
     }
     return null;
-  }, [fileQuery]);
+  }, [fileQuery, fileBrowserState.uiFileSharePath]);
 
   React.useEffect(() => {
     (async function () {

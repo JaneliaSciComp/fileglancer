@@ -2,7 +2,7 @@ import React from 'react';
 import logger from '@/logger';
 
 import type { Profile } from '@/shared.types';
-import { useProfileQuery } from '@/queries/useProfileQuery';
+import { useProfileQuery } from '@/queries/profileQuery';
 
 type ProfileContextType = {
   profile: Profile | undefined;

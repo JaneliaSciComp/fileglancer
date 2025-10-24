@@ -49,7 +49,7 @@ export default function useZarrMetadata() {
   const neuroglancerBaseUrl = 'https://neuroglancer-demo.appspot.com/#!';
   const voleBaseUrl = 'https://volumeviewer.allencell.org/viewer?url=';
   const avivatorBaseUrl = 'https://janeliascicomp.github.io/viv/?image_url=';
-  const { fileQuery } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const { dataUrl } = useProxiedPathContext();
   const { externalDataUrl } = useExternalBucketContext();
   const {
@@ -126,16 +126,19 @@ export default function useZarrMetadata() {
 
   const getFile = React.useCallback(
     (fileName: string) => {
+      if (!fileQuery.data?.files) {
+        return undefined;
+      }
       return fileQuery.data.files.find(
         (file: FileOrFolder) => file.name === fileName
       );
     },
-    [fileQuery.data.files]
+    [fileQuery.data?.files]
   );
 
   const checkZarrMetadata = React.useCallback(
     async (signal: AbortSignal) => {
-      if (fileQuery.isPending) {
+      if (fileQuery.isPending || !fileQuery.data) {
         return;
       }
 
@@ -149,18 +152,18 @@ export default function useZarrMetadata() {
       notifiedPathRef.current = null;
 
       if (
-        fileQuery.data.currentFileSharePath &&
+        fileBrowserState.uiFileSharePath &&
         fileQuery.data.currentFileOrFolder
       ) {
         const imageUrl = getFileURL(
-          fileQuery.data.currentFileSharePath.name,
+          fileBrowserState.uiFileSharePath.name,
           fileQuery.data.currentFileOrFolder.path
         );
 
         const zarrJsonFile = getFile('zarr.json');
         if (zarrJsonFile) {
           const attrs = (await fetchFileAsJson(
-            fileQuery.data.currentFileSharePath.name,
+            fileBrowserState.uiFileSharePath.name,
             zarrJsonFile.path
           )) as any;
           if (signal.aborted) {
@@ -183,9 +186,9 @@ export default function useZarrMetadata() {
             await checkZarrArray(imageUrl, 2, signal);
           } else {
             const zattrsFile = getFile('.zattrs');
-            if (zattrsFile) {
+            if (zattrsFile && fileBrowserState.uiFileSharePath) {
               const attrs = (await fetchFileAsJson(
-                fileQuery.data.currentFileSharePath.name,
+                fileBrowserState.uiFileSharePath.name,
                 zattrsFile.path
               )) as any;
               if (signal.aborted) {
@@ -203,8 +206,8 @@ export default function useZarrMetadata() {
       checkOmeZarrMetadata,
       checkZarrArray,
       fileQuery.isPending,
-      fileQuery.data.currentFileSharePath,
-      fileQuery.data.currentFileOrFolder,
+      fileQuery.data,
+      fileBrowserState.uiFileSharePath,
       getFile
     ]
   );
@@ -216,7 +219,7 @@ export default function useZarrMetadata() {
     return () => {
       controller.abort();
     };
-  }, [checkZarrMetadata]);
+  }, [checkZarrMetadata, fileQuery.isPending, fileQuery.data]);
 
   // When an OME-Zarr URL is set, load the thumbnail
   React.useEffect(() => {

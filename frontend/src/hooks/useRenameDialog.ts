@@ -14,7 +14,7 @@ export default function useRenameDialog() {
   const [newName, setNewName] = React.useState<string>('');
 
   const { fileBrowserState, refreshFiles } = useFileBrowserContext();
-  const { currentFileSharePath } = fileBrowserState;
+  const currentFileSharePath = fileBrowserState.uiFileSharePath;
 
   async function handleRenameSubmit(path: string): Promise<Result<void>> {
     if (!currentFileSharePath) {

@@ -483,12 +483,12 @@ export const PreferencesProvider = ({
   );
 
   const handleContextMenuFavorite = async (): Promise<Result<boolean>> => {
-    if (fileQuery.data.currentFileSharePath) {
+    if (fileBrowserState.uiFileSharePath) {
       return await handleFavoriteChange(
         {
           type: 'folder',
           folderPath: fileBrowserState.selectedFiles[0].path,
-          fsp: fileQuery.data.currentFileSharePath
+          fsp: fileBrowserState.uiFileSharePath
         },
         'folder'
       );
@@ -666,7 +666,7 @@ export const PreferencesProvider = ({
     if (
       fileQuery.isPending ||
       !fileQuery.data ||
-      !fileQuery.data.currentFileSharePath ||
+      !fileBrowserState.uiFileSharePath ||
       !fileQuery.data.currentFileOrFolder
     ) {
       return;
@@ -676,7 +676,7 @@ export const PreferencesProvider = ({
       return;
     }
 
-    const fspName = fileQuery.data.currentFileSharePath.name;
+    const fspName = fileBrowserState.uiFileSharePath.name;
     const folderPath = fileQuery.data.currentFileOrFolder.path;
 
     // Skip if this is the same folder we just processed
@@ -727,7 +727,8 @@ export const PreferencesProvider = ({
     recentlyViewedFolders,
     savePreferencesToBackend,
     loadingRecentlyViewedFolders,
-    fileQuery
+    fileQuery,
+    fileBrowserState.uiFileSharePath
   ]);
 
   return (

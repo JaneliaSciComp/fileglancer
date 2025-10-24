@@ -136,7 +136,7 @@ function BtnContainer({
 export default function DataLinkDialog(
   props: DataLinkDialogProps
 ): React.JSX.Element {
-  const { fileQuery } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const { pathPreference, areDataLinksAutomatic } = usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const [localAreDataLinksAutomatic] = React.useState(areDataLinksAutomatic);
@@ -145,8 +145,8 @@ export default function DataLinkDialog(
     const fspKey =
       props.action === 'delete'
         ? makeMapKey('fsp', props.proxiedPath.fsp_name)
-        : fileQuery.data.currentFileSharePath
-          ? makeMapKey('fsp', fileQuery.data.currentFileSharePath.name)
+        : fileBrowserState.uiFileSharePath
+          ? makeMapKey('fsp', fileBrowserState.uiFileSharePath.name)
           : '';
 
     const pathFsp =
@@ -156,7 +156,7 @@ export default function DataLinkDialog(
     const targetPath =
       props.action === 'delete'
         ? props.proxiedPath.path
-        : fileQuery.data.currentFileOrFolder
+        : fileQuery.data?.currentFileOrFolder
           ? fileQuery.data.currentFileOrFolder.path
           : '';
 

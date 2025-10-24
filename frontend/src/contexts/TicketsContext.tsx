@@ -98,7 +98,7 @@ export const TicketProvider = ({
       // Not an error, just the state before the file browser is ready
       return createSuccess(undefined);
     }
-    if (!fileQuery.data?.currentFileSharePath) {
+    if (!fileBrowserState.uiFileSharePath) {
       return handleError(new Error('No file share path selected'));
     }
     if (!fileBrowserState.propertiesTarget) {
@@ -107,7 +107,7 @@ export const TicketProvider = ({
 
     try {
       const response = await sendFetchRequest(
-        `/api/ticket?fsp_name=${fileQuery.data.currentFileSharePath.name}&path=${fileBrowserState.propertiesTarget.path}`,
+        `/api/ticket?fsp_name=${fileBrowserState.uiFileSharePath.name}&path=${fileBrowserState.propertiesTarget.path}`,
         'GET'
       );
 
@@ -129,22 +129,26 @@ export const TicketProvider = ({
     } catch (error) {
       return handleError(error);
     }
-  }, [fileQuery, fileBrowserState.propertiesTarget]);
+  }, [
+    fileQuery,
+    fileBrowserState.propertiesTarget,
+    fileBrowserState.uiFileSharePath
+  ]);
 
   async function createTicket(destinationFolder: string): Promise<void> {
-    if (!fileQuery.data.currentFileSharePath) {
+    if (!fileBrowserState.uiFileSharePath) {
       throw new Error('No file share path selected');
     } else if (!fileBrowserState.propertiesTarget) {
       throw new Error('No properties target selected');
     }
 
     const messagePath = joinPaths(
-      fileQuery.data.currentFileSharePath.mount_path,
+      fileBrowserState.uiFileSharePath.mount_path,
       fileBrowserState.propertiesTarget.path
     );
 
     const createTicketResponse = await sendFetchRequest('/api/ticket', 'POST', {
-      fsp_name: fileQuery.data.currentFileSharePath.name,
+      fsp_name: fileBrowserState.uiFileSharePath.name,
       path: fileBrowserState.propertiesTarget.path,
       project_key: 'FT',
       issue_type: 'Task',

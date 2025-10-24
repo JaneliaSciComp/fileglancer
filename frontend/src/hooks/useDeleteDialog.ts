@@ -4,17 +4,17 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { handleError, createSuccess, toHttpError } from '@/utils/errorHandling';
 
 export default function useDeleteDialog() {
-  const { fileQuery, refreshFiles } = useFileBrowserContext();
+  const { fileBrowserState, refreshFiles } = useFileBrowserContext();
 
   async function handleDelete(targetItem: FileOrFolder): Promise<Result<void>> {
-    if (!fileQuery.data.currentFileSharePath) {
+    if (!fileBrowserState.uiFileSharePath) {
       return handleError(
         new Error('Current file share path not set; cannot delete item')
       );
     }
 
     const fetchPath = getFileBrowsePath(
-      fileQuery.data.currentFileSharePath.name,
+      fileBrowserState.uiFileSharePath.name,
       targetItem.path
     );
 

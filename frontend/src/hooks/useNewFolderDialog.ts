@@ -8,17 +8,18 @@ import type { Result } from '@/shared.types';
 export default function useNewFolderDialog() {
   const [newName, setNewName] = React.useState<string>('');
 
-  const { fileBrowserState, refreshFiles } = useFileBrowserContext();
-  const { currentFileOrFolder, currentFileSharePath } = fileBrowserState;
+  const { fileBrowserState, refreshFiles, fileQuery } = useFileBrowserContext();
+  const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
+  const currentFileSharePath = fileBrowserState.uiFileSharePath;
 
   const isDuplicateName = React.useMemo(() => {
     if (!newName.trim()) {
       return false;
     }
-    return fileBrowserState.files.some(
+    return fileQuery.data?.files.some(
       file => file.name.toLowerCase() === newName.trim().toLowerCase()
     );
-  }, [newName, fileBrowserState.files]);
+  }, [newName, fileQuery.data?.files]);
 
   async function handleNewFolderSubmit(): Promise<Result<void>> {
     if (!currentFileSharePath) {

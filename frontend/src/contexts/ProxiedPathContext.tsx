@@ -62,7 +62,7 @@ export const ProxiedPathProvider = ({
     null
   );
   const [dataUrl, setDataUrl] = React.useState<string | null>(null);
-  const { fileQuery } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
 
   const updateProxiedPath = React.useCallback(
     (proxiedPath: ProxiedPath | null) => {
@@ -115,14 +115,14 @@ export const ProxiedPathProvider = ({
   > => {
     if (fileQuery.isPending) {
       return createSuccess(undefined);
-    } else if (!fileQuery.data?.currentFileSharePath) {
+    } else if (!fileBrowserState.uiFileSharePath) {
       return handleError(new Error('No file share path selected'));
     } else if (!fileQuery.data?.currentFileOrFolder) {
       return handleError(new Error('No file or folder selected'));
     }
     try {
       const response = await sendFetchRequest(
-        `/api/proxied-path?fsp_name=${fileQuery.data.currentFileSharePath.name}&path=${fileQuery.data.currentFileOrFolder.path}`,
+        `/api/proxied-path?fsp_name=${fileBrowserState.uiFileSharePath.name}&path=${fileQuery.data.currentFileOrFolder.path}`,
         'GET'
       );
       if (!response.ok && response.status !== 404) {
@@ -140,19 +140,19 @@ export const ProxiedPathProvider = ({
     } catch (error) {
       return handleError(error);
     }
-  }, [fileQuery]);
+  }, [fileQuery, fileBrowserState.uiFileSharePath]);
 
   const createProxiedPath = React.useCallback(async (): Promise<
     Result<ProxiedPath | void>
   > => {
-    if (!fileQuery.data.currentFileSharePath) {
+    if (!fileBrowserState.uiFileSharePath) {
       return handleError(new Error('No file share path selected'));
-    } else if (!fileQuery.data.currentFileOrFolder) {
+    } else if (!fileQuery.data?.currentFileOrFolder) {
       return handleError(new Error('No folder selected'));
     }
 
     try {
-      const fspName = fileQuery.data.currentFileSharePath.name;
+      const fspName = fileBrowserState.uiFileSharePath.name;
       const pathValue = fileQuery.data.currentFileOrFolder.path;
       const response = await sendFetchRequest(
         `/api/proxied-path?fsp_name=${encodeURIComponent(fspName)}&path=${encodeURIComponent(pathValue)}`,
@@ -169,7 +169,7 @@ export const ProxiedPathProvider = ({
     } catch (error) {
       return handleError(error);
     }
-  }, [fileQuery, updateProxiedPath]);
+  }, [fileQuery, updateProxiedPath, fileBrowserState.uiFileSharePath]);
 
   const deleteProxiedPath = React.useCallback(
     async (proxiedPath: ProxiedPath): Promise<Result<void>> => {

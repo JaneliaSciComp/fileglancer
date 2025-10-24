@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { ZonesAndFileSharePathsMap } from '@/shared.types';
-import useZoneAndFileSharePathMapQuery from '@/queries/useZoneAndFileSharePathMapQuery';
+import useZoneAndFileSharePathMapQuery from '@/queries/zoneAndFileSharePathMapQuery';
 import { UseQueryResult } from '@tanstack/react-query';
 
 type ZonesAndFspMapContextType = {

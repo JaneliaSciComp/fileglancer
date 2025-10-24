@@ -1,6 +1,7 @@
 import React from 'react';
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 
+import { FetchError } from './queryUtils';
 import { sendFetchRequest, getFileBrowsePath, makeMapKey } from '@/utils';
 import { normalizePosixStylePath } from '@/utils/pathHandling';
 import type { FileOrFolder, FileSharePath } from '@/shared.types';
@@ -42,67 +43,75 @@ export default function useFileQuery(
     const response = await sendFetchRequest(url, 'GET');
     const body = await response.json();
 
-    if (!response.ok) {
-      if (response.status === 403) {
-        const errorMessage =
-          body.info && body.info.owner
-            ? `You do not have permission to list this folder. Contact the owner (${body.info.owner}) for access.`
-            : 'You do not have permission to list this folder. Contact the owner for access.';
-
-        // Create custom error with additional info for fallback object
-        const error = new Error(errorMessage) as Error & { info?: any };
-        error.info = body.info;
-        throw error;
-      } else if (response.status === 404) {
-        throw new Error('Folder not found');
-      } else {
-        throw new Error(
-          body.error ? body.error : `Unknown error (${response.status})`
-        );
-      }
+    if (response.ok) {
+      return body as FileBrowserResponse;
     }
 
-    return body as FileBrowserResponse;
+    // Handle error responses
+    if (response.status === 403) {
+      const errorMessage =
+        body.info && body.info.owner
+          ? `You do not have permission to list this folder. Contact the owner (${body.info.owner}) for access.`
+          : 'You do not have permission to list this folder. Contact the owner for access.';
+      // Include partial data (info) if available from backend
+      const error = new FetchError(
+        response,
+        errorMessage,
+        body.info ? { info: body.info } : undefined
+      );
+      throw error;
+    } else if (response.status === 404) {
+      throw new Error('Folder not found');
+    } else {
+      throw new Error(
+        body.error ? body.error : `Unknown error (${response.status})`
+      );
+    }
   };
 
-  const transformData = (data: FileBrowserResponse): FileQueryData => {
-    // This should never happen because query is disabled when !fspName
-    if (!fspName) {
-      throw new Error('fspName is required for transforming file query data');
-    }
+  const transformData = React.useCallback(
+    (data: FileBrowserResponse | { info: FileOrFolder }): FileQueryData => {
+      // This should never happen because query is disabled when !fspName
+      if (!fspName) {
+        throw new Error('fspName is required for transforming file query data');
+      }
 
-    const fspKey = makeMapKey('fsp', fspName);
-    const currentFileSharePath =
-      (zonesAndFspQuery.data?.[fspKey] as FileSharePath) || null;
+      const fspKey = makeMapKey('fsp', fspName);
+      const currentFileSharePath =
+        (zonesAndFspQuery.data?.[fspKey] as FileSharePath) || null;
 
-    // Normalize the path in the current file or folder
-    let currentFileOrFolder: FileOrFolder | null = data.info;
-    if (currentFileOrFolder) {
-      currentFileOrFolder = {
-        ...currentFileOrFolder,
-        path: normalizePosixStylePath(currentFileOrFolder.path)
+      // Normalize the path in the current file or folder
+      let currentFileOrFolder: FileOrFolder | null = data.info;
+      if (currentFileOrFolder) {
+        currentFileOrFolder = {
+          ...currentFileOrFolder,
+          path: normalizePosixStylePath(currentFileOrFolder.path)
+        };
+      }
+
+      // Normalize file paths and sort: directories first, then alphabetically
+      // Handle partial data case (403 error with only info, no files)
+      const rawFiles = 'files' in data ? data.files : [];
+      let files = (rawFiles || []).map(file => ({
+        ...file,
+        path: normalizePosixStylePath(file.path)
+      })) as FileOrFolder[];
+
+      files = files.sort((a: FileOrFolder, b: FileOrFolder) => {
+        if (a.is_dir === b.is_dir) {
+          return a.name.localeCompare(b.name);
+        }
+        return a.is_dir ? -1 : 1;
+      });
+
+      return {
+        currentFileSharePath,
+        currentFileOrFolder,
+        files
       };
-    }
-
-    // Normalize file paths and sort: directories first, then alphabetically
-    let files = (data.files || []).map(file => ({
-      ...file,
-      path: normalizePosixStylePath(file.path)
-    })) as FileOrFolder[];
-
-    files = files.sort((a: FileOrFolder, b: FileOrFolder) => {
-      if (a.is_dir === b.is_dir) {
-        return a.name.localeCompare(b.name);
-      }
-      return a.is_dir ? -1 : 1;
-    });
-
-    return {
-      currentFileSharePath,
-      currentFileOrFolder,
-      files
-    };
-  };
+    },
+    [fspName, zonesAndFspQuery.data]
+  );
 
   const query = useQuery<FileBrowserResponse, Error, FileQueryData>({
     queryKey: fileQueryKeys.filePath(fspName || '', folderName),
@@ -112,20 +121,31 @@ export default function useFileQuery(
     staleTime: 5 * 60 * 1000 // 5 minutes - file listings don't change that often
   });
 
-  // Handle 403 errors with fallback currentFileOrFolder
-  const currentFileOrFolderWithFallback = React.useMemo(() => {
-    if (query.data?.currentFileOrFolder) {
-      return query.data.currentFileOrFolder;
+  // Handle 403 errors with fallback data from partial response
+  const dataWithFallback = React.useMemo(() => {
+    if (query.data) {
+      return query.data;
     }
 
-    // If there's a 403 error with body.info, create a fallback FileOrFolder
-    if (query.error && (query.error as any).info) {
-      const bodyInfo = (query.error as any).info;
-      return {
+    // If there's a 403 error with partialData, extract and transform it
+    if (query.error && (query.error as FetchError).partialData?.info) {
+      const partialData = (query.error as FetchError).partialData;
+      return transformData(partialData);
+    }
+
+    // If there's a 403 error without partialData (e.g., individual file access denied),
+    // create a minimal fallback FileOrFolder object
+    if (query.error && (query.error as FetchError).res?.status === 403) {
+      const bodyInfo = (query.error as FetchError).partialData?.info;
+      const targetPath = folderName || '.';
+
+      // Create a minimal FileOrFolder object with the target path information
+      // Use body.info if available from 403 response, otherwise use fallback values
+      const fallbackFileOrFolder: FileOrFolder = {
         name:
           bodyInfo?.name ||
-          (folderName === '.' ? '' : folderName.split('/').pop() || ''),
-        path: normalizePosixStylePath(bodyInfo?.path || folderName),
+          (targetPath === '.' ? '' : targetPath.split('/').pop() || ''),
+        path: normalizePosixStylePath(bodyInfo?.path || targetPath),
         is_dir: bodyInfo?.is_dir ?? true,
         size: bodyInfo?.size || 0,
         last_modified: bodyInfo?.last_modified || 0,
@@ -134,20 +154,36 @@ export default function useFileQuery(
         hasRead: bodyInfo?.hasRead || false,
         hasWrite: bodyInfo?.hasWrite || false,
         permissions: bodyInfo?.permissions || ''
-      } as FileOrFolder;
+      };
+
+      if (!fspName || !zonesAndFspQuery.data) {
+        return undefined;
+      }
+
+      const fspKey = makeMapKey('fsp', fspName);
+      const currentFileSharePath =
+        (zonesAndFspQuery.data[fspKey] as FileSharePath) || null;
+
+      return {
+        currentFileSharePath,
+        currentFileOrFolder: fallbackFileOrFolder,
+        files: []
+      };
     }
 
-    return null;
-  }, [query.data?.currentFileOrFolder, query.error, folderName]);
+    return undefined;
+  }, [
+    query.data,
+    query.error,
+    fspName,
+    folderName,
+    zonesAndFspQuery.data,
+    transformData
+  ]);
 
   // Return enhanced query with fallback data
   return {
     ...query,
-    data: query.data
-      ? {
-          ...query.data,
-          currentFileOrFolder: currentFileOrFolderWithFallback
-        }
-      : undefined
+    data: dataWithFallback
   } as UseQueryResult<FileQueryData, Error>;
 }

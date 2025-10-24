@@ -43,11 +43,12 @@ export default function Toolbar({
   togglePropertiesDrawer,
   showSidebar,
   toggleSidebar
-}: ToolbarProps): JSX.Element {
-  const { fileQuery, fspName, filePath } = useFileBrowserContext();
+}: ToolbarProps): React.JSX.Element {
+  const { fileBrowserState, fileQuery, fspName, filePath } =
+    useFileBrowserContext();
   const queryClient = useQueryClient();
 
-  const currentFileSharePath = fileQuery.data?.currentFileSharePath;
+  const currentFileSharePath = fileBrowserState.uiFileSharePath;
   const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
   const { profile } = useProfileContext();
   const {

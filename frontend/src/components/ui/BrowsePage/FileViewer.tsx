@@ -76,13 +76,12 @@ const getLanguageFromExtension = (filename: string): string => {
 };
 
 export default function FileViewer({ file }: FileViewerProps): React.ReactNode {
-  const { fileQuery } = useFileBrowserContext();
+  const { fileBrowserState } = useFileBrowserContext();
 
   const [isDarkMode, setIsDarkMode] = React.useState<boolean>(false);
 
-  // Use Tanstack Query for file content
   const contentQuery = useFileContentQuery(
-    fileQuery.data?.currentFileSharePath?.name,
+    fileBrowserState.uiFileSharePath?.name,
     file.path
   );
 

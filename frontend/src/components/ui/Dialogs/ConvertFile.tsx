@@ -29,7 +29,7 @@ export default function ConvertFileDialog({
   const { destinationFolder, setDestinationFolder, handleTicketSubmit } =
     useConvertFileDialog();
   const { pathPreference } = usePreferencesContext();
-  const { fileQuery, fileBrowserState } = useFileBrowserContext();
+  const { fileBrowserState } = useFileBrowserContext();
   const { refreshTickets } = useTicketContext();
 
   const placeholderText =
@@ -37,11 +37,13 @@ export default function ConvertFileDialog({
       ? '\\path\\to\\destination\\folder\\'
       : '/path/to/destination/folder/';
 
-  const displayPath = getPreferredPathForDisplay(
-    pathPreference,
-    fileQuery.data.currentFileSharePath,
-    fileBrowserState.propertiesTarget?.path
-  );
+  const displayPath = fileBrowserState.uiFileSharePath
+    ? getPreferredPathForDisplay(
+        pathPreference,
+        fileBrowserState.uiFileSharePath,
+        fileBrowserState.propertiesTarget?.path
+      )
+    : '';
 
   return (
     <FgDialog

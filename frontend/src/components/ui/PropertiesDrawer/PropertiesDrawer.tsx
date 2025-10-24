@@ -86,7 +86,7 @@ export default function PropertiesDrawer({
     React.useState<boolean>(false);
   const [activeTab, setActiveTab] = React.useState<string>('overview');
 
-  const { fileQuery, fileBrowserState } = useFileBrowserContext();
+  const { fileBrowserState } = useFileBrowserContext();
   const { pathPreference, areDataLinksAutomatic } = usePreferencesContext();
   const { ticket } = useTicketContext();
   const { proxiedPath, dataUrl } = useProxiedPathContext();
@@ -109,7 +109,7 @@ export default function PropertiesDrawer({
 
   const fullPath = getPreferredPathForDisplay(
     pathPreference,
-    fileQuery.data?.currentFileSharePath,
+    fileBrowserState.uiFileSharePath,
     fileBrowserState.propertiesTarget?.path
   );
 

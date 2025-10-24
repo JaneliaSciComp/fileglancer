@@ -2,10 +2,11 @@ import React from 'react';
 import { useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 
-import type { FileOrFolder, Result } from '@/shared.types';
-import { makeBrowseLink } from '@/utils';
+import type { FileSharePath, FileOrFolder, Result } from '@/shared.types';
+import { makeBrowseLink, makeMapKey } from '@/utils';
 import { createSuccess, handleError } from '@/utils/errorHandling';
 import useFileQuery, { fileQueryKeys } from '@/queries/fileQueries';
+import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 
 type FileBrowserContextProviderProps = {
   readonly children: React.ReactNode;
@@ -15,6 +16,7 @@ type FileBrowserContextProviderProps = {
 
 // Client-only state (UI state that's not fetched from server)
 interface FileBrowserState {
+  uiFileSharePath: FileSharePath | null;
   propertiesTarget: FileOrFolder | null;
   selectedFiles: FileOrFolder[];
 }
@@ -59,9 +61,12 @@ export const FileBrowserContextProvider = ({
   fspName,
   filePath
 }: FileBrowserContextProviderProps) => {
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
+
   // Client-only state for UI interactions
   const [fileBrowserState, setFileBrowserState] =
     React.useState<FileBrowserState>({
+      uiFileSharePath: null,
       propertiesTarget: null,
       selectedFiles: []
     });
@@ -88,9 +93,9 @@ export const FileBrowserContextProvider = ({
     showFilePropertiesDrawer: boolean
   ) => {
     // If clicking on a file (not directory), navigate to the file URL
-    if (!file.is_dir && fileQuery.data?.currentFileSharePath) {
+    if (!file.is_dir && fileBrowserState.uiFileSharePath) {
       const fileLink = makeBrowseLink(
-        fileQuery.data.currentFileSharePath.name,
+        fileBrowserState.uiFileSharePath.name,
         file.path
       );
       navigate(fileLink);
@@ -149,11 +154,22 @@ export const FileBrowserContextProvider = ({
   // Update client state when URL changes (navigation to different file/folder)
   // Set propertiesTarget to the current directory/file being viewed
   React.useEffect(() => {
+    const fspKey = fspName ? makeMapKey('fsp', fspName) : null;
+    const newFileSharePathTarget =
+      zonesAndFspQuery.data && fspKey
+        ? (zonesAndFspQuery.data[fspKey] as FileSharePath)
+        : null;
     setFileBrowserState({
+      uiFileSharePath: newFileSharePathTarget,
       propertiesTarget: fileQuery.data?.currentFileOrFolder || null,
       selectedFiles: []
     });
-  }, [fspName, filePath, fileQuery.data?.currentFileOrFolder]);
+  }, [
+    fspName,
+    filePath,
+    zonesAndFspQuery?.data,
+    fileQuery.data?.currentFileOrFolder
+  ]);
 
   return (
     <FileBrowserContext.Provider

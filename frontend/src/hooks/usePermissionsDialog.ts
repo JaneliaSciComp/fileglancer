@@ -55,7 +55,7 @@ export default function usePermissionsDialog() {
   async function handleChangePermissions(): Promise<Result<void>> {
     setIsLoading(true);
 
-    if (!fileQuery.data.currentFileSharePath) {
+    if (!fileQuery.data?.currentFileSharePath) {
       return handleError(
         new Error('Cannot change permissions; no file share path selected')
       );

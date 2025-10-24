@@ -4,8 +4,9 @@ import type { Result } from '@/shared.types';
 import { handleError } from '@/utils/errorHandling';
 
 export default function useFavoriteToggle() {
-  const { fileBrowserState } = useFileBrowserContext();
-  const { currentFileSharePath, currentFileOrFolder } = fileBrowserState;
+  const { fileBrowserState, fileQuery } = useFileBrowserContext();
+  const currentFileSharePath = fileBrowserState.uiFileSharePath;
+  const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
   const { handleFavoriteChange } = usePreferencesContext();
 
   async function handleFavoriteToggle(
