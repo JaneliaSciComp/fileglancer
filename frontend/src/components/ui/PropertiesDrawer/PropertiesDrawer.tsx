@@ -88,9 +88,12 @@ export default function PropertiesDrawer({
 
   const { fileBrowserState } = useFileBrowserContext();
   const { pathPreference, areDataLinksAutomatic } = usePreferencesContext();
-  const { ticket } = useTicketContext();
-  const { proxiedPath, dataUrl } = useProxiedPathContext();
+  const { ticketByPathQuery } = useTicketContext();
+  const { proxiedPathByFspAndPathQuery } = useProxiedPathContext();
   const { externalDataUrl } = useExternalBucketContext();
+
+  const ticket = ticketByPathQuery.data;
+  const proxiedPath = proxiedPathByFspAndPathQuery.data;
   const {
     handleDialogConfirm,
     handleDialogCancel,
@@ -235,8 +238,11 @@ export default function PropertiesDrawer({
               ) : null}
               {externalDataUrl ? (
                 <CopyPathButton isDataLink={true} path={externalDataUrl} />
-              ) : dataUrl ? (
-                <CopyPathButton isDataLink={true} path={dataUrl} />
+              ) : proxiedPathByFspAndPathQuery.data?.url ? (
+                <CopyPathButton
+                  isDataLink={true}
+                  path={proxiedPathByFspAndPathQuery.data.url}
+                />
               ) : null}
             </Tabs.Panel>
 

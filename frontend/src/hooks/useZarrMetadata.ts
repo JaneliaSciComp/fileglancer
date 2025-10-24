@@ -50,7 +50,7 @@ export default function useZarrMetadata() {
   const voleBaseUrl = 'https://volumeviewer.allencell.org/viewer?url=';
   const avivatorBaseUrl = 'https://janeliascicomp.github.io/viv/?image_url=';
   const { fileQuery, fileBrowserState } = useFileBrowserContext();
-  const { dataUrl } = useProxiedPathContext();
+  const { proxiedPathByFspAndPathQuery } = useProxiedPathContext();
   const { externalDataUrl } = useExternalBucketContext();
   const {
     disableNeuroglancerStateGeneration,
@@ -298,7 +298,7 @@ export default function useZarrMetadata() {
   React.useEffect(() => {
     // Always create openWithToolUrls data structure when metadata is available
     if (metadata) {
-      const url = externalDataUrl || dataUrl;
+      const url = externalDataUrl || proxiedPathByFspAndPathQuery.data?.url;
       const openWithToolUrls = {
         copy: url || ''
       } as OpenWithToolUrls;
@@ -380,7 +380,7 @@ export default function useZarrMetadata() {
     }
   }, [
     metadata,
-    dataUrl,
+    proxiedPathByFspAndPathQuery.data?.url,
     externalDataUrl,
     disableNeuroglancerStateGeneration,
     layerType,

@@ -7,9 +7,9 @@ import {
 } from '@/contexts/ProxiedPathContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useExternalBucketContext } from '@/contexts/ExternalBucketContext';
+import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 
 import { copyToClipboard } from '@/utils/copyText';
-import type { Result } from '@/shared.types';
 import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
 
 // Overload for ZarrPreview usage with required parameters
@@ -19,7 +19,7 @@ export default function useDataToolLinks(
   pendingToolKey: PendingToolKey,
   setPendingToolKey: React.Dispatch<React.SetStateAction<PendingToolKey>>
 ): {
-  handleCreateDataLink: () => Promise<Result<void | ProxiedPath[]>>;
+  handleCreateDataLink: () => Promise<void>;
   handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
   handleToolClick: (toolKey: PendingToolKey) => Promise<void>;
   handleDialogConfirm: () => Promise<void>;
@@ -31,7 +31,7 @@ export default function useDataToolLinks(
 export default function useDataToolLinks(
   setShowDataLinkDialog: React.Dispatch<React.SetStateAction<boolean>>
 ): {
-  handleCreateDataLink: () => Promise<Result<void | ProxiedPath[]>>;
+  handleCreateDataLink: () => Promise<void>;
   handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
   handleToolClick: (toolKey: PendingToolKey) => Promise<void>;
   handleDialogConfirm: () => Promise<void>;
@@ -51,12 +51,15 @@ export default function useDataToolLinks(
   const currentUrlsRef = React.useRef(openWithToolUrls);
   currentUrlsRef.current = openWithToolUrls;
 
+  const { fileBrowserState, fileQuery } = useFileBrowserContext();
   const {
-    createProxiedPath,
-    deleteProxiedPath,
-    refreshProxiedPaths,
-    proxiedPath
+    createProxiedPathMutation,
+    deleteProxiedPathMutation,
+    allProxiedPathsQuery,
+    proxiedPathByFspAndPathQuery
   } = useProxiedPathContext();
+
+  const proxiedPath = proxiedPathByFspAndPathQuery.data;
 
   const { areDataLinksAutomatic } = usePreferencesContext();
   const { externalDataUrl } = useExternalBucketContext();
@@ -71,16 +74,28 @@ export default function useDataToolLinks(
     }
   };
 
-  const handleCreateDataLink = async (): Promise<
-    Result<void | ProxiedPath[]>
-  > => {
-    const createProxiedPathResult = await createProxiedPath();
-    if (createProxiedPathResult.success) {
-      toast.success('Data link created successfully');
-    } else if (createProxiedPathResult.error) {
-      toast.error(`Error creating data link: ${createProxiedPathResult.error}`);
+  const handleCreateDataLink = async (): Promise<void> => {
+    if (!fileBrowserState.uiFileSharePath) {
+      toast.error('No file share path selected');
+      return;
     }
-    return await refreshProxiedPaths();
+    if (!fileQuery.data?.currentFileOrFolder) {
+      toast.error('No folder selected');
+      return;
+    }
+
+    try {
+      await createProxiedPathMutation.mutateAsync({
+        fsp_name: fileBrowserState.uiFileSharePath.name,
+        path: fileQuery.data.currentFileOrFolder.path
+      });
+      toast.success('Data link created successfully');
+      await allProxiedPathsQuery.refetch();
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Error creating data link: ${errorMessage}`);
+    }
   };
 
   const executeToolAction = async (
@@ -110,8 +125,10 @@ export default function useDataToolLinks(
     if (!toolKey) {
       return;
     }
-    const result = await handleCreateDataLink();
-    if (result.success) {
+
+    try {
+      await handleCreateDataLink();
+
       // Wait for URLs to be updated and use ref to get current value
       let attempts = 0;
       const maxAttempts = 50; // 5 seconds max
@@ -133,8 +150,8 @@ export default function useDataToolLinks(
           `${toolKey === 'copy' ? 'Error copying data link' : `Error navigating to ${toolKey}`}`
         );
       }
-    } else if (result.error) {
-      toast.error(`Error refreshing links: ${result.error}`);
+    } catch (error) {
+      // Error already handled in handleCreateDataLink
     }
   };
 
@@ -173,18 +190,16 @@ export default function useDataToolLinks(
       return;
     }
 
-    const deleteResult = await deleteProxiedPath(proxiedPath);
-    if (!deleteResult.success) {
-      toast.error(`Error deleting data link: ${deleteResult.error}`);
-      return;
-    } else {
-      toast.success(`Successfully deleted data link`);
-
-      const refreshResult = await refreshProxiedPaths();
-      if (!refreshResult.success) {
-        toast.error(`Error refreshing proxied paths: ${refreshResult.error}`);
-        return;
-      }
+    try {
+      await deleteProxiedPathMutation.mutateAsync({
+        sharing_key: proxiedPath.sharing_key
+      });
+      toast.success('Successfully deleted data link');
+      await allProxiedPathsQuery.refetch();
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Error deleting data link: ${errorMessage}`);
     }
   };
 

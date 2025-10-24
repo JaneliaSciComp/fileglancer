@@ -12,14 +12,14 @@ import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 
 export default function RecentDataLinksCard() {
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
-  const { allProxiedPaths, loadingProxiedPaths } = useProxiedPathContext();
+  const { allProxiedPathsQuery } = useProxiedPathContext();
 
   // Get the 10 most recent data links
-  const recentDataLinks = allProxiedPaths.slice(0, 10) || [];
+  const recentDataLinks = allProxiedPathsQuery.data?.slice(0, 10) || [];
 
   return (
     <DashboardCard title="Recently created data links">
-      {loadingProxiedPaths || zonesAndFspQuery.isPending ? (
+      {allProxiedPathsQuery.isPending || zonesAndFspQuery.isPending ? (
         Array(5)
           .fill(0)
           .map((_, index) => (
