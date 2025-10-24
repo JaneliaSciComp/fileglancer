@@ -22,7 +22,6 @@ export function useFileContentQuery(
       const { content } = await fetchFileWithTextDetection(fspName, filePath);
       return content;
     },
-    enabled: !!fspName,
-    staleTime: 5 * 60 * 1000 // 5 minutes - same caching strategy as file lists
+    enabled: !!fspName
   });
 }

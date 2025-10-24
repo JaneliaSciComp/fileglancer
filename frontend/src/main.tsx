@@ -6,7 +6,13 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import './index.css';
 import App from './App';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 20 * 1000 // 20 seconds; suggested as a minimum here: https://tkdodo.eu/blog/react-query-as-a-state-manager
+    }
+  }
+});
 
 // From Tanstack Query DevTools extension instructions
 declare global {

@@ -11,6 +11,7 @@ export const useProfileQuery = () => {
 
   return useQuery<Profile, Error>({
     queryKey: ['profile'],
-    queryFn: async () => fetchProfile()
+    queryFn: async () => fetchProfile(),
+    staleTime: 5 * 60 * 1000 // 5 minutes - shouldn't change often
   });
 };
