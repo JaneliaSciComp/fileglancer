@@ -146,8 +146,6 @@ If you run into any build issues, the first thing to try is to clear the build d
 ./clean.sh
 ```
 
-If you're still having issues, try manually deleting the symlink at `.pixi/envs/share/jupyter/labextensions/fileglancer` inside the fileglancer repo directory. Then, reinstall the extension using `pixi run dev-install`, and follow the steps above from there.
-
 ## Testing
 
 ### Backend tests
