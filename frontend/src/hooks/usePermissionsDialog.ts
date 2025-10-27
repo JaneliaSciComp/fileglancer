@@ -1,20 +1,15 @@
 import React from 'react';
 
-import { sendFetchRequest, getFileBrowsePath } from '@/utils';
-import type { Result } from '@/shared.types';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-import { handleError, toHttpError } from '@/utils/errorHandling';
 
 export default function usePermissionsDialog() {
-  const { fileQuery, fileBrowserState, refreshFiles } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState, mutations } = useFileBrowserContext();
 
   const [localPermissions, setLocalPermissions] = React.useState(
     fileBrowserState.propertiesTarget
       ? fileBrowserState.propertiesTarget.permissions
       : null
   );
-
-  const [isLoading, setIsLoading] = React.useState(false);
 
   /**
    * Handles local permission state changes based on user input to the form.
@@ -52,47 +47,27 @@ export default function usePermissionsDialog() {
     });
   }
 
-  async function handleChangePermissions(): Promise<Result<void>> {
-    setIsLoading(true);
-
+  async function handleChangePermissions(): Promise<void> {
     if (!fileQuery.data?.currentFileSharePath) {
-      return handleError(
-        new Error('Cannot change permissions; no file share path selected')
-      );
+      throw new Error('Cannot change permissions; no file share path selected');
     }
     if (!fileBrowserState.propertiesTarget) {
-      return handleError(
-        new Error('Cannot change permissions; no properties target set')
-      );
+      throw new Error('Cannot change permissions; no properties target set');
+    }
+    if (!localPermissions) {
+      throw new Error('No permissions set');
     }
 
-    const fetchPath = getFileBrowsePath(
-      fileQuery.data.currentFileSharePath.name,
-      fileBrowserState.propertiesTarget.path
-    );
-
-    try {
-      const response = await sendFetchRequest(fetchPath, 'PATCH', {
-        permissions: localPermissions
-      });
-      if (response.ok) {
-        return await refreshFiles();
-      } else if (response.status === 403) {
-        return handleError(new Error('Permission denied'));
-      } else {
-        throw await toHttpError(response);
-      }
-    } catch (error) {
-      return handleError(error);
-    } finally {
-      setIsLoading(false);
-    }
+    await mutations.changePermissions.mutateAsync({
+      fspName: fileQuery.data.currentFileSharePath.name,
+      filePath: fileBrowserState.propertiesTarget.path,
+      permissions: localPermissions
+    });
   }
 
   return {
     handleLocalPermissionChange,
     localPermissions,
-    handleChangePermissions,
-    isLoading
+    handleChangePermissions
   };
 }

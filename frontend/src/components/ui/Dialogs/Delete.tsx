@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import TextWithFilePath from '@/components/ui/Dialogs/TextWithFilePath';
+import { Spinner } from '@/components/ui/widgets/Loaders';
 import useDeleteDialog from '@/hooks/useDeleteDialog';
 import { getPreferredPathForDisplay } from '@/utils';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
@@ -19,7 +20,7 @@ export default function DeleteDialog({
   setShowDeleteDialog
 }: DeleteDialogProps): React.JSX.Element {
   const { handleDelete } = useDeleteDialog();
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fileBrowserState, mutations } = useFileBrowserContext();
   const { pathPreference } = usePreferencesContext();
 
   if (!fileBrowserState.uiFileSharePath) {
@@ -48,17 +49,25 @@ export default function DeleteDialog({
       <Button
         className="!rounded-md mt-4"
         color="error"
+        disabled={mutations.delete.isPending}
         onClick={async () => {
-          const result = await handleDelete(fileBrowserState.propertiesTarget!);
-          if (!result.success) {
-            toast.error(`Error deleting item: ${result.error}`);
-          } else {
-            toast.success(`Item deleted!`);
+          try {
+            await handleDelete(fileBrowserState.propertiesTarget!);
+            toast.success('Item deleted!');
+          } catch (error) {
+            toast.error(
+              `Error deleting item: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
+          } finally {
             setShowDeleteDialog(false);
           }
         }}
       >
-        Delete
+        {mutations.delete.isPending ? (
+          <Spinner customClasses="border-white" text="Deleting..." />
+        ) : (
+          'Delete'
+        )}
       </Button>
     </FgDialog>
   );

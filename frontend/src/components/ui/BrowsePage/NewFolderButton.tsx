@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
+import { Spinner } from '@/components/ui/widgets/Loaders';
 import useNewFolderDialog from '@/hooks/useNewFolderDialog';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 
@@ -16,11 +17,12 @@ export default function NewFolderButton({
   triggerClasses
 }: NewFolderButtonProps): React.JSX.Element {
   const [showNewFolderDialog, setShowNewFolderDialog] = React.useState(false);
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fileBrowserState, mutations } = useFileBrowserContext();
   const { handleNewFolderSubmit, newName, setNewName, isDuplicateName } =
     useNewFolderDialog();
 
-  const isSubmitDisabled = !newName.trim() || isDuplicateName;
+  const isSubmitDisabled =
+    !newName.trim() || isDuplicateName || mutations.createFolder.isPending;
 
   return (
     <>
@@ -43,14 +45,17 @@ export default function NewFolderButton({
           <form
             onSubmit={async event => {
               event.preventDefault();
-              const result = await handleNewFolderSubmit();
-              if (result.success) {
+              try {
+                await handleNewFolderSubmit();
                 toast.success('New folder created!');
-              } else {
-                toast.error(`Error creating folder: ${result.error}`);
+                setNewName('');
+              } catch (error) {
+                toast.error(
+                  `Error creating folder: ${error instanceof Error ? error.message : 'Unknown error'}`
+                );
+              } finally {
+                setShowNewFolderDialog(false);
               }
-              setShowNewFolderDialog(false);
-              setNewName('');
             }}
           >
             <div className="mt-8 flex flex-col gap-2">
@@ -79,7 +84,11 @@ export default function NewFolderButton({
                 disabled={isSubmitDisabled}
                 type="submit"
               >
-                Submit
+                {mutations.createFolder.isPending ? (
+                  <Spinner customClasses="border-white" text="Creating..." />
+                ) : (
+                  'Submit'
+                )}
               </Button>
               {!newName.trim() ? (
                 <Typography className="text-sm text-gray-500">

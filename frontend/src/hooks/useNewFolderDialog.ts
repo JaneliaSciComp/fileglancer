@@ -1,14 +1,12 @@
 import React from 'react';
 
-import { getFileBrowsePath, sendFetchRequest, joinPaths } from '@/utils';
-import { handleError, toHttpError } from '@/utils/errorHandling';
+import { joinPaths } from '@/utils';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-import type { Result } from '@/shared.types';
 
 export default function useNewFolderDialog() {
   const [newName, setNewName] = React.useState<string>('');
 
-  const { fileBrowserState, refreshFiles, fileQuery } = useFileBrowserContext();
+  const { fileBrowserState, fileQuery, mutations } = useFileBrowserContext();
   const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
   const currentFileSharePath = fileBrowserState.uiFileSharePath;
 
@@ -21,36 +19,18 @@ export default function useNewFolderDialog() {
     );
   }, [newName, fileQuery.data?.files]);
 
-  async function handleNewFolderSubmit(): Promise<Result<void>> {
+  async function handleNewFolderSubmit(): Promise<void> {
     if (!currentFileSharePath) {
-      return handleError(new Error('No file share path selected.'));
+      throw new Error('No file share path selected.');
     }
     if (!currentFileOrFolder) {
-      return handleError(new Error('No current file or folder selected.'));
+      throw new Error('No current file or folder selected.');
     }
-    try {
-      const response = await sendFetchRequest(
-        getFileBrowsePath(
-          currentFileSharePath.name,
-          joinPaths(currentFileOrFolder.path, newName)
-        ),
-        'POST',
-        {
-          type: 'directory'
-        }
-      );
-      if (response.ok) {
-        return await refreshFiles();
-      } else {
-        if (response.status === 403) {
-          return handleError(new Error('Permission denied'));
-        } else {
-          throw await toHttpError(response);
-        }
-      }
-    } catch (error) {
-      return handleError(error);
-    }
+
+    await mutations.createFolder.mutateAsync({
+      fspName: currentFileSharePath.name,
+      folderPath: joinPaths(currentFileOrFolder.path, newName)
+    });
   }
 
   return {
