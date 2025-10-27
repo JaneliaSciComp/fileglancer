@@ -141,14 +141,8 @@ export function useProxiedPathByFspAndPathQuery(
   path: string | undefined
 ): UseQueryResult<ProxiedPath | null, Error> {
   return useQuery<ProxiedPath | null, Error>({
-    queryKey:
-      fspName && path
-        ? proxiedPathQueryKeys.detail(fspName, path)
-        : ['proxiedPaths', 'detail', 'disabled'],
-    queryFn:
-      fspName && path
-        ? () => fetchProxiedPathByFspAndPath(fspName, path)
-        : undefined,
+    queryKey: proxiedPathQueryKeys.detail(fspName ?? '', path ?? ''),
+    queryFn: () => fetchProxiedPathByFspAndPath(fspName!, path!),
     enabled: !!fspName && !!path
   });
 }

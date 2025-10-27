@@ -141,12 +141,8 @@ export function useTicketByPathQuery(
   const shouldFetch = enabled && !!fspName && !!path;
 
   return useQuery<Ticket | null, Error>({
-    queryKey:
-      fspName && path
-        ? ticketsQueryKeys.detail(fspName, path)
-        : ['tickets', 'detail', 'disabled'],
-    queryFn:
-      fspName && path ? () => fetchTicketByPath(fspName, path) : undefined,
+    queryKey: ticketsQueryKeys.detail(fspName ?? '', path ?? ''),
+    queryFn: () => fetchTicketByPath(fspName!, path!),
     enabled: shouldFetch,
     staleTime: 30 * 1000 // 30 seconds
   });
