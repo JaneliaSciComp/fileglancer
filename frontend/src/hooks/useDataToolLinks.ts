@@ -144,33 +144,28 @@ export default function useDataToolLinks(
     if (!toolKey) {
       return;
     }
+    await handleCreateDataLink();
 
-    try {
-      await handleCreateDataLink();
+    // Wait for URLs to be updated and use ref to get current value
+    let attempts = 0;
+    const maxAttempts = 50; // 5 seconds max
 
-      // Wait for URLs to be updated and use ref to get current value
-      let attempts = 0;
-      const maxAttempts = 50; // 5 seconds max
+    while (attempts < maxAttempts) {
+      const currentUrls = currentUrlsRef.current;
 
-      while (attempts < maxAttempts) {
-        const currentUrls = currentUrlsRef.current;
-
-        if (currentUrls && currentUrls.copy && currentUrls.copy !== '') {
-          await executeToolAction(toolKey, currentUrls);
-          break;
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 100));
-        attempts++;
+      if (currentUrls && currentUrls.copy && currentUrls.copy !== '') {
+        await executeToolAction(toolKey, currentUrls);
+        break;
       }
 
-      if (attempts >= maxAttempts) {
-        toast.error(
-          `${toolKey === 'copy' ? 'Error copying data link' : `Error navigating to ${toolKey}`}`
-        );
-      }
-    } catch (error) {
-      // Error already handled in handleCreateDataLink
+      await new Promise(resolve => setTimeout(resolve, 100));
+      attempts++;
+    }
+
+    if (attempts >= maxAttempts) {
+      toast.error(
+        `${toolKey === 'copy' ? 'Error copying data link' : `Error navigating to ${toolKey}`}`
+      );
     }
   };
 
