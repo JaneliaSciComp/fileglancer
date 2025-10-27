@@ -30,11 +30,16 @@ db_url: sqlite:///fileglancer.db
 use_access_flags: True
 
 #
-# File share mount paths to view in the UI.
+# File share mount paths to view in the UI. 
+# If not set, defaults to the user's home directory
 #
 # file_share_mounts:
 #   - "~/"
 #   - /tmp
+# 
+# To view paths from fileglancer.db, use:
+#
+# file_share_mounts: []
 
 #
 # Atlassian Cloud info. Used for retrieving JIRA tickets.
