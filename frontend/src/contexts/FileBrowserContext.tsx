@@ -1,11 +1,15 @@
 import React from 'react';
 import { useNavigate } from 'react-router';
-import { useQueryClient } from '@tanstack/react-query';
+import { UseMutationResult } from '@tanstack/react-query';
 
-import type { FileSharePath, FileOrFolder, Result } from '@/shared.types';
+import type { FileSharePath, FileOrFolder } from '@/shared.types';
 import { makeBrowseLink, makeMapKey } from '@/utils';
-import { createSuccess, handleError } from '@/utils/errorHandling';
-import useFileQuery, { fileQueryKeys } from '@/queries/fileQueries';
+import useFileQuery, {
+  useDeleteFileMutation,
+  useCreateFolderMutation,
+  useRenameFileMutation,
+  useChangePermissionsMutation
+} from '@/queries/fileQueries';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 
 type FileBrowserContextProviderProps = {
@@ -32,8 +36,31 @@ type FileBrowserContextType = {
   // Server state query (single source of truth)
   fileQuery: ReturnType<typeof useFileQuery>;
 
+  // File operation mutations
+  mutations: {
+    delete: UseMutationResult<
+      void,
+      Error,
+      { fspName: string; filePath: string }
+    >;
+    createFolder: UseMutationResult<
+      void,
+      Error,
+      { fspName: string; folderPath: string }
+    >;
+    rename: UseMutationResult<
+      void,
+      Error,
+      { fspName: string; oldPath: string; newPath: string }
+    >;
+    changePermissions: UseMutationResult<
+      void,
+      Error,
+      { fspName: string; filePath: string; permissions: string }
+    >;
+  };
+
   // Actions
-  refreshFiles: () => Promise<Result<void>>;
   handleLeftClick: (
     file: FileOrFolder,
     showFilePropertiesDrawer: boolean
@@ -72,10 +99,15 @@ export const FileBrowserContextProvider = ({
     });
 
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
   // Fetch file data using Tanstack Query (includes 403 fallback handling)
   const fileQuery = useFileQuery(fspName, filePath || '.');
+
+  // File operation mutations
+  const deleteMutation = useDeleteFileMutation();
+  const createFolderMutation = useCreateFolderMutation();
+  const renameMutation = useRenameFileMutation();
+  const changePermissionsMutation = useChangePermissionsMutation();
 
   // Function to update fileBrowserState with complete, consistent data
   const updateFileBrowserState = React.useCallback(
@@ -134,23 +166,6 @@ export const FileBrowserContextProvider = ({
     });
   };
 
-  // Function to refresh files for the current FSP and current file or folder
-  const refreshFiles = async (): Promise<Result<void>> => {
-    if (!fspName || !filePath) {
-      return handleError(
-        new Error('File share path and file/folder required to refresh')
-      );
-    }
-    try {
-      await queryClient.invalidateQueries({
-        queryKey: fileQueryKeys.filePath(fspName, filePath)
-      });
-      return createSuccess(undefined);
-    } catch (error) {
-      return handleError(error);
-    }
-  };
-
   // Update client state when URL changes (navigation to different file/folder)
   // Set propertiesTarget to the current directory/file being viewed
   React.useEffect(() => {
@@ -184,8 +199,15 @@ export const FileBrowserContextProvider = ({
         // Server state query
         fileQuery,
 
+        // File operation mutations
+        mutations: {
+          delete: deleteMutation,
+          createFolder: createFolderMutation,
+          rename: renameMutation,
+          changePermissions: changePermissionsMutation
+        },
+
         // Actions
-        refreshFiles,
         handleLeftClick,
         updateFilesWithContextMenuClick
       }}
