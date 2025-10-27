@@ -28,7 +28,7 @@ export default function ConvertFileDialog({
     useConvertFileDialog();
   const { pathPreference } = usePreferencesContext();
   const { fileBrowserState } = useFileBrowserContext();
-  const { allTicketsQuery, ticketByPathQuery } = useTicketContext();
+  const { allTicketsQuery, createTicketMutation } = useTicketContext();
 
   const placeholderText =
     pathPreference[0] === 'windows_path'
@@ -67,8 +67,8 @@ export default function ConvertFileDialog({
           if (!createTicketResult.success) {
             toast.error(`Error creating ticket: ${createTicketResult.error}`);
           } else {
-            toast.success('Ticket created!');
             await allTicketsQuery.refetch();
+            toast.success('Ticket created!');
           }
           setShowConvertFileDialog(false);
         }}
@@ -106,12 +106,12 @@ export default function ConvertFileDialog({
           disabled={
             !destinationFolder ||
             !tasksEnabled ||
-            allTicketsQuery.isPending ||
-            ticketByPathQuery.isPending
+            createTicketMutation.isPending ||
+            allTicketsQuery.isFetching
           }
           type="submit"
         >
-          {allTicketsQuery.isPending || ticketByPathQuery.isPending ? (
+          {createTicketMutation.isPending || allTicketsQuery.isFetching ? (
             <Spinner customClasses="border-white" text="Processing..." />
           ) : (
             'Submit'
