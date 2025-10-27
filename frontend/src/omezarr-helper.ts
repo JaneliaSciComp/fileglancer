@@ -530,7 +530,6 @@ async function getZarrArray(
  * Process the given OME-Zarr array and return the metadata, thumbnail, and Neuroglancer link.
  */
 async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
-  log.debug('Getting OME-Zarr metadata for', dataUrl);
   const store = new zarr.FetchStore(dataUrl, {
     overrides: {
       credentials: 'include'
@@ -574,7 +573,6 @@ async function getOmeZarrThumbnail(
   maxThumbnailSize: number = 1024,
   autoBoost: boolean = true
 ): Promise<ThumbnailResult> {
-  log.debug('Getting OME-Zarr thumbnail for', dataUrl);
   const store = new zarr.FetchStore(dataUrl, {
     overrides: {
       credentials: 'include',
