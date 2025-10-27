@@ -8,45 +8,28 @@ import {
   HiLogin
 } from 'react-icons/hi';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { useSimpleLoginMutation } from '@/queries/authQueries';
 import React from 'react';
 
 export default function Home() {
   const { authStatus, loading } = useAuthContext();
   const isAuthenticated = authStatus?.authenticated;
   const isSimpleAuth = authStatus?.auth_method === 'simple';
-  const [loginError, setLoginError] = React.useState('');
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const simpleLoginMutation = useSimpleLoginMutation();
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const username = formData.get('username') as string;
 
-    setIsSubmitting(true);
-    setLoginError('');
-
-    try {
-      const response = await fetch('/api/auth/simple-login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ username }),
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        window.location.href = data.redirect || '/fg/browse';
-      } else {
-        const data = await response.json();
-        setLoginError(data.detail || 'Login failed');
-        setIsSubmitting(false);
+    simpleLoginMutation.mutate(
+      { username },
+      {
+        onSuccess: data => {
+          window.location.href = data.redirect || '/fg/browse';
+        }
       }
-    } catch {
-      setLoginError('Network error. Please try again.');
-      setIsSubmitting(false);
-    }
+    );
   };
 
   if (loading) {
@@ -162,22 +145,24 @@ export default function Home() {
                   <input
                     autoFocus
                     className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
-                    disabled={isSubmitting}
+                    disabled={simpleLoginMutation.isPending}
                     id="username"
                     name="username"
                     required
                     type="text"
                   />
                 </div>
-                {loginError ? (
-                  <div className="text-sm text-error">{loginError}</div>
+                {simpleLoginMutation.error ? (
+                  <div className="text-sm text-error">
+                    {simpleLoginMutation.error.message}
+                  </div>
                 ) : null}
                 <button
                   className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  disabled={isSubmitting}
+                  disabled={simpleLoginMutation.isPending}
                   type="submit"
                 >
-                  {isSubmitting ? 'Logging in...' : 'Log In'}
+                  {simpleLoginMutation.isPending ? 'Logging in...' : 'Log In'}
                 </button>
               </form>
             </div>
