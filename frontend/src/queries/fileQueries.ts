@@ -373,8 +373,62 @@ export function useChangePermissionsMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: changePermissions,
+    onMutate: async variables => {
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({
+        queryKey: fileQueryKeys.fspName(variables.fspName)
+      });
+
+      // Snapshot the previous value for rollback on error
+      const previousData = queryClient.getQueriesData({
+        queryKey: fileQueryKeys.fspName(variables.fspName)
+      });
+
+      // Optimistically update all relevant queries
+      queryClient.setQueriesData(
+        { queryKey: fileQueryKeys.fspName(variables.fspName) },
+        (old: FileQueryData | undefined) => {
+          if (!old) {
+            return old;
+          }
+
+          // Update the current file/folder if it matches
+          const updatedCurrentFileOrFolder =
+            old.currentFileOrFolder?.path === variables.filePath
+              ? {
+                  ...old.currentFileOrFolder,
+                  permissions: variables.permissions
+                }
+              : old.currentFileOrFolder;
+
+          // Update the file in the files array if it exists
+          const updatedFiles = old.files.map(file =>
+            file.path === variables.filePath
+              ? { ...file, permissions: variables.permissions }
+              : file
+          );
+
+          return {
+            ...old,
+            currentFileOrFolder: updatedCurrentFileOrFolder,
+            files: updatedFiles
+          };
+        }
+      );
+
+      // Return context for rollback
+      return { previousData };
+    },
+    onError: (_err, _variables, context) => {
+      // Rollback to the previous data on error
+      if (context?.previousData) {
+        context.previousData.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+    },
     onSuccess: (_, variables) => {
-      // Invalidate the parent directory's file list
+      // Invalidate the parent directory's file list to ensure consistency
       queryClient.invalidateQueries({
         queryKey: fileQueryKeys.fspName(variables.fspName)
       });

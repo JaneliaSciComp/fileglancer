@@ -186,6 +186,41 @@ export const FileBrowserContextProvider = ({
     fileQuery.data?.currentFileOrFolder
   ]);
 
+  // Update propertiesTarget when the selected file's data changes in the query cache
+  // This ensures optimistic updates to permissions are reflected in the properties drawer
+  // which reads from propertiesTarget, not currentFileOrFolder directly
+  React.useEffect(() => {
+    if (
+      !fileBrowserState.propertiesTarget ||
+      !fileQuery.data?.currentFileOrFolder
+    ) {
+      return;
+    }
+
+    // If we have a propertiesTarget selected, check if its data has been updated in the query
+    const updatedFile = fileQuery.data.files.find(
+      f => f.path === fileBrowserState.propertiesTarget?.path
+    );
+
+    // If the file exists in the files array and has been updated, update propertiesTarget
+    if (updatedFile) {
+      setFileBrowserState(prev => ({
+        ...prev,
+        propertiesTarget: updatedFile
+      }));
+    }
+    // If propertiesTarget is the current folder itself, update it from currentFileOrFolder
+    else if (
+      fileBrowserState.propertiesTarget.path ===
+      fileQuery.data.currentFileOrFolder.path
+    ) {
+      setFileBrowserState(prev => ({
+        ...prev,
+        propertiesTarget: fileQuery.data.currentFileOrFolder
+      }));
+    }
+  }, [fileQuery.data, fileBrowserState.propertiesTarget]);
+
   return (
     <FileBrowserContext.Provider
       value={{
