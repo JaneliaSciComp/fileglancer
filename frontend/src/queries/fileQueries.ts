@@ -1,5 +1,11 @@
 import React from 'react';
-import { useQuery, UseQueryResult } from '@tanstack/react-query';
+import {
+  useQuery,
+  UseQueryResult,
+  useMutation,
+  UseMutationResult,
+  useQueryClient
+} from '@tanstack/react-query';
 
 import { FetchError } from './queryUtils';
 import { sendFetchRequest, getFileBrowsePath, makeMapKey } from '@/utils';
@@ -186,4 +192,192 @@ export default function useFileQuery(
     ...query,
     data: dataWithFallback
   } as UseQueryResult<FileQueryData, Error>;
+}
+
+// Mutation Hooks
+
+// Mutation key factory
+export const fileMutationKeys = {
+  delete: (fspName: string, filePath: string) =>
+    ['files', 'delete', fspName, filePath] as const,
+  create: (fspName: string, filePath: string) =>
+    ['files', 'create', fspName, filePath] as const,
+  rename: (fspName: string, filePath: string) =>
+    ['files', 'rename', fspName, filePath] as const,
+  permissions: (fspName: string, filePath: string) =>
+    ['files', 'permissions', fspName, filePath] as const
+};
+
+type DeleteFileParams = {
+  fspName: string;
+  filePath: string;
+};
+
+async function deleteFile({
+  fspName,
+  filePath
+}: DeleteFileParams): Promise<void> {
+  const url = getFileBrowsePath(fspName, filePath);
+  const response = await sendFetchRequest(url, 'DELETE');
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new FetchError(response, 'Permission denied');
+    }
+    const body = await response.json().catch(() => ({}));
+    const errorMessage =
+      body.error || `Failed to delete file (${response.status})`;
+    throw new FetchError(response, errorMessage);
+  }
+}
+
+export function useDeleteFileMutation(): UseMutationResult<
+  void,
+  Error,
+  DeleteFileParams
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteFile,
+    onSuccess: (_, variables) => {
+      // Invalidate the parent directory's file list
+      queryClient.invalidateQueries({
+        queryKey: fileQueryKeys.fspName(variables.fspName)
+      });
+    }
+  });
+}
+
+type CreateFolderParams = {
+  fspName: string;
+  folderPath: string;
+};
+
+async function createFolder({
+  fspName,
+  folderPath
+}: CreateFolderParams): Promise<void> {
+  const url = getFileBrowsePath(fspName, folderPath);
+  const response = await sendFetchRequest(url, 'POST', {
+    type: 'directory'
+  });
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new FetchError(response, 'Permission denied');
+    }
+    const body = await response.json().catch(() => ({}));
+    const errorMessage =
+      body.error || `Failed to create folder (${response.status})`;
+    throw new FetchError(response, errorMessage);
+  }
+}
+
+export function useCreateFolderMutation(): UseMutationResult<
+  void,
+  Error,
+  CreateFolderParams
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: createFolder,
+    onSuccess: (_, variables) => {
+      // Invalidate the parent directory's file list
+      queryClient.invalidateQueries({
+        queryKey: fileQueryKeys.fspName(variables.fspName)
+      });
+    }
+  });
+}
+
+type RenameFileParams = {
+  fspName: string;
+  oldPath: string;
+  newPath: string;
+};
+
+async function renameFile({
+  fspName,
+  oldPath,
+  newPath
+}: RenameFileParams): Promise<void> {
+  const url = getFileBrowsePath(fspName, oldPath);
+  const response = await sendFetchRequest(url, 'PATCH', {
+    path: newPath
+  });
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new FetchError(response, 'Permission denied');
+    }
+    const body = await response.json().catch(() => ({}));
+    const errorMessage =
+      body.error || `Failed to rename file (${response.status})`;
+    throw new FetchError(response, errorMessage);
+  }
+}
+
+export function useRenameFileMutation(): UseMutationResult<
+  void,
+  Error,
+  RenameFileParams
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: renameFile,
+    onSuccess: (_, variables) => {
+      // Invalidate the parent directory's file list
+      queryClient.invalidateQueries({
+        queryKey: fileQueryKeys.fspName(variables.fspName)
+      });
+    }
+  });
+}
+
+type ChangePermissionsParams = {
+  fspName: string;
+  filePath: string;
+  permissions: string;
+};
+
+async function changePermissions({
+  fspName,
+  filePath,
+  permissions
+}: ChangePermissionsParams): Promise<void> {
+  const url = getFileBrowsePath(fspName, filePath);
+  const response = await sendFetchRequest(url, 'PATCH', {
+    permissions
+  });
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new FetchError(response, 'Permission denied');
+    }
+    const body = await response.json().catch(() => ({}));
+    const errorMessage =
+      body.error || `Failed to change permissions (${response.status})`;
+    throw new FetchError(response, errorMessage);
+  }
+}
+
+export function useChangePermissionsMutation(): UseMutationResult<
+  void,
+  Error,
+  ChangePermissionsParams
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: changePermissions,
+    onSuccess: (_, variables) => {
+      // Invalidate the parent directory's file list
+      queryClient.invalidateQueries({
+        queryKey: fileQueryKeys.fspName(variables.fspName)
+      });
+    }
+  });
 }
