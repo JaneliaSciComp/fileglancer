@@ -4,11 +4,10 @@ import { Link } from 'react-router-dom';
 import { IconButton, List, Typography } from '@material-tailwind/react';
 import { HiOutlineFolder } from 'react-icons/hi2';
 import { HiStar } from 'react-icons/hi';
+import { useQueryClient } from '@tanstack/react-query';
 
 import {
   makeMapKey,
-  getFileBrowsePath,
-  sendFetchRequest,
   getLastSegmentFromPath,
   getPreferredPathForDisplay,
   makeBrowseLink
@@ -16,6 +15,7 @@ import {
 import MissingFolderFavoriteDialog from './MissingFolderFavoriteDialog';
 import FgTooltip from '../widgets/FgTooltip';
 import type { FileSharePath } from '@/shared.types';
+import { fileQueryKeys } from '@/queries/fileQueries';
 
 import {
   FolderFavorite,
@@ -39,6 +39,7 @@ export default function Folder({
   const [showMissingFolderFavoriteDialog, setShowMissingFolderFavoriteDialog] =
     React.useState(false);
   const { pathPreference, handleFavoriteChange } = usePreferencesContext();
+  const queryClient = useQueryClient();
 
   const folderFavorite = React.useMemo(() => {
     if (isFavoritable) {
@@ -69,18 +70,22 @@ export default function Folder({
       return;
     }
     try {
-      const fetchPath = getFileBrowsePath(
-        folderFavorite.fsp.name,
-        folderFavorite.folderPath
-      );
-      const response = await sendFetchRequest(fetchPath, 'GET');
+      // Use queryClient.fetchQuery to check if folder exists
+      // This leverages the existing query infrastructure and caching
+      await queryClient.fetchQuery({
+        queryKey: fileQueryKeys.filePath(fsp.name, folderPath),
+        retry: false, // Don't retry on 404
+        staleTime: 0 // Always fetch fresh data for this check
+      });
 
-      if (response.status === 200) {
-        return true;
-      } else {
+      // If fetchQuery succeeds, folder exists
+      return true;
+    } catch (error) {
+      // Check if it's a 404 error (folder doesn't exist)
+      if (error instanceof Error && error.message === 'Folder not found') {
         return false;
       }
-    } catch (error) {
+      // For other errors (403, network issues, etc.), log and return false
       log.error('Error checking folder existence:', error);
       return false;
     }
