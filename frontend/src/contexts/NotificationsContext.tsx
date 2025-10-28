@@ -1,24 +1,14 @@
 import React from 'react';
-import { sendFetchRequest } from '@/utils';
-import type { Result } from '@/shared.types';
-import { createSuccess, handleError, toHttpError } from '@/utils/errorHandling';
-import { usePageVisibility } from '@/hooks/usePageVisibility';
+import { useNotificationsQuery } from '@/queries/notificationQueries';
+import type { Notification } from '@/queries/notificationQueries';
 import logger from '@/logger';
-
-export type Notification = {
-  id: number;
-  type: 'info' | 'warning' | 'success' | 'error';
-  title: string;
-  message: string;
-  active: boolean;
-  created_at: string;
-  expires_at?: string;
-};
 
 type NotificationContextType = {
   notifications: Notification[];
   dismissedNotifications: number[];
-  error: string | null;
+  isLoading: boolean;
+  isFetching: boolean;
+  error: Error | null;
   dismissNotification: (id: number) => void;
 };
 
@@ -41,12 +31,12 @@ export const NotificationProvider = ({
 }: {
   readonly children: React.ReactNode;
 }) => {
-  const [notifications, setNotifications] = React.useState<Notification[]>([]);
   const [dismissedNotifications, setDismissedNotifications] = React.useState<
     number[]
   >([]);
-  const [error, setError] = React.useState<string | null>(null);
-  const isPageVisible = usePageVisibility();
+
+  // Use TanStack Query for data fetching
+  const { data, isLoading, isFetching, error } = useNotificationsQuery();
 
   // Load dismissed notifications from localStorage
   React.useEffect(() => {
@@ -63,29 +53,6 @@ export const NotificationProvider = ({
     }
   }, []);
 
-  const fetchNotifications = React.useCallback(async (): Promise<
-    Result<Notification[] | null>
-  > => {
-    setError(null);
-
-    try {
-      const response = await sendFetchRequest('/api/notifications', 'GET');
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data?.notifications) {
-          return createSuccess(data.notifications as Notification[]);
-        }
-        // Not an error, just no notifications available
-        return createSuccess(null);
-      } else {
-        throw await toHttpError(response);
-      }
-    } catch (error) {
-      return handleError(error);
-    }
-  }, []);
-
   const dismissNotification = React.useCallback(
     (id: number) => {
       const newDismissed = [...dismissedNotifications, id];
@@ -98,41 +65,13 @@ export const NotificationProvider = ({
     [dismissedNotifications]
   );
 
-  // Fetch notifications on mount and then every minute (only when page is visible)
-  React.useEffect(() => {
-    const fetchAndSetNotifications = async () => {
-      const result = await fetchNotifications();
-      if (result.success) {
-        setNotifications(result.data || []);
-      } else {
-        setError(`Error fetching notifications: ${result.error}`);
-      }
-    };
-
-    // Only fetch and set up polling if page is visible
-    if (!isPageVisible) {
-      logger.debug('Page hidden - skipping notification polling');
-      return;
-    }
-
-    // Initial fetch
-    fetchAndSetNotifications();
-
-    // Set up interval to fetch every minute (60000ms)
-    const interval = setInterval(fetchAndSetNotifications, 60000);
-
-    // Cleanup interval on unmount or when page becomes hidden
-    return () => {
-      clearInterval(interval);
-      logger.debug('Notification polling stopped');
-    };
-  }, [fetchNotifications, isPageVisible]);
-
   return (
     <NotificationContext.Provider
       value={{
-        notifications,
+        notifications: data || [],
         dismissedNotifications,
+        isLoading,
+        isFetching,
         error,
         dismissNotification
       }}

@@ -9,7 +9,7 @@ import App from './App';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 20 * 1000 // 20 seconds; suggested as a minimum here: https://tkdodo.eu/blog/react-query-as-a-state-manager
+      staleTime: 30 * 1000 // 30 seconds; 20s is the minimum suggested here: https://tkdodo.eu/blog/react-query-as-a-state-manager
     }
   }
 });
