@@ -16,7 +16,6 @@ import TextWithFilePath from './TextWithFilePath';
 import AutomaticLinksToggle from '@/components/ui/PreferencesPage/AutomaticLinksToggle';
 
 interface CommonDataLinkDialogProps {
-  getDisplayPath?: () => string;
   showDataLinkDialog: boolean;
   setShowDataLinkDialog: React.Dispatch<React.SetStateAction<boolean>>;
 }
