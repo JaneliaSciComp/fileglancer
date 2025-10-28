@@ -2,7 +2,9 @@ pre-push:
   parallel: true
   jobs:
     - name: Run Prettier check; fix if check fails
-      run: pixi run ./frontend/prettier-check-and-fix.sh
+      root: frontend/
+      run: pixi run ./prettier-check-and-fix.sh
 
     - name: Run ESLint check
+      root: frontend/
       run: pixi run node-eslint-check
