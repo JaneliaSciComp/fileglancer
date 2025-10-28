@@ -467,7 +467,8 @@ export const PreferencesProvider = ({
     pathPreference: preferencesQuery.data?.pathPreference || ['linux_path'],
     layout: preferencesQuery.data?.layout || '',
     hideDotFiles: preferencesQuery.data?.hideDotFiles || false,
-    areDataLinksAutomatic: preferencesQuery.data?.areDataLinksAutomatic ?? true,
+    areDataLinksAutomatic:
+      preferencesQuery.data?.areDataLinksAutomatic ?? false,
     disableNeuroglancerStateGeneration:
       preferencesQuery.data?.disableNeuroglancerStateGeneration || false,
     disableHeuristicalLayerTypeDetection:
