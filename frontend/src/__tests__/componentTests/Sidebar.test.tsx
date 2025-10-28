@@ -13,7 +13,10 @@ describe('Sidebar', () => {
   });
 
   it('displays all zones initially', async () => {
-    expect(screen.getByText('Zone1')).toBeInTheDocument();
+    // Wait for zones to load from the API
+    await waitFor(() => {
+      expect(screen.getByText('Zone1')).toBeInTheDocument();
+    });
     expect(screen.getByText('Zone2')).toBeInTheDocument();
   });
 
