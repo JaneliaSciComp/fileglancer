@@ -3,6 +3,7 @@ import React from 'react';
 import { MemoryRouter, Route, Routes, useParams } from 'react-router';
 import { render, RenderOptions } from '@testing-library/react';
 import { ErrorBoundary } from 'react-error-boundary';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { ZonesAndFspMapContextProvider } from '@/contexts/ZonesAndFspMapContext';
 import { FileBrowserContextProvider } from '@/contexts/FileBrowserContext';
@@ -64,19 +65,31 @@ const MockRouterAndProviders = ({
   children: React.ReactNode;
   initialEntries?: string[];
 }) => {
+  // Create a new QueryClient for each test to ensure isolation
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false, // Disable retries in tests
+        staleTime: 30 * 1000
+      }
+    }
+  });
+
   return (
-    <ErrorBoundary FallbackComponent={ErrorFallback}>
-      <MemoryRouter initialEntries={initialEntries}>
-        <Routes>
-          <Route path="browse" element={<Browse>{children}</Browse>} />
-          <Route path="browse/:fspName" element={<Browse>{children}</Browse>} />
-          <Route
-            path="browse/:fspName/*"
-            element={<Browse>{children}</Browse>}
-          />
-        </Routes>
-      </MemoryRouter>
-    </ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ErrorBoundary FallbackComponent={ErrorFallback}>
+        <MemoryRouter initialEntries={initialEntries}>
+          <Routes>
+            <Route path="browse" element={<Browse>{children}</Browse>} />
+            <Route path="browse/:fspName" element={<Browse>{children}</Browse>} />
+            <Route
+              path="browse/:fspName/*"
+              element={<Browse>{children}</Browse>}
+            />
+          </Routes>
+        </MemoryRouter>
+      </ErrorBoundary>
+    </QueryClientProvider>
   );
 };
 
