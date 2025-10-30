@@ -2,34 +2,24 @@
  * Configuration for Playwright for standalone Fileglancer app
  */
 import { defineConfig } from '@playwright/test';
-import { mkdtempSync, mkdirSync } from 'fs';
+import { mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { writeFilesSync } from './mocks/files.js';
-import { createZarrDirsSync } from './mocks/zarrDirs.js';
 
-// Create a unique temp directory for this test run ONLY if not already set
-// This ensures all workers share the same temp directory
+// Create temp directory for this test run
+// Use fixed directory path so file share paths remain consistent across runs
+// This is especially important in non-CI mode when reuseExistingServer is true
 let testTempDir = process.env.TEST_TEMP_DIR;
 
 if (!testTempDir) {
-  testTempDir = mkdtempSync(join(tmpdir(), 'fg-playwright-'));
+  testTempDir = join(tmpdir(), 'fg-playwright-test');
   process.env.TEST_TEMP_DIR = testTempDir;
 
-  const primaryDir = join(testTempDir, 'primary');
   const scratchDir = join(testTempDir, 'scratch');
-  mkdirSync(primaryDir, { recursive: true });
   mkdirSync(scratchDir, { recursive: true });
-
-  // Create default test files (f1, f2, f3) for file-operations tests
-  writeFilesSync(scratchDir);
-
-  // Create Zarr test directories for load-zarr-files tests
-  createZarrDirsSync(scratchDir);
 }
 
 const testDbPath = join(testTempDir, 'test.db');
-const primaryDir = join(testTempDir, 'primary');
 const scratchDir = join(testTempDir, 'scratch');
 
 // Export temp directory path for tests and global teardown
@@ -53,9 +43,7 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       FGC_DB_URL: `sqlite:///${testDbPath}`,
-      FGC_FILE_SHARE_MOUNTS: JSON.stringify([primaryDir, scratchDir])
+      FGC_FILE_SHARE_MOUNTS: JSON.stringify([scratchDir])
     }
-  },
-  // Clean up temp directory after all tests complete
-  globalTeardown: './global-teardown.js'
+  }
 });
