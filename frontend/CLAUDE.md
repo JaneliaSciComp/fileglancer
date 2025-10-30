@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code when working with the frontend code in this directory.
 
-> **Note**: This is a subdirectory-specific guide. For full project context, see [../CLAUDE.md](../CLAUDE.md) in the root directory.
+> **Note**: This is a subdirectory-specific guide. For full project context, look for a CLAUDE.md in the root directory.
 
 ## Directory Overview
 
@@ -410,4 +410,4 @@ export function useUpdateMyData() {
 
 ---
 
-For backend development, database migrations, or full-stack workflows, see [../CLAUDE.md](../CLAUDE.md) in the root directory.
+For backend development, database migrations, or full-stack workflows, look for a CLAUDE.md in the root directory.
