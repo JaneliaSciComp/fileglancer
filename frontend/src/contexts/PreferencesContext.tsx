@@ -1,5 +1,4 @@
 import React from 'react';
-import { default as log } from '@/logger';
 
 import type { FileSharePath, Zone } from '@/shared.types';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
