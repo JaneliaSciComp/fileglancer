@@ -39,7 +39,8 @@ async function fetchZarrMetadata({
   files
 }: ZarrMetadataQueryParams): Promise<ZarrMetadataResult> {
   if (!fspName || !currentFileOrFolder || !files) {
-    throw new Error('Missing required parameters for Zarr metadata fetch');
+    log.warn('Missing required parameters for Zarr metadata fetch');
+    return { metadata: null, omeZarrUrl: null };
   }
 
   const imageUrl = getFileURL(fspName, currentFileOrFolder.path);
@@ -83,11 +84,11 @@ async function fetchZarrMetadata({
         };
       } else {
         log.info('Zarrv3 group has no multiscales', attrs.attributes);
-        throw new Error('Zarr v3 group has no multiscales');
+        return { metadata: null, omeZarrUrl: null };
       }
     } else {
       log.warn('Unknown Zarrv3 node type', attrs.node_type);
-      throw new Error(`Unknown Zarr v3 node type: ${attrs.node_type}`);
+      return { metadata: null, omeZarrUrl: null };
     }
   }
 
@@ -129,8 +130,9 @@ async function fetchZarrMetadata({
     }
   }
 
-  // No Zarr metadata found
-  throw new Error('No Zarr metadata files found');
+  // No Zarr metadata found - this is expected for non-Zarr files
+  log.debug('No Zarr metadata files found for', imageUrl);
+  return { metadata: null, omeZarrUrl: null };
 }
 
 /**
@@ -148,7 +150,15 @@ export function useZarrMetadataQuery(
       fspName || '',
       currentFileOrFolder?.path || ''
     ],
-    queryFn: () => fetchZarrMetadata(params),
+    queryFn: async () => {
+      try {
+        return await fetchZarrMetadata(params);
+      } catch (error) {
+        log.error('Error fetching Zarr metadata:', error);
+        // Return null result instead of throwing to avoid error boundary
+        return { metadata: null, omeZarrUrl: null };
+      }
+    },
     enabled: !!fspName && !!currentFileOrFolder && !!files && files.length > 0,
     staleTime: 5 * 60 * 1000, // 5 minutes - Zarr metadata doesn't change often
     retry: false // Don't retry if no Zarr files found
@@ -193,7 +203,18 @@ export function useOmeZarrThumbnailQuery(
 ): UseQueryResult<ThumbnailResult, Error> {
   return useQuery({
     queryKey: ['zarr', 'thumbnail', omeZarrUrl || ''],
-    queryFn: ({ signal }) => fetchOmeZarrThumbnail(omeZarrUrl!, signal),
+    queryFn: async ({ signal }) => {
+      try {
+        return await fetchOmeZarrThumbnail(omeZarrUrl!, signal);
+      } catch (error) {
+        log.error('Error fetching OME-Zarr thumbnail:', error);
+        // Return error result instead of throwing to avoid error boundary
+        return {
+          thumbnailSrc: null,
+          thumbnailError: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
     enabled: !!omeZarrUrl,
     staleTime: 30 * 60 * 1000, // 30 minutes - thumbnails are expensive to generate
     retry: false
