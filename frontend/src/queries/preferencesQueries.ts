@@ -210,7 +210,7 @@ const createTransformPreferences = (
       pathPreference: rawData.path?.value || ['linux_path'],
       layout: rawData.layout?.value || '',
       hideDotFiles: rawData.hideDotFiles?.value || false,
-      areDataLinksAutomatic: rawData.areDataLinksAutomatic?.value ?? true,
+      areDataLinksAutomatic: rawData.areDataLinksAutomatic?.value ?? false,
       disableNeuroglancerStateGeneration:
         rawData.disableNeuroglancerStateGeneration?.value || false,
       disableHeuristicalLayerTypeDetection:
