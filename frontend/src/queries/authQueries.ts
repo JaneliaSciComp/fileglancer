@@ -1,4 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  QueryFunctionContext
+} from '@tanstack/react-query';
 
 import { sendFetchRequest } from '@/utils';
 
@@ -18,14 +23,18 @@ export type SimpleLoginResponse = {
 };
 
 export const useAuthStatusQuery = () => {
-  const fetchAuthStatus = async (): Promise<AuthStatus> => {
-    const response = await sendFetchRequest('/api/auth/status', 'GET');
+  const fetchAuthStatus = async ({
+    signal
+  }: QueryFunctionContext): Promise<AuthStatus> => {
+    const response = await sendFetchRequest('/api/auth/status', 'GET', undefined, {
+      signal
+    });
     return await response.json();
   };
 
   return useQuery<AuthStatus, Error>({
     queryKey: ['auth', 'status'],
-    queryFn: async () => fetchAuthStatus(),
+    queryFn: fetchAuthStatus,
     retry: false // Don't retry auth failures automatically
   });
 };
@@ -38,11 +47,12 @@ export const useSimpleLoginMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation<SimpleLoginResponse, Error, SimpleLoginPayload>({
-    mutationFn: async (payload: SimpleLoginPayload) => {
+    mutationFn: async (payload: SimpleLoginPayload, { signal }) => {
       const response = await sendFetchRequest(
         '/api/auth/simple-login',
         'POST',
-        payload
+        payload,
+        { signal }
       );
 
       if (!response.ok) {

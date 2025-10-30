@@ -54,9 +54,9 @@ function sortProxiedPathsByDate(paths: ProxiedPath[]): ProxiedPath[] {
  * Fetches all proxied paths from the backend
  * Returns empty array if no paths exist (404)
  */
-const fetchAllProxiedPaths = async (): Promise<ProxiedPath[]> => {
+const fetchAllProxiedPaths = async (signal?: AbortSignal): Promise<ProxiedPath[]> => {
   try {
-    const response = await sendFetchRequest('/api/proxied-path', 'GET');
+    const response = await sendFetchRequest('/api/proxied-path', 'GET', undefined, { signal });
     if (response.status === 404) {
       // Not an error, just no proxied paths available
       return [];
@@ -83,12 +83,15 @@ const fetchAllProxiedPaths = async (): Promise<ProxiedPath[]> => {
  */
 const fetchProxiedPathByFspAndPath = async (
   fspName: string,
-  path: string
+  path: string,
+  signal?: AbortSignal
 ): Promise<ProxiedPath | null> => {
   try {
     const response = await sendFetchRequest(
       `/api/proxied-path?fsp_name=${fspName}&path=${path}`,
-      'GET'
+      'GET',
+      undefined,
+      { signal }
     );
 
     if (response.status === 404) {
@@ -124,7 +127,7 @@ export function useAllProxiedPathsQuery(): UseQueryResult<
 > {
   return useQuery<ProxiedPath[], Error>({
     queryKey: proxiedPathQueryKeys.list(),
-    queryFn: fetchAllProxiedPaths
+    queryFn: ({ signal }) => fetchAllProxiedPaths(signal)
   });
 }
 
@@ -142,7 +145,7 @@ export function useProxiedPathByFspAndPathQuery(
 ): UseQueryResult<ProxiedPath | null, Error> {
   return useQuery<ProxiedPath | null, Error>({
     queryKey: proxiedPathQueryKeys.detail(fspName ?? '', path ?? ''),
-    queryFn: () => fetchProxiedPathByFspAndPath(fspName!, path!),
+    queryFn: ({ signal }) => fetchProxiedPathByFspAndPath(fspName!, path!, signal),
     enabled: !!fspName && !!path
   });
 }
@@ -163,10 +166,12 @@ export function useCreateProxiedPathMutation(): UseMutationResult<
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: CreateProxiedPathPayload) => {
+    mutationFn: async (payload: CreateProxiedPathPayload, { signal }) => {
       const response = await sendFetchRequest(
         `/api/proxied-path?fsp_name=${encodeURIComponent(payload.fsp_name)}&path=${encodeURIComponent(payload.path)}`,
-        'POST'
+        'POST',
+        undefined,
+        { signal }
       );
       if (!response.ok) {
         throw await toHttpError(response);
@@ -230,10 +235,12 @@ export function useDeleteProxiedPathMutation(): UseMutationResult<
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: DeleteProxiedPathPayload) => {
+    mutationFn: async (payload: DeleteProxiedPathPayload, { signal }) => {
       const response = await sendFetchRequest(
         `/api/proxied-path/${payload.sharing_key}`,
-        'DELETE'
+        'DELETE',
+        undefined,
+        { signal }
       );
       if (!response.ok) {
         throw await toHttpError(response);

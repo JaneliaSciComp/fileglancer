@@ -93,9 +93,9 @@ export const preferencesQueryKeys = {
  * Fetches all preferences from the backend
  * Returns empty object if no preferences exist (404)
  */
-const fetchPreferences = async (): Promise<PreferencesApiResponse> => {
+const fetchPreferences = async (signal?: AbortSignal): Promise<PreferencesApiResponse> => {
   try {
-    const response = await sendFetchRequest('/api/preference', 'GET');
+    const response = await sendFetchRequest('/api/preference', 'GET', undefined, { signal });
     if (!response.ok && response.status === 404) {
       return {}; // No preferences found, return empty object
     }
@@ -238,7 +238,7 @@ export function usePreferencesQuery(
 
   return useQuery<PreferencesApiResponse, Error, PreferencesQueryData>({
     queryKey: preferencesQueryKeys.all,
-    queryFn: fetchPreferences,
+    queryFn: ({ signal }) => fetchPreferences(signal),
     select: transformPreferences,
     enabled: !!zonesAndFspMap // Don't fetch until zones/FSPs are loaded
   });
@@ -261,10 +261,10 @@ export function useUpdatePreferenceMutation(): UseMutationResult<
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async <T>({ key, value }: UpdatePreferencePayload<T>) => {
+    mutationFn: async <T>({ key, value }: UpdatePreferencePayload<T>, { signal }) => {
       const response = await sendFetchRequest(`/api/preference/${key}`, 'PUT', {
         value
-      });
+      }, { signal });
       if (!response.ok) {
         throw await toHttpError(response);
       }
@@ -343,11 +343,12 @@ export function useUpdateFavoritesMutation(): UseMutationResult<
     mutationFn: async ({
       preferenceKey,
       updatedMap
-    }: FavoriteUpdatePayload) => {
+    }: FavoriteUpdatePayload, { signal }) => {
       const response = await sendFetchRequest(
         `/api/preference/${preferenceKey}`,
         'PUT',
-        { value: Object.values(updatedMap) }
+        { value: Object.values(updatedMap) },
+        { signal }
       );
       if (!response.ok) {
         throw await toHttpError(response);
@@ -417,11 +418,12 @@ export function useUpdateRecentlyViewedFoldersMutation(): UseMutationResult<
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (folders: FolderPreference[]) => {
+    mutationFn: async (folders: FolderPreference[], { signal }) => {
       const response = await sendFetchRequest(
         '/api/preference/recentlyViewedFolders',
         'PUT',
-        { value: folders }
+        { value: folders },
+        { signal }
       );
       if (!response.ok) {
         throw await toHttpError(response);

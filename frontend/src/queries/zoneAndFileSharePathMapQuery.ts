@@ -1,4 +1,8 @@
-import { useQuery, UseQueryResult } from '@tanstack/react-query';
+import {
+  useQuery,
+  UseQueryResult,
+  QueryFunctionContext
+} from '@tanstack/react-query';
 
 import { sendFetchRequest, makeMapKey } from '@/utils';
 import { removeTrailingSlashes } from '@/utils/pathHandling';
@@ -8,8 +12,12 @@ export default function useZoneAndFileSharePathMapQuery(): UseQueryResult<
   ZonesAndFileSharePathsMap,
   Error
 > {
-  const getZones = async (): Promise<{ paths: FileSharePath[] }> => {
-    const response = await sendFetchRequest('/api/file-share-paths', 'GET');
+  const getZones = async ({
+    signal
+  }: QueryFunctionContext): Promise<{ paths: FileSharePath[] }> => {
+    const response = await sendFetchRequest('/api/file-share-paths', 'GET', undefined, {
+      signal
+    });
     return await response.json();
   };
 

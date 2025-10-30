@@ -4,7 +4,8 @@ import {
   UseQueryResult,
   useMutation,
   UseMutationResult,
-  useQueryClient
+  useQueryClient,
+  QueryFunctionContext
 } from '@tanstack/react-query';
 
 import { FetchError } from './queryUtils';
@@ -39,14 +40,16 @@ export default function useFileQuery(
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
 
   // Function to fetch files for the current FSP and current folder
-  const fetchFileInfo = async (): Promise<FileBrowserResponse> => {
+  const fetchFileInfo = async ({
+    signal
+  }: QueryFunctionContext): Promise<FileBrowserResponse> => {
     if (!fspName) {
       throw new Error('No file share path selected');
     }
 
     const url = getFileBrowsePath(fspName, folderName);
 
-    const response = await sendFetchRequest(url, 'GET');
+    const response = await sendFetchRequest(url, 'GET', undefined, { signal });
     const body = await response.json();
 
     if (response.ok) {
@@ -211,14 +214,16 @@ export const fileMutationKeys = {
 type DeleteFileParams = {
   fspName: string;
   filePath: string;
+  signal?: AbortSignal;
 };
 
 async function deleteFile({
   fspName,
-  filePath
+  filePath,
+  signal
 }: DeleteFileParams): Promise<void> {
   const url = getFileBrowsePath(fspName, filePath);
-  const response = await sendFetchRequest(url, 'DELETE');
+  const response = await sendFetchRequest(url, 'DELETE', undefined, { signal });
 
   if (!response.ok) {
     if (response.status === 403) {
@@ -252,16 +257,23 @@ export function useDeleteFileMutation(): UseMutationResult<
 type CreateFolderParams = {
   fspName: string;
   folderPath: string;
+  signal?: AbortSignal;
 };
 
 async function createFolder({
   fspName,
-  folderPath
+  folderPath,
+  signal
 }: CreateFolderParams): Promise<void> {
   const url = getFileBrowsePath(fspName, folderPath);
-  const response = await sendFetchRequest(url, 'POST', {
-    type: 'directory'
-  });
+  const response = await sendFetchRequest(
+    url,
+    'POST',
+    {
+      type: 'directory'
+    },
+    { signal }
+  );
 
   if (!response.ok) {
     if (response.status === 403) {
@@ -296,17 +308,24 @@ type RenameFileParams = {
   fspName: string;
   oldPath: string;
   newPath: string;
+  signal?: AbortSignal;
 };
 
 async function renameFile({
   fspName,
   oldPath,
-  newPath
+  newPath,
+  signal
 }: RenameFileParams): Promise<void> {
   const url = getFileBrowsePath(fspName, oldPath);
-  const response = await sendFetchRequest(url, 'PATCH', {
-    path: newPath
-  });
+  const response = await sendFetchRequest(
+    url,
+    'PATCH',
+    {
+      path: newPath
+    },
+    { signal }
+  );
 
   if (!response.ok) {
     if (response.status === 403) {
@@ -341,17 +360,24 @@ type ChangePermissionsParams = {
   fspName: string;
   filePath: string;
   permissions: string;
+  signal?: AbortSignal;
 };
 
 async function changePermissions({
   fspName,
   filePath,
-  permissions
+  permissions,
+  signal
 }: ChangePermissionsParams): Promise<void> {
   const url = getFileBrowsePath(fspName, filePath);
-  const response = await sendFetchRequest(url, 'PATCH', {
-    permissions
-  });
+  const response = await sendFetchRequest(
+    url,
+    'PATCH',
+    {
+      permissions
+    },
+    { signal }
+  );
 
   if (!response.ok) {
     if (response.status === 403) {

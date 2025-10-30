@@ -28,12 +28,15 @@ export const externalBucketQueryKeys = {
  * Returns null if no external bucket exists (404)
  */
 const fetchExternalBucket = async (
-  fspName: string
+  fspName: string,
+  signal?: AbortSignal
 ): Promise<ExternalBucket | null> => {
   try {
     const response = await sendFetchRequest(
       `/api/external-buckets/${fspName}`,
-      'GET'
+      'GET',
+      undefined,
+      { signal }
     );
 
     if (response.status === 404) {
@@ -76,7 +79,7 @@ export function useExternalBucketQuery(
 
   return useQuery<ExternalBucket | null, Error>({
     queryKey: externalBucketQueryKeys.byFsp(fspName ?? ''),
-    queryFn: () => fetchExternalBucket(fspName!),
+    queryFn: ({ signal }) => fetchExternalBucket(fspName!, signal),
     enabled: shouldFetch,
     staleTime: 5 * 60 * 1000 // 5 minutes - external buckets rarely change
   });

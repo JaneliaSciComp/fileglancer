@@ -1,4 +1,8 @@
-import { useQuery, UseQueryResult } from '@tanstack/react-query';
+import {
+  useQuery,
+  UseQueryResult,
+  QueryFunctionContext
+} from '@tanstack/react-query';
 
 import { fetchFileWithTextDetection } from '@/utils';
 
@@ -14,14 +18,12 @@ export function useFileContentQuery(
 ): UseQueryResult<string, Error> {
   return useQuery<string, Error>({
     queryKey: fileContentQueryKeys.detail(fspName || '', filePath),
-    queryFn: async () => {
-      if (!fspName) {
-        throw new Error('No file share path selected');
-      }
-
-      const { content } = await fetchFileWithTextDetection(fspName, filePath);
+    queryFn: async ({ signal }: QueryFunctionContext) => {
+      const { content } = await fetchFileWithTextDetection(fspName!, filePath, {
+        signal
+      });
       return content;
     },
-    enabled: !!fspName
+    enabled: !!fspName && !!filePath
   });
 }

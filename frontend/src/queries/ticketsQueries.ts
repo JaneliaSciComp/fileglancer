@@ -50,9 +50,9 @@ function sortTicketsByDate(tickets: Ticket[]): Ticket[] {
  * Fetches all tickets from the backend
  * Returns empty array if no tickets exist (404)
  */
-const fetchAllTickets = async (): Promise<Ticket[]> => {
+const fetchAllTickets = async (signal?: AbortSignal): Promise<Ticket[]> => {
   try {
-    const response = await sendFetchRequest('/api/ticket', 'GET');
+    const response = await sendFetchRequest('/api/ticket', 'GET', undefined, { signal });
     if (response.status === 404) {
       // Not an error, just no tickets available
       return [];
@@ -79,12 +79,15 @@ const fetchAllTickets = async (): Promise<Ticket[]> => {
  */
 const fetchTicketByPath = async (
   fspName: string,
-  path: string
+  path: string,
+  signal?: AbortSignal
 ): Promise<Ticket | null> => {
   try {
     const response = await sendFetchRequest(
       `/api/ticket?fsp_name=${fspName}&path=${path}`,
-      'GET'
+      'GET',
+      undefined,
+      { signal }
     );
 
     if (response.status === 404) {
@@ -120,7 +123,7 @@ export function useAllTicketsQuery(
 ): UseQueryResult<Ticket[], Error> {
   return useQuery<Ticket[], Error>({
     queryKey: ticketsQueryKeys.list(),
-    queryFn: fetchAllTickets,
+    queryFn: ({ signal }) => fetchAllTickets(signal),
     enabled
   });
 }
@@ -142,7 +145,7 @@ export function useTicketByPathQuery(
 
   return useQuery<Ticket | null, Error>({
     queryKey: ticketsQueryKeys.detail(fspName ?? '', path ?? ''),
-    queryFn: () => fetchTicketByPath(fspName!, path!),
+    queryFn: ({ signal }) => fetchTicketByPath(fspName!, path!, signal),
     enabled: shouldFetch,
     staleTime: 30 * 1000 // 30 seconds
   });
@@ -164,8 +167,8 @@ export function useCreateTicketMutation(): UseMutationResult<
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: CreateTicketPayload) => {
-      const response = await sendFetchRequest('/api/ticket', 'POST', payload);
+    mutationFn: async (payload: CreateTicketPayload, { signal }) => {
+      const response = await sendFetchRequest('/api/ticket', 'POST', payload, { signal });
       if (!response.ok) {
         throw await toHttpError(response);
       }
