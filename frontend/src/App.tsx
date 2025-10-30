@@ -71,45 +71,62 @@ const AppComponent = () => {
             <Route element={<Home />} index />
             <Route
               element={
-                <RequireAuth>
-                  <Links />
-                </RequireAuth>
+                <ErrorBoundary FallbackComponent={ErrorFallback}>
+                  <RequireAuth>
+                    <Links />
+                  </RequireAuth>
+                </ErrorBoundary>
               }
               path="links"
             />
             {tasksEnabled ? (
               <Route
                 element={
-                  <RequireAuth>
-                    <Jobs />
-                  </RequireAuth>
+                  <ErrorBoundary FallbackComponent={ErrorFallback}>
+                    <RequireAuth>
+                      <Jobs />
+                    </RequireAuth>
+                  </ErrorBoundary>
                 }
                 path="jobs"
               />
             ) : null}
-            <Route element={<Help />} path="help" />
             <Route
               element={
-                <RequireAuth>
-                  <Preferences />
-                </RequireAuth>
+                <ErrorBoundary FallbackComponent={ErrorFallback}>
+                  <Help />
+                </ErrorBoundary>
+              }
+              path="help"
+            />
+            <Route
+              element={
+                <ErrorBoundary FallbackComponent={ErrorFallback}>
+                  <RequireAuth>
+                    <Preferences />
+                  </RequireAuth>
+                </ErrorBoundary>
               }
               path="preferences"
             />
             <Route
               element={
-                <RequireAuth>
-                  <Notifications />
-                </RequireAuth>
+                <ErrorBoundary FallbackComponent={ErrorFallback}>
+                  <RequireAuth>
+                    <Notifications />
+                  </RequireAuth>
+                </ErrorBoundary>
               }
               path="notifications"
             />
           </Route>
           <Route
             element={
-              <RequireAuth>
-                <BrowsePageLayout />
-              </RequireAuth>
+              <ErrorBoundary FallbackComponent={ErrorFallback}>
+                <RequireAuth>
+                  <BrowsePageLayout />
+                </RequireAuth>
+              </ErrorBoundary>
             }
           >
             <Route element={<Browse />} path="browse" />
