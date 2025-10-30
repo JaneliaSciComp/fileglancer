@@ -39,7 +39,6 @@ export default defineConfig({
   webServer: {
     command: 'pixi run test-launch',
     url: 'http://localhost:7879/fg/',
-    reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     env: {
       FGC_DB_URL: `sqlite:///${testDbPath}`,
