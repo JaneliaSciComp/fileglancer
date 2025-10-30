@@ -10,7 +10,8 @@ import {
   makeMapKey,
   getLastSegmentFromPath,
   getPreferredPathForDisplay,
-  makeBrowseLink
+  makeBrowseLink,
+  getFileBrowsePath
 } from '@/utils';
 import MissingFolderFavoriteDialog from './MissingFolderFavoriteDialog';
 import FgTooltip from '../widgets/FgTooltip';
@@ -67,13 +68,25 @@ export default function Folder({
 
   async function checkFavFolderExists() {
     if (!folderFavorite || !isFavoritable) {
-      return;
+      return true; // If not favoritable, assume it exists (skip check)
     }
     try {
       // Use queryClient.fetchQuery to check if folder exists
       // This leverages the existing query infrastructure and caching
+      const url = getFileBrowsePath(fsp.name, folderPath);
       await queryClient.fetchQuery({
         queryKey: fileQueryKeys.filePath(fsp.name, folderPath),
+        queryFn: async () => {
+          const response = await fetch(url);
+          if (!response.ok) {
+            if (response.status === 404) {
+              throw new Error('Folder not found');
+            }
+            // For other errors, throw generic error
+            throw new Error(`Error checking folder: ${response.status}`);
+          }
+          return response.json();
+        },
         retry: false, // Don't retry on 404
         staleTime: 0 // Always fetch fresh data for this check
       });
@@ -85,9 +98,10 @@ export default function Folder({
       if (error instanceof Error && error.message === 'Folder not found') {
         return false;
       }
-      // For other errors (403, network issues, etc.), log and return false
+      // For other errors (403, network issues, etc.), log and assume it exists
+      // to avoid false positives (better to navigate and show real error)
       log.error('Error checking folder existence:', error);
-      return false;
+      return true; // Changed from false to true to avoid false positives
     }
   }
 
