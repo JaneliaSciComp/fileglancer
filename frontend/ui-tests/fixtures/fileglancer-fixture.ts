@@ -82,17 +82,26 @@ export const test = base.extend<FileglancerFixtures>({
     }
   },
 
-  fileglancerPage: async ({ page }, use) => {
-    // Setup
+  fileglancerPage: async ({ page, testDir }, use) => {
+    // Setup - Clean database before test
+    const fullTestPath = join(global.testTempDir, 'scratch', testDir);
+    console.log(`[Fixture] Test temp dir: ${global.testTempDir}`);
+    console.log(`[Fixture] Test directory: ${fullTestPath}`);
+
+    // Clean user-specific database tables
+    cleanDatabase(global.testTempDir);
+
     await mockAPI(page);
     await openFileglancer(page);
-    await navigateToScratchDir(page);
+    await navigateToScratchFsp(page);
+    await navigateToTestDir(page, fullTestPath);
 
     // Provide the page to the test
     await use(page);
 
-    // Teardown
+    // Teardown - wait for any pending operations before cleanup
     await teardownMockAPI(page);
+    await page.waitForTimeout(100);
   }
 });
 
