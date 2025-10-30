@@ -15,9 +15,14 @@ export default function useZoneAndFileSharePathMapQuery(): UseQueryResult<
   const getZones = async ({
     signal
   }: QueryFunctionContext): Promise<{ paths: FileSharePath[] }> => {
-    const response = await sendFetchRequest('/api/file-share-paths', 'GET', undefined, {
-      signal
-    });
+    const response = await sendFetchRequest(
+      '/api/file-share-paths',
+      'GET',
+      undefined,
+      {
+        signal
+      }
+    );
     return await response.json();
   };
 

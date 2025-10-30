@@ -93,9 +93,16 @@ export const preferencesQueryKeys = {
  * Fetches all preferences from the backend
  * Returns empty object if no preferences exist (404)
  */
-const fetchPreferences = async (signal?: AbortSignal): Promise<PreferencesApiResponse> => {
+const fetchPreferences = async (
+  signal?: AbortSignal
+): Promise<PreferencesApiResponse> => {
   try {
-    const response = await sendFetchRequest('/api/preference', 'GET', undefined, { signal });
+    const response = await sendFetchRequest(
+      '/api/preference',
+      'GET',
+      undefined,
+      { signal }
+    );
     if (!response.ok && response.status === 404) {
       return {}; // No preferences found, return empty object
     }
@@ -261,10 +268,18 @@ export function useUpdatePreferenceMutation(): UseMutationResult<
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async <T>({ key, value }: UpdatePreferencePayload<T>, { signal }) => {
-      const response = await sendFetchRequest(`/api/preference/${key}`, 'PUT', {
-        value
-      }, { signal });
+    mutationFn: async <T>(
+      { key, value }: UpdatePreferencePayload<T>,
+      { signal }
+    ) => {
+      const response = await sendFetchRequest(
+        `/api/preference/${key}`,
+        'PUT',
+        {
+          value
+        },
+        { signal }
+      );
       if (!response.ok) {
         throw await toHttpError(response);
       }
@@ -340,10 +355,10 @@ export function useUpdateFavoritesMutation(): UseMutationResult<
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      preferenceKey,
-      updatedMap
-    }: FavoriteUpdatePayload, { signal }) => {
+    mutationFn: async (
+      { preferenceKey, updatedMap }: FavoriteUpdatePayload,
+      { signal }
+    ) => {
       const response = await sendFetchRequest(
         `/api/preference/${preferenceKey}`,
         'PUT',

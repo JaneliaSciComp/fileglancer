@@ -26,9 +26,14 @@ export const useAuthStatusQuery = () => {
   const fetchAuthStatus = async ({
     signal
   }: QueryFunctionContext): Promise<AuthStatus> => {
-    const response = await sendFetchRequest('/api/auth/status', 'GET', undefined, {
-      signal
-    });
+    const response = await sendFetchRequest(
+      '/api/auth/status',
+      'GET',
+      undefined,
+      {
+        signal
+      }
+    );
     return await response.json();
   };
 

@@ -54,9 +54,16 @@ function sortProxiedPathsByDate(paths: ProxiedPath[]): ProxiedPath[] {
  * Fetches all proxied paths from the backend
  * Returns empty array if no paths exist (404)
  */
-const fetchAllProxiedPaths = async (signal?: AbortSignal): Promise<ProxiedPath[]> => {
+const fetchAllProxiedPaths = async (
+  signal?: AbortSignal
+): Promise<ProxiedPath[]> => {
   try {
-    const response = await sendFetchRequest('/api/proxied-path', 'GET', undefined, { signal });
+    const response = await sendFetchRequest(
+      '/api/proxied-path',
+      'GET',
+      undefined,
+      { signal }
+    );
     if (response.status === 404) {
       // Not an error, just no proxied paths available
       return [];
@@ -145,7 +152,8 @@ export function useProxiedPathByFspAndPathQuery(
 ): UseQueryResult<ProxiedPath | null, Error> {
   return useQuery<ProxiedPath | null, Error>({
     queryKey: proxiedPathQueryKeys.detail(fspName ?? '', path ?? ''),
-    queryFn: ({ signal }) => fetchProxiedPathByFspAndPath(fspName!, path!, signal),
+    queryFn: ({ signal }) =>
+      fetchProxiedPathByFspAndPath(fspName!, path!, signal),
     enabled: !!fspName && !!path
   });
 }

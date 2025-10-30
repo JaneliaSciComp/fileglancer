@@ -211,7 +211,8 @@ export function useOmeZarrThumbnailQuery(
         // Return error result instead of throwing to avoid error boundary
         return {
           thumbnailSrc: null,
-          thumbnailError: error instanceof Error ? error.message : 'Unknown error'
+          thumbnailError:
+            error instanceof Error ? error.message : 'Unknown error'
         };
       }
     },

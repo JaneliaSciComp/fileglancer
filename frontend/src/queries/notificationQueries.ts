@@ -23,9 +23,14 @@ export function useNotificationsQuery(): UseQueryResult<Notification[], Error> {
   return useQuery({
     queryKey: notificationQueryKeys.all,
     queryFn: async ({ signal }): Promise<Notification[]> => {
-      const response = await sendFetchRequest('/api/notifications', 'GET', undefined, {
-        signal
-      });
+      const response = await sendFetchRequest(
+        '/api/notifications',
+        'GET',
+        undefined,
+        {
+          signal
+        }
+      );
 
       if (!response.ok) {
         throw new FetchError(response, 'Failed to fetch notifications');

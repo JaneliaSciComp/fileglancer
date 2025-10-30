@@ -52,7 +52,9 @@ function sortTicketsByDate(tickets: Ticket[]): Ticket[] {
  */
 const fetchAllTickets = async (signal?: AbortSignal): Promise<Ticket[]> => {
   try {
-    const response = await sendFetchRequest('/api/ticket', 'GET', undefined, { signal });
+    const response = await sendFetchRequest('/api/ticket', 'GET', undefined, {
+      signal
+    });
     if (response.status === 404) {
       // Not an error, just no tickets available
       return [];
@@ -168,7 +170,9 @@ export function useCreateTicketMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: async (payload: CreateTicketPayload, { signal }) => {
-      const response = await sendFetchRequest('/api/ticket', 'POST', payload, { signal });
+      const response = await sendFetchRequest('/api/ticket', 'POST', payload, {
+        signal
+      });
       if (!response.ok) {
         throw await toHttpError(response);
       }

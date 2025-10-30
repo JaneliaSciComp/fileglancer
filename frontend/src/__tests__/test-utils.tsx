@@ -81,7 +81,10 @@ const MockRouterAndProviders = ({
         <MemoryRouter initialEntries={initialEntries}>
           <Routes>
             <Route path="browse" element={<Browse>{children}</Browse>} />
-            <Route path="browse/:fspName" element={<Browse>{children}</Browse>} />
+            <Route
+              path="browse/:fspName"
+              element={<Browse>{children}</Browse>}
+            />
             <Route
               path="browse/:fspName/*"
               element={<Browse>{children}</Browse>}
