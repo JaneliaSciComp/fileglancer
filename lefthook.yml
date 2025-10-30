@@ -1,3 +1,6 @@
+# Specify where lefthook is installed (in frontend subdirectory)
+lefthook: cd frontend && npx lefthook
+
 pre-push:
   parallel: true
   jobs:
