@@ -35,7 +35,7 @@ export default defineConfig({
   },
   timeout: process.env.CI ? 90_000 : 10_000,
   navigationTimeout: process.env.CI ? 90_000 : 10_000,
-  workers: process.env.CI ? 1 : undefined,
+  workers: 1,
   webServer: {
     command: 'pixi run test-launch',
     url: 'http://localhost:7879/fg/',
