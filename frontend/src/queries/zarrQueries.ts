@@ -31,6 +31,19 @@ type ZarrMetadataResult = {
 };
 
 /**
+ * Detects if a directory contains Zarr-related files
+ * Returns true if zarr.json, .zarray, or .zattrs files are present
+ */
+function isZarrDirectory(files: FileOrFolder[] | undefined): boolean {
+  if (!files || files.length === 0) {
+    return false;
+  }
+
+  const zarrFileNames = ['zarr.json', '.zarray', '.zattrs'];
+  return files.some(file => zarrFileNames.includes(file.name));
+}
+
+/**
  * Fetches Zarr metadata by checking for zarr.json, .zarray, or .zattrs files
  */
 async function fetchZarrMetadata({
@@ -159,7 +172,12 @@ export function useZarrMetadataQuery(
         return { metadata: null, omeZarrUrl: null };
       }
     },
-    enabled: !!fspName && !!currentFileOrFolder && !!files && files.length > 0,
+    enabled:
+      !!fspName &&
+      !!currentFileOrFolder &&
+      !!files &&
+      files.length > 0 &&
+      isZarrDirectory(files),
     staleTime: 5 * 60 * 1000, // 5 minutes - Zarr metadata doesn't change often
     retry: false // Don't retry if no Zarr files found
   });
