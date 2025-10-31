@@ -77,9 +77,9 @@ export default function FileBrowser({
       ) : zarrMetadataQuery.data?.metadata ? (
         <ZarrPreview
           layerType={layerType}
-          metadata={zarrMetadataQuery.data.metadata}
           openWithToolUrls={openWithToolUrls}
           thumbnailQuery={thumbnailQuery}
+          zarrMetadataQuery={zarrMetadataQuery}
         />
       ) : null}
 

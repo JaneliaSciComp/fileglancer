@@ -20,14 +20,17 @@ type ZarrPreviewProps = {
     thumbnailError: string | null;
   }>;
   readonly openWithToolUrls: OpenWithToolUrls | null;
-  readonly metadata: ZarrMetadata;
+  readonly zarrMetadataQuery: UseQueryResult<{
+    metadata: ZarrMetadata;
+    omeZarrUrl: string | null;
+  }>;
   readonly layerType: 'auto' | 'image' | 'segmentation' | null;
 };
 
 export default function ZarrPreview({
   thumbnailQuery,
   openWithToolUrls,
-  metadata,
+  zarrMetadataQuery,
   layerType
 }: ZarrPreviewProps): React.ReactNode {
   const [showDataLinkDialog, setShowDataLinkDialog] =
@@ -52,16 +55,14 @@ export default function ZarrPreview({
       <div className="flex gap-12 w-full h-fit">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2 max-h-full">
-            {thumbnailQuery.isPending ? (
+            {zarrMetadataQuery.data?.omeZarrUrl && thumbnailQuery.isPending ? (
               <div className="w-72 h-72 animate-pulse bg-surface text-foreground flex">
                 <Typography className="place-self-center text-center w-full">
                   Loading thumbnail...
                 </Typography>
               </div>
             ) : null}
-            {!thumbnailQuery.isPending &&
-            metadata &&
-            thumbnailQuery.data?.thumbnailSrc ? (
+            {!thumbnailQuery.isPending && thumbnailQuery.data?.thumbnailSrc ? (
               <img
                 alt="Thumbnail"
                 className="max-h-72 max-w-max rounded-md"
@@ -69,8 +70,7 @@ export default function ZarrPreview({
                 src={thumbnailQuery.data.thumbnailSrc}
               />
             ) : !thumbnailQuery.isPending &&
-              metadata &&
-              !thumbnailQuery.data?.thumbnailSrc ? (
+              !zarrMetadataQuery.data?.omeZarrUrl ? (
               <div className="p-2">
                 <img
                   alt="Zarr logo"
@@ -109,10 +109,11 @@ export default function ZarrPreview({
             />
           ) : null}
         </div>
-        {metadata && 'arr' in metadata ? (
+        {zarrMetadataQuery.data?.metadata &&
+        'arr' in zarrMetadataQuery.data.metadata ? (
           <ZarrMetadataTable
             layerType={layerType}
-            metadata={metadata as Metadata}
+            metadata={zarrMetadataQuery.data.metadata as Metadata}
           />
         ) : null}
       </div>
