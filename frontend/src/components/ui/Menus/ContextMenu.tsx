@@ -61,12 +61,13 @@ export default function ContextMenu({
   }
 
   const isFavorite: boolean = Boolean(
-    folderPreferenceMap[
-      makeMapKey(
-        'folder',
-        `${fileBrowserState.currentFileSharePath?.name}_${fileBrowserState.propertiesTarget.path}`
-      )
-    ]
+    fileBrowserState.uiFileSharePath &&
+      folderPreferenceMap[
+        makeMapKey(
+          'folder',
+          `${fileBrowserState.uiFileSharePath.name}_${fileBrowserState.propertiesTarget.path}`
+        )
+      ]
   );
 
   const menuItems: MenuItem<ContextMenuActionProps>[] = [

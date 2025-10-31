@@ -11,7 +11,7 @@ import { createSuccess, handleError } from '@/utils/errorHandling';
 
 export default function useNavigationInput(initialValue: string = '') {
   const [inputValue, setInputValue] = React.useState<string>(initialValue);
-  const { zonesAndFileSharePathsMap } = useZoneAndFspMapContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const navigate = useNavigate();
 
   // Update inputValue when initialValue changes
@@ -24,6 +24,21 @@ export default function useNavigationInput(initialValue: string = '') {
   };
 
   const handleNavigationInputSubmit = (): Result<void> => {
+    if (zonesAndFspQuery.isError) {
+      return handleError(
+        new Error(
+          `Cannot navigate: error loading zones and file share paths: ${zonesAndFspQuery.error.message}`
+        )
+      );
+    }
+    if (zonesAndFspQuery.isPending) {
+      return handleError(
+        new Error(
+          'Cannot navigate: zones and file share paths are still loading.'
+        )
+      );
+    }
+
     try {
       // Trim white space and, if necessary, convert backslashes to forward slashes
       const normalizedInput = convertBackToForwardSlash(inputValue.trim());
@@ -35,11 +50,11 @@ export default function useNavigationInput(initialValue: string = '') {
         subpath: string;
       } | null = null;
 
-      const keys = Object.keys(zonesAndFileSharePathsMap);
+      const keys = Object.keys(zonesAndFspQuery.data);
       for (const key of keys) {
         // Iterate through only the objects in zonesAndFileSharePathsMap that have a key that start with "fsp_"
         if (key.startsWith('fsp_')) {
-          const fspObject = zonesAndFileSharePathsMap[key] as FileSharePath;
+          const fspObject = zonesAndFspQuery.data[key] as FileSharePath;
           const linuxPath = fspObject.linux_path || '';
           const macPath = fspObject.mac_path || '';
           const windowsPath = convertBackToForwardSlash(fspObject.windows_path);

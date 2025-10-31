@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw';
 
 export const handlers = [
   // Proxied paths
-  http.get('http://localhost:3000/api/proxied-path', ({ request }) => {
+  http.get('/api/proxied-path', ({ request }) => {
     const url = new URL(request.url);
     const fspName = url.searchParams.get('fsp_name');
     const path = url.searchParams.get('path');
@@ -18,7 +18,7 @@ export const handlers = [
     return HttpResponse.json({ paths: [] }, { status: 200 });
   }),
 
-  http.post('http://localhost:3000/api/proxied-path', () => {
+  http.post('/api/proxied-path', () => {
     return HttpResponse.json({
       username: 'testuser',
       sharing_key: 'testkey',
@@ -31,23 +31,23 @@ export const handlers = [
     });
   }),
 
-  // Preferences
-  http.get('http://localhost:3000/api/preference', ({ request }) => {
-    const url = new URL(request.url);
-    const queryParam = url.searchParams.get('key');
-    if (queryParam === 'path') {
+  // Preferences - using URL params instead of query params
+  // Base preference endpoint (in case it's called without a key)
+  http.get('/api/preference/:key', ({ params }) => {
+    const { key } = params;
+    if (key === 'path') {
       return HttpResponse.json({
         value: ['linux_path']
       });
-    } else if (queryParam === 'areDataLinksAutomatic') {
+    } else if (key === 'areDataLinksAutomatic') {
       return HttpResponse.json({
         value: false
       });
     } else if (
-      queryParam === 'fileSharePath' ||
-      queryParam === 'zone' ||
-      queryParam === 'folder' ||
-      queryParam === 'recentlyViewedFolders'
+      key === 'fileSharePath' ||
+      key === 'zone' ||
+      key === 'folder' ||
+      key === 'recentlyViewedFolders'
     ) {
       return HttpResponse.json({
         value: []
@@ -59,16 +59,17 @@ export const handlers = [
       });
     }
   }),
-  http.put('http://localhost:3000/api/preference', ({ request }) => {
-    const url = new URL(request.url);
-    const queryParam = url.searchParams.get('key');
-    if (queryParam === 'recentlyViewedFolders') {
+  http.put('/api/preference/:key', ({ params }) => {
+    const { key } = params;
+    if (key === 'recentlyViewedFolders') {
       return HttpResponse.json(null, { status: 204 });
     }
+    // Default success response for other preferences
+    return HttpResponse.json(null, { status: 204 });
   }),
 
   // File share paths
-  http.get('http://localhost:3000/api/file-share-paths', () => {
+  http.get('/api/file-share-paths', () => {
     return HttpResponse.json({
       paths: [
         {
@@ -96,42 +97,39 @@ export const handlers = [
   }),
 
   // Files
-  http.get(
-    'http://localhost:3000/api/files/:fspName',
-    ({ params, request }) => {
-      const url = new URL(request.url);
-      const subpath = url.searchParams.get('subpath');
-      const { fspName } = params;
+  http.get('/api/files/:fspName', ({ params, request }) => {
+    const url = new URL(request.url);
+    const subpath = url.searchParams.get('subpath');
+    const { fspName } = params;
 
-      if (fspName === 'test_fsp') {
-        return HttpResponse.json({
-          info: {
-            name: subpath ? subpath.split('/').pop() : '',
-            path: subpath || '.',
-            size: subpath ? 1024 : 0,
-            is_dir: true,
-            permissions: 'drwxr-xr-x',
-            owner: 'testuser',
-            group: 'testgroup',
-            last_modified: 1647855213
-          },
-          files: []
-        });
-      }
-      return HttpResponse.json({ error: 'Not found' }, { status: 404 });
+    if (fspName === 'test_fsp') {
+      return HttpResponse.json({
+        info: {
+          name: subpath ? subpath.split('/').pop() : '',
+          path: subpath || '.',
+          size: subpath ? 1024 : 0,
+          is_dir: true,
+          permissions: 'drwxr-xr-x',
+          owner: 'testuser',
+          group: 'testgroup',
+          last_modified: 1647855213
+        },
+        files: []
+      });
     }
-  ),
+    return HttpResponse.json({ error: 'Not found' }, { status: 404 });
+  }),
   // Default to successful PATCH request for permission changes
   // 204 = successful, no content in response
-  http.patch('http://localhost:3000/api/files/:fspName', () => {
+  http.patch('/api/files/:fspName', () => {
     return HttpResponse.json(null, { status: 204 });
   }),
-  http.delete('http://localhost:3000/api/files/:fspName', () => {
+  http.delete('/api/files/:fspName', () => {
     return HttpResponse.json(null, { status: 200 });
   }),
 
   // Tickets
-  http.get('http://localhost:3000/api/ticket', () => {
+  http.get('/api/ticket', () => {
     return HttpResponse.json({
       tickets: [
         {
@@ -165,7 +163,7 @@ export const handlers = [
       ]
     });
   }),
-  http.post('http://localhost:3000/api/ticket', () => {
+  http.post('/api/ticket', () => {
     return HttpResponse.json({
       username: 'testuser',
       path: '/test/path',
@@ -181,12 +179,15 @@ export const handlers = [
   }),
 
   // External bucket
-  http.get('http://localhost:3000/api/external-bucket', () => {
+  http.get('/api/external-bucket', () => {
+    return HttpResponse.json({ buckets: [] }, { status: 200 });
+  }),
+  http.get('/api/external-buckets/:fspName', () => {
     return HttpResponse.json({ buckets: [] }, { status: 200 });
   }),
 
   //Profile
-  http.get('http://localhost:3000/api/profile', () => {
+  http.get('/api/profile', () => {
     return HttpResponse.json({ username: 'testuser' });
   })
 ];

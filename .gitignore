@@ -146,6 +146,6 @@ config.yaml
 
 # Claude Code
 .claude
-CLAUDE.md
+/CLAUDE.md
 
 notifications.yaml

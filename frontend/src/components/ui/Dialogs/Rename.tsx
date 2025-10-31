@@ -3,6 +3,7 @@ import { Button, Typography } from '@material-tailwind/react';
 
 import useRenameDialog from '@/hooks/useRenameDialog';
 import FgDialog from './FgDialog';
+import { Spinner } from '@/components/ui/widgets/Loaders';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import toast from 'react-hot-toast';
 
@@ -14,8 +15,8 @@ type ItemNamingDialogProps = {
 export default function RenameDialog({
   showRenameDialog,
   setShowRenameDialog
-}: ItemNamingDialogProps): JSX.Element {
-  const { fileBrowserState } = useFileBrowserContext();
+}: ItemNamingDialogProps): React.JSX.Element {
+  const { fileBrowserState, mutations } = useFileBrowserContext();
   const { handleRenameSubmit, newName, setNewName } = useRenameDialog();
 
   return (
@@ -28,20 +29,23 @@ export default function RenameDialog({
           event.preventDefault();
 
           if (!fileBrowserState.propertiesTarget) {
-            toast.error(`No target file selected`);
+            toast.error('No target file selected');
             return;
           }
 
-          const result = await handleRenameSubmit(
-            `${fileBrowserState.propertiesTarget.path}`
-          );
-          if (result.success) {
+          try {
+            await handleRenameSubmit(
+              `${fileBrowserState.propertiesTarget.path}`
+            );
             toast.success('Item renamed successfully!');
-          } else {
-            toast.error(`Error renaming item: ${result.error}`);
+            setNewName('');
+          } catch (error) {
+            toast.error(
+              `Error renaming item: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
+          } finally {
+            setShowRenameDialog(false);
           }
-          setShowRenameDialog(false);
-          setNewName('');
         }}
       >
         <div className="mt-8 flex flex-col gap-2">
@@ -64,8 +68,16 @@ export default function RenameDialog({
             value={newName}
           />
         </div>
-        <Button className="!rounded-md" type="submit">
-          Submit
+        <Button
+          className="!rounded-md"
+          disabled={mutations.rename.isPending}
+          type="submit"
+        >
+          {mutations.rename.isPending ? (
+            <Spinner customClasses="border-white" text="Renaming..." />
+          ) : (
+            'Submit'
+          )}
         </Button>
       </form>
     </FgDialog>

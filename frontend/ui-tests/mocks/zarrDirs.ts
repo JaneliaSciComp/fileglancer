@@ -1,3 +1,6 @@
+import * as fs from 'fs/promises';
+import * as path from 'path';
+
 /**
  * Mock Zarr metadata files for testing different Zarr file types
  */
@@ -185,7 +188,7 @@ export const ZARR_TEST_FILE_INFO = {
   }
 } as const;
 
-// Synchronousfor use in playwright.config.ts
+// Synchronous for use in playwright.config.ts
 export function createZarrDirsSync(baseDir: string): void {
   const fsSync = require('fs');
   const path = require('path');
@@ -246,4 +249,65 @@ export function createZarrDirsSync(baseDir: string): void {
     JSON.stringify(ZARR_V2_OME_ZARRAY_METADATA, null, 2),
     { mode: 0o644 }
   );
+}
+
+// Asynchronous version for use in tests
+export async function createZarrDirs(baseDir: string): Promise<void> {
+  // Type 1: Zarr V3 non OME
+  const v3ArrayDir = path.join(baseDir, ZARR_TEST_FILE_INFO.v3_non_ome.dirname);
+  await fs.mkdir(v3ArrayDir, { recursive: true, mode: 0o755 });
+  await fs.writeFile(
+    path.join(v3ArrayDir, 'zarr.json'),
+    JSON.stringify(ZARR_V3_NON_OME_METADATA, null, 2),
+    { mode: 0o644 }
+  );
+
+  // Type 2: Zarr V3 OME-Zarr
+  const v3OmeDir = path.join(baseDir, ZARR_TEST_FILE_INFO.v3_ome.dirname);
+  await fs.mkdir(v3OmeDir, { recursive: true, mode: 0o755 });
+  await fs.writeFile(
+    path.join(v3OmeDir, 'zarr.json'),
+    JSON.stringify(ZARR_V3_OME_METADATA, null, 2),
+    { mode: 0o644 }
+  );
+  // Create s0 subdirectory with array metadata
+  const v3OmeS0Dir = path.join(v3OmeDir, 's0');
+  await fs.mkdir(v3OmeS0Dir, { recursive: true, mode: 0o755 });
+  await fs.writeFile(
+    path.join(v3OmeS0Dir, 'zarr.json'),
+    JSON.stringify(ZARR_V3_OME_ARRAY_METADATA, null, 2),
+    { mode: 0o644 }
+  );
+
+  // Type 3: Zarr V2 Array
+  const v2ArrayDir = path.join(baseDir, ZARR_TEST_FILE_INFO.v2_non_ome.dirname);
+  await fs.mkdir(v2ArrayDir, { recursive: true, mode: 0o755 });
+  await fs.writeFile(
+    path.join(v2ArrayDir, '.zarray'),
+    JSON.stringify(ZARR_V2_NON_OME_METADATA, null, 2),
+    { mode: 0o644 }
+  );
+
+  // Type 4: Zarr V2 OME-Zarr (needs .zgroup and .zattrs at root, .zarray in dataset dirs)
+  const v2OmeDir = path.join(baseDir, ZARR_TEST_FILE_INFO.v2_ome.dirname);
+  await fs.mkdir(v2OmeDir, { recursive: true, mode: 0o755 });
+  await fs.writeFile(
+    path.join(v2OmeDir, '.zgroup'),
+    JSON.stringify(ZARR_V2_GROUP_METADATA, null, 2),
+    { mode: 0o644 }
+  );
+  await fs.writeFile(
+    path.join(v2OmeDir, '.zattrs'),
+    JSON.stringify(ZARR_V2_OME_ZATTRS_METADATA, null, 2),
+    { mode: 0o644 }
+  );
+  // Create 0 subdirectory with array metadata
+  const v2Ome0Dir = path.join(v2OmeDir, '0');
+  await fs.mkdir(v2Ome0Dir, { recursive: true, mode: 0o755 });
+  await fs.writeFile(
+    path.join(v2Ome0Dir, '.zarray'),
+    JSON.stringify(ZARR_V2_OME_ZARRAY_METADATA, null, 2),
+    { mode: 0o644 }
+  );
+  console.log('Created Zarr test directories in', baseDir);
 }

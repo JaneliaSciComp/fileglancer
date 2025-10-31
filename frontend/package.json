@@ -31,6 +31,8 @@
     },
     "dependencies": {
         "@material-tailwind/react": "^3.0.0-beta.24",
+        "@tanstack/react-query": "^5.90.2",
+        "@tanstack/react-query-devtools": "^5.90.2",
         "@tanstack/react-table": "^8.21.3",
         "@types/react-syntax-highlighter": "^15.5.13",
         "@vitejs/plugin-react": "^5.0.0",
@@ -56,6 +58,7 @@
         "@eslint/js": "^9.26.0",
         "@eslint/json": "^0.12.0",
         "@eslint/markdown": "^6.4.0",
+        "@tanstack/eslint-plugin-query": "^5.91.0",
         "@testing-library/dom": "^10.4.0",
         "@testing-library/jest-dom": "^6.6.3",
         "@testing-library/react": "^16.3.0",

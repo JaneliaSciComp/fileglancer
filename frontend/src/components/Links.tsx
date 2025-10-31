@@ -5,7 +5,7 @@ import { TableCard } from '@/components/ui/Table/TableCard';
 import { linksColumns } from '@/components/ui/Table/linksColumns';
 
 export default function Links() {
-  const { allProxiedPaths, loadingProxiedPaths } = useProxiedPathContext();
+  const { allProxiedPathsQuery } = useProxiedPathContext();
 
   return (
     <>
@@ -19,11 +19,11 @@ export default function Links() {
       </Typography>
       <TableCard
         columns={linksColumns}
-        data={allProxiedPaths || []}
+        data={allProxiedPathsQuery.data || []}
         emptyText="No shared paths."
         enableColumnSearch={true}
         gridColsClass="grid-cols-[1.5fr_2.5fr_1.5fr_1fr_1fr]"
-        loadingState={loadingProxiedPaths}
+        loadingState={allProxiedPathsQuery.isPending}
       />
     </>
   );

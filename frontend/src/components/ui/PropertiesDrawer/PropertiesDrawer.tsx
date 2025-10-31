@@ -42,7 +42,7 @@ function CopyPathButton({
 }: {
   readonly path: string;
   readonly isDataLink?: boolean;
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <div className="group flex justify-between items-center min-w-0 max-w-full">
       <FgTooltip label={path} triggerClasses="block truncate">
@@ -88,9 +88,12 @@ export default function PropertiesDrawer({
 
   const { fileBrowserState } = useFileBrowserContext();
   const { pathPreference, areDataLinksAutomatic } = usePreferencesContext();
-  const { ticket } = useTicketContext();
-  const { proxiedPath, dataUrl } = useProxiedPathContext();
+  const { ticketByPathQuery } = useTicketContext();
+  const { proxiedPathByFspAndPathQuery } = useProxiedPathContext();
   const { externalDataUrl } = useExternalBucketContext();
+
+  const ticket = ticketByPathQuery.data;
+  const proxiedPath = proxiedPathByFspAndPathQuery.data;
   const {
     handleDialogConfirm,
     handleDialogCancel,
@@ -109,7 +112,7 @@ export default function PropertiesDrawer({
 
   const fullPath = getPreferredPathForDisplay(
     pathPreference,
-    fileBrowserState.currentFileSharePath,
+    fileBrowserState.uiFileSharePath,
     fileBrowserState.propertiesTarget?.path
   );
 
@@ -235,8 +238,11 @@ export default function PropertiesDrawer({
               ) : null}
               {externalDataUrl ? (
                 <CopyPathButton isDataLink={true} path={externalDataUrl} />
-              ) : dataUrl ? (
-                <CopyPathButton isDataLink={true} path={dataUrl} />
+              ) : proxiedPathByFspAndPathQuery.data?.url ? (
+                <CopyPathButton
+                  isDataLink={true}
+                  path={proxiedPathByFspAndPathQuery.data.url}
+                />
               ) : null}
             </Tabs.Panel>
 

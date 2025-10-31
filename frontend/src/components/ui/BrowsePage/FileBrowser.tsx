@@ -11,6 +11,7 @@ import useContextMenu from '@/hooks/useContextMenu';
 import useZarrMetadata from '@/hooks/useZarrMetadata';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
+import { isZarrDirectory } from '@/queries/zarrQueries';
 
 type FileBrowserProps = {
   readonly showPropertiesDrawer: boolean;
@@ -33,7 +34,7 @@ export default function FileBrowser({
   setShowPermissionsDialog,
   setShowConvertFileDialog
 }: FileBrowserProps): React.ReactNode {
-  const { fileBrowserState, areFileDataLoading } = useFileBrowserContext();
+  const { fileQuery } = useFileBrowserContext();
   const { displayFiles } = useHideDotFiles();
 
   const {
@@ -44,62 +45,65 @@ export default function FileBrowser({
     handleContextMenuClick
   } = useContextMenu();
 
-  const {
-    metadata,
-    thumbnailSrc,
-    openWithToolUrls,
-    loadingThumbnail,
-    thumbnailError,
-    layerType
-  } = useZarrMetadata();
+  const { zarrMetadataQuery, thumbnailQuery, openWithToolUrls, layerType } =
+    useZarrMetadata();
+
+  const isZarrDir = isZarrDirectory(fileQuery.data?.files);
+
+  const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
+  const isLoading = fileQuery.isPending;
+  const error = fileQuery.error;
 
   // If current item is a file, render the FileViewer instead of the file browser
-  if (
-    fileBrowserState.currentFileOrFolder &&
-    !fileBrowserState.currentFileOrFolder.is_dir
-  ) {
-    return <FileViewer file={fileBrowserState.currentFileOrFolder} />;
+  if (currentFileOrFolder && !currentFileOrFolder.is_dir) {
+    return <FileViewer file={currentFileOrFolder} />;
   }
 
   return (
     <>
       <Crumbs />
-      {metadata ? (
+      {isZarrDir && zarrMetadataQuery.isPending ? (
+        <div className="flex my-4 shadow-sm rounded-md w-full min-h-96 bg-surface animate-appear animate-pulse animate-delay-150 opacity-0">
+          <Typography className="place-self-center text-center w-full">
+            Loading Zarr metadata...
+          </Typography>
+        </div>
+      ) : zarrMetadataQuery.isError ? (
+        <div className="flex my-4 shadow-sm rounded-md w-full min-h-96 bg-primary-light/30">
+          <Typography className="place-self-center text-center w-full text-warning">
+            Error loading Zarr metadata
+          </Typography>
+        </div>
+      ) : zarrMetadataQuery.data?.metadata ? (
         <ZarrPreview
           layerType={layerType}
-          loadingThumbnail={loadingThumbnail}
-          metadata={metadata}
           openWithToolUrls={openWithToolUrls}
-          thumbnailError={thumbnailError}
-          thumbnailSrc={thumbnailSrc}
+          thumbnailQuery={thumbnailQuery}
+          zarrMetadataQuery={zarrMetadataQuery}
         />
       ) : null}
 
       {/* Loading state */}
-      {areFileDataLoading ? (
+      {isLoading ? (
         <div className="min-w-full bg-background select-none">
           {Array.from({ length: 10 }, (_, index) => (
             <FileRowSkeleton key={index} />
           ))}
         </div>
-      ) : !areFileDataLoading && displayFiles.length > 0 ? (
+      ) : !isLoading && displayFiles.length > 0 ? (
         <Table
           data={displayFiles}
           handleContextMenuClick={handleContextMenuClick}
           showPropertiesDrawer={showPropertiesDrawer}
         />
-      ) : !areFileDataLoading &&
-        displayFiles.length === 0 &&
-        !fileBrowserState.uiErrorMsg ? (
+      ) : !isLoading && displayFiles.length === 0 && !error ? (
         <div className="flex items-center pl-3 py-1">
           <Typography>No files available for display.</Typography>
         </div>
-      ) : !areFileDataLoading &&
-        displayFiles.length === 0 &&
-        fileBrowserState.uiErrorMsg ? (
+      ) : !isLoading && displayFiles.length === 0 && error ? (
         /* Error state */
         <div className="flex items-center pl-3 py-1">
-          <Typography>{fileBrowserState.uiErrorMsg}</Typography>
+          <Typography>{error.message}</Typography>
         </div>
       ) : null}
       {showContextMenu ? (

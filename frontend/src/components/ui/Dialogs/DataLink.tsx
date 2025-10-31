@@ -16,7 +16,6 @@ import TextWithFilePath from './TextWithFilePath';
 import AutomaticLinksToggle from '@/components/ui/PreferencesPage/AutomaticLinksToggle';
 
 interface CommonDataLinkDialogProps {
-  getDisplayPath?: () => string;
   showDataLinkDialog: boolean;
   setShowDataLinkDialog: React.Dispatch<React.SetStateAction<boolean>>;
 }
@@ -51,7 +50,7 @@ function CreateLinkBtn({
   onConfirm
 }: {
   readonly onConfirm: () => Promise<void>;
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <Button
       className="!rounded-md flex items-center gap-2"
@@ -74,7 +73,7 @@ function DeleteLinkBtn({
   readonly proxiedPath: ProxiedPath;
   readonly setShowDataLinkDialog: React.Dispatch<React.SetStateAction<boolean>>;
   readonly handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <Button
       className="!rounded-md flex items-center gap-2 hover:text-background focus:text-background"
@@ -102,7 +101,7 @@ function CancelBtn({
     React.SetStateAction<boolean>
   >;
   readonly onCancel?: () => void;
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <Button
       className="!rounded-md flex items-center gap-2"
@@ -129,34 +128,35 @@ function BtnContainer({
   children
 }: {
   readonly children: React.ReactNode;
-}): JSX.Element {
+}): React.JSX.Element {
   return <div className="flex gap-4">{children}</div>;
 }
 
 export default function DataLinkDialog(
   props: DataLinkDialogProps
-): JSX.Element {
-  const { fileBrowserState } = useFileBrowserContext();
+): React.JSX.Element {
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const { pathPreference, areDataLinksAutomatic } = usePreferencesContext();
-  const { zonesAndFileSharePathsMap } = useZoneAndFspMapContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const [localAreDataLinksAutomatic] = React.useState(areDataLinksAutomatic);
 
   function getDisplayPath(): string {
     const fspKey =
       props.action === 'delete'
         ? makeMapKey('fsp', props.proxiedPath.fsp_name)
-        : fileBrowserState.currentFileSharePath
-          ? makeMapKey('fsp', fileBrowserState.currentFileSharePath.name)
+        : fileBrowserState.uiFileSharePath
+          ? makeMapKey('fsp', fileBrowserState.uiFileSharePath.name)
           : '';
 
-    const pathFsp = fspKey
-      ? (zonesAndFileSharePathsMap[fspKey] as FileSharePath)
-      : null;
+    const pathFsp =
+      fspKey && zonesAndFspQuery.isSuccess
+        ? (zonesAndFspQuery.data[fspKey] as FileSharePath)
+        : null;
     const targetPath =
       props.action === 'delete'
         ? props.proxiedPath.path
-        : fileBrowserState.currentFileOrFolder
-          ? fileBrowserState.currentFileOrFolder.path
+        : fileQuery.data?.currentFileOrFolder
+          ? fileQuery.data.currentFileOrFolder.path
           : '';
 
     return pathFsp && targetPath

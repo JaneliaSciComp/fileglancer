@@ -24,19 +24,27 @@ export default function useLayoutPrefs() {
   const [showPropertiesDrawer, setShowPropertiesDrawer] =
     React.useState<boolean>(false);
   const [showSidebar, setShowSidebar] = React.useState(true);
-  const { layout, handleUpdateLayout, isLayoutLoadedFromDB } =
+  const { layout, handleUpdateLayout, preferenceQuery } =
     usePreferencesContext();
   const { status: serverStatus } = useServerHealthContext();
 
   const timerRef = React.useRef<number | null>(null);
+  const lastSavedLayoutRef = React.useRef<string | null>(null);
+  const hasInitializedRef = React.useRef(false);
 
   const debouncedUpdateLayout = React.useCallback(
     (newLayout: string) => {
+      // Skip if this exact layout was just saved
+      if (lastSavedLayoutRef.current === newLayout) {
+        return;
+      }
+
       if (timerRef.current !== null) {
         window.clearTimeout(timerRef.current);
       }
 
       timerRef.current = window.setTimeout(() => {
+        lastSavedLayoutRef.current = newLayout;
         handleUpdateLayout(newLayout).catch(error => {
           logger.debug('Failed to update layout:', error);
         });
@@ -54,11 +62,15 @@ export default function useLayoutPrefs() {
     setShowSidebar(prev => !prev);
   };
 
-  // Initialize layouts from saved preferences
+  // Initialize layouts from saved preferences (only once on mount)
   React.useEffect(() => {
-    if (!isLayoutLoadedFromDB) {
+    if (preferenceQuery.isPending || hasInitializedRef.current) {
       return;
-    } else if (layout === '') {
+    }
+
+    hasInitializedRef.current = true;
+
+    if (layout === '') {
       // If screen is small, default to no sidebar or properties drawer
       if (window.innerWidth < 640) {
         setShowPropertiesDrawer(false);
@@ -92,13 +104,13 @@ export default function useLayoutPrefs() {
         logger.debug('Error parsing layout:', error);
       }
     }
-  }, [layout, isLayoutLoadedFromDB]);
+  }, [layout, preferenceQuery.isPending]);
 
   const layoutPrefsStorage = React.useMemo(
     () => ({
       getItem(name: string): string {
         // Don't try to parse layout until it's loaded from the database
-        if (!isLayoutLoadedFromDB) {
+        if (preferenceQuery.isPending) {
           return '';
         }
         // If layout is empty, return default layout based on screen size
@@ -125,7 +137,7 @@ export default function useLayoutPrefs() {
         }
       },
       setItem(name: string, value: string) {
-        if (!isLayoutLoadedFromDB) {
+        if (preferenceQuery.isPending) {
           return;
         }
         // This check is here, because if the server is down, we don't want to
@@ -216,7 +228,7 @@ export default function useLayoutPrefs() {
     [
       layout,
       debouncedUpdateLayout,
-      isLayoutLoadedFromDB,
+      preferenceQuery.isPending,
       showPropertiesDrawer,
       showSidebar,
       serverStatus

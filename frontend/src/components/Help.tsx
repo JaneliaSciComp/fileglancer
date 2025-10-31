@@ -6,7 +6,7 @@ import { IconType } from 'react-icons/lib';
 import { LuBookOpenText } from 'react-icons/lu';
 import { HiExternalLink } from 'react-icons/hi';
 
-import useVersionNo from '@/hooks/useVersionState';
+import useVersionQuery from '@/queries/versionQuery';
 
 type HelpLink = {
   icon: IconType;
@@ -16,7 +16,7 @@ type HelpLink = {
 };
 
 export default function Help() {
-  const { versionNo } = useVersionNo();
+  const versionQuery = useVersionQuery();
 
   const helpLinks: HelpLink[] = [
     {
@@ -29,14 +29,14 @@ export default function Help() {
     {
       icon: TbBrandGithub,
       title: 'Release Notes',
-      description: `What's new and improved in Fileglancer version ${versionNo}`,
-      url: `https://github.com/JaneliaSciComp/fileglancer/releases/tag/${versionNo}`
+      description: `What's new and improved in Fileglancer version ${versionQuery.data?.version}`,
+      url: `https://github.com/JaneliaSciComp/fileglancer/releases/tag/${versionQuery.data?.version}`
     },
     {
       icon: SiClickup,
       title: 'Submit Tickets',
       description: 'Report bugs or request features through a ClickUp form',
-      url: `https://forms.clickup.com/10502797/f/a0gmd-713/NBUCBCIN78SI2BE71G?Version=${versionNo}&URL=${window.location}`
+      url: `https://forms.clickup.com/10502797/f/a0gmd-713/NBUCBCIN78SI2BE71G?Version=${versionQuery.data?.version}&URL=${window.location}`
     },
     {
       icon: SiSlack,
@@ -53,7 +53,7 @@ export default function Help() {
           Help
         </Typography>
         <Typography className="text-foreground font-bold" type="lead">
-          {`Fileglancer Version ${versionNo}`}
+          {`Fileglancer Version ${versionQuery.data?.version}`}
         </Typography>
       </div>
       <div className="grid grid-cols-2 gap-10">

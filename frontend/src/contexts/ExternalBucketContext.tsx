@@ -1,17 +1,15 @@
 import React from 'react';
-import { default as log } from '@/logger';
-import { sendFetchRequest } from '@/utils';
+import type { UseQueryResult } from '@tanstack/react-query';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import {
+  useExternalBucketQuery,
+  type ExternalBucket
+} from '@/queries/externalBucketQueries';
 
-export type ExternalBucket = {
-  full_path: string;
-  external_url: string;
-  fsp_name: string;
-  relative_path: string;
-};
+export type { ExternalBucket };
 
 type ExternalBucketContextType = {
-  externalBucket: ExternalBucket | null;
+  externalBucketQuery: UseQueryResult<ExternalBucket | null, Error>;
   externalDataUrl: string | null;
 };
 
@@ -33,110 +31,60 @@ export const ExternalBucketProvider = ({
 }: {
   readonly children: React.ReactNode;
 }) => {
-  const [externalBucket, setExternalBucket] =
-    React.useState<ExternalBucket | null>(null);
-  const [externalDataUrl, setExternalDataUrl] = React.useState<string | null>(
-    null
-  );
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
 
-  const updateExternalBucket = React.useCallback(
-    (bucket: ExternalBucket | null) => {
-      setExternalBucket(bucket);
-
-      if (bucket) {
-        if (!fileBrowserState.currentFileSharePath) {
-          throw new Error('No file share path selected');
-        }
-        if (!fileBrowserState.currentFileOrFolder) {
-          throw new Error('No folder selected');
-        }
-        // Check if current path is an ancestor of the bucket path
-        if (
-          fileBrowserState.currentFileSharePath.name === bucket.fsp_name &&
-          fileBrowserState.currentFileOrFolder.path.startsWith(
-            bucket.relative_path
-          )
-        ) {
-          // Create data URL with relative path from bucket
-          const relativePath =
-            fileBrowserState.currentFileOrFolder.path.substring(
-              bucket.relative_path.length
-            );
-          const cleanRelativePath = relativePath.startsWith('/')
-            ? relativePath.substring(1)
-            : relativePath;
-          const externalUrl = bucket.external_url.endsWith('/')
-            ? bucket.external_url.slice(0, -1)
-            : bucket.external_url;
-          setExternalDataUrl(`${externalUrl}/${cleanRelativePath}/`);
-        } else {
-          setExternalDataUrl(null);
-        }
-      } else {
-        setExternalDataUrl(null);
-      }
-    },
-    [
-      fileBrowserState.currentFileOrFolder,
-      fileBrowserState.currentFileSharePath
-    ]
+  // Use TanStack Query to fetch external bucket
+  // Second parameter is conditions required to enable the query
+  const externalBucketQuery = useExternalBucketQuery(
+    fileBrowserState.uiFileSharePath?.name,
+    !fileQuery.isPending && !!fileBrowserState.uiFileSharePath
   );
 
-  const fetchExternalBucket = React.useCallback(async () => {
-    if (!fileBrowserState.currentFileSharePath) {
-      log.trace('No current file share path selected');
+  // Compute external data URL based on query data
+  const externalDataUrl = React.useMemo(() => {
+    const bucket = externalBucketQuery.data;
+
+    if (!bucket || !fileQuery.data) {
       return null;
     }
-    try {
-      const response = await sendFetchRequest(
-        `/api/external-buckets/${fileBrowserState.currentFileSharePath.name}`,
-        'GET'
-      );
-      if (!response.ok) {
-        if (response.status === 404) {
-          log.debug('No external bucket found for FSP');
-          return null;
-        }
-        log.error(
-          `Failed to fetch external bucket: ${response.status} ${response.statusText}`
-        );
-        return null;
-      }
-      const data = (await response.json()) as any;
-      if (data?.buckets) {
-        return data.buckets[0] as ExternalBucket;
-      } else {
-        log.error('No buckets found in response');
-        return null;
-      }
-    } catch (error) {
-      log.error('Error fetching external bucket:', error);
-    }
-    return null;
-  }, [fileBrowserState.currentFileSharePath]);
 
-  React.useEffect(() => {
-    (async function () {
-      try {
-        const bucket = await fetchExternalBucket();
-        updateExternalBucket(bucket);
-      } catch (error) {
-        log.error('Error in useEffect:', error);
-        updateExternalBucket(null);
-      }
-    })();
+    if (!fileBrowserState.uiFileSharePath) {
+      return null;
+    }
+
+    if (!fileQuery.data.currentFileOrFolder) {
+      return null;
+    }
+
+    // Check if current path is an ancestor of the bucket path
+    if (
+      fileBrowserState.uiFileSharePath.name === bucket.fsp_name &&
+      fileQuery.data.currentFileOrFolder.path.startsWith(bucket.relative_path)
+    ) {
+      // Create data URL with relative path from bucket
+      const relativePath = fileQuery.data.currentFileOrFolder.path.substring(
+        bucket.relative_path.length
+      );
+      const cleanRelativePath = relativePath.startsWith('/')
+        ? relativePath.substring(1)
+        : relativePath;
+      const externalUrl = bucket.external_url.endsWith('/')
+        ? bucket.external_url.slice(0, -1)
+        : bucket.external_url;
+      return `${externalUrl}/${cleanRelativePath}/`;
+    }
+
+    return null;
   }, [
-    fileBrowserState.currentFileSharePath,
-    fileBrowserState.currentFileOrFolder,
-    fetchExternalBucket,
-    updateExternalBucket
+    externalBucketQuery.data,
+    fileQuery.data,
+    fileBrowserState.uiFileSharePath
   ]);
 
   return (
     <ExternalBucketContext.Provider
       value={{
-        externalBucket,
+        externalBucketQuery,
         externalDataUrl
       }}
     >
