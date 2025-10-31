@@ -29,7 +29,8 @@ function TimelineSegment({
   readonly step: string;
   readonly index: number;
 }) {
-  const { ticket } = useTicketContext();
+  const { ticketByPathQuery } = useTicketContext();
+  const ticket = ticketByPathQuery.data;
   const ticketStatus = ticket?.status;
   const isCurrentStep = ticketStatus === step;
   const isFirstStep = index === 0;
@@ -74,7 +75,8 @@ function TimelineSegment({
 }
 
 export default function TicketDetails() {
-  const { ticket } = useTicketContext();
+  const { ticketByPathQuery } = useTicketContext();
+  const ticket = ticketByPathQuery.data;
 
   // Format description to properly display line breaks
   const formattedDescription = ticket?.description

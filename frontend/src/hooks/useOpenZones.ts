@@ -20,13 +20,13 @@ export default function useOpenZones() {
   );
 
   React.useEffect(() => {
-    if (fileBrowserState.currentFileSharePath) {
+    if (fileBrowserState.uiFileSharePath) {
       setOpenZones(prev => ({
         ...prev,
-        [fileBrowserState.currentFileSharePath!.zone]: true
+        [fileBrowserState.uiFileSharePath!.zone]: true
       }));
     }
-  }, [fileBrowserState.currentFileSharePath]);
+  }, [fileBrowserState.uiFileSharePath]);
 
   return {
     openZones,

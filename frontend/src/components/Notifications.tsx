@@ -19,7 +19,7 @@ export default function Notifications() {
       </div>
       {error ? (
         <Card className="p-6">
-          <Typography className="text-error">{error}</Typography>
+          <Typography className="text-error">{error.message}</Typography>
         </Card>
       ) : notifications.length > 0 ? (
         <div className="mb-8">

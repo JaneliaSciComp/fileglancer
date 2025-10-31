@@ -57,9 +57,9 @@ export default function Table({
           const name = getValue() as string;
           let link = '#';
 
-          if (file.is_dir && fileBrowserState.currentFileSharePath) {
+          if (file.is_dir && fileBrowserState.uiFileSharePath) {
             link = makeBrowseLink(
-              fileBrowserState.currentFileSharePath.name,
+              fileBrowserState.uiFileSharePath.name,
               file.path
             ) as string;
           }
@@ -147,7 +147,7 @@ export default function Table({
         enableSorting: false
       }
     ],
-    [fileBrowserState.currentFileSharePath, handleContextMenuClick]
+    [fileBrowserState.uiFileSharePath, handleContextMenuClick]
   );
 
   const table = useReactTable({

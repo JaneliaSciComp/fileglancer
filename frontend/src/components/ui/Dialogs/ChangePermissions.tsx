@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 
 import FgDialog from './FgDialog';
 import TextWithFilePath from './TextWithFilePath';
+import { Spinner } from '@/components/ui/widgets/Loaders';
 import usePermissionsDialog from '@/hooks/usePermissionsDialog';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 
@@ -17,14 +18,13 @@ type ChangePermissionsProps = {
 export default function ChangePermissions({
   showPermissionsDialog,
   setShowPermissionsDialog
-}: ChangePermissionsProps): JSX.Element {
-  const { fileBrowserState } = useFileBrowserContext();
+}: ChangePermissionsProps): React.JSX.Element {
+  const { fileBrowserState, mutations } = useFileBrowserContext();
 
   const {
     handleLocalPermissionChange,
     localPermissions,
-    handleChangePermissions,
-    isLoading
+    handleChangePermissions
   } = usePermissionsDialog();
 
   return (
@@ -48,13 +48,16 @@ export default function ChangePermissions({
               );
               return;
             }
-            const result = await handleChangePermissions();
-            if (result.success) {
+            try {
+              await handleChangePermissions();
               toast.success('Permissions changed!');
-            } else {
-              toast.error(`Error changing permissions: ${result.error}`);
+            } catch (error) {
+              toast.error(
+                `Error changing permissions: ${error instanceof Error ? error.message : 'Unknown error'}`
+              );
+            } finally {
+              setShowPermissionsDialog(false);
             }
-            setShowPermissionsDialog(false);
           }}
         >
           <TextWithFilePath
@@ -157,13 +160,17 @@ export default function ChangePermissions({
           <Button
             className="!rounded-md"
             disabled={Boolean(
-              isLoading ||
+              mutations.changePermissions.isPending ||
                 localPermissions ===
                   fileBrowserState.propertiesTarget.permissions
             )}
             type="submit"
           >
-            Change Permissions
+            {mutations.changePermissions.isPending ? (
+              <Spinner customClasses="border-white" text="Updating..." />
+            ) : (
+              'Change Permissions'
+            )}
           </Button>
         </form>
       ) : null}

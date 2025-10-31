@@ -1,17 +1,11 @@
 import React from 'react';
 import logger from '@/logger';
 
-import { sendFetchRequest } from '@/utils';
-
-type Profile = {
-  username: string;
-  homeFileSharePathName: string;
-  homeDirectoryName: string;
-  groups: string[];
-};
+import type { Profile } from '@/shared.types';
+import { useProfileQuery } from '@/queries/profileQuery';
 
 type ProfileContextType = {
-  profile: Profile | null;
+  profile: Profile | undefined;
   loading: boolean;
   error: Error | null;
 };
@@ -33,32 +27,12 @@ export const ProfileContextProvider = ({
 }: {
   readonly children: React.ReactNode;
 }) => {
-  const [profile, setProfile] = React.useState<Profile | null>(null);
-  const [loading, setLoading] = React.useState<boolean>(true);
-  const [error, setError] = React.useState<Error | null>(null);
-
-  React.useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const response = await sendFetchRequest('/api/profile', 'GET');
-        if (!response.ok) {
-          throw new Error('Failed to fetch profile data');
-        }
-        const profileData: Profile = await response.json();
-        setProfile(profileData);
-      } catch (err) {
-        logger.error('Error fetching profile:', err);
-        setError(err as Error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProfile();
-  }, []);
-
+  const { data: profile, isPending, isError, error } = useProfileQuery();
+  if (isError) {
+    logger.error('Error fetching profile:', error);
+  }
   return (
-    <ProfileContext.Provider value={{ profile, loading, error }}>
+    <ProfileContext.Provider value={{ profile, loading: isPending, error }}>
       {children}
     </ProfileContext.Provider>
   );

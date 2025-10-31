@@ -25,7 +25,7 @@ export const BrowsePageLayout = () => {
   const [showConvertFileDialog, setShowConvertFileDialog] =
     React.useState(false);
 
-  const { isLayoutLoadedFromDB } = usePreferencesContext();
+  const { preferenceQuery } = usePreferencesContext();
   const {
     layoutPrefsStorage,
     togglePropertiesDrawer,
@@ -47,9 +47,9 @@ export const BrowsePageLayout = () => {
 
   return (
     <div
-      className={`flex h-full w-full overflow-y-hidden ${!isLayoutLoadedFromDB ? 'animate-pulse gap-4 p-4' : ''}`}
+      className={`flex h-full w-full overflow-y-hidden ${preferenceQuery.isPending ? 'animate-pulse gap-4 p-4' : ''}`}
     >
-      {!isLayoutLoadedFromDB ? (
+      {preferenceQuery.isPending ? (
         <>
           <div className="bg-surface rounded h-full w-1/4" />
           <div className="bg-surface rounded h-full w-1/2" />
@@ -59,7 +59,7 @@ export const BrowsePageLayout = () => {
         <PanelGroup
           autoSaveId="layout"
           direction="horizontal"
-          key={`layout-${isLayoutLoadedFromDB}`}
+          key={`layout-${preferenceQuery.isPending}`}
           storage={layoutPrefsStorage}
         >
           {showSidebar ? (

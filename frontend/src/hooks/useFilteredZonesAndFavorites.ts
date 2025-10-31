@@ -12,8 +12,8 @@ import {
 } from '@/contexts/PreferencesContext';
 import { useProfileContext } from '@/contexts/ProfileContext';
 
-export default function useFilteredZonesAndFavorites() {
-  const { zonesAndFileSharePathsMap } = useZoneAndFspMapContext();
+export default function useSearchFilter() {
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const {
     zoneFavorites,
     fileSharePathFavorites,
@@ -36,9 +36,14 @@ export default function useFilteredZonesAndFavorites() {
 
   const filterZonesMap = React.useCallback(
     (query: string) => {
+      if (!zonesAndFspQuery.isSuccess) {
+        setFilteredZonesMap({});
+        return;
+      }
+
       const userGroups = profile?.groups || [];
 
-      const matches = Object.entries(zonesAndFileSharePathsMap)
+      const matches = Object.entries(zonesAndFspQuery.data)
         .map(([key, value]) => {
           // Map through zones only
           if (key.startsWith('zone')) {
@@ -88,7 +93,7 @@ export default function useFilteredZonesAndFavorites() {
 
       setFilteredZonesMap(Object.fromEntries(matches as [string, Zone][]));
     },
-    [zonesAndFileSharePathsMap, isFilteredByGroups, profile]
+    [zonesAndFspQuery, isFilteredByGroups, profile]
   );
 
   const filterAllFavorites = React.useCallback(
@@ -143,8 +148,15 @@ export default function useFilteredZonesAndFavorites() {
       filterAllFavorites(searchQuery);
     } else if (searchQuery === '' && isFilteredByGroups && profile?.groups) {
       // When search query is empty but group filtering is enabled, apply group filter
+      if (!zonesAndFspQuery.isSuccess) {
+        setFilteredZonesMap({});
+        setFilteredZoneFavorites([]);
+        setFilteredFileSharePathFavorites([]);
+        setFilteredFolderFavorites([]);
+        return;
+      }
       const userGroups = profile.groups;
-      const groupFilteredMap = Object.entries(zonesAndFileSharePathsMap)
+      const groupFilteredMap = Object.entries(zonesAndFspQuery.data)
         .map(([key, value]) => {
           if (key.startsWith('zone')) {
             const zone = value as Zone;
@@ -179,7 +191,7 @@ export default function useFilteredZonesAndFavorites() {
     }
   }, [
     searchQuery,
-    zonesAndFileSharePathsMap,
+    zonesAndFspQuery,
     zoneFavorites,
     fileSharePathFavorites,
     folderFavorites,
