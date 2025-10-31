@@ -63,7 +63,19 @@ export default function FileBrowser({
   return (
     <>
       <Crumbs />
-      {metadata ? (
+      {zarrMetadataQuery.isFetching ? (
+        <div className="flex my-4 shadow-sm rounded-md w-full min-h-96 bg-surface animate-appear animate-pulse animate-delay-150 opacity-0">
+          <Typography className="place-self-center text-center w-full">
+            Loading Zarr metadata...
+          </Typography>
+        </div>
+      ) : zarrMetadataQuery.isError ? (
+        <div className="flex my-4 shadow-sm rounded-md w-full min-h-96 bg-primary-light/30">
+          <Typography className="place-self-center text-center w-full text-warning">
+            Error loading Zarr metadata
+          </Typography>
+        </div>
+      ) : zarrMetadataQuery.data?.metadata ? (
         <ZarrPreview
           layerType={layerType}
           metadata={zarrMetadataQuery.data.metadata}
