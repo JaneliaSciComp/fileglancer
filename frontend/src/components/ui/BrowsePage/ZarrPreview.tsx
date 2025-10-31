@@ -1,5 +1,6 @@
 import React from 'react';
 import { Typography } from '@material-tailwind/react';
+import type { UseQueryResult } from '@tanstack/react-query';
 
 import zarrLogo from '@/assets/zarr.jpg';
 import ZarrMetadataTable from '@/components/ui/BrowsePage/ZarrMetadataTable';
@@ -14,20 +15,19 @@ import useDataToolLinks from '@/hooks/useDataToolLinks';
 import { Metadata } from '@/omezarr-helper';
 
 type ZarrPreviewProps = {
-  readonly thumbnailSrc: string | null;
-  readonly loadingThumbnail: boolean;
+  readonly thumbnailQuery: UseQueryResult<{
+    thumbnailSrc: string | null;
+    thumbnailError: string | null;
+  }>;
   readonly openWithToolUrls: OpenWithToolUrls | null;
   readonly metadata: ZarrMetadata;
-  readonly thumbnailError: string | null;
   readonly layerType: 'auto' | 'image' | 'segmentation' | null;
 };
 
 export default function ZarrPreview({
-  thumbnailSrc,
-  loadingThumbnail,
+  thumbnailQuery,
   openWithToolUrls,
   metadata,
-  thumbnailError,
   layerType
 }: ZarrPreviewProps): React.ReactNode {
   const [showDataLinkDialog, setShowDataLinkDialog] =
@@ -49,32 +49,36 @@ export default function ZarrPreview({
 
   return (
     <div className="my-4 p-4 shadow-sm rounded-md bg-primary-light/30">
-      <div className="flex gap-12 w-full h-fit max-h-100">
+      <div className="flex gap-12 w-full h-fit">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2 max-h-full">
-            {loadingThumbnail ? (
+            {thumbnailQuery.isPending ? (
               <div className="w-72 h-72 animate-pulse bg-surface text-foreground flex">
                 <Typography className="place-self-center text-center w-full">
                   Loading thumbnail...
                 </Typography>
               </div>
             ) : null}
-            {!loadingThumbnail && metadata && thumbnailSrc ? (
+            {!thumbnailQuery.isPending &&
+            metadata &&
+            thumbnailQuery.data?.thumbnailSrc ? (
               <img
                 alt="Thumbnail"
                 className="max-h-72 max-w-max rounded-md"
                 id="thumbnail"
-                src={thumbnailSrc}
+                src={thumbnailQuery.data.thumbnailSrc}
               />
-            ) : !loadingThumbnail && metadata && !thumbnailSrc ? (
+            ) : !thumbnailQuery.isPending &&
+              metadata &&
+              !thumbnailQuery.data?.thumbnailSrc ? (
               <div className="p-2">
                 <img
                   alt="Zarr logo"
                   className="max-h-44 rounded-md"
                   src={zarrLogo}
                 />
-                {thumbnailError ? (
-                  <Typography className="text-error text-xs pt-3">{`${thumbnailError}`}</Typography>
+                {thumbnailQuery.isError ? (
+                  <Typography className="text-error text-xs pt-3">{`${thumbnailQuery.error}`}</Typography>
                 ) : null}
               </div>
             ) : null}
