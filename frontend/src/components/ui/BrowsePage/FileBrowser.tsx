@@ -55,7 +55,7 @@ export default function FileBrowser({
 
   const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
   const isLoading = fileQuery.isPending;
-  const error = fileQuery.error;
+  const errorMessage = fileQuery.data?.errorMessage; // Permission error message embedded in data
 
   // If current item is a file, render the FileViewer instead of the file browser
   if (currentFileOrFolder && !currentFileOrFolder.is_dir) {
@@ -89,14 +89,14 @@ export default function FileBrowser({
           handleContextMenuClick={handleContextMenuClick}
           showPropertiesDrawer={showPropertiesDrawer}
         />
-      ) : !isLoading && displayFiles.length === 0 && !error ? (
+      ) : !isLoading && displayFiles.length === 0 && !errorMessage ? (
         <div className="flex items-center pl-3 py-1">
           <Typography>No files available for display.</Typography>
         </div>
-      ) : !isLoading && displayFiles.length === 0 && error ? (
-        /* Error state */
+      ) : !isLoading && displayFiles.length === 0 && errorMessage ? (
+        /* Permission error state - shows when user lacks access to folder */
         <div className="flex items-center pl-3 py-1">
-          <Typography>{error.message}</Typography>
+          <Typography>{errorMessage}</Typography>
         </div>
       ) : null}
       {showContextMenu ? (
