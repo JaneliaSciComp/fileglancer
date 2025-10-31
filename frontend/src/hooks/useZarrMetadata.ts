@@ -1,6 +1,5 @@
 import React from 'react';
 import { default as log } from '@/logger';
-import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
 import { useExternalBucketContext } from '@/contexts/ExternalBucketContext';
@@ -9,6 +8,7 @@ import {
   useOmeZarrThumbnailQuery
 } from '@/queries/zarrQueries';
 import type { OpenWithToolUrls, ZarrMetadata } from '@/queries/zarrQueries';
+import type { FileOrFolder } from '@/shared.types';
 import {
   generateNeuroglancerStateForDataURL,
   generateNeuroglancerStateForZarrArray,
@@ -21,8 +21,11 @@ export type { OpenWithToolUrls, ZarrMetadata };
 export type PendingToolKey = keyof OpenWithToolUrls | null;
 export type ZarrArray = zarr.Array<any>;
 
-export default function useZarrMetadata() {
-  const { fileQuery, fileBrowserState } = useFileBrowserContext();
+export default function useZarrMetadata(
+  fspName: string | undefined,
+  currentFileOrFolder: FileOrFolder | undefined | null,
+  files: FileOrFolder[] | undefined
+) {
   const { proxiedPathByFspAndPathQuery } = useProxiedPathContext();
   const { externalDataUrl } = useExternalBucketContext();
   const {
@@ -32,20 +35,18 @@ export default function useZarrMetadata() {
   } = usePreferencesContext();
 
   // Fetch Zarr metadata
-  const metadataQuery = useZarrMetadataQuery({
-    fspName: fileBrowserState.uiFileSharePath?.name,
-    currentFileOrFolder: fileQuery.data?.currentFileOrFolder,
-    files: fileQuery.data?.files
+  const zarrMetadataQuery = useZarrMetadataQuery({
+    fspName,
+    currentFileOrFolder,
+    files
   });
 
-  const metadata = metadataQuery.data?.metadata || null;
-  const omeZarrUrl = metadataQuery.data?.omeZarrUrl || null;
+  const metadata = zarrMetadataQuery.data?.metadata || null;
+  const omeZarrUrl = zarrMetadataQuery.data?.omeZarrUrl || null;
 
   // Fetch thumbnail when OME-Zarr URL is available
   const thumbnailQuery = useOmeZarrThumbnailQuery(omeZarrUrl);
   const thumbnailSrc = thumbnailQuery.data?.thumbnailSrc || null;
-  const thumbnailError = thumbnailQuery.data?.thumbnailError || null;
-  const loadingThumbnail = thumbnailQuery.isPending && !!omeZarrUrl;
 
   // Determine layer type from thumbnail (non-reactive, calculated once when thumbnail is ready)
   const [layerType, setLayerType] = React.useState<
@@ -190,11 +191,9 @@ export default function useZarrMetadata() {
   ]);
 
   return {
-    thumbnailSrc,
+    zarrMetadataQuery,
+    thumbnailQuery,
     openWithToolUrls,
-    metadata,
-    loadingThumbnail,
-    thumbnailError,
     layerType
   };
 }

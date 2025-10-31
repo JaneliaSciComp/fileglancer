@@ -33,7 +33,7 @@ export default function FileBrowser({
   setShowPermissionsDialog,
   setShowConvertFileDialog
 }: FileBrowserProps): React.ReactNode {
-  const { fileQuery } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const { displayFiles } = useHideDotFiles();
 
   const {
@@ -44,14 +44,12 @@ export default function FileBrowser({
     handleContextMenuClick
   } = useContextMenu();
 
-  const {
-    metadata,
-    thumbnailSrc,
-    openWithToolUrls,
-    loadingThumbnail,
-    thumbnailError,
-    layerType
-  } = useZarrMetadata();
+  const { zarrMetadataQuery, thumbnailQuery, openWithToolUrls, layerType } =
+    useZarrMetadata(
+      fileBrowserState.uiFileSharePath?.name ?? undefined,
+      fileQuery.data?.currentFileOrFolder ?? undefined,
+      fileQuery.data?.files ?? undefined
+    );
 
   const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
   const isLoading = fileQuery.isPending;
@@ -68,11 +66,9 @@ export default function FileBrowser({
       {metadata ? (
         <ZarrPreview
           layerType={layerType}
-          loadingThumbnail={loadingThumbnail}
-          metadata={metadata}
+          metadata={zarrMetadataQuery.data.metadata}
           openWithToolUrls={openWithToolUrls}
-          thumbnailError={thumbnailError}
-          thumbnailSrc={thumbnailSrc}
+          thumbnailQuery={thumbnailQuery}
         />
       ) : null}
 
