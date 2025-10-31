@@ -34,7 +34,7 @@ type ZarrMetadataResult = {
  * Detects if a directory contains Zarr-related files
  * Returns true if zarr.json, .zarray, or .zattrs files are present
  */
-function isZarrDirectory(files: FileOrFolder[] | undefined): boolean {
+export function isZarrDirectory(files: FileOrFolder[] | undefined): boolean {
   if (!files || files.length === 0) {
     return false;
   }
@@ -222,8 +222,11 @@ export function useOmeZarrThumbnailQuery(
   return useQuery({
     queryKey: ['zarr', 'thumbnail', omeZarrUrl || ''],
     queryFn: async ({ signal }) => {
+      if (!omeZarrUrl) {
+        throw new Error('omeZarrUrl is required for thumbnail generation');
+      }
       try {
-        return await fetchOmeZarrThumbnail(omeZarrUrl!, signal);
+        return await fetchOmeZarrThumbnail(omeZarrUrl, signal);
       } catch (error) {
         log.error('Error fetching OME-Zarr thumbnail:', error);
         // Return error result instead of throwing to avoid error boundary

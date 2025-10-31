@@ -11,6 +11,7 @@ import useContextMenu from '@/hooks/useContextMenu';
 import useZarrMetadata from '@/hooks/useZarrMetadata';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
+import { isZarrDirectory } from '@/queries/zarrQueries';
 
 type FileBrowserProps = {
   readonly showPropertiesDrawer: boolean;
@@ -33,7 +34,7 @@ export default function FileBrowser({
   setShowPermissionsDialog,
   setShowConvertFileDialog
 }: FileBrowserProps): React.ReactNode {
-  const { fileQuery, fileBrowserState } = useFileBrowserContext();
+  const { fileQuery } = useFileBrowserContext();
   const { displayFiles } = useHideDotFiles();
 
   const {
@@ -45,11 +46,9 @@ export default function FileBrowser({
   } = useContextMenu();
 
   const { zarrMetadataQuery, thumbnailQuery, openWithToolUrls, layerType } =
-    useZarrMetadata(
-      fileBrowserState.uiFileSharePath?.name ?? undefined,
-      fileQuery.data?.currentFileOrFolder ?? undefined,
-      fileQuery.data?.files ?? undefined
-    );
+    useZarrMetadata();
+
+  const isZarrDir = isZarrDirectory(fileQuery.data?.files);
 
   const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
   const isLoading = fileQuery.isPending;
@@ -63,7 +62,7 @@ export default function FileBrowser({
   return (
     <>
       <Crumbs />
-      {zarrMetadataQuery.isFetching ? (
+      {isZarrDir && zarrMetadataQuery.isPending ? (
         <div className="flex my-4 shadow-sm rounded-md w-full min-h-96 bg-surface animate-appear animate-pulse animate-delay-150 opacity-0">
           <Typography className="place-self-center text-center w-full">
             Loading Zarr metadata...

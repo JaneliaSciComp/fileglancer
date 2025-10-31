@@ -78,7 +78,11 @@ export default function ZarrPreview({
                   src={zarrLogo}
                 />
                 {thumbnailQuery.isError ? (
-                  <Typography className="text-error text-xs pt-3">{`${thumbnailQuery.error}`}</Typography>
+                  <Typography className="text-error text-xs pt-3">
+                    {thumbnailQuery.error instanceof Error
+                      ? thumbnailQuery.error.message
+                      : 'Failed to load thumbnail'}
+                  </Typography>
                 ) : null}
               </div>
             ) : null}

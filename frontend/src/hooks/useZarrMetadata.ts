@@ -1,5 +1,6 @@
 import React from 'react';
 import { default as log } from '@/logger';
+import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
 import { useExternalBucketContext } from '@/contexts/ExternalBucketContext';
@@ -8,7 +9,6 @@ import {
   useOmeZarrThumbnailQuery
 } from '@/queries/zarrQueries';
 import type { OpenWithToolUrls, ZarrMetadata } from '@/queries/zarrQueries';
-import type { FileOrFolder } from '@/shared.types';
 import {
   generateNeuroglancerStateForDataURL,
   generateNeuroglancerStateForZarrArray,
@@ -21,11 +21,8 @@ export type { OpenWithToolUrls, ZarrMetadata };
 export type PendingToolKey = keyof OpenWithToolUrls | null;
 export type ZarrArray = zarr.Array<any>;
 
-export default function useZarrMetadata(
-  fspName: string | undefined,
-  currentFileOrFolder: FileOrFolder | undefined | null,
-  files: FileOrFolder[] | undefined
-) {
+export default function useZarrMetadata() {
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const { proxiedPathByFspAndPathQuery } = useProxiedPathContext();
   const { externalDataUrl } = useExternalBucketContext();
   const {
@@ -36,9 +33,9 @@ export default function useZarrMetadata(
 
   // Fetch Zarr metadata
   const zarrMetadataQuery = useZarrMetadataQuery({
-    fspName,
-    currentFileOrFolder,
-    files
+    fspName: fileBrowserState.uiFileSharePath?.name,
+    currentFileOrFolder: fileQuery.data?.currentFileOrFolder,
+    files: fileQuery.data?.files
   });
 
   const metadata = zarrMetadataQuery.data?.metadata || null;
