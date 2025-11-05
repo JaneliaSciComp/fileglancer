@@ -2,6 +2,8 @@ import React from 'react';
 
 import { joinPaths } from '@/utils';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import type { Result } from '@/shared.types';
+import { createSuccess, handleError } from '@/utils/errorHandling';
 
 export default function useNewFolderDialog() {
   const [newName, setNewName] = React.useState<string>('');
@@ -19,18 +21,23 @@ export default function useNewFolderDialog() {
     );
   }, [newName, fileQuery.data?.files]);
 
-  async function handleNewFolderSubmit(): Promise<void> {
+  async function handleNewFolderSubmit(): Promise<Result<void>> {
     if (!currentFileSharePath) {
-      throw new Error('No file share path selected.');
+      return handleError(new Error('No file share path selected.'));
     }
     if (!currentFileOrFolder) {
-      throw new Error('No current file or folder selected.');
+      return handleError(new Error('No current file or folder selected.'));
     }
 
-    await mutations.createFolder.mutateAsync({
-      fspName: currentFileSharePath.name,
-      folderPath: joinPaths(currentFileOrFolder.path, newName)
-    });
+    try {
+      await mutations.createFolder.mutateAsync({
+        fspName: currentFileSharePath.name,
+        folderPath: joinPaths(currentFileOrFolder.path, newName)
+      });
+      return createSuccess(undefined);
+    } catch (error) {
+      return handleError(error);
+    }
   }
 
   return {

@@ -45,17 +45,14 @@ export default function NewFolderButton({
           <form
             onSubmit={async event => {
               event.preventDefault();
-              try {
-                await handleNewFolderSubmit();
+              const result = await handleNewFolderSubmit();
+              if (result.success) {
                 toast.success('New folder created!');
                 setNewName('');
-              } catch (error) {
-                toast.error(
-                  `Error creating folder: ${error instanceof Error ? error.message : 'Unknown error'}`
-                );
-              } finally {
-                setShowNewFolderDialog(false);
+              } else {
+                toast.error(`Error creating folder: ${result.error}`);
               }
+              setShowNewFolderDialog(false);
             }}
           >
             <div className="mt-8 flex flex-col gap-2">
