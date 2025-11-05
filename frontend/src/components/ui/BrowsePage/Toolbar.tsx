@@ -2,7 +2,6 @@ import * as React from 'react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router';
 import { ButtonGroup } from '@material-tailwind/react';
-import { useQueryClient } from '@tanstack/react-query';
 import {
   HiRefresh,
   HiEye,
@@ -28,8 +27,7 @@ import {
 } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
 import useFavoriteToggle from '@/hooks/useFavoriteToggle';
-import { fileQueryKeys } from '@/queries/fileQueries';
-import { fileContentQueryKeys } from '@/queries/fileContentQueries';
+import { useRefreshFileBrowser } from '@/hooks/useRefreshFileBrowser';
 
 type ToolbarProps = {
   readonly showPropertiesDrawer: boolean;
@@ -44,9 +42,8 @@ export default function Toolbar({
   showSidebar,
   toggleSidebar
 }: ToolbarProps): React.JSX.Element {
-  const { fileBrowserState, fileQuery, fspName, filePath } =
-    useFileBrowserContext();
-  const queryClient = useQueryClient();
+  const { fileBrowserState, fileQuery } = useFileBrowserContext();
+  const { refreshFileBrowser } = useRefreshFileBrowser();
 
   const currentFileSharePath = fileBrowserState.uiFileSharePath;
   const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
@@ -133,25 +130,7 @@ export default function Toolbar({
             <FgTooltip
               icon={HiRefresh}
               label="Refresh file browser"
-              onClick={async () => {
-                // Check if we're viewing a file or a folder
-                const isViewingFile =
-                  currentFileOrFolder && !currentFileOrFolder.is_dir;
-
-                if (isViewingFile && fspName && filePath) {
-                  // If viewing a file, invalidate file content query
-                  await queryClient.invalidateQueries({
-                    queryKey: fileContentQueryKeys.detail(fspName, filePath)
-                  });
-                  toast.success('File content refreshed!');
-                } else if (fspName && filePath) {
-                  // If viewing a folder, invalidate file list query
-                  await queryClient.invalidateQueries({
-                    queryKey: fileQueryKeys.filePath(fspName, filePath)
-                  });
-                  toast.success('File browser refreshed!');
-                }
-              }}
+              onClick={refreshFileBrowser}
               triggerClasses={triggerClasses}
             />
           ) : null}
