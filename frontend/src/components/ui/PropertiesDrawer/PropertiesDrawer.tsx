@@ -92,7 +92,6 @@ export default function PropertiesDrawer({
   const { proxiedPathByFspAndPathQuery } = useProxiedPathContext();
   const { externalDataUrl } = useExternalBucketContext();
 
-  const ticket = ticketByPathQuery.data;
   const proxiedPath = proxiedPathByFspAndPathQuery.data;
   const {
     handleDialogConfirm,
@@ -270,8 +269,22 @@ export default function PropertiesDrawer({
                 className="flex flex-col gap-4 flex-1 w-full p-2"
                 value="convert"
               >
-                {ticket ? (
-                  <TicketDetails />
+                {ticketByPathQuery.isPending ? (
+                  <Typography className="text-foreground">
+                    Loading ticket information...
+                  </Typography>
+                ) : ticketByPathQuery.isError ? (
+                  <>
+                    <Typography className="text-error">
+                      Error loading ticket information
+                    </Typography>
+                    <Typography className="text-foreground" type="small">
+                      {ticketByPathQuery.error.message ||
+                        'An unknown error occurred'}
+                    </Typography>
+                  </>
+                ) : ticketByPathQuery.data ? (
+                  <TicketDetails ticket={ticketByPathQuery.data} />
                 ) : (
                   <>
                     <Typography className="min-w-64">
