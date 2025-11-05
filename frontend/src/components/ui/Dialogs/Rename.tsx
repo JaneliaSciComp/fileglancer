@@ -19,35 +19,33 @@ export default function RenameDialog({
   const { fileBrowserState, mutations } = useFileBrowserContext();
   const { handleRenameSubmit, newName, setNewName } = useRenameDialog();
 
+  const submitForm = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!fileBrowserState.propertiesTarget) {
+      toast.error('No target file selected');
+      return;
+    }
+
+    try {
+      await handleRenameSubmit(`${fileBrowserState.propertiesTarget.path}`);
+      toast.success('Item renamed successfully!');
+      setNewName('');
+    } catch (error) {
+      toast.error(
+        `Error renaming item: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    } finally {
+      setShowRenameDialog(false);
+    }
+  };
+
   return (
     <FgDialog
       onClose={() => setShowRenameDialog(false)}
       open={showRenameDialog}
     >
-      <form
-        onSubmit={async event => {
-          event.preventDefault();
-
-          if (!fileBrowserState.propertiesTarget) {
-            toast.error('No target file selected');
-            return;
-          }
-
-          try {
-            await handleRenameSubmit(
-              `${fileBrowserState.propertiesTarget.path}`
-            );
-            toast.success('Item renamed successfully!');
-            setNewName('');
-          } catch (error) {
-            toast.error(
-              `Error renaming item: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-          } finally {
-            setShowRenameDialog(false);
-          }
-        }}
-      >
+      <form onSubmit={submitForm}>
         <div className="mt-8 flex flex-col gap-2">
           <Typography
             as="label"
