@@ -63,7 +63,7 @@ export default function Help() {
     );
   }
 
-  const version = versionQuery.isError ? undefined : versionQuery.data?.version;
+  const version = versionQuery.isError ? undefined : versionQuery.data.version;
   const versionDisplay = versionQuery.isError
     ? 'Error getting version number'
     : `Fileglancer Version ${version}`;
