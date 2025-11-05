@@ -1,5 +1,6 @@
 // https://testing-library.com/docs/react-testing-library/setup
-import { type ReactNode, type ReactNode, ReactElement } from 'react';
+import { ReactElement } from 'react';
+import type { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes, useParams } from 'react-router';
 import { render, RenderOptions } from '@testing-library/react';
 import { ErrorBoundary } from 'react-error-boundary';
