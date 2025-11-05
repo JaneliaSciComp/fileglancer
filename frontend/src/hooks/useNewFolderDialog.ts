@@ -1,16 +1,16 @@
-import React from 'react';
+import { useState, useMemo } from 'react';
 
 import { joinPaths } from '@/utils';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 
 export default function useNewFolderDialog() {
-  const [newName, setNewName] = React.useState<string>('');
+  const [newName, setNewName] = useState<string>('');
 
   const { fileBrowserState, fileQuery, mutations } = useFileBrowserContext();
   const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
   const currentFileSharePath = fileBrowserState.uiFileSharePath;
 
-  const isDuplicateName = React.useMemo(() => {
+  const isDuplicateName = useMemo(() => {
     if (!newName.trim()) {
       return false;
     }

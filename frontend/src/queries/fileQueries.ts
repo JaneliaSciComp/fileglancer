@@ -1,4 +1,4 @@
-import React from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   useQuery,
   UseQueryResult,
@@ -78,7 +78,7 @@ export default function useFileQuery(
     }
   };
 
-  const transformData = React.useCallback(
+  const transformData = useCallback(
     (data: FileBrowserResponse | { info: FileOrFolder }): FileQueryData => {
       // This should never happen because query is disabled when !fspName
       if (!fspName) {
@@ -131,7 +131,7 @@ export default function useFileQuery(
   });
 
   // Handle 403 errors with fallback data from partial response
-  const dataWithFallback = React.useMemo(() => {
+  const dataWithFallback = useMemo(() => {
     if (query.data) {
       return query.data;
     }

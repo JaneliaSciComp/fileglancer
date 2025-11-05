@@ -1,3 +1,4 @@
+import type { MouseEvent } from 'react';
 import { Typography } from '@material-tailwind/react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { useNavigate } from 'react-router';
@@ -31,7 +32,7 @@ function FilePathCell({ item }: { readonly item: Ticket }) {
     item.path
   );
 
-  const handleClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+  const handleClick = async (e: MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     const result = await setLayoutWithPropertiesOpen();
     if (!result.success) {

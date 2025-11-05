@@ -1,4 +1,11 @@
-import React from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback
+} from 'react';
+import type { ReactNode } from 'react';
 import { useNotificationsQuery } from '@/queries/notificationQueries';
 import type { Notification } from '@/queries/notificationQueries';
 import logger from '@/logger';
@@ -12,12 +19,10 @@ type NotificationContextType = {
   dismissNotification: (id: number) => void;
 };
 
-const NotificationContext = React.createContext<NotificationContextType | null>(
-  null
-);
+const NotificationContext = createContext<NotificationContextType | null>(null);
 
 export const useNotificationContext = () => {
-  const context = React.useContext(NotificationContext);
+  const context = useContext(NotificationContext);
   if (!context) {
     throw new Error(
       'useNotificationContext must be used within a NotificationProvider'
@@ -29,9 +34,9 @@ export const useNotificationContext = () => {
 export const NotificationProvider = ({
   children
 }: {
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
 }) => {
-  const [dismissedNotifications, setDismissedNotifications] = React.useState<
+  const [dismissedNotifications, setDismissedNotifications] = useState<
     number[]
   >([]);
 
@@ -39,7 +44,7 @@ export const NotificationProvider = ({
   const { data, isLoading, isFetching, error } = useNotificationsQuery();
 
   // Load dismissed notifications from localStorage
-  React.useEffect(() => {
+  useEffect(() => {
     const dismissed = localStorage.getItem('dismissedNotifications');
     if (dismissed) {
       try {
@@ -53,7 +58,7 @@ export const NotificationProvider = ({
     }
   }, []);
 
-  const dismissNotification = React.useCallback(
+  const dismissNotification = useCallback(
     (id: number) => {
       const newDismissed = [...dismissedNotifications, id];
       setDismissedNotifications(newDismissed);

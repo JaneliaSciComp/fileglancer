@@ -1,13 +1,14 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
+import type { ChangeEvent } from 'react';
 import { usePreferencesContext } from '../contexts/PreferencesContext';
 
 export default function useLocalPathPreference() {
   const { pathPreference } = usePreferencesContext();
 
   const [localPathPreference, setLocalPathPreference] =
-    React.useState(pathPreference);
+    useState(pathPreference);
 
-  const handleLocalChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLocalChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (
       event.target.value === 'linux_path' ||
       event.target.value === 'mac_path' ||
@@ -18,7 +19,7 @@ export default function useLocalPathPreference() {
   };
 
   // Update localPathPreference when pathPreference changes
-  React.useEffect(() => {
+  useEffect(() => {
     setLocalPathPreference(pathPreference);
   }, [pathPreference]);
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { default as log } from '@/logger';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
@@ -48,11 +48,11 @@ export default function useZarrMetadata() {
   const loadingThumbnail = thumbnailQuery.isPending && !!omeZarrUrl;
 
   // Determine layer type from thumbnail (non-reactive, calculated once when thumbnail is ready)
-  const [layerType, setLayerType] = React.useState<
+  const [layerType, setLayerType] = useState<
     'auto' | 'image' | 'segmentation' | null
   >(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (disableHeuristicalLayerTypeDetection) {
       setLayerType('image');
       return;
@@ -78,18 +78,18 @@ export default function useZarrMetadata() {
   // Compute tool URLs based on metadata and proxied path
   // Note: layerType is NOT in the dependency array to avoid recalculating URLs
   // when layer type is determined. We use a ref to track the effective layer type.
-  const effectiveLayerTypeRef = React.useRef<'auto' | 'image' | 'segmentation'>(
+  const effectiveLayerTypeRef = useRef<'auto' | 'image' | 'segmentation'>(
     'image'
   );
 
   // Update the ref when layerType changes, but don't trigger re-render
-  React.useEffect(() => {
+  useEffect(() => {
     if (layerType) {
       effectiveLayerTypeRef.current = layerType;
     }
   }, [layerType]);
 
-  const openWithToolUrls = React.useMemo(() => {
+  const openWithToolUrls = useMemo(() => {
     if (!metadata) {
       return null;
     }

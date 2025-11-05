@@ -1,4 +1,4 @@
-import React from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { Button } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
@@ -12,13 +12,13 @@ import { usePreferencesContext } from '@/contexts/PreferencesContext';
 
 type DeleteDialogProps = {
   readonly showDeleteDialog: boolean;
-  readonly setShowDeleteDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  readonly setShowDeleteDialog: Dispatch<SetStateAction<boolean>>;
 };
 
 export default function DeleteDialog({
   showDeleteDialog,
   setShowDeleteDialog
-}: DeleteDialogProps): React.JSX.Element {
+}: DeleteDialogProps) {
   const { handleDelete } = useDeleteDialog();
   const { fileBrowserState, mutations } = useFileBrowserContext();
   const { pathPreference } = usePreferencesContext();

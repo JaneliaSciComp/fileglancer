@@ -1,4 +1,4 @@
-import React from 'react';
+import { Fragment } from 'react';
 import { Timeline, Typography, Button } from '@material-tailwind/react';
 import { HiExternalLink } from 'react-icons/hi';
 
@@ -81,10 +81,10 @@ export default function TicketDetails() {
   // Format description to properly display line breaks
   const formattedDescription = ticket?.description
     ? ticket.description.split('\\n').map((line, index) => (
-        <React.Fragment key={index}>
+        <Fragment key={index}>
           {line}
           {index < ticket.description.split('\\n').length - 1 ? <br /> : null}
-        </React.Fragment>
+        </Fragment>
       ))
     : null;
 

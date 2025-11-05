@@ -1,4 +1,4 @@
-import React from 'react';
+import { useEffect, useState } from 'react';
 import { Typography } from '@material-tailwind/react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import {
@@ -75,10 +75,10 @@ const getLanguageFromExtension = (filename: string): string => {
   return languageMap[extension] || 'text';
 };
 
-export default function FileViewer({ file }: FileViewerProps): React.ReactNode {
+export default function FileViewer({ file }: FileViewerProps) {
   const { fileBrowserState } = useFileBrowserContext();
 
-  const [isDarkMode, setIsDarkMode] = React.useState<boolean>(false);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
   const contentQuery = useFileContentQuery(
     fileBrowserState.uiFileSharePath?.name,
@@ -86,7 +86,7 @@ export default function FileViewer({ file }: FileViewerProps): React.ReactNode {
   );
 
   // Detect dark mode from document
-  React.useEffect(() => {
+  useEffect(() => {
     const checkDarkMode = () => {
       setIsDarkMode(document.documentElement.classList.contains('dark'));
     };

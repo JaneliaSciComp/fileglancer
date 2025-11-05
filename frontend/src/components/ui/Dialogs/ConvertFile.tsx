@@ -1,4 +1,4 @@
-import React from 'react';
+import type { ChangeEvent } from 'react';
 import { Button, Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
@@ -23,7 +23,7 @@ const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
 export default function ConvertFileDialog({
   showConvertFileDialog,
   setShowConvertFileDialog
-}: ItemNamingDialogProps): React.JSX.Element {
+}: ItemNamingDialogProps) {
   const { destinationFolder, setDestinationFolder, handleTicketSubmit } =
     useConvertFileDialog();
   const { pathPreference } = usePreferencesContext();
@@ -87,7 +87,7 @@ export default function ConvertFileDialog({
             className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!tasksEnabled}
             id="destination_folder"
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
               setDestinationFolder(event.target.value);
             }}
             placeholder={placeholderText}

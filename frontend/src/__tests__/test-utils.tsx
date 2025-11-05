@@ -1,5 +1,5 @@
 // https://testing-library.com/docs/react-testing-library/setup
-import React from 'react';
+import { type ReactNode, type ReactNode, ReactElement } from 'react';
 import { MemoryRouter, Route, Routes, useParams } from 'react-router';
 import { render, RenderOptions } from '@testing-library/react';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -20,11 +20,7 @@ interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
   initialEntries?: string[];
 }
 
-const FileBrowserTestingWrapper = ({
-  children
-}: {
-  children: React.ReactNode;
-}) => {
+const FileBrowserTestingWrapper = ({ children }: { children: ReactNode }) => {
   const params = useParams();
   const fspName = params.fspName;
   const filePath = params['*'];
@@ -36,7 +32,7 @@ const FileBrowserTestingWrapper = ({
   );
 };
 
-const Browse = ({ children }: { children: React.ReactNode }) => {
+const Browse = ({ children }: { children: ReactNode }) => {
   return (
     <ServerHealthProvider>
       <ZonesAndFspMapContextProvider>
@@ -62,7 +58,7 @@ const MockRouterAndProviders = ({
   children,
   initialEntries = ['/']
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   initialEntries?: string[];
 }) => {
   // Create a new QueryClient for each test to ensure isolation
@@ -96,10 +92,7 @@ const MockRouterAndProviders = ({
   );
 };
 
-const customRender = (
-  ui: React.ReactElement,
-  options?: CustomRenderOptions
-) => {
+const customRender = (ui: ReactElement, options?: CustomRenderOptions) => {
   const { initialEntries, ...renderOptions } = options || {};
   return render(ui, {
     wrapper: props => (

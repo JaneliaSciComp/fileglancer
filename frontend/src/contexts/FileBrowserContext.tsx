@@ -1,4 +1,11 @@
-import React from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect
+} from 'react';
+import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { UseMutationResult } from '@tanstack/react-query';
 
@@ -13,7 +20,7 @@ import useFileQuery, {
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 
 type FileBrowserContextProviderProps = {
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
   readonly fspName: string | undefined;
   readonly filePath: string | undefined;
 };
@@ -68,12 +75,10 @@ type FileBrowserContextType = {
   updateFilesWithContextMenuClick: (file: FileOrFolder) => void;
 };
 
-const FileBrowserContext = React.createContext<FileBrowserContextType | null>(
-  null
-);
+const FileBrowserContext = createContext<FileBrowserContextType | null>(null);
 
 export const useFileBrowserContext = () => {
-  const context = React.useContext(FileBrowserContext);
+  const context = useContext(FileBrowserContext);
   if (!context) {
     throw new Error(
       'useFileBrowserContext must be used within a FileBrowserContextProvider'
@@ -91,12 +96,11 @@ export const FileBrowserContextProvider = ({
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
 
   // Client-only state for UI interactions
-  const [fileBrowserState, setFileBrowserState] =
-    React.useState<FileBrowserState>({
-      uiFileSharePath: null,
-      propertiesTarget: null,
-      selectedFiles: []
-    });
+  const [fileBrowserState, setFileBrowserState] = useState<FileBrowserState>({
+    uiFileSharePath: null,
+    propertiesTarget: null,
+    selectedFiles: []
+  });
 
   const navigate = useNavigate();
 
@@ -110,7 +114,7 @@ export const FileBrowserContextProvider = ({
   const changePermissionsMutation = useChangePermissionsMutation();
 
   // Function to update fileBrowserState with complete, consistent data
-  const updateFileBrowserState = React.useCallback(
+  const updateFileBrowserState = useCallback(
     (newState: Partial<FileBrowserState>) => {
       setFileBrowserState(prev => ({
         ...prev,
@@ -168,7 +172,7 @@ export const FileBrowserContextProvider = ({
 
   // Update client state when URL changes (navigation to different file/folder)
   // Set propertiesTarget to the current directory/file being viewed
-  React.useEffect(() => {
+  useEffect(() => {
     const fspKey = fspName ? makeMapKey('fsp', fspName) : null;
     const newFileSharePathTarget =
       zonesAndFspQuery.data && fspKey
@@ -189,7 +193,7 @@ export const FileBrowserContextProvider = ({
   // Update propertiesTarget when the selected file's data changes in the query cache
   // This ensures optimistic updates to permissions are reflected in the properties drawer
   // which reads from propertiesTarget, not currentFileOrFolder directly
-  React.useEffect(() => {
+  useEffect(() => {
     if (
       !fileBrowserState.propertiesTarget ||
       !fileQuery.data?.currentFileOrFolder

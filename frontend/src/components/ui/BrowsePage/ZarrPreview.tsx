@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState } from 'react';
 import { Typography } from '@material-tailwind/react';
 
 import zarrLogo from '@/assets/zarr.jpg';
@@ -29,11 +29,9 @@ export default function ZarrPreview({
   metadata,
   thumbnailError,
   layerType
-}: ZarrPreviewProps): React.ReactNode {
-  const [showDataLinkDialog, setShowDataLinkDialog] =
-    React.useState<boolean>(false);
-  const [pendingToolKey, setPendingToolKey] =
-    React.useState<PendingToolKey>(null);
+}: ZarrPreviewProps) {
+  const [showDataLinkDialog, setShowDataLinkDialog] = useState<boolean>(false);
+  const [pendingToolKey, setPendingToolKey] = useState<PendingToolKey>(null);
 
   const {
     handleToolClick,

@@ -1,4 +1,4 @@
-import React from 'react';
+import { useMemo } from 'react';
 import {
   useQuery,
   useMutation,
@@ -238,7 +238,7 @@ const createTransformPreferences = (
 export function usePreferencesQuery(
   zonesAndFspMap: ZonesAndFileSharePathsMap | undefined
 ): UseQueryResult<PreferencesQueryData, Error> {
-  const transformPreferences = React.useMemo(
+  const transformPreferences = useMemo(
     () => createTransformPreferences(zonesAndFspMap),
     [zonesAndFspMap]
   );

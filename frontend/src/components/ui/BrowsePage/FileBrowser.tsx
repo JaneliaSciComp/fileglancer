@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { Typography } from '@material-tailwind/react';
 
 import Crumbs from './Crumbs';
@@ -32,7 +31,7 @@ export default function FileBrowser({
   setShowDeleteDialog,
   setShowPermissionsDialog,
   setShowConvertFileDialog
-}: FileBrowserProps): React.ReactNode {
+}: FileBrowserProps) {
   const { fileQuery } = useFileBrowserContext();
   const { displayFiles } = useHideDotFiles();
 

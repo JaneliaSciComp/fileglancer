@@ -1,4 +1,5 @@
-import * as React from 'react';
+import { useMemo } from 'react';
+import type { MouseEvent } from 'react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router';
 import { ButtonGroup } from '@material-tailwind/react';
@@ -43,7 +44,7 @@ export default function Toolbar({
   togglePropertiesDrawer,
   showSidebar,
   toggleSidebar
-}: ToolbarProps): React.JSX.Element {
+}: ToolbarProps) {
   const { fileBrowserState, fileQuery, fspName, filePath } =
     useFileBrowserContext();
   const queryClient = useQueryClient();
@@ -67,7 +68,7 @@ export default function Toolbar({
     currentFileOrFolder?.path
   );
 
-  const isFavorited = React.useMemo(() => {
+  const isFavorited = useMemo(() => {
     if (!currentFileSharePath) {
       return false;
     }
@@ -106,7 +107,7 @@ export default function Toolbar({
                 ? 'Hide favorites and zone browser'
                 : 'View favorites and zone browser'
             }
-            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+            onClick={(e: MouseEvent<HTMLButtonElement>) => {
               toggleSidebar();
               e.currentTarget.blur();
             }}
@@ -166,7 +167,7 @@ export default function Toolbar({
             <FgTooltip
               icon={hideDotFiles ? HiEyeOff : HiEye}
               label={hideDotFiles ? 'Show dot files' : 'Hide dot files'}
-              onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
+              onClick={async (e: MouseEvent<HTMLButtonElement>) => {
                 const result = await toggleHideDotFiles();
                 if (result.success) {
                   toast.success(
@@ -192,7 +193,7 @@ export default function Toolbar({
                   ? 'Remove current directory from favorites'
                   : 'Add current directory to favorites'
               }
-              onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
+              onClick={async (e: MouseEvent<HTMLButtonElement>) => {
                 const result = await handleFavoriteToggle(false);
                 if (!result.success) {
                   toast.error(`Error updating favorites: ${result.error}`);
@@ -233,7 +234,7 @@ export default function Toolbar({
               ? 'Hide file properties'
               : 'View file properties'
           }
-          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+          onClick={(e: MouseEvent<HTMLButtonElement>) => {
             togglePropertiesDrawer();
             e.currentTarget.blur();
           }}
