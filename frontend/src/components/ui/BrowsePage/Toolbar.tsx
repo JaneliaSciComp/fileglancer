@@ -91,6 +91,55 @@ export default function Toolbar({
   const triggerClasses =
     'inline-grid place-items-center border align-middle select-none font-sans font-medium text-center transition-all duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:pointer-events-none data-[shape=circular]:rounded-full text-sm min-w-[38px] min-h-[38px] rounded-md shadow-sm hover:shadow-md bg-transparent border-primary text-primary hover:bg-primary hover:text-primary-foreground outline-none group';
 
+  const handleToggleSidebar = (e: React.MouseEvent<HTMLButtonElement>) => {
+    toggleSidebar();
+    e.currentTarget.blur();
+  };
+
+  const handleToggleHideDotFiles = async (
+    e: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    const result = await toggleHideDotFiles();
+    if (result.success) {
+      toast.success(
+        hideDotFiles ? 'Dot files are now visible' : 'Dot files are now hidden'
+      );
+    } else {
+      toast.error(result.error);
+    }
+    e.currentTarget.blur();
+  };
+
+  const handleToggleFavorite = async (
+    e: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    const result = await handleFavoriteToggle(false);
+    if (!result.success) {
+      toast.error(`Error updating favorites: ${result.error}`);
+    } else if (result.data === true) {
+      openFavoritesSection();
+      toast.success('Favorite added!');
+    } else {
+      toast.success('Favorite removed!');
+    }
+  };
+
+  const handleCopyPath = () => {
+    try {
+      copyToClipboard(fullPath);
+      toast.success('Path copied to clipboard!');
+    } catch (error) {
+      toast.error(`Failed to copy path. Error: ${error}`);
+    }
+  };
+
+  const handleTogglePropertiesDrawer = (
+    e: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    togglePropertiesDrawer();
+    e.currentTarget.blur();
+  };
+
   return (
     <div className="flex flex-col min-w-full p-2 border-b border-surface">
       <div className="flex justify-between items-center">
@@ -103,10 +152,7 @@ export default function Toolbar({
                 ? 'Hide favorites and zone browser'
                 : 'View favorites and zone browser'
             }
-            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-              toggleSidebar();
-              e.currentTarget.blur();
-            }}
+            onClick={handleToggleSidebar}
             triggerClasses={triggerClasses}
           />
 
@@ -145,19 +191,7 @@ export default function Toolbar({
             <FgTooltip
               icon={hideDotFiles ? HiEyeOff : HiEye}
               label={hideDotFiles ? 'Show dot files' : 'Hide dot files'}
-              onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
-                const result = await toggleHideDotFiles();
-                if (result.success) {
-                  toast.success(
-                    hideDotFiles
-                      ? 'Dot files are now visible'
-                      : 'Dot files are now hidden'
-                  );
-                } else {
-                  toast.error(result.error);
-                }
-                e.currentTarget.blur();
-              }}
+              onClick={handleToggleHideDotFiles}
               triggerClasses={triggerClasses}
             />
           ) : null}
@@ -171,17 +205,7 @@ export default function Toolbar({
                   ? 'Remove current directory from favorites'
                   : 'Add current directory to favorites'
               }
-              onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
-                const result = await handleFavoriteToggle(false);
-                if (!result.success) {
-                  toast.error(`Error updating favorites: ${result.error}`);
-                } else if (result.data === true) {
-                  openFavoritesSection();
-                  toast.success('Favorite added!');
-                } else {
-                  toast.success('Favorite removed!');
-                }
-              }}
+              onClick={handleToggleFavorite}
               triggerClasses={triggerClasses}
             />
           ) : null}
@@ -191,14 +215,7 @@ export default function Toolbar({
             <FgTooltip
               icon={HiOutlineClipboardCopy}
               label="Copy current path"
-              onClick={() => {
-                try {
-                  copyToClipboard(fullPath);
-                  toast.success('Path copied to clipboard!');
-                } catch (error) {
-                  toast.error(`Failed to copy path. Error: ${error}`);
-                }
-              }}
+              onClick={handleCopyPath}
               triggerClasses={triggerClasses}
             />
           ) : null}
@@ -212,10 +229,7 @@ export default function Toolbar({
               ? 'Hide file properties'
               : 'View file properties'
           }
-          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-            togglePropertiesDrawer();
-            e.currentTarget.blur();
-          }}
+          onClick={handleTogglePropertiesDrawer}
           triggerClasses={triggerClasses}
         />
       </div>
