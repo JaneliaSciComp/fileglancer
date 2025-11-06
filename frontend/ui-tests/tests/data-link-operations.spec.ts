@@ -122,9 +122,8 @@ test.describe('Data Link Operations', () => {
       const deleteLinkOption = page.getByRole('menuitem', { name: /unshare/i });
       await deleteLinkOption.click();
       // Confirm deletion
-      if (await confirmDeleteButton.isVisible()) {
-        await confirmDeleteButton.click();
-      }
+      await expect(confirmDeleteButton).toBeVisible({ timeout: 10000 });
+      await confirmDeleteButton.click();
 
       // Verify the link is removed from the table
       await expect(linkRow).not.toBeVisible({ timeout: 10000 });
