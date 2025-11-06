@@ -65,22 +65,61 @@ const fetchExternalBucket = async (
 };
 
 /**
- * Query hook for fetching an external bucket by FSP name
+ * Transforms an external bucket into a data URL based on the current file path
+ *
+ * @param bucket - The external bucket configuration or null
+ * @param currentFilePath - The current file or folder path
+ * @param fspName - The file share path name
+ * @returns The external data URL or null if not applicable
+ */
+export function transformBucketToDataUrl(
+  bucket: ExternalBucket | null,
+  currentFilePath: string | undefined,
+  fspName: string | undefined
+): string | null {
+  if (!bucket || !currentFilePath || !fspName) {
+    return null;
+  }
+
+  // Check if current path is within the bucket path and FSP matches
+  if (
+    fspName === bucket.fsp_name &&
+    currentFilePath.startsWith(bucket.relative_path)
+  ) {
+    // Create data URL with relative path from bucket
+    const relativePath = currentFilePath.substring(bucket.relative_path.length);
+    const cleanRelativePath = relativePath.startsWith('/')
+      ? relativePath.substring(1)
+      : relativePath;
+    const externalUrl = bucket.external_url.endsWith('/')
+      ? bucket.external_url.slice(0, -1)
+      : bucket.external_url;
+    return `${externalUrl}/${cleanRelativePath}/`;
+  }
+
+  return null;
+}
+
+/**
+ * Query hook for fetching an external bucket and transforming it to a data URL
  *
  * @param fspName - File share path name
+ * @param currentFilePath - The current file or folder path
  * @param enabled - Whether the query should run
- * @returns Query result with external bucket or null
+ * @returns Query result with external data URL or null
  */
-export function useExternalBucketQuery(
+export function useExternalDataUrlQuery(
   fspName: string | undefined,
+  currentFilePath: string | undefined,
   enabled: boolean = false
-): UseQueryResult<ExternalBucket | null, Error> {
+): UseQueryResult<string | null, Error> {
   const shouldFetch = enabled && !!fspName;
 
-  return useQuery<ExternalBucket | null, Error>({
+  return useQuery<ExternalBucket | null, Error, string | null>({
     queryKey: externalBucketQueryKeys.byFsp(fspName ?? ''),
     queryFn: ({ signal }) => fetchExternalBucket(fspName!, signal),
     enabled: shouldFetch,
-    staleTime: 5 * 60 * 1000 // 5 minutes - external buckets rarely change
+    staleTime: 5 * 60 * 1000, // 5 minutes - external buckets rarely change
+    select: bucket => transformBucketToDataUrl(bucket, currentFilePath, fspName)
   });
 }
