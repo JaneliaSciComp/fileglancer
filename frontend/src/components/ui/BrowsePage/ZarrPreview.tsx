@@ -15,10 +15,7 @@ import useDataToolLinks from '@/hooks/useDataToolLinks';
 import { Metadata } from '@/omezarr-helper';
 
 type ZarrPreviewProps = {
-  readonly thumbnailQuery: UseQueryResult<{
-    thumbnailSrc: string | null;
-    thumbnailError: string | null;
-  }>;
+  readonly thumbnailQuery: UseQueryResult<string, Error>;
   readonly openWithToolUrls: OpenWithToolUrls | null;
   readonly zarrMetadataQuery: UseQueryResult<{
     metadata: ZarrMetadata;
@@ -53,36 +50,39 @@ export default function ZarrPreview({
       <div className="flex gap-12 w-full h-fit">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2 max-h-full">
-            {zarrMetadataQuery.data?.omeZarrUrl && thumbnailQuery.isPending ? (
-              <div className="w-72 h-72 animate-pulse bg-surface text-foreground flex">
-                <Typography className="place-self-center text-center w-full">
-                  Loading thumbnail...
-                </Typography>
-              </div>
-            ) : null}
-            {!thumbnailQuery.isPending && thumbnailQuery.data?.thumbnailSrc ? (
-              <img
-                alt="Thumbnail"
-                className="max-h-72 max-w-max rounded-md"
-                id="thumbnail"
-                src={thumbnailQuery.data.thumbnailSrc}
-              />
-            ) : !thumbnailQuery.isPending &&
-              !zarrMetadataQuery.data?.omeZarrUrl ? (
+            {!zarrMetadataQuery.data?.omeZarrUrl ? (
               <div className="p-2">
                 <img
                   alt="Zarr logo"
                   className="max-h-44 rounded-md"
                   src={zarrLogo}
                 />
-                {thumbnailQuery.isError ? (
-                  <Typography className="text-error text-xs pt-3">
-                    {thumbnailQuery.error instanceof Error
-                      ? thumbnailQuery.error.message
-                      : 'Failed to load thumbnail'}
-                  </Typography>
-                ) : null}
               </div>
+            ) : zarrMetadataQuery.data?.omeZarrUrl &&
+              thumbnailQuery.isPending ? (
+              <div className="w-72 h-72 animate-pulse bg-surface text-foreground flex">
+                <Typography className="place-self-center text-center w-full">
+                  Loading thumbnail...
+                </Typography>
+              </div>
+            ) : thumbnailQuery.isError ? (
+              <div className="p-2">
+                <img
+                  alt="Zarr logo"
+                  className="max-h-44 rounded-md"
+                  src={zarrLogo}
+                />
+                <Typography className="text-error text-xs pt-3">
+                  {thumbnailQuery.error.message}
+                </Typography>
+              </div>
+            ) : !thumbnailQuery.isPending && thumbnailQuery.data ? (
+              <img
+                alt="Thumbnail"
+                className="max-h-72 max-w-max rounded-md"
+                id="thumbnail"
+                src={thumbnailQuery.data}
+              />
             ) : null}
           </div>
 

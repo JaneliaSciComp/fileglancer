@@ -175,15 +175,10 @@ export function useZarrMetadataQuery(
   });
 }
 
-type ThumbnailResult = {
-  thumbnailSrc: string | null;
-  thumbnailError: string | null;
-};
-
 async function fetchOmeZarrThumbnail(
   omeZarrUrl: string,
   signal: AbortSignal
-): Promise<ThumbnailResult> {
+): Promise<string> {
   log.debug('Getting OME-Zarr thumbnail for', omeZarrUrl);
 
   const [thumbnail, errorMessage] = await getOmeZarrThumbnail(
@@ -192,17 +187,12 @@ async function fetchOmeZarrThumbnail(
   );
 
   if (errorMessage) {
-    log.error('Thumbnail load failed:', errorMessage);
-    return {
-      thumbnailSrc: null,
-      thumbnailError: errorMessage
-    };
+    throw new Error(errorMessage);
+  } else if (!thumbnail) {
+    throw new Error('Unknown error: Thumbnail not generated');
   }
 
-  return {
-    thumbnailSrc: thumbnail,
-    thumbnailError: null
-  };
+  return thumbnail;
 }
 
 /**
@@ -210,24 +200,14 @@ async function fetchOmeZarrThumbnail(
  */
 export function useOmeZarrThumbnailQuery(
   omeZarrUrl: string | null
-): UseQueryResult<ThumbnailResult, Error> {
+): UseQueryResult<string, Error> {
   return useQuery({
     queryKey: ['zarr', 'thumbnail', omeZarrUrl || ''],
     queryFn: async ({ signal }) => {
       if (!omeZarrUrl) {
         throw new Error('omeZarrUrl is required for thumbnail generation');
       }
-      try {
-        return await fetchOmeZarrThumbnail(omeZarrUrl, signal);
-      } catch (error) {
-        log.error('Error fetching OME-Zarr thumbnail:', error);
-        // Return error result instead of throwing to avoid error boundary
-        return {
-          thumbnailSrc: null,
-          thumbnailError:
-            error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
+      return await fetchOmeZarrThumbnail(omeZarrUrl, signal);
     },
     enabled: !!omeZarrUrl,
     staleTime: 30 * 60 * 1000, // 30 minutes - thumbnails are expensive to generate

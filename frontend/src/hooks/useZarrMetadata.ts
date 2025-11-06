@@ -43,7 +43,7 @@ export default function useZarrMetadata() {
 
   // Fetch thumbnail when OME-Zarr URL is available
   const thumbnailQuery = useOmeZarrThumbnailQuery(omeZarrUrl);
-  const thumbnailSrc = thumbnailQuery.data?.thumbnailSrc || null;
+  const thumbnailSrc = thumbnailQuery.data || null;
 
   const [layerType, setLayerType] = useState<
     'auto' | 'image' | 'segmentation' | null
