@@ -95,7 +95,6 @@ export default function useZoneAndFileSharePathMapQuery(): UseQueryResult<
 
   const makeSortedZonesAndFspsMap = (data: { paths: FileSharePath[] }) => {
     const zonesAndFileSharePathsMap = createZonesAndFileSharePathsMap(data);
-    console.log('Zones and File Share Paths Map:', zonesAndFileSharePathsMap);
     return alphabetizeZonesAndFsps(zonesAndFileSharePathsMap);
   };
 

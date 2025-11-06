@@ -70,19 +70,14 @@ export default function Browse() {
       className="flex flex-col h-full max-h-full w-full max-w-full"
       data-browse-container
       onPaste={async event => {
-        log.debug('React paste event fired!', event);
-
         // Check if any input, textarea, or contenteditable element is focused
         const activeElement = document.activeElement;
-        log.debug('Active element:', activeElement);
 
         const isTextInputFocused =
           activeElement &&
           (activeElement.tagName === 'INPUT' ||
             activeElement.tagName === 'TEXTAREA' ||
             activeElement.getAttribute('contenteditable') === 'true');
-
-        log.debug('Is text input focused:', isTextInputFocused);
 
         // Only handle paste if no text input is focused
         if (!isTextInputFocused) {
@@ -91,14 +86,12 @@ export default function Browse() {
 
           try {
             const clipboardText = await navigator.clipboard.readText();
-            log.debug('Clipboard text (API):', clipboardText);
             setPastedPath(clipboardText);
             setShowNavigationDialog(true);
           } catch (error) {
             log.debug('Clipboard API failed, using fallback:', error);
             // Fallback to event.clipboardData if clipboard API fails
             const clipboardText = event.clipboardData?.getData('text') || '';
-            log.debug('Clipboard text (fallback):', clipboardText);
             setPastedPath(clipboardText);
             setShowNavigationDialog(true);
           }
