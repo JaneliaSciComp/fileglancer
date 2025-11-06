@@ -78,6 +78,10 @@ export default function FileBrowser({
         <div className="flex items-center pl-3 py-1">
           <Typography>{fileQuery.error.message}</Typography>
         </div>
+      ) : displayFiles.length === 0 && fileQuery.data.errorMessage ? (
+        <div className="flex items-center pl-3 py-1">
+          <Typography>{fileQuery.data.errorMessage}</Typography>
+        </div>
       ) : fileQuery.data.currentFileOrFolder &&
         !fileQuery.data.currentFileOrFolder.is_dir ? (
         // If current item is a file, render the FileViewer instead of the file browser
@@ -88,7 +92,7 @@ export default function FileBrowser({
           handleContextMenuClick={handleContextMenuClick}
           showPropertiesDrawer={showPropertiesDrawer}
         />
-      ) : displayFiles.length === 0 ? (
+      ) : displayFiles.length === 0 && !fileQuery.data.errorMessage ? (
         <div className="flex items-center pl-3 py-1">
           <Typography>No files available for display.</Typography>
         </div>
