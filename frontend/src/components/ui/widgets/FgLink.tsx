@@ -1,6 +1,5 @@
-// Help page
 import { Link } from 'react-router';
-import { ReactNode } from 'react';
+import type { ReactNode, MouseEvent } from 'react';
 
 type StyledLinkProps = {
   readonly to: string;
@@ -9,7 +8,7 @@ type StyledLinkProps = {
   readonly target?: string;
   readonly rel?: string;
   readonly textSize?: 'default' | 'large' | 'small';
-  readonly onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+  readonly onClick?: (e: MouseEvent<HTMLAnchorElement>) => void;
 };
 
 export function FgStyledLink({

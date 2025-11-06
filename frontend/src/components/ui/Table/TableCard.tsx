@@ -1,4 +1,12 @@
-import React from 'react';
+import {
+  Fragment,
+  useState,
+  forwardRef,
+  useRef,
+  useEffect,
+  useCallback
+} from 'react';
+import type { ReactNode } from 'react';
 import {
   ColumnFiltersState,
   flexRender,
@@ -47,7 +55,7 @@ function TableRow({
   children
 }: {
   readonly gridColsClass: string;
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
 }) {
   return (
     <div
@@ -79,7 +87,7 @@ function SortIcons<TData, TValue>({
 }
 
 // Follows example here: https://tanstack.com/table/latest/docs/framework/react/examples/filters
-const DebouncedInput = React.forwardRef<
+const DebouncedInput = forwardRef<
   HTMLInputElement,
   {
     readonly value: string;
@@ -109,14 +117,14 @@ function SearchPopover<TData, TValue>({
 }: {
   readonly header: Header<TData, TValue>;
 }) {
-  const [isSearchFocused, setIsSearchFocused] = React.useState(false);
-  const [forceOpen, setForceOpen] = React.useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [forceOpen, setForceOpen] = useState(false);
 
   const initialValue = (header.column.getFilterValue() as string) || '';
-  const [value, setValue] = React.useState(initialValue);
+  const [value, setValue] = useState(initialValue);
 
-  const inputRef = React.useRef<HTMLInputElement>(null);
-  const tooltipRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   const debounce = 350;
 
@@ -125,7 +133,7 @@ function SearchPopover<TData, TValue>({
     setForceOpen(true);
   }
 
-  const clearAndClose = React.useCallback(() => {
+  const clearAndClose = useCallback(() => {
     setValue('');
     header.column.setFilterValue('');
     setIsSearchFocused(false);
@@ -134,7 +142,7 @@ function SearchPopover<TData, TValue>({
   }, [header.column]);
 
   // Handle clicks outside the tooltip
-  React.useEffect(() => {
+  useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
         tooltipRef.current &&
@@ -152,7 +160,7 @@ function SearchPopover<TData, TValue>({
   }, [forceOpen, clearAndClose]);
 
   // Handle Escape key to clear and close tooltip
-  React.useEffect(() => {
+  useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape' && forceOpen) {
         clearAndClose();
@@ -165,7 +173,7 @@ function SearchPopover<TData, TValue>({
     };
   }, [forceOpen, clearAndClose]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const timeout = setTimeout(() => {
       header.column.setFilterValue(value);
     }, debounce);
@@ -174,7 +182,7 @@ function SearchPopover<TData, TValue>({
   }, [value, debounce, header.column]);
 
   // Keep tooltip open if there's a search value
-  React.useEffect(() => {
+  useEffect(() => {
     if (value) {
       setForceOpen(true);
     } else if (!isSearchFocused) {
@@ -259,10 +267,8 @@ function Table<TData>({
   emptyText,
   enableColumnSearch
 }: TableProps<TData>) {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  );
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
   const table = useReactTable({
     data,
@@ -360,9 +366,9 @@ function Table<TData>({
           {table.getRowModel().rows.map(row => (
             <TableRow gridColsClass={gridColsClass} key={row.id}>
               {row.getVisibleCells().map(cell => (
-                <React.Fragment key={cell.id}>
+                <Fragment key={cell.id}>
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </React.Fragment>
+                </Fragment>
               ))}
             </TableRow>
           ))}

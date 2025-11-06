@@ -1,5 +1,3 @@
-import React from 'react';
-
 import { FileOrFolder } from '@/shared.types';
 import { formatUnixTimestamp, formatFileSize } from '@/utils';
 

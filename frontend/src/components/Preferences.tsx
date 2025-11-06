@@ -1,4 +1,4 @@
-import * as React from 'react';
+import type { ChangeEvent } from 'react';
 import { Card, Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
@@ -38,7 +38,7 @@ export default function Preferences() {
               checked={pathPreference[0] === 'linux_path'}
               className="icon-small checked:accent-secondary-light"
               id="linux_path"
-              onChange={async (event: React.ChangeEvent<HTMLInputElement>) => {
+              onChange={async (event: ChangeEvent<HTMLInputElement>) => {
                 if (event.target.checked) {
                   const result = await handlePathPreferenceSubmit([
                     'linux_path'
@@ -68,7 +68,7 @@ export default function Preferences() {
               checked={pathPreference[0] === 'windows_path'}
               className="icon-small checked:accent-secondary-light"
               id="windows_path"
-              onChange={async (event: React.ChangeEvent<HTMLInputElement>) => {
+              onChange={async (event: ChangeEvent<HTMLInputElement>) => {
                 if (event.target.checked) {
                   const result = await handlePathPreferenceSubmit([
                     'windows_path'
@@ -97,7 +97,7 @@ export default function Preferences() {
               checked={pathPreference[0] === 'mac_path'}
               className="icon-small checked:accent-secondary-light"
               id="mac_path"
-              onChange={async (event: React.ChangeEvent<HTMLInputElement>) => {
+              onChange={async (event: ChangeEvent<HTMLInputElement>) => {
                 if (event.target.checked) {
                   const result = await handlePathPreferenceSubmit(['mac_path']);
                   if (result.success) {

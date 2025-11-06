@@ -1,4 +1,3 @@
-import React from 'react';
 import { Button } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
@@ -18,7 +17,7 @@ type ChangePermissionsProps = {
 export default function ChangePermissions({
   showPermissionsDialog,
   setShowPermissionsDialog
-}: ChangePermissionsProps): React.JSX.Element {
+}: ChangePermissionsProps) {
   const { fileBrowserState, mutations } = useFileBrowserContext();
 
   const {

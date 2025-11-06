@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState } from 'react';
 
 import { joinPaths, removeLastSegmentFromPath } from '@/utils';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
@@ -6,7 +6,7 @@ import { handleError, createSuccess } from '@/utils/errorHandling';
 import type { Result } from '@/shared.types';
 
 export default function useRenameDialog() {
-  const [newName, setNewName] = React.useState<string>('');
+  const [newName, setNewName] = useState<string>('');
 
   const { fileBrowserState, mutations } = useFileBrowserContext();
   const currentFileSharePath = fileBrowserState.uiFileSharePath;

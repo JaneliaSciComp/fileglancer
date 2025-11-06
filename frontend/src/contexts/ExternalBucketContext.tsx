@@ -1,4 +1,5 @@
-import React from 'react';
+import { createContext, useContext } from 'react';
+import type { ReactNode } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import {
@@ -12,11 +13,12 @@ type ExternalBucketContextType = {
   externalDataUrlQuery: UseQueryResult<string | null, Error>;
 };
 
-const ExternalBucketContext =
-  React.createContext<ExternalBucketContextType | null>(null);
+const ExternalBucketContext = createContext<ExternalBucketContextType | null>(
+  null
+);
 
 export const useExternalBucketContext = () => {
-  const context = React.useContext(ExternalBucketContext);
+  const context = useContext(ExternalBucketContext);
   if (!context) {
     throw new Error(
       'useExternalBucketContext must be used within an ExternalBucketProvider'
@@ -28,7 +30,7 @@ export const useExternalBucketContext = () => {
 export const ExternalBucketProvider = ({
   children
 }: {
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
 }) => {
   const { fileQuery, fileBrowserState } = useFileBrowserContext();
 

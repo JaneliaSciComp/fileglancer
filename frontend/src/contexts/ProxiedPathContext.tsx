@@ -1,4 +1,5 @@
-import React from 'react';
+import { createContext, useContext } from 'react';
+import type { ReactNode } from 'react';
 
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import {
@@ -28,12 +29,10 @@ type ProxiedPathContextType = {
   deleteProxiedPathMutation: ReturnType<typeof useDeleteProxiedPathMutation>;
 };
 
-const ProxiedPathContext = React.createContext<ProxiedPathContextType | null>(
-  null
-);
+const ProxiedPathContext = createContext<ProxiedPathContextType | null>(null);
 
 export const useProxiedPathContext = () => {
-  const context = React.useContext(ProxiedPathContext);
+  const context = useContext(ProxiedPathContext);
   if (!context) {
     throw new Error(
       'useProxiedPathContext must be used within a ProxiedPathProvider'
@@ -45,7 +44,7 @@ export const useProxiedPathContext = () => {
 export const ProxiedPathProvider = ({
   children
 }: {
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
 }) => {
   const { fileQuery, fileBrowserState } = useFileBrowserContext();
 

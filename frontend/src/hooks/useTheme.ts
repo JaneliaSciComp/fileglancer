@@ -1,9 +1,9 @@
-import * as React from 'react';
+import { useState, useCallback } from 'react';
 
 export default function useTheme() {
-  const [isLightTheme, setIsLightTheme] = React.useState(true);
+  const [isLightTheme, setIsLightTheme] = useState(true);
 
-  const toggleTheme = React.useCallback(() => {
+  const toggleTheme = useCallback(() => {
     setIsLightTheme(prev => {
       const newTheme = !prev;
       localStorage.setItem('theme', newTheme ? 'light' : 'dark');

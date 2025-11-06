@@ -1,4 +1,5 @@
-import React from 'react';
+import { useState } from 'react';
+import type { ChangeEvent } from 'react';
 
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { handleError, createSuccess } from '@/utils/errorHandling';
@@ -7,7 +8,7 @@ import type { Result } from '@/shared.types';
 export default function usePermissionsDialog() {
   const { fileQuery, fileBrowserState, mutations } = useFileBrowserContext();
 
-  const [localPermissions, setLocalPermissions] = React.useState(
+  const [localPermissions, setLocalPermissions] = useState(
     fileBrowserState.propertiesTarget
       ? fileBrowserState.propertiesTarget.permissions
       : null
@@ -20,9 +21,7 @@ export default function usePermissionsDialog() {
    * @param event - The change event from the input field.
    * @returns void - Nothing is returned; the local permission state is updated.
    */
-  function handleLocalPermissionChange(
-    event: React.ChangeEvent<HTMLInputElement>
-  ) {
+  function handleLocalPermissionChange(event: ChangeEvent<HTMLInputElement>) {
     if (!localPermissions) {
       return null; // If the local permissions are not set, this means the fileBrowserState is not set, return null
     }

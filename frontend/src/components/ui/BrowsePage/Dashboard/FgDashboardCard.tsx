@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Card, Typography } from '@material-tailwind/react';
 
 export default function DashboardCard({
@@ -5,7 +6,7 @@ export default function DashboardCard({
   children
 }: {
   readonly title: string;
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
 }) {
   return (
     <Card className="flex flex-col w-full border bg-background border-surface h-[670px]">

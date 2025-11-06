@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { default as log } from '@/logger';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
@@ -47,11 +47,11 @@ export default function useZarrMetadata() {
   const thumbnailError = thumbnailQuery.data?.thumbnailError || null;
   const loadingThumbnail = thumbnailQuery.isPending && !!omeZarrUrl;
 
-  const [layerType, setLayerType] = React.useState<
+  const [layerType, setLayerType] = useState<
     'auto' | 'image' | 'segmentation' | null
   >(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (disableHeuristicalLayerTypeDetection) {
       setLayerType('image');
       return;
@@ -74,7 +74,7 @@ export default function useZarrMetadata() {
     };
   }, [thumbnailSrc, disableHeuristicalLayerTypeDetection]);
 
-  const openWithToolUrls = React.useMemo(() => {
+  const openWithToolUrls = useMemo(() => {
     if (!metadata) {
       return null;
     }

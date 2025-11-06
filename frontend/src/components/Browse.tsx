@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router';
 import { default as log } from '@/logger';
 import type { OutletContextType } from '@/layouts/BrowseLayout';
@@ -28,10 +28,10 @@ export default function Browse() {
 
   const { fspName } = useFileBrowserContext();
 
-  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
-  const [showRenameDialog, setShowRenameDialog] = React.useState(false);
-  const [showNavigationDialog, setShowNavigationDialog] = React.useState(false);
-  const [pastedPath, setPastedPath] = React.useState<string>('');
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [showNavigationDialog, setShowNavigationDialog] = useState(false);
+  const [pastedPath, setPastedPath] = useState<string>('');
   const [componentWidth, setComponentWidth] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
 

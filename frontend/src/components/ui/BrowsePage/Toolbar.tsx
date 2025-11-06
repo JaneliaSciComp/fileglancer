@@ -1,4 +1,4 @@
-import * as React from 'react';
+import { useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router';
 import { ButtonGroup } from '@material-tailwind/react';
@@ -41,7 +41,7 @@ export default function Toolbar({
   togglePropertiesDrawer,
   showSidebar,
   toggleSidebar
-}: ToolbarProps): React.JSX.Element {
+}: ToolbarProps) {
   const { fileBrowserState, fileQuery } = useFileBrowserContext();
   const { refreshFileBrowser } = useRefreshFileBrowser();
 
@@ -64,7 +64,7 @@ export default function Toolbar({
     currentFileOrFolder?.path
   );
 
-  const isFavorited = React.useMemo(() => {
+  const isFavorited = useMemo(() => {
     if (!currentFileSharePath) {
       return false;
     }

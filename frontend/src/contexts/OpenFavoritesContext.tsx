@@ -1,13 +1,14 @@
-import React from 'react';
+import { createContext, useContext, useState } from 'react';
+import type { ReactNode } from 'react';
 
-const OpenFavoritesContext = React.createContext<{
+const OpenFavoritesContext = createContext<{
   openFavorites: Record<string, boolean>;
   toggleOpenFavorites: (zone: string) => void;
   openFavoritesSection: () => void;
 } | null>(null);
 
 export const useOpenFavoritesContext = () => {
-  const context = React.useContext(OpenFavoritesContext);
+  const context = useContext(OpenFavoritesContext);
   if (!context) {
     throw new Error(
       'useOpenFavoritesContext must be used within a OpenFavoritesProvider'
@@ -19,11 +20,11 @@ export const useOpenFavoritesContext = () => {
 export const OpenFavoritesProvider = ({
   children
 }: {
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
 }) => {
-  const [openFavorites, setOpenFavorites] = React.useState<
-    Record<string, boolean>
-  >({ all: true });
+  const [openFavorites, setOpenFavorites] = useState<Record<string, boolean>>({
+    all: true
+  });
 
   function toggleOpenFavorites(zone: string) {
     setOpenFavorites(prev => ({

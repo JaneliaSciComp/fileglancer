@@ -1,4 +1,5 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
+import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router';
 
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
@@ -10,16 +11,16 @@ import {
 import { createSuccess, handleError } from '@/utils/errorHandling';
 
 export default function useNavigationInput(initialValue: string = '') {
-  const [inputValue, setInputValue] = React.useState<string>(initialValue);
+  const [inputValue, setInputValue] = useState<string>(initialValue);
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const navigate = useNavigate();
 
   // Update inputValue when initialValue changes
-  React.useEffect(() => {
+  useEffect(() => {
     setInputValue(initialValue);
   }, [initialValue]);
 
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
     setInputValue(event.target.value);
   };
 

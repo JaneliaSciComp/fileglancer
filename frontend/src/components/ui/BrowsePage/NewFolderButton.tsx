@@ -1,4 +1,5 @@
-import React from 'react';
+import { useState } from 'react';
+import type { ChangeEvent, MouseEvent } from 'react';
 import { Button, Typography } from '@material-tailwind/react';
 import { HiFolderAdd } from 'react-icons/hi';
 import toast from 'react-hot-toast';
@@ -15,8 +16,8 @@ type NewFolderButtonProps = {
 
 export default function NewFolderButton({
   triggerClasses
-}: NewFolderButtonProps): React.JSX.Element {
-  const [showNewFolderDialog, setShowNewFolderDialog] = React.useState(false);
+}: NewFolderButtonProps) {
+  const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
   const { fileBrowserState, mutations } = useFileBrowserContext();
   const { handleNewFolderSubmit, newName, setNewName, isDuplicateName } =
     useNewFolderDialog();
@@ -43,7 +44,7 @@ export default function NewFolderButton({
         disabledCondition={!fileBrowserState.uiFileSharePath}
         icon={HiFolderAdd}
         label="New folder"
-        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+        onClick={(e: MouseEvent<HTMLButtonElement>) => {
           setShowNewFolderDialog(true);
           e.currentTarget.blur();
         }}
@@ -67,7 +68,7 @@ export default function NewFolderButton({
                 autoFocus
                 className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background"
                 id="new_name"
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                onChange={(event: ChangeEvent<HTMLInputElement>) => {
                   setNewName(event.target.value);
                 }}
                 placeholder="Folder name ..."

@@ -1,4 +1,4 @@
-import React from 'react';
+import type { ChangeEvent, Dispatch, SetStateAction } from 'react';
 import { Button, Typography } from '@material-tailwind/react';
 
 import useRenameDialog from '@/hooks/useRenameDialog';
@@ -9,13 +9,13 @@ import toast from 'react-hot-toast';
 
 type ItemNamingDialogProps = {
   readonly showRenameDialog: boolean;
-  readonly setShowRenameDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  readonly setShowRenameDialog: Dispatch<SetStateAction<boolean>>;
 };
 
 export default function RenameDialog({
   showRenameDialog,
   setShowRenameDialog
-}: ItemNamingDialogProps): React.JSX.Element {
+}: ItemNamingDialogProps) {
   const { fileBrowserState, mutations } = useFileBrowserContext();
   const { handleRenameSubmit, newName, setNewName } = useRenameDialog();
 
@@ -57,7 +57,7 @@ export default function RenameDialog({
             autoFocus
             className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background"
             id="new_name"
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
               setNewName(event.target.value);
             }}
             placeholder="Enter name"

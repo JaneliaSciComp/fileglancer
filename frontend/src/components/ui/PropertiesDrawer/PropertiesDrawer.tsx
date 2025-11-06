@@ -1,4 +1,4 @@
-import * as React from 'react';
+import { useEffect, useState } from 'react';
 import {
   Button,
   Card,
@@ -42,7 +42,7 @@ function CopyPathButton({
 }: {
   readonly path: string;
   readonly isDataLink?: boolean;
-}): React.JSX.Element {
+}) {
   return (
     <div className="group flex justify-between items-center min-w-0 max-w-full">
       <FgTooltip label={path} triggerClasses="block truncate">
@@ -80,11 +80,10 @@ export default function PropertiesDrawer({
   togglePropertiesDrawer,
   setShowPermissionsDialog,
   setShowConvertFileDialog
-}: PropertiesDrawerProps): React.JSX.Element {
+}: PropertiesDrawerProps) {
   const location = useLocation();
-  const [showDataLinkDialog, setShowDataLinkDialog] =
-    React.useState<boolean>(false);
-  const [activeTab, setActiveTab] = React.useState<string>('overview');
+  const [showDataLinkDialog, setShowDataLinkDialog] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<string>('overview');
 
   const { fileBrowserState } = useFileBrowserContext();
   const { pathPreference, areDataLinksAutomatic } = usePreferencesContext();
@@ -102,7 +101,7 @@ export default function PropertiesDrawer({
   const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
 
   // Set active tab to 'convert' when navigating from jobs page
-  React.useEffect(() => {
+  useEffect(() => {
     if (location.state?.openConvertTab) {
       setActiveTab('convert');
     }

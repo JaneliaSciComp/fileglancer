@@ -1,4 +1,11 @@
-import React from 'react';
+import {
+  createContext,
+  useContext,
+  useRef,
+  useCallback,
+  useEffect
+} from 'react';
+import type { ReactNode } from 'react';
 
 import type { FileSharePath, Zone } from '@/shared.types';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
@@ -78,12 +85,10 @@ type PreferencesContextType = {
   handleContextMenuFavorite: () => Promise<Result<boolean>>;
 };
 
-const PreferencesContext = React.createContext<PreferencesContextType | null>(
-  null
-);
+const PreferencesContext = createContext<PreferencesContextType | null>(null);
 
 export const usePreferencesContext = () => {
-  const context = React.useContext(PreferencesContext);
+  const context = useContext(PreferencesContext);
   if (!context) {
     throw new Error(
       'usePreferencesContext must be used within a PreferencesProvider'
@@ -95,7 +100,7 @@ export const usePreferencesContext = () => {
 export const PreferencesProvider = ({
   children
 }: {
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
 }) => {
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const { fileQuery, fileBrowserState } = useFileBrowserContext();
@@ -105,8 +110,8 @@ export const PreferencesProvider = ({
   const updatePreferenceListMutation = useUpdatePreferenceListMutation();
 
   // Store last viewed folder path and FSP name to avoid duplicate updates
-  const lastFolderPathRef = React.useRef<string | null>(null);
-  const lastFspNameRef = React.useRef<string | null>(null);
+  const lastFolderPathRef = useRef<string | null>(null);
+  const lastFspNameRef = useRef<string | null>(null);
 
   const handleUpdateLayout = async (newLayout: string): Promise<void> => {
     // Don't update if layout hasn't changed
@@ -351,7 +356,7 @@ export const PreferencesProvider = ({
     }
   };
 
-  const updateRecentlyViewedFolders = React.useCallback(
+  const updateRecentlyViewedFolders = useCallback(
     (
       folderPath: string,
       fspName: string,
@@ -409,7 +414,7 @@ export const PreferencesProvider = ({
 
   // useEffect that runs when the current folder in fileBrowserState changes,
   // to update the recently viewed folder
-  React.useEffect(() => {
+  useEffect(() => {
     if (
       fileQuery.isPending ||
       !fileQuery.data ||
