@@ -1,4 +1,4 @@
-import { Card, Spinner, Typography } from '@material-tailwind/react';
+import { Card, Typography } from '@material-tailwind/react';
 import { Link } from 'react-router';
 import { TbBrandGithub } from 'react-icons/tb';
 import { SiClickup, SiSlack } from 'react-icons/si';

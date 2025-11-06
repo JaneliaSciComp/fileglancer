@@ -53,15 +53,6 @@ export default function FileBrowser({
     layerType
   } = useZarrMetadata();
 
-  const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
-  const isLoading = fileQuery.isPending;
-  const error = fileQuery.error;
-
-  // If current item is a file, render the FileViewer instead of the file browser
-  if (currentFileOrFolder && !currentFileOrFolder.is_dir) {
-    return <FileViewer file={currentFileOrFolder} />;
-  }
-
   return (
     <>
       <Crumbs />
