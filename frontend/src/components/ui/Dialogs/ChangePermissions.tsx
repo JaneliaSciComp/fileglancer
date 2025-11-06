@@ -27,36 +27,32 @@ export default function ChangePermissions({
     handleChangePermissions
   } = usePermissionsDialog();
 
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!localPermissions) {
+      toast.error('Error setting permissions: no local permission state');
+      return;
+    }
+    if (!fileBrowserState.propertiesTarget) {
+      toast.error('Error setting permissions: no properties target set');
+      return;
+    }
+    const result = await handleChangePermissions();
+    if (result.success) {
+      toast.success('Permissions changed!');
+    } else {
+      toast.error(`Error changing permissions: ${result.error}`);
+    }
+    setShowPermissionsDialog(false);
+  }
+
   return (
     <FgDialog
       onClose={() => setShowPermissionsDialog(false)}
       open={showPermissionsDialog}
     >
       {fileBrowserState.propertiesTarget ? (
-        <form
-          onSubmit={async event => {
-            event.preventDefault();
-            if (!localPermissions) {
-              toast.error(
-                'Error setting permissions: no local permission state'
-              );
-              return;
-            }
-            if (!fileBrowserState.propertiesTarget) {
-              toast.error(
-                'Error setting permissions: no properties target set'
-              );
-              return;
-            }
-            const result = await handleChangePermissions();
-            if (result.success) {
-              toast.success('Permissions changed!');
-            } else {
-              toast.error(`Error changing permissions: ${result.error}`);
-            }
-            setShowPermissionsDialog(false);
-          }}
-        >
+        <form onSubmit={handleSubmit}>
           <TextWithFilePath
             path={fileBrowserState.propertiesTarget.name}
             text="Change permissions for file:"
