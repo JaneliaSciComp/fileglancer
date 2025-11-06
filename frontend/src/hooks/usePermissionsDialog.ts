@@ -1,6 +1,8 @@
 import React from 'react';
 
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import { handleError, createSuccess } from '@/utils/errorHandling';
+import type { Result } from '@/shared.types';
 
 export default function usePermissionsDialog() {
   const { fileQuery, fileBrowserState, mutations } = useFileBrowserContext();
@@ -47,22 +49,30 @@ export default function usePermissionsDialog() {
     });
   }
 
-  async function handleChangePermissions(): Promise<void> {
-    if (!fileQuery.data?.currentFileSharePath) {
-      throw new Error('Cannot change permissions; no file share path selected');
-    }
-    if (!fileBrowserState.propertiesTarget) {
-      throw new Error('Cannot change permissions; no properties target set');
-    }
-    if (!localPermissions) {
-      throw new Error('No permissions set');
-    }
+  async function handleChangePermissions(): Promise<Result<void>> {
+    try {
+      if (!fileQuery.data?.currentFileSharePath) {
+        throw new Error(
+          'Cannot change permissions; no file share path selected'
+        );
+      }
+      if (!fileBrowserState.propertiesTarget) {
+        throw new Error('Cannot change permissions; no properties target set');
+      }
+      if (!localPermissions) {
+        throw new Error('No permissions set');
+      }
 
-    await mutations.changePermissions.mutateAsync({
-      fspName: fileQuery.data.currentFileSharePath.name,
-      filePath: fileBrowserState.propertiesTarget.path,
-      permissions: localPermissions
-    });
+      await mutations.changePermissions.mutateAsync({
+        fspName: fileQuery.data.currentFileSharePath.name,
+        filePath: fileBrowserState.propertiesTarget.path,
+        permissions: localPermissions
+      });
+
+      return createSuccess(undefined);
+    } catch (error) {
+      return handleError(error);
+    }
   }
 
   return {

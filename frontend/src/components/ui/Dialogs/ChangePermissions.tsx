@@ -48,16 +48,13 @@ export default function ChangePermissions({
               );
               return;
             }
-            try {
-              await handleChangePermissions();
+            const result = await handleChangePermissions();
+            if (result.success) {
               toast.success('Permissions changed!');
-            } catch (error) {
-              toast.error(
-                `Error changing permissions: ${error instanceof Error ? error.message : 'Unknown error'}`
-              );
-            } finally {
-              setShowPermissionsDialog(false);
+            } else {
+              toast.error(`Error changing permissions: ${result.error}`);
             }
+            setShowPermissionsDialog(false);
           }}
         >
           <TextWithFilePath
