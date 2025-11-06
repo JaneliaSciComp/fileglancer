@@ -93,54 +93,51 @@ export default function useFileQuery(
     }
   };
 
-  const transformData = React.useCallback(
-    (
-      data: (FileBrowserResponse | { info: FileOrFolder }) & {
-        errorMessage?: string;
-      }
-    ): FileQueryData => {
-      // This should never happen because query is disabled when !fspName
-      if (!fspName) {
-        throw new Error('fspName is required for transforming file query data');
-      }
+  const transformData = (
+    data: (FileBrowserResponse | { info: FileOrFolder }) & {
+      errorMessage?: string;
+    }
+  ): FileQueryData => {
+    // This should never happen because query is disabled when !fspName
+    if (!fspName) {
+      throw new Error('fspName is required for transforming file query data');
+    }
 
-      const fspKey = makeMapKey('fsp', fspName);
-      const currentFileSharePath =
-        (zonesAndFspQuery.data?.[fspKey] as FileSharePath) || null;
+    const fspKey = makeMapKey('fsp', fspName);
+    const currentFileSharePath =
+      (zonesAndFspQuery.data?.[fspKey] as FileSharePath) || null;
 
-      // Normalize the path in the current file or folder
-      let currentFileOrFolder: FileOrFolder | null = data.info;
-      if (currentFileOrFolder) {
-        currentFileOrFolder = {
-          ...currentFileOrFolder,
-          path: normalizePosixStylePath(currentFileOrFolder.path)
-        };
-      }
-
-      // Normalize file paths and sort: directories first, then alphabetically
-      // Handle partial data case (403 error with only info, no files)
-      const rawFiles = 'files' in data ? data.files : [];
-      let files = (rawFiles || []).map(file => ({
-        ...file,
-        path: normalizePosixStylePath(file.path)
-      })) as FileOrFolder[];
-
-      files = files.sort((a: FileOrFolder, b: FileOrFolder) => {
-        if (a.is_dir === b.is_dir) {
-          return a.name.localeCompare(b.name);
-        }
-        return a.is_dir ? -1 : 1;
-      });
-
-      return {
-        currentFileSharePath,
-        currentFileOrFolder,
-        files,
-        errorMessage: data.errorMessage
+    // Normalize the path in the current file or folder
+    let currentFileOrFolder: FileOrFolder | null = data.info;
+    if (currentFileOrFolder) {
+      currentFileOrFolder = {
+        ...currentFileOrFolder,
+        path: normalizePosixStylePath(currentFileOrFolder.path)
       };
-    },
-    [fspName, zonesAndFspQuery.data]
-  );
+    }
+
+    // Normalize file paths and sort: directories first, then alphabetically
+    // Handle partial data case (403 error with only info, no files)
+    const rawFiles = 'files' in data ? data.files : [];
+    let files = (rawFiles || []).map(file => ({
+      ...file,
+      path: normalizePosixStylePath(file.path)
+    })) as FileOrFolder[];
+
+    files = files.sort((a: FileOrFolder, b: FileOrFolder) => {
+      if (a.is_dir === b.is_dir) {
+        return a.name.localeCompare(b.name);
+      }
+      return a.is_dir ? -1 : 1;
+    });
+
+    return {
+      currentFileSharePath,
+      currentFileOrFolder,
+      files,
+      errorMessage: data.errorMessage
+    };
+  };
 
   return useQuery<
     FileBrowserResponse & { errorMessage?: string },
