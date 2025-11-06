@@ -126,33 +126,26 @@ export default function FileViewer({ file }: FileViewerProps): React.ReactNode {
     const content = contentQuery.data ?? '';
 
     return (
-      <div className="h-full overflow-y-auto">
-        <SyntaxHighlighter
-          customStyle={{
-            margin: 0,
-            padding: '1rem',
-            fontSize: '14px',
-            lineHeight: '1.5'
-          }}
-          language={language}
-          showLineNumbers={false}
-          style={isDarkMode ? materialDark : coy}
-          wrapLines={true}
-          wrapLongLines={true}
-        >
-          {content}
-        </SyntaxHighlighter>
-      </div>
+      <SyntaxHighlighter
+        customStyle={{
+          margin: 0,
+          padding: '1rem',
+          fontSize: '14px',
+          lineHeight: '1.5'
+        }}
+        language={language}
+        showLineNumbers={false}
+        style={isDarkMode ? materialDark : coy}
+        wrapLines={true}
+        wrapLongLines={true}
+      >
+        {content}
+      </SyntaxHighlighter>
     );
   };
 
   return (
     <div className="flex flex-col h-full max-h-full overflow-hidden">
-      {/* Header with breadcrumbs */}
-      <div className="px-2 py-2 border-b border-surface">
-        <Crumbs />
-      </div>
-
       {/* File info header */}
       <div className="px-4 py-2 bg-surface-light border-b border-surface">
         <Typography className="text-foreground" type="h6">
@@ -165,7 +158,7 @@ export default function FileViewer({ file }: FileViewerProps): React.ReactNode {
       </div>
 
       {/* File content viewer */}
-      <div className="flex-1 overflow-hidden bg-background">
+      <div className="flex-1 overflow-y-auto bg-background">
         {renderViewer()}
       </div>
     </div>
