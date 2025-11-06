@@ -95,7 +95,7 @@ const fetchProxiedPathByFspAndPath = async (
 ): Promise<ProxiedPath | null> => {
   try {
     const response = await sendFetchRequest(
-      `/api/proxied-path?fsp_name=${fspName}&path=${path}`,
+      `/api/proxied-path?fsp_name=${encodeURIComponent(fspName)}&path=${encodeURIComponent(path)}`,
       'GET',
       undefined,
       { signal }

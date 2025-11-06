@@ -86,7 +86,7 @@ const fetchTicketByPath = async (
 ): Promise<Ticket | null> => {
   try {
     const response = await sendFetchRequest(
-      `/api/ticket?fsp_name=${fspName}&path=${path}`,
+      `/api/ticket?fsp_name=${encodeURIComponent(fspName)}&path=${encodeURIComponent(path)}`,
       'GET',
       undefined,
       { signal }

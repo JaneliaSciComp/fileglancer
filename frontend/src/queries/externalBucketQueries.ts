@@ -33,7 +33,7 @@ const fetchExternalBucket = async (
 ): Promise<ExternalBucket | null> => {
   try {
     const response = await sendFetchRequest(
-      `/api/external-buckets/${fspName}`,
+      `/api/external-buckets/${encodeURIComponent(fspName)}`,
       'GET',
       undefined,
       { signal }
