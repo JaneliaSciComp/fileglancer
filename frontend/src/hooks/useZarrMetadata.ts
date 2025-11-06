@@ -24,7 +24,7 @@ export type ZarrArray = zarr.Array<any>;
 export default function useZarrMetadata() {
   const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const { proxiedPathByFspAndPathQuery } = useProxiedPathContext();
-  const { externalDataUrl } = useExternalBucketContext();
+  const { externalDataUrlQuery } = useExternalBucketContext();
   const {
     disableNeuroglancerStateGeneration,
     disableHeuristicalLayerTypeDetection,
@@ -100,7 +100,8 @@ export default function useZarrMetadata() {
     const voleBaseUrl = 'https://volumeviewer.allencell.org/viewer?url=';
     const avivatorBaseUrl = 'https://janeliascicomp.github.io/viv/?image_url=';
 
-    const url = externalDataUrl || proxiedPathByFspAndPathQuery.data?.url;
+    const url =
+      externalDataUrlQuery.data || proxiedPathByFspAndPathQuery.data?.url;
     const openWithToolUrls = {
       copy: url || ''
     } as OpenWithToolUrls;
@@ -184,7 +185,7 @@ export default function useZarrMetadata() {
   }, [
     metadata,
     proxiedPathByFspAndPathQuery.data?.url,
-    externalDataUrl,
+    externalDataUrlQuery.data,
     disableNeuroglancerStateGeneration,
     useLegacyMultichannelApproach
   ]);
