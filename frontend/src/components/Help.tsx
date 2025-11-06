@@ -1,4 +1,4 @@
-import { Card, Typography } from '@material-tailwind/react';
+import { Card, Spinner, Typography } from '@material-tailwind/react';
 import { Link } from 'react-router';
 import { TbBrandGithub } from 'react-icons/tb';
 import { SiClickup, SiSlack } from 'react-icons/si';
@@ -15,28 +15,32 @@ type HelpLink = {
   url: string;
 };
 
-export default function Help() {
-  const versionQuery = useVersionQuery();
-
-  const helpLinks: HelpLink[] = [
+function getHelpLinks(version: string | undefined): HelpLink[] {
+  return [
     {
       icon: LuBookOpenText,
       title: 'User Manual',
       description:
         'Comprehensive guide to Fileglancer features and functionality',
-      url: `https://fileglancer-docs.janelia.org`
+      url: 'https://fileglancer-docs.janelia.org'
     },
     {
       icon: TbBrandGithub,
       title: 'Release Notes',
-      description: `What's new and improved in Fileglancer version ${versionQuery.data?.version}`,
-      url: `https://github.com/JaneliaSciComp/fileglancer/releases/tag/${versionQuery.data?.version}`
+      description: version
+        ? `What's new and improved in Fileglancer version ${version}`
+        : "What's new and improved in Fileglancer",
+      url: version
+        ? `https://github.com/JaneliaSciComp/fileglancer/releases/tag/${version}`
+        : 'https://github.com/JaneliaSciComp/fileglancer/releases'
     },
     {
       icon: SiClickup,
       title: 'Submit Tickets',
       description: 'Report bugs or request features through a ClickUp form',
-      url: `https://forms.clickup.com/10502797/f/a0gmd-713/NBUCBCIN78SI2BE71G?Version=${versionQuery.data?.version}&URL=${window.location}`
+      url: version
+        ? `https://forms.clickup.com/10502797/f/a0gmd-713/NBUCBCIN78SI2BE71G?Version=${version}&URL=${window.location}`
+        : `https://forms.clickup.com/10502797/f/a0gmd-713/NBUCBCIN78SI2BE71G?URL=${window.location}`
     },
     {
       icon: SiSlack,
@@ -45,6 +49,25 @@ export default function Help() {
       url: 'https://hhmi.enterprise.slack.com/archives/C0938N06YN8'
     }
   ];
+}
+
+export default function Help() {
+  const versionQuery = useVersionQuery();
+
+  // Show loading state while query is pending
+  if (versionQuery.isPending) {
+    return (
+      <Typography className="text-muted-foreground">
+        Loading help resources...
+      </Typography>
+    );
+  }
+
+  const version = versionQuery.isError ? undefined : versionQuery.data.version;
+  const versionDisplay = versionQuery.isError
+    ? 'Error getting version number'
+    : `Fileglancer Version ${version}`;
+  const helpLinks = getHelpLinks(version);
 
   return (
     <>
@@ -53,11 +76,11 @@ export default function Help() {
           Help
         </Typography>
         <Typography className="text-foreground font-bold" type="lead">
-          {`Fileglancer Version ${versionQuery.data?.version}`}
+          {versionDisplay}
         </Typography>
       </div>
       <div className="grid grid-cols-2 gap-10">
-        {helpLinks.map(({ icon: Icon, title, description, url }, index) => (
+        {helpLinks.map(({ icon: Icon, title, description, url }) => (
           <Card
             as={Link}
             className="group min-h-44 p-8 md:p-12 flex flex-col gap-2 text-left w-full hover:shadow-lg transition-shadow duration-200"

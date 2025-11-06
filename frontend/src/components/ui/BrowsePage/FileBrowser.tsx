@@ -55,7 +55,7 @@ export default function FileBrowser({
 
   const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
   const isLoading = fileQuery.isPending;
-  const errorMessage = fileQuery.data?.errorMessage; // Permission error message embedded in data
+  const error = fileQuery.error;
 
   // If current item is a file, render the FileViewer instead of the file browser
   if (currentFileOrFolder && !currentFileOrFolder.is_dir) {
@@ -77,26 +77,33 @@ export default function FileBrowser({
       ) : null}
 
       {/* Loading state */}
-      {isLoading ? (
+      {fileQuery.isPending ? (
         <div className="min-w-full bg-background select-none">
           {Array.from({ length: 10 }, (_, index) => (
             <FileRowSkeleton key={index} />
           ))}
         </div>
-      ) : !isLoading && displayFiles.length > 0 ? (
+      ) : fileQuery.isError ? (
+        <div className="flex items-center pl-3 py-1">
+          <Typography>{fileQuery.error.message}</Typography>
+        </div>
+      ) : displayFiles.length === 0 && fileQuery.data.errorMessage ? (
+        <div className="flex items-center pl-3 py-1">
+          <Typography>{fileQuery.data.errorMessage}</Typography>
+        </div>
+      ) : fileQuery.data.currentFileOrFolder &&
+        !fileQuery.data.currentFileOrFolder.is_dir ? (
+        // If current item is a file, render the FileViewer instead of the file browser
+        <FileViewer file={fileQuery.data.currentFileOrFolder} />
+      ) : displayFiles.length > 0 ? (
         <Table
           data={displayFiles}
           handleContextMenuClick={handleContextMenuClick}
           showPropertiesDrawer={showPropertiesDrawer}
         />
-      ) : !isLoading && displayFiles.length === 0 && !errorMessage ? (
+      ) : displayFiles.length === 0 && !fileQuery.data.errorMessage ? (
         <div className="flex items-center pl-3 py-1">
           <Typography>No files available for display.</Typography>
-        </div>
-      ) : !isLoading && displayFiles.length === 0 && errorMessage ? (
-        /* Permission error state - shows when user lacks access to folder */
-        <div className="flex items-center pl-3 py-1">
-          <Typography>{errorMessage}</Typography>
         </div>
       ) : null}
       {showContextMenu ? (

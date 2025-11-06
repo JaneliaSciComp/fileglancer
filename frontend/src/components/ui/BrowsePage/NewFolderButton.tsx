@@ -24,6 +24,18 @@ export default function NewFolderButton({
   const isSubmitDisabled =
     !newName.trim() || isDuplicateName || mutations.createFolder.isPending;
 
+  const formSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const result = await handleNewFolderSubmit();
+    if (result.success) {
+      toast.success('New folder created!');
+      setNewName('');
+    } else {
+      toast.error(`Error creating folder: ${result.error}`);
+    }
+    setShowNewFolderDialog(false);
+  };
+
   return (
     <>
       <FgTooltip
@@ -42,22 +54,7 @@ export default function NewFolderButton({
           onClose={() => setShowNewFolderDialog(false)}
           open={showNewFolderDialog}
         >
-          <form
-            onSubmit={async event => {
-              event.preventDefault();
-              try {
-                await handleNewFolderSubmit();
-                toast.success('New folder created!');
-                setNewName('');
-              } catch (error) {
-                toast.error(
-                  `Error creating folder: ${error instanceof Error ? error.message : 'Unknown error'}`
-                );
-              } finally {
-                setShowNewFolderDialog(false);
-              }
-            }}
-          >
+          <form onSubmit={formSubmit}>
             <div className="mt-8 flex flex-col gap-2">
               <Typography
                 as="label"
