@@ -23,9 +23,8 @@ test.describe('Properties Panel Navigation', () => {
 
     // Click on the zarr_v3_ome.zarr row (but not the link) to populate properties panel
     await page
-      .getByRole('row', { name: 'zarr_v3_ome.zarr Folder Oct' })
-      .getByRole('cell')
-      .nth(2)
+      .getByRole('cell', { name: 'zarr_v3_ome.zarr' })
+      .locator('svg')
       .click();
     // The properties panel should show the zarr directory name as the properties target
     await expect(
@@ -50,9 +49,8 @@ test.describe('Properties Panel Navigation', () => {
   }) => {
     // Click the zarr directory row first to populate properties panel
     await page
-      .getByRole('row', { name: 'zarr_v2_ome.zarr Folder Oct' })
-      .getByRole('cell')
-      .nth(2)
+      .getByRole('cell', { name: 'zarr_v2_ome.zarr' })
+      .locator('svg')
       .click();
 
     // Then double-click the link to navigate
@@ -75,11 +73,7 @@ test.describe('Properties Panel Navigation', () => {
     ).toBeVisible({ timeout: 10000 });
 
     // Now click on the subdirectory '0'
-    await page
-      .getByRole('row', { name: '0 Folder Oct' })
-      .getByRole('cell')
-      .nth(2)
-      .click();
+    await page.getByRole('cell', { name: '0' }).locator('svg').click();
 
     // Properties panel should update to show '0' as the target
     await expect(

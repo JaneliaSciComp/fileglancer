@@ -60,10 +60,8 @@ export default function useDataToolLinks(
     proxiedPathByFspAndPathQuery
   } = useProxiedPathContext();
 
-  const proxiedPath = proxiedPathByFspAndPathQuery.data;
-
   const { areDataLinksAutomatic } = usePreferencesContext();
-  const { externalDataUrl } = useExternalBucketContext();
+  const { externalDataUrlQuery } = useExternalBucketContext();
 
   const handleCopy = async (url: string): Promise<void> => {
     const result = await copyToClipboard(url);
@@ -171,14 +169,17 @@ export default function useDataToolLinks(
   };
 
   const handleToolClick = async (toolKey: PendingToolKey) => {
-    if (!proxiedPath && !externalDataUrl) {
+    if (!proxiedPathByFspAndPathQuery.data && !externalDataUrlQuery.data) {
       if (areDataLinksAutomatic) {
         await createLinkAndExecuteAction(toolKey);
       } else {
         setPendingToolKey?.(toolKey);
         setShowDataLinkDialog?.(true);
       }
-    } else if ((proxiedPath || externalDataUrl) && openWithToolUrls) {
+    } else if (
+      (proxiedPathByFspAndPathQuery.data || externalDataUrlQuery.data) &&
+      openWithToolUrls
+    ) {
       await executeToolAction(toolKey, openWithToolUrls);
     }
   };

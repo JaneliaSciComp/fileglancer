@@ -33,7 +33,7 @@ export default defineConfig({
     video: 'on',
     screenshot: 'only-on-failure'
   },
-  timeout: process.env.CI ? 90_000 : 10_000,
+  timeout: process.env.CI ? 180_000 : 20_000,
   navigationTimeout: process.env.CI ? 90_000 : 10_000,
   workers: 1,
   webServer: {

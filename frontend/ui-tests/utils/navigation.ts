@@ -17,6 +17,7 @@ const navigateToScratchFsp = async (page: Page) => {
 
   // Wait for file directory to load
   await scratchFsp.click();
+  await page.waitForLoadState('domcontentloaded', { timeout: 10000 });
   await expect(page.getByText('Name', { exact: true })).toBeVisible();
 };
 

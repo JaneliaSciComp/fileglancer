@@ -73,15 +73,21 @@ type UpdatePreferencePayload<T = unknown> = {
 };
 
 /**
- * Payload for updating favorites
+ * Generic payload for updating list-based preferences
+ * Handles both map-based (zone, fileSharePath, folder) and array-based (recentlyViewedFolders)
  */
-type FavoriteUpdatePayload = {
-  preferenceKey: 'zone' | 'fileSharePath' | 'folder';
-  updatedMap: Record<
-    string,
-    ZonePreference | FileSharePathPreference | FolderPreference
-  >;
-};
+type PreferenceListUpdatePayload =
+  | {
+      preferenceKey: 'zone' | 'fileSharePath' | 'folder';
+      updatedMap: Record<
+        string,
+        ZonePreference | FileSharePathPreference | FolderPreference
+      >;
+    }
+  | {
+      preferenceKey: 'recentlyViewedFolders';
+      updatedArray: FolderPreference[];
+    };
 
 // Query key factory for preferences
 export const preferencesQueryKeys = {
@@ -268,18 +274,10 @@ export function useUpdatePreferenceMutation(): UseMutationResult<
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async <T>(
-      { key, value }: UpdatePreferencePayload<T>,
-      { signal }
-    ) => {
-      const response = await sendFetchRequest(
-        `/api/preference/${key}`,
-        'PUT',
-        {
-          value
-        },
-        { signal }
-      );
+    mutationFn: async <T>({ key, value }: UpdatePreferencePayload<T>) => {
+      const response = await sendFetchRequest(`/api/preference/${key}`, 'PUT', {
+        value
+      });
       if (!response.ok) {
         throw await toHttpError(response);
       }
@@ -340,30 +338,46 @@ export function useUpdatePreferenceMutation(): UseMutationResult<
 }
 
 /**
- * Mutation hook for updating favorites (zone, fileSharePath, or folder)
+ * Generic mutation hook for updating list-based preferences
+ * Handles both map-based preferences (zone, fileSharePath, folder) and
+ * array-based preferences (recentlyViewedFolders)
  *
  * @example
- * const mutation = useUpdateFavoritesMutation();
+ * // For favorites (map-based)
+ * const mutation = useUpdatePreferenceListMutation();
  * mutation.mutate({ preferenceKey: 'zone', updatedMap: { ... } });
+ *
+ * @example
+ * // For recently viewed folders (array-based)
+ * const mutation = useUpdatePreferenceListMutation();
+ * mutation.mutate({ preferenceKey: 'recentlyViewedFolders', updatedArray: [...] });
  */
-export function useUpdateFavoritesMutation(): UseMutationResult<
+export function useUpdatePreferenceListMutation(): UseMutationResult<
   void,
   Error,
-  FavoriteUpdatePayload,
+  PreferenceListUpdatePayload,
   { previousData?: PreferencesApiResponse }
 > {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (
-      { preferenceKey, updatedMap }: FavoriteUpdatePayload,
-      { signal }
-    ) => {
+    mutationFn: async (payload: PreferenceListUpdatePayload) => {
+      const { preferenceKey } = payload;
+
+      // Determine the value to send based on payload type
+      let value: unknown;
+      if ('updatedMap' in payload) {
+        // Map-based preference (zone, fileSharePath, folder)
+        value = Object.values(payload.updatedMap);
+      } else {
+        // Array-based preference (recentlyViewedFolders)
+        value = payload.updatedArray;
+      }
+
       const response = await sendFetchRequest(
         `/api/preference/${preferenceKey}`,
         'PUT',
-        { value: Object.values(updatedMap) },
-        { signal }
+        { value }
       );
       if (!response.ok) {
         throw await toHttpError(response);
@@ -372,7 +386,9 @@ export function useUpdateFavoritesMutation(): UseMutationResult<
       return;
     },
     // Optimistic update for immediate UI feedback
-    onMutate: async ({ preferenceKey, updatedMap }) => {
+    onMutate: async (payload: PreferenceListUpdatePayload) => {
+      const { preferenceKey } = payload;
+
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: preferencesQueryKeys.all });
 
@@ -381,6 +397,14 @@ export function useUpdateFavoritesMutation(): UseMutationResult<
         preferencesQueryKeys.all
       );
 
+      // Determine the value for cache update
+      let value: unknown;
+      if ('updatedMap' in payload) {
+        value = Object.values(payload.updatedMap);
+      } else {
+        value = payload.updatedArray;
+      }
+
       // Optimistically update the raw API response cache
       queryClient.setQueryData<PreferencesApiResponse>(
         preferencesQueryKeys.all,
@@ -388,10 +412,9 @@ export function useUpdateFavoritesMutation(): UseMutationResult<
           if (!old) {
             return old;
           }
-          // Update the appropriate favorites array in raw format
           return {
             ...old,
-            [preferenceKey]: { value: Object.values(updatedMap) }
+            [preferenceKey]: { value }
           };
         }
       );
@@ -400,80 +423,6 @@ export function useUpdateFavoritesMutation(): UseMutationResult<
     },
     // On error, rollback
     onError: (_err, _variables, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(
-          preferencesQueryKeys.all,
-          context.previousData
-        );
-      }
-    },
-    // Mark as stale but don't force refetch - respect staleTime
-    onSettled: () => {
-      queryClient.invalidateQueries({
-        queryKey: preferencesQueryKeys.all,
-        refetchType: 'none'
-      });
-    }
-  });
-}
-
-/**
- * Mutation hook for updating recently viewed folders with optimistic updates
- *
- * @example
- * const mutation = useUpdateRecentlyViewedFoldersMutation();
- * mutation.mutate(updatedFolders);
- */
-export function useUpdateRecentlyViewedFoldersMutation(): UseMutationResult<
-  void,
-  Error,
-  FolderPreference[],
-  { previousData?: PreferencesApiResponse }
-> {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (folders: FolderPreference[], { signal }) => {
-      const response = await sendFetchRequest(
-        '/api/preference/recentlyViewedFolders',
-        'PUT',
-        { value: folders },
-        { signal }
-      );
-      if (!response.ok) {
-        throw await toHttpError(response);
-      }
-      // Don't return the Response object - it can't be cloned by devtools
-      return;
-    },
-    // Optimistic update for better UX
-    onMutate: async (newFolders: FolderPreference[]) => {
-      // Cancel any outgoing refetches to avoid overwriting our optimistic update
-      await queryClient.cancelQueries({ queryKey: preferencesQueryKeys.all });
-
-      // Get the raw API response data (before transformation)
-      const previousData = queryClient.getQueryData<PreferencesApiResponse>(
-        preferencesQueryKeys.all
-      );
-
-      // Optimistically update the raw API response cache
-      queryClient.setQueryData<PreferencesApiResponse>(
-        preferencesQueryKeys.all,
-        old => {
-          if (!old) {
-            return old;
-          }
-          return {
-            ...old,
-            recentlyViewedFolders: { value: newFolders }
-          };
-        }
-      );
-
-      return { previousData };
-    },
-    // On error, rollback to the previous value
-    onError: (_err, _newFolders, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(
           preferencesQueryKeys.all,
