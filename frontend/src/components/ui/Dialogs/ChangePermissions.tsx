@@ -1,4 +1,3 @@
-import React from 'react';
 import { Button } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
@@ -18,7 +17,7 @@ type ChangePermissionsProps = {
 export default function ChangePermissions({
   showPermissionsDialog,
   setShowPermissionsDialog
-}: ChangePermissionsProps): React.JSX.Element {
+}: ChangePermissionsProps) {
   const { fileBrowserState, mutations } = useFileBrowserContext();
 
   const {
@@ -27,39 +26,32 @@ export default function ChangePermissions({
     handleChangePermissions
   } = usePermissionsDialog();
 
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!localPermissions) {
+      toast.error('Error setting permissions: no local permission state');
+      return;
+    }
+    if (!fileBrowserState.propertiesTarget) {
+      toast.error('Error setting permissions: no properties target set');
+      return;
+    }
+    const result = await handleChangePermissions();
+    if (result.success) {
+      toast.success('Permissions changed!');
+    } else {
+      toast.error(`Error changing permissions: ${result.error}`);
+    }
+    setShowPermissionsDialog(false);
+  }
+
   return (
     <FgDialog
       onClose={() => setShowPermissionsDialog(false)}
       open={showPermissionsDialog}
     >
       {fileBrowserState.propertiesTarget ? (
-        <form
-          onSubmit={async event => {
-            event.preventDefault();
-            if (!localPermissions) {
-              toast.error(
-                'Error setting permissions: no local permission state'
-              );
-              return;
-            }
-            if (!fileBrowserState.propertiesTarget) {
-              toast.error(
-                'Error setting permissions: no properties target set'
-              );
-              return;
-            }
-            try {
-              await handleChangePermissions();
-              toast.success('Permissions changed!');
-            } catch (error) {
-              toast.error(
-                `Error changing permissions: ${error instanceof Error ? error.message : 'Unknown error'}`
-              );
-            } finally {
-              setShowPermissionsDialog(false);
-            }
-          }}
-        >
+        <form onSubmit={handleSubmit}>
           <TextWithFilePath
             path={fileBrowserState.propertiesTarget.name}
             text="Change permissions for file:"

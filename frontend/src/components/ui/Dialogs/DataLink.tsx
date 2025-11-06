@@ -1,7 +1,8 @@
 /* eslint-disable react/destructuring-assignment */
 // Props are used for TypeScript type narrowing purposes and cannot be destructured at the beginning
 
-import React from 'react';
+import { useState, SetStateAction } from 'react';
+import type { ReactNode, Dispatch } from 'react';
 import { Button, Typography } from '@material-tailwind/react';
 
 import type { ProxiedPath } from '@/contexts/ProxiedPathContext';
@@ -17,7 +18,7 @@ import AutomaticLinksToggle from '@/components/ui/PreferencesPage/AutomaticLinks
 
 interface CommonDataLinkDialogProps {
   showDataLinkDialog: boolean;
-  setShowDataLinkDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowDataLinkDialog: Dispatch<SetStateAction<boolean>>;
 }
 
 interface CreateLinkFromToolsProps extends CommonDataLinkDialogProps {
@@ -25,7 +26,7 @@ interface CreateLinkFromToolsProps extends CommonDataLinkDialogProps {
   action: 'create';
   onConfirm: () => Promise<void>;
   onCancel: () => void;
-  setPendingToolKey: React.Dispatch<React.SetStateAction<PendingToolKey>>;
+  setPendingToolKey: Dispatch<SetStateAction<PendingToolKey>>;
 }
 
 interface CreateLinkNotFromToolsProps extends CommonDataLinkDialogProps {
@@ -50,7 +51,7 @@ function CreateLinkBtn({
   onConfirm
 }: {
   readonly onConfirm: () => Promise<void>;
-}): React.JSX.Element {
+}) {
   return (
     <Button
       className="!rounded-md flex items-center gap-2"
@@ -71,9 +72,9 @@ function DeleteLinkBtn({
   handleDeleteDataLink
 }: {
   readonly proxiedPath: ProxiedPath;
-  readonly setShowDataLinkDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  readonly setShowDataLinkDialog: Dispatch<SetStateAction<boolean>>;
   readonly handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
-}): React.JSX.Element {
+}) {
   return (
     <Button
       className="!rounded-md flex items-center gap-2 hover:text-background focus:text-background"
@@ -94,14 +95,10 @@ function CancelBtn({
   setShowDataLinkDialog,
   onCancel
 }: {
-  readonly setPendingToolKey?: React.Dispatch<
-    React.SetStateAction<PendingToolKey>
-  >;
-  readonly setShowDataLinkDialog?: React.Dispatch<
-    React.SetStateAction<boolean>
-  >;
+  readonly setPendingToolKey?: Dispatch<SetStateAction<PendingToolKey>>;
+  readonly setShowDataLinkDialog?: Dispatch<SetStateAction<boolean>>;
   readonly onCancel?: () => void;
-}): React.JSX.Element {
+}) {
   return (
     <Button
       className="!rounded-md flex items-center gap-2"
@@ -124,21 +121,15 @@ function CancelBtn({
   );
 }
 
-function BtnContainer({
-  children
-}: {
-  readonly children: React.ReactNode;
-}): React.JSX.Element {
+function BtnContainer({ children }: { readonly children: ReactNode }) {
   return <div className="flex gap-4">{children}</div>;
 }
 
-export default function DataLinkDialog(
-  props: DataLinkDialogProps
-): React.JSX.Element {
+export default function DataLinkDialog(props: DataLinkDialogProps) {
   const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const { pathPreference, areDataLinksAutomatic } = usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
-  const [localAreDataLinksAutomatic] = React.useState(areDataLinksAutomatic);
+  const [localAreDataLinksAutomatic] = useState(areDataLinksAutomatic);
 
   function getDisplayPath(): string {
     const fspKey =

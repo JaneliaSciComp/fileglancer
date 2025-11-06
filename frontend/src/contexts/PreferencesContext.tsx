@@ -1,4 +1,11 @@
-import React from 'react';
+import {
+  createContext,
+  useContext,
+  useRef,
+  useCallback,
+  useEffect
+} from 'react';
+import type { ReactNode } from 'react';
 
 import type { FileSharePath, Zone } from '@/shared.types';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
@@ -14,8 +21,7 @@ import {
 import {
   usePreferencesQuery,
   useUpdatePreferenceMutation,
-  useUpdateFavoritesMutation,
-  useUpdateRecentlyViewedFoldersMutation
+  useUpdatePreferenceListMutation
 } from '@/queries/preferencesQueries';
 
 export type FolderFavorite = {
@@ -79,12 +85,10 @@ type PreferencesContextType = {
   handleContextMenuFavorite: () => Promise<Result<boolean>>;
 };
 
-const PreferencesContext = React.createContext<PreferencesContextType | null>(
-  null
-);
+const PreferencesContext = createContext<PreferencesContextType | null>(null);
 
 export const usePreferencesContext = () => {
-  const context = React.useContext(PreferencesContext);
+  const context = useContext(PreferencesContext);
   if (!context) {
     throw new Error(
       'usePreferencesContext must be used within a PreferencesProvider'
@@ -96,19 +100,18 @@ export const usePreferencesContext = () => {
 export const PreferencesProvider = ({
   children
 }: {
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
 }) => {
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const { fileQuery, fileBrowserState } = useFileBrowserContext();
 
   const preferencesQuery = usePreferencesQuery(zonesAndFspQuery.data);
   const updatePreferenceMutation = useUpdatePreferenceMutation();
-  const updateFavoritesMutation = useUpdateFavoritesMutation();
-  const updateRecentlyViewedMutation = useUpdateRecentlyViewedFoldersMutation();
+  const updatePreferenceListMutation = useUpdatePreferenceListMutation();
 
   // Store last viewed folder path and FSP name to avoid duplicate updates
-  const lastFolderPathRef = React.useRef<string | null>(null);
-  const lastFspNameRef = React.useRef<string | null>(null);
+  const lastFolderPathRef = useRef<string | null>(null);
+  const lastFspNameRef = useRef<string | null>(null);
 
   const handleUpdateLayout = async (newLayout: string): Promise<void> => {
     // Don't update if layout hasn't changed
@@ -257,7 +260,7 @@ export const PreferencesProvider = ({
       updatedFavorites: Record<string, ZonePreference>;
       favoriteAdded: boolean;
     };
-    await updateFavoritesMutation.mutateAsync({
+    await updatePreferenceListMutation.mutateAsync({
       preferenceKey: 'zone',
       updatedMap: updatedFavorites
     });
@@ -276,7 +279,7 @@ export const PreferencesProvider = ({
       updatedFavorites: Record<string, FileSharePathPreference>;
       favoriteAdded: boolean;
     };
-    await updateFavoritesMutation.mutateAsync({
+    await updatePreferenceListMutation.mutateAsync({
       preferenceKey: 'fileSharePath',
       updatedMap: updatedFavorites
     });
@@ -302,7 +305,7 @@ export const PreferencesProvider = ({
       updatedFavorites: Record<string, FolderPreference>;
       favoriteAdded: boolean;
     };
-    await updateFavoritesMutation.mutateAsync({
+    await updatePreferenceListMutation.mutateAsync({
       preferenceKey: 'folder',
       updatedMap: updatedFavorites
     });
@@ -353,7 +356,7 @@ export const PreferencesProvider = ({
     }
   };
 
-  const updateRecentlyViewedFolders = React.useCallback(
+  const updateRecentlyViewedFolders = useCallback(
     (
       folderPath: string,
       fspName: string,
@@ -411,7 +414,7 @@ export const PreferencesProvider = ({
 
   // useEffect that runs when the current folder in fileBrowserState changes,
   // to update the recently viewed folder
-  React.useEffect(() => {
+  useEffect(() => {
     if (
       fileQuery.isPending ||
       !fileQuery.data ||
@@ -447,10 +450,13 @@ export const PreferencesProvider = ({
       preferencesQuery.data?.recentlyViewedFolders || []
     );
 
-    updateRecentlyViewedMutation.mutate(updatedFolders);
+    updatePreferenceListMutation.mutate({
+      preferenceKey: 'recentlyViewedFolders',
+      updatedArray: updatedFolders
+    });
   }, [
     updateRecentlyViewedFolders,
-    updateRecentlyViewedMutation,
+    updatePreferenceListMutation,
     preferencesQuery.data?.recentlyViewedFolders,
     preferencesQuery.isPending,
     fileQuery.isPending,

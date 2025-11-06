@@ -1,4 +1,5 @@
-import React from 'react';
+import { useState, useRef, SetStateAction } from 'react';
+import type { Dispatch } from 'react';
 import toast from 'react-hot-toast';
 
 import {
@@ -14,10 +15,10 @@ import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
 
 // Overload for ZarrPreview usage with required parameters
 export default function useDataToolLinks(
-  setShowDataLinkDialog: React.Dispatch<React.SetStateAction<boolean>>,
+  setShowDataLinkDialog: Dispatch<SetStateAction<boolean>>,
   openWithToolUrls: OpenWithToolUrls | null,
   pendingToolKey: PendingToolKey,
-  setPendingToolKey: React.Dispatch<React.SetStateAction<PendingToolKey>>
+  setPendingToolKey: Dispatch<SetStateAction<PendingToolKey>>
 ): {
   handleCreateDataLink: () => Promise<void>;
   handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
@@ -29,7 +30,7 @@ export default function useDataToolLinks(
 
 // Overload for linksColumns and PropertiesDrawer usage with only one param
 export default function useDataToolLinks(
-  setShowDataLinkDialog: React.Dispatch<React.SetStateAction<boolean>>
+  setShowDataLinkDialog: Dispatch<SetStateAction<boolean>>
 ): {
   handleCreateDataLink: () => Promise<void>;
   handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
@@ -40,15 +41,15 @@ export default function useDataToolLinks(
 };
 
 export default function useDataToolLinks(
-  setShowDataLinkDialog: React.Dispatch<React.SetStateAction<boolean>>,
+  setShowDataLinkDialog: Dispatch<SetStateAction<boolean>>,
   openWithToolUrls?: OpenWithToolUrls | null,
   pendingToolKey?: PendingToolKey,
-  setPendingToolKey?: React.Dispatch<React.SetStateAction<PendingToolKey>>
+  setPendingToolKey?: Dispatch<SetStateAction<PendingToolKey>>
 ) {
-  const [showCopiedTooltip, setShowCopiedTooltip] = React.useState(false);
+  const [showCopiedTooltip, setShowCopiedTooltip] = useState(false);
 
   // Store current URLs in a ref to avoid stale closure issues
-  const currentUrlsRef = React.useRef(openWithToolUrls);
+  const currentUrlsRef = useRef(openWithToolUrls);
   currentUrlsRef.current = openWithToolUrls;
 
   const { fileBrowserState, fileQuery } = useFileBrowserContext();
@@ -59,10 +60,8 @@ export default function useDataToolLinks(
     proxiedPathByFspAndPathQuery
   } = useProxiedPathContext();
 
-  const proxiedPath = proxiedPathByFspAndPathQuery.data;
-
   const { areDataLinksAutomatic } = usePreferencesContext();
-  const { externalDataUrl } = useExternalBucketContext();
+  const { externalDataUrlQuery } = useExternalBucketContext();
 
   const handleCopy = async (url: string): Promise<void> => {
     const result = await copyToClipboard(url);
@@ -170,14 +169,17 @@ export default function useDataToolLinks(
   };
 
   const handleToolClick = async (toolKey: PendingToolKey) => {
-    if (!proxiedPath && !externalDataUrl) {
+    if (!proxiedPathByFspAndPathQuery.data && !externalDataUrlQuery.data) {
       if (areDataLinksAutomatic) {
         await createLinkAndExecuteAction(toolKey);
       } else {
         setPendingToolKey?.(toolKey);
         setShowDataLinkDialog?.(true);
       }
-    } else if ((proxiedPath || externalDataUrl) && openWithToolUrls) {
+    } else if (
+      (proxiedPathByFspAndPathQuery.data || externalDataUrlQuery.data) &&
+      openWithToolUrls
+    ) {
       await executeToolAction(toolKey, openWithToolUrls);
     }
   };

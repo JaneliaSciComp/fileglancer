@@ -1,7 +1,8 @@
+import type { ReactNode } from 'react';
 import { Typography } from '@material-tailwind/react';
 
 type TagProps = {
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
   readonly classProps: string;
 };
 

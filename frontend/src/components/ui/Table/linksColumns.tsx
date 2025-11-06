@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState } from 'react';
 import { Typography } from '@material-tailwind/react';
 import { FilterFn, type ColumnDef } from '@tanstack/react-table';
 
@@ -62,8 +62,7 @@ function PathCell({ item }: { readonly item: ProxiedPath }) {
 }
 
 function ActionsCell({ item }: { readonly item: ProxiedPath }) {
-  const [showDataLinkDialog, setShowDataLinkDialog] =
-    React.useState<boolean>(false);
+  const [showDataLinkDialog, setShowDataLinkDialog] = useState<boolean>(false);
   const { handleDeleteDataLink } = useDataToolLinks(setShowDataLinkDialog);
   const { pathPreference } = usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();

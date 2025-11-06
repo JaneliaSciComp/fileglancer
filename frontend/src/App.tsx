@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router';
 import { ErrorBoundary } from 'react-error-boundary';
 
@@ -14,7 +15,7 @@ import Links from '@/components/Links';
 import Notifications from '@/components/Notifications';
 import ErrorFallback from '@/components/ErrorFallback';
 
-function RequireAuth({ children }: { readonly children: React.ReactNode }) {
+function RequireAuth({ children }: { readonly children: ReactNode }) {
   const { loading, authStatus } = useAuthContext();
 
   if (loading) {
@@ -71,62 +72,45 @@ const AppComponent = () => {
             <Route element={<Home />} index />
             <Route
               element={
-                <ErrorBoundary FallbackComponent={ErrorFallback}>
-                  <RequireAuth>
-                    <Links />
-                  </RequireAuth>
-                </ErrorBoundary>
+                <RequireAuth>
+                  <Links />
+                </RequireAuth>
               }
               path="links"
             />
             {tasksEnabled ? (
               <Route
                 element={
-                  <ErrorBoundary FallbackComponent={ErrorFallback}>
-                    <RequireAuth>
-                      <Jobs />
-                    </RequireAuth>
-                  </ErrorBoundary>
+                  <RequireAuth>
+                    <Jobs />
+                  </RequireAuth>
                 }
                 path="jobs"
               />
             ) : null}
+            <Route element={<Help />} path="help" />
             <Route
               element={
-                <ErrorBoundary FallbackComponent={ErrorFallback}>
-                  <Help />
-                </ErrorBoundary>
-              }
-              path="help"
-            />
-            <Route
-              element={
-                <ErrorBoundary FallbackComponent={ErrorFallback}>
-                  <RequireAuth>
-                    <Preferences />
-                  </RequireAuth>
-                </ErrorBoundary>
+                <RequireAuth>
+                  <Preferences />
+                </RequireAuth>
               }
               path="preferences"
             />
             <Route
               element={
-                <ErrorBoundary FallbackComponent={ErrorFallback}>
-                  <RequireAuth>
-                    <Notifications />
-                  </RequireAuth>
-                </ErrorBoundary>
+                <RequireAuth>
+                  <Notifications />
+                </RequireAuth>
               }
               path="notifications"
             />
           </Route>
           <Route
             element={
-              <ErrorBoundary FallbackComponent={ErrorFallback}>
-                <RequireAuth>
-                  <BrowsePageLayout />
-                </RequireAuth>
-              </ErrorBoundary>
+              <RequireAuth>
+                <BrowsePageLayout />
+              </RequireAuth>
             }
           >
             <Route element={<Browse />} path="browse" />

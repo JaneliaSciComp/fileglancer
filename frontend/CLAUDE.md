@@ -108,7 +108,7 @@ frontend/
 
 ### Core
 
-- **React 18.3** - UI framework with hooks and concurrent features
+- **React 18.3.1** - UI framework with hooks and concurrent features
 - **TypeScript 5.8** - Type-safe JavaScript
 - **Vite** (Rolldown) - Fast Rust-based bundler (Rollup alternative)
 - **React Router 7.4** - Client-side routing
@@ -143,6 +143,8 @@ frontend/
 - **MSW 2.10** - API mocking for tests
 - **@testing-library/jest-dom 6.6** - DOM matchers
 - **@testing-library/user-event 14.6** - User interaction simulation
+- **@types/react 18.3** - React type definitions
+- **@types/react-dom 18.3** - React DOM type definitions
 - **Playwright** (in ui-tests/) - E2E browser testing
 
 ### Development Tools
@@ -152,6 +154,26 @@ frontend/
 - **Lefthook 1.12** - Git hooks manager
 
 ## Development Patterns
+
+### Import Formatting
+
+**Separate imports for functions and types:**
+
+When importing both functions/values and types from the same namespace, use separate import lines:
+
+```typescript
+// Good - separate imports
+import { useState, useEffect } from 'react';
+import type { FC, ReactNode } from 'react';
+
+import { useQuery } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
+
+// Avoid - mixing functions and types
+import { useState, useEffect, type FC, type ReactNode } from 'react';
+```
+
+This improves readability and makes it clear which imports are type-only.
 
 ### Component Guidelines
 
@@ -167,6 +189,10 @@ frontend/
 6. **Use logger**: Import from `src/logger.ts` - never use `console.log()`
 7. **TypeScript interfaces**: Always define props interfaces for components
 8. **File naming**: PascalCase for components (e.g., `MyComponent.tsx`)
+9. **React imports**: Use named imports, not namespace imports (e.g., `import { useState } from 'react'`, not `import React from 'react'`)
+10. **Component return types**: Do not specify return types for React component functions unless absolutely necessary
+    - Good: `function MyComponent() { ... }`
+    - Avoid: `function MyComponent(): JSX.Element { ... }`
 
 ### State Management Patterns
 

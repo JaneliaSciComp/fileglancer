@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState } from 'react';
 import { Typography } from '@material-tailwind/react';
 import type { UseQueryResult } from '@tanstack/react-query';
 
@@ -32,11 +32,9 @@ export default function ZarrPreview({
   openWithToolUrls,
   zarrMetadataQuery,
   layerType
-}: ZarrPreviewProps): React.ReactNode {
-  const [showDataLinkDialog, setShowDataLinkDialog] =
-    React.useState<boolean>(false);
-  const [pendingToolKey, setPendingToolKey] =
-    React.useState<PendingToolKey>(null);
+}: ZarrPreviewProps) {
+  const [showDataLinkDialog, setShowDataLinkDialog] = useState<boolean>(false);
+  const [pendingToolKey, setPendingToolKey] = useState<PendingToolKey>(null);
 
   const {
     handleToolClick,

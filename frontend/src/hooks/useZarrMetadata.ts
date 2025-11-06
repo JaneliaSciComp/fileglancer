@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { default as log } from '@/logger';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
@@ -24,7 +24,7 @@ export type ZarrArray = zarr.Array<any>;
 export default function useZarrMetadata() {
   const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const { proxiedPathByFspAndPathQuery } = useProxiedPathContext();
-  const { externalDataUrl } = useExternalBucketContext();
+  const { externalDataUrlQuery } = useExternalBucketContext();
   const {
     disableNeuroglancerStateGeneration,
     disableHeuristicalLayerTypeDetection,
@@ -45,12 +45,11 @@ export default function useZarrMetadata() {
   const thumbnailQuery = useOmeZarrThumbnailQuery(omeZarrUrl);
   const thumbnailSrc = thumbnailQuery.data?.thumbnailSrc || null;
 
-  // Determine layer type from thumbnail (non-reactive, calculated once when thumbnail is ready)
-  const [layerType, setLayerType] = React.useState<
+  const [layerType, setLayerType] = useState<
     'auto' | 'image' | 'segmentation' | null
   >(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (disableHeuristicalLayerTypeDetection) {
       setLayerType('image');
       return;
@@ -73,38 +72,21 @@ export default function useZarrMetadata() {
     };
   }, [thumbnailSrc, disableHeuristicalLayerTypeDetection]);
 
-  // Compute tool URLs based on metadata and proxied path
-  // Note: layerType is NOT in the dependency array to avoid recalculating URLs
-  // when layer type is determined. We use a ref to track the effective layer type.
-  const effectiveLayerTypeRef = React.useRef<'auto' | 'image' | 'segmentation'>(
-    'image'
-  );
-
-  // Update the ref when layerType changes, but don't trigger re-render
-  React.useEffect(() => {
-    if (layerType) {
-      effectiveLayerTypeRef.current = layerType;
-    }
-  }, [layerType]);
-
-  const openWithToolUrls = React.useMemo(() => {
+  const openWithToolUrls = useMemo(() => {
     if (!metadata) {
       return null;
     }
-
     const validatorBaseUrl =
       'https://ome.github.io/ome-ngff-validator/?source=';
     const neuroglancerBaseUrl = 'https://neuroglancer-demo.appspot.com/#!';
     const voleBaseUrl = 'https://volumeviewer.allencell.org/viewer?url=';
     const avivatorBaseUrl = 'https://janeliascicomp.github.io/viv/?image_url=';
 
-    const url = externalDataUrl || proxiedPathByFspAndPathQuery.data?.url;
+    const url =
+      externalDataUrlQuery.data || proxiedPathByFspAndPathQuery.data?.url;
     const openWithToolUrls = {
       copy: url || ''
     } as OpenWithToolUrls;
-
-    // Use the effective layer type from ref to avoid dependency on layerType state
-    const currentLayerType = effectiveLayerTypeRef.current;
 
     // Determine which tools should be available based on metadata type
     if (metadata?.multiscale) {
@@ -118,14 +100,14 @@ export default function useZarrMetadata() {
         if (disableNeuroglancerStateGeneration) {
           openWithToolUrls.neuroglancer =
             neuroglancerBaseUrl + generateNeuroglancerStateForDataURL(url);
-        } else {
+        } else if (layerType) {
           try {
             openWithToolUrls.neuroglancer =
               neuroglancerBaseUrl +
               generateNeuroglancerStateForOmeZarr(
                 url,
                 metadata.zarrVersion,
-                currentLayerType,
+                layerType,
                 metadata.multiscale,
                 metadata.arr,
                 metadata.omero,
@@ -160,13 +142,13 @@ export default function useZarrMetadata() {
         if (disableNeuroglancerStateGeneration) {
           openWithToolUrls.neuroglancer =
             neuroglancerBaseUrl + generateNeuroglancerStateForDataURL(url);
-        } else {
+        } else if (layerType) {
           openWithToolUrls.neuroglancer =
             neuroglancerBaseUrl +
             generateNeuroglancerStateForZarrArray(
               url,
               metadata.zarrVersion,
-              currentLayerType
+              layerType
             );
         }
       } else {
@@ -182,9 +164,10 @@ export default function useZarrMetadata() {
   }, [
     metadata,
     proxiedPathByFspAndPathQuery.data?.url,
-    externalDataUrl,
+    externalDataUrlQuery.data,
     disableNeuroglancerStateGeneration,
-    useLegacyMultichannelApproach
+    useLegacyMultichannelApproach,
+    layerType
   ]);
 
   return {

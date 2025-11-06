@@ -1,4 +1,4 @@
-import * as React from 'react';
+import { useEffect, useState } from 'react';
 import {
   IconButton,
   Typography,
@@ -47,7 +47,7 @@ const LINKS = [
 ];
 
 // Logo SVG component to reduce JSX nesting depth
-function LogoSvg(): JSX.Element {
+function LogoSvg() {
   return (
     <svg
       className="icon-large short:icon-small text-primary"
@@ -113,10 +113,10 @@ function NavList() {
 
 // Composed navbar
 export default function FileglancerNavbar() {
-  const [openNav, setOpenNav] = React.useState(false);
+  const [openNav, setOpenNav] = useState(false);
   const { toggleTheme, isLightTheme, setIsLightTheme } = useTheme();
 
-  React.useEffect(() => {
+  useEffect(() => {
     window.addEventListener(
       'resize',
       () => window.innerWidth >= 960 && setOpenNav(false)

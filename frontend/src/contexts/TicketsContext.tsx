@@ -1,4 +1,5 @@
-import React from 'react';
+import { createContext, useContext } from 'react';
+import type { ReactNode } from 'react';
 
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { useProfileContext } from './ProfileContext';
@@ -31,10 +32,10 @@ type TicketContextType = {
   tasksEnabled: boolean;
 };
 
-const TicketContext = React.createContext<TicketContextType | null>(null);
+const TicketContext = createContext<TicketContextType | null>(null);
 
 export const useTicketContext = () => {
-  const context = React.useContext(TicketContext);
+  const context = useContext(TicketContext);
   if (!context) {
     throw new Error('useTicketContext must be used within a TicketProvider');
   }
@@ -44,7 +45,7 @@ export const useTicketContext = () => {
 export const TicketProvider = ({
   children
 }: {
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
 }) => {
   const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const { profile } = useProfileContext();

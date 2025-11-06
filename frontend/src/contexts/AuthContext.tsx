@@ -1,4 +1,5 @@
-import React from 'react';
+import { createContext, useContext, useCallback } from 'react';
+import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import logger from '@/logger';
 import { useAuthStatusQuery, type AuthStatus } from '@/queries/authQueries';
@@ -10,10 +11,10 @@ type AuthContextType = {
   logout: () => Promise<void>;
 };
 
-const AuthContext = React.createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthContextType | null>(null);
 
 export const useAuthContext = () => {
-  const context = React.useContext(AuthContext);
+  const context = useContext(AuthContext);
   if (!context) {
     throw new Error(
       'useAuthContext must be used within an AuthContextProvider'
@@ -25,12 +26,12 @@ export const useAuthContext = () => {
 export const AuthContextProvider = ({
   children
 }: {
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
 }) => {
   const queryClient = useQueryClient();
   const { data: authStatus, isLoading: loading, error } = useAuthStatusQuery();
 
-  const logout = React.useCallback(async () => {
+  const logout = useCallback(async () => {
     try {
       // Invalidate auth query cache before navigating to logout
       await queryClient.invalidateQueries({ queryKey: ['auth', 'status'] });

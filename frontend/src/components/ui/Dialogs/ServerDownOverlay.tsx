@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, Button, Typography } from '@material-tailwind/react';
 import { HiOutlineExclamationTriangle } from 'react-icons/hi2';
 import { HiRefresh } from 'react-icons/hi';
@@ -13,7 +13,7 @@ type ServerDownOverlayProps = {
 const COUNTDOWN_INTERVAL_MS = 1000; // 1 second intervals for countdown
 
 // Helper components to reduce JSX nesting depth
-function MessageContent(): JSX.Element {
+function MessageContent() {
   return (
     <div className="text-left space-y-2">
       <Typography className="text-foreground font-medium" type="small">
@@ -36,11 +36,7 @@ function MessageContent(): JSX.Element {
   );
 }
 
-function RetryButton({
-  onRetry
-}: {
-  readonly onRetry: () => void;
-}): JSX.Element {
+function RetryButton({ onRetry }: { readonly onRetry: () => void }) {
   return (
     <Button
       autoFocus
@@ -58,20 +54,18 @@ export function ServerDownOverlay({
   open,
   onRetry,
   countdownSeconds
-}: ServerDownOverlayProps): JSX.Element {
-  const [localCountdown, setLocalCountdown] = React.useState<number | null>(
-    null
-  );
+}: ServerDownOverlayProps) {
+  const [localCountdown, setLocalCountdown] = useState<number | null>(null);
 
   // Update local countdown when prop changes
-  React.useEffect(() => {
+  useEffect(() => {
     setLocalCountdown(countdownSeconds);
   }, [countdownSeconds]);
 
   const isCountdownActive = localCountdown !== null && localCountdown > 0;
 
   // Handle countdown timer - only restart when countdown becomes active
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isCountdownActive) {
       return;
     }

@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState, useMemo, type ReactNode, type MouseEvent } from 'react';
 import { default as log } from '@/logger';
 import { Link } from 'react-router-dom';
 import { IconButton, List, Typography } from '@material-tailwind/react';
@@ -28,7 +28,7 @@ type FolderProps = {
   readonly fsp: FileSharePath;
   readonly folderPath: string;
   readonly isFavoritable?: boolean;
-  readonly icon?: React.ReactNode;
+  readonly icon?: ReactNode;
 };
 
 export default function Folder({
@@ -38,11 +38,11 @@ export default function Folder({
   icon
 }: FolderProps) {
   const [showMissingFolderFavoriteDialog, setShowMissingFolderFavoriteDialog] =
-    React.useState(false);
+    useState(false);
   const { pathPreference, handleFavoriteChange } = usePreferencesContext();
   const queryClient = useQueryClient();
 
-  const folderFavorite = React.useMemo(() => {
+  const folderFavorite = useMemo(() => {
     if (isFavoritable) {
       return {
         type: 'folder',
@@ -156,7 +156,7 @@ export default function Folder({
             <IconButton
               className="min-w-0 min-h-0"
               isCircular
-              onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
+              onClick={async (e: MouseEvent<HTMLButtonElement>) => {
                 e.stopPropagation();
                 const result = await handleFavoriteChange(
                   folderFavorite,

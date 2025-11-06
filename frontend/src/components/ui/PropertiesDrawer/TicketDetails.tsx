@@ -1,10 +1,10 @@
-import React from 'react';
+import { Fragment } from 'react';
 import { Timeline, Typography, Button } from '@material-tailwind/react';
 import { HiExternalLink } from 'react-icons/hi';
 
-import { useTicketContext } from '@/contexts/TicketsContext';
 import { formatDateString } from '@/utils';
 import { Link } from 'react-router';
+import type { Ticket } from '@/contexts/TicketsContext';
 
 /**
  * Sample ticket object:
@@ -24,14 +24,14 @@ const possibleStatuses = ['Open', 'Pending', 'Work in progress', 'Done'];
 
 function TimelineSegment({
   step,
-  index
+  index,
+  ticket
 }: {
   readonly step: string;
   readonly index: number;
+  readonly ticket: Ticket;
 }) {
-  const { ticketByPathQuery } = useTicketContext();
-  const ticket = ticketByPathQuery.data;
-  const ticketStatus = ticket?.status;
+  const ticketStatus = ticket.status;
   const isCurrentStep = ticketStatus === step;
   const isFirstStep = index === 0;
   const isLastStep = index === possibleStatuses.length - 1;
@@ -65,8 +65,8 @@ function TimelineSegment({
             type="small"
           >
             {isFirstStep && !isCurrentStep
-              ? `Opened: ${formatDateString(ticket?.created || '')}`
-              : `Last updated: ${formatDateString(ticket?.updated || '')}`}
+              ? `Opened: ${formatDateString(ticket.created)}`
+              : `Last updated: ${formatDateString(ticket.updated)}`}
           </Typography>
         ) : null}
       </Timeline.Body>
@@ -74,23 +74,24 @@ function TimelineSegment({
   );
 }
 
-export default function TicketDetails() {
-  const { ticketByPathQuery } = useTicketContext();
-  const ticket = ticketByPathQuery.data;
+type TicketDetailsProps = {
+  readonly ticket: Ticket;
+};
 
+export default function TicketDetails({ ticket }: TicketDetailsProps) {
   // Format description to properly display line breaks
-  const formattedDescription = ticket?.description
-    ? ticket.description.split('\\n').map((line, index) => (
-        <React.Fragment key={index}>
-          {line}
-          {index < ticket.description.split('\\n').length - 1 ? <br /> : null}
-        </React.Fragment>
-      ))
-    : null;
+  const formattedDescription = ticket.description
+    .split('\\n')
+    .map((line, index) => (
+      <Fragment key={index}>
+        {line}
+        {index < ticket.description.split('\\n').length - 1 ? <br /> : null}
+      </Fragment>
+    ));
 
   return (
     <div className="mt-4 flex flex-col gap-6 min-w-max w-full">
-      {ticket?.link ? (
+      {ticket.link ? (
         <Button
           as={Link}
           className="flex items-center justify-center gap-1 text-primary px-2 py-1 !self-start"
@@ -114,7 +115,12 @@ export default function TicketDetails() {
       </div>
       <Timeline orientation="vertical">
         {possibleStatuses.map((step, index) => (
-          <TimelineSegment index={index} key={step} step={step} />
+          <TimelineSegment
+            index={index}
+            key={step}
+            step={step}
+            ticket={ticket}
+          />
         ))}
       </Timeline>
     </div>

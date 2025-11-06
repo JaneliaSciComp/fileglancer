@@ -1,4 +1,4 @@
-import React from 'react';
+import type { ChangeEvent } from 'react';
 import { Card, Input } from '@material-tailwind/react';
 import { HiOutlineFunnel, HiXMark } from 'react-icons/hi2';
 
@@ -22,9 +22,7 @@ export default function Sidebar() {
       <div className="my-3 short:my-1 relative">
         <Input
           className="bg-background text-foreground short:text-xs [&::-webkit-search-cancel-button]:appearance-none"
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-            handleSearchChange(e)
-          }
+          onChange={(e: ChangeEvent<HTMLInputElement>) => handleSearchChange(e)}
           placeholder="Type to filter zones"
           type="search"
           value={searchQuery}

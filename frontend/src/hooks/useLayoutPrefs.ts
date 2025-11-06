@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useServerHealthContext } from '@/contexts/ServerHealthContext';
@@ -22,17 +22,17 @@ const DEBOUNCE_MS = 500;
 
 export default function useLayoutPrefs() {
   const [showPropertiesDrawer, setShowPropertiesDrawer] =
-    React.useState<boolean>(false);
-  const [showSidebar, setShowSidebar] = React.useState(true);
+    useState<boolean>(false);
+  const [showSidebar, setShowSidebar] = useState(true);
   const { layout, handleUpdateLayout, preferenceQuery } =
     usePreferencesContext();
   const { status: serverStatus } = useServerHealthContext();
 
-  const timerRef = React.useRef<number | null>(null);
-  const lastSavedLayoutRef = React.useRef<string | null>(null);
-  const hasInitializedRef = React.useRef(false);
+  const timerRef = useRef<number | null>(null);
+  const lastSavedLayoutRef = useRef<string | null>(null);
+  const hasInitializedRef = useRef(false);
 
-  const debouncedUpdateLayout = React.useCallback(
+  const debouncedUpdateLayout = useCallback(
     (newLayout: string) => {
       // Skip if this exact layout was just saved
       if (lastSavedLayoutRef.current === newLayout) {
@@ -63,7 +63,7 @@ export default function useLayoutPrefs() {
   };
 
   // Initialize layouts from saved preferences (only once on mount)
-  React.useEffect(() => {
+  useEffect(() => {
     if (preferenceQuery.isPending || hasInitializedRef.current) {
       return;
     }
@@ -106,7 +106,7 @@ export default function useLayoutPrefs() {
     }
   }, [layout, preferenceQuery.isPending]);
 
-  const layoutPrefsStorage = React.useMemo(
+  const layoutPrefsStorage = useMemo(
     () => ({
       getItem(name: string): string {
         // Don't try to parse layout until it's loaded from the database
@@ -236,7 +236,7 @@ export default function useLayoutPrefs() {
   );
 
   // Clean up the timer on unmount
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       if (timerRef.current !== null) {
         window.clearTimeout(timerRef.current);

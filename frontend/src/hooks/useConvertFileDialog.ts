@@ -1,11 +1,11 @@
-import React from 'react';
+import { useState } from 'react';
 
 import { useTicketContext } from '@/contexts/TicketsContext';
 import { createSuccess, handleError } from '@/utils/errorHandling';
 import type { Result } from '@/shared.types';
 
 export default function useConvertFileDialog() {
-  const [destinationFolder, setDestinationFolder] = React.useState<string>('');
+  const [destinationFolder, setDestinationFolder] = useState<string>('');
   const { createTicket, tasksEnabled } = useTicketContext();
 
   async function handleTicketSubmit(): Promise<Result<void>> {

@@ -1,3 +1,4 @@
+import type { MouseEvent } from 'react';
 import { Menu, IconButton } from '@material-tailwind/react';
 import { HiOutlineEllipsisHorizontalCircle } from 'react-icons/hi2';
 
@@ -18,7 +19,7 @@ export default function DataLinksActionsMenu<T>({
       <Menu.Trigger
         as={IconButton}
         className="p-1 max-w-fit"
-        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        onClick={(e: MouseEvent) => e.stopPropagation()}
         variant="ghost"
       >
         <HiOutlineEllipsisHorizontalCircle className="icon-default text-foreground" />

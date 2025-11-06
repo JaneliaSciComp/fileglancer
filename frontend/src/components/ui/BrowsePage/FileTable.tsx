@@ -1,4 +1,5 @@
-import React from 'react';
+import { useMemo, useState } from 'react';
+import type { MouseEvent } from 'react';
 import {
   flexRender,
   getCoreRowModel,
@@ -29,7 +30,7 @@ type TableProps = {
   readonly data: FileOrFolder[];
   readonly showPropertiesDrawer: boolean;
   readonly handleContextMenuClick: (
-    e: React.MouseEvent<HTMLDivElement>,
+    e: MouseEvent<HTMLDivElement>,
     file: FileOrFolder
   ) => void;
 };
@@ -40,14 +41,14 @@ export default function Table({
   handleContextMenuClick
 }: TableProps) {
   const { fileBrowserState, handleLeftClick } = useFileBrowserContext();
-  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [sorting, setSorting] = useState<SortingState>([]);
 
-  const selectedFileNames = React.useMemo(
+  const selectedFileNames = useMemo(
     () => new Set(fileBrowserState.selectedFiles.map(file => file.name)),
     [fileBrowserState.selectedFiles]
   );
 
-  const columns = React.useMemo<ColumnDef<FileOrFolder>[]>(
+  const columns = useMemo<ColumnDef<FileOrFolder>[]>(
     () => [
       {
         accessorKey: 'name',

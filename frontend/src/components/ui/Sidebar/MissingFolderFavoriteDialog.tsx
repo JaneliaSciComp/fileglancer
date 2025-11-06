@@ -1,4 +1,4 @@
-import React from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { useNavigate } from 'react-router';
 import toast from 'react-hot-toast';
 import {
@@ -22,8 +22,8 @@ import {
 type MissingFolderFavoriteDialogProps = {
   readonly folderFavorite: FolderFavorite;
   readonly showMissingFolderFavoriteDialog: boolean;
-  readonly setShowMissingFolderFavoriteDialog: React.Dispatch<
-    React.SetStateAction<boolean>
+  readonly setShowMissingFolderFavoriteDialog: Dispatch<
+    SetStateAction<boolean>
   >;
 };
 
@@ -31,7 +31,7 @@ export default function MissingFolderFavoriteDialog({
   folderFavorite,
   showMissingFolderFavoriteDialog,
   setShowMissingFolderFavoriteDialog
-}: MissingFolderFavoriteDialogProps): JSX.Element {
+}: MissingFolderFavoriteDialogProps) {
   const { handleFavoriteChange, pathPreference } = usePreferencesContext();
   const navigate = useNavigate();
 

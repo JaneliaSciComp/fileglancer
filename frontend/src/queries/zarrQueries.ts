@@ -163,15 +163,7 @@ export function useZarrMetadataQuery(
       fspName || '',
       currentFileOrFolder?.path || ''
     ],
-    queryFn: async () => {
-      try {
-        return await fetchZarrMetadata(params);
-      } catch (error) {
-        log.error('Error fetching Zarr metadata:', error);
-        // Return null result instead of throwing to avoid error boundary
-        return { metadata: null, omeZarrUrl: null };
-      }
-    },
+    queryFn: async () => await fetchZarrMetadata(params),
     enabled:
       !!fspName &&
       !!currentFileOrFolder &&

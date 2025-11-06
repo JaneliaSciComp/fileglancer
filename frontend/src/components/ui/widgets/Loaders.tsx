@@ -1,4 +1,3 @@
-import React from 'react';
 import { Typography } from '@material-tailwind/react';
 
 function Spinner({
@@ -7,7 +6,7 @@ function Spinner({
 }: {
   readonly customClasses?: string;
   readonly text?: string;
-}): React.JSX.Element {
+}) {
   return (
     <div className="flex items-center gap-2">
       <div
@@ -19,7 +18,7 @@ function Spinner({
   );
 }
 
-function FileRowSkeleton(): React.JSX.Element {
+function FileRowSkeleton() {
   return (
     <div className="grid grid-cols-[minmax(170px,2fr)_minmax(80px,1fr)_minmax(95px,1fr)_minmax(75px,1fr)_minmax(40px,1fr)] gap-6 animate-appear animate-pulse animate-delay-150 opacity-0">
       {/* For div above, after specified delay, executes animate-appear to convert opacity to 1 and then let animate-pulse take over */}
@@ -56,7 +55,7 @@ function SidebarItemSkeleton({
   withEndIcon
 }: {
   readonly withEndIcon?: boolean;
-}): React.JSX.Element {
+}) {
   return (
     <div className="py-2 pl-6 w-full flex items-center justify-between animate-pulse">
       <div className="flex-1 min-w-0 flex items-center gap-1">
@@ -74,7 +73,7 @@ function TableRowSkeleton({
 }: {
   readonly gridColsClass: string;
   readonly numberOfCols?: number;
-}): React.JSX.Element {
+}) {
   return (
     <div
       className={`grid ${gridColsClass} justify-items-start gap-4 px-4 py-4 animate-pulse`}

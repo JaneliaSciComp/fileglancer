@@ -1,3 +1,4 @@
+import type { FormEvent } from 'react';
 import { Link } from 'react-router';
 import {
   HiFolderOpen,
@@ -9,7 +10,6 @@ import {
 } from 'react-icons/hi';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useSimpleLoginMutation } from '@/queries/authQueries';
-import React from 'react';
 
 export default function Home() {
   const { authStatus, loading } = useAuthContext();
@@ -17,7 +17,7 @@ export default function Home() {
   const isSimpleAuth = authStatus?.auth_method === 'simple';
   const simpleLoginMutation = useSimpleLoginMutation();
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const username = formData.get('username') as string;

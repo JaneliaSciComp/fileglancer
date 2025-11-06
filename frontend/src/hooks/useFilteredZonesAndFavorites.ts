@@ -1,4 +1,5 @@
-import React from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import type { ChangeEvent } from 'react';
 
 import type {
   Zone,
@@ -22,19 +23,19 @@ export default function useSearchFilter() {
   } = usePreferencesContext();
   const { profile } = useProfileContext();
 
-  const [searchQuery, setSearchQuery] = React.useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [filteredZonesMap, setFilteredZonesMap] =
-    React.useState<ZonesAndFileSharePathsMap>({});
-  const [filteredZoneFavorites, setFilteredZoneFavorites] = React.useState<
-    Zone[]
-  >([]);
+    useState<ZonesAndFileSharePathsMap>({});
+  const [filteredZoneFavorites, setFilteredZoneFavorites] = useState<Zone[]>(
+    []
+  );
   const [filteredFileSharePathFavorites, setFilteredFileSharePathFavorites] =
-    React.useState<FileSharePath[]>([]);
-  const [filteredFolderFavorites, setFilteredFolderFavorites] = React.useState<
+    useState<FileSharePath[]>([]);
+  const [filteredFolderFavorites, setFilteredFolderFavorites] = useState<
     FolderFavorite[]
   >([]);
 
-  const filterZonesMap = React.useCallback(
+  const filterZonesMap = useCallback(
     (query: string) => {
       if (!zonesAndFspQuery.isSuccess) {
         setFilteredZonesMap({});
@@ -96,7 +97,7 @@ export default function useSearchFilter() {
     [zonesAndFspQuery, isFilteredByGroups, profile]
   );
 
-  const filterAllFavorites = React.useCallback(
+  const filterAllFavorites = useCallback(
     (query: string) => {
       const filteredZoneFavorites = zoneFavorites.filter(
         zone =>
@@ -131,9 +132,7 @@ export default function useSearchFilter() {
     [zoneFavorites, fileSharePathFavorites, folderFavorites]
   );
 
-  const handleSearchChange = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ): void => {
+  const handleSearchChange = (event: ChangeEvent<HTMLInputElement>): void => {
     const searchQuery = event.target.value;
     setSearchQuery(searchQuery.trim().toLowerCase());
   };
@@ -142,7 +141,7 @@ export default function useSearchFilter() {
     setSearchQuery('');
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (searchQuery !== '') {
       filterZonesMap(searchQuery);
       filterAllFavorites(searchQuery);
