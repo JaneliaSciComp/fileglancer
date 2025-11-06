@@ -174,12 +174,10 @@ export function useCreateProxiedPathMutation(): UseMutationResult<
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: CreateProxiedPathPayload, { signal }) => {
+    mutationFn: async (payload: CreateProxiedPathPayload) => {
       const response = await sendFetchRequest(
         `/api/proxied-path?fsp_name=${encodeURIComponent(payload.fsp_name)}&path=${encodeURIComponent(payload.path)}`,
-        'POST',
-        undefined,
-        { signal }
+        'POST'
       );
       if (!response.ok) {
         throw await toHttpError(response);
@@ -243,12 +241,10 @@ export function useDeleteProxiedPathMutation(): UseMutationResult<
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: DeleteProxiedPathPayload, { signal }) => {
+    mutationFn: async (payload: DeleteProxiedPathPayload) => {
       const response = await sendFetchRequest(
         `/api/proxied-path/${payload.sharing_key}`,
-        'DELETE',
-        undefined,
-        { signal }
+        'DELETE'
       );
       if (!response.ok) {
         throw await toHttpError(response);
