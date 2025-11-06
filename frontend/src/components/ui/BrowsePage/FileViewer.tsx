@@ -6,7 +6,6 @@ import {
   coy
 } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
-import Crumbs from './Crumbs';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { formatFileSize, formatUnixTimestamp } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
