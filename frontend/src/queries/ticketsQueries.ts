@@ -169,10 +169,8 @@ export function useCreateTicketMutation(): UseMutationResult<
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: CreateTicketPayload, { signal }) => {
-      const response = await sendFetchRequest('/api/ticket', 'POST', payload, {
-        signal
-      });
+    mutationFn: async (payload: CreateTicketPayload) => {
+      const response = await sendFetchRequest('/api/ticket', 'POST', payload);
       if (!response.ok) {
         throw await toHttpError(response);
       }
