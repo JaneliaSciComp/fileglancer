@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import type { MouseEvent } from 'react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router';
 import { ButtonGroup } from '@material-tailwind/react';
