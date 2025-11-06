@@ -27,17 +27,16 @@ export default function RenameDialog({
       return;
     }
 
-    try {
-      await handleRenameSubmit(`${fileBrowserState.propertiesTarget.path}`);
+    const result = await handleRenameSubmit(
+      `${fileBrowserState.propertiesTarget.path}`
+    );
+    if (result.success) {
       toast.success('Item renamed successfully!');
       setNewName('');
-    } catch (error) {
-      toast.error(
-        `Error renaming item: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    } finally {
-      setShowRenameDialog(false);
+    } else {
+      toast.error(`Error renaming item: ${result.error}`);
     }
+    setShowRenameDialog(false);
   };
 
   return (
