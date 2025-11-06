@@ -8,14 +8,14 @@ export function useHandleDownload() {
 
   const handleDownload = (): Result<void> => {
     if (
-      !fileBrowserState.currentFileSharePath ||
+      !fileBrowserState.uiFileSharePath ||
       !fileBrowserState.propertiesTarget
     ) {
       return handleError(new Error('No file selected for download'));
     }
     try {
       const downloadUrl = getFileURL(
-        fileBrowserState.currentFileSharePath.name,
+        fileBrowserState.uiFileSharePath.name,
         fileBrowserState.propertiesTarget.path
       );
       const link = document.createElement('a');

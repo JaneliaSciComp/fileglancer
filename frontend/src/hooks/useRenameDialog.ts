@@ -1,42 +1,31 @@
-import React from 'react';
+import { useState } from 'react';
 
-import {
-  getFileBrowsePath,
-  joinPaths,
-  sendFetchRequest,
-  removeLastSegmentFromPath
-} from '@/utils';
-import { handleError, toHttpError } from '@/utils/errorHandling';
+import { joinPaths, removeLastSegmentFromPath } from '@/utils';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-import { Result } from '@/shared.types';
+import { handleError, createSuccess } from '@/utils/errorHandling';
+import type { Result } from '@/shared.types';
 
 export default function useRenameDialog() {
-  const [newName, setNewName] = React.useState<string>('');
+  const [newName, setNewName] = useState<string>('');
 
-  const { fileBrowserState, refreshFiles } = useFileBrowserContext();
-  const { currentFileSharePath } = fileBrowserState;
+  const { fileBrowserState, mutations } = useFileBrowserContext();
+  const currentFileSharePath = fileBrowserState.uiFileSharePath;
 
   async function handleRenameSubmit(path: string): Promise<Result<void>> {
-    if (!currentFileSharePath) {
-      return handleError(new Error('No file share path selected.'));
-    }
-
     try {
+      if (!currentFileSharePath) {
+        throw new Error('No file share path selected.');
+      }
+
       const newPath = joinPaths(removeLastSegmentFromPath(path), newName);
-      const fetchPath = getFileBrowsePath(currentFileSharePath?.name, path);
-      const response = await sendFetchRequest(fetchPath, 'PATCH', {
-        path: newPath
+
+      await mutations.rename.mutateAsync({
+        fspName: currentFileSharePath.name,
+        oldPath: path,
+        newPath
       });
 
-      if (response.ok) {
-        return await refreshFiles();
-      } else {
-        if (response.status === 403) {
-          return handleError(new Error('Permission denied'));
-        } else {
-          throw await toHttpError(response);
-        }
-      }
+      return createSuccess(undefined);
     } catch (error) {
       return handleError(error);
     }

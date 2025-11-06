@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { Typography } from '@material-tailwind/react';
 
 import Crumbs from './Crumbs';
@@ -11,6 +10,7 @@ import useContextMenu from '@/hooks/useContextMenu';
 import useZarrMetadata from '@/hooks/useZarrMetadata';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
+import { isZarrDirectory } from '@/queries/zarrQueries';
 
 type FileBrowserProps = {
   readonly showPropertiesDrawer: boolean;
@@ -32,8 +32,8 @@ export default function FileBrowser({
   setShowDeleteDialog,
   setShowPermissionsDialog,
   setShowConvertFileDialog
-}: FileBrowserProps): React.ReactNode {
-  const { fileBrowserState, areFileDataLoading } = useFileBrowserContext();
+}: FileBrowserProps) {
+  const { fileQuery } = useFileBrowserContext();
   const { displayFiles } = useHideDotFiles();
 
   const {
@@ -44,62 +44,63 @@ export default function FileBrowser({
     handleContextMenuClick
   } = useContextMenu();
 
-  const {
-    metadata,
-    thumbnailSrc,
-    openWithToolUrls,
-    loadingThumbnail,
-    thumbnailError,
-    layerType
-  } = useZarrMetadata();
+  const { zarrMetadataQuery, thumbnailQuery, openWithToolUrls, layerType } =
+    useZarrMetadata();
 
-  // If current item is a file, render the FileViewer instead of the file browser
-  if (
-    fileBrowserState.currentFileOrFolder &&
-    !fileBrowserState.currentFileOrFolder.is_dir
-  ) {
-    return <FileViewer file={fileBrowserState.currentFileOrFolder} />;
-  }
+  const isZarrDir = isZarrDirectory(fileQuery.data?.files);
 
   return (
     <>
       <Crumbs />
-      {metadata ? (
+      {isZarrDir && zarrMetadataQuery.isPending ? (
+        <div className="flex my-4 shadow-sm rounded-md w-full min-h-96 bg-surface animate-appear animate-pulse animate-delay-150 opacity-0">
+          <Typography className="place-self-center text-center w-full">
+            Loading Zarr metadata...
+          </Typography>
+        </div>
+      ) : zarrMetadataQuery.isError ? (
+        <div className="flex my-4 shadow-sm rounded-md w-full min-h-96 bg-primary-light/30">
+          <Typography className="place-self-center text-center w-full text-warning">
+            Error loading Zarr metadata
+          </Typography>
+        </div>
+      ) : zarrMetadataQuery.data?.metadata ? (
         <ZarrPreview
           layerType={layerType}
-          loadingThumbnail={loadingThumbnail}
-          metadata={metadata}
           openWithToolUrls={openWithToolUrls}
-          thumbnailError={thumbnailError}
-          thumbnailSrc={thumbnailSrc}
+          thumbnailQuery={thumbnailQuery}
+          zarrMetadataQuery={zarrMetadataQuery}
         />
       ) : null}
 
       {/* Loading state */}
-      {areFileDataLoading ? (
+      {fileQuery.isPending ? (
         <div className="min-w-full bg-background select-none">
           {Array.from({ length: 10 }, (_, index) => (
             <FileRowSkeleton key={index} />
           ))}
         </div>
-      ) : !areFileDataLoading && displayFiles.length > 0 ? (
+      ) : fileQuery.isError ? (
+        <div className="flex items-center pl-3 py-1">
+          <Typography>{fileQuery.error.message}</Typography>
+        </div>
+      ) : displayFiles.length === 0 && fileQuery.data.errorMessage ? (
+        <div className="flex items-center pl-3 py-1">
+          <Typography>{fileQuery.data.errorMessage}</Typography>
+        </div>
+      ) : fileQuery.data.currentFileOrFolder &&
+        !fileQuery.data.currentFileOrFolder.is_dir ? (
+        // If current item is a file, render the FileViewer instead of the file browser
+        <FileViewer file={fileQuery.data.currentFileOrFolder} />
+      ) : displayFiles.length > 0 ? (
         <Table
           data={displayFiles}
           handleContextMenuClick={handleContextMenuClick}
           showPropertiesDrawer={showPropertiesDrawer}
         />
-      ) : !areFileDataLoading &&
-        displayFiles.length === 0 &&
-        !fileBrowserState.uiErrorMsg ? (
+      ) : displayFiles.length === 0 && !fileQuery.data.errorMessage ? (
         <div className="flex items-center pl-3 py-1">
           <Typography>No files available for display.</Typography>
-        </div>
-      ) : !areFileDataLoading &&
-        displayFiles.length === 0 &&
-        fileBrowserState.uiErrorMsg ? (
-        /* Error state */
-        <div className="flex items-center pl-3 py-1">
-          <Typography>{fileBrowserState.uiErrorMsg}</Typography>
         </div>
       ) : null}
       {showContextMenu ? (

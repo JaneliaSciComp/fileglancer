@@ -1,25 +1,24 @@
-import React from 'react';
-import { default as log } from '@/logger';
-import { sendFetchRequest } from '@/utils';
+import { createContext, useContext } from 'react';
+import type { ReactNode } from 'react';
+import type { UseQueryResult } from '@tanstack/react-query';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import {
+  useExternalDataUrlQuery,
+  type ExternalBucket
+} from '@/queries/externalBucketQueries';
 
-export type ExternalBucket = {
-  full_path: string;
-  external_url: string;
-  fsp_name: string;
-  relative_path: string;
-};
+export type { ExternalBucket };
 
 type ExternalBucketContextType = {
-  externalBucket: ExternalBucket | null;
-  externalDataUrl: string | null;
+  externalDataUrlQuery: UseQueryResult<string | null, Error>;
 };
 
-const ExternalBucketContext =
-  React.createContext<ExternalBucketContextType | null>(null);
+const ExternalBucketContext = createContext<ExternalBucketContextType | null>(
+  null
+);
 
 export const useExternalBucketContext = () => {
-  const context = React.useContext(ExternalBucketContext);
+  const context = useContext(ExternalBucketContext);
   if (!context) {
     throw new Error(
       'useExternalBucketContext must be used within an ExternalBucketProvider'
@@ -31,113 +30,22 @@ export const useExternalBucketContext = () => {
 export const ExternalBucketProvider = ({
   children
 }: {
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
 }) => {
-  const [externalBucket, setExternalBucket] =
-    React.useState<ExternalBucket | null>(null);
-  const [externalDataUrl, setExternalDataUrl] = React.useState<string | null>(
-    null
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
+
+  // Use TanStack Query to fetch external bucket and transform to data URL
+  // Second parameter is conditions required to enable the query
+  const externalDataUrlQuery = useExternalDataUrlQuery(
+    fileBrowserState.uiFileSharePath?.name,
+    fileQuery.data?.currentFileOrFolder?.path,
+    !fileQuery.isPending && !!fileBrowserState.uiFileSharePath
   );
-  const { fileBrowserState } = useFileBrowserContext();
-
-  const updateExternalBucket = React.useCallback(
-    (bucket: ExternalBucket | null) => {
-      setExternalBucket(bucket);
-
-      if (bucket) {
-        if (!fileBrowserState.currentFileSharePath) {
-          throw new Error('No file share path selected');
-        }
-        if (!fileBrowserState.currentFileOrFolder) {
-          throw new Error('No folder selected');
-        }
-        // Check if current path is an ancestor of the bucket path
-        if (
-          fileBrowserState.currentFileSharePath.name === bucket.fsp_name &&
-          fileBrowserState.currentFileOrFolder.path.startsWith(
-            bucket.relative_path
-          )
-        ) {
-          // Create data URL with relative path from bucket
-          const relativePath =
-            fileBrowserState.currentFileOrFolder.path.substring(
-              bucket.relative_path.length
-            );
-          const cleanRelativePath = relativePath.startsWith('/')
-            ? relativePath.substring(1)
-            : relativePath;
-          const externalUrl = bucket.external_url.endsWith('/')
-            ? bucket.external_url.slice(0, -1)
-            : bucket.external_url;
-          setExternalDataUrl(`${externalUrl}/${cleanRelativePath}/`);
-        } else {
-          setExternalDataUrl(null);
-        }
-      } else {
-        setExternalDataUrl(null);
-      }
-    },
-    [
-      fileBrowserState.currentFileOrFolder,
-      fileBrowserState.currentFileSharePath
-    ]
-  );
-
-  const fetchExternalBucket = React.useCallback(async () => {
-    if (!fileBrowserState.currentFileSharePath) {
-      log.trace('No current file share path selected');
-      return null;
-    }
-    try {
-      const response = await sendFetchRequest(
-        `/api/external-buckets/${fileBrowserState.currentFileSharePath.name}`,
-        'GET'
-      );
-      if (!response.ok) {
-        if (response.status === 404) {
-          log.debug('No external bucket found for FSP');
-          return null;
-        }
-        log.error(
-          `Failed to fetch external bucket: ${response.status} ${response.statusText}`
-        );
-        return null;
-      }
-      const data = (await response.json()) as any;
-      if (data?.buckets) {
-        return data.buckets[0] as ExternalBucket;
-      } else {
-        log.error('No buckets found in response');
-        return null;
-      }
-    } catch (error) {
-      log.error('Error fetching external bucket:', error);
-    }
-    return null;
-  }, [fileBrowserState.currentFileSharePath]);
-
-  React.useEffect(() => {
-    (async function () {
-      try {
-        const bucket = await fetchExternalBucket();
-        updateExternalBucket(bucket);
-      } catch (error) {
-        log.error('Error in useEffect:', error);
-        updateExternalBucket(null);
-      }
-    })();
-  }, [
-    fileBrowserState.currentFileSharePath,
-    fileBrowserState.currentFileOrFolder,
-    fetchExternalBucket,
-    updateExternalBucket
-  ]);
 
   return (
     <ExternalBucketContext.Provider
       value={{
-        externalBucket,
-        externalDataUrl
+        externalDataUrlQuery
       }}
     >
       {children}

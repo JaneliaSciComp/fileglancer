@@ -1,25 +1,20 @@
-import React from 'react';
+import { createContext, useContext, useCallback } from 'react';
+import type { ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import logger from '@/logger';
-
-type AuthStatus = {
-  authenticated: boolean;
-  username?: string;
-  email?: string;
-  auth_method?: 'simple' | 'okta';
-};
+import { useAuthStatusQuery, type AuthStatus } from '@/queries/authQueries';
 
 type AuthContextType = {
   authStatus: AuthStatus | null;
   loading: boolean;
   error: Error | null;
   logout: () => Promise<void>;
-  refreshAuthStatus: () => Promise<void>;
 };
 
-const AuthContext = React.createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthContextType | null>(null);
 
 export const useAuthContext = () => {
-  const context = React.useContext(AuthContext);
+  const context = useContext(AuthContext);
   if (!context) {
     throw new Error(
       'useAuthContext must be used within an AuthContextProvider'
@@ -31,58 +26,31 @@ export const useAuthContext = () => {
 export const AuthContextProvider = ({
   children
 }: {
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
 }) => {
-  const [authStatus, setAuthStatus] = React.useState<AuthStatus | null>(null);
-  const [loading, setLoading] = React.useState<boolean>(true);
-  const [error, setError] = React.useState<Error | null>(null);
+  const queryClient = useQueryClient();
+  const { data: authStatus, isLoading: loading, error } = useAuthStatusQuery();
 
-  const fetchAuthStatus = React.useCallback(async () => {
+  const logout = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/status', {
-        method: 'GET',
-        credentials: 'include'
-      });
+      // Invalidate auth query cache before navigating to logout
+      await queryClient.invalidateQueries({ queryKey: ['auth', 'status'] });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch auth status');
-      }
-
-      const status: AuthStatus = await response.json();
-      setAuthStatus(status);
-
-      // Don't auto-redirect on auth status check
-      // Individual routes will handle requiring authentication
-    } catch (err) {
-      logger.error('Error fetching auth status:', err);
-      setError(err as Error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const logout = React.useCallback(async () => {
-    try {
       // Navigate directly to logout endpoint - it will handle session cleanup and redirect
       window.location.href = '/api/auth/logout';
     } catch (err) {
       logger.error('Error during logout:', err);
       throw err;
     }
-  }, []);
-
-  React.useEffect(() => {
-    fetchAuthStatus();
-  }, [fetchAuthStatus]);
+  }, [queryClient]);
 
   return (
     <AuthContext.Provider
       value={{
-        authStatus,
+        authStatus: authStatus ?? null,
         loading,
-        error,
-        logout,
-        refreshAuthStatus: fetchAuthStatus
+        error: error ?? null,
+        logout
       }}
     >
       {children}

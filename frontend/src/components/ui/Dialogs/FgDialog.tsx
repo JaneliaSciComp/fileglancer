@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Dialog, IconButton } from '@material-tailwind/react';
 import { HiX } from 'react-icons/hi';
 
@@ -14,7 +14,7 @@ export default function FgDialog({
   onClose,
   children,
   className = ''
-}: FgDialogProps): JSX.Element {
+}: FgDialogProps) {
   return (
     <Dialog open={open}>
       <Dialog.Overlay>

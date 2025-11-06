@@ -1,5 +1,5 @@
-import React from 'react';
-import ReactDOM from 'react-dom';
+import type { Dispatch, SetStateAction, RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 
 import FgMenuItems, { MenuItem } from './FgMenuItems';
@@ -12,29 +12,25 @@ import { useHandleDownload } from '@/hooks/useHandleDownload';
 type ContextMenuProps = {
   readonly x: number;
   readonly y: number;
-  readonly menuRef: React.RefObject<HTMLDivElement | null>;
+  readonly menuRef: RefObject<HTMLDivElement | null>;
   readonly showPropertiesDrawer: boolean;
   readonly togglePropertiesDrawer: () => void;
-  readonly setShowContextMenu: React.Dispatch<React.SetStateAction<boolean>>;
-  readonly setShowRenameDialog: React.Dispatch<React.SetStateAction<boolean>>;
-  readonly setShowDeleteDialog: React.Dispatch<React.SetStateAction<boolean>>;
-  readonly setShowPermissionsDialog: React.Dispatch<
-    React.SetStateAction<boolean>
-  >;
-  readonly setShowConvertFileDialog: React.Dispatch<
-    React.SetStateAction<boolean>
-  >;
+  readonly setShowContextMenu: Dispatch<SetStateAction<boolean>>;
+  readonly setShowRenameDialog: Dispatch<SetStateAction<boolean>>;
+  readonly setShowDeleteDialog: Dispatch<SetStateAction<boolean>>;
+  readonly setShowPermissionsDialog: Dispatch<SetStateAction<boolean>>;
+  readonly setShowConvertFileDialog: Dispatch<SetStateAction<boolean>>;
 };
 
 type ContextMenuActionProps = {
   handleContextMenuFavorite: () => Promise<Result<boolean>>;
   handleDownload: () => Result<void>;
   togglePropertiesDrawer: () => void;
-  setShowContextMenu: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowRenameDialog: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowDeleteDialog: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowPermissionsDialog: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowConvertFileDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowContextMenu: Dispatch<SetStateAction<boolean>>;
+  setShowRenameDialog: Dispatch<SetStateAction<boolean>>;
+  setShowDeleteDialog: Dispatch<SetStateAction<boolean>>;
+  setShowPermissionsDialog: Dispatch<SetStateAction<boolean>>;
+  setShowConvertFileDialog: Dispatch<SetStateAction<boolean>>;
 };
 
 const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
@@ -50,7 +46,7 @@ export default function ContextMenu({
   setShowDeleteDialog,
   setShowPermissionsDialog,
   setShowConvertFileDialog
-}: ContextMenuProps): React.ReactNode {
+}: ContextMenuProps) {
   const { fileBrowserState } = useFileBrowserContext();
   const { folderPreferenceMap, handleContextMenuFavorite } =
     usePreferencesContext();
@@ -61,12 +57,13 @@ export default function ContextMenu({
   }
 
   const isFavorite: boolean = Boolean(
-    folderPreferenceMap[
-      makeMapKey(
-        'folder',
-        `${fileBrowserState.currentFileSharePath?.name}_${fileBrowserState.propertiesTarget.path}`
-      )
-    ]
+    fileBrowserState.uiFileSharePath &&
+      folderPreferenceMap[
+        makeMapKey(
+          'folder',
+          `${fileBrowserState.uiFileSharePath.name}_${fileBrowserState.propertiesTarget.path}`
+        )
+      ]
   );
 
   const menuItems: MenuItem<ContextMenuActionProps>[] = [
@@ -149,7 +146,7 @@ export default function ContextMenu({
     setShowConvertFileDialog
   };
 
-  return ReactDOM.createPortal(
+  return createPortal(
     <div
       className="fixed z-[9999] min-w-40 rounded-lg space-y-0.5 border border-surface bg-background p-1"
       ref={menuRef}

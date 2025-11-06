@@ -1,4 +1,4 @@
-import React from 'react';
+import type { ChangeEvent } from 'react';
 import { Button, Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
@@ -23,25 +23,25 @@ const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
 export default function ConvertFileDialog({
   showConvertFileDialog,
   setShowConvertFileDialog
-}: ItemNamingDialogProps): React.JSX.Element {
-  const [waitingForTicketResponse, setWaitingForTicketResponse] =
-    React.useState(false);
+}: ItemNamingDialogProps) {
   const { destinationFolder, setDestinationFolder, handleTicketSubmit } =
     useConvertFileDialog();
   const { pathPreference } = usePreferencesContext();
   const { fileBrowserState } = useFileBrowserContext();
-  const { refreshTickets } = useTicketContext();
+  const { allTicketsQuery, createTicketMutation } = useTicketContext();
 
   const placeholderText =
     pathPreference[0] === 'windows_path'
       ? '\\path\\to\\destination\\folder\\'
       : '/path/to/destination/folder/';
 
-  const displayPath = getPreferredPathForDisplay(
-    pathPreference,
-    fileBrowserState.currentFileSharePath,
-    fileBrowserState.propertiesTarget?.path
-  );
+  const displayPath = fileBrowserState.uiFileSharePath
+    ? getPreferredPathForDisplay(
+        pathPreference,
+        fileBrowserState.uiFileSharePath,
+        fileBrowserState.propertiesTarget?.path
+      )
+    : '';
 
   return (
     <FgDialog
@@ -62,21 +62,13 @@ export default function ConvertFileDialog({
       <form
         onSubmit={async event => {
           event.preventDefault();
-          setWaitingForTicketResponse(true);
           const createTicketResult = await handleTicketSubmit();
 
           if (!createTicketResult.success) {
             toast.error(`Error creating ticket: ${createTicketResult.error}`);
-            setWaitingForTicketResponse(false);
           } else {
-            const refreshTicketResponse = await refreshTickets();
+            await allTicketsQuery.refetch();
             toast.success('Ticket created!');
-            setWaitingForTicketResponse(false);
-            if (!refreshTicketResponse.success) {
-              toast.error(
-                `Error refreshing ticket list: ${refreshTicketResponse.error}`
-              );
-            }
           }
           setShowConvertFileDialog(false);
         }}
@@ -95,7 +87,7 @@ export default function ConvertFileDialog({
             className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!tasksEnabled}
             id="destination_folder"
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
               setDestinationFolder(event.target.value);
             }}
             placeholder={placeholderText}
@@ -112,11 +104,14 @@ export default function ConvertFileDialog({
         <Button
           className="!rounded-md"
           disabled={
-            !destinationFolder || !tasksEnabled || waitingForTicketResponse
+            !destinationFolder ||
+            !tasksEnabled ||
+            createTicketMutation.isPending ||
+            allTicketsQuery.isFetching
           }
           type="submit"
         >
-          {waitingForTicketResponse ? (
+          {createTicketMutation.isPending || allTicketsQuery.isFetching ? (
             <Spinner customClasses="border-white" text="Processing..." />
           ) : (
             'Submit'

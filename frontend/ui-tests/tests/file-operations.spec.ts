@@ -5,16 +5,13 @@ test.describe('File Operations', () => {
     'Navigate to test directory',
     async ({ fileglancerPage: page }) => {
       // Wait for files to load - verify f1 is visible
-      await expect(page.getByText('f1')).toBeVisible();
+      await expect(page.getByText('f1', { exact: true })).toBeVisible();
     }
   );
 
-  test('rename file via context menu', async ({
-    fileglancerPage: page,
-    freshFiles
-  }) => {
+  test('rename file via context menu', async ({ fileglancerPage: page }) => {
     // Right-click to open context menu, select Rename. Wait for dialog.
-    await page.getByText('f3').click({ button: 'right' });
+    await page.getByText('f3', { exact: true }).click({ button: 'right' });
     await page.getByRole('menuitem', { name: /rename/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
@@ -27,16 +24,13 @@ test.describe('File Operations', () => {
     // Verify new name is in file list; old name no longer be visible
     await expect(page.getByText('f3_renamed')).toBeVisible();
     await expect(
-      page.getByText('f3').filter({ hasNotText: 'f3_renamed' })
+      page.getByText('f3', { exact: true }).filter({ hasNotText: 'f3_renamed' })
     ).not.toBeVisible();
   });
 
-  test('delete file via context menu', async ({
-    fileglancerPage: page,
-    freshFiles
-  }) => {
+  test('delete file via context menu', async ({ fileglancerPage: page }) => {
     // Right-click to open context menu, select Delete. Wait for dialog.
-    await page.getByText('f2').click({ button: 'right' });
+    await page.getByText('f2', { exact: true }).click({ button: 'right' });
     await page.getByRole('menuitem', { name: /delete/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
@@ -44,15 +38,16 @@ test.describe('File Operations', () => {
     await page.getByRole('button', { name: /delete/i }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible();
 
-    // Verify f2 is no longer visible; f1 still is
-    await expect(page.getByText('f2')).not.toBeVisible();
-    await expect(page.getByText('f1')).toBeVisible();
+    // After toast appears and is cleared, verify f2 is no longer visible; f1 still is
+    await expect(page.getByText('Item deleted!')).toBeVisible();
+    await expect(page.getByText('Item deleted!')).not.toBeVisible({
+      timeout: 10000
+    });
+    await expect(page.getByText('f2', { exact: true })).not.toBeVisible();
+    await expect(page.getByText('f1', { exact: true })).toBeVisible();
   });
 
-  test('create new folder via toolbar', async ({
-    fileglancerPage: page,
-    freshFiles
-  }) => {
+  test('create new folder via toolbar', async ({ fileglancerPage: page }) => {
     const newFolderName = 'new_test_folder';
 
     // Click on "New Folder" button in toolbar. Wait for dialog.

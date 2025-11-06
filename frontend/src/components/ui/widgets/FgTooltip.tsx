@@ -1,16 +1,17 @@
+import type { ReactNode, ElementType, MouseEvent } from 'react';
 import { Tooltip, Typography } from '@material-tailwind/react';
 
 type FgTooltipProps = {
-  readonly as?: React.ElementType;
+  readonly as?: ElementType;
   readonly variant?: 'outline' | 'ghost';
   readonly link?: string;
   readonly disabledCondition?: boolean;
-  readonly onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
-  readonly icon?: React.ElementType;
+  readonly onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
+  readonly icon?: ElementType;
   readonly label: string;
   readonly triggerClasses?: string;
   readonly openCondition?: boolean;
-  readonly children?: React.ReactNode;
+  readonly children?: ReactNode;
 };
 
 export default function FgTooltip({

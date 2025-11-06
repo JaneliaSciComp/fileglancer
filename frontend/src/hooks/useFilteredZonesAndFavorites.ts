@@ -1,4 +1,5 @@
-import React from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import type { ChangeEvent } from 'react';
 
 import type {
   Zone,
@@ -12,8 +13,8 @@ import {
 } from '@/contexts/PreferencesContext';
 import { useProfileContext } from '@/contexts/ProfileContext';
 
-export default function useFilteredZonesAndFavorites() {
-  const { zonesAndFileSharePathsMap } = useZoneAndFspMapContext();
+export default function useSearchFilter() {
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const {
     zoneFavorites,
     fileSharePathFavorites,
@@ -22,23 +23,28 @@ export default function useFilteredZonesAndFavorites() {
   } = usePreferencesContext();
   const { profile } = useProfileContext();
 
-  const [searchQuery, setSearchQuery] = React.useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [filteredZonesMap, setFilteredZonesMap] =
-    React.useState<ZonesAndFileSharePathsMap>({});
-  const [filteredZoneFavorites, setFilteredZoneFavorites] = React.useState<
-    Zone[]
-  >([]);
+    useState<ZonesAndFileSharePathsMap>({});
+  const [filteredZoneFavorites, setFilteredZoneFavorites] = useState<Zone[]>(
+    []
+  );
   const [filteredFileSharePathFavorites, setFilteredFileSharePathFavorites] =
-    React.useState<FileSharePath[]>([]);
-  const [filteredFolderFavorites, setFilteredFolderFavorites] = React.useState<
+    useState<FileSharePath[]>([]);
+  const [filteredFolderFavorites, setFilteredFolderFavorites] = useState<
     FolderFavorite[]
   >([]);
 
-  const filterZonesMap = React.useCallback(
+  const filterZonesMap = useCallback(
     (query: string) => {
+      if (!zonesAndFspQuery.isSuccess) {
+        setFilteredZonesMap({});
+        return;
+      }
+
       const userGroups = profile?.groups || [];
 
-      const matches = Object.entries(zonesAndFileSharePathsMap)
+      const matches = Object.entries(zonesAndFspQuery.data)
         .map(([key, value]) => {
           // Map through zones only
           if (key.startsWith('zone')) {
@@ -88,10 +94,10 @@ export default function useFilteredZonesAndFavorites() {
 
       setFilteredZonesMap(Object.fromEntries(matches as [string, Zone][]));
     },
-    [zonesAndFileSharePathsMap, isFilteredByGroups, profile]
+    [zonesAndFspQuery, isFilteredByGroups, profile]
   );
 
-  const filterAllFavorites = React.useCallback(
+  const filterAllFavorites = useCallback(
     (query: string) => {
       const filteredZoneFavorites = zoneFavorites.filter(
         zone =>
@@ -126,9 +132,7 @@ export default function useFilteredZonesAndFavorites() {
     [zoneFavorites, fileSharePathFavorites, folderFavorites]
   );
 
-  const handleSearchChange = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ): void => {
+  const handleSearchChange = (event: ChangeEvent<HTMLInputElement>): void => {
     const searchQuery = event.target.value;
     setSearchQuery(searchQuery.trim().toLowerCase());
   };
@@ -137,14 +141,21 @@ export default function useFilteredZonesAndFavorites() {
     setSearchQuery('');
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (searchQuery !== '') {
       filterZonesMap(searchQuery);
       filterAllFavorites(searchQuery);
     } else if (searchQuery === '' && isFilteredByGroups && profile?.groups) {
       // When search query is empty but group filtering is enabled, apply group filter
+      if (!zonesAndFspQuery.isSuccess) {
+        setFilteredZonesMap({});
+        setFilteredZoneFavorites([]);
+        setFilteredFileSharePathFavorites([]);
+        setFilteredFolderFavorites([]);
+        return;
+      }
       const userGroups = profile.groups;
-      const groupFilteredMap = Object.entries(zonesAndFileSharePathsMap)
+      const groupFilteredMap = Object.entries(zonesAndFspQuery.data)
         .map(([key, value]) => {
           if (key.startsWith('zone')) {
             const zone = value as Zone;
@@ -179,7 +190,7 @@ export default function useFilteredZonesAndFavorites() {
     }
   }, [
     searchQuery,
-    zonesAndFileSharePathsMap,
+    zonesAndFspQuery,
     zoneFavorites,
     fileSharePathFavorites,
     folderFavorites,

@@ -1,4 +1,5 @@
-import React from 'react';
+import { useMemo, useState } from 'react';
+import type { MouseEvent } from 'react';
 import {
   flexRender,
   getCoreRowModel,
@@ -29,7 +30,7 @@ type TableProps = {
   readonly data: FileOrFolder[];
   readonly showPropertiesDrawer: boolean;
   readonly handleContextMenuClick: (
-    e: React.MouseEvent<HTMLDivElement>,
+    e: MouseEvent<HTMLDivElement>,
     file: FileOrFolder
   ) => void;
 };
@@ -40,14 +41,14 @@ export default function Table({
   handleContextMenuClick
 }: TableProps) {
   const { fileBrowserState, handleLeftClick } = useFileBrowserContext();
-  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [sorting, setSorting] = useState<SortingState>([]);
 
-  const selectedFileNames = React.useMemo(
+  const selectedFileNames = useMemo(
     () => new Set(fileBrowserState.selectedFiles.map(file => file.name)),
     [fileBrowserState.selectedFiles]
   );
 
-  const columns = React.useMemo<ColumnDef<FileOrFolder>[]>(
+  const columns = useMemo<ColumnDef<FileOrFolder>[]>(
     () => [
       {
         accessorKey: 'name',
@@ -57,9 +58,9 @@ export default function Table({
           const name = getValue() as string;
           let link = '#';
 
-          if (file.is_dir && fileBrowserState.currentFileSharePath) {
+          if (file.is_dir && fileBrowserState.uiFileSharePath) {
             link = makeBrowseLink(
-              fileBrowserState.currentFileSharePath.name,
+              fileBrowserState.uiFileSharePath.name,
               file.path
             ) as string;
           }
@@ -147,7 +148,7 @@ export default function Table({
         enableSorting: false
       }
     ],
-    [fileBrowserState.currentFileSharePath, handleContextMenuClick]
+    [fileBrowserState.uiFileSharePath, handleContextMenuClick]
   );
 
   const table = useReactTable({

@@ -1,4 +1,5 @@
-import React from 'react';
+import { useState } from 'react';
+import type { MouseEvent } from 'react';
 import { IoNavigateCircleSharp } from 'react-icons/io5';
 
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
@@ -11,15 +12,15 @@ type NavigationButtonProps = {
 
 export default function NavigationButton({
   triggerClasses
-}: NavigationButtonProps): React.JSX.Element {
-  const [showNavigationDialog, setShowNavigationDialog] = React.useState(false);
+}: NavigationButtonProps) {
+  const [showNavigationDialog, setShowNavigationDialog] = useState(false);
 
   return (
     <>
       <FgTooltip
         icon={IoNavigateCircleSharp}
         label="Navigate to a path"
-        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+        onClick={(e: MouseEvent<HTMLButtonElement>) => {
           setShowNavigationDialog(true);
           e.currentTarget.blur();
         }}

@@ -18,7 +18,7 @@ export default function NavigationInput({
   >;
   readonly initialValue?: string;
   readonly onDialogClose?: () => void;
-}): JSX.Element {
+}) {
   const { inputValue, handleInputChange, handleNavigationInputSubmit } =
     useNavigationInput(initialValue);
   const { pathPreference } = usePreferencesContext();

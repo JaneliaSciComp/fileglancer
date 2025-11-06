@@ -1,16 +1,22 @@
-import React from 'react';
+import { useMemo } from 'react';
 import { useFileBrowserContext } from '../contexts/FileBrowserContext';
 import { usePreferencesContext } from '../contexts/PreferencesContext';
+import { FileOrFolder } from '@/shared.types';
 
 export default function useHideDotFiles() {
   const { hideDotFiles } = usePreferencesContext();
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fileQuery } = useFileBrowserContext();
 
-  const displayFiles = React.useMemo(() => {
+  const displayFiles = useMemo(() => {
+    if (!fileQuery.data?.files) {
+      return [];
+    }
     return hideDotFiles
-      ? fileBrowserState.files.filter(file => !file.name.startsWith('.'))
-      : fileBrowserState.files;
-  }, [fileBrowserState.files, hideDotFiles]);
+      ? fileQuery.data.files.filter(
+          (file: FileOrFolder) => !file.name.startsWith('.')
+        )
+      : fileQuery.data.files;
+  }, [fileQuery, hideDotFiles]);
 
   return {
     displayFiles

@@ -1,9 +1,10 @@
-import React from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { Button } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import TextWithFilePath from '@/components/ui/Dialogs/TextWithFilePath';
+import { Spinner } from '@/components/ui/widgets/Loaders';
 import useDeleteDialog from '@/hooks/useDeleteDialog';
 import { getPreferredPathForDisplay } from '@/utils';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
@@ -11,18 +12,18 @@ import { usePreferencesContext } from '@/contexts/PreferencesContext';
 
 type DeleteDialogProps = {
   readonly showDeleteDialog: boolean;
-  readonly setShowDeleteDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  readonly setShowDeleteDialog: Dispatch<SetStateAction<boolean>>;
 };
 
 export default function DeleteDialog({
   showDeleteDialog,
   setShowDeleteDialog
-}: DeleteDialogProps): JSX.Element {
+}: DeleteDialogProps) {
   const { handleDelete } = useDeleteDialog();
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fileBrowserState, mutations } = useFileBrowserContext();
   const { pathPreference } = usePreferencesContext();
 
-  if (!fileBrowserState.currentFileSharePath) {
+  if (!fileBrowserState.uiFileSharePath) {
     return <>{toast.error('No file share path selected')}</>; // No file share path available
   }
 
@@ -32,7 +33,7 @@ export default function DeleteDialog({
 
   const displayPath = getPreferredPathForDisplay(
     pathPreference,
-    fileBrowserState.currentFileSharePath,
+    fileBrowserState.uiFileSharePath,
     fileBrowserState.propertiesTarget.path
   );
 
@@ -48,17 +49,25 @@ export default function DeleteDialog({
       <Button
         className="!rounded-md mt-4"
         color="error"
+        disabled={mutations.delete.isPending}
         onClick={async () => {
-          const result = await handleDelete(fileBrowserState.propertiesTarget!);
-          if (!result.success) {
-            toast.error(`Error deleting item: ${result.error}`);
-          } else {
-            toast.success(`Item deleted!`);
+          try {
+            await handleDelete(fileBrowserState.propertiesTarget!);
+            toast.success('Item deleted!');
+          } catch (error) {
+            toast.error(
+              `Error deleting item: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
+          } finally {
             setShowDeleteDialog(false);
           }
         }}
       >
-        Delete
+        {mutations.delete.isPending ? (
+          <Spinner customClasses="border-white" text="Deleting..." />
+        ) : (
+          'Delete'
+        )}
       </Button>
     </FgDialog>
   );

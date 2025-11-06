@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router';
 import { default as log } from '@/logger';
 import type { OutletContextType } from '@/layouts/BrowseLayout';
@@ -26,12 +26,12 @@ export default function Browse() {
     showConvertFileDialog
   } = useOutletContext<OutletContextType>();
 
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fspName } = useFileBrowserContext();
 
-  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
-  const [showRenameDialog, setShowRenameDialog] = React.useState(false);
-  const [showNavigationDialog, setShowNavigationDialog] = React.useState(false);
-  const [pastedPath, setPastedPath] = React.useState<string>('');
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [showNavigationDialog, setShowNavigationDialog] = useState(false);
+  const [pastedPath, setPastedPath] = useState<string>('');
   const [componentWidth, setComponentWidth] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -70,19 +70,14 @@ export default function Browse() {
       className="flex flex-col h-full max-h-full w-full max-w-full"
       data-browse-container
       onPaste={async event => {
-        log.debug('React paste event fired!', event);
-
         // Check if any input, textarea, or contenteditable element is focused
         const activeElement = document.activeElement;
-        log.debug('Active element:', activeElement);
 
         const isTextInputFocused =
           activeElement &&
           (activeElement.tagName === 'INPUT' ||
             activeElement.tagName === 'TEXTAREA' ||
             activeElement.getAttribute('contenteditable') === 'true');
-
-        log.debug('Is text input focused:', isTextInputFocused);
 
         // Only handle paste if no text input is focused
         if (!isTextInputFocused) {
@@ -91,14 +86,12 @@ export default function Browse() {
 
           try {
             const clipboardText = await navigator.clipboard.readText();
-            log.debug('Clipboard text (API):', clipboardText);
             setPastedPath(clipboardText);
             setShowNavigationDialog(true);
           } catch (error) {
             log.debug('Clipboard API failed, using fallback:', error);
             // Fallback to event.clipboardData if clipboard API fails
             const clipboardText = event.clipboardData?.getData('text') || '';
-            log.debug('Clipboard text (fallback):', clipboardText);
             setPastedPath(clipboardText);
             setShowNavigationDialog(true);
           }
@@ -116,9 +109,9 @@ export default function Browse() {
         toggleSidebar={toggleSidebar}
       />
       <div
-        className={`relative grow shrink-0 max-h-[calc(100%-55px)] flex flex-col overflow-y-auto px-2 ${!fileBrowserState.currentFileSharePath ? 'bg-surface-light py-6' : ''}`}
+        className={`relative grow shrink-0 max-h-[calc(100%-55px)] flex flex-col overflow-y-auto px-2 ${!fspName ? 'bg-surface-light py-6' : ''}`}
       >
-        {!fileBrowserState.currentFileSharePath ? (
+        {!fspName ? (
           <div className="flex flex-col max-w-full gap-6 px-6">
             <NavigationInput location="dashboard" />
             <div

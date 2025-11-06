@@ -7,7 +7,7 @@ function PermissionIcon({
   hasPermission
 }: {
   readonly hasPermission: boolean;
-}): JSX.Element {
+}) {
   return hasPermission ? (
     <HiCheck className="icon-default" />
   ) : (

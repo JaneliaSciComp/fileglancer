@@ -1,3 +1,4 @@
+import type { MouseEvent } from 'react';
 import { Typography } from '@material-tailwind/react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { useNavigate } from 'react-router';
@@ -16,21 +17,22 @@ import { FgStyledLink } from '../widgets/FgLink';
 import toast from 'react-hot-toast';
 
 function FilePathCell({ item }: { readonly item: Ticket }) {
-  const { zonesAndFileSharePathsMap } = useZoneAndFspMapContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const { pathPreference, setLayoutWithPropertiesOpen } =
     usePreferencesContext();
+
   const navigate = useNavigate();
 
-  const itemFsp = zonesAndFileSharePathsMap[
-    makeMapKey('fsp', item.fsp_name)
-  ] as FileSharePath;
+  const itemFsp = zonesAndFspQuery.isSuccess
+    ? (zonesAndFspQuery.data[makeMapKey('fsp', item.fsp_name)] as FileSharePath)
+    : null;
   const displayPath = getPreferredPathForDisplay(
     pathPreference,
     itemFsp,
     item.path
   );
 
-  const handleClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+  const handleClick = async (e: MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     const result = await setLayoutWithPropertiesOpen();
     if (!result.success) {

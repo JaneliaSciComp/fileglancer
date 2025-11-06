@@ -1,4 +1,4 @@
-import React from 'react';
+import { type MouseEvent } from 'react';
 import { Link } from 'react-router';
 import { List, Typography, IconButton } from '@material-tailwind/react';
 import { HiOutlineStar, HiStar } from 'react-icons/hi';
@@ -61,7 +61,7 @@ export default function FileSharePathComponent({
           <IconButton
             className="min-w-0 min-h-0"
             isCircular
-            onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
+            onClick={async (e: MouseEvent<HTMLButtonElement>) => {
               e.stopPropagation();
               const result = await handleFavoriteChange(fsp, 'fileSharePath');
               if (result.success) {

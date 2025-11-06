@@ -1,8 +1,10 @@
 // https://testing-library.com/docs/react-testing-library/setup
-import React from 'react';
+import { ReactElement } from 'react';
+import type { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes, useParams } from 'react-router';
 import { render, RenderOptions } from '@testing-library/react';
 import { ErrorBoundary } from 'react-error-boundary';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { ZonesAndFspMapContextProvider } from '@/contexts/ZonesAndFspMapContext';
 import { FileBrowserContextProvider } from '@/contexts/FileBrowserContext';
@@ -19,11 +21,7 @@ interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
   initialEntries?: string[];
 }
 
-const FileBrowserTestingWrapper = ({
-  children
-}: {
-  children: React.ReactNode;
-}) => {
+const FileBrowserTestingWrapper = ({ children }: { children: ReactNode }) => {
   const params = useParams();
   const fspName = params.fspName;
   const filePath = params['*'];
@@ -35,7 +33,7 @@ const FileBrowserTestingWrapper = ({
   );
 };
 
-const Browse = ({ children }: { children: React.ReactNode }) => {
+const Browse = ({ children }: { children: ReactNode }) => {
   return (
     <ServerHealthProvider>
       <ZonesAndFspMapContextProvider>
@@ -61,29 +59,41 @@ const MockRouterAndProviders = ({
   children,
   initialEntries = ['/']
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   initialEntries?: string[];
 }) => {
+  // Create a new QueryClient for each test to ensure isolation
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false, // Disable retries in tests
+        staleTime: 30 * 1000
+      }
+    }
+  });
+
   return (
-    <ErrorBoundary FallbackComponent={ErrorFallback}>
-      <MemoryRouter initialEntries={initialEntries}>
-        <Routes>
-          <Route path="browse" element={<Browse>{children}</Browse>} />
-          <Route path="browse/:fspName" element={<Browse>{children}</Browse>} />
-          <Route
-            path="browse/:fspName/*"
-            element={<Browse>{children}</Browse>}
-          />
-        </Routes>
-      </MemoryRouter>
-    </ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ErrorBoundary FallbackComponent={ErrorFallback}>
+        <MemoryRouter initialEntries={initialEntries}>
+          <Routes>
+            <Route path="browse" element={<Browse>{children}</Browse>} />
+            <Route
+              path="browse/:fspName"
+              element={<Browse>{children}</Browse>}
+            />
+            <Route
+              path="browse/:fspName/*"
+              element={<Browse>{children}</Browse>}
+            />
+          </Routes>
+        </MemoryRouter>
+      </ErrorBoundary>
+    </QueryClientProvider>
   );
 };
 
-const customRender = (
-  ui: React.ReactElement,
-  options?: CustomRenderOptions
-) => {
+const customRender = (ui: ReactElement, options?: CustomRenderOptions) => {
   const { initialEntries, ...renderOptions } = options || {};
   return render(ui, {
     wrapper: props => (

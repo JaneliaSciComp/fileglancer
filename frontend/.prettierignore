@@ -7,3 +7,5 @@ fileglancer
 .github
 /style/tailwind_converted.css
 .claude/settings.local.json
+ui-tests/playwright-report
+ui-tests/test-results

@@ -1,4 +1,5 @@
-import React from 'react';
+import { useState, SetStateAction } from 'react';
+import type { Dispatch } from 'react';
 import { Outlet } from 'react-router';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { PiDotsSixVerticalBold } from 'react-icons/pi';
@@ -9,10 +10,10 @@ import Sidebar from '@/components/ui/Sidebar/Sidebar';
 import PropertiesDrawer from '@/components/ui/PropertiesDrawer/PropertiesDrawer';
 
 export type OutletContextType = {
-  setShowPermissionsDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowPermissionsDialog: Dispatch<SetStateAction<boolean>>;
   togglePropertiesDrawer: () => void;
   toggleSidebar: () => void;
-  setShowConvertFileDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowConvertFileDialog: Dispatch<SetStateAction<boolean>>;
   showPermissionsDialog: boolean;
   showPropertiesDrawer: boolean;
   showSidebar: boolean;
@@ -20,12 +21,10 @@ export type OutletContextType = {
 };
 
 export const BrowsePageLayout = () => {
-  const [showPermissionsDialog, setShowPermissionsDialog] =
-    React.useState(false);
-  const [showConvertFileDialog, setShowConvertFileDialog] =
-    React.useState(false);
+  const [showPermissionsDialog, setShowPermissionsDialog] = useState(false);
+  const [showConvertFileDialog, setShowConvertFileDialog] = useState(false);
 
-  const { isLayoutLoadedFromDB } = usePreferencesContext();
+  const { preferenceQuery } = usePreferencesContext();
   const {
     layoutPrefsStorage,
     togglePropertiesDrawer,
@@ -47,9 +46,9 @@ export const BrowsePageLayout = () => {
 
   return (
     <div
-      className={`flex h-full w-full overflow-y-hidden ${!isLayoutLoadedFromDB ? 'animate-pulse gap-4 p-4' : ''}`}
+      className={`flex h-full w-full overflow-y-hidden ${preferenceQuery.isPending ? 'animate-pulse gap-4 p-4' : ''}`}
     >
-      {!isLayoutLoadedFromDB ? (
+      {preferenceQuery.isPending ? (
         <>
           <div className="bg-surface rounded h-full w-1/4" />
           <div className="bg-surface rounded h-full w-1/2" />
@@ -59,7 +58,7 @@ export const BrowsePageLayout = () => {
         <PanelGroup
           autoSaveId="layout"
           direction="horizontal"
-          key={`layout-${isLayoutLoadedFromDB}`}
+          key={`layout-${preferenceQuery.isPending}`}
           storage={layoutPrefsStorage}
         >
           {showSidebar ? (

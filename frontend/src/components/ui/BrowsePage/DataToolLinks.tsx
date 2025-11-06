@@ -1,4 +1,3 @@
-import React from 'react';
 import { Button, ButtonGroup, Typography } from '@material-tailwind/react';
 import { Link } from 'react-router';
 
@@ -20,7 +19,7 @@ export default function DataToolLinks({
   readonly showCopiedTooltip: boolean;
   readonly title: string;
   readonly urls: OpenWithToolUrls | null;
-}): React.ReactNode {
+}) {
   const tooltipTriggerClasses =
     'rounded-sm m-0 p-0 transform active:scale-90 transition-transform duration-75';
 

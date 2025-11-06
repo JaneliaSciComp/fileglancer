@@ -1,4 +1,4 @@
-import * as React from 'react';
+import { useEffect, useState } from 'react';
 import {
   Button,
   Card,
@@ -42,7 +42,7 @@ function CopyPathButton({
 }: {
   readonly path: string;
   readonly isDataLink?: boolean;
-}): JSX.Element {
+}) {
   return (
     <div className="group flex justify-between items-center min-w-0 max-w-full">
       <FgTooltip label={path} triggerClasses="block truncate">
@@ -80,17 +80,17 @@ export default function PropertiesDrawer({
   togglePropertiesDrawer,
   setShowPermissionsDialog,
   setShowConvertFileDialog
-}: PropertiesDrawerProps): React.JSX.Element {
+}: PropertiesDrawerProps) {
   const location = useLocation();
-  const [showDataLinkDialog, setShowDataLinkDialog] =
-    React.useState<boolean>(false);
-  const [activeTab, setActiveTab] = React.useState<string>('overview');
+  const [showDataLinkDialog, setShowDataLinkDialog] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<string>('overview');
 
   const { fileBrowserState } = useFileBrowserContext();
   const { pathPreference, areDataLinksAutomatic } = usePreferencesContext();
-  const { ticket } = useTicketContext();
-  const { proxiedPath, dataUrl } = useProxiedPathContext();
-  const { externalDataUrl } = useExternalBucketContext();
+  const { ticketByPathQuery } = useTicketContext();
+  const { proxiedPathByFspAndPathQuery } = useProxiedPathContext();
+  const { externalDataUrlQuery } = useExternalBucketContext();
+
   const {
     handleDialogConfirm,
     handleDialogCancel,
@@ -101,7 +101,7 @@ export default function PropertiesDrawer({
   const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
 
   // Set active tab to 'convert' when navigating from jobs page
-  React.useEffect(() => {
+  useEffect(() => {
     if (location.state?.openConvertTab) {
       setActiveTab('convert');
     }
@@ -109,7 +109,7 @@ export default function PropertiesDrawer({
 
   const fullPath = getPreferredPathForDisplay(
     pathPreference,
-    fileBrowserState.currentFileSharePath,
+    fileBrowserState.uiFileSharePath,
     fileBrowserState.propertiesTarget?.path
   );
 
@@ -194,49 +194,95 @@ export default function PropertiesDrawer({
             >
               <CopyPathButton path={fullPath} />
               <OverviewTable file={fileBrowserState.propertiesTarget} />
-              {fileBrowserState.propertiesTarget.is_dir ? (
-                <div className="flex flex-col gap-2 min-w-[175px] max-w-full pt-2">
-                  <div className="flex items-center gap-2 max-w-full">
-                    <Switch
-                      checked={externalDataUrl || proxiedPath ? true : false}
-                      className="before:bg-primary/50 after:border-primary/50 checked:disabled:before:bg-surface checked:disabled:before:border checked:disabled:before:border-surface-dark checked:disabled:after:border-surface-dark"
-                      disabled={Boolean(
-                        externalDataUrl ||
-                          fileBrowserState.propertiesTarget.hasRead === false
-                      )}
-                      id="share-switch"
-                      onChange={async () => {
-                        if (areDataLinksAutomatic && !proxiedPath) {
-                          await handleCreateDataLink();
-                        } else {
-                          setShowDataLinkDialog(true);
+              {fileBrowserState.propertiesTarget.is_dir &&
+              (proxiedPathByFspAndPathQuery.isPending ||
+                externalDataUrlQuery.isPending) ? (
+                <Typography className="text-foreground pt-2">
+                  Loading data link information...
+                </Typography>
+              ) : fileBrowserState.propertiesTarget.is_dir &&
+                proxiedPathByFspAndPathQuery.isError ? (
+                <>
+                  <Typography className="text-error pt-2">
+                    Error loading data link information
+                  </Typography>
+                  <Typography className="text-foreground" type="small">
+                    {proxiedPathByFspAndPathQuery.error.message ||
+                      'An unknown error occurred'}
+                  </Typography>
+                </>
+              ) : fileBrowserState.propertiesTarget.is_dir &&
+                externalDataUrlQuery.isError ? (
+                <>
+                  <Typography className="text-error pt-2">
+                    Error loading external data link information
+                  </Typography>
+                  <Typography className="text-foreground" type="small">
+                    {externalDataUrlQuery.error.message ||
+                      'An unknown error occurred'}
+                  </Typography>
+                </>
+              ) : fileBrowserState.propertiesTarget.is_dir ? (
+                <>
+                  <div className="flex flex-col gap-2 min-w-[175px] max-w-full pt-2">
+                    <div className="flex items-center gap-2 max-w-full">
+                      <Switch
+                        checked={
+                          externalDataUrlQuery.data ||
+                          proxiedPathByFspAndPathQuery.data
+                            ? true
+                            : false
                         }
-                      }}
-                    />
+                        className="before:bg-primary/50 after:border-primary/50 checked:disabled:before:bg-surface checked:disabled:before:border checked:disabled:before:border-surface-dark checked:disabled:after:border-surface-dark"
+                        disabled={Boolean(
+                          externalDataUrlQuery.data ||
+                            fileBrowserState.propertiesTarget.hasRead === false
+                        )}
+                        id="share-switch"
+                        onChange={async () => {
+                          if (
+                            areDataLinksAutomatic &&
+                            !proxiedPathByFspAndPathQuery.data
+                          ) {
+                            await handleCreateDataLink();
+                          } else {
+                            setShowDataLinkDialog(true);
+                          }
+                        }}
+                      />
+                      <Typography
+                        as="label"
+                        className={`${externalDataUrlQuery.data || fileBrowserState.propertiesTarget.hasRead === false ? 'cursor-default' : 'cursor-pointer'} text-foreground font-semibold`}
+                        htmlFor="share-switch"
+                      >
+                        {proxiedPathByFspAndPathQuery.data
+                          ? 'Delete data link'
+                          : 'Create data link'}
+                      </Typography>
+                    </div>
                     <Typography
-                      as="label"
-                      className={`${externalDataUrl || fileBrowserState.propertiesTarget.hasRead === false ? 'cursor-default' : 'cursor-pointer'} text-foreground font-semibold`}
-                      htmlFor="share-switch"
+                      className="text-foreground whitespace-normal w-full"
+                      type="small"
                     >
-                      {proxiedPath ? 'Delete data link' : 'Create data link'}
+                      {externalDataUrlQuery.data
+                        ? 'Public data link already exists since this data is on s3.janelia.org.'
+                        : proxiedPathByFspAndPathQuery.data
+                          ? 'Deleting the data link will remove data access for collaborators with the link.'
+                          : 'Creating a data link allows you to share the data at this path with internal collaborators or use tools to view the data.'}
                     </Typography>
                   </div>
-                  <Typography
-                    className="text-foreground whitespace-normal w-full"
-                    type="small"
-                  >
-                    {externalDataUrl
-                      ? 'Public data link already exists since this data is on s3.janelia.org.'
-                      : proxiedPath
-                        ? 'Deleting the data link will remove data access for collaborators with the link.'
-                        : 'Creating a data link allows you to share the data at this path with internal collaborators or use tools to view the data.'}
-                  </Typography>
-                </div>
-              ) : null}
-              {externalDataUrl ? (
-                <CopyPathButton isDataLink={true} path={externalDataUrl} />
-              ) : dataUrl ? (
-                <CopyPathButton isDataLink={true} path={dataUrl} />
+                  {externalDataUrlQuery.data ? (
+                    <CopyPathButton
+                      isDataLink={true}
+                      path={externalDataUrlQuery.data}
+                    />
+                  ) : proxiedPathByFspAndPathQuery.data?.url ? (
+                    <CopyPathButton
+                      isDataLink={true}
+                      path={proxiedPathByFspAndPathQuery.data.url}
+                    />
+                  ) : null}
+                </>
               ) : null}
             </Tabs.Panel>
 
@@ -264,8 +310,22 @@ export default function PropertiesDrawer({
                 className="flex flex-col gap-4 flex-1 w-full p-2"
                 value="convert"
               >
-                {ticket ? (
-                  <TicketDetails />
+                {ticketByPathQuery.isPending ? (
+                  <Typography className="text-foreground">
+                    Loading ticket information...
+                  </Typography>
+                ) : ticketByPathQuery.isError ? (
+                  <>
+                    <Typography className="text-error">
+                      Error loading ticket information
+                    </Typography>
+                    <Typography className="text-foreground" type="small">
+                      {ticketByPathQuery.error.message ||
+                        'An unknown error occurred'}
+                    </Typography>
+                  </>
+                ) : ticketByPathQuery.data ? (
+                  <TicketDetails ticket={ticketByPathQuery.data} />
                 ) : (
                   <>
                     <Typography className="min-w-64">
@@ -291,7 +351,9 @@ export default function PropertiesDrawer({
           </Tabs>
         ) : null}
       </Card>
-      {showDataLinkDialog && !proxiedPath && !externalDataUrl ? (
+      {showDataLinkDialog &&
+      !proxiedPathByFspAndPathQuery.data &&
+      !externalDataUrlQuery.data ? (
         <DataLinkDialog
           action="create"
           onCancel={handleDialogCancel}
@@ -300,11 +362,11 @@ export default function PropertiesDrawer({
           showDataLinkDialog={showDataLinkDialog}
           tools={false}
         />
-      ) : showDataLinkDialog && proxiedPath ? (
+      ) : showDataLinkDialog && proxiedPathByFspAndPathQuery.data ? (
         <DataLinkDialog
           action="delete"
           handleDeleteDataLink={handleDeleteDataLink}
-          proxiedPath={proxiedPath}
+          proxiedPath={proxiedPathByFspAndPathQuery.data}
           setShowDataLinkDialog={setShowDataLinkDialog}
           showDataLinkDialog={showDataLinkDialog}
         />

@@ -17,15 +17,14 @@ export default function ZonesBrowser({
   readonly searchQuery: string;
   readonly filteredZonesMap: ZonesAndFileSharePathsMap;
 }) {
-  const { zonesAndFileSharePathsMap, areZoneDataLoading } =
-    useZoneAndFspMapContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const { isFilteredByGroups } = usePreferencesContext();
   const { openZones, toggleOpenZones } = useOpenZones();
 
   const displayZones: ZonesAndFileSharePathsMap =
     Object.keys(filteredZonesMap).length > 0 || searchQuery.length > 0
       ? filteredZonesMap
-      : zonesAndFileSharePathsMap;
+      : zonesAndFspQuery.data || {};
 
   return (
     <div className="flex flex-col my-1 mx-1">
@@ -53,7 +52,7 @@ export default function ZonesBrowser({
         className="overflow-x-hidden flex-grow w-full"
         open={openZones['all'] ? true : false}
       >
-        {areZoneDataLoading ? (
+        {zonesAndFspQuery.isPending ? (
           Array.from({ length: 10 }, (_, index) => (
             <SidebarItemSkeleton key={index} />
           ))

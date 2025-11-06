@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react';
+import { Fragment } from 'react';
 import {
   BreadcrumbLink,
   Breadcrumb,
@@ -21,11 +21,12 @@ import {
 } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
 
-export default function Crumbs(): ReactNode {
-  const { fileBrowserState } = useFileBrowserContext();
+export default function Crumbs() {
+  const { filePath, fileQuery, fileBrowserState } = useFileBrowserContext();
   const { pathPreference } = usePreferencesContext();
-  const { currentFileSharePath, currentFileOrFolder } = fileBrowserState;
-  const dirArray = makePathSegmentArray(currentFileOrFolder?.path || '');
+
+  const currentFileSharePath = fileBrowserState.uiFileSharePath;
+  const dirArray = makePathSegmentArray(filePath || '');
 
   // Add the current file share path name as the first segment in the array
   if (currentFileSharePath) {
@@ -39,7 +40,7 @@ export default function Crumbs(): ReactNode {
   const fullPath = getPreferredPathForDisplay(
     pathPreference,
     currentFileSharePath,
-    currentFileOrFolder?.path
+    filePath
   );
 
   return (
@@ -54,8 +55,8 @@ export default function Crumbs(): ReactNode {
         {dirArray.map((pathSegment, index) => {
           if (currentFileSharePath) {
             const isFile =
-              currentFileOrFolder &&
-              !currentFileOrFolder.is_dir &&
+              fileQuery.data?.currentFileOrFolder &&
+              !fileQuery.data.currentFileOrFolder.is_dir &&
               index === dirDepth - 1;
 
             if (index < dirDepth - 1) {
@@ -63,7 +64,7 @@ export default function Crumbs(): ReactNode {
               const link = makeBrowseLink(currentFileSharePath.name, path);
               // Render a breadcrumb link for each segment in the parent path
               return (
-                <React.Fragment key={pathSegment + '-' + index}>
+                <Fragment key={pathSegment + '-' + index}>
                   <BreadcrumbLink as={FgStyledLink} to={link}>
                     <Typography
                       className="font-medium text-primary-light"
@@ -80,13 +81,13 @@ export default function Crumbs(): ReactNode {
                       <HiMiniSlash className="icon-default" />
                     )}
                   </BreadcrumbSeparator>
-                </React.Fragment>
+                </Fragment>
               );
             } else {
               // Render the last path component as text only
               // If it's a file, make it visually distinct
               return (
-                <React.Fragment key={pathSegment + '-' + index}>
+                <Fragment key={pathSegment + '-' + index}>
                   <Typography
                     className={`font-medium ${
                       isFile
@@ -96,7 +97,7 @@ export default function Crumbs(): ReactNode {
                   >
                     {pathSegment}
                   </Typography>
-                </React.Fragment>
+                </Fragment>
               );
             }
           }

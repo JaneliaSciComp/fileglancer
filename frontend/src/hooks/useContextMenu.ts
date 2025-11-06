@@ -1,16 +1,17 @@
-import * as React from 'react';
+import { useState, useEffect, useRef } from 'react';
+import type { MouseEvent } from 'react';
 
 import type { FileOrFolder } from '@/shared.types';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 
 export default function useContextMenu() {
-  const [contextMenuCoords, setContextMenuCoords] = React.useState({
+  const [contextMenuCoords, setContextMenuCoords] = useState({
     x: 0,
     y: 0
   });
-  const [showContextMenu, setShowContextMenu] = React.useState<boolean>(false);
+  const [showContextMenu, setShowContextMenu] = useState<boolean>(false);
 
-  const menuRef = React.useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   const { updateFilesWithContextMenuClick } = useFileBrowserContext();
 
@@ -18,7 +19,7 @@ export default function useContextMenu() {
     setShowContextMenu(false);
   }
 
-  React.useEffect(() => {
+  useEffect(() => {
     // Adjust menu position if it would go off screen
     if (menuRef.current) {
       const rect = menuRef.current.getBoundingClientRect();
@@ -41,7 +42,7 @@ export default function useContextMenu() {
     }
 
     // Add click handler to close the menu when clicking outside
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: Event) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onClose();
       }
@@ -54,7 +55,7 @@ export default function useContextMenu() {
   }, [contextMenuCoords.x, contextMenuCoords.y]);
 
   function handleContextMenuClick(
-    e: React.MouseEvent<HTMLDivElement>,
+    e: MouseEvent<HTMLDivElement>,
     file: FileOrFolder
   ) {
     e.preventDefault();

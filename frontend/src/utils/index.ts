@@ -131,12 +131,18 @@ async function checkSessionValidity(): Promise<boolean> {
 // Define a more specific type for request body
 type RequestBody = Record<string, unknown>;
 
+// Additional options for sendFetchRequest
+type FetchRequestOptions = {
+  signal?: AbortSignal;
+};
+
 async function sendFetchRequest(
   apiPath: string,
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
-  body?: RequestBody
+  body?: RequestBody,
+  options?: FetchRequestOptions
 ): Promise<Response> {
-  const options: RequestInit = {
+  const requestOptions: RequestInit = {
     method,
     credentials: 'include',
     headers: {
@@ -145,12 +151,13 @@ async function sendFetchRequest(
     },
     ...(method !== 'GET' &&
       method !== 'DELETE' &&
-      body && { body: JSON.stringify(body) })
+      body && { body: JSON.stringify(body) }),
+    ...(options?.signal && { signal: options.signal })
   };
 
   let response: Response;
   try {
-    response = await fetch(getFullPath(apiPath), options);
+    response = await fetch(getFullPath(apiPath), requestOptions);
   } catch (error) {
     // Report network errors to central server health monitoring if applicable
     const reporter = healthCheckRegistry.getReporter();
@@ -229,10 +236,11 @@ function makeMapKey(type: 'zone' | 'fsp' | 'folder', name: string): string {
 
 async function fetchFileContent(
   fspName: string,
-  path: string
+  path: string,
+  options?: FetchRequestOptions
 ): Promise<Uint8Array> {
   const url = getFileContentPath(fspName, path);
-  const response = await sendFetchRequest(url, 'GET');
+  const response = await sendFetchRequest(url, 'GET', undefined, options);
   if (!response.ok) {
     throw new Error(`Failed to fetch file: ${response.statusText}`);
   }
@@ -266,9 +274,10 @@ function isLikelyTextFile(buffer: ArrayBuffer | Uint8Array): boolean {
 
 async function fetchFileWithTextDetection(
   fspName: string,
-  path: string
+  path: string,
+  options?: FetchRequestOptions
 ): Promise<{ isText: boolean; content: string; rawData: Uint8Array }> {
-  const rawData = await fetchFileContent(fspName, path);
+  const rawData = await fetchFileContent(fspName, path, options);
   const isText = isLikelyTextFile(rawData);
 
   let content: string;

@@ -1,4 +1,12 @@
-import React from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useRef,
+  useCallback,
+  useEffect
+} from 'react';
+import type { ReactNode } from 'react';
 import {
   checkServerHealth,
   ServerStatus,
@@ -25,9 +33,7 @@ type ServerHealthContextType = {
   nextRetrySeconds: number | null;
 };
 
-const ServerHealthContext = React.createContext<ServerHealthContextType | null>(
-  null
-);
+const ServerHealthContext = createContext<ServerHealthContextType | null>(null);
 
 // Health check retry configuration constants
 const MAX_RETRY_ATTEMPTS = 100; // Limit total retry attempts to prevent infinite loops
@@ -36,7 +42,7 @@ const RETRY_MAX_DELAY_MS = 300000; // Cap at 5 minutes
 const HEALTH_CHECK_DEBOUNCE_MS = 1000; // Wait 1 second before checking
 
 export const useServerHealthContext = () => {
-  const context = React.useContext(ServerHealthContext);
+  const context = useContext(ServerHealthContext);
   if (!context) {
     throw new Error(
       'useServerHealthContext must be used within a ServerHealthProvider'
@@ -48,27 +54,25 @@ export const useServerHealthContext = () => {
 export const ServerHealthProvider = ({
   children
 }: {
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
 }) => {
-  const [status, setStatus] = React.useState<ServerStatus>('healthy');
-  const [showWarningOverlay, setShowWarningOverlay] = React.useState(false);
-  const [isChecking, setIsChecking] = React.useState(false);
-  const [nextRetrySeconds, setNextRetrySeconds] = React.useState<number | null>(
-    null
-  );
+  const [status, setStatus] = useState<ServerStatus>('healthy');
+  const [showWarningOverlay, setShowWarningOverlay] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
+  const [nextRetrySeconds, setNextRetrySeconds] = useState<number | null>(null);
   const isPageVisible = usePageVisibility();
 
   // Debounce health checks to avoid spam
-  const healthCheckTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const healthCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Abort controller to prevent race conditions
-  const abortControllerRef = React.useRef<AbortController | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Retry mechanism state
-  const retryStateRef = React.useRef<RetryState | null>(null);
+  const retryStateRef = useRef<RetryState | null>(null);
 
   // Stop retry mechanism
-  const stopRetrying = React.useCallback(() => {
+  const stopRetrying = useCallback(() => {
     if (retryStateRef.current) {
       retryStateRef.current.stop();
       retryStateRef.current = null;
@@ -81,7 +85,7 @@ export const ServerHealthProvider = ({
   }, []);
 
   // Start exponential backoff retry
-  const startRetrying = React.useCallback(() => {
+  const startRetrying = useCallback(() => {
     if (retryStateRef.current?.isRetrying) {
       return; // Already retrying
     }
@@ -155,7 +159,7 @@ export const ServerHealthProvider = ({
     );
   }, [stopRetrying]);
 
-  const checkHealth = React.useCallback(async () => {
+  const checkHealth = useCallback(async () => {
     if (isChecking) {
       return; // Already checking, avoid duplicate checks
     }
@@ -201,7 +205,7 @@ export const ServerHealthProvider = ({
     }
   }, [isChecking, startRetrying, stopRetrying]);
 
-  const reportFailedRequest = React.useCallback(
+  const reportFailedRequest = useCallback(
     async (apiPath: string, responseStatus?: number) => {
       // Only trigger health check if this looks like a server issue
       if (!shouldTriggerHealthCheck(apiPath, responseStatus)) {
@@ -234,14 +238,14 @@ export const ServerHealthProvider = ({
     [checkHealth, isChecking, status]
   );
 
-  const dismissWarning = React.useCallback(() => {
+  const dismissWarning = useCallback(() => {
     setShowWarningOverlay(false);
     // reload the page to ensure full recovery
     window.location.reload();
   }, []);
 
   // Register health check reporter with global sendFetchRequest
-  React.useEffect(() => {
+  useEffect(() => {
     setHealthCheckReporter(reportFailedRequest);
     return () => {
       clearHealthCheckReporter();
@@ -249,7 +253,7 @@ export const ServerHealthProvider = ({
   }, [reportFailedRequest]);
 
   // Pause/resume retry mechanism based on page visibility
-  React.useEffect(() => {
+  useEffect(() => {
     if (!retryStateRef.current) {
       return;
     }
@@ -270,7 +274,7 @@ export const ServerHealthProvider = ({
   }, [isPageVisible]);
 
   // Cleanup timeouts and abort controllers on unmount
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       if (healthCheckTimeoutRef.current) {
         clearTimeout(healthCheckTimeoutRef.current);

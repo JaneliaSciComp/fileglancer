@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router';
 import { ErrorBoundary } from 'react-error-boundary';
 
@@ -14,7 +15,7 @@ import Links from '@/components/Links';
 import Notifications from '@/components/Notifications';
 import ErrorFallback from '@/components/ErrorFallback';
 
-function RequireAuth({ children }: { readonly children: React.ReactNode }) {
+function RequireAuth({ children }: { readonly children: ReactNode }) {
   const { loading, authStatus } = useAuthContext();
 
   if (loading) {

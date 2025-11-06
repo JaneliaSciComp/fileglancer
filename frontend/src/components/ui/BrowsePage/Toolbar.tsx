@@ -1,4 +1,4 @@
-import * as React from 'react';
+import { useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router';
 import { ButtonGroup } from '@material-tailwind/react';
@@ -27,6 +27,7 @@ import {
 } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
 import useFavoriteToggle from '@/hooks/useFavoriteToggle';
+import { useRefreshFileBrowser } from '@/hooks/useRefreshFileBrowser';
 
 type ToolbarProps = {
   readonly showPropertiesDrawer: boolean;
@@ -40,10 +41,12 @@ export default function Toolbar({
   togglePropertiesDrawer,
   showSidebar,
   toggleSidebar
-}: ToolbarProps): JSX.Element {
-  const { fileBrowserState, refreshFiles, triggerFileContentRefresh } =
-    useFileBrowserContext();
-  const { currentFileSharePath, currentFileOrFolder } = fileBrowserState;
+}: ToolbarProps) {
+  const { fileBrowserState, fileQuery } = useFileBrowserContext();
+  const { refreshFileBrowser } = useRefreshFileBrowser();
+
+  const currentFileSharePath = fileBrowserState.uiFileSharePath;
+  const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
   const { profile } = useProfileContext();
   const {
     folderPreferenceMap,
@@ -61,7 +64,7 @@ export default function Toolbar({
     currentFileOrFolder?.path
   );
 
-  const isFavorited = React.useMemo(() => {
+  const isFavorited = useMemo(() => {
     if (!currentFileSharePath) {
       return false;
     }
@@ -88,6 +91,55 @@ export default function Toolbar({
   const triggerClasses =
     'inline-grid place-items-center border align-middle select-none font-sans font-medium text-center transition-all duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:pointer-events-none data-[shape=circular]:rounded-full text-sm min-w-[38px] min-h-[38px] rounded-md shadow-sm hover:shadow-md bg-transparent border-primary text-primary hover:bg-primary hover:text-primary-foreground outline-none group';
 
+  const handleToggleSidebar = (e: React.MouseEvent<HTMLButtonElement>) => {
+    toggleSidebar();
+    e.currentTarget.blur();
+  };
+
+  const handleToggleHideDotFiles = async (
+    e: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    const result = await toggleHideDotFiles();
+    if (result.success) {
+      toast.success(
+        hideDotFiles ? 'Dot files are now visible' : 'Dot files are now hidden'
+      );
+    } else {
+      toast.error(result.error);
+    }
+    e.currentTarget.blur();
+  };
+
+  const handleToggleFavorite = async (
+    e: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    const result = await handleFavoriteToggle(false);
+    if (!result.success) {
+      toast.error(`Error updating favorites: ${result.error}`);
+    } else if (result.data === true) {
+      openFavoritesSection();
+      toast.success('Favorite added!');
+    } else {
+      toast.success('Favorite removed!');
+    }
+  };
+
+  const handleCopyPath = () => {
+    try {
+      copyToClipboard(fullPath);
+      toast.success('Path copied to clipboard!');
+    } catch (error) {
+      toast.error(`Failed to copy path. Error: ${error}`);
+    }
+  };
+
+  const handleTogglePropertiesDrawer = (
+    e: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    togglePropertiesDrawer();
+    e.currentTarget.blur();
+  };
+
   return (
     <div className="flex flex-col min-w-full p-2 border-b border-surface">
       <div className="flex justify-between items-center">
@@ -100,10 +152,7 @@ export default function Toolbar({
                 ? 'Hide favorites and zone browser'
                 : 'View favorites and zone browser'
             }
-            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-              toggleSidebar();
-              e.currentTarget.blur();
-            }}
+            onClick={handleToggleSidebar}
             triggerClasses={triggerClasses}
           />
 
@@ -127,27 +176,7 @@ export default function Toolbar({
             <FgTooltip
               icon={HiRefresh}
               label="Refresh file browser"
-              onClick={async () => {
-                // Check if we're viewing a file or a folder
-                const isViewingFile =
-                  currentFileOrFolder && !currentFileOrFolder.is_dir;
-
-                if (isViewingFile) {
-                  // If viewing a file, trigger file content refresh
-                  triggerFileContentRefresh();
-                  toast.success('File content refreshed!');
-                } else {
-                  // If viewing a folder, refresh the file list
-                  const result = await refreshFiles();
-                  if (result.success) {
-                    toast.success('File browser refreshed!');
-                  } else {
-                    toast.error(
-                      `Error refreshing file browser: ${result.error}`
-                    );
-                  }
-                }
-              }}
+              onClick={refreshFileBrowser}
               triggerClasses={triggerClasses}
             />
           ) : null}
@@ -162,19 +191,7 @@ export default function Toolbar({
             <FgTooltip
               icon={hideDotFiles ? HiEyeOff : HiEye}
               label={hideDotFiles ? 'Show dot files' : 'Hide dot files'}
-              onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
-                const result = await toggleHideDotFiles();
-                if (result.success) {
-                  toast.success(
-                    hideDotFiles
-                      ? 'Dot files are now visible'
-                      : 'Dot files are now hidden'
-                  );
-                } else {
-                  toast.error(result.error);
-                }
-                e.currentTarget.blur();
-              }}
+              onClick={handleToggleHideDotFiles}
               triggerClasses={triggerClasses}
             />
           ) : null}
@@ -188,17 +205,7 @@ export default function Toolbar({
                   ? 'Remove current directory from favorites'
                   : 'Add current directory to favorites'
               }
-              onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
-                const result = await handleFavoriteToggle(false);
-                if (!result.success) {
-                  toast.error(`Error updating favorites: ${result.error}`);
-                } else if (result.data === true) {
-                  openFavoritesSection();
-                  toast.success('Favorite added!');
-                } else {
-                  toast.success('Favorite removed!');
-                }
-              }}
+              onClick={handleToggleFavorite}
               triggerClasses={triggerClasses}
             />
           ) : null}
@@ -208,14 +215,7 @@ export default function Toolbar({
             <FgTooltip
               icon={HiOutlineClipboardCopy}
               label="Copy current path"
-              onClick={() => {
-                try {
-                  copyToClipboard(fullPath);
-                  toast.success('Path copied to clipboard!');
-                } catch (error) {
-                  toast.error(`Failed to copy path. Error: ${error}`);
-                }
-              }}
+              onClick={handleCopyPath}
               triggerClasses={triggerClasses}
             />
           ) : null}
@@ -229,10 +229,7 @@ export default function Toolbar({
               ? 'Hide file properties'
               : 'View file properties'
           }
-          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-            togglePropertiesDrawer();
-            e.currentTarget.blur();
-          }}
+          onClick={handleTogglePropertiesDrawer}
           triggerClasses={triggerClasses}
         />
       </div>

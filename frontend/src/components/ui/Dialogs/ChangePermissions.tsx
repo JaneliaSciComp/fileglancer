@@ -1,9 +1,9 @@
-import React from 'react';
 import { Button } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
 import FgDialog from './FgDialog';
 import TextWithFilePath from './TextWithFilePath';
+import { Spinner } from '@/components/ui/widgets/Loaders';
 import usePermissionsDialog from '@/hooks/usePermissionsDialog';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 
@@ -17,15 +17,33 @@ type ChangePermissionsProps = {
 export default function ChangePermissions({
   showPermissionsDialog,
   setShowPermissionsDialog
-}: ChangePermissionsProps): JSX.Element {
-  const { fileBrowserState } = useFileBrowserContext();
+}: ChangePermissionsProps) {
+  const { fileBrowserState, mutations } = useFileBrowserContext();
 
   const {
     handleLocalPermissionChange,
     localPermissions,
-    handleChangePermissions,
-    isLoading
+    handleChangePermissions
   } = usePermissionsDialog();
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!localPermissions) {
+      toast.error('Error setting permissions: no local permission state');
+      return;
+    }
+    if (!fileBrowserState.propertiesTarget) {
+      toast.error('Error setting permissions: no properties target set');
+      return;
+    }
+    const result = await handleChangePermissions();
+    if (result.success) {
+      toast.success('Permissions changed!');
+    } else {
+      toast.error(`Error changing permissions: ${result.error}`);
+    }
+    setShowPermissionsDialog(false);
+  }
 
   return (
     <FgDialog
@@ -33,30 +51,7 @@ export default function ChangePermissions({
       open={showPermissionsDialog}
     >
       {fileBrowserState.propertiesTarget ? (
-        <form
-          onSubmit={async event => {
-            event.preventDefault();
-            if (!localPermissions) {
-              toast.error(
-                'Error setting permissions: no local permission state'
-              );
-              return;
-            }
-            if (!fileBrowserState.propertiesTarget) {
-              toast.error(
-                'Error setting permissions: no properties target set'
-              );
-              return;
-            }
-            const result = await handleChangePermissions();
-            if (result.success) {
-              toast.success('Permissions changed!');
-            } else {
-              toast.error(`Error changing permissions: ${result.error}`);
-            }
-            setShowPermissionsDialog(false);
-          }}
-        >
+        <form onSubmit={handleSubmit}>
           <TextWithFilePath
             path={fileBrowserState.propertiesTarget.name}
             text="Change permissions for file:"
@@ -157,13 +152,17 @@ export default function ChangePermissions({
           <Button
             className="!rounded-md"
             disabled={Boolean(
-              isLoading ||
+              mutations.changePermissions.isPending ||
                 localPermissions ===
                   fileBrowserState.propertiesTarget.permissions
             )}
             type="submit"
           >
-            Change Permissions
+            {mutations.changePermissions.isPending ? (
+              <Spinner customClasses="border-white" text="Updating..." />
+            ) : (
+              'Change Permissions'
+            )}
           </Button>
         </form>
       ) : null}
