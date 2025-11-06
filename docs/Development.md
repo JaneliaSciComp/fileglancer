@@ -64,7 +64,7 @@ file_share_mounts:
 
 **Alternative: Database Configuration**
 
-Instead of using the `file_share_mounts` setting, you can configure file share paths in the database. This is useful for production deployments where you want centralized management of file share paths. To use the paths in the database, set `file_share_mounts` to `[]`. See [fileglancer-janelia](https://github.com/JaneliaSciComp/fileglancer-janelia) for an example of populating the file share paths in the database, using a private wiki source. 
+Instead of using the `file_share_mounts` setting, you can configure file share paths in the database. This is useful for production deployments where you want centralized management of file share paths. To use the paths in the database, set `file_share_mounts: []`. See [fileglancer-janelia](https://github.com/JaneliaSciComp/fileglancer-janelia) for an example of populating the file share paths in the database, using a private wiki source.
 
 ### Running with SSL/HTTPS (Secure Mode)
 
@@ -145,8 +145,6 @@ If you run into any build issues, the first thing to try is to clear the build d
 ```bash
 ./clean.sh
 ```
-
-If you're still having issues, try manually deleting the symlink at `.pixi/envs/share/jupyter/labextensions/fileglancer` inside the fileglancer repo directory. Then, reinstall the extension using `pixi run dev-install`, and follow the steps above from there.
 
 ## Testing
 
