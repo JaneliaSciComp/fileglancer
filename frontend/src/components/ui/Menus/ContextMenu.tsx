@@ -12,7 +12,7 @@ import { useHandleDownload } from '@/hooks/useHandleDownload';
 type ContextMenuProps = {
   readonly x: number;
   readonly y: number;
-  readonly menuRef: RefObject<HTMLDivElement>;
+  readonly menuRef: RefObject<HTMLDivElement | null>;
   readonly showPropertiesDrawer: boolean;
   readonly togglePropertiesDrawer: () => void;
   readonly setShowContextMenu: Dispatch<SetStateAction<boolean>>;

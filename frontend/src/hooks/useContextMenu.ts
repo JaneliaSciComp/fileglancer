@@ -11,7 +11,7 @@ export default function useContextMenu() {
   });
   const [showContextMenu, setShowContextMenu] = useState<boolean>(false);
 
-  const menuRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   const { updateFilesWithContextMenuClick } = useFileBrowserContext();
 
@@ -42,7 +42,7 @@ export default function useContextMenu() {
     }
 
     // Add click handler to close the menu when clicking outside
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: Event) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onClose();
       }
