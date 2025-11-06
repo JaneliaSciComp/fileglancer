@@ -14,8 +14,7 @@ import {
 import {
   usePreferencesQuery,
   useUpdatePreferenceMutation,
-  useUpdateFavoritesMutation,
-  useUpdateRecentlyViewedFoldersMutation
+  useUpdatePreferenceListMutation
 } from '@/queries/preferencesQueries';
 
 export type FolderFavorite = {
@@ -103,8 +102,7 @@ export const PreferencesProvider = ({
 
   const preferencesQuery = usePreferencesQuery(zonesAndFspQuery.data);
   const updatePreferenceMutation = useUpdatePreferenceMutation();
-  const updateFavoritesMutation = useUpdateFavoritesMutation();
-  const updateRecentlyViewedMutation = useUpdateRecentlyViewedFoldersMutation();
+  const updatePreferenceListMutation = useUpdatePreferenceListMutation();
 
   // Store last viewed folder path and FSP name to avoid duplicate updates
   const lastFolderPathRef = React.useRef<string | null>(null);
@@ -257,7 +255,7 @@ export const PreferencesProvider = ({
       updatedFavorites: Record<string, ZonePreference>;
       favoriteAdded: boolean;
     };
-    await updateFavoritesMutation.mutateAsync({
+    await updatePreferenceListMutation.mutateAsync({
       preferenceKey: 'zone',
       updatedMap: updatedFavorites
     });
@@ -276,7 +274,7 @@ export const PreferencesProvider = ({
       updatedFavorites: Record<string, FileSharePathPreference>;
       favoriteAdded: boolean;
     };
-    await updateFavoritesMutation.mutateAsync({
+    await updatePreferenceListMutation.mutateAsync({
       preferenceKey: 'fileSharePath',
       updatedMap: updatedFavorites
     });
@@ -302,7 +300,7 @@ export const PreferencesProvider = ({
       updatedFavorites: Record<string, FolderPreference>;
       favoriteAdded: boolean;
     };
-    await updateFavoritesMutation.mutateAsync({
+    await updatePreferenceListMutation.mutateAsync({
       preferenceKey: 'folder',
       updatedMap: updatedFavorites
     });
@@ -447,10 +445,13 @@ export const PreferencesProvider = ({
       preferencesQuery.data?.recentlyViewedFolders || []
     );
 
-    updateRecentlyViewedMutation.mutate(updatedFolders);
+    updatePreferenceListMutation.mutate({
+      preferenceKey: 'recentlyViewedFolders',
+      updatedArray: updatedFolders
+    });
   }, [
     updateRecentlyViewedFolders,
-    updateRecentlyViewedMutation,
+    updatePreferenceListMutation,
     preferencesQuery.data?.recentlyViewedFolders,
     preferencesQuery.isPending,
     fileQuery.isPending,
