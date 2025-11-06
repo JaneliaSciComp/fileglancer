@@ -32,20 +32,18 @@ export default function useZarrMetadata() {
   } = usePreferencesContext();
 
   // Fetch Zarr metadata
-  const metadataQuery = useZarrMetadataQuery({
+  const zarrMetadataQuery = useZarrMetadataQuery({
     fspName: fileBrowserState.uiFileSharePath?.name,
     currentFileOrFolder: fileQuery.data?.currentFileOrFolder,
     files: fileQuery.data?.files
   });
 
-  const metadata = metadataQuery.data?.metadata || null;
-  const omeZarrUrl = metadataQuery.data?.omeZarrUrl || null;
+  const metadata = zarrMetadataQuery.data?.metadata || null;
+  const omeZarrUrl = zarrMetadataQuery.data?.omeZarrUrl || null;
 
   // Fetch thumbnail when OME-Zarr URL is available
   const thumbnailQuery = useOmeZarrThumbnailQuery(omeZarrUrl);
-  const thumbnailSrc = thumbnailQuery.data?.thumbnailSrc || null;
-  const thumbnailError = thumbnailQuery.data?.thumbnailError || null;
-  const loadingThumbnail = thumbnailQuery.isPending && !!omeZarrUrl;
+  const thumbnailSrc = thumbnailQuery.data || null;
 
   const [layerType, setLayerType] = useState<
     'auto' | 'image' | 'segmentation' | null
@@ -173,11 +171,9 @@ export default function useZarrMetadata() {
   ]);
 
   return {
-    thumbnailSrc,
+    zarrMetadataQuery,
+    thumbnailQuery,
     openWithToolUrls,
-    metadata,
-    loadingThumbnail,
-    thumbnailError,
     layerType
   };
 }

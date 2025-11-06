@@ -31,6 +31,19 @@ type ZarrMetadataResult = {
 };
 
 /**
+ * Detects if a directory contains Zarr-related files
+ * Returns true if zarr.json, .zarray, or .zattrs files are present
+ */
+export function isZarrDirectory(files: FileOrFolder[] | undefined): boolean {
+  if (!files || files.length === 0) {
+    return false;
+  }
+
+  const zarrFileNames = ['zarr.json', '.zarray', '.zattrs'];
+  return files.some(file => zarrFileNames.includes(file.name));
+}
+
+/**
  * Fetches Zarr metadata by checking for zarr.json, .zarray, or .zattrs files
  */
 async function fetchZarrMetadata({
@@ -151,21 +164,21 @@ export function useZarrMetadataQuery(
       currentFileOrFolder?.path || ''
     ],
     queryFn: async () => await fetchZarrMetadata(params),
-    enabled: !!fspName && !!currentFileOrFolder && !!files && files.length > 0,
+    enabled:
+      !!fspName &&
+      !!currentFileOrFolder &&
+      !!files &&
+      files.length > 0 &&
+      isZarrDirectory(files),
     staleTime: 5 * 60 * 1000, // 5 minutes - Zarr metadata doesn't change often
     retry: false // Don't retry if no Zarr files found
   });
 }
 
-type ThumbnailResult = {
-  thumbnailSrc: string | null;
-  thumbnailError: string | null;
-};
-
 async function fetchOmeZarrThumbnail(
   omeZarrUrl: string,
   signal: AbortSignal
-): Promise<ThumbnailResult> {
+): Promise<string> {
   log.debug('Getting OME-Zarr thumbnail for', omeZarrUrl);
 
   const [thumbnail, errorMessage] = await getOmeZarrThumbnail(
@@ -174,17 +187,12 @@ async function fetchOmeZarrThumbnail(
   );
 
   if (errorMessage) {
-    log.error('Thumbnail load failed:', errorMessage);
-    return {
-      thumbnailSrc: null,
-      thumbnailError: errorMessage
-    };
+    throw new Error(errorMessage);
+  } else if (!thumbnail) {
+    throw new Error('Unknown error: Thumbnail not generated');
   }
 
-  return {
-    thumbnailSrc: thumbnail,
-    thumbnailError: null
-  };
+  return thumbnail;
 }
 
 /**
@@ -192,21 +200,14 @@ async function fetchOmeZarrThumbnail(
  */
 export function useOmeZarrThumbnailQuery(
   omeZarrUrl: string | null
-): UseQueryResult<ThumbnailResult, Error> {
+): UseQueryResult<string, Error> {
   return useQuery({
     queryKey: ['zarr', 'thumbnail', omeZarrUrl || ''],
     queryFn: async ({ signal }) => {
-      try {
-        return await fetchOmeZarrThumbnail(omeZarrUrl!, signal);
-      } catch (error) {
-        log.error('Error fetching OME-Zarr thumbnail:', error);
-        // Return error result instead of throwing to avoid error boundary
-        return {
-          thumbnailSrc: null,
-          thumbnailError:
-            error instanceof Error ? error.message : 'Unknown error'
-        };
+      if (!omeZarrUrl) {
+        throw new Error('omeZarrUrl is required for thumbnail generation');
       }
+      return await fetchOmeZarrThumbnail(omeZarrUrl, signal);
     },
     enabled: !!omeZarrUrl,
     staleTime: 30 * 60 * 1000, // 30 minutes - thumbnails are expensive to generate

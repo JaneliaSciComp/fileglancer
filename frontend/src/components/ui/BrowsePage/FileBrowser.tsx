@@ -10,6 +10,7 @@ import useContextMenu from '@/hooks/useContextMenu';
 import useZarrMetadata from '@/hooks/useZarrMetadata';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
+import { isZarrDirectory } from '@/queries/zarrQueries';
 
 type FileBrowserProps = {
   readonly showPropertiesDrawer: boolean;
@@ -43,26 +44,32 @@ export default function FileBrowser({
     handleContextMenuClick
   } = useContextMenu();
 
-  const {
-    metadata,
-    thumbnailSrc,
-    openWithToolUrls,
-    loadingThumbnail,
-    thumbnailError,
-    layerType
-  } = useZarrMetadata();
+  const { zarrMetadataQuery, thumbnailQuery, openWithToolUrls, layerType } =
+    useZarrMetadata();
+
+  const isZarrDir = isZarrDirectory(fileQuery.data?.files);
 
   return (
     <>
       <Crumbs />
-      {metadata ? (
+      {isZarrDir && zarrMetadataQuery.isPending ? (
+        <div className="flex my-4 shadow-sm rounded-md w-full min-h-96 bg-surface animate-appear animate-pulse animate-delay-150 opacity-0">
+          <Typography className="place-self-center text-center w-full">
+            Loading Zarr metadata...
+          </Typography>
+        </div>
+      ) : zarrMetadataQuery.isError ? (
+        <div className="flex my-4 shadow-sm rounded-md w-full min-h-96 bg-primary-light/30">
+          <Typography className="place-self-center text-center w-full text-warning">
+            Error loading Zarr metadata
+          </Typography>
+        </div>
+      ) : zarrMetadataQuery.data?.metadata ? (
         <ZarrPreview
           layerType={layerType}
-          loadingThumbnail={loadingThumbnail}
-          metadata={metadata}
           openWithToolUrls={openWithToolUrls}
-          thumbnailError={thumbnailError}
-          thumbnailSrc={thumbnailSrc}
+          thumbnailQuery={thumbnailQuery}
+          zarrMetadataQuery={zarrMetadataQuery}
         />
       ) : null}
 
