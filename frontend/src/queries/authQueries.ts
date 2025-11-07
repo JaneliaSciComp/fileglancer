@@ -16,6 +16,7 @@ export type AuthStatus = {
 
 export type SimpleLoginPayload = {
   username: string;
+  next?: string;
 };
 
 export type SimpleLoginResponse = {
