@@ -93,10 +93,12 @@ export default function useZarrMetadata() {
       // OME-Zarr - all urls for v2; no avivator for v3
       if (url) {
         // Populate with actual URLs when proxied path is available
-        openWithToolUrls.validator = validatorBaseUrl + url;
-        openWithToolUrls.vole = voleBaseUrl + url;
+        openWithToolUrls.validator = validatorBaseUrl + encodeURIComponent(url);
+        openWithToolUrls.vole = voleBaseUrl + encodeURIComponent(url);
         openWithToolUrls.avivator =
-          metadata.zarrVersion === 2 ? avivatorBaseUrl + url : null;
+          metadata.zarrVersion === 2
+            ? avivatorBaseUrl + encodeURIComponent(url)
+            : null;
         if (disableNeuroglancerStateGeneration) {
           openWithToolUrls.neuroglancer =
             neuroglancerBaseUrl + generateNeuroglancerStateForDataURL(url);
