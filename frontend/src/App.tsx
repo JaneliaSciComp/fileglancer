@@ -26,9 +26,11 @@ function RequireAuth({ children }: { readonly children: ReactNode }) {
     );
   }
 
-  // If not authenticated, redirect to home page
+  // If not authenticated, redirect to home page with the current URL as 'next' parameter
   if (!authStatus?.authenticated) {
-    window.location.href = '/fg/';
+    const currentPath = window.location.pathname + window.location.search + window.location.hash;
+    const encodedNext = encodeURIComponent(currentPath);
+    window.location.href = `/fg/?next=${encodedNext}`;
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-foreground">Redirecting to login...</div>
