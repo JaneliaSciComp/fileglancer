@@ -216,6 +216,7 @@ This improves readability and makes it clear which imports are type-only.
    - **Use for**: Constructing file paths within URLs
 
 **Best Practices**:
+
 - **Always use utility functions** - Never manually construct URLs with template strings
 - **Choose the right utility**:
   - Internal API calls → `buildApiUrl`
@@ -281,7 +282,9 @@ export function useMyData(fspName: string, filePath?: string) {
       );
 
       // Use sendFetchRequest for session handling and health checks
-      const response = await sendFetchRequest(url, 'GET', undefined, { signal });
+      const response = await sendFetchRequest(url, 'GET', undefined, {
+        signal
+      });
 
       if (!response.ok) {
         throw new Error('Failed to fetch');
@@ -328,6 +331,7 @@ export function useUpdateMyData() {
 ```
 
 **Why use `sendFetchRequest`?**
+
 - Automatically includes credentials for session management
 - Handles session expiration (401/403) with automatic logout
 - Reports failed requests to health check monitoring
