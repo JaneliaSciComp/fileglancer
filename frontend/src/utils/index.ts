@@ -234,6 +234,149 @@ function makeMapKey(type: 'zone' | 'fsp' | 'folder', name: string): string {
   return `${type}_${name}`;
 }
 
+/**
+ * Constructs an API URL with proper encoding for path segments and query parameters.
+ * This is the recommended way to build URLs for use with sendFetchRequest.
+ *
+ * @param basePath - The base API path (e.g., '/api/files/')
+ * @param pathSegments - Optional path segments to append (e.g., fspName)
+ * @param queryParams - Optional query parameters as key-value pairs
+ * @returns A properly encoded URL string ready for sendFetchRequest
+ *
+ * @example
+ * // Simple path
+ * buildApiUrl('/api/files/', ['myFSP'])
+ * // Returns: '/api/files/myFSP'
+ *
+ * @example
+ * // Path with query parameters
+ * buildApiUrl('/api/files/', ['myFSP'], { subpath: 'folder/file.txt' })
+ * // Returns: '/api/files/myFSP?subpath=folder%2Ffile.txt'
+ *
+ * @example
+ * // Multiple query parameters
+ * buildApiUrl('/api/ticket', [], { fsp_name: 'myFSP', path: 'folder/file.txt' })
+ * // Returns: '/api/ticket?fsp_name=myFSP&path=folder%2Ffile.txt'
+ */
+function buildApiUrl(
+  basePath: string,
+  pathSegments?: string[],
+  queryParams?: Record<string, string>
+): string {
+  // Build the base path with encoded path segments
+  let url = basePath;
+  if (pathSegments && pathSegments.length > 0) {
+    const encodedSegments = pathSegments.map(seg => encodeURIComponent(seg));
+    url = joinPaths(url, ...encodedSegments);
+  }
+
+  // Add query parameters if provided
+  if (queryParams && Object.keys(queryParams).length > 0) {
+    const searchParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(queryParams)) {
+      searchParams.append(key, value);
+    }
+    url += `?${searchParams.toString()}`;
+  }
+
+  return url;
+}
+
+/**
+ * Constructs an external URL with path segments (S3-style URLs).
+ * Use this when building URLs for services that use path-based resource access (e.g., S3, cloud storage).
+ * Path segments are encoded while preserving '/' as the path separator.
+ *
+ * @param baseUrl - The base URL of the external service (e.g., 'https://s3.example.com/bucket')
+ * @param pathSegment - Optional path to append (e.g., 'folder/file.zarr'). Special characters are encoded.
+ * @param queryParams - Optional query parameters. Only used when path segments need to be combined with query params.
+ * @returns A properly encoded external URL string
+ *
+ * @example
+ * // Simple path segment
+ * buildExternalUrlWithPath('https://s3.example.com/bucket', 'folder/file.zarr')
+ * // Returns: 'https://s3.example.com/bucket/folder/file.zarr'
+ *
+ * @example
+ * // Path with special characters
+ * buildExternalUrlWithPath('https://s3.example.com/bucket', 'path with spaces/file 100%.zarr')
+ * // Returns: 'https://s3.example.com/bucket/path%20with%20spaces/file%20100%25.zarr'
+ *
+ * @example
+ * // Path with query parameters
+ * buildExternalUrlWithPath('https://example.com', 'data/file.zarr', { version: '2' })
+ * // Returns: 'https://example.com/data/file.zarr?version=2'
+ */
+function buildExternalUrlWithPath(
+  baseUrl: string,
+  pathSegment?: string,
+  queryParams?: Record<string, string>
+): string {
+  // Remove trailing slash from base URL if present
+  let url = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+
+  // Append path segment if provided
+  if (pathSegment) {
+    // Use escapePathForUrl to encode segments while preserving '/' as path separator
+    const encodedPath = escapePathForUrl(pathSegment);
+    url = `${url}/${encodedPath}`;
+  }
+
+  // Add query parameters if provided
+  if (queryParams && Object.keys(queryParams).length > 0) {
+    const searchParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(queryParams)) {
+      searchParams.append(key, value);
+    }
+    url += `?${searchParams.toString()}`;
+  }
+
+  return url;
+}
+
+/**
+ * Constructs an external URL with query parameters only.
+ * Use this when building URLs for services that accept data via query parameters (e.g., form submissions, validators, web apps).
+ * Query parameter values are properly URL-encoded.
+ *
+ * @param baseUrl - The base URL of the external service (e.g., 'https://viewer.example.com/')
+ * @param queryParams - Query parameters as key-value pairs. Values will be encoded.
+ * @returns A properly encoded external URL string
+ *
+ * @example
+ * // Single query parameter
+ * buildExternalUrlWithQuery('https://viewer.example.com/', { url: 'https://data.example.com/file.zarr' })
+ * // Returns: 'https://viewer.example.com?url=https%3A%2F%2Fdata.example.com%2Ffile.zarr'
+ *
+ * @example
+ * // Multiple query parameters
+ * buildExternalUrlWithQuery('https://forms.clickup.com/form', { Version: '1.0', URL: 'https://app.com' })
+ * // Returns: 'https://forms.clickup.com/form?Version=1.0&URL=https%3A%2F%2Fapp.com'
+ *
+ * @example
+ * // Query parameter with special characters
+ * buildExternalUrlWithQuery('https://validator.com/', { source: 'https://data.com/my file.zarr' })
+ * // Returns: 'https://validator.com?source=https%3A%2F%2Fdata.com%2Fmy+file.zarr'
+ */
+function buildExternalUrlWithQuery(
+  baseUrl: string,
+  queryParams?: Record<string, string>
+): string {
+  // Remove trailing slash from base URL if present
+  let url = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+
+  // Add query parameters if provided
+  if (queryParams && Object.keys(queryParams).length > 0) {
+    const searchParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(queryParams)) {
+      searchParams.append(key, value);
+    }
+    url += `?${searchParams.toString()}`;
+  }
+
+  return url;
+}
+
 async function fetchFileContent(
   fspName: string,
   path: string,
