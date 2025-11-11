@@ -6,7 +6,7 @@ import {
   UseMutationResult
 } from '@tanstack/react-query';
 
-import { sendFetchRequest, HTTPError } from '@/utils';
+import { sendFetchRequest, buildApiUrl, HTTPError } from '@/utils';
 import { toHttpError } from '@/utils/errorHandling';
 import type { ProxiedPath } from '@/contexts/ProxiedPathContext';
 
@@ -94,12 +94,11 @@ const fetchProxiedPathByFspAndPath = async (
   signal?: AbortSignal
 ): Promise<ProxiedPath | null> => {
   try {
-    const response = await sendFetchRequest(
-      `/api/proxied-path?fsp_name=${encodeURIComponent(fspName)}&path=${encodeURIComponent(path)}`,
-      'GET',
-      undefined,
-      { signal }
-    );
+    const url = buildApiUrl('/api/proxied-path', [], {
+      fsp_name: fspName,
+      path
+    });
+    const response = await sendFetchRequest(url, 'GET', undefined, { signal });
 
     if (response.status === 404) {
       // Not an error, just no proxied path found for this fsp/path
@@ -175,10 +174,11 @@ export function useCreateProxiedPathMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: async (payload: CreateProxiedPathPayload) => {
-      const response = await sendFetchRequest(
-        `/api/proxied-path?fsp_name=${encodeURIComponent(payload.fsp_name)}&path=${encodeURIComponent(payload.path)}`,
-        'POST'
-      );
+      const url = buildApiUrl('/api/proxied-path', [], {
+        fsp_name: payload.fsp_name,
+        path: payload.path
+      });
+      const response = await sendFetchRequest(url, 'POST');
       if (!response.ok) {
         throw await toHttpError(response);
       }
@@ -242,10 +242,8 @@ export function useDeleteProxiedPathMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: async (payload: DeleteProxiedPathPayload) => {
-      const response = await sendFetchRequest(
-        `/api/proxied-path/${payload.sharing_key}`,
-        'DELETE'
-      );
+      const url = buildApiUrl('/api/proxied-path/', [payload.sharing_key]);
+      const response = await sendFetchRequest(url, 'DELETE');
       if (!response.ok) {
         throw await toHttpError(response);
       }
