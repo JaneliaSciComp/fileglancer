@@ -149,7 +149,15 @@ function SearchPopover<TData, TValue>({
         !tooltipRef.current.contains(event.target as Node) &&
         forceOpen
       ) {
-        clearAndClose();
+        // Don't close if clicking within the table body or actions menu
+        // Closing clears the search, resets the table, and prevents navigation/actions
+        const tableBody = document.getElementById('table-body');
+        const isInTableBody = tableBody?.contains(event.target as Node);
+        const isInMenu =
+          (event.target as HTMLElement).closest('[role="menu"]') !== null;
+        if (!isInTableBody && !isInMenu) {
+          clearAndClose();
+        }
       }
     }
 
@@ -362,7 +370,7 @@ function Table<TData>({
       {loadingState ? (
         <TableRowSkeleton gridColsClass={gridColsClass} />
       ) : data && data.length > 0 ? (
-        <div className="max-h-full">
+        <div className="max-h-full" id="table-body">
           {table.getRowModel().rows.map(row => (
             <TableRow gridColsClass={gridColsClass} key={row.id}>
               {row.getVisibleCells().map(cell => (
