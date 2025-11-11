@@ -11,7 +11,7 @@ import {
   getLastSegmentFromPath,
   getPreferredPathForDisplay,
   makeBrowseLink,
-  getFileBrowsePath
+  buildApiUrl
 } from '@/utils';
 import MissingFolderFavoriteDialog from './MissingFolderFavoriteDialog';
 import FgTooltip from '../widgets/FgTooltip';
@@ -73,7 +73,9 @@ export default function Folder({
     try {
       // Use queryClient.fetchQuery to check if folder exists
       // This leverages the existing query infrastructure and caching
-      const url = getFileBrowsePath(fsp.name, folderPath);
+      const url = buildApiUrl('/api/files/', [fsp.name], {
+        subpath: folderPath
+      });
       await queryClient.fetchQuery({
         queryKey: fileQueryKeys.filePath(fsp.name, folderPath),
         queryFn: async () => {

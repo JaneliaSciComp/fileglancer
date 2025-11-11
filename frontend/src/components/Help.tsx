@@ -7,6 +7,7 @@ import { LuBookOpenText } from 'react-icons/lu';
 import { HiExternalLink } from 'react-icons/hi';
 
 import useVersionQuery from '@/queries/versionQuery';
+import { buildExternalUrlWithQuery } from '@/utils';
 
 type HelpLink = {
   icon: IconType;
@@ -16,6 +17,13 @@ type HelpLink = {
 };
 
 function getHelpLinks(version: string | undefined): HelpLink[] {
+  const clickupBaseUrl =
+    'https://forms.clickup.com/10502797/f/a0gmd-713/NBUCBCIN78SI2BE71G';
+  const clickupParams: Record<string, string> = { URL: window.location.href };
+  if (version) {
+    clickupParams.Version = version;
+  }
+
   return [
     {
       icon: LuBookOpenText,
@@ -38,9 +46,7 @@ function getHelpLinks(version: string | undefined): HelpLink[] {
       icon: SiClickup,
       title: 'Submit Tickets',
       description: 'Report bugs or request features through a ClickUp form',
-      url: version
-        ? `https://forms.clickup.com/10502797/f/a0gmd-713/NBUCBCIN78SI2BE71G?Version=${version}&URL=${window.location}`
-        : `https://forms.clickup.com/10502797/f/a0gmd-713/NBUCBCIN78SI2BE71G?URL=${window.location}`
+      url: buildExternalUrlWithQuery(clickupBaseUrl, clickupParams)
     },
     {
       icon: SiSlack,
