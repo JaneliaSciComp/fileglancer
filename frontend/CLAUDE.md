@@ -175,6 +175,57 @@ import { useState, useEffect, type FC, type ReactNode } from 'react';
 
 This improves readability and makes it clear which imports are type-only.
 
+### URL Construction and Encoding
+
+**Key Principle**: URL encoding must happen at the point of URL construction using utility functions, not manually.
+
+**Data Flow**: User-controlled data (file paths, FSP names, etc.) flows through the application in raw, unencoded form. Encoding is applied by URL construction utilities.
+
+**URL Construction Utilities** (`src/utils/index.ts` and `src/utils/pathHandling.ts`):
+
+1. **`buildApiUrl(basePath, pathSegments?, queryParams?)`** - For internal API requests
+   - Encodes path segments with `encodeURIComponent()` (including `/`)
+   - Uses `URLSearchParams` for query parameters
+   - Returns relative URLs (e.g., `/api/files/myFSP?subpath=file.txt`)
+   - **Why it encodes `/`**: FastAPI automatically URL-decodes path parameters, so full encoding is required
+   - **Use for**: All `sendFetchRequest()` calls to internal APIs
+
+2. **`buildExternalUrlWithQuery(baseUrl, queryParams?)`** - For form/query-based external URLs
+   - Takes absolute URLs as base
+   - Only supports query parameters (no path segments)
+   - Uses `URLSearchParams` for query encoding
+   - Returns absolute URLs (e.g., `https://viewer.com?url=...`)
+   - **Use for**: External form submissions, validators, and web apps that accept data as query params
+
+3. **`buildExternalUrlWithPath(baseUrl, pathSegment?, queryParams?)`** - For S3-style external URLs
+   - Takes absolute URLs as base
+   - Path segments are encoded while preserving `/` as path separator
+   - Optional query parameters using `URLSearchParams`
+   - Returns absolute URLs (e.g., `https://s3.example.com/bucket/folder/file.zarr`)
+   - **Use for**: S3-compatible storage, cloud bucket URLs with path-based resource access
+
+4. **`getFileURL(fspName, filePath?)`** - For browser-accessible file content URLs
+   - Uses `escapePathForUrl()` which preserves `/` as path separator
+   - Returns absolute URLs using `window.location.origin`
+   - Specifically for `/api/content/` endpoint
+   - **Use for**: File content URLs displayed to users or used in OME-Zarr viewers
+
+5. **`escapePathForUrl(path)`** - For path-style URLs (preserves `/`)
+   - Encodes each path segment separately
+   - Preserves forward slashes as path separators
+   - **Use for**: Constructing file paths within URLs
+
+**Best Practices**:
+- **Always use utility functions** - Never manually construct URLs with template strings
+- **Choose the right utility**:
+  - Internal API calls → `buildApiUrl`
+  - Query-based external URLs → `buildExternalUrlWithQuery`
+  - S3-style external URLs → `buildExternalUrlWithPath`
+  - File content URLs → `getFileURL`
+  - Manual path construction → `escapePathForUrl`
+- **No double encoding**: Functions that receive URLs (like `sendFetchRequest`) do not re-encode
+- **Backend URLs are ready**: URLs from backend API responses are already encoded
+
 ### Component Guidelines
 
 **Preferences when adding a new UI component:**
@@ -216,13 +267,25 @@ This improves readability and makes it clear which imports are type-only.
 // default `staleTime` set to 30 seconds in /src/main.tsx
 // only override if good reason to (see example below)
 import { useQuery } from '@tanstack/react-query';
+import { buildApiUrl, sendFetchRequest } from '@/utils';
 
-export function useMyData(id: string) {
+export function useMyData(fspName: string, filePath?: string) {
   return useQuery({
-    queryKey: ['my-data', id],
-    queryFn: async () => {
-      const response = await fetch(`/api/my-endpoint/${id}`);
-      if (!response.ok) throw new Error('Failed to fetch');
+    queryKey: ['my-data', fspName, filePath],
+    queryFn: async ({ signal }) => {
+      // Use buildApiUrl for proper URL encoding
+      const url = buildApiUrl(
+        '/api/files/',
+        [fspName],
+        filePath ? { subpath: filePath } : undefined
+      );
+
+      // Use sendFetchRequest for session handling and health checks
+      const response = await sendFetchRequest(url, 'GET', undefined, { signal });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch');
+      }
       return response.json();
     },
     staleTime: 1000 * 60 * 5 // 5 minutes, data not expected to change frequently
@@ -230,7 +293,7 @@ export function useMyData(id: string) {
 }
 
 // In component
-const { data, isLoading, error } = useMyData(id);
+const { data, isLoading, error } = useMyData(fspName, filePath);
 ```
 
 **Pattern for mutations:**
@@ -238,18 +301,22 @@ const { data, isLoading, error } = useMyData(id);
 ```typescript
 // In src/queries/useUpdateMyData.ts
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { buildApiUrl, sendFetchRequest } from '@/utils';
 
 export function useUpdateMyData() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: MyData) => {
-      const response = await fetch('/api/my-endpoint', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      if (!response.ok) throw new Error('Update failed');
+    mutationFn: async (payload: { fspName: string; data: MyData }) => {
+      // Use buildApiUrl for proper URL encoding
+      const url = buildApiUrl('/api/files/', [payload.fspName]);
+
+      // Use sendFetchRequest - it handles headers, credentials, and error handling
+      const response = await sendFetchRequest(url, 'PUT', payload.data);
+
+      if (!response.ok) {
+        throw new Error('Update failed');
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -259,6 +326,13 @@ export function useUpdateMyData() {
   });
 }
 ```
+
+**Why use `sendFetchRequest`?**
+- Automatically includes credentials for session management
+- Handles session expiration (401/403) with automatic logout
+- Reports failed requests to health check monitoring
+- Consistent error handling across the application
+- Sets appropriate headers based on HTTP method
 
 ### Routing
 
