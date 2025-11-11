@@ -1,10 +1,7 @@
 import { default as log } from '@/logger';
 import {
   escapePathForUrl,
-  getFileContentPath,
-  getFileBrowsePath,
   getFileURL,
-  getFullPath,
   getLastSegmentFromPath,
   getPreferredPathForDisplay,
   joinPaths,
@@ -117,7 +114,7 @@ class HTTPError extends Error {
 
 async function checkSessionValidity(): Promise<boolean> {
   try {
-    const response = await fetch(getFullPath('/api/profile'), {
+    const response = await fetch('/api/profile', {
       method: 'GET',
       credentials: 'include'
     });
@@ -157,7 +154,7 @@ async function sendFetchRequest(
 
   let response: Response;
   try {
-    response = await fetch(getFullPath(apiPath), requestOptions);
+    response = await fetch(apiPath, requestOptions);
   } catch (error) {
     // Report network errors to central server health monitoring if applicable
     const reporter = healthCheckRegistry.getReporter();
@@ -382,7 +379,7 @@ async function fetchFileContent(
   path: string,
   options?: FetchRequestOptions
 ): Promise<Uint8Array> {
-  const url = getFileContentPath(fspName, path);
+  const url = buildApiUrl('/api/content/', [fspName], { subpath: path });
   const response = await sendFetchRequest(url, 'GET', undefined, options);
   if (!response.ok) {
     throw new Error(`Failed to fetch file: ${response.statusText}`);
@@ -434,18 +431,18 @@ async function fetchFileWithTextDetection(
 }
 
 export {
+  buildApiUrl,
+  buildExternalUrlWithPath,
+  buildExternalUrlWithQuery,
   checkSessionValidity,
   escapePathForUrl,
   fetchFileAsJson,
   fetchFileAsText,
   fetchFileContent,
   fetchFileWithTextDetection,
-  getFullPath,
   formatDateString,
   formatUnixTimestamp,
   formatFileSize,
-  getFileContentPath,
-  getFileBrowsePath,
   getFileURL,
   getLastSegmentFromPath,
   getPreferredPathForDisplay,
