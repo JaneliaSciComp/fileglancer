@@ -7,14 +7,13 @@ import getpass
 import secrets
 import signal
 import sys
-import asyncio
 import click
 import uvicorn
 import json
 import webbrowser
 import threading
 import time
-import socket
+
 from pathlib import Path
 from datetime import datetime, timedelta, UTC
 from loguru import logger

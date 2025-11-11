@@ -137,6 +137,26 @@ class SessionDB(Base):
     last_accessed_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
 
 
+
+class TaskDataDB(Base):
+    """TaskData DB model"""
+    __tablename__ = 'tasks'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, nullable=False, index=True)
+    owner = Column(String, nullable=True)
+    proxy = Column(String, nullable=True)
+    parameters = Column(String, nullable=True)
+    compute_resources = Column(String, nullable=True)
+    monitor_url = Column(String, nullable=True)
+    output_log = Column(String, nullable=True)
+    error_log = Column(String, nullable=True)
+    status = Column(String, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)
+
+
 def run_alembic_upgrade(db_url):
     """Run Alembic migrations to upgrade database to latest version"""
     global _migrations_run

@@ -32,6 +32,7 @@ dependencies = [
     "click >=8.0",
     "fastapi >=0.119.1",
     "httpx >=0.28",
+    "importlib-metadata >=8.7.0",
     "itsdangerous >=2.2.0",
     "loguru >=0.7.3",
     "lxml >=5.3.1",
@@ -48,6 +49,9 @@ dependencies = [
 
 [project.scripts]
 fileglancer = "fileglancer.cli:cli"
+
+[project.entry-points."fileglancer.tasks"]
+nextflow_task = "fileglancer.fgtasks.nftask:NextflowTaskDefn"
 
 [project.optional-dependencies]
 test = [
@@ -93,7 +97,7 @@ path = "fileglancer/_version.py"
 [tool.check-wheel-contents]
 ignore = ["W002"]
 
-[tool.pixi.project]
+[tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = ["osx-arm64", "osx-64", "linux-64"]
 
