@@ -1098,10 +1098,9 @@ def create_app(settings):
     async def create_task(
         task_name: str,
         task_input: Dict[str, Any] = Body(...),
-        # username: str = Depends(get_current_user)
+        username: str = Depends(get_current_user)
     ):
         tasks_registry = get_tasks_registry()
-        username = 'goinac' # !!!!!!!
         with _get_user_context(username):
             # lookup task
             task_defn = tasks_registry.get_task(task_name)
