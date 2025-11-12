@@ -3031,7 +3031,7 @@ packages:
 - pypi: ./
   name: fileglancer
   version: 2.1.2
-  sha256: 34cc9d943a0f28f313fe0d8da68798e8d9e62db25c8c22c2917b2e06cf848306
+  sha256: d2e03ed9f609f89fc78d7ece14bf36c43f0af00e92af9eddaae332a31ca5161c
   requires_dist:
   - aiosqlite>=0.21.0
   - alembic>=1.17.0

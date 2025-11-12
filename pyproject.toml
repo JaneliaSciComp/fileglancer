@@ -147,8 +147,8 @@ dev-watch = { cmd = "cd frontend && NODE_ENV=development npm run watch" }
 dev-launch = "pixi run uvicorn fileglancer.app:app --no-access-log --port 7878 --reload"
 dev-launch-remote = "pixi run uvicorn fileglancer.app:app --no-access-log --host 0.0.0.0 --port 7878 --reload --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
 dev-launch-secure = "python fileglancer/dev_launch.py"
-migrate = "alembic upgrade head"
-migrate-create = "alembic revision --autogenerate"
+migrate = { cmd = "alembic upgrade head", cwd = "fileglancer" }
+migrate-create = { cmd = "alembic revision --autogenerate", cwd = "fileglancer" }
 stamp-db = "python -m fileglancer.stamp_db"
 
 [tool.pixi.dependencies]

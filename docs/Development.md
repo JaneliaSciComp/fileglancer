@@ -66,6 +66,17 @@ file_share_mounts:
 
 Instead of using the `file_share_mounts` setting, you can configure file share paths in the database. This is useful for production deployments where you want centralized management of file share paths. To use the paths in the database, set `file_share_mounts: []`. See [fileglancer-janelia](https://github.com/JaneliaSciComp/fileglancer-janelia) for an example of populating the file share paths in the database, using a private wiki source.
 
+### Making changes to the database
+If database changes are needed you first need to create a new alembic revision using:
+```
+pixi run migrate-create -m "enter what the migration is about"
+```
+Then run the actual up-migration
+```
+pixi run migrate
+```
+If database downgrade is required, so far there's no pixi task defined for it so that would have to be done in a `pixi shell`
+
 ### Running with SSL/HTTPS (Secure Mode)
 
 By default, `pixi run dev-launch` runs the server in insecure HTTP mode on port 7878. This is suitable for most local development scenarios.
