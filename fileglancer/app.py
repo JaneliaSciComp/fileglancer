@@ -1091,7 +1091,7 @@ def create_app(settings):
 
     @app.get("/api/tasks")
     async def list_tasks():
-        tasks_registry = get_tasks_registry()
+        tasks_registry = get_tasks_registry(get_settings())
         # list tasks
         task_names = tasks_registry.list_tasks()
         return JSONResponse(content = task_names, status_code=200)
@@ -1100,7 +1100,7 @@ def create_app(settings):
     async def get_task_params(
         task_name: str,
     ):
-        tasks_registry = get_tasks_registry()
+        tasks_registry = get_tasks_registry(get_settings())
         logger.info(f'Lookup task {task_name}')
         # lookup task
         task_defn = tasks_registry.get_task(task_name)
@@ -1117,7 +1117,7 @@ def create_app(settings):
         task_input: Dict[str, Any] = Body(...),
         username: str = Depends(get_current_user)
     ):
-        tasks_registry = get_tasks_registry()
+        tasks_registry = get_tasks_registry(get_settings())
         with _get_user_context(username):
             # lookup task
             task_defn = tasks_registry.get_task(task_name)

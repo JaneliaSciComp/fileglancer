@@ -1,9 +1,8 @@
 """
 Authentication module for OKTA OAuth/OIDC integration
 """
-import os
 import hashlib
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, UTC
 from typing import Optional
 
 from authlib.integrations.starlette_client import OAuth

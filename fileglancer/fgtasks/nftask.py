@@ -7,8 +7,8 @@ from .fgtasks import TaskData, TaskDefn
 
 
 class NextflowTaskDefn(TaskDefn):
-    def __init__(self, name):
-        super().__init__(name)
+    def __init__(self, name, settings):
+        super().__init__(name, settings)
         self._process = None
 
     def define_args(self) -> ArgumentParser:

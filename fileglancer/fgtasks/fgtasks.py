@@ -6,7 +6,8 @@ from datetime import datetime
 from importlib.metadata import entry_points
 from typing import Dict, List, Any, Optional, Sequence
 from loguru import logger
-
+from pathlib import Path
+from fileglancer.settings import Settings
 
 @dataclass
 class TaskData:
@@ -37,8 +38,9 @@ class TaskDefn(ABC):
     """
     Task definition
     """
-    def __init__(self, name:str):
+    def __init__(self, name:str, settings:Settings):
         self._name = name
+        self._settings = settings
         self._executor = None
 
     # parameter definition
@@ -107,11 +109,11 @@ class TaskParameterDefn:
         })
 
 
-
 class TaskExecutor:
     def __init__(self, task_name):
         self._task_name = task_name
         self._process = None
+        self._monitor = None
         self._process_stdout_reader = None
         self._process_stderr_reader = None
 
@@ -123,25 +125,57 @@ class TaskExecutor:
             stderr=asyncio.subprocess.PIPE,
         )
         logger.info(f'Task {self._task_name} PID: {self._process.pid}')
+        # Start the background monitor
+        self._monitor = asyncio.create_task(self._monitor_task_process(self._process))
         # Start background tasks to read the output output
         self._process_stdout_reader = asyncio.create_task(self._read_stream(self._process.stdout, "STDOUT"))
         self._process_stderr_reader = asyncio.create_task(self._read_stream(self._process.stderr, "STDERR"))
 
-    async def _read_stream(self, stream: asyncio.StreamReader | None, label: str):
+    async def _read_stream(self, stream: asyncio.StreamReader | None, label: str, filename: str|None=None):
         """Read and log process output lines as they arrive."""
+        if stream is None:
+            return # nothing to do
         try:
-            if stream is not None:
-                async for line in stream:
-                    text = line.decode().rstrip()
-                    logger.info(f"[{label}] {text}")
+            if filename:
+                # Ensure all parent directories exist
+                Path(filename).parent.mkdir(parents=True, exist_ok=True)
+                # Open file for writing (append mode is often useful for logs)
+                file_handle = open(filename, 'a', encoding='utf-8')
+            else:
+                file_handle = None
+
+            async for line in stream:
+                text = line.decode(errors='replace').rstrip()
+                logger.debug(f"[{label}] {text}")
+
+                if file_handle:
+                    file_handle.write(text + '\n')
+                    file_handle.flush()
+
         except Exception as e:
             logger.error(f"Error reading {label}: {e}")
 
+    async def _monitor_task_process(self, process:asyncio.subprocess.Process):
+        try:
+            while True:
+                if process.returncode is not None:
+                    logger.info(f'{self._task_name} process finished with {process.returncode} code')
+                    await asyncio.gather(
+                        *(t for t in [self._process_stdout_reader, self._process_stderr_reader] if t),
+                        return_exceptions=True
+                    )
+                    break
+                await asyncio.sleep(0.5)
+        except asyncio.CancelledError:
+            logger.info(f'{self._task_name} monitor cancelled')
+        except Exception as e:
+            logger.error(f'{self._task_name} monitor error: {e}')
 
 
 class TaskRegistry:
 
-    def __init__(self, entry_point_group: str = 'fileglancer.tasks'):
+    def __init__(self, settings: Settings, entry_point_group: str = 'fileglancer.tasks'):
+        self._settings = settings
         self._entry_point_group = entry_point_group
         self._tasks : Dict[str, TaskDefn] = {}
 
@@ -156,7 +190,7 @@ class TaskRegistry:
         for ep in group:
             try:
                 task_class = ep.load()
-                task = task_class(ep.name)
+                task = task_class(ep.name, self._settings)
                 if not isinstance(task, TaskDefn):
                     logger.warning(f'Warning: {ep.name} is not a Task definition instance')
                     continue
@@ -203,11 +237,11 @@ def create_taskdata(task_name: str,
 tasks_registry : Optional[TaskRegistry] = None
 
 
-def get_tasks_registry():
+def get_tasks_registry(settings:Settings):
     global tasks_registry
     if tasks_registry is None:
         logger.info('Initialize task registry')
-        tasks_registry = TaskRegistry()
+        tasks_registry = TaskRegistry(settings)
         tasks_registry.discover_tasks()
     
     return tasks_registry
