@@ -97,13 +97,13 @@ class TaskParameterDefn:
 
     def to_json(self) -> str:
         return json.dumps({
-            "name": self.name,
-            "flags": list(self.flags),  # convert Sequence to list
-            "required": self.required,
-            "default": _as_json_type(self.default),
-            "help": self.help,
-            "nargs": _as_json_type(self.nargs),
-            "choices": _as_json_type(self.choices),            
+            'name': self.name,
+            'flags': list(self.flags),  # convert Sequence to list
+            'required': self.required,
+            'default': _as_json_type(self.default),
+            'help': self.help,
+            'nargs': _as_json_type(self.nargs),
+            'choices': _as_json_type(self.choices),            
         })
 
 
