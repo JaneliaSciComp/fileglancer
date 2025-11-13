@@ -71,70 +71,6 @@ function joinPaths(...paths: string[]): string {
 }
 
 /**
- * Returns the root path for the Fileglancer API based on the current window location.
- * This is used to construct API paths relative to the current Jupyter environment, if applicable.
- * It checks for common JupyterLab and Jupyter Single User URL patterns.
- * Example:
- * getAPIPathRoot(); // Returns '/jupyter/user/username/' or '/user/username/'
- */
-function getAPIPathRoot() {
-  const path = window.location.pathname;
-  const patterns = [
-    /^\/jupyter\/user\/[^/]+\//, // JupyterLab
-    /^\/user\/[^/]+\// // Jupyter Single User
-  ];
-
-  for (const pattern of patterns) {
-    const match = path.match(pattern);
-    if (match) {
-      return match[0];
-    }
-  }
-
-  return '/';
-}
-
-/**
- * Constructs a URL for the UI to fetch folder and/or file information from the Fileglancer API.
- * If no filePath is provided, it returns the endpoint URL with the FSP path appended - this is the base URL.
- * If filePath is provided, it appends it as a URL param with key "subpath" to the base URL.
- * Example:
- * getFileBrowsePath('myFSP'); // Returns '/api/files/myFSP'
- * getFileBrowsePath('myFSP', 'path/to/folder'); // Returns '/api/files/myFSP?subpath=path%2Fto%2Ffolder'
- */
-function getFileBrowsePath(fspName: string, filePath?: string): string {
-  let fetchPath = joinPaths('/api/files/', fspName);
-
-  const params: string[] = [];
-  if (filePath) {
-    params.push(`subpath=${encodeURIComponent(filePath)}`);
-  }
-  if (params.length > 0) {
-    fetchPath += `?${params.join('&')}`;
-  }
-
-  return fetchPath;
-}
-
-/**
- * Constructs a URL for the UI to fetch file contents from the Fileglancer API.
- * If no filePath is provided, it returns the endpoint URL with the FSP path appended - this is the base URL.
- * If filePath is provided, it appends it as a URL param with key "subpath" to the base URL.
- * Example:
- * getFileContentPath('myFSP'); // Returns '/api/content/myFSP'
- * getFileContentPath('myFSP', 'path/to/file.txt'); // Returns '/api/content/myFSP?subpath=path%2Fto%2Ffile.txt'
- */
-function getFileContentPath(fspName: string, filePath: string): string {
-  let fetchPath = joinPaths('/api/content/', fspName);
-
-  if (filePath) {
-    fetchPath += `?subpath=${encodeURIComponent(filePath)}`;
-  }
-
-  return fetchPath;
-}
-
-/**
  * Constructs a sharable URL to access file contents from the browser with the Fileglancer API.
  * If no filePath is provided, it returns the endpoint URL with the FSP path appended - this is the base URL.
  * If filePath is provided, this is appended to the base URL with proper URL escaping.
@@ -146,28 +82,14 @@ function getFileContentPath(fspName: string, filePath: string): string {
 function getFileURL(fspName: string, filePath?: string): string {
   const escapedFspName = encodeURIComponent(fspName);
   const fspPath = joinPaths('/api/content/', escapedFspName);
-  const apiPath = getFullPath(fspPath);
 
   if (filePath) {
     const escapedFilePath = escapePathForUrl(filePath);
-    const apiFilePath = joinPaths(apiPath, escapedFilePath);
+    const apiFilePath = joinPaths(fspPath, escapedFilePath);
     return new URL(apiFilePath, window.location.origin).href;
   }
 
-  return new URL(apiPath, window.location.origin).href;
-}
-
-/** * Constructs a full API path by joining the API root with a relative path.
- * This is useful for creating complete API endpoints based on the current Jupyter environment.
- * Example:
- * getFullPath('files/myFSP'); // Returns '/jupyter/user/username/files/myFSP'
- * getFullPath('content/myFSP/path/to/file.txt'); // Returns '/jupyter/user/username/content/myFSP/path/to/file.txt'
- * If no Jupyter environment is detected, it returns the relative path as is.
- * Example:
- * getFullPath('files/myFSP'); // Returns '/files/myFSP'
- */
-function getFullPath(relativePath: string) {
-  return joinPaths(getAPIPathRoot(), relativePath);
+  return new URL(fspPath, window.location.origin).href;
 }
 
 /**
@@ -283,11 +205,7 @@ function makeBrowseLink(
 export {
   convertBackToForwardSlash,
   escapePathForUrl,
-  getAPIPathRoot,
-  getFileBrowsePath,
-  getFileContentPath,
   getFileURL,
-  getFullPath,
   getLastSegmentFromPath,
   getPreferredPathForDisplay,
   joinPaths,

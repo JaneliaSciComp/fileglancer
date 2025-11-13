@@ -24,7 +24,7 @@ from fastapi.responses import RedirectResponse, Response, JSONResponse, PlainTex
 from fastapi.exceptions import RequestValidationError, StarletteHTTPException
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 from fileglancer import database as db
 from fileglancer import auth
@@ -139,7 +139,13 @@ def create_app(settings):
             proxied_path = db.get_proxied_path_by_sharing_key(session, sharing_key)
             if not proxied_path:
                 return get_nosuchbucket_response(sharing_name), None
-            if proxied_path.sharing_name != sharing_name:
+            
+            # Vol-E viewer sends URLs with literal % characters (not URL-encoded)
+            # FastAPI automatically decodes path parameters - % chars are treated as escapes, creating a garbled sharing_name if they're present
+            # We therefore need to handle two cases:
+            #   1. Properly encoded requests (sharing_name matches DB value of proxied_path.sharing_name)
+            #   2. Vol-E's unencoded requests (unquote(proxied_path.sharing_name) matches the garbled request value)
+            if proxied_path.sharing_name != sharing_name and unquote(proxied_path.sharing_name) != sharing_name:
                 return get_error_response(400, "InvalidArgument", f"Sharing name mismatch for sharing key {sharing_key}", sharing_name), None
 
             fsp = db.get_file_share_path(session, proxied_path.fsp_name)

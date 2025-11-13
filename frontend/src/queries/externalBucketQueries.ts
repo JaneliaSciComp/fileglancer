@@ -1,6 +1,6 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 
-import { sendFetchRequest, HTTPError } from '@/utils';
+import { sendFetchRequest, buildUrl, HTTPError } from '@/utils';
 import { toHttpError } from '@/utils/errorHandling';
 import { default as log } from '@/logger';
 
@@ -32,12 +32,8 @@ const fetchExternalBucket = async (
   signal?: AbortSignal
 ): Promise<ExternalBucket | null> => {
   try {
-    const response = await sendFetchRequest(
-      `/api/external-buckets/${fspName}`,
-      'GET',
-      undefined,
-      { signal }
-    );
+    const url = buildUrl('/api/external-buckets/', fspName, null);
+    const response = await sendFetchRequest(url, 'GET', undefined, { signal });
 
     if (response.status === 404) {
       log.debug('No external bucket found for FSP');
@@ -86,15 +82,15 @@ export function transformBucketToDataUrl(
     fspName === bucket.fsp_name &&
     currentFilePath.startsWith(bucket.relative_path)
   ) {
-    // Create data URL with relative path from bucket
+    // Extract the relative path from the bucket base path
     const relativePath = currentFilePath.substring(bucket.relative_path.length);
     const cleanRelativePath = relativePath.startsWith('/')
       ? relativePath.substring(1)
       : relativePath;
-    const externalUrl = bucket.external_url.endsWith('/')
-      ? bucket.external_url.slice(0, -1)
-      : bucket.external_url;
-    return `${externalUrl}/${cleanRelativePath}/`;
+
+    // Build external URL with path segment (S3-style URL)
+    // buildUrl (overload 2) will encode path segments while preserving '/' as separator
+    return buildUrl(bucket.external_url, cleanRelativePath);
   }
 
   return null;

@@ -6,7 +6,7 @@ import {
   UseMutationResult
 } from '@tanstack/react-query';
 
-import { sendFetchRequest, HTTPError } from '@/utils';
+import { sendFetchRequest, buildUrl, HTTPError } from '@/utils';
 import { toHttpError } from '@/utils/errorHandling';
 import type { Ticket } from '@/contexts/TicketsContext';
 
@@ -85,12 +85,8 @@ const fetchTicketByPath = async (
   signal?: AbortSignal
 ): Promise<Ticket | null> => {
   try {
-    const response = await sendFetchRequest(
-      `/api/ticket?fsp_name=${fspName}&path=${path}`,
-      'GET',
-      undefined,
-      { signal }
-    );
+    const url = buildUrl('/api/ticket', null, { fsp_name: fspName, path });
+    const response = await sendFetchRequest(url, 'GET', undefined, { signal });
 
     if (response.status === 404) {
       // Not an error, just no ticket available
@@ -169,10 +165,8 @@ export function useCreateTicketMutation(): UseMutationResult<
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: CreateTicketPayload, { signal }) => {
-      const response = await sendFetchRequest('/api/ticket', 'POST', payload, {
-        signal
-      });
+    mutationFn: async (payload: CreateTicketPayload) => {
+      const response = await sendFetchRequest('/api/ticket', 'POST', payload);
       if (!response.ok) {
         throw await toHttpError(response);
       }

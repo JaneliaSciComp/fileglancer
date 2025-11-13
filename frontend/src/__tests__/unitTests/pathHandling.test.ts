@@ -1,7 +1,7 @@
 import { describe, test, expect, afterEach, beforeEach } from 'vitest';
 import {
   joinPaths,
-  getFileBrowsePath,
+  buildUrl,
   getFileURL,
   getLastSegmentFromPath,
   getPreferredPathForDisplay,
@@ -95,19 +95,106 @@ describe('joinPaths', () => {
   });
 });
 
-describe('getFileBrowsePath', () => {
-  test('returns correct API path for normal path', () => {
-    expect(getFileBrowsePath('fsp_name', 'file.zarr')).toBe(
-      '/api/files/fsp_name?subpath=file.zarr'
-    );
+describe('buildUrl', () => {
+  describe('Overload 1: Single segment with query params', () => {
+    test('builds URL with single segment', () => {
+      expect(buildUrl('/api/files/', 'fsp_name', null)).toBe(
+        '/api/files/fsp_name'
+      );
+    });
+    test('builds URL with single segment and query params', () => {
+      expect(
+        buildUrl('/api/files/', 'fsp_name', { subpath: 'file.zarr' })
+      ).toBe('/api/files/fsp_name?subpath=file.zarr');
+    });
+    test('encodes single path segment', () => {
+      expect(buildUrl('/api/files/', 'my/fsp', null)).toBe(
+        '/api/files/my%2Ffsp'
+      );
+    });
+    test('encodes query parameter values', () => {
+      expect(buildUrl('/api/files/', 'fsp', { subpath: 'a/b c' })).toBe(
+        '/api/files/fsp?subpath=a%2Fb+c'
+      );
+    });
+    test('handles no path segment, only query params', () => {
+      expect(
+        buildUrl('/api/ticket', null, {
+          fsp_name: 'myFSP',
+          path: 'folder/file.txt'
+        })
+      ).toBe('/api/ticket?fsp_name=myFSP&path=folder%2Ffile.txt');
+    });
+    test('handles single segment with no query params', () => {
+      expect(buildUrl('/api/files/', 'fsp', null)).toBe('/api/files/fsp');
+    });
+    test('handles empty query params object', () => {
+      expect(buildUrl('/api/files/', 'fsp', {})).toBe('/api/files/fsp');
+    });
+    test('builds URL with single query parameter', () => {
+      expect(
+        buildUrl('https://viewer.example.com/', null, {
+          url: 'https://data.example.com/file.zarr'
+        })
+      ).toBe(
+        'https://viewer.example.com?url=https%3A%2F%2Fdata.example.com%2Ffile.zarr'
+      );
+    });
+    test('builds URL with multiple query parameters', () => {
+      expect(
+        buildUrl('https://example.com/form', null, {
+          Version: '1.0.0',
+          URL: 'https://app.com'
+        })
+      ).toBe(
+        'https://example.com/form?Version=1.0.0&URL=https%3A%2F%2Fapp.com'
+      );
+    });
+    test('encodes special characters in query parameters', () => {
+      expect(
+        buildUrl('https://validator.com/', null, {
+          source: 'https://data.com/my file.zarr'
+        })
+      ).toBe(
+        'https://validator.com?source=https%3A%2F%2Fdata.com%2Fmy+file.zarr'
+      );
+    });
   });
-  test('handles empty string', () => {
-    expect(getFileBrowsePath('')).toBe('/api/files/');
+
+  describe('Overload 2: Multi-segment path', () => {
+    test('builds URL with multi-segment path', () => {
+      expect(
+        buildUrl('https://s3.example.com/bucket', 'folder/file.zarr')
+      ).toBe('https://s3.example.com/bucket/folder/file.zarr');
+    });
+    test('encodes path segments with special characters while preserving slashes', () => {
+      expect(
+        buildUrl(
+          'https://s3.example.com/bucket',
+          'path with spaces/file 100%.zarr'
+        )
+      ).toBe(
+        'https://s3.example.com/bucket/path%20with%20spaces/file%20100%25.zarr'
+      );
+    });
+    test('removes trailing slash from base URL before adding path', () => {
+      expect(buildUrl('https://s3.example.com/bucket/', 'file.zarr')).toBe(
+        'https://s3.example.com/bucket/file.zarr'
+      );
+    });
   });
-  test('encodes filePath', () => {
-    expect(getFileBrowsePath('fsp', 'a/b c')).toBe(
-      '/api/files/fsp?subpath=a%2Fb%20c'
-    );
+
+  describe('Edge cases', () => {
+    test('removes trailing slash from base URL', () => {
+      expect(buildUrl('https://example.com/', null, { key: 'value' })).toBe(
+        'https://example.com?key=value'
+      );
+    });
+    test('handles base URL without trailing slash', () => {
+      expect(buildUrl('https://example.com', null, { key: 'value' })).toBe(
+        'https://example.com?key=value'
+      );
+    });
   });
 });
 

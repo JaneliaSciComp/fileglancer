@@ -15,6 +15,7 @@ import {
   generateNeuroglancerStateForOmeZarr,
   determineLayerType
 } from '@/omezarr-helper';
+import { buildUrl } from '@/utils';
 import * as zarr from 'zarrita';
 
 export type { OpenWithToolUrls, ZarrMetadata };
@@ -76,11 +77,10 @@ export default function useZarrMetadata() {
     if (!metadata) {
       return null;
     }
-    const validatorBaseUrl =
-      'https://ome.github.io/ome-ngff-validator/?source=';
+    const validatorBaseUrl = 'https://ome.github.io/ome-ngff-validator/';
     const neuroglancerBaseUrl = 'https://neuroglancer-demo.appspot.com/#!';
-    const voleBaseUrl = 'https://volumeviewer.allencell.org/viewer?url=';
-    const avivatorBaseUrl = 'https://janeliascicomp.github.io/viv/?image_url=';
+    const voleBaseUrl = 'https://volumeviewer.allencell.org/viewer';
+    const avivatorBaseUrl = 'https://janeliascicomp.github.io/viv/';
 
     const url =
       externalDataUrlQuery.data || proxiedPathByFspAndPathQuery.data?.url;
@@ -93,10 +93,16 @@ export default function useZarrMetadata() {
       // OME-Zarr - all urls for v2; no avivator for v3
       if (url) {
         // Populate with actual URLs when proxied path is available
-        openWithToolUrls.validator = validatorBaseUrl + url;
-        openWithToolUrls.vole = voleBaseUrl + url;
+        openWithToolUrls.validator = buildUrl(validatorBaseUrl, null, {
+          source: url
+        });
+        openWithToolUrls.vole = buildUrl(voleBaseUrl, null, {
+          url
+        });
         openWithToolUrls.avivator =
-          metadata.zarrVersion === 2 ? avivatorBaseUrl + url : null;
+          metadata.zarrVersion === 2
+            ? buildUrl(avivatorBaseUrl, null, { image_url: url })
+            : null;
         if (disableNeuroglancerStateGeneration) {
           openWithToolUrls.neuroglancer =
             neuroglancerBaseUrl + generateNeuroglancerStateForDataURL(url);
