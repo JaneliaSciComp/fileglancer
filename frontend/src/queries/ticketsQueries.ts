@@ -6,7 +6,7 @@ import {
   UseMutationResult
 } from '@tanstack/react-query';
 
-import { sendFetchRequest, buildApiUrl, HTTPError } from '@/utils';
+import { sendFetchRequest, buildUrl, HTTPError } from '@/utils';
 import { toHttpError } from '@/utils/errorHandling';
 import type { Ticket } from '@/contexts/TicketsContext';
 
@@ -85,7 +85,7 @@ const fetchTicketByPath = async (
   signal?: AbortSignal
 ): Promise<Ticket | null> => {
   try {
-    const url = buildApiUrl('/api/ticket', [], { fsp_name: fspName, path });
+    const url = buildUrl('/api/ticket', null, { fsp_name: fspName, path });
     const response = await sendFetchRequest(url, 'GET', undefined, { signal });
 
     if (response.status === 404) {

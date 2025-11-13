@@ -1,11 +1,6 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 
-import {
-  sendFetchRequest,
-  buildApiUrl,
-  buildExternalUrlWithPath,
-  HTTPError
-} from '@/utils';
+import { sendFetchRequest, buildUrl, HTTPError } from '@/utils';
 import { toHttpError } from '@/utils/errorHandling';
 import { default as log } from '@/logger';
 
@@ -37,7 +32,7 @@ const fetchExternalBucket = async (
   signal?: AbortSignal
 ): Promise<ExternalBucket | null> => {
   try {
-    const url = buildApiUrl('/api/external-buckets/', [fspName]);
+    const url = buildUrl('/api/external-buckets/', fspName, null);
     const response = await sendFetchRequest(url, 'GET', undefined, { signal });
 
     if (response.status === 404) {
@@ -94,10 +89,8 @@ export function transformBucketToDataUrl(
       : relativePath;
 
     // Build external URL with path segment (S3-style URL)
-    // buildExternalUrlWithPath will encode path segments while preserving '/' as separator
-    return (
-      buildExternalUrlWithPath(bucket.external_url, cleanRelativePath) + '/'
-    );
+    // buildUrl (overload 2) will encode path segments while preserving '/' as separator
+    return buildUrl(bucket.external_url, cleanRelativePath);
   }
 
   return null;

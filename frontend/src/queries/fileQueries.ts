@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-query';
 
 import { FetchError } from './queryUtils';
-import { sendFetchRequest, buildApiUrl, makeMapKey } from '@/utils';
+import { sendFetchRequest, buildUrl, makeMapKey } from '@/utils';
 import { normalizePosixStylePath } from '@/utils/pathHandling';
 import type { FileOrFolder, FileSharePath } from '@/shared.types';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
@@ -49,10 +49,10 @@ export default function useFileQuery(
       throw new Error('No file share path selected');
     }
 
-    const url = buildApiUrl(
+    const url = buildUrl(
       '/api/files/',
-      [fspName],
-      folderName ? { subpath: folderName } : undefined
+      fspName,
+      folderName ? { subpath: folderName } : null
     );
 
     const response = await sendFetchRequest(url, 'GET', undefined, { signal });
@@ -180,7 +180,7 @@ async function deleteFile({
   filePath,
   signal
 }: DeleteFileParams): Promise<void> {
-  const url = buildApiUrl('/api/files/', [fspName], { subpath: filePath });
+  const url = buildUrl('/api/files/', fspName, { subpath: filePath });
   const response = await sendFetchRequest(url, 'DELETE', undefined, { signal });
 
   if (!response.ok) {
@@ -223,7 +223,7 @@ async function createFolder({
   folderPath,
   signal
 }: CreateFolderParams): Promise<void> {
-  const url = buildApiUrl('/api/files/', [fspName], { subpath: folderPath });
+  const url = buildUrl('/api/files/', fspName, { subpath: folderPath });
   const response = await sendFetchRequest(
     url,
     'POST',
@@ -275,7 +275,7 @@ async function renameFile({
   newPath,
   signal
 }: RenameFileParams): Promise<void> {
-  const url = buildApiUrl('/api/files/', [fspName], { subpath: oldPath });
+  const url = buildUrl('/api/files/', fspName, { subpath: oldPath });
   const response = await sendFetchRequest(
     url,
     'PATCH',
@@ -327,7 +327,7 @@ async function changePermissions({
   permissions,
   signal
 }: ChangePermissionsParams): Promise<void> {
-  const url = buildApiUrl('/api/files/', [fspName], { subpath: filePath });
+  const url = buildUrl('/api/files/', fspName, { subpath: filePath });
   const response = await sendFetchRequest(
     url,
     'PATCH',

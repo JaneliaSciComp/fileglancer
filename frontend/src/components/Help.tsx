@@ -7,7 +7,7 @@ import { LuBookOpenText } from 'react-icons/lu';
 import { HiExternalLink } from 'react-icons/hi';
 
 import useVersionQuery from '@/queries/versionQuery';
-import { buildExternalUrlWithQuery } from '@/utils';
+import { buildUrl } from '@/utils';
 
 type HelpLink = {
   icon: IconType;
@@ -46,7 +46,7 @@ function getHelpLinks(version: string | undefined): HelpLink[] {
       icon: SiClickup,
       title: 'Submit Tickets',
       description: 'Report bugs or request features through a ClickUp form',
-      url: buildExternalUrlWithQuery(clickupBaseUrl, clickupParams)
+      url: buildUrl(clickupBaseUrl, null, clickupParams)
     },
     {
       icon: SiSlack,

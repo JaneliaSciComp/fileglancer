@@ -1,9 +1,7 @@
 import { describe, test, expect, afterEach, beforeEach } from 'vitest';
 import {
   joinPaths,
-  buildApiUrl,
-  buildExternalUrlWithPath,
-  buildExternalUrlWithQuery,
+  buildUrl,
   getFileURL,
   getLastSegmentFromPath,
   getPreferredPathForDisplay,
@@ -97,100 +95,81 @@ describe('joinPaths', () => {
   });
 });
 
-describe('buildApiUrl', () => {
-  test('builds URL with path segments', () => {
-    expect(buildApiUrl('/api/files/', ['fsp_name'])).toBe(
-      '/api/files/fsp_name'
-    );
-  });
-  test('builds URL with path segments and query params', () => {
-    expect(
-      buildApiUrl('/api/files/', ['fsp_name'], { subpath: 'file.zarr' })
-    ).toBe('/api/files/fsp_name?subpath=file.zarr');
-  });
-  test('encodes path segments', () => {
-    expect(buildApiUrl('/api/files/', ['my fsp'])).toBe('/api/files/my%20fsp');
-  });
-  test('encodes query parameter values', () => {
-    expect(buildApiUrl('/api/files/', ['fsp'], { subpath: 'a/b c' })).toBe(
-      '/api/files/fsp?subpath=a%2Fb+c'
-    );
-  });
-  test('handles multiple query parameters', () => {
-    expect(
-      buildApiUrl('/api/ticket', [], {
-        fsp_name: 'myFSP',
-        path: 'folder/file.txt'
-      })
-    ).toBe('/api/ticket?fsp_name=myFSP&path=folder%2Ffile.txt');
-  });
-  test('handles no path segments and no query params', () => {
-    expect(buildApiUrl('/api/files/')).toBe('/api/files/');
-  });
-});
-
-describe('buildExternalUrlWithQuery', () => {
-  test('builds URL with single query parameter', () => {
-    expect(
-      buildExternalUrlWithQuery('https://viewer.example.com/', {
-        url: 'https://data.example.com/file.zarr'
-      })
-    ).toBe(
-      'https://viewer.example.com?url=https%3A%2F%2Fdata.example.com%2Ffile.zarr'
-    );
-  });
-  test('builds URL with multiple query parameters', () => {
-    expect(
-      buildExternalUrlWithQuery('https://example.com/form', {
-        Version: '1.0.0',
-        URL: 'https://app.com'
-      })
-    ).toBe('https://example.com/form?Version=1.0.0&URL=https%3A%2F%2Fapp.com');
-  });
-  test('encodes special characters in query parameters', () => {
-    expect(
-      buildExternalUrlWithQuery('https://validator.com/', {
-        source: 'https://data.com/my file.zarr'
-      })
-    ).toBe(
-      'https://validator.com?source=https%3A%2F%2Fdata.com%2Fmy+file.zarr'
-    );
-  });
-  test('removes trailing slash from base URL', () => {
-    expect(
-      buildExternalUrlWithQuery('https://example.com/', { key: 'value' })
-    ).toBe('https://example.com?key=value');
-  });
-  test('handles base URL without trailing slash', () => {
-    expect(
-      buildExternalUrlWithQuery('https://example.com', { key: 'value' })
-    ).toBe('https://example.com?key=value');
-  });
-  test('returns base URL when no query params provided', () => {
-    expect(buildExternalUrlWithQuery('https://example.com/')).toBe(
-      'https://example.com'
-    );
-  });
-  test('handles empty query params object', () => {
-    expect(buildExternalUrlWithQuery('https://example.com/', {})).toBe(
-      'https://example.com'
-    );
-  });
-});
-
-describe('buildExternalUrlWithPath', () => {
-  describe('path segments only', () => {
-    test('builds URL with path segment', () => {
+describe('buildUrl', () => {
+  describe('Overload 1: Single segment with query params', () => {
+    test('builds URL with single segment', () => {
+      expect(buildUrl('/api/files/', 'fsp_name', null)).toBe(
+        '/api/files/fsp_name'
+      );
+    });
+    test('builds URL with single segment and query params', () => {
       expect(
-        buildExternalUrlWithPath(
-          'https://s3.example.com/bucket',
-          'folder/file.zarr'
-        )
+        buildUrl('/api/files/', 'fsp_name', { subpath: 'file.zarr' })
+      ).toBe('/api/files/fsp_name?subpath=file.zarr');
+    });
+    test('encodes single path segment', () => {
+      expect(buildUrl('/api/files/', 'my/fsp', null)).toBe(
+        '/api/files/my%2Ffsp'
+      );
+    });
+    test('encodes query parameter values', () => {
+      expect(buildUrl('/api/files/', 'fsp', { subpath: 'a/b c' })).toBe(
+        '/api/files/fsp?subpath=a%2Fb+c'
+      );
+    });
+    test('handles no path segment, only query params', () => {
+      expect(
+        buildUrl('/api/ticket', null, {
+          fsp_name: 'myFSP',
+          path: 'folder/file.txt'
+        })
+      ).toBe('/api/ticket?fsp_name=myFSP&path=folder%2Ffile.txt');
+    });
+    test('handles single segment with no query params', () => {
+      expect(buildUrl('/api/files/', 'fsp', null)).toBe('/api/files/fsp');
+    });
+    test('handles empty query params object', () => {
+      expect(buildUrl('/api/files/', 'fsp', {})).toBe('/api/files/fsp');
+    });
+    test('builds URL with single query parameter', () => {
+      expect(
+        buildUrl('https://viewer.example.com/', null, {
+          url: 'https://data.example.com/file.zarr'
+        })
+      ).toBe(
+        'https://viewer.example.com?url=https%3A%2F%2Fdata.example.com%2Ffile.zarr'
+      );
+    });
+    test('builds URL with multiple query parameters', () => {
+      expect(
+        buildUrl('https://example.com/form', null, {
+          Version: '1.0.0',
+          URL: 'https://app.com'
+        })
+      ).toBe(
+        'https://example.com/form?Version=1.0.0&URL=https%3A%2F%2Fapp.com'
+      );
+    });
+    test('encodes special characters in query parameters', () => {
+      expect(
+        buildUrl('https://validator.com/', null, {
+          source: 'https://data.com/my file.zarr'
+        })
+      ).toBe(
+        'https://validator.com?source=https%3A%2F%2Fdata.com%2Fmy+file.zarr'
+      );
+    });
+  });
+
+  describe('Overload 2: Multi-segment path', () => {
+    test('builds URL with multi-segment path', () => {
+      expect(
+        buildUrl('https://s3.example.com/bucket', 'folder/file.zarr')
       ).toBe('https://s3.example.com/bucket/folder/file.zarr');
     });
-    test('encodes path segments with special characters', () => {
+    test('encodes path segments with special characters while preserving slashes', () => {
       expect(
-        buildExternalUrlWithPath(
+        buildUrl(
           'https://s3.example.com/bucket',
           'path with spaces/file 100%.zarr'
         )
@@ -199,26 +178,21 @@ describe('buildExternalUrlWithPath', () => {
       );
     });
     test('removes trailing slash from base URL before adding path', () => {
-      expect(
-        buildExternalUrlWithPath('https://s3.example.com/bucket/', 'file.zarr')
-      ).toBe('https://s3.example.com/bucket/file.zarr');
+      expect(buildUrl('https://s3.example.com/bucket/', 'file.zarr')).toBe(
+        'https://s3.example.com/bucket/file.zarr'
+      );
     });
   });
 
-  describe('path and query parameters', () => {
-    test('builds URL with both path and query parameters', () => {
-      expect(
-        buildExternalUrlWithPath('https://example.com', 'data/file.zarr', {
-          version: '2'
-        })
-      ).toBe('https://example.com/data/file.zarr?version=2');
+  describe('Edge cases', () => {
+    test('removes trailing slash from base URL', () => {
+      expect(buildUrl('https://example.com/', null, { key: 'value' })).toBe(
+        'https://example.com?key=value'
+      );
     });
-  });
-
-  describe('no parameters', () => {
-    test('returns base URL when no path provided', () => {
-      expect(buildExternalUrlWithPath('https://example.com/')).toBe(
-        'https://example.com'
+    test('handles base URL without trailing slash', () => {
+      expect(buildUrl('https://example.com', null, { key: 'value' })).toBe(
+        'https://example.com?key=value'
       );
     });
   });

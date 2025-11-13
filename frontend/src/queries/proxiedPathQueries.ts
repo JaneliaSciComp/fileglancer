@@ -6,7 +6,7 @@ import {
   UseMutationResult
 } from '@tanstack/react-query';
 
-import { sendFetchRequest, buildApiUrl, HTTPError } from '@/utils';
+import { sendFetchRequest, buildUrl, HTTPError } from '@/utils';
 import { toHttpError } from '@/utils/errorHandling';
 import type { ProxiedPath } from '@/contexts/ProxiedPathContext';
 
@@ -94,7 +94,7 @@ const fetchProxiedPathByFspAndPath = async (
   signal?: AbortSignal
 ): Promise<ProxiedPath | null> => {
   try {
-    const url = buildApiUrl('/api/proxied-path', [], {
+    const url = buildUrl('/api/proxied-path', null, {
       fsp_name: fspName,
       path
     });
@@ -174,7 +174,7 @@ export function useCreateProxiedPathMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: async (payload: CreateProxiedPathPayload) => {
-      const url = buildApiUrl('/api/proxied-path', [], {
+      const url = buildUrl('/api/proxied-path', null, {
         fsp_name: payload.fsp_name,
         path: payload.path
       });
@@ -242,7 +242,7 @@ export function useDeleteProxiedPathMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: async (payload: DeleteProxiedPathPayload) => {
-      const url = buildApiUrl('/api/proxied-path/', [payload.sharing_key]);
+      const url = buildUrl('/api/proxied-path/', payload.sharing_key, null);
       const response = await sendFetchRequest(url, 'DELETE');
       if (!response.ok) {
         throw await toHttpError(response);

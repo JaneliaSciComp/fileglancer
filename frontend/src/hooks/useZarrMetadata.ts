@@ -15,7 +15,7 @@ import {
   generateNeuroglancerStateForOmeZarr,
   determineLayerType
 } from '@/omezarr-helper';
-import { buildExternalUrlWithQuery } from '@/utils';
+import { buildUrl } from '@/utils';
 import * as zarr from 'zarrita';
 
 export type { OpenWithToolUrls, ZarrMetadata };
@@ -93,18 +93,15 @@ export default function useZarrMetadata() {
       // OME-Zarr - all urls for v2; no avivator for v3
       if (url) {
         // Populate with actual URLs when proxied path is available
-        openWithToolUrls.validator = buildExternalUrlWithQuery(
-          validatorBaseUrl,
-          {
-            source: url
-          }
-        );
-        openWithToolUrls.vole = buildExternalUrlWithQuery(voleBaseUrl, {
+        openWithToolUrls.validator = buildUrl(validatorBaseUrl, null, {
+          source: url
+        });
+        openWithToolUrls.vole = buildUrl(voleBaseUrl, null, {
           url
         });
         openWithToolUrls.avivator =
           metadata.zarrVersion === 2
-            ? buildExternalUrlWithQuery(avivatorBaseUrl, { image_url: url })
+            ? buildUrl(avivatorBaseUrl, null, { image_url: url })
             : null;
         if (disableNeuroglancerStateGeneration) {
           openWithToolUrls.neuroglancer =
