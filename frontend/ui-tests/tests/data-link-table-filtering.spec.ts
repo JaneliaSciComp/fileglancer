@@ -63,7 +63,6 @@ test.describe('Data Link Table Filtering', () => {
     fileglancerPage: page,
     testDir
   }) => {
-    let realDataLink: ProxiedPath;
     const zarrDirName = ZARR_TEST_FILE_INFO.v3_ome.dirname;
 
     await test.step('Setup mock API with 10 links', async () => {
@@ -126,7 +125,6 @@ test.describe('Data Link Table Filtering', () => {
       const data = await response.json();
       const paths = (data as { paths?: ProxiedPath[] }).paths || [];
       expect(paths.length).toBe(1);
-      realDataLink = paths[0];
     });
 
     await test.step('Verify new data is visible in table', async () => {
@@ -149,7 +147,10 @@ test.describe('Data Link Table Filtering', () => {
 
       // Verify we're on page 2
       await expect(
-        page.locator('div').filter({ hasText: /^Page2 of 210\/page$/ })
+        page
+          .locator('div')
+          .filter({ hasText: /^Page2 of 210\/page$/ })
+          .first()
       ).toBeVisible();
 
       // Check that Mock Link 1 is visible on page 2
@@ -169,7 +170,10 @@ test.describe('Data Link Table Filtering', () => {
 
       // Verify we're back on page 1
       await expect(
-        page.locator('div').filter({ hasText: /^Page1 of 210\/page$/ })
+        page
+          .locator('div')
+          .filter({ hasText: /^Page1 of 210\/page$/ })
+          .first()
       ).toBeVisible();
 
       // Click on the Name sort icon to sort A-Z
@@ -188,15 +192,11 @@ test.describe('Data Link Table Filtering', () => {
     });
 
     await test.step('Filter table to show only real data link', async () => {
-      // Click on the Name search icon to open filter input
-      const nameSearchIcon = page
-        .locator('.outline-none > .icon-default')
-        .first();
-      await nameSearchIcon.click();
-
-      // Wait for search input to be visible
-      const searchInput = page.getByRole('searchbox', { name: 'Search...' });
-      await expect(searchInput).toBeVisible();
+      // Click on search input
+      const searchInput = page.getByRole('searchbox', {
+        name: 'Search all columns...'
+      });
+      await searchInput.click();
 
       // Type the filter text to show only the real zarr directory
       await searchInput.fill(zarrDirName);
