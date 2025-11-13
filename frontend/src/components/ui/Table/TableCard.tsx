@@ -8,7 +8,6 @@ import {
 } from 'react';
 import type { ReactNode } from 'react';
 import {
-  ColumnFiltersState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -16,6 +15,7 @@ import {
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
+  type FilterFn,
   type Header,
   type SortingState
 } from '@tanstack/react-table';
@@ -25,7 +25,6 @@ import {
   IconButton,
   Input,
   Select,
-  Tooltip,
   Typography
 } from '@material-tailwind/react';
 import {
@@ -38,8 +37,10 @@ import {
   HiOutlineSwitchVertical,
   HiOutlineSearch
 } from 'react-icons/hi';
+import { HiXMark } from 'react-icons/hi2';
 
 import { TableRowSkeleton } from '@/components/ui/widgets/Loaders';
+import { formatDateString } from '@/utils';
 
 type TableProps<TData> = {
   readonly columns: ColumnDef<TData>[];
@@ -47,24 +48,7 @@ type TableProps<TData> = {
   readonly gridColsClass: string;
   readonly loadingState?: boolean;
   readonly emptyText?: string;
-  readonly enableColumnSearch?: boolean;
 };
-
-function TableRow({
-  gridColsClass,
-  children
-}: {
-  readonly gridColsClass: string;
-  readonly children: ReactNode;
-}) {
-  return (
-    <div
-      className={`grid ${gridColsClass} justify-items-start items-center gap-4 px-4 py-4 border-b border-surface last:border-0 items-start`}
-    >
-      {children}
-    </div>
-  );
-}
 
 function SortIcons<TData, TValue>({
   header
@@ -92,212 +76,117 @@ const DebouncedInput = forwardRef<
   {
     readonly value: string;
     readonly setValue: (value: string) => void;
-    readonly handleInputFocus: () => void;
   }
->(({ value, setValue, handleInputFocus }, ref) => {
+>(({ value, setValue }, ref) => {
   return (
     <div className="max-w-full" onClick={e => e.stopPropagation()}>
       <Input
-        className="w-36 max-w-full border shadow rounded"
+        className="bg-background text-foreground [&::-webkit-search-cancel-button]:appearance-none"
         onChange={e => setValue(e.target.value)}
-        onFocus={handleInputFocus}
-        placeholder="Search..."
+        placeholder="Search all columns..."
         ref={ref}
         type="search"
         value={value}
-      />
+      >
+        <Input.Icon>
+          <HiOutlineSearch />
+        </Input.Icon>
+      </Input>
     </div>
   );
 });
 
 DebouncedInput.displayName = 'DebouncedInput';
 
-function SearchPopover<TData, TValue>({
-  header
-}: {
-  readonly header: Header<TData, TValue>;
-}) {
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [forceOpen, setForceOpen] = useState(false);
-
-  const initialValue = (header.column.getFilterValue() as string) || '';
-  const [value, setValue] = useState(initialValue);
-
-  const inputRef = useRef<HTMLInputElement>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
-
-  const debounce = 350;
-
-  function handleInputFocus() {
-    setIsSearchFocused(true);
-    setForceOpen(true);
-  }
-
-  const clearAndClose = useCallback(() => {
-    setValue('');
-    header.column.setFilterValue('');
-    setIsSearchFocused(false);
-    setForceOpen(false);
-    inputRef.current?.blur();
-  }, [header.column]);
-
-  // Handle clicks outside the tooltip
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        tooltipRef.current &&
-        !tooltipRef.current.contains(event.target as Node) &&
-        forceOpen
-      ) {
-        // Don't close if clicking within the table body or actions menu
-        // Closing clears the search, resets the table, and prevents navigation/actions
-        const tableBody = document.getElementById('table-body');
-        const isInTableBody = tableBody?.contains(event.target as Node);
-        const isInMenu =
-          (event.target as HTMLElement).closest('[role="menu"]') !== null;
-        if (!isInTableBody && !isInMenu) {
-          clearAndClose();
-        }
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [forceOpen, clearAndClose]);
-
-  // Handle Escape key to clear and close tooltip
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape' && forceOpen) {
-        clearAndClose();
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [forceOpen, clearAndClose]);
-
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      header.column.setFilterValue(value);
-    }, debounce);
-
-    return () => clearTimeout(timeout);
-  }, [value, debounce, header.column]);
-
-  // Keep tooltip open if there's a search value
-  useEffect(() => {
-    if (value) {
-      setForceOpen(true);
-    } else if (!isSearchFocused) {
-      setForceOpen(false);
-    }
-  }, [value, isSearchFocused]);
-
-  return (
-    <Tooltip
-      interactive={true}
-      open={forceOpen ? true : undefined}
-      placement="top-start"
-    >
-      {/** when open is undefined (forceOpen is false), then the interactive=true prop takes over.
-       * This allows use of the safePolygon() function in tooltip.tsx, keeping the tooltip open
-       * as the user moves towards it */}
-      <Tooltip.Trigger
-        as="div"
-        className="max-w-min flex flex-col"
-        ref={tooltipRef}
-      >
-        <HiOutlineSearch className="icon-default text-foreground/40 dark:text-foreground/60 hover:text-foreground/100 hover:stroke-[3px]" />
-      </Tooltip.Trigger>
-      <Tooltip.Content
-        className="z-10 min-w-36 border border-surface bg-background px-3 py-2.5 text-foreground"
-        onMouseEnter={() => inputRef.current?.focus()}
-      >
-        <DebouncedInput
-          handleInputFocus={handleInputFocus}
-          ref={inputRef}
-          setValue={setValue}
-          value={value}
-        />
-      </Tooltip.Content>
-    </Tooltip>
-  );
-}
-
 function HeaderIcons<TData, TValue>({
   header
 }: {
   readonly header: Header<TData, TValue>;
 }) {
-  if (!header.column.getCanFilter()) {
-    // Non-filterable column - just show header with sorting
-    return (
-      <div
-        className={`flex flex-col ${
-          header.column.getCanSort() ? 'cursor-pointer' : ''
-        }`}
-        onClick={header.column.getToggleSortingHandler()}
-      >
-        <div className="flex items-center gap-2 font-semibold select-none group/sort">
-          {flexRender(header.column.columnDef.header, header.getContext())}
-          <SortIcons header={header} />
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex items-center gap-2 font-semibold select-none text-nowrap">
-      <div
-        className={`flex items-center gap-2 group/sort ${
-          header.column.getCanSort() ? 'cursor-pointer' : ''
-        }`}
-        onClick={header.column.getToggleSortingHandler()}
-      >
+    <div
+      className={`flex flex-col ${
+        header.column.getCanSort() ? 'cursor-pointer' : ''
+      }`}
+      onClick={header.column.getToggleSortingHandler()}
+    >
+      <div className="flex items-center gap-2 font-semibold select-none group/sort">
         {flexRender(header.column.columnDef.header, header.getContext())}
         <SortIcons header={header} />
       </div>
-      <SearchPopover header={header} />
     </div>
   );
 }
 
-function Table<TData>({
-  columns,
-  data,
-  gridColsClass,
-  loadingState,
-  emptyText,
-  enableColumnSearch
-}: TableProps<TData>) {
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+// Helper function to check if a string looks like an ISO date
+const isISODate = (str: string): boolean => {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(str);
+};
 
-  const table = useReactTable({
-    data,
-    columns,
-    state: {
-      sorting,
-      columnFilters
-    },
-    enableColumnFilters: enableColumnSearch || false,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel()
+// Custom global filter function that searches all columns
+const globalFilterFn: FilterFn<unknown> = (row, _columnId, filterValue) => {
+  if (!filterValue) {
+    return true;
+  }
+
+  const query = String(filterValue).toLowerCase();
+  const original = row.original as Record<string, unknown>;
+
+  // Special case for ProxiedPath: search both path and fsp_name on the path column
+  if (
+    original &&
+    typeof original === 'object' &&
+    'path' in original &&
+    'fsp_name' in original
+  ) {
+    const pathMatch = String(original.path || '')
+      .toLowerCase()
+      .includes(query);
+    const fspNameMatch = String(original.fsp_name || '')
+      .toLowerCase()
+      .includes(query);
+    if (pathMatch || fspNameMatch) {
+      return true;
+    }
+  }
+
+  // Get all cell values from the row and check if any match the search query
+  const rowValues = row.getVisibleCells().map(cell => {
+    const value = cell.getValue();
+    if (value === null || value === undefined) {
+      return '';
+    }
+
+    const strValue = String(value);
+
+    // Special handling for date columns: format the ISO date before searching
+    if (isISODate(strValue)) {
+      return formatDateString(strValue).toLowerCase();
+    }
+
+    return strValue.toLowerCase();
   });
 
+  return rowValues.some(value => value.includes(query));
+};
+
+function TableHeader({
+  table,
+  globalFilter,
+  setGlobalFilter,
+  clearSearch,
+  inputRef
+}: {
+  readonly table: ReturnType<typeof useReactTable>;
+  readonly globalFilter: string;
+  readonly setGlobalFilter: (value: string) => void;
+  readonly clearSearch: () => void;
+  readonly inputRef: React.RefObject<HTMLInputElement>;
+}) {
   return (
-    <div className="flex flex-col h-full">
-      {/* https://tanstack.com/table/latest/docs/framework/react/examples/pagination */}
-      <div className="shrink-0 flex items-center gap-2 py-4 px-4">
+    <div className="shrink-0 flex flex-col md:flex-row md:items-center gap-2 py-4 px-4">
+      <div className="flex items-center gap-2">
+        {/* https://tanstack.com/table/latest/docs/framework/react/examples/pagination */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1">
             <Typography variant="small">Page</Typography>
@@ -353,6 +242,113 @@ function Table<TData>({
           </Select>
         </div>
       </div>
+      {/* Global Search Input */}
+      <div className="grow py-2 md:px-4">
+        <div className="relative">
+          <DebouncedInput
+            ref={inputRef}
+            setValue={setGlobalFilter}
+            value={globalFilter}
+          />
+          {globalFilter ? (
+            <button
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-primary hover:text-primary/80 transition-colors"
+              onClick={clearSearch}
+              type="button"
+            >
+              <HiXMark className="h-5 w-5 font-bold" />
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TableRow({
+  gridColsClass,
+  children
+}: {
+  readonly gridColsClass: string;
+  readonly children: ReactNode;
+}) {
+  return (
+    <div
+      className={`grid ${gridColsClass} justify-items-start items-center gap-4 px-4 py-4 border-b border-surface last:border-0 items-start`}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Table<TData>({
+  columns,
+  data,
+  gridColsClass,
+  loadingState,
+  emptyText
+}: TableProps<TData>) {
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [globalFilter, setGlobalFilter] = useState<string>('');
+  const [inputValue, setInputValue] = useState<string>('');
+  const debounceMs = 350;
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const table = useReactTable({
+    data,
+    columns: columns as ColumnDef<unknown>[],
+    state: {
+      sorting,
+      globalFilter
+    },
+    onSortingChange: setSorting,
+    onGlobalFilterChange: setGlobalFilter,
+    globalFilterFn,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel()
+  });
+
+  // Debounce the global filter updates
+  useEffect(() => {
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+    }
+
+    timerRef.current = setTimeout(() => {
+      setGlobalFilter(inputValue.toLowerCase());
+      table.firstPage(); // Reset to first page when searching
+    }, debounceMs);
+
+    return () => {
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, [inputValue, debounceMs, table]);
+
+  const handleInputChange = useCallback((value: string): void => {
+    setInputValue(value);
+  }, []);
+
+  const clearSearch = useCallback((): void => {
+    setInputValue('');
+    setGlobalFilter('');
+    inputRef.current?.blur();
+  }, []);
+
+  return (
+    <div className="flex flex-col h-full">
+      <TableHeader
+        clearSearch={clearSearch}
+        globalFilter={inputValue}
+        inputRef={inputRef}
+        setGlobalFilter={handleInputChange}
+        table={table}
+      />
       <div
         className={`shrink-0 grid ${gridColsClass} gap-4 px-4 py-2 bg-surface/30`}
       >
@@ -399,8 +395,7 @@ function TableCard<TData>({
   data,
   gridColsClass,
   loadingState,
-  emptyText,
-  enableColumnSearch
+  emptyText
 }: TableProps<TData>) {
   return (
     <Card className="min-h-48">
@@ -408,7 +403,6 @@ function TableCard<TData>({
         columns={columns}
         data={data}
         emptyText={emptyText}
-        enableColumnSearch={enableColumnSearch}
         gridColsClass={gridColsClass}
         loadingState={loadingState}
       />
