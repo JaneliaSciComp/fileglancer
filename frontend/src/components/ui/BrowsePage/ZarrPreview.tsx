@@ -146,6 +146,7 @@ export default function ZarrPreview({
           {openWithToolUrls ? (
             <DataToolLinks
               onToolClick={handleToolClick}
+              selectedZarrVersion={selectedZarrVersion}
               showCopiedTooltip={showCopiedTooltip}
               title="Open with:"
               urls={openWithToolUrls as OpenWithToolUrls}

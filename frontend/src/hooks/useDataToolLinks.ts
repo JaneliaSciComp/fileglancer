@@ -13,6 +13,39 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { copyToClipboard } from '@/utils/copyText';
 import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
 
+export function getNeuroglancerUrlAndKey(
+  urls: OpenWithToolUrls | null,
+  selectedZarrVersion: 2 | 3 | null
+): { url: string | null; key: 'neuroglancerV2' | 'neuroglancerV3' } {
+  if (!urls) {
+    return { url: null, key: 'neuroglancerV2' };
+  }
+
+  const hasV2 = urls.neuroglancerV2 !== null;
+  const hasV3 = urls.neuroglancerV3 !== null;
+
+  if (hasV2 && hasV3) {
+    // Both available: use selectedZarrVersion if set, otherwise default to v3
+    const version = selectedZarrVersion === 2 ? 2 : 3;
+    const url = version === 2 ? urls.neuroglancerV2 : urls.neuroglancerV3;
+    return {
+      url,
+      key: version === 2 ? 'neuroglancerV2' : 'neuroglancerV3'
+    };
+  } else if (hasV2) {
+    // Only v2 available
+    return { url: urls.neuroglancerV2, key: 'neuroglancerV2' };
+  } else if (hasV3) {
+    // Only v3 available
+    return { url: urls.neuroglancerV3, key: 'neuroglancerV3' };
+  } else {
+    // Neither available - check if both are empty strings (pending) or both null
+    const url =
+      urls.neuroglancerV2 === '' || urls.neuroglancerV3 === '' ? '' : null;
+    return { url, key: 'neuroglancerV3' };
+  }
+}
+
 // Overload for ZarrPreview usage with required parameters
 export default function useDataToolLinks(
   setShowDataLinkDialog: Dispatch<SetStateAction<boolean>>,

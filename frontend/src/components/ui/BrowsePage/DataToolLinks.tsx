@@ -7,15 +7,18 @@ import volE_logo from '@/assets/aics_website-3d-cell-viewer.png';
 import avivator_logo from '@/assets/vizarr_logo.png';
 import copy_logo from '@/assets/copy-link-64.png';
 import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
+import { getNeuroglancerUrlAndKey } from '@/hooks/useDataToolLinks';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 
 export default function DataToolLinks({
   onToolClick,
+  selectedZarrVersion,
   showCopiedTooltip,
   title,
   urls
 }: {
   readonly onToolClick: (toolKey: PendingToolKey) => Promise<void>;
+  readonly selectedZarrVersion: 2 | 3 | null;
   readonly showCopiedTooltip: boolean;
   readonly title: string;
   readonly urls: OpenWithToolUrls | null;
@@ -27,13 +30,17 @@ export default function DataToolLinks({
     return null;
   }
 
+  // Determine which neuroglancer URL and key to use based on selected version and available versions
+  const { url: neuroglancerUrl, key: neuroglancerKey } =
+    getNeuroglancerUrlAndKey(urls, selectedZarrVersion);
+
   return (
     <div className="my-1">
       <Typography className="font-semibold text-sm text-surface-foreground">
         {title}
       </Typography>
       <ButtonGroup className="relative">
-        {urls.neuroglancer !== null ? (
+        {neuroglancerUrl !== null ? (
           <FgTooltip
             as={Button}
             label="View in Neuroglancer"
@@ -43,11 +50,11 @@ export default function DataToolLinks({
             <Link
               onClick={async e => {
                 e.preventDefault();
-                await onToolClick('neuroglancer');
+                await onToolClick(neuroglancerKey);
               }}
               rel="noopener noreferrer"
               target="_blank"
-              to={urls.neuroglancer}
+              to={neuroglancerUrl}
             >
               <img
                 alt="Neuroglancer logo"
