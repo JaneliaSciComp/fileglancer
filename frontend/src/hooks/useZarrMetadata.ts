@@ -70,13 +70,9 @@ export default function useZarrMetadata() {
   }, [zarrMetadataQuery.data?.availableVersions, selectedZarrVersion]);
 
   useEffect(() => {
-    if (disableHeuristicalLayerTypeDetection) {
+    if (!thumbnailSrc || disableHeuristicalLayerTypeDetection) {
+      // Default layer type
       setLayerType('image');
-      return;
-    }
-
-    if (!thumbnailSrc) {
-      setLayerType(null);
       return;
     }
 
