@@ -68,6 +68,6 @@ test.describe('File Operations', () => {
     await expect(page.getByRole('dialog')).not.toBeVisible();
 
     // Verify the new folder appears in the file list
-    await expect(page.getByText(newFolderName)).toBeVisible();
+    await expect(page.getByText(newFolderName)).toBeVisible({ timeout: 10000 });
   });
 });

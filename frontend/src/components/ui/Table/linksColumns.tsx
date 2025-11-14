@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Typography } from '@material-tailwind/react';
-import { FilterFn, type ColumnDef } from '@tanstack/react-table';
+import type { ColumnDef } from '@tanstack/react-table';
 
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
 import DataLinksActionsMenu from '@/components/ui/Menus/DataLinksActions';
@@ -138,27 +138,6 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
 
 const tooltipTriggerClasses = 'max-w-full truncate';
 
-// Custom filter function for path column that searches both path and fsp_name,
-// instead of just the accessor value for the column, which is path.
-const pathFilter: FilterFn<ProxiedPath> = (row, columnId, filterValue) => {
-  const item = row.original;
-  const searchValue = String(filterValue).toLowerCase();
-
-  const pathMatch = item.path?.toLowerCase().includes(searchValue) || false;
-  const fspNameMatch =
-    item.fsp_name?.toLowerCase().includes(searchValue) || false;
-
-  return pathMatch || fspNameMatch;
-};
-
-//Custom filter function for date column, to filter on the formatted date string
-// instead of the raw date string.
-const dateFilter: FilterFn<ProxiedPath> = (row, columnId, filterValue) => {
-  const dateString = row.getValue(columnId) as string;
-  const formattedDate = formatDateString(dateString).toLowerCase();
-  return formattedDate.includes(String(filterValue).toLowerCase());
-};
-
 export const linksColumns: ColumnDef<ProxiedPath>[] = [
   {
     accessorKey: 'sharing_name',
@@ -178,17 +157,13 @@ export const linksColumns: ColumnDef<ProxiedPath>[] = [
         </div>
       );
     },
-    enableSorting: true,
-    enableColumnFilter: true,
-    filterFn: 'includesString'
+    enableSorting: true
   },
   {
     accessorKey: 'path',
     header: 'File Path',
     cell: ({ row }) => <PathCell item={row.original} />,
-    enableSorting: true,
-    enableColumnFilter: true,
-    filterFn: pathFilter
+    enableSorting: true
   },
   {
     accessorKey: 'created_at',
@@ -211,9 +186,7 @@ export const linksColumns: ColumnDef<ProxiedPath>[] = [
         </div>
       );
     },
-    enableSorting: true,
-    enableColumnFilter: true,
-    filterFn: dateFilter
+    enableSorting: true
   },
   {
     accessorKey: 'sharing_key',
@@ -228,9 +201,7 @@ export const linksColumns: ColumnDef<ProxiedPath>[] = [
         </div>
       );
     },
-    enableSorting: true,
-    enableColumnFilter: true,
-    filterFn: 'includesString'
+    enableSorting: true
   },
   {
     id: 'actions',
