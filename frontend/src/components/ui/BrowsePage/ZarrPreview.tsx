@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
-import { Select, Typography } from '@material-tailwind/react';
+import { Typography } from '@material-tailwind/react';
 
 import zarrLogo from '@/assets/zarr.jpg';
 import ZarrMetadataTable from '@/components/ui/BrowsePage/ZarrMetadataTable';
@@ -104,51 +104,15 @@ export default function ZarrPreview({
             ) : null}
           </div>
 
-          {availableVersions && availableVersions.length > 1 ? (
-            <div
-              className="mb-4 mt-4 flex items-center gap-3"
-              data-testid="zarr-version-selector-container"
-            >
-              <label
-                className="text-sm font-medium"
-                htmlFor="zarr-version-select"
-              >
-                Zarr Version:
-              </label>
-              <Select
-                onValueChange={value => {
-                  if (value) {
-                    const version = parseInt(value, 10);
-                    if (version === 2 || version === 3) {
-                      setSelectedZarrVersion(version);
-                    }
-                  }
-                }}
-                value={String(selectedZarrVersion ?? 3)}
-              >
-                <Select.Trigger
-                  className="w-24"
-                  id="zarr-version-select"
-                  placeholder="Select version"
-                />
-                <Select.List>
-                  {availableVersions.includes('v2') ? (
-                    <Select.Option value="2">v2</Select.Option>
-                  ) : null}
-                  {availableVersions.includes('v3') ? (
-                    <Select.Option value="3">v3</Select.Option>
-                  ) : null}
-                </Select.List>
-              </Select>
-            </div>
-          ) : null}
-
           {openWithToolUrls ? (
             <DataToolLinks
+              availableVersions={availableVersions}
               onToolClick={handleToolClick}
+              onVersionChange={(version: 2 | 3) => {
+                setSelectedZarrVersion(version);
+              }}
               selectedZarrVersion={selectedZarrVersion}
               showCopiedTooltip={showCopiedTooltip}
-              title="Open with:"
               urls={openWithToolUrls as OpenWithToolUrls}
             />
           ) : null}
