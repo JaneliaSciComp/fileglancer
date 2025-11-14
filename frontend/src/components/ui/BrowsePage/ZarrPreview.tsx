@@ -155,6 +155,7 @@ export default function ZarrPreview({
         {zarrMetadataQuery.data?.metadata &&
         'arr' in zarrMetadataQuery.data.metadata ? (
           <ZarrMetadataTable
+            availableVersions={availableVersions}
             layerType={layerType}
             metadata={zarrMetadataQuery.data.metadata as Metadata}
           />
