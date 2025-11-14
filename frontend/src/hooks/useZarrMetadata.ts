@@ -54,13 +54,9 @@ export default function useZarrMetadata() {
   >(null);
 
   useEffect(() => {
-    if (disableHeuristicalLayerTypeDetection) {
+    if (!thumbnailSrc || disableHeuristicalLayerTypeDetection) {
+      // Default layer type
       setLayerType('image');
-      return;
-    }
-
-    if (!thumbnailSrc) {
-      setLayerType(null);
       return;
     }
 
