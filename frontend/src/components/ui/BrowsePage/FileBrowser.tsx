@@ -49,8 +49,6 @@ export default function FileBrowser({
     thumbnailQuery,
     openWithToolUrls,
     layerType,
-    selectedZarrVersion,
-    setSelectedZarrVersion,
     availableVersions
   } = useZarrMetadata();
 
@@ -75,9 +73,7 @@ export default function FileBrowser({
         <ZarrPreview
           availableVersions={availableVersions}
           layerType={layerType}
-          onVersionChange={setSelectedZarrVersion}
           openWithToolUrls={openWithToolUrls}
-          selectedZarrVersion={selectedZarrVersion}
           thumbnailQuery={thumbnailQuery}
           zarrMetadataQuery={zarrMetadataQuery}
         />

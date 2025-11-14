@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { Select, Typography } from '@material-tailwind/react';
 
@@ -23,8 +23,6 @@ type ZarrPreviewProps = {
   }>;
   readonly layerType: 'auto' | 'image' | 'segmentation' | null;
   readonly availableVersions?: ('v2' | 'v3')[];
-  readonly selectedZarrVersion?: 2 | 3 | null;
-  readonly onVersionChange?: (version: 2 | 3) => void;
 };
 
 export default function ZarrPreview({
@@ -32,12 +30,26 @@ export default function ZarrPreview({
   openWithToolUrls,
   zarrMetadataQuery,
   layerType,
-  availableVersions,
-  selectedZarrVersion,
-  onVersionChange
+  availableVersions
 }: ZarrPreviewProps) {
   const [showDataLinkDialog, setShowDataLinkDialog] = useState<boolean>(false);
   const [pendingToolKey, setPendingToolKey] = useState<PendingToolKey>(null);
+  const [selectedZarrVersion, setSelectedZarrVersion] = useState<2 | 3 | null>(
+    null
+  );
+
+  // Initialize selected version when availableVersions changes
+  useEffect(() => {
+    if (
+      availableVersions &&
+      availableVersions.length > 0 &&
+      selectedZarrVersion === null
+    ) {
+      // Default to v3 if available, otherwise v2
+      const defaultVersion = availableVersions.includes('v3') ? 3 : 2;
+      setSelectedZarrVersion(defaultVersion);
+    }
+  }, [availableVersions, selectedZarrVersion, setSelectedZarrVersion]);
 
   const {
     handleToolClick,
@@ -105,10 +117,10 @@ export default function ZarrPreview({
               </label>
               <Select
                 onValueChange={value => {
-                  if (onVersionChange && value) {
+                  if (value) {
                     const version = parseInt(value, 10);
                     if (version === 2 || version === 3) {
-                      onVersionChange(version);
+                      setSelectedZarrVersion(version);
                     }
                   }
                 }}

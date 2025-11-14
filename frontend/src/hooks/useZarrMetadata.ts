@@ -49,26 +49,6 @@ export default function useZarrMetadata() {
     'auto' | 'image' | 'segmentation' | null
   >(null);
 
-  const [selectedZarrVersion, setSelectedZarrVersion] = useState<2 | 3 | null>(
-    null
-  );
-
-  // Initialize selected version when metadata is available
-  useEffect(() => {
-    if (
-      zarrMetadataQuery.data?.availableVersions &&
-      selectedZarrVersion === null
-    ) {
-      // Default to v3 if available, otherwise v2
-      const defaultVersion = zarrMetadataQuery.data.availableVersions.includes(
-        'v3'
-      )
-        ? 3
-        : 2;
-      setSelectedZarrVersion(defaultVersion);
-    }
-  }, [zarrMetadataQuery.data?.availableVersions, selectedZarrVersion]);
-
   useEffect(() => {
     if (!thumbnailSrc || disableHeuristicalLayerTypeDetection) {
       // Default layer type
@@ -254,8 +234,6 @@ export default function useZarrMetadata() {
     thumbnailQuery,
     openWithToolUrls,
     layerType,
-    selectedZarrVersion,
-    setSelectedZarrVersion,
     availableVersions: zarrMetadataQuery.data?.availableVersions ?? []
   };
 }
