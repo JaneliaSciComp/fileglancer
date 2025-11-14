@@ -44,8 +44,7 @@ class TaskDefn(ABC):
         self._executor = None
 
     # parameter definition
-    @property
-    def parameter_defns(self) -> List[TaskParameterDefn]:
+    def parameter_defns(self, task_context:Dict[str,Any]={}) -> List[TaskParameterDefn]:
         """List of parameters accepted by this task"""
         args_meta = []
         argparser = self.define_args()
@@ -61,13 +60,19 @@ class TaskDefn(ABC):
                 action.nargs,
                 action.choices,
             ))
+        if task_context:
+            args_meta.extend(self.parameter_defns_for_context(task_context))
         return args_meta
+
+    @abstractmethod
+    def parameter_defns_for_context(self, task_context:Dict[str, Any])-> List[TaskParameterDefn]:
+        pass
 
     async def launch_task(self, task_data:TaskData):
         # the default launcher parses the task arguments and invokes the execute method
         logger.info(f'Parse task args: {task_data.parameters}')
         args, additional_args = self.define_args().parse_known_args(task_data.parameters)
-        task_args = {tp.name: getattr(args, tp.name) for tp in self.parameter_defns}
+        task_args = {tp.name: getattr(args, tp.name) for tp in self.parameter_defns()}
         task_args['extra_args'] = additional_args
 
         logger.info(f'Task arguments: {task_args}')

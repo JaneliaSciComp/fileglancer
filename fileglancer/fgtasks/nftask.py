@@ -1,9 +1,10 @@
-import asyncio
+import json
 
 from argparse import ArgumentParser
 from loguru import logger
-from typing import Optional, List
-from .fgtasks import TaskData, TaskDefn
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+from .fgtasks import TaskData, TaskDefn, TaskParameterDefn
 
 
 class NextflowTaskDefn(TaskDefn):
@@ -45,3 +46,53 @@ class NextflowTaskDefn(TaskDefn):
                    + extra_args)
         logger.debug('Nextflow cmd', cmdline)
         return cmdline
+
+    def parameter_defns_for_context(self, task_context:Dict[str, Any])-> List[TaskParameterDefn]:
+        """
+        task_context: dictionary containing pipeline path and a flag whether to include hidden parameters, e.g.,
+                      {'pipeline': '/location/of/the/pipeline', 'include_hidden': True}
+        """
+        pipeline_path = task_context.get('pipeline')
+        if not pipeline_path:
+            return []
+        p = Path(pipeline_path)
+        if p.is_dir():
+            p = p / 'nextflow_schema.json'
+        if not p.exists():
+            raise ValueError(f'No schema found at {pipeline_path}')
+
+        with open(p, "r", encoding="utf-8") as nf_schema_file:
+            nf_schema = json.load(nf_schema_file)
+
+        include_hidden = task_context.get('include_hidden', False)            
+        return self._extract_parameter_defns_from_section(nf_schema, include_hidden)
+
+    def _extract_parameter_defns_from_section(self, section: Dict[str, Any], include_hidden):
+        param_defs = []
+        if 'properties' in section:
+            props = section['properties']
+            required_fields = set(section.get("required", []))
+            for name, attr in props.items():
+                is_hidden = attr.get('hidden', False)
+                if not is_hidden or include_hidden:
+                    param = TaskParameterDefn(
+                        name=name,
+                        flags=[f'--{name}'],
+                        required=name in required_fields,
+                        default=attr.get('default'),
+                        help=attr.get('description'),
+                        nargs='+' if attr.get('type') == 'array' else None,
+                        choices=attr.get('enum')
+                    )
+                    param_defs.append(param)
+        
+        for key, value in section.items():
+            if isinstance(value, dict):
+                logger.debug(f'Extract {key} parmeters')
+                param_defs.extend(self._extract_parameter_defns_from_section(value, include_hidden))
+
+
+        return param_defs
+        
+        
+        return [] # !!!!! FIXME

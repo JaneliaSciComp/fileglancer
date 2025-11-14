@@ -1099,6 +1099,7 @@ def create_app(settings):
     @app.get("/api/tasks/{task_name}/param-defs")
     async def get_task_params(
         task_name: str,
+        request: Request
     ):
         tasks_registry = get_tasks_registry(get_settings())
         logger.info(f'Lookup task {task_name}')
@@ -1108,7 +1109,10 @@ def create_app(settings):
             logger.error(f'No task found for {task_name}')
             return Response(status_code = 404)
         
-        param_defs = [p.to_json() for p in task_defn.parameter_defns]
+        # request.query_params is a MultiDict-like object
+        task_context = dict(request.query_params)
+ 
+        param_defs = [p.to_json() for p in task_defn.parameter_defns(task_context)]
         return JSONResponse(content = param_defs, status_code=200)
 
     @app.post("/api/tasks/{task_name}")
