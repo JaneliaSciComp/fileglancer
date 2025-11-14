@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Typography } from '@material-tailwind/react';
 import type { UseQueryResult } from '@tanstack/react-query';
+import { Select, Typography } from '@material-tailwind/react';
 
 import zarrLogo from '@/assets/zarr.jpg';
 import ZarrMetadataTable from '@/components/ui/BrowsePage/ZarrMetadataTable';
@@ -8,8 +8,8 @@ import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
 import DataToolLinks from './DataToolLinks';
 import type {
   OpenWithToolUrls,
-  ZarrMetadata,
-  PendingToolKey
+  PendingToolKey,
+  ZarrMetadata
 } from '@/hooks/useZarrMetadata';
 import useDataToolLinks from '@/hooks/useDataToolLinks';
 import { Metadata } from '@/omezarr-helper';
@@ -22,13 +22,19 @@ type ZarrPreviewProps = {
     omeZarrUrl: string | null;
   }>;
   readonly layerType: 'auto' | 'image' | 'segmentation' | null;
+  readonly availableVersions?: ('v2' | 'v3')[];
+  readonly selectedZarrVersion?: 2 | 3 | null;
+  readonly onVersionChange?: (version: 2 | 3) => void;
 };
 
 export default function ZarrPreview({
   thumbnailQuery,
   openWithToolUrls,
   zarrMetadataQuery,
-  layerType
+  layerType,
+  availableVersions,
+  selectedZarrVersion,
+  onVersionChange
 }: ZarrPreviewProps) {
   const [showDataLinkDialog, setShowDataLinkDialog] = useState<boolean>(false);
   const [pendingToolKey, setPendingToolKey] = useState<PendingToolKey>(null);
@@ -85,6 +91,45 @@ export default function ZarrPreview({
               />
             ) : null}
           </div>
+
+          {availableVersions && availableVersions.length > 1 ? (
+            <div
+              className="mb-4 mt-4 flex items-center gap-3"
+              data-testid="zarr-version-selector-container"
+            >
+              <label
+                className="text-sm font-medium"
+                htmlFor="zarr-version-select"
+              >
+                Zarr Version:
+              </label>
+              <Select
+                onValueChange={value => {
+                  if (onVersionChange && value) {
+                    const version = parseInt(value, 10);
+                    if (version === 2 || version === 3) {
+                      onVersionChange(version);
+                    }
+                  }
+                }}
+                value={String(selectedZarrVersion ?? 3)}
+              >
+                <Select.Trigger
+                  className="w-24"
+                  id="zarr-version-select"
+                  placeholder="Select version"
+                />
+                <Select.List>
+                  {availableVersions.includes('v2') ? (
+                    <Select.Option value="2">v2</Select.Option>
+                  ) : null}
+                  {availableVersions.includes('v3') ? (
+                    <Select.Option value="3">v3</Select.Option>
+                  ) : null}
+                </Select.List>
+              </Select>
+            </div>
+          ) : null}
 
           {openWithToolUrls ? (
             <DataToolLinks
