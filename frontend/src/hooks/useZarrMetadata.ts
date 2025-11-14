@@ -49,6 +49,26 @@ export default function useZarrMetadata() {
     'auto' | 'image' | 'segmentation' | null
   >(null);
 
+  const [selectedZarrVersion, setSelectedZarrVersion] = useState<2 | 3 | null>(
+    null
+  );
+
+  // Initialize selected version when metadata is available
+  useEffect(() => {
+    if (
+      zarrMetadataQuery.data?.availableVersions &&
+      selectedZarrVersion === null
+    ) {
+      // Default to v3 if available, otherwise v2
+      const defaultVersion = zarrMetadataQuery.data.availableVersions.includes(
+        'v3'
+      )
+        ? 3
+        : 2;
+      setSelectedZarrVersion(defaultVersion);
+    }
+  }, [zarrMetadataQuery.data?.availableVersions, selectedZarrVersion]);
+
   useEffect(() => {
     if (disableHeuristicalLayerTypeDetection) {
       setLayerType('image');
@@ -96,7 +116,9 @@ export default function useZarrMetadata() {
         openWithToolUrls.validator = validatorBaseUrl + url;
         openWithToolUrls.vole = voleBaseUrl + url;
         openWithToolUrls.avivator =
-          metadata.zarrVersion === 2 ? avivatorBaseUrl + url : null;
+          (selectedZarrVersion ?? metadata.zarrVersion) === 2
+            ? avivatorBaseUrl + url
+            : null;
         if (disableNeuroglancerStateGeneration) {
           openWithToolUrls.neuroglancer =
             neuroglancerBaseUrl + generateNeuroglancerStateForDataURL(url);
@@ -106,7 +128,7 @@ export default function useZarrMetadata() {
               neuroglancerBaseUrl +
               generateNeuroglancerStateForOmeZarr(
                 url,
-                metadata.zarrVersion,
+                selectedZarrVersion ?? metadata.zarrVersion,
                 layerType,
                 metadata.multiscale,
                 metadata.arr,
@@ -130,7 +152,8 @@ export default function useZarrMetadata() {
         // the icon before a data link has been generated. Setting it to null for
         // all other versions, eg zarr v3 means the icon will not be present before
         // a data link is generated.
-        openWithToolUrls.avivator = metadata.zarrVersion === 2 ? '' : null;
+        openWithToolUrls.avivator =
+          (selectedZarrVersion ?? metadata.zarrVersion) === 2 ? '' : null;
         openWithToolUrls.neuroglancer = '';
       }
     } else {
@@ -147,7 +170,7 @@ export default function useZarrMetadata() {
             neuroglancerBaseUrl +
             generateNeuroglancerStateForZarrArray(
               url,
-              metadata.zarrVersion,
+              selectedZarrVersion ?? metadata.zarrVersion,
               layerType
             );
         }
@@ -167,13 +190,17 @@ export default function useZarrMetadata() {
     externalDataUrlQuery.data,
     disableNeuroglancerStateGeneration,
     useLegacyMultichannelApproach,
-    layerType
+    layerType,
+    selectedZarrVersion
   ]);
 
   return {
     zarrMetadataQuery,
     thumbnailQuery,
     openWithToolUrls,
-    layerType
+    layerType,
+    selectedZarrVersion,
+    setSelectedZarrVersion,
+    availableVersions: zarrMetadataQuery.data?.availableVersions ?? []
   };
 }
