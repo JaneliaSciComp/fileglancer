@@ -104,6 +104,21 @@ export default function useZarrMetadata() {
       copy: url || ''
     } as OpenWithToolUrls;
 
+    function addDualNeuroglancerDataUrls(
+      baseUrl: string,
+      dataUrl: string,
+      openWithToolUrls: OpenWithToolUrls
+    ) {
+      if (zarrMetadataQuery.data?.availableVersions.includes('v2')) {
+        openWithToolUrls.neuroglancerV2 =
+          baseUrl + generateNeuroglancerStateForDataURL(dataUrl, 2);
+      }
+      if (zarrMetadataQuery.data?.availableVersions.includes('v3')) {
+        openWithToolUrls.neuroglancerV3 =
+          baseUrl + generateNeuroglancerStateForDataURL(dataUrl, 3);
+      }
+    }
+
     // Determine which tools should be available based on metadata type
     if (metadata?.multiscale) {
       // OME-Zarr - all urls for v2; no avivator for v3
@@ -111,46 +126,75 @@ export default function useZarrMetadata() {
         // Populate with actual URLs when proxied path is available
         openWithToolUrls.validator = validatorBaseUrl + url;
         openWithToolUrls.vole = voleBaseUrl + url;
+        // Avivator is only available for Zarr v2
         openWithToolUrls.avivator =
-          (selectedZarrVersion ?? metadata.zarrVersion) === 2
+          zarrMetadataQuery.data?.availableVersions.includes('v2')
             ? avivatorBaseUrl + url
             : null;
         if (disableNeuroglancerStateGeneration) {
-          openWithToolUrls.neuroglancer =
-            neuroglancerBaseUrl + generateNeuroglancerStateForDataURL(url);
+          addDualNeuroglancerDataUrls(
+            neuroglancerBaseUrl,
+            url,
+            openWithToolUrls
+          );
         } else if (layerType) {
           try {
-            openWithToolUrls.neuroglancer =
-              neuroglancerBaseUrl +
-              generateNeuroglancerStateForOmeZarr(
-                url,
-                selectedZarrVersion ?? metadata.zarrVersion,
-                layerType,
-                metadata.multiscale,
-                metadata.arr,
-                metadata.omero,
-                useLegacyMultichannelApproach
-              );
+            if (zarrMetadataQuery.data?.availableVersions.includes('v2')) {
+              openWithToolUrls.neuroglancerV2 =
+                neuroglancerBaseUrl +
+                generateNeuroglancerStateForOmeZarr(
+                  url,
+                  2,
+                  layerType,
+                  metadata.multiscale,
+                  metadata.arr,
+                  metadata.omero,
+                  useLegacyMultichannelApproach
+                );
+            }
+            if (zarrMetadataQuery.data?.availableVersions.includes('v3')) {
+              openWithToolUrls.neuroglancerV3 =
+                neuroglancerBaseUrl +
+                generateNeuroglancerStateForOmeZarr(
+                  url,
+                  3,
+                  layerType,
+                  metadata.multiscale,
+                  metadata.arr,
+                  metadata.omero,
+                  useLegacyMultichannelApproach
+                );
+            }
           } catch (error) {
             log.error(
               'Error generating Neuroglancer state for OME-Zarr:',
               error
             );
-            openWithToolUrls.neuroglancer =
-              neuroglancerBaseUrl + generateNeuroglancerStateForDataURL(url);
+            addDualNeuroglancerDataUrls(
+              neuroglancerBaseUrl,
+              url,
+              openWithToolUrls
+            );
+          }
+        } else {
+          // layerType not yet determined - leave empty (skeleton will show)
+          if (zarrMetadataQuery.data?.availableVersions.includes('v2')) {
+            openWithToolUrls.neuroglancerV2 = '';
+          }
+          if (zarrMetadataQuery.data?.availableVersions.includes('v3')) {
+            openWithToolUrls.neuroglancerV3 = '';
           }
         }
       } else {
         // No proxied URL - show all tools as available but empty
         openWithToolUrls.validator = '';
         openWithToolUrls.vole = '';
-        // if this is a zarr version 2, then set the url to blank which will show
-        // the icon before a data link has been generated. Setting it to null for
-        // all other versions, eg zarr v3 means the icon will not be present before
-        // a data link is generated.
+        // Avivator is only available for Zarr v2. Show empty string for loading if v2 available,
+        // otherwise null to hide the icon entirely
         openWithToolUrls.avivator =
-          (selectedZarrVersion ?? metadata.zarrVersion) === 2 ? '' : null;
-        openWithToolUrls.neuroglancer = '';
+          zarrMetadataQuery.data?.availableVersions.includes('v2') ? '' : null;
+        openWithToolUrls.neuroglancerV2 = '';
+        openWithToolUrls.neuroglancerV3 = '';
       }
     } else {
       // Non-OME Zarr - only Neuroglancer available
@@ -159,23 +203,38 @@ export default function useZarrMetadata() {
         openWithToolUrls.vole = null;
         openWithToolUrls.avivator = null;
         if (disableNeuroglancerStateGeneration) {
-          openWithToolUrls.neuroglancer =
-            neuroglancerBaseUrl + generateNeuroglancerStateForDataURL(url);
+          addDualNeuroglancerDataUrls(
+            neuroglancerBaseUrl,
+            url,
+            openWithToolUrls
+          );
         } else if (layerType) {
-          openWithToolUrls.neuroglancer =
-            neuroglancerBaseUrl +
-            generateNeuroglancerStateForZarrArray(
-              url,
-              selectedZarrVersion ?? metadata.zarrVersion,
-              layerType
-            );
+          if (zarrMetadataQuery.data?.availableVersions.includes('v2')) {
+            openWithToolUrls.neuroglancerV2 =
+              neuroglancerBaseUrl +
+              generateNeuroglancerStateForZarrArray(url, 2, layerType);
+          }
+          if (zarrMetadataQuery.data?.availableVersions.includes('v3')) {
+            openWithToolUrls.neuroglancerV3 =
+              neuroglancerBaseUrl +
+              generateNeuroglancerStateForZarrArray(url, 3, layerType);
+          }
+        } else {
+          // layerType not yet determined - leave empty (skeleton will show)
+          if (zarrMetadataQuery.data?.availableVersions.includes('v2')) {
+            openWithToolUrls.neuroglancerV2 = '';
+          }
+          if (zarrMetadataQuery.data?.availableVersions.includes('v3')) {
+            openWithToolUrls.neuroglancerV3 = '';
+          }
         }
       } else {
         // No proxied URL - only show Neuroglancer as available but empty
         openWithToolUrls.validator = null;
         openWithToolUrls.vole = null;
         openWithToolUrls.avivator = null;
-        openWithToolUrls.neuroglancer = '';
+        openWithToolUrls.neuroglancerV2 = '';
+        openWithToolUrls.neuroglancerV3 = '';
       }
     }
 
@@ -187,7 +246,7 @@ export default function useZarrMetadata() {
     disableNeuroglancerStateGeneration,
     useLegacyMultichannelApproach,
     layerType,
-    selectedZarrVersion
+    zarrMetadataQuery.data?.availableVersions
   ]);
 
   return {

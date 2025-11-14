@@ -12,7 +12,8 @@ import { FileOrFolder } from '@/shared.types';
 export type OpenWithToolUrls = {
   copy: string;
   validator: string | null;
-  neuroglancer: string;
+  neuroglancerV2: string | null;
+  neuroglancerV3: string | null;
   vole: string | null;
   avivator: string | null;
 };
@@ -86,9 +87,6 @@ async function fetchZarrMetadata({
   // Detect all available Zarr versions
   const fileNames = files.map(f => f.name);
   const availableVersions = detectZarrVersions(fileNames);
-
-  // DEFAULT: Prefer v3 if both versions exist
-  const selectedVersion: 2 | 3 = availableVersions.includes('v3') ? 3 : 2;
 
   // Check for zarr.json (Zarr v3)
   const zarrJsonFile = getFile('zarr.json');
