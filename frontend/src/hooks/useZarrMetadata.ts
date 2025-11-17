@@ -230,10 +230,10 @@ export default function useZarrMetadata() {
   ]);
 
   return {
-    zarrMetadataQuery,
-    thumbnailQuery,
-    openWithToolUrls,
+    availableVersions: zarrMetadataQuery.data?.availableVersions ?? [],
     layerType,
-    availableVersions: zarrMetadataQuery.data?.availableVersions ?? []
+    openWithToolUrls,
+    thumbnailQuery,
+    zarrMetadataQuery
   };
 }
