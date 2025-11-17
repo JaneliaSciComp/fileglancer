@@ -9,8 +9,8 @@ import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { UseMutationResult } from '@tanstack/react-query';
 
-import type { FileSharePath, FileOrFolder } from '@/shared.types';
-import { makeBrowseLink, makeMapKey } from '@/utils';
+import type { FileOrFolder } from '@/shared.types';
+import { makeBrowseLink } from '@/utils';
 import useFileQuery, {
   useDeleteFileMutation,
   useCreateFolderMutation,
@@ -27,7 +27,6 @@ type FileBrowserContextProviderProps = {
 
 // Client-only state (UI state that's not fetched from server)
 interface FileBrowserState {
-  uiFileSharePath: FileSharePath | null;
   propertiesTarget: FileOrFolder | null;
   selectedFiles: FileOrFolder[];
 }
@@ -97,7 +96,6 @@ export const FileBrowserContextProvider = ({
 
   // Client-only state for UI interactions
   const [fileBrowserState, setFileBrowserState] = useState<FileBrowserState>({
-    uiFileSharePath: null,
     propertiesTarget: null,
     selectedFiles: []
   });
@@ -129,9 +127,9 @@ export const FileBrowserContextProvider = ({
     showFilePropertiesDrawer: boolean
   ) => {
     // If clicking on a file (not directory), navigate to the file URL
-    if (!file.is_dir && fileBrowserState.uiFileSharePath) {
+    if (!file.is_dir && fileQuery.data?.currentFileSharePath) {
       const fileLink = makeBrowseLink(
-        fileBrowserState.uiFileSharePath.name,
+        fileQuery.data?.currentFileSharePath.name,
         file.path
       );
       navigate(fileLink);
@@ -173,13 +171,7 @@ export const FileBrowserContextProvider = ({
   // Update client state when URL changes (navigation to different file/folder)
   // Set propertiesTarget to the current directory/file being viewed
   useEffect(() => {
-    const fspKey = fspName ? makeMapKey('fsp', fspName) : null;
-    const newFileSharePathTarget =
-      zonesAndFspQuery.data && fspKey
-        ? (zonesAndFspQuery.data[fspKey] as FileSharePath)
-        : null;
     setFileBrowserState({
-      uiFileSharePath: newFileSharePathTarget,
       propertiesTarget: fileQuery.data?.currentFileOrFolder || null,
       selectedFiles: []
     });
