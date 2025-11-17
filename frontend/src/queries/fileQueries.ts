@@ -68,25 +68,7 @@ export default function useFileQuery(
         body.info && body.info.owner
           ? `You do not have permission to list this folder. Contact the owner (${body.info.owner}) for access.`
           : 'You do not have permission to list this folder. Contact the owner for access.';
-
-      // Return partial data with error message instead of throwing
-      // This allows the UI to display both the folder info AND the error message
-      return {
-        info: body.info || {
-          name: folderName === '.' ? '' : folderName.split('/').pop() || '',
-          path: folderName || '.',
-          is_dir: true,
-          size: 0,
-          last_modified: 0,
-          owner: '',
-          group: '',
-          hasRead: false,
-          hasWrite: false,
-          permissions: ''
-        },
-        files: [], // No files accessible due to permission error
-        errorMessage
-      };
+      throw new Error(errorMessage);
     } else if (response.status === 404) {
       throw new Error('Folder not found');
     } else {
