@@ -28,6 +28,7 @@ type ZarrMetadataQueryParams = {
 type ZarrMetadataResult = {
   metadata: ZarrMetadata;
   omeZarrUrl: string | null;
+  availableVersions: ('v2' | 'v3')[];
 };
 
 /**
@@ -44,6 +45,26 @@ export function isZarrDirectory(files: FileOrFolder[] | undefined): boolean {
 }
 
 /**
+ * Detects which Zarr versions are supported by checking for version-specific marker files.
+ * @returns Array of supported versions: ['v2'], ['v3'], or ['v2', 'v3']
+ */
+export function detectZarrVersions(fileNames: string[]): ('v2' | 'v3')[] {
+  const versions: ('v2' | 'v3')[] = [];
+
+  // Check for Zarr v2 indicators
+  if (fileNames.includes('.zarray') || fileNames.includes('.zattrs')) {
+    versions.push('v2');
+  }
+
+  // Check for Zarr v3 indicator
+  if (fileNames.includes('zarr.json')) {
+    versions.push('v3');
+  }
+
+  return versions;
+}
+
+/**
  * Fetches Zarr metadata by checking for zarr.json, .zarray, or .zattrs files
  */
 async function fetchZarrMetadata({
@@ -53,7 +74,7 @@ async function fetchZarrMetadata({
 }: ZarrMetadataQueryParams): Promise<ZarrMetadataResult> {
   if (!fspName || !currentFileOrFolder || !files) {
     log.warn('Missing required parameters for Zarr metadata fetch');
-    return { metadata: null, omeZarrUrl: null };
+    return { metadata: null, omeZarrUrl: null, availableVersions: [] };
   }
 
   const imageUrl = getFileURL(fspName, currentFileOrFolder.path);
@@ -62,9 +83,16 @@ async function fetchZarrMetadata({
   const getFile = (fileName: string) =>
     files.find((file: FileOrFolder) => file.name === fileName);
 
-  // Check for zarr.json (Zarr v3)
   const zarrJsonFile = getFile('zarr.json');
-  if (zarrJsonFile) {
+  const zarrayFile = getFile('.zarray');
+  const zattrsFile = getFile('.zattrs');
+
+  // Detect all available Zarr versions
+  const fileNames = files.map(f => f.name);
+  const availableVersions = detectZarrVersions(fileNames);
+
+  // Default to Zarr v3 when available
+  if (availableVersions.includes('v3') && zarrJsonFile) {
     const attrs = (await fetchFileAsJson(fspName, zarrJsonFile.path)) as any;
 
     if (attrs.node_type === 'array') {
@@ -80,7 +108,8 @@ async function fetchZarrMetadata({
           scales: undefined,
           zarrVersion: 3
         },
-        omeZarrUrl: null
+        omeZarrUrl: null,
+        availableVersions
       };
     } else if (attrs.node_type === 'group') {
       if (attrs.attributes?.ome?.multiscales) {
@@ -93,21 +122,21 @@ async function fetchZarrMetadata({
         const metadata = await getOmeZarrMetadata(imageUrl);
         return {
           metadata,
-          omeZarrUrl: imageUrl
+          omeZarrUrl: imageUrl,
+          availableVersions
         };
       } else {
         log.info('Zarrv3 group has no multiscales', attrs.attributes);
-        return { metadata: null, omeZarrUrl: null };
+        return { metadata: null, omeZarrUrl: null, availableVersions };
       }
     } else {
       log.warn('Unknown Zarrv3 node type', attrs.node_type);
-      return { metadata: null, omeZarrUrl: null };
+      return { metadata: null, omeZarrUrl: null, availableVersions };
     }
   }
 
   // Check for .zarray (Zarr v2 array)
-  const zarrayFile = getFile('.zarray');
-  if (zarrayFile) {
+  if (!availableVersions.includes('v3') && zarrayFile) {
     log.info('Getting Zarr array for', imageUrl, 'with Zarr version', 2);
     const arr = await getZarrArray(imageUrl, 2);
     const shapes = [arr.shape];
@@ -120,13 +149,13 @@ async function fetchZarrMetadata({
         scales: undefined,
         zarrVersion: 2
       },
-      omeZarrUrl: null
+      omeZarrUrl: null,
+      availableVersions
     };
   }
 
   // Check for .zattrs (Zarr v2 OME-Zarr)
-  const zattrsFile = getFile('.zattrs');
-  if (zattrsFile) {
+  if (!availableVersions.includes('v3') && zattrsFile) {
     const attrs = (await fetchFileAsJson(fspName, zattrsFile.path)) as any;
     if (attrs.multiscales) {
       log.info(
@@ -138,14 +167,15 @@ async function fetchZarrMetadata({
       const metadata = await getOmeZarrMetadata(imageUrl);
       return {
         metadata,
-        omeZarrUrl: imageUrl
+        omeZarrUrl: imageUrl,
+        availableVersions
       };
     }
   }
 
   // No Zarr metadata found - this is expected for non-Zarr files
   log.debug('No Zarr metadata files found for', imageUrl);
-  return { metadata: null, omeZarrUrl: null };
+  return { metadata: null, omeZarrUrl: null, availableVersions };
 }
 
 /**
