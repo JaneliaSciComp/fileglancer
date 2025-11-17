@@ -1,10 +1,7 @@
 import { default as log } from '@/logger';
 import {
   escapePathForUrl,
-  getFileContentPath,
-  getFileBrowsePath,
   getFileURL,
-  getFullPath,
   getLastSegmentFromPath,
   getPreferredPathForDisplay,
   joinPaths,
@@ -117,7 +114,7 @@ class HTTPError extends Error {
 
 async function checkSessionValidity(): Promise<boolean> {
   try {
-    const response = await fetch(getFullPath('/api/profile'), {
+    const response = await fetch('/api/profile', {
       method: 'GET',
       credentials: 'include'
     });
@@ -157,7 +154,7 @@ async function sendFetchRequest(
 
   let response: Response;
   try {
-    response = await fetch(getFullPath(apiPath), requestOptions);
+    response = await fetch(apiPath, requestOptions);
   } catch (error) {
     // Report network errors to central server health monitoring if applicable
     const reporter = healthCheckRegistry.getReporter();
@@ -234,12 +231,88 @@ function makeMapKey(type: 'zone' | 'fsp' | 'folder', name: string): string {
   return `${type}_${name}`;
 }
 
+/**
+ * Constructs a properly encoded URL from base URL, optional path, and optional query parameters.
+ *
+ * Two overloads:
+ * 1. URLs with a single path segment and/or query parameters
+ * 2. URLs with multi-segment path strings (S3-style)
+ *
+ * @param baseUrl - The base URL (e.g., '/api/files/' or 'https://viewer.example.com/')
+ * @param singlePathSegment - Single path segment, encoded with encodeURIComponent (Overload 1)
+ * @param queryParams - Query parameters as key-value pairs (Overload 1 only)
+ *
+ * OR
+ *
+ * @param baseUrl - The base URL (e.g., 'https://s3.example.com/bucket')
+ * @param multiSegmentPathString - Path with '/' separators, encoded with escapePathForUrl (Overload 2)
+ * @returns A properly encoded URL string
+ *
+ * @example
+ * // Overload 1: URL with single segment
+ * buildUrl('/api/files/', 'myFSP', null)
+ * // Returns: '/api/files/myFSP'
+ *
+ * @example
+ * // Overload 1: URL with query params only
+ * buildUrl('/api/endpoint', null, { key: 'value' })
+ * // Returns: '/api/endpoint?key=value'
+ *
+ * @example
+ * // Overload 1: URL with single segment and query params
+ * buildUrl('/api/files/', 'myFSP', { subpath: 'folder/file.txt' })
+ * // Returns: '/api/files/myFSP?subpath=folder%2Ffile.txt'
+ *
+ * @example
+ * // Overload 2: External URL with multi-segment path
+ * buildUrl('https://s3.example.com/bucket', 'folder/file 100%.zarr')
+ * // Returns: 'https://s3.example.com/bucket/folder/file%20100%25.zarr'
+ */
+function buildUrl(
+  baseUrl: string,
+  singlePathSegment: string | null,
+  queryParams: Record<string, string> | null
+): string;
+function buildUrl(baseUrl: string, multiSegmentPathString: string): string;
+function buildUrl(
+  baseUrl: string,
+  pathParam?: string | null,
+  queryParams?: Record<string, string> | null
+): string {
+  // Remove trailing slash from base URL if present
+  let url = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+
+  // Handle path parameter if provided
+  if (pathParam) {
+    if (queryParams !== undefined) {
+      // Overload 1: Single path segment (queryParams is null or object)
+      const encodedSegment = encodeURIComponent(pathParam);
+      url = joinPaths(url, encodedSegment);
+    } else {
+      // Overload 2: Multi-segment path string (only 2 params)
+      const encodedPath = escapePathForUrl(pathParam);
+      url = `${url}/${encodedPath}`;
+    }
+  }
+
+  // Add query parameters if provided and not null
+  if (queryParams && Object.keys(queryParams).length > 0) {
+    const searchParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(queryParams)) {
+      searchParams.append(key, value);
+    }
+    url += `?${searchParams.toString()}`;
+  }
+
+  return url;
+}
+
 async function fetchFileContent(
   fspName: string,
   path: string,
   options?: FetchRequestOptions
 ): Promise<Uint8Array> {
-  const url = getFileContentPath(fspName, path);
+  const url = buildUrl('/api/content/', fspName, { subpath: path });
   const response = await sendFetchRequest(url, 'GET', undefined, options);
   if (!response.ok) {
     throw new Error(`Failed to fetch file: ${response.statusText}`);
@@ -291,18 +364,16 @@ async function fetchFileWithTextDetection(
 }
 
 export {
+  buildUrl,
   checkSessionValidity,
   escapePathForUrl,
   fetchFileAsJson,
   fetchFileAsText,
   fetchFileContent,
   fetchFileWithTextDetection,
-  getFullPath,
   formatDateString,
   formatUnixTimestamp,
   formatFileSize,
-  getFileContentPath,
-  getFileBrowsePath,
   getFileURL,
   getLastSegmentFromPath,
   getPreferredPathForDisplay,

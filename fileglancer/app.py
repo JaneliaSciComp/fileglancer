@@ -24,7 +24,7 @@ from fastapi.responses import RedirectResponse, Response, JSONResponse, PlainTex
 from fastapi.exceptions import RequestValidationError, StarletteHTTPException
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 from fileglancer import database as db
 from fileglancer import auth
@@ -139,7 +139,13 @@ def create_app(settings):
             proxied_path = db.get_proxied_path_by_sharing_key(session, sharing_key)
             if not proxied_path:
                 return get_nosuchbucket_response(sharing_name), None
-            if proxied_path.sharing_name != sharing_name:
+            
+            # Vol-E viewer sends URLs with literal % characters (not URL-encoded)
+            # FastAPI automatically decodes path parameters - % chars are treated as escapes, creating a garbled sharing_name if they're present
+            # We therefore need to handle two cases:
+            #   1. Properly encoded requests (sharing_name matches DB value of proxied_path.sharing_name)
+            #   2. Vol-E's unencoded requests (unquote(proxied_path.sharing_name) matches the garbled request value)
+            if proxied_path.sharing_name != sharing_name and unquote(proxied_path.sharing_name) != sharing_name:
                 return get_error_response(400, "InvalidArgument", f"Sharing name mismatch for sharing key {sharing_key}", sharing_name), None
 
             fsp = db.get_file_share_path(session, proxied_path.fsp_name)
@@ -251,10 +257,14 @@ def create_app(settings):
     # Authentication routes
     @app.get("/api/auth/login", include_in_schema=settings.enable_okta_auth,
              description="Initiate OKTA OAuth login flow")
-    async def login(request: Request):
+    async def login(request: Request, next: Optional[str] = Query(None)):
         """Redirect to OKTA for authentication"""
         if not settings.enable_okta_auth:
             raise HTTPException(status_code=404, detail="OKTA authentication not enabled")
+
+        # Store the next URL in the session for use after OAuth callback
+        if next and next.startswith("/fg/"):
+            request.session['next_url'] = next
 
         redirect_uri = str(settings.okta_redirect_uri)
         return await oauth.okta.authorize_redirect(request, redirect_uri)
@@ -304,8 +314,15 @@ def create_app(settings):
                 # Extract session_id while still in database session context
                 session_id = user_session.session_id
 
+            # Get the next URL from session (stored during initial login redirect)
+            next_url = request.session.pop('next_url', '/fg/browse')
+
+            # Validate next_url to prevent open redirect vulnerabilities
+            if not next_url.startswith('/fg/'):
+                next_url = '/fg/browse'
+
             # Create redirect response
-            redirect_response = RedirectResponse(url="/fg/browse")
+            redirect_response = RedirectResponse(url=next_url)
 
             # Set session cookie on the redirect response
             auth.create_session_cookie(redirect_response, session_id, settings)
@@ -1040,11 +1057,17 @@ def create_app(settings):
 
         # Parse JSON body
         username = body.get("username")
+        next_url = body.get("next", "/fg/browse")
 
         if not username or not username.strip():
             raise HTTPException(status_code=400, detail="Username is required")
 
         username = username.strip()
+
+        # Validate next_url to prevent open redirect vulnerabilities
+        # Only allow relative URLs that start with /fg/
+        if not next_url.startswith("/fg/"):
+            next_url = "/fg/browse"
 
         # Create session in database
         expires_at = datetime.now(UTC) + timedelta(hours=settings.session_expiry_hours)
@@ -1061,8 +1084,8 @@ def create_app(settings):
             )
             session_id = user_session.session_id
 
-        # Create JSON response
-        response = JSONResponse(content={"success": True, "username": username, "redirect": "/fg/browse"})
+        # Create JSON response with the next URL
+        response = JSONResponse(content={"success": True, "username": username, "redirect": next_url})
 
         # Set session cookie
         auth.create_session_cookie(response, session_id, settings)

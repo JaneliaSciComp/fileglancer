@@ -7,7 +7,7 @@ import {
   UseMutationResult
 } from '@tanstack/react-query';
 
-import { sendFetchRequest, makeMapKey, HTTPError } from '@/utils';
+import { sendFetchRequest, buildUrl, makeMapKey, HTTPError } from '@/utils';
 import { toHttpError } from '@/utils/errorHandling';
 import type {
   FileSharePath,
@@ -275,9 +275,8 @@ export function useUpdatePreferenceMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: async <T>({ key, value }: UpdatePreferencePayload<T>) => {
-      const response = await sendFetchRequest(`/api/preference/${key}`, 'PUT', {
-        value
-      });
+      const url = buildUrl('/api/preference/', key, null);
+      const response = await sendFetchRequest(url, 'PUT', { value });
       if (!response.ok) {
         throw await toHttpError(response);
       }
@@ -374,11 +373,8 @@ export function useUpdatePreferenceListMutation(): UseMutationResult<
         value = payload.updatedArray;
       }
 
-      const response = await sendFetchRequest(
-        `/api/preference/${preferenceKey}`,
-        'PUT',
-        { value }
-      );
+      const url = buildUrl('/api/preference/', preferenceKey, null);
+      const response = await sendFetchRequest(url, 'PUT', { value });
       if (!response.ok) {
         throw await toHttpError(response);
       }

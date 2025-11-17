@@ -17,13 +17,17 @@ export default function Home() {
   const isSimpleAuth = authStatus?.auth_method === 'simple';
   const simpleLoginMutation = useSimpleLoginMutation();
 
+  // Get the 'next' parameter from URL to redirect after login
+  const urlParams = new URLSearchParams(window.location.search);
+  const nextUrl = urlParams.get('next') || '/fg/browse';
+
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const username = formData.get('username') as string;
 
     simpleLoginMutation.mutate(
-      { username },
+      { username, next: nextUrl },
       {
         onSuccess: data => {
           window.location.href = data.redirect || '/fg/browse';
@@ -181,7 +185,7 @@ export default function Home() {
               </div>
               <a
                 className="block w-full px-4 py-2 bg-primary text-primary-foreground rounded-md font-medium text-center hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors"
-                href="/api/auth/login"
+                href={`/api/auth/login?next=${encodeURIComponent(nextUrl)}`}
               >
                 Log In
               </a>
