@@ -11,7 +11,13 @@ vi.mock('@/omezarr-helper', async () => {
 
 // Test component that uses the actual useZarrMetadata hook
 function ZarrPreviewTestWrapper() {
-  const { availableVersions, layerType, openWithToolUrls, thumbnailQuery, zarrMetadataQuery } = useZarrMetadata();
+  const {
+    availableVersions,
+    layerType,
+    openWithToolUrls,
+    thumbnailQuery,
+    zarrMetadataQuery
+  } = useZarrMetadata();
 
   return (
     <ZarrPreview
@@ -32,7 +38,9 @@ describe('ZarrPreview version selector', () => {
 
     // Wait for queries to resolve
     await waitFor(() => {
-      expect(screen.queryByTestId('zarr-version-selector-container')).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId('zarr-version-selector-container')
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -43,7 +51,9 @@ describe('ZarrPreview version selector', () => {
 
     // Wait for queries to resolve
     await waitFor(() => {
-      expect(screen.queryByTestId('zarr-version-selector-container')).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId('zarr-version-selector-container')
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -54,7 +64,9 @@ describe('ZarrPreview version selector', () => {
 
     // Wait for version selector to appear
     await waitFor(() => {
-      expect(screen.getByTestId('zarr-version-selector-container')).toBeInTheDocument();
+      expect(
+        screen.getByTestId('zarr-version-selector-container')
+      ).toBeInTheDocument();
     });
   });
 
