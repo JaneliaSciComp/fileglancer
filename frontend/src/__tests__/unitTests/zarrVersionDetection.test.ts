@@ -15,7 +15,12 @@ describe('detectZarrVersions', () => {
   });
 
   it('should detect both versions when both zarr.json and .zarray exist', () => {
-    const files = ['zarr.json', '.zarray', '.zattrs', 'arrays/data/chunk_key_1'];
+    const files = [
+      'zarr.json',
+      '.zarray',
+      '.zattrs',
+      'arrays/data/chunk_key_1'
+    ];
     const result = detectZarrVersions(files);
     expect(result).toEqual(['v2', 'v3']);
   });

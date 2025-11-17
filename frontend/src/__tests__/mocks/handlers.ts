@@ -297,7 +297,14 @@ export const handlers = [
                     { name: 'y', type: 'space', unit: 'micrometer' },
                     { name: 'x', type: 'space', unit: 'micrometer' }
                   ],
-                  datasets: [{ path: '0', coordinateTransformations: [{ type: 'scale', scale: [1.0, 0.5, 0.5] }] }]
+                  datasets: [
+                    {
+                      path: '0',
+                      coordinateTransformations: [
+                        { type: 'scale', scale: [1.0, 0.5, 0.5] }
+                      ]
+                    }
+                  ]
                 }
               ]
             }
@@ -355,7 +362,14 @@ export const handlers = [
                 { name: 'y', type: 'space', unit: 'micrometer' },
                 { name: 'x', type: 'space', unit: 'micrometer' }
               ],
-              datasets: [{ path: '0', coordinateTransformations: [{ type: 'scale', scale: [1.0, 0.5, 0.5] }] }]
+              datasets: [
+                {
+                  path: '0',
+                  coordinateTransformations: [
+                    { type: 'scale', scale: [1.0, 0.5, 0.5] }
+                  ]
+                }
+              ]
             }
           ]
         });
