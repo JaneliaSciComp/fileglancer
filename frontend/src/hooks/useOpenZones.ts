@@ -1,5 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import { useState, useCallback } from 'react';
 
 // Hook to manage the open zones in the file browser sidebar
 export default function useOpenZones() {
