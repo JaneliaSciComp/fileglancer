@@ -44,8 +44,13 @@ export default function FileBrowser({
     handleContextMenuClick
   } = useContextMenu();
 
-  const { zarrMetadataQuery, thumbnailQuery, openWithToolUrls, layerType } =
-    useZarrMetadata();
+  const {
+    zarrMetadataQuery,
+    thumbnailQuery,
+    openWithToolUrls,
+    layerType,
+    availableVersions
+  } = useZarrMetadata();
 
   const isZarrDir = isZarrDirectory(fileQuery.data?.files);
 
@@ -66,6 +71,7 @@ export default function FileBrowser({
         </div>
       ) : zarrMetadataQuery.data?.metadata ? (
         <ZarrPreview
+          availableVersions={availableVersions}
           layerType={layerType}
           openWithToolUrls={openWithToolUrls}
           thumbnailQuery={thumbnailQuery}

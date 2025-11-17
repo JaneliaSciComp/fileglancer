@@ -15,6 +15,7 @@ import useDataToolLinks from '@/hooks/useDataToolLinks';
 import { Metadata } from '@/omezarr-helper';
 
 type ZarrPreviewProps = {
+  readonly availableVersions: ('v2' | 'v3')[];
   readonly thumbnailQuery: UseQueryResult<string, Error>;
   readonly openWithToolUrls: OpenWithToolUrls | null;
   readonly zarrMetadataQuery: UseQueryResult<{
@@ -25,6 +26,7 @@ type ZarrPreviewProps = {
 };
 
 export default function ZarrPreview({
+  availableVersions,
   thumbnailQuery,
   openWithToolUrls,
   zarrMetadataQuery,
@@ -110,6 +112,7 @@ export default function ZarrPreview({
         {zarrMetadataQuery.data?.metadata &&
         'arr' in zarrMetadataQuery.data.metadata ? (
           <ZarrMetadataTable
+            availableVersions={availableVersions}
             layerType={layerType}
             metadata={zarrMetadataQuery.data.metadata as Metadata}
           />

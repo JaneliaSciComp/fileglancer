@@ -180,6 +180,7 @@ export default function useZarrMetadata() {
     zarrMetadataQuery,
     thumbnailQuery,
     openWithToolUrls,
-    layerType
+    layerType,
+    availableVersions: zarrMetadataQuery.data?.availableVersions || []
   };
 }
