@@ -133,7 +133,14 @@ export default function useFileQuery(
     queryFn: fetchFileInfo,
     select: transformData,
     enabled: !!fspName && !!zonesAndFspQuery.data,
-    staleTime: 5 * 60 * 1000 // 5 minutes - file listings don't change that often
+    staleTime: 5 * 60 * 1000, // 5 minutes - file listings don't change that often
+    retry: (failureCount, error) => {
+      // Do not retry on permission errors
+      if (error instanceof Error && error.message.includes('permission')) {
+        return false;
+      }
+      return failureCount < 3; // Default retry behavior
+    }
   });
 }
 
