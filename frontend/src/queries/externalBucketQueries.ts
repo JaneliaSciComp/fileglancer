@@ -106,10 +106,9 @@ export function transformBucketToDataUrl(
  */
 export function useExternalDataUrlQuery(
   fspName: string | undefined,
-  currentFilePath: string | undefined,
-  enabled: boolean = false
+  currentFilePath: string | undefined
 ): UseQueryResult<string | null, Error> {
-  const shouldFetch = enabled && !!fspName;
+  const shouldFetch = !!fspName;
 
   return useQuery<ExternalBucket | null, Error, string | null>({
     queryKey: externalBucketQueryKeys.byFsp(fspName ?? ''),

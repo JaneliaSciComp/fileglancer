@@ -8,8 +8,8 @@ import type { Result } from '@/shared.types';
 export default function useRenameDialog() {
   const [newName, setNewName] = useState<string>('');
 
-  const { fileBrowserState, mutations } = useFileBrowserContext();
-  const currentFileSharePath = fileBrowserState.uiFileSharePath;
+  const { fileQuery, mutations } = useFileBrowserContext();
+  const currentFileSharePath = fileQuery.data?.currentFileSharePath;
 
   async function handleRenameSubmit(path: string): Promise<Result<void>> {
     try {

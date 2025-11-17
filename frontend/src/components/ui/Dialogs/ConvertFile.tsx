@@ -27,7 +27,7 @@ export default function ConvertFileDialog({
   const { destinationFolder, setDestinationFolder, handleTicketSubmit } =
     useConvertFileDialog();
   const { pathPreference } = usePreferencesContext();
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const { allTicketsQuery, createTicketMutation } = useTicketContext();
 
   const placeholderText =
@@ -35,10 +35,10 @@ export default function ConvertFileDialog({
       ? '\\path\\to\\destination\\folder\\'
       : '/path/to/destination/folder/';
 
-  const displayPath = fileBrowserState.uiFileSharePath
+  const displayPath = fileQuery.data?.currentFileSharePath
     ? getPreferredPathForDisplay(
         pathPreference,
-        fileBrowserState.uiFileSharePath,
+        fileQuery.data.currentFileSharePath,
         fileBrowserState.propertiesTarget?.path
       )
     : '';

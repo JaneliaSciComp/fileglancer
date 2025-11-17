@@ -42,10 +42,10 @@ export default function Toolbar({
   showSidebar,
   toggleSidebar
 }: ToolbarProps) {
-  const { fileBrowserState, fileQuery } = useFileBrowserContext();
+  const { fileQuery } = useFileBrowserContext();
   const { refreshFileBrowser } = useRefreshFileBrowser();
 
-  const currentFileSharePath = fileBrowserState.uiFileSharePath;
+  const currentFileSharePath = fileQuery.data?.currentFileSharePath;
   const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
   const { profile } = useProfileContext();
   const {

@@ -8,9 +8,9 @@ import { createSuccess, handleError } from '@/utils/errorHandling';
 export default function useNewFolderDialog() {
   const [newName, setNewName] = useState<string>('');
 
-  const { fileBrowserState, fileQuery, mutations } = useFileBrowserContext();
+  const { fileQuery, mutations } = useFileBrowserContext();
   const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
-  const currentFileSharePath = fileBrowserState.uiFileSharePath;
+  const currentFileSharePath = fileQuery.data?.currentFileSharePath;
 
   const isDuplicateName = useMemo(() => {
     if (!newName.trim()) {

@@ -18,7 +18,7 @@ export default function NewFolderButton({
   triggerClasses
 }: NewFolderButtonProps) {
   const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
-  const { fileBrowserState, mutations } = useFileBrowserContext();
+  const { fspName, mutations } = useFileBrowserContext();
   const { handleNewFolderSubmit, newName, setNewName, isDuplicateName } =
     useNewFolderDialog();
 
@@ -41,7 +41,7 @@ export default function NewFolderButton({
     <>
       <FgTooltip
         as="button"
-        disabledCondition={!fileBrowserState.uiFileSharePath}
+        disabledCondition={!fspName}
         icon={HiFolderAdd}
         label="New folder"
         onClick={(e: MouseEvent<HTMLButtonElement>) => {

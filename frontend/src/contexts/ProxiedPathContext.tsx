@@ -46,13 +46,14 @@ export const ProxiedPathProvider = ({
 }: {
   readonly children: ReactNode;
 }) => {
-  const { fileQuery, fileBrowserState } = useFileBrowserContext();
+  const { fileQuery } = useFileBrowserContext();
 
   // Initialize all queries and mutations
   const allProxiedPathsQuery = useAllProxiedPathsQuery();
   const proxiedPathByFspAndPathQuery = useProxiedPathByFspAndPathQuery(
-    fileBrowserState.uiFileSharePath?.name,
-    fileQuery.data?.currentFileOrFolder?.path
+    fileQuery.data?.currentFileSharePath?.name,
+    fileQuery.data?.currentFileOrFolder?.path,
+    !fileQuery.isPending && !fileQuery.isError
   );
   const createProxiedPathMutation = useCreateProxiedPathMutation();
   const deleteProxiedPathMutation = useDeleteProxiedPathMutation();

@@ -20,10 +20,10 @@ export default function DeleteDialog({
   setShowDeleteDialog
 }: DeleteDialogProps) {
   const { handleDelete } = useDeleteDialog();
-  const { fileBrowserState, mutations } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState, mutations } = useFileBrowserContext();
   const { pathPreference } = usePreferencesContext();
 
-  if (!fileBrowserState.uiFileSharePath) {
+  if (!fileQuery.data?.currentFileSharePath) {
     return <>{toast.error('No file share path selected')}</>; // No file share path available
   }
 
@@ -33,7 +33,7 @@ export default function DeleteDialog({
 
   const displayPath = getPreferredPathForDisplay(
     pathPreference,
-    fileBrowserState.uiFileSharePath,
+    fileQuery.data.currentFileSharePath,
     fileBrowserState.propertiesTarget.path
   );
 
