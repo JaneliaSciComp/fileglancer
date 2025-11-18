@@ -32,6 +32,7 @@ dependencies = [
     "click >=8.0",
     "fastapi >=0.119.1",
     "httpx >=0.28",
+    "importlib-metadata >=8.7.0",
     "itsdangerous >=2.2.0",
     "loguru >=0.7.3",
     "lxml >=5.3.1",
@@ -48,6 +49,9 @@ dependencies = [
 
 [project.scripts]
 fileglancer = "fileglancer.cli:cli"
+
+[project.entry-points."fileglancer.tasks"]
+nextflow_task = "fileglancer.fgtasks.nftask:NextflowTaskDefn"
 
 [project.optional-dependencies]
 test = [
@@ -93,7 +97,7 @@ path = "fileglancer/_version.py"
 [tool.check-wheel-contents]
 ignore = ["W002"]
 
-[tool.pixi.project]
+[tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = ["osx-arm64", "osx-64", "linux-64"]
 
@@ -143,8 +147,8 @@ dev-watch = { cmd = "cd frontend && NODE_ENV=development npm run watch" }
 dev-launch = "pixi run uvicorn fileglancer.app:app --no-access-log --port 7878 --reload"
 dev-launch-remote = "pixi run uvicorn fileglancer.app:app --no-access-log --host 0.0.0.0 --port 7878 --reload --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
 dev-launch-secure = "python fileglancer/dev_launch.py"
-migrate = "alembic upgrade head"
-migrate-create = "alembic revision --autogenerate"
+migrate = { cmd = "alembic upgrade head", cwd = "fileglancer" }
+migrate-create = { cmd = "alembic revision --autogenerate", cwd = "fileglancer" }
 stamp-db = "python -m fileglancer.stamp_db"
 
 [tool.pixi.dependencies]

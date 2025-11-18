@@ -7,7 +7,7 @@ import secrets
 from datetime import datetime, timedelta, timezone, UTC
 from functools import cache
 from pathlib import Path as PathLib
-from typing import List, Optional, Dict, Tuple, Generator
+from typing import List, Optional, Dict, Tuple, Any
 
 try:
     import tomllib
@@ -34,6 +34,7 @@ from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, dele
 from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header
 from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext
 from fileglancer.filestore import Filestore
+from fileglancer.fgtasks.fgtasks import create_taskdata, get_tasks_registry
 from fileglancer.log import AccessLogMiddleware
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response
@@ -1094,6 +1095,56 @@ def create_app(settings):
 
         return response
 
+    @app.get("/api/tasks")
+    async def list_tasks():
+        tasks_registry = get_tasks_registry(get_settings())
+        # list tasks
+        task_names = tasks_registry.list_tasks()
+        return JSONResponse(content = task_names, status_code=200)
+
+    @app.get("/api/tasks/{task_name}/param-defs")
+    async def get_task_params(
+        task_name: str,
+        request: Request
+    ):
+        tasks_registry = get_tasks_registry(get_settings())
+        logger.info(f'Lookup task {task_name}')
+        # lookup task
+        task_defn = tasks_registry.get_task(task_name)
+        if task_defn is None:
+            logger.error(f'No task found for {task_name}')
+            return Response(status_code = 404)
+        
+        # request.query_params is a MultiDict-like object
+        task_context = dict(request.query_params)
+ 
+        param_defs = [p.to_json() for p in task_defn.parameter_defns(task_context)]
+        return JSONResponse(content = param_defs, status_code=200)
+
+    @app.post("/api/tasks/{task_name}")
+    async def create_task(
+        task_name: str,
+        task_input: Dict[str, Any] = Body(...),
+        username: str = Depends(get_current_user)
+    ):
+        tasks_registry = get_tasks_registry(get_settings())
+        with _get_user_context(username):
+            # lookup task
+            task_defn = tasks_registry.get_task(task_name)
+
+            if task_defn is None:
+                logger.error(f'No task found for {task_name}')
+                return Response(status_code = 404)
+            
+            # create and run task
+            task_data = create_taskdata(
+                task_name,
+                task_input.get('parameters',[]),
+                task_input.get('env', {}),
+                task_input.get('compute_resources', {}),
+            )
+            await task_defn.launch_task(task_data)
+            return Response(status_code=201)
 
     # Home page - redirect to /fg
     @app.get("/", include_in_schema=False)
