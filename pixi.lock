@@ -3030,8 +3030,8 @@ packages:
   timestamp: 1760972937564
 - pypi: ./
   name: fileglancer
-  version: 2.2.0
-  sha256: 568a88fbeaa707ed25d850e71614cfb49c634032acfca92b456b180c6464a0f1
+  version: 2.1.2
+  sha256: f975e27b37ab401c66220d582720b10a503b353b1347be80b4f0a113086e7938
   requires_dist:
   - aiosqlite>=0.21.0
   - alembic>=1.17.0
