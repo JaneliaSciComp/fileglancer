@@ -36,6 +36,10 @@ type ZarrMetadataResult = {
  * @returns Array of supported versions: ['v2'], ['v3'], or ['v2', 'v3']
  */
 export function detectZarrVersions(files: FileOrFolder[]): ('v2' | 'v3')[] {
+  if (!files || files.length === 0) {
+    return [];
+  }
+
   const fileNames = files.map(f => f.name);
   const versions: ('v2' | 'v3')[] = [];
 

@@ -10,7 +10,8 @@ import useContextMenu from '@/hooks/useContextMenu';
 import useZarrMetadata from '@/hooks/useZarrMetadata';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
-import { isZarrDirectory } from '@/queries/zarrQueries';
+import { detectZarrVersions } from '@/queries/zarrQueries';
+import { FileOrFolder } from '@/shared.types';
 
 type FileBrowserProps = {
   readonly showPropertiesDrawer: boolean;
@@ -52,7 +53,8 @@ export default function FileBrowser({
     availableVersions
   } = useZarrMetadata();
 
-  const isZarrDir = isZarrDirectory(fileQuery.data?.files);
+  const isZarrDir =
+    detectZarrVersions(fileQuery.data?.files as FileOrFolder[]).length > 0;
 
   return (
     <>
