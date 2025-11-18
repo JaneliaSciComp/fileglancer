@@ -46,8 +46,6 @@ export default function useDataToolLinks(
   pendingToolKey?: PendingToolKey,
   setPendingToolKey?: Dispatch<SetStateAction<PendingToolKey>>
 ) {
-  const [showCopiedTooltip, setShowCopiedTooltip] = useState(false);
-
   // Store current URLs in a ref to avoid stale closure issues
   const currentUrlsRef = useRef(openWithToolUrls);
   currentUrlsRef.current = openWithToolUrls;
@@ -62,16 +60,6 @@ export default function useDataToolLinks(
 
   const { areDataLinksAutomatic } = usePreferencesContext();
   const { externalDataUrlQuery } = useExternalBucketContext();
-
-  const handleCopy = async (url: string): Promise<void> => {
-    const result = await copyToClipboard(url);
-    if (result.success) {
-      setShowCopiedTooltip(true);
-      setTimeout(() => setShowCopiedTooltip(false), 2000);
-    } else {
-      toast.error('Failed to copy URL to clipboard');
-    }
-  };
 
   const handleCreateDataLink = async (): Promise<void> => {
     if (!fileQuery.data?.currentFileSharePath) {
