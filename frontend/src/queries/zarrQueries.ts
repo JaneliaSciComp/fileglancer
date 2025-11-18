@@ -32,23 +32,11 @@ type ZarrMetadataResult = {
 };
 
 /**
- * Detects if a directory contains Zarr-related files
- * Returns true if zarr.json, .zarray, or .zattrs files are present
- */
-export function isZarrDirectory(files: FileOrFolder[] | undefined): boolean {
-  if (!files || files.length === 0) {
-    return false;
-  }
-
-  const zarrFileNames = ['zarr.json', '.zarray', '.zattrs'];
-  return files.some(file => zarrFileNames.includes(file.name));
-}
-
-/**
  * Detects which Zarr versions are supported by checking for version-specific marker files.
  * @returns Array of supported versions: ['v2'], ['v3'], or ['v2', 'v3']
  */
-export function detectZarrVersions(fileNames: string[]): ('v2' | 'v3')[] {
+export function detectZarrVersions(files: FileOrFolder[]): ('v2' | 'v3')[] {
+  const fileNames = files.map(f => f.name);
   const versions: ('v2' | 'v3')[] = [];
 
   // Check for Zarr v2 indicators
@@ -199,7 +187,7 @@ export function useZarrMetadataQuery(
       !!currentFileOrFolder &&
       !!files &&
       files.length > 0 &&
-      isZarrDirectory(files),
+      detectZarrVersions(files).length > 0,
     staleTime: 5 * 60 * 1000, // 5 minutes - Zarr metadata doesn't change often
     retry: false // Don't retry if no Zarr files found
   });
