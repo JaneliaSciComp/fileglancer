@@ -16,7 +16,10 @@ const createFile = (name: string): FileOrFolder => ({
 
 describe('detectZarrVersions', () => {
   it('should detect only zarr v3 when only zarr.json exists', () => {
-    const files = [createFile('zarr.json'), createFile('arrays/data/chunk_key_1')];
+    const files = [
+      createFile('zarr.json'),
+      createFile('arrays/data/chunk_key_1')
+    ];
     const result = detectZarrVersions(files);
     expect(result).toEqual(['v3']);
   });
