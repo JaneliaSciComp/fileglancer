@@ -85,7 +85,7 @@ export default function PropertiesDrawer({
   const [showDataLinkDialog, setShowDataLinkDialog] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('overview');
 
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const { pathPreference, areDataLinksAutomatic } = usePreferencesContext();
   const { ticketByPathQuery } = useTicketContext();
   const { proxiedPathByFspAndPathQuery } = useProxiedPathContext();
@@ -109,7 +109,7 @@ export default function PropertiesDrawer({
 
   const fullPath = getPreferredPathForDisplay(
     pathPreference,
-    fileBrowserState.uiFileSharePath,
+    fileQuery.data?.currentFileSharePath,
     fileBrowserState.propertiesTarget?.path
   );
 

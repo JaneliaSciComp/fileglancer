@@ -147,13 +147,14 @@ export function useAllProxiedPathsQuery(): UseQueryResult<
  */
 export function useProxiedPathByFspAndPathQuery(
   fspName: string | undefined,
-  path: string | undefined
+  path: string | undefined,
+  shouldFetch: boolean
 ): UseQueryResult<ProxiedPath | null, Error> {
   return useQuery<ProxiedPath | null, Error>({
     queryKey: proxiedPathQueryKeys.detail(fspName ?? '', path ?? ''),
     queryFn: ({ signal }) =>
       fetchProxiedPathByFspAndPath(fspName!, path!, signal),
-    enabled: !!fspName && !!path
+    enabled: !!fspName && shouldFetch
   });
 }
 

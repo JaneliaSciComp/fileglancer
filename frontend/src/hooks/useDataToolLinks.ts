@@ -52,7 +52,7 @@ export default function useDataToolLinks(
   const currentUrlsRef = useRef(openWithToolUrls);
   currentUrlsRef.current = openWithToolUrls;
 
-  const { fileBrowserState, fileQuery } = useFileBrowserContext();
+  const { fileQuery } = useFileBrowserContext();
   const {
     createProxiedPathMutation,
     deleteProxiedPathMutation,
@@ -74,7 +74,7 @@ export default function useDataToolLinks(
   };
 
   const handleCreateDataLink = async (): Promise<void> => {
-    if (!fileBrowserState.uiFileSharePath) {
+    if (!fileQuery.data?.currentFileSharePath) {
       toast.error('No file share path selected');
       return;
     }
@@ -85,7 +85,7 @@ export default function useDataToolLinks(
 
     try {
       await createProxiedPathMutation.mutateAsync({
-        fsp_name: fileBrowserState.uiFileSharePath.name,
+        fsp_name: fileQuery.data.currentFileSharePath.name,
         path: fileQuery.data.currentFileOrFolder.path
       });
       toast.success('Data link created successfully');

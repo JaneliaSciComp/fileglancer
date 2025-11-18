@@ -55,9 +55,9 @@ export const TicketProvider = ({
   // Initialize all queries and mutations (only enabled if tasksEnabled)
   const allTicketsQuery = useAllTicketsQuery(tasksEnabled);
   const ticketByPathQuery = useTicketByPathQuery(
-    fileBrowserState.uiFileSharePath?.name,
+    fileQuery.data?.currentFileSharePath?.name,
     fileBrowserState.propertiesTarget?.path,
-    tasksEnabled && !fileQuery.isPending
+    tasksEnabled && !fileQuery.isPending && !fileQuery.isError
   );
   const createTicketMutation = useCreateTicketMutation();
 
@@ -66,7 +66,7 @@ export const TicketProvider = ({
     if (!tasksEnabled) {
       throw new Error('Task functionality is disabled.');
     }
-    if (!fileBrowserState.uiFileSharePath) {
+    if (!fileQuery.data?.currentFileSharePath) {
       throw new Error('No file share path selected');
     }
     if (!fileBrowserState.propertiesTarget) {
@@ -74,12 +74,12 @@ export const TicketProvider = ({
     }
 
     const messagePath = joinPaths(
-      fileBrowserState.uiFileSharePath.mount_path,
+      fileQuery.data.currentFileSharePath.mount_path,
       fileBrowserState.propertiesTarget.path
     );
 
     await createTicketMutation.mutateAsync({
-      fsp_name: fileBrowserState.uiFileSharePath.name,
+      fsp_name: fileQuery.data.currentFileSharePath.name,
       path: fileBrowserState.propertiesTarget.path,
       project_key: 'FT',
       issue_type: 'Task',

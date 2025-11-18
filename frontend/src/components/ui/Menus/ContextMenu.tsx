@@ -47,7 +47,7 @@ export default function ContextMenu({
   setShowPermissionsDialog,
   setShowConvertFileDialog
 }: ContextMenuProps) {
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fspName, fileBrowserState } = useFileBrowserContext();
   const { folderPreferenceMap, handleContextMenuFavorite } =
     usePreferencesContext();
   const { handleDownload } = useHandleDownload();
@@ -57,11 +57,11 @@ export default function ContextMenu({
   }
 
   const isFavorite: boolean = Boolean(
-    fileBrowserState.uiFileSharePath &&
+    fspName &&
       folderPreferenceMap[
         makeMapKey(
           'folder',
-          `${fileBrowserState.uiFileSharePath.name}_${fileBrowserState.propertiesTarget.path}`
+          `${fspName}_${fileBrowserState.propertiesTarget.path}`
         )
       ]
   );

@@ -1,13 +1,10 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import { useState, useCallback } from 'react';
 
 // Hook to manage the open zones in the file browser sidebar
 export default function useOpenZones() {
   const [openZones, setOpenZones] = useState<Record<string, boolean>>({
     all: true
   });
-
-  const { fileBrowserState } = useFileBrowserContext();
 
   const toggleOpenZones = useCallback(
     (zone: string) => {
@@ -18,15 +15,6 @@ export default function useOpenZones() {
     },
     [setOpenZones]
   );
-
-  useEffect(() => {
-    if (fileBrowserState.uiFileSharePath) {
-      setOpenZones(prev => ({
-        ...prev,
-        [fileBrowserState.uiFileSharePath!.zone]: true
-      }));
-    }
-  }, [fileBrowserState.uiFileSharePath]);
 
   return {
     openZones,

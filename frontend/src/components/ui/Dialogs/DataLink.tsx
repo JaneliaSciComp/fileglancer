@@ -126,7 +126,7 @@ function BtnContainer({ children }: { readonly children: ReactNode }) {
 }
 
 export default function DataLinkDialog(props: DataLinkDialogProps) {
-  const { fileQuery, fileBrowserState } = useFileBrowserContext();
+  const { fspName, filePath } = useFileBrowserContext();
   const { pathPreference, areDataLinksAutomatic } = usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const [localAreDataLinksAutomatic] = useState(areDataLinksAutomatic);
@@ -135,8 +135,8 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
     const fspKey =
       props.action === 'delete'
         ? makeMapKey('fsp', props.proxiedPath.fsp_name)
-        : fileBrowserState.uiFileSharePath
-          ? makeMapKey('fsp', fileBrowserState.uiFileSharePath.name)
+        : fspName
+          ? makeMapKey('fsp', fspName)
           : '';
 
     const pathFsp =
@@ -144,11 +144,7 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
         ? (zonesAndFspQuery.data[fspKey] as FileSharePath)
         : null;
     const targetPath =
-      props.action === 'delete'
-        ? props.proxiedPath.path
-        : fileQuery.data?.currentFileOrFolder
-          ? fileQuery.data.currentFileOrFolder.path
-          : '';
+      props.action === 'delete' ? props.proxiedPath.path : filePath;
 
     return pathFsp && targetPath
       ? getPreferredPathForDisplay(pathPreference, pathFsp, targetPath)

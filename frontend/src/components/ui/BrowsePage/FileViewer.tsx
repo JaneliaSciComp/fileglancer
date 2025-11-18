@@ -75,14 +75,11 @@ const getLanguageFromExtension = (filename: string): string => {
 };
 
 export default function FileViewer({ file }: FileViewerProps) {
-  const { fileBrowserState } = useFileBrowserContext();
+  const { fspName } = useFileBrowserContext();
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
-  const contentQuery = useFileContentQuery(
-    fileBrowserState.uiFileSharePath?.name,
-    file.path
-  );
+  const contentQuery = useFileContentQuery(fspName, file.path);
 
   // Detect dark mode from document
   useEffect(() => {

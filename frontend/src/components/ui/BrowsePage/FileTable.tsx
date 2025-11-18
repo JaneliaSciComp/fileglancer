@@ -40,7 +40,8 @@ export default function Table({
   showPropertiesDrawer,
   handleContextMenuClick
 }: TableProps) {
-  const { fileBrowserState, handleLeftClick } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState, handleLeftClick } =
+    useFileBrowserContext();
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const selectedFileNames = useMemo(
@@ -58,9 +59,9 @@ export default function Table({
           const name = getValue() as string;
           let link = '#';
 
-          if (file.is_dir && fileBrowserState.uiFileSharePath) {
+          if (file.is_dir && fileQuery.data?.currentFileSharePath) {
             link = makeBrowseLink(
-              fileBrowserState.uiFileSharePath.name,
+              fileQuery.data?.currentFileSharePath.name,
               file.path
             ) as string;
           }
@@ -148,7 +149,7 @@ export default function Table({
         enableSorting: false
       }
     ],
-    [fileBrowserState.uiFileSharePath, handleContextMenuClick]
+    [fileQuery.data?.currentFileSharePath, handleContextMenuClick]
   );
 
   const table = useReactTable({

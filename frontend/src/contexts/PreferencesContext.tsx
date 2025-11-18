@@ -103,7 +103,8 @@ export const PreferencesProvider = ({
   readonly children: ReactNode;
 }) => {
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
-  const { fileQuery, fileBrowserState } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState, fspName, filePath } =
+    useFileBrowserContext();
 
   const preferencesQuery = usePreferencesQuery(zonesAndFspQuery.data);
   const updatePreferenceMutation = useUpdatePreferenceMutation();
@@ -342,12 +343,12 @@ export const PreferencesProvider = ({
   };
 
   const handleContextMenuFavorite = async (): Promise<Result<boolean>> => {
-    if (fileBrowserState.uiFileSharePath) {
+    if (fileQuery.data?.currentFileSharePath) {
       return await handleFavoriteChange(
         {
           type: 'folder',
           folderPath: fileBrowserState.selectedFiles[0].path,
-          fsp: fileBrowserState.uiFileSharePath
+          fsp: fileQuery.data.currentFileSharePath
         },
         'folder'
       );
@@ -418,7 +419,7 @@ export const PreferencesProvider = ({
     if (
       fileQuery.isPending ||
       !fileQuery.data ||
-      !fileBrowserState.uiFileSharePath ||
+      !fileQuery.data.currentFileSharePath ||
       !fileQuery.data.currentFileOrFolder
     ) {
       return;
@@ -428,25 +429,22 @@ export const PreferencesProvider = ({
       return;
     }
 
-    const fspName = fileBrowserState.uiFileSharePath.name;
-    const folderPath = fileQuery.data.currentFileOrFolder.path;
-
     // Skip if this is the same folder we just processed
     if (
       lastFspNameRef.current === fspName &&
-      lastFolderPathRef.current === folderPath
+      lastFolderPathRef.current === filePath
     ) {
       return;
     }
 
     // Update references
     lastFspNameRef.current = fspName;
-    lastFolderPathRef.current = folderPath;
+    lastFolderPathRef.current = filePath;
 
     // Calculate updated folders and trigger mutation
     const updatedFolders = updateRecentlyViewedFolders(
-      folderPath,
       fspName,
+      filePath,
       preferencesQuery.data?.recentlyViewedFolders || []
     );
 
@@ -461,7 +459,8 @@ export const PreferencesProvider = ({
     preferencesQuery.isPending,
     fileQuery.isPending,
     fileQuery,
-    fileBrowserState.uiFileSharePath
+    fspName,
+    filePath
   ]);
 
   const value: PreferencesContextType = {

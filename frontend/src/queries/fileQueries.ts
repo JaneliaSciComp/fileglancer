@@ -68,25 +68,7 @@ export default function useFileQuery(
         body.info && body.info.owner
           ? `You do not have permission to list this folder. Contact the owner (${body.info.owner}) for access.`
           : 'You do not have permission to list this folder. Contact the owner for access.';
-
-      // Return partial data with error message instead of throwing
-      // This allows the UI to display both the folder info AND the error message
-      return {
-        info: body.info || {
-          name: folderName === '.' ? '' : folderName.split('/').pop() || '',
-          path: folderName || '.',
-          is_dir: true,
-          size: 0,
-          last_modified: 0,
-          owner: '',
-          group: '',
-          hasRead: false,
-          hasWrite: false,
-          permissions: ''
-        },
-        files: [], // No files accessible due to permission error
-        errorMessage
-      };
+      throw new Error(errorMessage);
     } else if (response.status === 404) {
       throw new Error('Folder not found');
     } else {
@@ -151,7 +133,14 @@ export default function useFileQuery(
     queryFn: fetchFileInfo,
     select: transformData,
     enabled: !!fspName && !!zonesAndFspQuery.data,
-    staleTime: 5 * 60 * 1000 // 5 minutes - file listings don't change that often
+    staleTime: 5 * 60 * 1000, // 5 minutes - file listings don't change that often
+    retry: (failureCount, error) => {
+      // Do not retry on permission errors
+      if (error instanceof Error && error.message.includes('permission')) {
+        return false;
+      }
+      return failureCount < 3; // Default retry behavior
+    }
   });
 }
 

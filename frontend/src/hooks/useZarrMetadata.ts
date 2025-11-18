@@ -23,7 +23,7 @@ export type PendingToolKey = keyof OpenWithToolUrls | null;
 export type ZarrArray = zarr.Array<any>;
 
 export default function useZarrMetadata() {
-  const { fileQuery, fileBrowserState } = useFileBrowserContext();
+  const { fileQuery } = useFileBrowserContext();
   const { proxiedPathByFspAndPathQuery } = useProxiedPathContext();
   const { externalDataUrlQuery } = useExternalBucketContext();
   const {
@@ -34,7 +34,7 @@ export default function useZarrMetadata() {
 
   // Fetch Zarr metadata
   const zarrMetadataQuery = useZarrMetadataQuery({
-    fspName: fileBrowserState.uiFileSharePath?.name,
+    fspName: fileQuery.data?.currentFileSharePath?.name,
     currentFileOrFolder: fileQuery.data?.currentFileOrFolder,
     files: fileQuery.data?.files
   });
