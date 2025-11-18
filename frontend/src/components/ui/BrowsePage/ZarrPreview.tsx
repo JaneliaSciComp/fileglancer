@@ -33,17 +33,13 @@ export default function ZarrPreview({
   const [showDataLinkDialog, setShowDataLinkDialog] = useState<boolean>(false);
   const [pendingToolKey, setPendingToolKey] = useState<PendingToolKey>(null);
 
-  const {
-    handleToolClick,
-    handleDialogConfirm,
-    handleDialogCancel,
-    showCopiedTooltip
-  } = useDataToolLinks(
-    setShowDataLinkDialog,
-    openWithToolUrls,
-    pendingToolKey,
-    setPendingToolKey
-  );
+  const { handleToolClick, handleDialogConfirm, handleDialogCancel } =
+    useDataToolLinks(
+      setShowDataLinkDialog,
+      openWithToolUrls,
+      pendingToolKey,
+      setPendingToolKey
+    );
 
   return (
     <div className="my-4 p-4 shadow-sm rounded-md bg-primary-light/30">
@@ -89,7 +85,6 @@ export default function ZarrPreview({
           {openWithToolUrls ? (
             <DataToolLinks
               onToolClick={handleToolClick}
-              showCopiedTooltip={showCopiedTooltip}
               title="Open with:"
               urls={openWithToolUrls as OpenWithToolUrls}
             />
