@@ -45,8 +45,7 @@ export default function Toolbar({
   const { fileQuery } = useFileBrowserContext();
   const { refreshFileBrowser } = useRefreshFileBrowser();
 
-  const currentFileSharePath = fileQuery.data?.currentFileSharePath;
-  const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
+  const { currentFileSharePath, currentFileOrFolder } = fileQuery.data || {};
   const { profile } = useProfileContext();
   const {
     folderPreferenceMap,

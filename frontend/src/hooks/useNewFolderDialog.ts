@@ -9,8 +9,7 @@ export default function useNewFolderDialog() {
   const [newName, setNewName] = useState<string>('');
 
   const { fileQuery, mutations } = useFileBrowserContext();
-  const currentFileOrFolder = fileQuery.data?.currentFileOrFolder;
-  const currentFileSharePath = fileQuery.data?.currentFileSharePath;
+  const { currentFileSharePath, currentFileOrFolder } = fileQuery.data || {};
 
   const isDuplicateName = useMemo(() => {
     if (!newName.trim()) {
