@@ -6,9 +6,10 @@ import { handleError, createSuccess } from '@/utils/errorHandling';
 import type { Result } from '@/shared.types';
 
 export default function useRenameDialog() {
-  const [newName, setNewName] = useState<string>('');
-
-  const { fileQuery, mutations } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState, mutations } = useFileBrowserContext();
+  const [newName, setNewName] = useState<string>(
+    fileBrowserState.propertiesTarget?.name || ''
+  );
   const currentFileSharePath = fileQuery.data?.currentFileSharePath;
 
   async function handleRenameSubmit(path: string): Promise<Result<void>> {
