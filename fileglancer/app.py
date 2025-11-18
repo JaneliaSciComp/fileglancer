@@ -838,7 +838,7 @@ def create_app(settings):
 
             except FileNotFoundError:
                 logger.warning(f"File not found in {filestore_name}: {subpath}")
-                return Response(status_code=404, headers=headers, media_type=content_type)
+                raise HTTPException(status_code=404, detail="File not found")
             except PermissionError:
                 raise HTTPException(status_code=403, detail="Permission denied")
 
