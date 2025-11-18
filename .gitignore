@@ -4,7 +4,7 @@
 lib/
 node_modules/
 *.log
-.eslintcache
+*.eslintcache
 .stylelintcache
 *.egg-info/
 .ipynb_checkpoints

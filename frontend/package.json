@@ -38,7 +38,7 @@
         "autoprefixer": "^10.4.21",
         "loglevel": "^1.9.2",
         "npm-run-all2": "^7.0.2",
-        "ome-zarr.js": "^0.0.14",
+        "ome-zarr.js": "^0.0.17",
         "postcss": "^8.5.3",
         "react": "^18.3.1",
         "react-dom": "^18.3.1",

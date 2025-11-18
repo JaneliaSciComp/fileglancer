@@ -130,7 +130,7 @@ pip-install = { cmd = "pixi reinstall fileglancer" }
 pip-uninstall = { cmd = "pixi clean" }
 node-install = "cd frontend && npm install"
 node-build = { cmd = "cd frontend && npm run build", depends-on = ["node-install"] }
-node-eslint-check = "cd frontend && npx eslint . --cache --ext .ts,.tsx"
+node-eslint-check = "cd frontend && npx eslint . --ext .ts,.tsx"
 node-eslint-write = "cd frontend && npx eslint . --cache --fix --ext .ts,.tsx"
 node-prettier-check =  "cd frontend && npx prettier \"**/*{.ts,.tsx,.js,.jsx,.css,.json,.md}\" \"!package-lock.json\" --check"
 node-prettier-write = "cd frontend && npx prettier --list-different --write '**/*.{ts,tsx,js,jsx,json,md}' '!package-lock.json'"
