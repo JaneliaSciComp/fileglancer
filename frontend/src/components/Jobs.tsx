@@ -21,7 +21,7 @@ export default function Jobs() {
         columns={jobsColumns}
         data={allTicketsQuery.data || []}
         emptyText="You have not made any conversion requests."
-        gridColsClass="grid-cols-[2fr_3fr_1fr_1fr]"
+        gridColsClass="grid-cols-[3fr_3fr_1fr_2fr]"
         loadingState={allTicketsQuery.isPending}
       />
     </>
