@@ -1,11 +1,14 @@
 import { Typography } from '@material-tailwind/react';
 
 import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { TableCard } from '@/components/ui/Table/TableCard';
-import { linksColumns } from '@/components/ui/Table/linksColumns';
+import { useLinksColumns } from './ui/Table/linksColumns';
 
 export default function Links() {
   const { allProxiedPathsQuery } = useProxiedPathContext();
+  const { preferenceQuery } = usePreferencesContext();
+  const linksColumns = useLinksColumns();
 
   return (
     <>
@@ -22,7 +25,9 @@ export default function Links() {
         data={allProxiedPathsQuery.data || []}
         emptyText="No shared paths."
         gridColsClass="grid-cols-[1.5fr_2.5fr_1.5fr_1fr_1fr]"
-        loadingState={allProxiedPathsQuery.isPending}
+        loadingState={
+          allProxiedPathsQuery.isPending || preferenceQuery.isPending
+        }
       />
     </>
   );
