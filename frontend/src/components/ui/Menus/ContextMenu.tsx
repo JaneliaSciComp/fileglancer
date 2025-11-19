@@ -1,149 +1,34 @@
-import type { Dispatch, SetStateAction, RefObject } from 'react';
+import type { RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import toast from 'react-hot-toast';
+import { Menu, Typography } from '@material-tailwind/react';
 
-import FgMenuItems, { MenuItem } from './FgMenuItems';
-import type { Result } from '@/shared.types';
-import { makeMapKey } from '@/utils';
-import { usePreferencesContext } from '@/contexts/PreferencesContext';
-import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-import { useHandleDownload } from '@/hooks/useHandleDownload';
+export type ContextMenuItem = {
+  name: string;
+  action: () => boolean | void | Promise<boolean | void>; // return false to prevent auto-close
+  shouldShow?: boolean;
+  color?: string;
+};
 
 type ContextMenuProps = {
   readonly x: number;
   readonly y: number;
   readonly menuRef: RefObject<HTMLDivElement | null>;
-  readonly showPropertiesDrawer: boolean;
-  readonly togglePropertiesDrawer: () => void;
-  readonly setShowContextMenu: Dispatch<SetStateAction<boolean>>;
-  readonly setShowRenameDialog: Dispatch<SetStateAction<boolean>>;
-  readonly setShowDeleteDialog: Dispatch<SetStateAction<boolean>>;
-  readonly setShowPermissionsDialog: Dispatch<SetStateAction<boolean>>;
-  readonly setShowConvertFileDialog: Dispatch<SetStateAction<boolean>>;
+  readonly items: ContextMenuItem[];
+  readonly onClose: () => void;
 };
-
-type ContextMenuActionProps = {
-  handleContextMenuFavorite: () => Promise<Result<boolean>>;
-  handleDownload: () => Result<void>;
-  togglePropertiesDrawer: () => void;
-  setShowContextMenu: Dispatch<SetStateAction<boolean>>;
-  setShowRenameDialog: Dispatch<SetStateAction<boolean>>;
-  setShowDeleteDialog: Dispatch<SetStateAction<boolean>>;
-  setShowPermissionsDialog: Dispatch<SetStateAction<boolean>>;
-  setShowConvertFileDialog: Dispatch<SetStateAction<boolean>>;
-};
-
-const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
 
 export default function ContextMenu({
   x,
   y,
   menuRef,
-  showPropertiesDrawer,
-  togglePropertiesDrawer,
-  setShowContextMenu,
-  setShowRenameDialog,
-  setShowDeleteDialog,
-  setShowPermissionsDialog,
-  setShowConvertFileDialog
+  items,
+  onClose
 }: ContextMenuProps) {
-  const { fspName, fileBrowserState } = useFileBrowserContext();
-  const { folderPreferenceMap, handleContextMenuFavorite } =
-    usePreferencesContext();
-  const { handleDownload } = useHandleDownload();
-
-  if (!fileBrowserState.propertiesTarget) {
-    return <>{toast.error('No target file selected')}</>; // No target file available
-  }
-
-  const isFavorite: boolean = Boolean(
-    fspName &&
-      folderPreferenceMap[
-        makeMapKey(
-          'folder',
-          `${fspName}_${fileBrowserState.propertiesTarget.path}`
-        )
-      ]
-  );
-
-  const menuItems: MenuItem<ContextMenuActionProps>[] = [
-    {
-      name: 'View file properties',
-      action: (props: ContextMenuActionProps) => {
-        props.togglePropertiesDrawer();
-        props.setShowContextMenu(false);
-      },
-      shouldShow: !showPropertiesDrawer
-    },
-    {
-      name: 'Download',
-      action: (props: ContextMenuActionProps) => {
-        const result = props.handleDownload();
-        if (!result.success) {
-          toast.error(`Error downloading file: ${result.error}`);
-        }
-        props.setShowContextMenu(false);
-      },
-      shouldShow: !fileBrowserState.propertiesTarget.is_dir
-    },
-    {
-      name: isFavorite ? 'Unset favorite' : 'Set favorite',
-      action: async (props: ContextMenuActionProps) => {
-        const result = await props.handleContextMenuFavorite();
-        if (!result.success) {
-          toast.error(`Error toggling favorite: ${result.error}`);
-        } else {
-          toast.success(`Favorite ${isFavorite ? 'removed!' : 'added!'}`);
-        }
-        setShowContextMenu(false);
-      },
-      shouldShow: fileBrowserState.selectedFiles[0].is_dir
-    },
-    {
-      name: 'Convert images to OME-Zarr',
-      action: (props: ContextMenuActionProps) => {
-        setShowConvertFileDialog(true);
-        props.setShowContextMenu(false);
-      },
-      shouldShow: tasksEnabled && fileBrowserState.propertiesTarget.is_dir
-    },
-    {
-      name: 'Rename',
-      action: (props: ContextMenuActionProps) => {
-        props.setShowRenameDialog(true);
-        props.setShowContextMenu(false);
-      },
-      shouldShow: true
-    },
-    {
-      name: 'Change permissions',
-      action: (props: ContextMenuActionProps) => {
-        props.setShowPermissionsDialog(true);
-        props.setShowContextMenu(false);
-      },
-      shouldShow: !fileBrowserState.propertiesTarget.is_dir
-    },
-    {
-      name: 'Delete',
-      action: (props: ContextMenuActionProps) => {
-        props.setShowDeleteDialog(true);
-        props.setShowContextMenu(false);
-      },
-      color: 'text-red-600',
-      shouldShow: true
+  const handleItemClick = async (item: ContextMenuItem) => {
+    const result = await item.action();
+    if (result !== false) {
+      onClose();
     }
-  ];
-
-  const actionProps = {
-    fileBrowserState,
-    handleDownload,
-    handleContextMenuFavorite,
-    togglePropertiesDrawer,
-    setShowContextMenu,
-    setShowRenameDialog,
-    setShowDeleteDialog,
-    setShowPermissionsDialog,
-    setShowConvertFileDialog
   };
 
   return createPortal(
@@ -155,12 +40,18 @@ export default function ContextMenu({
         top: `${y}px`
       }}
     >
-      <FgMenuItems<ContextMenuActionProps>
-        actionProps={actionProps}
-        menuItems={menuItems}
-      />
+      {items
+        .filter(item => item.shouldShow !== false)
+        .map((item, index) => (
+          <Menu.Item key={index} onClick={() => handleItemClick(item)}>
+            <Typography
+              className={`text-sm p-1 ${item.color || 'text-secondary-light'}`}
+            >
+              {item.name}
+            </Typography>
+          </Menu.Item>
+        ))}
     </div>,
-
-    document.body // Render context menu directly to body
+    document.body
   );
 }
