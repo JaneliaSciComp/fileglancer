@@ -123,6 +123,22 @@ const isISODate = (str: string): boolean => {
   return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(str);
 };
 
+// Helper function to check match based on length heuristic
+// If query is shorter or equal in length to value, check if value contains query
+// If query is longer, check if query contains value
+const lengthAwareMatch = (value: string, query: string): boolean => {
+  if (!value) {
+    return false;
+  }
+  if (query.length <= value.length) {
+    return value.includes(query);
+  } else if (query.length > value.length && value.length > 1) {
+    return query.includes(value);
+  } else {
+    return false;
+  }
+};
+
 // Custom global filter function that searches all columns
 const globalFilterFn: FilterFn<unknown> = (row, _columnId, filterValue) => {
   if (!filterValue) {
@@ -130,44 +146,21 @@ const globalFilterFn: FilterFn<unknown> = (row, _columnId, filterValue) => {
   }
 
   const query = String(filterValue).toLowerCase();
-  const original = row.original as Record<string, unknown>;
 
-  // Special case for ProxiedPath: search both path and fsp_name on the path column
-  if (
-    original &&
-    typeof original === 'object' &&
-    'path' in original &&
-    'fsp_name' in original
-  ) {
-    const pathMatch = String(original.path || '')
-      .toLowerCase()
-      .includes(query);
-    const fspNameMatch = String(original.fsp_name || '')
-      .toLowerCase()
-      .includes(query);
-    if (pathMatch || fspNameMatch) {
-      return true;
-    }
-  }
-
-  // Get all cell values from the row and check if any match the search query
   const rowValues = row.getVisibleCells().map(cell => {
     const value = cell.getValue();
     if (value === null || value === undefined) {
       return '';
     }
-
     const strValue = String(value);
-
     // Special handling for date columns: format the ISO date before searching
     if (isISODate(strValue)) {
       return formatDateString(strValue).toLowerCase();
     }
-
     return strValue.toLowerCase();
   });
 
-  return rowValues.some(value => value.includes(query));
+  return rowValues.some(value => lengthAwareMatch(value, query));
 };
 
 function TableHeader({
