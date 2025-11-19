@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Typography } from '@material-tailwind/react';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -29,26 +29,20 @@ type ProxiedPathRowActionProps = {
   pathFsp: FileSharePath | undefined;
 };
 
-function PathCell({ item }: { readonly item: ProxiedPath }) {
-  const { pathPreference } = usePreferencesContext();
-  const { zonesAndFspQuery } = useZoneAndFspMapContext();
-  const tooltipTriggerClasses = 'max-w-full truncate';
+const TRIGGER_CLASSES = 'max-w-full truncate';
 
-  const pathFsp = zonesAndFspQuery.isSuccess
-    ? (zonesAndFspQuery.data[makeMapKey('fsp', item.fsp_name)] as FileSharePath)
-    : undefined;
-
-  const displayPath = getPreferredPathForDisplay(
-    pathPreference,
-    pathFsp,
-    item.path
-  );
-
+function PathCell({
+  item,
+  displayPath
+}: {
+  readonly item: ProxiedPath;
+  readonly displayPath: string;
+}) {
   const browseLink = makeBrowseLink(item.fsp_name, item.path);
 
   return (
     <div className="min-w-0 max-w-full flex" key={`path-${item.sharing_key}`}>
-      <FgTooltip label={displayPath} triggerClasses={tooltipTriggerClasses}>
+      <FgTooltip label={displayPath} triggerClasses={TRIGGER_CLASSES}>
         <Typography
           as={FgStyledLink}
           className="text-left truncate block"
@@ -136,77 +130,95 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
   );
 }
 
-const tooltipTriggerClasses = 'max-w-full truncate';
+export function useLinksColumns(): ColumnDef<ProxiedPath>[] {
+  const { pathPreference } = usePreferencesContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
 
-export const linksColumns: ColumnDef<ProxiedPath>[] = [
-  {
-    accessorKey: 'sharing_name',
-    header: 'Name',
-    cell: ({ cell, row }) => {
-      const item = row.original;
-      return (
-        <div className="flex min-w-0 max-w-full" key={cell.id}>
-          <FgTooltip
-            label={item.sharing_name}
-            triggerClasses={tooltipTriggerClasses}
-          >
-            <Typography className="text-foreground truncate">
-              {item.sharing_name}
-            </Typography>
-          </FgTooltip>
-        </div>
-      );
-    },
-    enableSorting: true
-  },
-  {
-    accessorKey: 'path',
-    header: 'File Path',
-    cell: ({ row }) => <PathCell item={row.original} />,
-    enableSorting: true
-  },
-  {
-    accessorKey: 'created_at',
-    header: 'Date Created',
-    cell: ({ cell, getValue }) => {
-      const dateString = getValue() as string;
-      return (
-        <div className="flex min-w-0 max-w-full" key={cell.id}>
-          <FgTooltip
-            label={formatDateString(dateString)}
-            triggerClasses={tooltipTriggerClasses}
-          >
-            <Typography
-              className="text-left text-foreground truncate"
-              variant="small"
-            >
-              {formatDateString(dateString)}
-            </Typography>
-          </FgTooltip>
-        </div>
-      );
-    },
-    enableSorting: true
-  },
-  {
-    accessorKey: 'sharing_key',
-    header: 'Key',
-    cell: ({ cell, getValue }) => {
-      const key = getValue() as string;
-      return (
-        <div className="flex min-w-0 max-w-full" key={cell.id}>
-          <FgTooltip label={key} triggerClasses={tooltipTriggerClasses}>
-            <Typography className="text-foreground truncate">{key}</Typography>
-          </FgTooltip>
-        </div>
-      );
-    },
-    enableSorting: true
-  },
-  {
-    id: 'actions',
-    header: 'Actions',
-    cell: ({ row }) => <ActionsCell item={row.original} />,
-    enableSorting: false
-  }
-];
+  return useMemo(
+    () => [
+      {
+        accessorKey: 'sharing_name',
+        header: 'Name',
+        cell: ({ cell, row }) => {
+          const item = row.original;
+          return (
+            <div className="flex min-w-0 max-w-full" key={cell.id}>
+              <FgTooltip
+                label={item.sharing_name}
+                triggerClasses={TRIGGER_CLASSES}
+              >
+                <Typography className="text-foreground truncate">
+                  {item.sharing_name}
+                </Typography>
+              </FgTooltip>
+            </div>
+          );
+        },
+        enableSorting: true
+      },
+      {
+        id: 'path',
+        header: 'File Path',
+        accessorFn: (row: ProxiedPath) => {
+          const pathFsp = zonesAndFspQuery.isSuccess
+            ? (zonesAndFspQuery.data[
+                makeMapKey('fsp', row.fsp_name)
+              ] as FileSharePath)
+            : undefined;
+          return getPreferredPathForDisplay(pathPreference, pathFsp, row.path);
+        },
+        cell: ({ row, getValue }) => (
+          <PathCell displayPath={getValue() as string} item={row.original} />
+        ),
+        enableSorting: true
+      },
+      {
+        accessorKey: 'created_at',
+        header: 'Date Created',
+        cell: ({ cell, getValue }) => {
+          const dateString = getValue() as string;
+          return (
+            <div className="flex min-w-0 max-w-full" key={cell.id}>
+              <FgTooltip
+                label={formatDateString(dateString)}
+                triggerClasses={TRIGGER_CLASSES}
+              >
+                <Typography
+                  className="text-left text-foreground truncate"
+                  variant="small"
+                >
+                  {formatDateString(dateString)}
+                </Typography>
+              </FgTooltip>
+            </div>
+          );
+        },
+        enableSorting: true
+      },
+      {
+        accessorKey: 'sharing_key',
+        header: 'Key',
+        cell: ({ cell, getValue }) => {
+          const key = getValue() as string;
+          return (
+            <div className="flex min-w-0 max-w-full" key={cell.id}>
+              <FgTooltip label={key} triggerClasses={TRIGGER_CLASSES}>
+                <Typography className="text-foreground truncate">
+                  {key}
+                </Typography>
+              </FgTooltip>
+            </div>
+          );
+        },
+        enableSorting: true
+      },
+      {
+        id: 'actions',
+        header: 'Actions',
+        cell: ({ row }) => <ActionsCell item={row.original} />,
+        enableSorting: false
+      }
+    ],
+    [pathPreference, zonesAndFspQuery.data, zonesAndFspQuery.isSuccess]
+  );
+}
