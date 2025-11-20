@@ -103,6 +103,78 @@ export const handlers = [
     const { fspName } = params;
 
     if (fspName === 'test_fsp') {
+      // Handle different Zarr test scenarios based on subpath
+      if (subpath === 'my_folder/zarr_both_versions') {
+        return HttpResponse.json({
+          info: {
+            name: 'zarr_both_versions',
+            path: subpath,
+            size: 1024,
+            is_dir: true,
+            permissions: 'drwxr-xr-x',
+            owner: 'testuser',
+            group: 'testgroup',
+            last_modified: 1647855213
+          },
+          files: [
+            { name: 'zarr.json', is_dir: false, path: `${subpath}/zarr.json` },
+            { name: '.zarray', is_dir: false, path: `${subpath}/.zarray` },
+            { name: '.zattrs', is_dir: false, path: `${subpath}/.zattrs` }
+          ]
+        });
+      } else if (subpath === 'my_folder/zarr_v2_only') {
+        return HttpResponse.json({
+          info: {
+            name: 'zarr_v2_only',
+            path: subpath,
+            size: 1024,
+            is_dir: true,
+            permissions: 'drwxr-xr-x',
+            owner: 'testuser',
+            group: 'testgroup',
+            last_modified: 1647855213
+          },
+          files: [
+            { name: '.zarray', is_dir: false, path: `${subpath}/.zarray` },
+            { name: '.zattrs', is_dir: false, path: `${subpath}/.zattrs` }
+          ]
+        });
+      } else if (subpath === 'my_folder/zarr_v3_only') {
+        return HttpResponse.json({
+          info: {
+            name: 'zarr_v3_only',
+            path: subpath,
+            size: 1024,
+            is_dir: true,
+            permissions: 'drwxr-xr-x',
+            owner: 'testuser',
+            group: 'testgroup',
+            last_modified: 1647855213
+          },
+          files: [
+            { name: 'zarr.json', is_dir: false, path: `${subpath}/zarr.json` }
+          ]
+        });
+      } else if (subpath === 'my_folder/ome_zarr_both_versions') {
+        return HttpResponse.json({
+          info: {
+            name: 'ome_zarr_both_versions',
+            path: subpath,
+            size: 1024,
+            is_dir: true,
+            permissions: 'drwxr-xr-x',
+            owner: 'testuser',
+            group: 'testgroup',
+            last_modified: 1647855213
+          },
+          files: [
+            { name: 'zarr.json', is_dir: false, path: `${subpath}/zarr.json` },
+            { name: '.zarray', is_dir: false, path: `${subpath}/.zarray` },
+            { name: '.zattrs', is_dir: false, path: `${subpath}/.zattrs` }
+          ]
+        });
+      }
+
       return HttpResponse.json({
         info: {
           name: subpath ? subpath.split('/').pop() : '',
@@ -189,5 +261,121 @@ export const handlers = [
   //Profile
   http.get('/api/profile', () => {
     return HttpResponse.json({ username: 'testuser' });
+  }),
+
+  // File content for Zarr metadata files
+  http.get('/api/content/:fspName', ({ params, request }) => {
+    const url = new URL(request.url);
+    const subpath = url.searchParams.get('subpath');
+    const { fspName } = params;
+
+    if (fspName === 'test_fsp') {
+      // Handle zarr.json for both_versions and v3_only scenarios
+      if (
+        subpath === 'my_folder/zarr_both_versions/zarr.json' ||
+        subpath === 'my_folder/my_zarr/zarr.json' ||
+        subpath === 'my_folder/zarr_v3_only/zarr.json'
+      ) {
+        return HttpResponse.json({
+          node_type: 'array',
+          zarr_format: 3
+        });
+      }
+
+      // Handle zarr.json for OME-Zarr group (multiscale) scenario
+      if (subpath === 'my_folder/ome_zarr_both_versions/zarr.json') {
+        return HttpResponse.json({
+          node_type: 'group',
+          zarr_format: 3,
+          attributes: {
+            ome: {
+              multiscales: [
+                {
+                  version: '0.4',
+                  axes: [
+                    { name: 'z', type: 'space', unit: 'micrometer' },
+                    { name: 'y', type: 'space', unit: 'micrometer' },
+                    { name: 'x', type: 'space', unit: 'micrometer' }
+                  ],
+                  datasets: [
+                    {
+                      path: '0',
+                      coordinateTransformations: [
+                        { type: 'scale', scale: [1.0, 0.5, 0.5] }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        });
+      }
+
+      // Handle .zarray for both_versions and v2_only scenarios
+      if (
+        subpath === 'my_folder/zarr_both_versions/.zarray' ||
+        subpath === 'my_folder/zarr_v2_only/.zarray'
+      ) {
+        return HttpResponse.json({
+          chunks: [1, 1, 1],
+          compressor: null,
+          dtype: '<f4',
+          fill_value: 0,
+          filters: null,
+          order: 'C',
+          shape: [1, 1, 1],
+          zarr_format: 2
+        });
+      }
+
+      // Handle .zarray for OME-Zarr multiscale scenario
+      if (subpath === 'my_folder/ome_zarr_both_versions/.zarray') {
+        return HttpResponse.json({
+          chunks: [1, 128, 128],
+          compressor: null,
+          dtype: '<f4',
+          fill_value: 0,
+          filters: null,
+          order: 'C',
+          shape: [10, 512, 512],
+          zarr_format: 2
+        });
+      }
+
+      // Handle .zattrs files
+      if (
+        subpath === 'my_folder/zarr_both_versions/.zattrs' ||
+        subpath === 'my_folder/zarr_v2_only/.zattrs'
+      ) {
+        return HttpResponse.json({});
+      }
+
+      // Handle .zattrs for OME-Zarr multiscale scenario
+      if (subpath === 'my_folder/ome_zarr_both_versions/.zattrs') {
+        return HttpResponse.json({
+          multiscales: [
+            {
+              version: '0.4',
+              axes: [
+                { name: 'z', type: 'space', unit: 'micrometer' },
+                { name: 'y', type: 'space', unit: 'micrometer' },
+                { name: 'x', type: 'space', unit: 'micrometer' }
+              ],
+              datasets: [
+                {
+                  path: '0',
+                  coordinateTransformations: [
+                    { type: 'scale', scale: [1.0, 0.5, 0.5] }
+                  ]
+                }
+              ]
+            }
+          ]
+        });
+      }
+    }
+
+    return HttpResponse.json({ error: 'Not found' }, { status: 404 });
   })
 ];

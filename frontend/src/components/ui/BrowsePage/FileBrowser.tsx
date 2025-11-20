@@ -10,7 +10,8 @@ import useContextMenu from '@/hooks/useContextMenu';
 import useZarrMetadata from '@/hooks/useZarrMetadata';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
-import { isZarrDirectory } from '@/queries/zarrQueries';
+import { detectZarrVersions } from '@/queries/zarrQueries';
+import { FileOrFolder } from '@/shared.types';
 
 type FileBrowserProps = {
   readonly mainPanelWidth: number;
@@ -46,10 +47,16 @@ export default function FileBrowser({
     handleContextMenuClick
   } = useContextMenu();
 
-  const { zarrMetadataQuery, thumbnailQuery, openWithToolUrls, layerType } =
-    useZarrMetadata();
+  const {
+    zarrMetadataQuery,
+    thumbnailQuery,
+    openWithToolUrls,
+    layerType,
+    availableVersions
+  } = useZarrMetadata();
 
-  const isZarrDir = isZarrDirectory(fileQuery.data?.files);
+  const isZarrDir =
+    detectZarrVersions(fileQuery.data?.files as FileOrFolder[]).length > 0;
 
   return (
     <>
@@ -68,6 +75,7 @@ export default function FileBrowser({
         </div>
       ) : zarrMetadataQuery.data?.metadata ? (
         <ZarrPreview
+          availableVersions={availableVersions}
           layerType={layerType}
           mainPanelWidth={mainPanelWidth}
           openWithToolUrls={openWithToolUrls}
