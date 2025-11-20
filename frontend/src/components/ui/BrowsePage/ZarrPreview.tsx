@@ -46,7 +46,7 @@ export default function ZarrPreview({
   );
 
   return (
-    <div className="my-4 p-4 shadow-sm rounded-md bg-primary-light/30">
+    <div className="min-w-full p-4 shadow-sm rounded-md bg-primary-light/30">
       <div className="flex gap-12 w-full h-fit">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2 max-h-full">
