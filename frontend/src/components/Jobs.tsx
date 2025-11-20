@@ -20,7 +20,7 @@ export default function Jobs() {
       <TableCard
         columns={jobsColumns}
         data={allTicketsQuery.data || []}
-        emptyText="You have not made any conversion requests."
+        dataType="tasks"
         gridColsClass="grid-cols-[2fr_3fr_1fr_1fr]"
         loadingState={allTicketsQuery.isPending}
       />
