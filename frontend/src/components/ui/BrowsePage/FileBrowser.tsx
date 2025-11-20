@@ -13,8 +13,7 @@ import useHideDotFiles from '@/hooks/useHideDotFiles';
 import { isZarrDirectory } from '@/queries/zarrQueries';
 
 type FileBrowserProps = {
-  readonly showPropertiesDrawer: boolean;
-  readonly togglePropertiesDrawer: () => void;
+  readonly mainPanelWidth: number;
   readonly setShowRenameDialog: React.Dispatch<React.SetStateAction<boolean>>;
   readonly setShowDeleteDialog: React.Dispatch<React.SetStateAction<boolean>>;
   readonly setShowPermissionsDialog: React.Dispatch<
@@ -23,15 +22,18 @@ type FileBrowserProps = {
   readonly setShowConvertFileDialog: React.Dispatch<
     React.SetStateAction<boolean>
   >;
+  readonly showPropertiesDrawer: boolean;
+  readonly togglePropertiesDrawer: () => void;
 };
 
 export default function FileBrowser({
-  showPropertiesDrawer,
-  togglePropertiesDrawer,
+  mainPanelWidth,
   setShowRenameDialog,
   setShowDeleteDialog,
   setShowPermissionsDialog,
-  setShowConvertFileDialog
+  setShowConvertFileDialog,
+  showPropertiesDrawer,
+  togglePropertiesDrawer
 }: FileBrowserProps) {
   const { fileQuery } = useFileBrowserContext();
   const { displayFiles } = useHideDotFiles();
@@ -53,13 +55,13 @@ export default function FileBrowser({
     <>
       <Crumbs />
       {isZarrDir && zarrMetadataQuery.isPending ? (
-        <div className="flex my-4 shadow-sm rounded-md w-full min-h-96 bg-surface animate-appear animate-pulse animate-delay-150 opacity-0">
+        <div className="flex shadow-sm rounded-md w-full min-h-96 bg-surface animate-appear animate-pulse animate-delay-150 opacity-0">
           <Typography className="place-self-center text-center w-full">
             Loading Zarr metadata...
           </Typography>
         </div>
       ) : zarrMetadataQuery.isError ? (
-        <div className="flex my-4 shadow-sm rounded-md w-full min-h-96 bg-primary-light/30">
+        <div className="flex shadow-sm rounded-md w-full min-h-96 bg-primary-light/30">
           <Typography className="place-self-center text-center w-full text-warning">
             Error loading Zarr metadata
           </Typography>
@@ -67,6 +69,7 @@ export default function FileBrowser({
       ) : zarrMetadataQuery.data?.metadata ? (
         <ZarrPreview
           layerType={layerType}
+          mainPanelWidth={mainPanelWidth}
           openWithToolUrls={openWithToolUrls}
           thumbnailQuery={thumbnailQuery}
           zarrMetadataQuery={zarrMetadataQuery}

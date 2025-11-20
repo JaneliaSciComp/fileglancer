@@ -15,20 +15,22 @@ import useDataToolLinks from '@/hooks/useDataToolLinks';
 import { Metadata } from '@/omezarr-helper';
 
 type ZarrPreviewProps = {
-  readonly thumbnailQuery: UseQueryResult<string, Error>;
+  readonly layerType: 'auto' | 'image' | 'segmentation' | null;
+  readonly mainPanelWidth: number;
   readonly openWithToolUrls: OpenWithToolUrls | null;
+  readonly thumbnailQuery: UseQueryResult<string, Error>;
   readonly zarrMetadataQuery: UseQueryResult<{
     metadata: ZarrMetadata;
     omeZarrUrl: string | null;
   }>;
-  readonly layerType: 'auto' | 'image' | 'segmentation' | null;
 };
 
 export default function ZarrPreview({
-  thumbnailQuery,
+  layerType,
+  mainPanelWidth,
   openWithToolUrls,
-  zarrMetadataQuery,
-  layerType
+  thumbnailQuery,
+  zarrMetadataQuery
 }: ZarrPreviewProps) {
   const [showDataLinkDialog, setShowDataLinkDialog] = useState<boolean>(false);
   const [pendingToolKey, setPendingToolKey] = useState<PendingToolKey>(null);
@@ -109,10 +111,14 @@ export default function ZarrPreview({
         </div>
         {zarrMetadataQuery.data?.metadata &&
         'arr' in zarrMetadataQuery.data.metadata ? (
-          <ZarrMetadataTable
-            layerType={layerType}
-            metadata={zarrMetadataQuery.data.metadata as Metadata}
-          />
+          <div
+            className={`flex ${mainPanelWidth > 1000 ? 'gap-6' : 'flex-col gap-4'} h-fit`}
+          >
+            <ZarrMetadataTable
+              layerType={layerType}
+              metadata={zarrMetadataQuery.data.metadata as Metadata}
+            />
+          </div>
         ) : null}
       </div>
     </div>
