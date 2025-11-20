@@ -1,10 +1,9 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { Button } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import TextWithFilePath from '@/components/ui/Dialogs/TextWithFilePath';
-import { Spinner } from '@/components/ui/widgets/Loaders';
+import DeleteBtn from '@/components/ui/buttons/DeleteBtn';
 import useDeleteDialog from '@/hooks/useDeleteDialog';
 import { getPreferredPathForDisplay } from '@/utils';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
@@ -39,6 +38,7 @@ export default function DeleteDialog({
 
   return (
     <FgDialog
+      className="flex flex-col gap-4"
       onClose={() => setShowDeleteDialog(false)}
       open={showDeleteDialog}
     >
@@ -46,9 +46,7 @@ export default function DeleteDialog({
         path={displayPath}
         text="Are you sure you want to delete this item?"
       />
-      <Button
-        className="!rounded-md mt-4"
-        color="error"
+      <DeleteBtn
         disabled={mutations.delete.isPending}
         onClick={async () => {
           try {
@@ -62,13 +60,8 @@ export default function DeleteDialog({
             setShowDeleteDialog(false);
           }
         }}
-      >
-        {mutations.delete.isPending ? (
-          <Spinner customClasses="border-white" text="Deleting..." />
-        ) : (
-          'Delete'
-        )}
-      </Button>
+        pending={mutations.delete.isPending}
+      />
     </FgDialog>
   );
 }

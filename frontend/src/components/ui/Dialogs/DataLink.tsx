@@ -15,6 +15,7 @@ import type { PendingToolKey } from '@/hooks/useZarrMetadata';
 import FgDialog from './FgDialog';
 import TextWithFilePath from './TextWithFilePath';
 import AutomaticLinksToggle from '@/components/ui/PreferencesPage/AutomaticLinksToggle';
+import DeleteBtn from '@/components/ui/buttons/DeleteBtn';
 
 interface CommonDataLinkDialogProps {
   showDataLinkDialog: boolean;
@@ -38,6 +39,7 @@ interface CreateLinkNotFromToolsProps extends CommonDataLinkDialogProps {
 
 interface DeleteLinkDialogProps extends CommonDataLinkDialogProps {
   action: 'delete';
+  pending: boolean;
   proxiedPath: ProxiedPath;
   handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
 }
@@ -62,30 +64,6 @@ function CreateLinkBtn({
       variant="outline"
     >
       Create Data Link
-    </Button>
-  );
-}
-
-function DeleteLinkBtn({
-  proxiedPath,
-  setShowDataLinkDialog,
-  handleDeleteDataLink
-}: {
-  readonly proxiedPath: ProxiedPath;
-  readonly setShowDataLinkDialog: Dispatch<SetStateAction<boolean>>;
-  readonly handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
-}) {
-  return (
-    <Button
-      className="!rounded-md flex items-center gap-2 hover:text-background focus:text-background"
-      color="error"
-      onClick={async () => {
-        await handleDeleteDataLink(proxiedPath);
-        setShowDataLinkDialog(false);
-      }}
-      variant="outline"
-    >
-      Delete Data Link
     </Button>
   );
 }
@@ -116,7 +94,7 @@ function CancelBtn({
       }}
       variant="outline"
     >
-      Cancel
+      <Typography>Cancel</Typography>
     </Button>
   );
 }
@@ -200,10 +178,13 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               link at any time.
             </Typography>
             <BtnContainer>
-              <DeleteLinkBtn
-                handleDeleteDataLink={props.handleDeleteDataLink}
-                proxiedPath={props.proxiedPath}
-                setShowDataLinkDialog={props.setShowDataLinkDialog}
+              <DeleteBtn
+                disabled={false}
+                onClick={async () => {
+                  await props.handleDeleteDataLink(props.proxiedPath);
+                  props.setShowDataLinkDialog(false);
+                }}
+                pending={props.pending}
               />
               <CancelBtn setShowDataLinkDialog={props.setShowDataLinkDialog} />
             </BtnContainer>
