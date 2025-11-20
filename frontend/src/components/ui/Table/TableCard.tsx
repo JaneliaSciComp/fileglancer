@@ -43,12 +43,14 @@ import { TableRowSkeleton } from '@/components/ui/widgets/Loaders';
 import { formatDateString } from '@/utils';
 import type { PathCellValue } from './linksColumns';
 
+type DataType = 'data links' | 'tasks';
+
 type TableProps<TData> = {
   readonly columns: ColumnDef<TData>[];
   readonly data: TData[];
   readonly gridColsClass: string;
-  readonly loadingState?: boolean;
-  readonly emptyText?: string;
+  readonly loadingState: boolean;
+  readonly dataType: DataType;
 };
 
 function SortIcons<TData, TValue>({
@@ -321,7 +323,7 @@ function Table<TData>({
   data,
   gridColsClass,
   loadingState,
-  emptyText
+  dataType
 }: TableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState<string>('');
@@ -400,24 +402,34 @@ function Table<TData>({
       {loadingState ? (
         <TableRowSkeleton gridColsClass={gridColsClass} />
       ) : data && data.length > 0 ? (
-        <div className="max-h-full" id="table-body">
-          {table.getRowModel().rows.map(row => (
-            <TableRow gridColsClass={gridColsClass} key={row.id}>
-              {row.getVisibleCells().map(cell => (
-                <Fragment key={cell.id}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </Fragment>
-              ))}
-            </TableRow>
-          ))}
-        </div>
+        table.getRowModel().rows.length > 0 ? (
+          <div className="max-h-full" id="table-body">
+            {table.getRowModel().rows.map(row => (
+              <TableRow gridColsClass={gridColsClass} key={row.id}>
+                {row.getVisibleCells().map(cell => (
+                  <Fragment key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </Fragment>
+                ))}
+              </TableRow>
+            ))}
+          </div>
+        ) : (
+          <div className="px-4 py-8 text-center text-foreground">
+            {dataType
+              ? `No ${dataType} match your query`
+              : 'No data matches your query'}
+          </div>
+        )
       ) : !data || data.length === 0 ? (
         <div className="px-4 py-8 text-center text-foreground">
-          {emptyText || 'No data available'}
+          {dataType
+            ? `You have not created any ${dataType} yet`
+            : 'No data available'}
         </div>
       ) : (
         <div className="px-4 py-8 text-center text-foreground">
-          There was an error loading the data.
+          There was an error loading the data
         </div>
       )}
     </div>
@@ -429,14 +441,14 @@ function TableCard<TData>({
   data,
   gridColsClass,
   loadingState,
-  emptyText
+  dataType
 }: TableProps<TData>) {
   return (
     <Card className="min-h-48">
       <Table
         columns={columns}
         data={data}
-        emptyText={emptyText}
+        dataType={dataType}
         gridColsClass={gridColsClass}
         loadingState={loadingState}
       />

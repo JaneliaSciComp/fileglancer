@@ -23,7 +23,7 @@ export default function Links() {
       <TableCard
         columns={linksColumns}
         data={allProxiedPathsQuery.data || []}
-        emptyText="No shared paths."
+        dataType="data links"
         gridColsClass="grid-cols-[1.5fr_2.5fr_1.5fr_1fr_1fr]"
         loadingState={
           allProxiedPathsQuery.isPending || preferenceQuery.isPending
