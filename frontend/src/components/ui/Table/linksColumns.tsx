@@ -68,19 +68,6 @@ function PathCell({
     data: { value: string }
   ) => void;
 }) {
-  const { pathPreference } = usePreferencesContext();
-  const { zonesAndFspQuery } = useZoneAndFspMapContext();
-
-  const pathFsp = zonesAndFspQuery.isSuccess
-    ? (zonesAndFspQuery.data[makeMapKey('fsp', item.fsp_name)] as FileSharePath)
-    : undefined;
-
-  const displayPath = getPreferredPathForDisplay(
-    pathPreference,
-    pathFsp,
-    item.path
-  );
-
   const browseLink = makeBrowseLink(item.fsp_name, item.path);
 
   return (
@@ -256,8 +243,8 @@ export function useLinksColumns(): ColumnDef<ProxiedPath>[] {
       {
         accessorKey: 'created_at',
         header: 'Date Created',
-        cell: ({ cell, getValue, table }) => {
-          const formattedDate = formatDateString(dateString);
+        cell: ({ cell, table }) => {
+          const formattedDate = formatDateString(cell.getValue() as string);
           const onContextMenu = table.options.meta?.onCellContextMenu;
           return (
             <div
