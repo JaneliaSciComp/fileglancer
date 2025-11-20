@@ -5,10 +5,10 @@ const navigateToScratchFsp = async (page: Page) => {
   const localZone = page
     .getByLabel('List of file share paths')
     .getByRole('button', { name: 'Local' });
-  await localZone.click();
+  // Click specifically on the text to avoid clicking the favorite button
+  await localZone.getByText('Local').click();
 
   // Wait for the zone to expand and show the scratch FSP
-  // Don't just wait for page load - wait for the actual link to appear
   const scratchFsp = page
     .getByRole('link', { name: /scratch/i })
     .filter({ hasNotText: 'zarr' })
