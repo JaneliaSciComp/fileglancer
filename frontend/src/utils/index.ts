@@ -10,6 +10,7 @@ import {
   removeLastSegmentFromPath
 } from './pathHandling';
 import { shouldTriggerHealthCheck } from './serverHealth';
+import { queryClient } from '@/main';
 
 // Health check reporter registry with robust type safety
 export type HealthCheckReporter = (
@@ -114,11 +115,17 @@ class HTTPError extends Error {
 
 async function checkSessionValidity(): Promise<boolean> {
   try {
-    const response = await fetch('/api/profile', {
+    const response = await fetch('/api/auth/status', {
       method: 'GET',
       credentials: 'include'
     });
-    return response.ok;
+
+    // if the response JSON contains { authenticated: true }, session is valid
+    const data = await response.json();
+    if (data && typeof data.authenticated === 'boolean') {
+      return data.authenticated;
+    }
+    return false;
   } catch (error) {
     log.error('Error checking session validity:', error);
     return false;
@@ -173,12 +180,14 @@ async function sendFetchRequest(
   }
 
   // Check for 403 Forbidden - could be permission denied or session expired
-  if (response.status === 403) {
+  if (response.status === 403 || response.status === 401) {
     // Check if session is still valid by testing a stable endpoint
     const sessionValid = await checkSessionValidity();
     if (!sessionValid) {
-      // Session has expired, redirect to logout
-      window.location.href = `${window.location.origin}/logout`;
+      // Session has expired, update auth status in query cache
+      queryClient.setQueryData(['auth', 'status'], {
+        authenticated: false
+      });
       throw new HTTPError('Session expired', 401);
     }
     // If session is valid, this is just a permission denied for this specific resource

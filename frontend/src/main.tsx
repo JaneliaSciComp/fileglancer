@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './index.css';
 import App from './App';
 
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30 * 1000 // 30 seconds; 20s is the minimum suggested here: https://tkdodo.eu/blog/react-query-as-a-state-manager
