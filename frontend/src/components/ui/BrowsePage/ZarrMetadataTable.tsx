@@ -68,51 +68,53 @@ export default function ZarrMetadataTable({
   const axisData = getAxisData(metadata);
 
   return (
-    <div className="flex flex-col gap-4 max-h-min">
+    <>
       {/* First table - General metadata */}
       <table className="bg-background/90">
         <tbody className="text-sm">
-          <tr className="border-y border-surface-dark">
-            <td className="p-3 font-semibold" colSpan={2}>
+          <tr className="h-11 border-y border-surface-dark">
+            <td className="px-3 py-2 font-semibold" colSpan={2}>
               {multiscale ? 'OME-Zarr Metadata' : 'Zarr Array Metadata'}
             </td>
           </tr>
-          <tr className="border-y border-surface-dark">
-            <td className="p-3 font-semibold">Zarr Version</td>
-            <td className="p-3">
+          <tr className="h-11 border-y border-surface-dark">
+            <td className="px-3 py-2 font-semibold">Zarr Version</td>
+            <td className="px-3 py-2">
               {availableVersions && availableVersions.length > 1
                 ? availableVersions.join(', ')
                 : zarrVersion}
             </td>
           </tr>
           {layerType ? (
-            <tr className="border-b border-surface-dark">
-              <td className="p-3 font-semibold">Content (auto-detected)</td>
-              <td className="p-3 capitalize">{layerType}</td>
+            <tr className="h-11 border-b border-surface-dark">
+              <td className="px-3 py-2 font-semibold">
+                Content (auto-detected)
+              </td>
+              <td className="px-3 py-2 capitalize">{layerType}</td>
             </tr>
           ) : null}
           {metadata.arr ? (
-            <tr className="border-b border-surface-dark">
-              <td className="p-3 font-semibold">Data Type</td>
-              <td className="p-3">{metadata.arr.dtype}</td>
+            <tr className="h-11 border-b border-surface-dark">
+              <td className="px-3 py-2 font-semibold">Data Type</td>
+              <td className="px-3 py-2">{metadata.arr.dtype}</td>
             </tr>
           ) : null}
           {!metadata.multiscale && shapes ? (
-            <tr className="border-b border-surface-dark">
-              <td className="p-3 font-semibold">Shape</td>
-              <td className="p-3">{getSizeString(shapes)}</td>
+            <tr className="h-11 border-b border-surface-dark">
+              <td className="px-3 py-2 font-semibold">Shape</td>
+              <td className="px-3 py-2">{getSizeString(shapes)}</td>
             </tr>
           ) : null}
           {!metadata.multiscale && metadata.arr ? (
-            <tr className="border-b border-surface-dark">
-              <td className="p-3 font-semibold">Chunk Size</td>
-              <td className="p-3">{getChunkSizeString(metadata.arr)}</td>
+            <tr className="h-11 border-b border-surface-dark">
+              <td className="px-3 py-2 font-semibold">Chunk Size</td>
+              <td className="px-3 py-2">{getChunkSizeString(metadata.arr)}</td>
             </tr>
           ) : null}
           {metadata.multiscale && shapes ? (
-            <tr className="border-b border-surface-dark">
-              <td className="p-3 font-semibold">Multiscale Levels</td>
-              <td className="p-3">{shapes.length}</td>
+            <tr className="h-11 border-b border-surface-dark">
+              <td className="px-3 py-2 font-semibold">Multiscale Levels</td>
+              <td className="px-3 py-2">{shapes.length}</td>
             </tr>
           ) : null}
         </tbody>
@@ -122,27 +124,27 @@ export default function ZarrMetadataTable({
       {axisData?.length > 0 ? (
         <table className="bg-background/90">
           <thead className="text-sm">
-            <tr className="border-y border-surface-dark">
-              <th className="p-3 font-semibold text-left">Axes</th>
-              <th className="p-3 font-semibold text-left">Shape</th>
-              <th className="p-3 font-semibold text-left">Chunk Size</th>
-              <th className="p-3 font-semibold text-left">Scale</th>
-              <th className="p-3 font-semibold text-left">Unit</th>
+            <tr className="h-11 border-y border-surface-dark">
+              <th className="px-3 py-2 font-semibold text-left">Axes</th>
+              <th className="px-3 py-2 font-semibold text-left">Shape</th>
+              <th className="px-3 py-2 font-semibold text-left">Chunk Size</th>
+              <th className="px-3 py-2 font-semibold text-left">Scale</th>
+              <th className="px-3 py-2 font-semibold text-left">Unit</th>
             </tr>
           </thead>
           <tbody className="text-sm">
-            {axisData.map((axis, index) => (
-              <tr className="border-b border-surface-dark" key={axis.name}>
-                <td className="p-3 text-center">{axis.name}</td>
-                <td className="p-3 text-right">{axis.shape}</td>
-                <td className="p-3 text-right">{axis.chunkSize}</td>
-                <td className="p-3 text-right">{axis.scale}</td>
-                <td className="p-3 text-left">{axis.unit}</td>
+            {axisData.map(axis => (
+              <tr className="h-11 border-b border-surface-dark" key={axis.name}>
+                <td className="px-3 py-2 text-center">{axis.name}</td>
+                <td className="px-3 py-2 text-right">{axis.shape}</td>
+                <td className="px-3 py-2 text-right">{axis.chunkSize}</td>
+                <td className="px-3 py-2 text-right">{axis.scale}</td>
+                <td className="px-3 py-2 text-left">{axis.unit}</td>
               </tr>
             ))}
           </tbody>
         </table>
       ) : null}
-    </div>
+    </>
   );
 }

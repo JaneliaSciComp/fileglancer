@@ -6,6 +6,7 @@ import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
 import DataLinksActionsMenu from '@/components/ui/Menus/DataLinksActions';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
+import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
 import useProxiedPathRow from '@/hooks/useProxiedPathRow';
 import {
   formatDateString,
@@ -66,6 +67,8 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
   const { handleDeleteDataLink } = useDataToolLinks(setShowDataLinkDialog);
   const { pathPreference } = usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
+  const { deleteProxiedPathMutation, allProxiedPathsQuery } =
+    useProxiedPathContext();
 
   const { handleCopyPath, handleCopyUrl, handleUnshare } = useProxiedPathRow({
     setShowDataLinkDialog
@@ -127,6 +130,10 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
         <DataLinkDialog
           action="delete"
           handleDeleteDataLink={handleDeleteDataLink}
+          pending={
+            deleteProxiedPathMutation.isPending ||
+            allProxiedPathsQuery.isPending
+          }
           proxiedPath={item}
           setShowDataLinkDialog={setShowDataLinkDialog}
           showDataLinkDialog={showDataLinkDialog}

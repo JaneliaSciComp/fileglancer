@@ -5,15 +5,16 @@ const navigateToScratchFsp = async (page: Page) => {
   const localZone = page
     .getByLabel('List of file share paths')
     .getByRole('button', { name: 'Local' });
-  await localZone.click();
-  await page.waitForLoadState('domcontentloaded', { timeout: 10000 });
+  // Click specifically on the text to avoid clicking the favorite button
+  await localZone.getByText('Local').click();
 
+  // Wait for the zone to expand and show the scratch FSP
   const scratchFsp = page
     .getByRole('link', { name: /scratch/i })
     .filter({ hasNotText: 'zarr' })
     .nth(0);
 
-  await expect(scratchFsp).toBeVisible();
+  await expect(scratchFsp).toBeVisible({ timeout: 10000 });
 
   // Wait for file directory to load
   await scratchFsp.click();

@@ -88,7 +88,11 @@ export default function PropertiesDrawer({
   const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const { pathPreference, areDataLinksAutomatic } = usePreferencesContext();
   const { ticketByPathQuery } = useTicketContext();
-  const { proxiedPathByFspAndPathQuery } = useProxiedPathContext();
+  const {
+    allProxiedPathsQuery,
+    proxiedPathByFspAndPathQuery,
+    deleteProxiedPathMutation
+  } = useProxiedPathContext();
   const { externalDataUrlQuery } = useExternalBucketContext();
 
   const {
@@ -366,6 +370,10 @@ export default function PropertiesDrawer({
         <DataLinkDialog
           action="delete"
           handleDeleteDataLink={handleDeleteDataLink}
+          pending={
+            deleteProxiedPathMutation.isPending ||
+            allProxiedPathsQuery.isPending
+          }
           proxiedPath={proxiedPathByFspAndPathQuery.data}
           setShowDataLinkDialog={setShowDataLinkDialog}
           showDataLinkDialog={showDataLinkDialog}
