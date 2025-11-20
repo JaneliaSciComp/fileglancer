@@ -16,15 +16,14 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
 import { useHandleDownload } from '@/hooks/useHandleDownload';
-import { isZarrDirectory } from '@/queries/zarrQueries';
+import { detectZarrVersions } from '@/queries/zarrQueries';
 import { makeMapKey } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
 
 const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
 
 type FileBrowserProps = {
-  readonly showPropertiesDrawer: boolean;
-  readonly togglePropertiesDrawer: () => void;
+  readonly mainPanelWidth: number;
   readonly setShowRenameDialog: React.Dispatch<React.SetStateAction<boolean>>;
   readonly setShowDeleteDialog: React.Dispatch<React.SetStateAction<boolean>>;
   readonly setShowPermissionsDialog: React.Dispatch<
@@ -33,15 +32,18 @@ type FileBrowserProps = {
   readonly setShowConvertFileDialog: React.Dispatch<
     React.SetStateAction<boolean>
   >;
+  readonly showPropertiesDrawer: boolean;
+  readonly togglePropertiesDrawer: () => void;
 };
 
 export default function FileBrowser({
-  showPropertiesDrawer,
-  togglePropertiesDrawer,
+  mainPanelWidth,
   setShowRenameDialog,
   setShowDeleteDialog,
   setShowPermissionsDialog,
-  setShowConvertFileDialog
+  setShowConvertFileDialog,
+  showPropertiesDrawer,
+  togglePropertiesDrawer
 }: FileBrowserProps) {
   const {
     fspName,
@@ -62,10 +64,16 @@ export default function FileBrowser({
     closeContextMenu
   } = useContextMenu();
 
-  const { zarrMetadataQuery, thumbnailQuery, openWithToolUrls, layerType } =
-    useZarrMetadata();
+  const {
+    zarrMetadataQuery,
+    thumbnailQuery,
+    openWithToolUrls,
+    layerType,
+    availableVersions
+  } = useZarrMetadata();
 
-  const isZarrDir = isZarrDirectory(fileQuery.data?.files);
+  const isZarrDir =
+    detectZarrVersions(fileQuery.data?.files as FileOrFolder[]).length > 0;
 
   // Handle right-click on file - FileBrowser-specific logic
   const handleFileContextMenu = (
@@ -156,20 +164,22 @@ export default function FileBrowser({
     <>
       <Crumbs />
       {isZarrDir && zarrMetadataQuery.isPending ? (
-        <div className="flex my-4 shadow-sm rounded-md w-full min-h-96 bg-surface animate-appear animate-pulse animate-delay-150 opacity-0">
+        <div className="flex shadow-sm rounded-md w-full min-h-96 bg-surface animate-appear animate-pulse animate-delay-150 opacity-0">
           <Typography className="place-self-center text-center w-full">
             Loading Zarr metadata...
           </Typography>
         </div>
       ) : zarrMetadataQuery.isError ? (
-        <div className="flex my-4 shadow-sm rounded-md w-full min-h-96 bg-primary-light/30">
+        <div className="flex shadow-sm rounded-md w-full min-h-96 bg-primary-light/30">
           <Typography className="place-self-center text-center w-full text-warning">
             Error loading Zarr metadata
           </Typography>
         </div>
       ) : zarrMetadataQuery.data?.metadata ? (
         <ZarrPreview
+          availableVersions={availableVersions}
           layerType={layerType}
+          mainPanelWidth={mainPanelWidth}
           openWithToolUrls={openWithToolUrls}
           thumbnailQuery={thumbnailQuery}
           zarrMetadataQuery={zarrMetadataQuery}

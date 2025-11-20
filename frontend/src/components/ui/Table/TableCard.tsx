@@ -63,13 +63,16 @@ declare module '@tanstack/react-table' {
     ) => void;
   }
 }
+import type { PathCellValue } from './linksColumns';
+
+type DataType = 'data links' | 'tasks';
 
 type TableProps<TData> = {
   readonly columns: ColumnDef<TData>[];
   readonly data: TData[];
   readonly gridColsClass: string;
-  readonly loadingState?: boolean;
-  readonly emptyText?: string;
+  readonly loadingState: boolean;
+  readonly dataType: DataType;
 };
 
 function SortIcons<TData, TValue>({
@@ -152,41 +155,58 @@ const globalFilterFn: FilterFn<unknown> = (row, _columnId, filterValue) => {
   }
 
   const query = String(filterValue).toLowerCase();
-  const original = row.original as Record<string, unknown>;
 
-  // Special case for ProxiedPath: search both path and fsp_name on the path column
-  if (
-    original &&
-    typeof original === 'object' &&
-    'path' in original &&
-    'fsp_name' in original
-  ) {
-    const pathMatch = String(original.path || '')
-      .toLowerCase()
-      .includes(query);
-    const fspNameMatch = String(original.fsp_name || '')
-      .toLowerCase()
-      .includes(query);
-    if (pathMatch || fspNameMatch) {
-      return true;
+  // Special handling for URLs: if query starts with "http", only check the key column
+  if (query.startsWith('http')) {
+    const keyCell = row
+      .getVisibleCells()
+      .find(cell => cell.column.id === 'sharing_key');
+    if (keyCell) {
+      const keyValue = keyCell.getValue();
+      if (keyValue !== null && keyValue !== undefined) {
+        const strKeyValue = String(keyValue).toLowerCase();
+        return query.includes(strKeyValue);
+      }
     }
+    return false;
   }
 
-  // Get all cell values from the row and check if any match the search query
-  const rowValues = row.getVisibleCells().map(cell => {
+  // For non-URL queries, search all columns except the name column
+  // NOTE: this needs to change if we allow custom sharing names
+  // For now, the sharing name is always in the file path
+  const rowValues = row.getVisibleCells().flatMap(cell => {
+    // Exclude the name column (sharing_name)
+    if (cell.column.id === 'sharing_name') {
+      return [];
+    }
+
     const value = cell.getValue();
     if (value === null || value === undefined) {
-      return '';
+      return [''];
+    }
+
+    // Special handling for path column with PathCellValue
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      'pathMap' in value &&
+      'displayPath' in value
+    ) {
+      const pathValue = value as PathCellValue;
+      // Return all three path types for searching
+      return [
+        pathValue.pathMap.mac_path.toLowerCase(),
+        pathValue.pathMap.linux_path.toLowerCase(),
+        pathValue.pathMap.windows_path.toLowerCase()
+      ];
     }
 
     const strValue = String(value);
-
     // Special handling for date columns: format the ISO date before searching
     if (isISODate(strValue)) {
-      return formatDateString(strValue).toLowerCase();
+      return [formatDateString(strValue).toLowerCase()];
     }
-
-    return strValue.toLowerCase();
+    return [strValue.toLowerCase()];
   });
 
   return rowValues.some(value => value.includes(query));
@@ -309,7 +329,7 @@ function Table<TData>({
   data,
   gridColsClass,
   loadingState,
-  emptyText
+  dataType
 }: TableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState<string>('');
@@ -419,24 +439,37 @@ function Table<TData>({
         {loadingState ? (
           <TableRowSkeleton gridColsClass={gridColsClass} />
         ) : data && data.length > 0 ? (
-          <div className="max-h-full" id="table-body">
-            {table.getRowModel().rows.map(row => (
-              <TableRow gridColsClass={gridColsClass} key={row.id}>
-                {row.getVisibleCells().map(cell => (
-                  <Fragment key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </Fragment>
-                ))}
-              </TableRow>
-            ))}
-          </div>
+          table.getRowModel().rows.length > 0 ? (
+            <div className="max-h-full" id="table-body">
+              {table.getRowModel().rows.map(row => (
+                <TableRow gridColsClass={gridColsClass} key={row.id}>
+                  {row.getVisibleCells().map(cell => (
+                    <Fragment key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </Fragment>
+                  ))}
+                </TableRow>
+              ))}
+            </div>
+          ) : (
+            <div className="px-4 py-8 text-center text-foreground">
+              {dataType
+                ? `No ${dataType} match your query`
+                : 'No data matches your query'}
+            </div>
+          )
         ) : !data || data.length === 0 ? (
           <div className="px-4 py-8 text-center text-foreground">
-            {emptyText || 'No data available'}
+            {dataType
+              ? `You have not created any ${dataType} yet`
+              : 'No data available'}
           </div>
         ) : (
           <div className="px-4 py-8 text-center text-foreground">
-            There was an error loading the data.
+            There was an error loading the data
           </div>
         )}
       </div>
@@ -458,14 +491,14 @@ function TableCard<TData>({
   data,
   gridColsClass,
   loadingState,
-  emptyText
+  dataType
 }: TableProps<TData>) {
   return (
     <Card className="min-h-48">
       <Table
         columns={columns}
         data={data}
-        emptyText={emptyText}
+        dataType={dataType}
         gridColsClass={gridColsClass}
         loadingState={loadingState}
       />

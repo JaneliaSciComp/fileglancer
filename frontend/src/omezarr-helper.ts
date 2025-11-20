@@ -195,11 +195,14 @@ function getLayerName(dataUrl: string): string {
   return dataUrl.split('/').filter(Boolean).pop() || 'Default';
 }
 
-function generateNeuroglancerStateForDataURL(dataUrl: string): string {
+function generateNeuroglancerStateForDataURL(
+  dataUrl: string,
+  zarrVersion: 2 | 3
+): string {
   log.debug('Generating Neuroglancer state for Zarr array:', dataUrl);
   const layer: Record<string, any> = {
     name: getLayerName(dataUrl),
-    source: dataUrl,
+    source: getNeuroglancerSource(dataUrl, zarrVersion),
     type: 'new'
   };
 
@@ -253,6 +256,7 @@ function generateNeuroglancerStateForZarrArray(
  */
 function generateSimpleNeuroglancerStateForOmeZarr(
   dataUrl: string,
+  zarrVersion: 2 | 3,
   layerType: LayerType,
   multiscale: omezarr.Multiscale,
   arr: zarr.Array<any>
@@ -284,7 +288,7 @@ function generateSimpleNeuroglancerStateForOmeZarr(
     layers: [
       {
         name: getLayerName(dataUrl),
-        source: 'zarr://' + dataUrl,
+        source: getNeuroglancerSource(dataUrl, zarrVersion),
         type
       }
     ]
@@ -508,6 +512,7 @@ function generateNeuroglancerStateForOmeZarr(
   // Otherwise use the simpler version
   return generateSimpleNeuroglancerStateForOmeZarr(
     dataUrl,
+    zarrVersion,
     layerType,
     multiscale,
     arr
@@ -707,6 +712,7 @@ async function determineLayerType(
 export {
   getScaleTransform,
   getResolvedScales,
+  getNeuroglancerSource,
   getZarrArray,
   getOmeZarrMetadata,
   getOmeZarrThumbnail,

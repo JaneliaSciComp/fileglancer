@@ -195,8 +195,8 @@ export default function useDataToolLinks(
       await deleteProxiedPathMutation.mutateAsync({
         sharing_key: proxiedPath.sharing_key
       });
-      toast.success('Successfully deleted data link');
       await allProxiedPathsQuery.refetch();
+      toast.success('Successfully deleted data link');
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';

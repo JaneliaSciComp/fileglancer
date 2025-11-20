@@ -67,7 +67,7 @@ export default function Browse() {
 
   return (
     <div
-      className="flex flex-col h-full max-h-full w-full max-w-full"
+      className={`flex flex-col h-full max-h-full max-w-full ${fspName ? 'min-w-fit' : 'w-full'}`}
       data-browse-container
       onPaste={async event => {
         // Check if any input, textarea, or contenteditable element is focused
@@ -109,7 +109,7 @@ export default function Browse() {
         toggleSidebar={toggleSidebar}
       />
       <div
-        className={`relative grow shrink-0 max-h-[calc(100%-55px)] flex flex-col overflow-y-auto px-2 ${!fspName ? 'bg-surface-light py-6' : ''}`}
+        className={`relative grow shrink-0 max-h-[calc(100%-55px)] flex flex-col overflow-y-auto px-2 ${!fspName ? 'bg-surface-light py-6' : 'min-w-fit'}`}
       >
         {!fspName ? (
           <div className="flex flex-col max-w-full gap-6 px-6">
@@ -123,6 +123,7 @@ export default function Browse() {
           </div>
         ) : (
           <FileBrowser
+            mainPanelWidth={componentWidth}
             setShowConvertFileDialog={setShowConvertFileDialog}
             setShowDeleteDialog={setShowDeleteDialog}
             setShowPermissionsDialog={setShowPermissionsDialog}
