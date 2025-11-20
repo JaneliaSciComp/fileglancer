@@ -9,6 +9,7 @@ import {
 type ZarrMetadataTableProps = {
   readonly metadata: Metadata;
   readonly layerType: 'auto' | 'image' | 'segmentation' | null;
+  readonly availableVersions?: ('v2' | 'v3')[];
 };
 
 function getSizeString(shapes: number[][] | undefined) {
@@ -60,7 +61,8 @@ function getAxisData(metadata: Metadata) {
 
 export default function ZarrMetadataTable({
   metadata,
-  layerType
+  layerType,
+  availableVersions
 }: ZarrMetadataTableProps) {
   const { zarrVersion, multiscale, shapes } = metadata;
   const axisData = getAxisData(metadata);
@@ -77,7 +79,11 @@ export default function ZarrMetadataTable({
           </tr>
           <tr className="border-y border-surface-dark">
             <td className="p-3 font-semibold">Zarr Version</td>
-            <td className="p-3">{zarrVersion}</td>
+            <td className="p-3">
+              {availableVersions && availableVersions.length > 1
+                ? availableVersions.join(', ')
+                : zarrVersion}
+            </td>
           </tr>
           {layerType ? (
             <tr className="border-b border-surface-dark">

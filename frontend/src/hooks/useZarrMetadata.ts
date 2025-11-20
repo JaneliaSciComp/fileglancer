@@ -39,6 +39,9 @@ export default function useZarrMetadata() {
     files: fileQuery.data?.files
   });
 
+  const effectiveZarrVersion =
+    zarrMetadataQuery.data?.availableVersions.includes('v3') ? 3 : 2;
+
   const metadata = zarrMetadataQuery.data?.metadata || null;
   const omeZarrUrl = zarrMetadataQuery.data?.omeZarrUrl || null;
 
@@ -51,13 +54,9 @@ export default function useZarrMetadata() {
   >(null);
 
   useEffect(() => {
-    if (disableHeuristicalLayerTypeDetection) {
+    if (!thumbnailSrc || disableHeuristicalLayerTypeDetection) {
+      // Default layer type
       setLayerType('image');
-      return;
-    }
-
-    if (!thumbnailSrc) {
-      setLayerType(null);
       return;
     }
 
@@ -92,6 +91,13 @@ export default function useZarrMetadata() {
     if (metadata?.multiscale) {
       // OME-Zarr - all urls for v2; no avivator for v3
       if (url) {
+        if (effectiveZarrVersion === 2) {
+          openWithToolUrls.avivator = buildUrl(avivatorBaseUrl, null, {
+            image_url: url
+          });
+        } else {
+          openWithToolUrls.avivator = null;
+        }
         // Populate with actual URLs when proxied path is available
         openWithToolUrls.validator = buildUrl(validatorBaseUrl, null, {
           source: url
@@ -99,20 +105,17 @@ export default function useZarrMetadata() {
         openWithToolUrls.vole = buildUrl(voleBaseUrl, null, {
           url
         });
-        openWithToolUrls.avivator =
-          metadata.zarrVersion === 2
-            ? buildUrl(avivatorBaseUrl, null, { image_url: url })
-            : null;
         if (disableNeuroglancerStateGeneration) {
           openWithToolUrls.neuroglancer =
-            neuroglancerBaseUrl + generateNeuroglancerStateForDataURL(url);
+            neuroglancerBaseUrl +
+            generateNeuroglancerStateForDataURL(url, effectiveZarrVersion);
         } else if (layerType) {
           try {
             openWithToolUrls.neuroglancer =
               neuroglancerBaseUrl +
               generateNeuroglancerStateForOmeZarr(
                 url,
-                metadata.zarrVersion,
+                effectiveZarrVersion,
                 layerType,
                 metadata.multiscale,
                 metadata.arr,
@@ -125,7 +128,8 @@ export default function useZarrMetadata() {
               error
             );
             openWithToolUrls.neuroglancer =
-              neuroglancerBaseUrl + generateNeuroglancerStateForDataURL(url);
+              neuroglancerBaseUrl +
+              generateNeuroglancerStateForDataURL(url, effectiveZarrVersion);
           }
         }
       } else {
@@ -136,7 +140,7 @@ export default function useZarrMetadata() {
         // the icon before a data link has been generated. Setting it to null for
         // all other versions, eg zarr v3 means the icon will not be present before
         // a data link is generated.
-        openWithToolUrls.avivator = metadata.zarrVersion === 2 ? '' : null;
+        openWithToolUrls.avivator = effectiveZarrVersion === 2 ? '' : null;
         openWithToolUrls.neuroglancer = '';
       }
     } else {
@@ -147,13 +151,14 @@ export default function useZarrMetadata() {
         openWithToolUrls.avivator = null;
         if (disableNeuroglancerStateGeneration) {
           openWithToolUrls.neuroglancer =
-            neuroglancerBaseUrl + generateNeuroglancerStateForDataURL(url);
+            neuroglancerBaseUrl +
+            generateNeuroglancerStateForDataURL(url, effectiveZarrVersion);
         } else if (layerType) {
           openWithToolUrls.neuroglancer =
             neuroglancerBaseUrl +
             generateNeuroglancerStateForZarrArray(
               url,
-              metadata.zarrVersion,
+              effectiveZarrVersion,
               layerType
             );
         }
@@ -173,13 +178,15 @@ export default function useZarrMetadata() {
     externalDataUrlQuery.data,
     disableNeuroglancerStateGeneration,
     useLegacyMultichannelApproach,
-    layerType
+    layerType,
+    effectiveZarrVersion
   ]);
 
   return {
     zarrMetadataQuery,
     thumbnailQuery,
     openWithToolUrls,
-    layerType
+    layerType,
+    availableVersions: zarrMetadataQuery.data?.availableVersions || []
   };
 }
