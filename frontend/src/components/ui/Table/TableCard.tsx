@@ -41,6 +41,7 @@ import { HiXMark } from 'react-icons/hi2';
 
 import { TableRowSkeleton } from '@/components/ui/widgets/Loaders';
 import { formatDateString } from '@/utils';
+import type { PathCellValue } from './linksColumns';
 
 type TableProps<TData> = {
   readonly columns: ColumnDef<TData>[];
@@ -147,17 +148,34 @@ const globalFilterFn: FilterFn<unknown> = (row, _columnId, filterValue) => {
 
   const query = String(filterValue).toLowerCase();
 
-  const rowValues = row.getVisibleCells().map(cell => {
+  const rowValues = row.getVisibleCells().flatMap(cell => {
     const value = cell.getValue();
     if (value === null || value === undefined) {
-      return '';
+      return [''];
     }
+
+    // Special handling for path column with PathCellValue
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      'pathMap' in value &&
+      'displayPath' in value
+    ) {
+      const pathValue = value as PathCellValue;
+      // Return all three path types for searching
+      return [
+        pathValue.pathMap.mac_path.toLowerCase(),
+        pathValue.pathMap.linux_path.toLowerCase(),
+        pathValue.pathMap.windows_path.toLowerCase()
+      ];
+    }
+
     const strValue = String(value);
     // Special handling for date columns: format the ISO date before searching
     if (isISODate(strValue)) {
-      return formatDateString(strValue).toLowerCase();
+      return [formatDateString(strValue).toLowerCase()];
     }
-    return strValue.toLowerCase();
+    return [strValue.toLowerCase()];
   });
 
   return rowValues.some(value => lengthAwareMatch(value, query));
