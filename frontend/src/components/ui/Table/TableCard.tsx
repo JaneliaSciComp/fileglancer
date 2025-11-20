@@ -126,22 +126,6 @@ const isISODate = (str: string): boolean => {
   return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(str);
 };
 
-// Helper function to check match based on length heuristic
-// If query is shorter or equal in length to value, check if value contains query
-// If query is longer, check if query contains value
-const lengthAwareMatch = (value: string, query: string): boolean => {
-  if (!value) {
-    return false;
-  }
-  if (query.length <= value.length) {
-    return value.includes(query);
-  } else if (query.length > value.length && value.length > 1) {
-    return query.includes(value);
-  } else {
-    return false;
-  }
-};
-
 // Custom global filter function that searches all columns
 const globalFilterFn: FilterFn<unknown> = (row, _columnId, filterValue) => {
   if (!filterValue) {
@@ -203,7 +187,7 @@ const globalFilterFn: FilterFn<unknown> = (row, _columnId, filterValue) => {
     return [strValue.toLowerCase()];
   });
 
-  return rowValues.some(value => lengthAwareMatch(value, query));
+  return rowValues.some(value => value.includes(query));
 };
 
 function TableHeader({
