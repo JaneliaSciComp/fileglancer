@@ -113,7 +113,10 @@ class HTTPError extends Error {
   }
 }
 
-async function checkSessionValidity(): Promise<boolean> {
+async function checkSessionValidity(): Promise<{
+  authenticated: boolean;
+  auth_method?: string;
+}> {
   try {
     const response = await fetch('/api/auth/status', {
       method: 'GET',
@@ -123,12 +126,15 @@ async function checkSessionValidity(): Promise<boolean> {
     // if the response JSON contains { authenticated: true }, session is valid
     const data = await response.json();
     if (data && typeof data.authenticated === 'boolean') {
-      return data.authenticated;
+      return {
+        authenticated: data.authenticated,
+        auth_method: data.auth_method
+      };
     }
-    return false;
+    return { authenticated: false, auth_method: data.auth_method };
   } catch (error) {
     log.error('Error checking session validity:', error);
-    return false;
+    return { authenticated: false, auth_method: 'okta' };
   }
 }
 
@@ -182,11 +188,12 @@ async function sendFetchRequest(
   // Check for 403 Forbidden - could be permission denied or session expired
   if (response.status === 403 || response.status === 401) {
     // Check if session is still valid by testing a stable endpoint
-    const sessionValid = await checkSessionValidity();
-    if (!sessionValid) {
+    const sessionStatus = await checkSessionValidity();
+    if (!sessionStatus.authenticated) {
       // Session has expired, update auth status in query cache
       queryClient.setQueryData(['auth', 'status'], {
-        authenticated: false
+        authenticated: false,
+        auth_method: sessionStatus.auth_method
       });
       throw new HTTPError('Session expired', 401);
     }
