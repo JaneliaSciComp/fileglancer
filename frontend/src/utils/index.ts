@@ -10,6 +10,7 @@ import {
   removeLastSegmentFromPath
 } from './pathHandling';
 import { shouldTriggerHealthCheck } from './serverHealth';
+import { queryClient } from '@/queryClient';
 
 // Health check reporter registry with robust type safety
 export type HealthCheckReporter = (
@@ -112,16 +113,28 @@ class HTTPError extends Error {
   }
 }
 
-async function checkSessionValidity(): Promise<boolean> {
+async function checkSessionValidity(): Promise<{
+  authenticated: boolean;
+  auth_method?: string;
+}> {
   try {
-    const response = await fetch('/api/profile', {
+    const response = await fetch('/api/auth/status', {
       method: 'GET',
       credentials: 'include'
     });
-    return response.ok;
+
+    // if the response JSON contains { authenticated: true }, session is valid
+    const data = await response.json();
+    if (data && typeof data.authenticated === 'boolean') {
+      return {
+        authenticated: data.authenticated,
+        auth_method: data.auth_method
+      };
+    }
+    return { authenticated: false, auth_method: data.auth_method };
   } catch (error) {
     log.error('Error checking session validity:', error);
-    return false;
+    return { authenticated: false, auth_method: 'okta' };
   }
 }
 
@@ -173,12 +186,15 @@ async function sendFetchRequest(
   }
 
   // Check for 403 Forbidden - could be permission denied or session expired
-  if (response.status === 403) {
+  if (response.status === 403 || response.status === 401) {
     // Check if session is still valid by testing a stable endpoint
-    const sessionValid = await checkSessionValidity();
-    if (!sessionValid) {
-      // Session has expired, redirect to logout
-      window.location.href = `${window.location.origin}/logout`;
+    const sessionStatus = await checkSessionValidity();
+    if (!sessionStatus.authenticated) {
+      // Session has expired, update auth status in query cache
+      queryClient.setQueryData(['auth', 'status'], {
+        authenticated: false,
+        auth_method: sessionStatus.auth_method
+      });
       throw new HTTPError('Session expired', 401);
     }
     // If session is valid, this is just a permission denied for this specific resource

@@ -263,6 +263,11 @@ export const handlers = [
     return HttpResponse.json({ username: 'testuser' });
   }),
 
+  // Auth status
+  http.get('/api/auth/status', () => {
+    return HttpResponse.json({ authenticated: true });
+  }),
+
   // File content for Zarr metadata files
   http.get('/api/content/:fspName', ({ params, request }) => {
     const url = new URL(request.url);
