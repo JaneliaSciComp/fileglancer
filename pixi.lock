@@ -2992,8 +2992,8 @@ packages:
   timestamp: 1760972937564
 - pypi: ./
   name: fileglancer
-  version: 2.2.0a1
-  sha256: 625432bf03684864deb3029d450c88d5bee3cd81d2d0332d30c5cc8f15f5441a
+  version: 2.2.0a2
+  sha256: 70fc0c52b891224575249afe6ea10a5881c36aaeab63bd9189a3cb62ceccd785
   requires_dist:
   - aiosqlite>=0.21.0
   - alembic>=1.17.0
@@ -3001,6 +3001,7 @@ packages:
   - authlib>=1.6.5
   - cachetools>=6.2.1
   - click>=8.0
+  - cryptography>=41.0.0
   - fastapi>=0.119.1
   - httpx>=0.28
   - itsdangerous>=2.2.0
@@ -3010,6 +3011,7 @@ packages:
   - psycopg2-binary>=2.9.10,<3
   - pydantic-settings>=2.11.0
   - pydantic>=2.10.6
+  - python-jose>=3.5.0,<4
   - sqlalchemy>=2.0.44
   - uvicorn>=0.38.0
   - x2s3>=0.9.1
