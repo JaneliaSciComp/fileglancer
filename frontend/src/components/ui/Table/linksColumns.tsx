@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import type { MouseEvent } from 'react';
 import { Typography } from '@material-tailwind/react';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -41,7 +42,7 @@ type ProxiedPathRowActionProps = {
   pathFsp: FileSharePath | undefined;
 };
 
-const TRIGGER_CLASSES = 'max-w-full truncate';
+const TRIGGER_CLASSES = 'h-min max-w-full';
 
 // Helper function to create a map of all path types
 function createPathMap(
@@ -56,16 +57,28 @@ function createPathMap(
 }
 
 function PathCell({
+  displayPath,
   item,
-  displayPath
+  onContextMenu
 }: {
-  readonly item: ProxiedPath;
   readonly displayPath: string;
+  readonly item: ProxiedPath;
+  readonly onContextMenu?: (
+    e: MouseEvent<HTMLElement>,
+    data: { value: string }
+  ) => void;
 }) {
   const browseLink = makeBrowseLink(item.fsp_name, item.path);
 
   return (
-    <div className="min-w-0 max-w-full flex" key={`path-${item.sharing_key}`}>
+    <div
+      className="flex items-center truncate w-full h-full"
+      key={`path-${item.sharing_key}`}
+      onContextMenu={e => {
+        e.preventDefault();
+        onContextMenu?.(e, { value: displayPath });
+      }}
+    >
       <FgTooltip label={displayPath} triggerClasses={TRIGGER_CLASSES}>
         <Typography
           as={FgStyledLink}
@@ -132,7 +145,7 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
 
   return (
     <div
-      className="min-w-0 flex"
+      className="min-w-0 flex items-center"
       data-testid="data-link-actions-cell"
       key={`action-${item.sharing_key}`}
     >
@@ -169,15 +182,23 @@ export function useLinksColumns(): ColumnDef<ProxiedPath>[] {
       {
         accessorKey: 'sharing_name',
         header: 'Name',
-        cell: ({ cell, row }) => {
+        cell: ({ cell, row, table }) => {
           const item = row.original;
+          const onContextMenu = table.options.meta?.onCellContextMenu;
           return (
-            <div className="flex min-w-0 max-w-full" key={cell.id}>
+            <div
+              className="flex items-center truncate w-full h-full"
+              key={cell.id}
+              onContextMenu={e => {
+                e.preventDefault();
+                onContextMenu?.(e, { value: item.sharing_name });
+              }}
+            >
               <FgTooltip
                 label={item.sharing_name}
                 triggerClasses={TRIGGER_CLASSES}
               >
-                <Typography className="text-foreground truncate">
+                <Typography className="text-foreground truncate select-all">
                   {item.sharing_name}
                 </Typography>
               </FgTooltip>
@@ -201,10 +222,15 @@ export function useLinksColumns(): ColumnDef<ProxiedPath>[] {
             pathMap
           };
         },
-        cell: ({ row, getValue }) => {
+        cell: ({ row, getValue, table }) => {
           const value = getValue() as PathCellValue;
+          const onContextMenu = table.options.meta?.onCellContextMenu;
           return (
-            <PathCell displayPath={value.displayPath} item={row.original} />
+            <PathCell
+              displayPath={value.displayPath}
+              item={row.original}
+              onContextMenu={onContextMenu}
+            />
           );
         },
         sortingFn: (rowA, rowB, columnId) => {
@@ -217,19 +243,24 @@ export function useLinksColumns(): ColumnDef<ProxiedPath>[] {
       {
         accessorKey: 'created_at',
         header: 'Date Created',
-        cell: ({ cell, getValue }) => {
-          const dateString = getValue() as string;
+        cell: ({ cell, table }) => {
+          const formattedDate = formatDateString(cell.getValue() as string);
+          const onContextMenu = table.options.meta?.onCellContextMenu;
           return (
-            <div className="flex min-w-0 max-w-full" key={cell.id}>
-              <FgTooltip
-                label={formatDateString(dateString)}
-                triggerClasses={TRIGGER_CLASSES}
-              >
+            <div
+              className="flex items-center truncate w-full h-full"
+              key={cell.id}
+              onContextMenu={e => {
+                e.preventDefault();
+                onContextMenu?.(e, { value: formattedDate });
+              }}
+            >
+              <FgTooltip label={formattedDate} triggerClasses={TRIGGER_CLASSES}>
                 <Typography
-                  className="text-left text-foreground truncate"
+                  className="text-left text-foreground truncate select-all"
                   variant="small"
                 >
-                  {formatDateString(dateString)}
+                  {formattedDate}
                 </Typography>
               </FgTooltip>
             </div>
@@ -240,12 +271,20 @@ export function useLinksColumns(): ColumnDef<ProxiedPath>[] {
       {
         accessorKey: 'sharing_key',
         header: 'Key',
-        cell: ({ cell, getValue }) => {
+        cell: ({ cell, getValue, table }) => {
           const key = getValue() as string;
+          const onContextMenu = table.options.meta?.onCellContextMenu;
           return (
-            <div className="flex min-w-0 max-w-full" key={cell.id}>
+            <div
+              className="flex items-center  truncate w-full h-full"
+              key={cell.id}
+              onContextMenu={e => {
+                e.preventDefault();
+                onContextMenu?.(e, { value: key });
+              }}
+            >
               <FgTooltip label={key} triggerClasses={TRIGGER_CLASSES}>
-                <Typography className="text-foreground truncate">
+                <Typography className="text-foreground truncate select-all">
                   {key}
                 </Typography>
               </FgTooltip>

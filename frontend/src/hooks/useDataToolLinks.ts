@@ -1,4 +1,4 @@
-import { useState, useRef, SetStateAction } from 'react';
+import { useRef, SetStateAction } from 'react';
 import type { Dispatch } from 'react';
 import toast from 'react-hot-toast';
 
@@ -10,7 +10,6 @@ import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useExternalBucketContext } from '@/contexts/ExternalBucketContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 
-import { copyToClipboard } from '@/utils/copyText';
 import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
 
 // Overload for ZarrPreview usage with required parameters
@@ -25,7 +24,6 @@ export default function useDataToolLinks(
   handleToolClick: (toolKey: PendingToolKey) => Promise<void>;
   handleDialogConfirm: () => Promise<void>;
   handleDialogCancel: () => void;
-  showCopiedTooltip: boolean;
 };
 
 // Overload for linksColumns and PropertiesDrawer usage with only one param
@@ -37,7 +35,6 @@ export default function useDataToolLinks(
   handleToolClick: (toolKey: PendingToolKey) => Promise<void>;
   handleDialogConfirm: () => Promise<void>;
   handleDialogCancel: () => void;
-  showCopiedTooltip: boolean;
 };
 
 export default function useDataToolLinks(
@@ -46,8 +43,6 @@ export default function useDataToolLinks(
   pendingToolKey?: PendingToolKey,
   setPendingToolKey?: Dispatch<SetStateAction<PendingToolKey>>
 ) {
-  const [showCopiedTooltip, setShowCopiedTooltip] = useState(false);
-
   // Store current URLs in a ref to avoid stale closure issues
   const currentUrlsRef = useRef(openWithToolUrls);
   currentUrlsRef.current = openWithToolUrls;
@@ -62,16 +57,6 @@ export default function useDataToolLinks(
 
   const { areDataLinksAutomatic } = usePreferencesContext();
   const { externalDataUrlQuery } = useExternalBucketContext();
-
-  const handleCopy = async (url: string): Promise<void> => {
-    const result = await copyToClipboard(url);
-    if (result.success) {
-      setShowCopiedTooltip(true);
-      setTimeout(() => setShowCopiedTooltip(false), 2000);
-    } else {
-      toast.error('Failed to copy URL to clipboard');
-    }
-  };
 
   const handleCreateDataLink = async (): Promise<void> => {
     if (!fileQuery.data?.currentFileSharePath) {
@@ -106,9 +91,7 @@ export default function useDataToolLinks(
     }
 
     try {
-      if (toolKey === 'copy') {
-        await handleCopy(urls.copy);
-      } else if (toolKey) {
+      if (toolKey) {
         const navigationUrl = urls[toolKey];
 
         if (navigationUrl) {
@@ -125,6 +108,8 @@ export default function useDataToolLinks(
         } else {
           toast.error('URL not available');
         }
+      } else {
+        toast.error('No tool selected');
       }
       setPendingToolKey?.(null);
     } catch (error) {
@@ -224,7 +209,6 @@ export default function useDataToolLinks(
     handleDeleteDataLink,
     handleToolClick,
     handleDialogConfirm,
-    handleDialogCancel,
-    showCopiedTooltip
+    handleDialogCancel
   };
 }

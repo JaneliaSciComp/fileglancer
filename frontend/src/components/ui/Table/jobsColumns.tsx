@@ -16,7 +16,16 @@ import { FileSharePath } from '@/shared.types';
 import { FgStyledLink } from '../widgets/FgLink';
 import toast from 'react-hot-toast';
 
-function FilePathCell({ item }: { readonly item: Ticket }) {
+function FilePathCell({
+  item,
+  onContextMenu
+}: {
+  readonly item: Ticket;
+  readonly onContextMenu?: (
+    e: MouseEvent<HTMLElement>,
+    data: { value: string }
+  ) => void;
+}) {
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const { pathPreference, setLayoutWithPropertiesOpen } =
     usePreferencesContext();
@@ -45,8 +54,15 @@ function FilePathCell({ item }: { readonly item: Ticket }) {
   };
 
   return (
-    <div className="line-clamp-2 max-w-full">
+    <div
+      className="flex items-center truncate w-full h-full"
+      onContextMenu={e => {
+        e.preventDefault();
+        onContextMenu?.(e, { value: displayPath });
+      }}
+    >
       <FgStyledLink
+        className="truncate"
         onClick={handleClick}
         to={makeBrowseLink(item.fsp_name, item.path)}
       >
@@ -82,37 +98,87 @@ export const jobsColumns: ColumnDef<Ticket>[] = [
   {
     accessorKey: 'path',
     header: 'File Path',
-    cell: ({ cell, row }) => <FilePathCell item={row.original} key={cell.id} />,
+    cell: ({ cell, row, table }) => {
+      const onContextMenu = table.options.meta?.onCellContextMenu;
+      return (
+        <FilePathCell
+          item={row.original}
+          key={cell.id}
+          onContextMenu={onContextMenu}
+        />
+      );
+    },
     enableSorting: true
   },
   {
     accessorKey: 'description',
     header: 'Job Description',
-    cell: ({ cell, getValue }) => (
-      <Typography
-        className="line-clamp-2 text-foreground max-w-full"
-        key={cell.id}
-      >
-        {getValue() as string}
-      </Typography>
-    )
+    cell: ({ cell, getValue, table }) => {
+      const description = getValue() as string;
+      const onContextMenu = table.options.meta?.onCellContextMenu;
+      return (
+        <div
+          className="flex items-center truncate w-full h-full"
+          onContextMenu={e => {
+            e.preventDefault();
+            onContextMenu?.(e, { value: description });
+          }}
+        >
+          <Typography
+            className="text-foreground max-w-full truncate select-all"
+            key={cell.id}
+          >
+            {description}
+          </Typography>
+        </div>
+      );
+    }
   },
   {
     accessorKey: 'status',
     header: 'Status',
-    cell: ({ cell, getValue }) => (
-      <StatusCell key={cell.id} status={getValue() as string} />
-    ),
+    cell: ({ cell, getValue, table }) => {
+      const status = getValue() as string;
+      const onContextMenu = table.options.meta?.onCellContextMenu;
+      return (
+        <div
+          className="flex items-center w-full h-full"
+          onContextMenu={e => {
+            e.preventDefault();
+            onContextMenu?.(e, { value: status });
+          }}
+        >
+          <StatusCell key={cell.id} status={status} />
+        </div>
+      );
+    },
     enableSorting: true
   },
   {
     accessorKey: 'updated',
     header: 'Last Updated',
-    cell: ({ cell, getValue }) => (
-      <div className="text-sm text-foreground-muted" key={cell.id}>
-        {formatDateString(getValue() as string)}
-      </div>
-    ),
+    cell: ({ cell, getValue, table }) => {
+      const dateString = getValue() as string;
+      const formattedDate = formatDateString(dateString);
+      const onContextMenu = table.options.meta?.onCellContextMenu;
+      return (
+        <div
+          className="flex items-center justify-items-start truncate w-full h-full"
+          key={cell.id}
+          onContextMenu={e => {
+            e.preventDefault();
+            onContextMenu?.(e, { value: formattedDate });
+          }}
+        >
+          <Typography
+            className="text-left text-foreground truncate select-all"
+            variant="small"
+          >
+            {formattedDate}
+          </Typography>
+        </div>
+      );
+    },
     enableSorting: true
   }
 ];

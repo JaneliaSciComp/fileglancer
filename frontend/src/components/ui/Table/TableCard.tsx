@@ -6,7 +6,7 @@ import {
   useEffect,
   useCallback
 } from 'react';
-import type { ReactNode } from 'react';
+import type { ReactNode, MouseEvent } from 'react';
 import {
   flexRender,
   getCoreRowModel,
@@ -38,9 +38,31 @@ import {
   HiOutlineSearch
 } from 'react-icons/hi';
 import { HiXMark } from 'react-icons/hi2';
+import toast from 'react-hot-toast';
 
 import { TableRowSkeleton } from '@/components/ui/widgets/Loaders';
 import { formatDateString } from '@/utils';
+import { copyToClipboard } from '@/utils/copyText';
+import useContextMenu from '@/hooks/useContextMenu';
+import ContextMenu, {
+  type ContextMenuItem
+} from '@/components/ui/Menus/ContextMenu';
+
+// Type for context menu data passed from cells
+type CellContextMenuData = {
+  value: string;
+};
+
+// Extend TanStack Table's meta to include context menu handler
+declare module '@tanstack/react-table' {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface TableMeta<TData> {
+    onCellContextMenu?: (
+      e: MouseEvent<HTMLElement>,
+      data: CellContextMenuData
+    ) => void;
+  }
+}
 import type { PathCellValue } from './linksColumns';
 
 type DataType = 'data links' | 'tasks';
@@ -295,7 +317,7 @@ function TableRow({
 }) {
   return (
     <div
-      className={`grid ${gridColsClass} justify-items-start items-center gap-4 px-4 py-4 border-b border-surface last:border-0 items-start`}
+      className={`grid ${gridColsClass} min-h-16 justify-items-start gap-4 px-4 border-b border-surface last:border-0`}
     >
       {children}
     </div>
@@ -316,6 +338,33 @@ function Table<TData>({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Context menu state
+  const {
+    contextMenuCoords,
+    showContextMenu,
+    contextData,
+    menuRef,
+    openContextMenu,
+    closeContextMenu
+  } = useContextMenu<CellContextMenuData>();
+
+  // Build context menu items
+  const contextMenuItems: ContextMenuItem[] = [
+    {
+      name: 'Copy',
+      action: async () => {
+        if (contextData?.value) {
+          const result = await copyToClipboard(contextData.value);
+          if (result.success) {
+            toast.success('Copied to clipboard');
+          } else {
+            toast.error(`Failed to copy: ${result.error}`);
+          }
+        }
+      }
+    }
+  ];
+
   const table = useReactTable({
     data,
     columns: columns as ColumnDef<unknown>[],
@@ -329,7 +378,10 @@ function Table<TData>({
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel()
+    getPaginationRowModel: getPaginationRowModel(),
+    meta: {
+      onCellContextMenu: openContextMenu
+    }
   });
 
   // Debounce the global filter updates
@@ -361,62 +413,76 @@ function Table<TData>({
   }, []);
 
   return (
-    <div className="flex flex-col h-full">
-      <TableHeader
-        clearSearch={clearSearch}
-        globalFilter={inputValue}
-        inputRef={inputRef}
-        setGlobalFilter={handleInputChange}
-        table={table}
-      />
-      <div
-        className={`shrink-0 grid ${gridColsClass} gap-4 px-4 py-2 bg-surface/30`}
-      >
-        {table
-          .getHeaderGroups()
-          .map(headerGroup =>
-            headerGroup.headers.map(header =>
-              header.isPlaceholder ? null : (
-                <HeaderIcons header={header} key={header.id} />
+    <>
+      <div className="flex flex-col h-full">
+        <TableHeader
+          clearSearch={clearSearch}
+          globalFilter={inputValue}
+          inputRef={inputRef}
+          setGlobalFilter={handleInputChange}
+          table={table}
+        />
+        <div
+          className={`shrink-0 grid ${gridColsClass} gap-4 px-4 py-2 bg-surface/30`}
+        >
+          {table
+            .getHeaderGroups()
+            .map(headerGroup =>
+              headerGroup.headers.map(header =>
+                header.isPlaceholder ? null : (
+                  <HeaderIcons header={header} key={header.id} />
+                )
               )
-            )
-          )}
-      </div>
-      {/* Body */}
-      {loadingState ? (
-        <TableRowSkeleton gridColsClass={gridColsClass} />
-      ) : data && data.length > 0 ? (
-        table.getRowModel().rows.length > 0 ? (
-          <div className="max-h-full" id="table-body">
-            {table.getRowModel().rows.map(row => (
-              <TableRow gridColsClass={gridColsClass} key={row.id}>
-                {row.getVisibleCells().map(cell => (
-                  <Fragment key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </Fragment>
-                ))}
-              </TableRow>
-            ))}
+            )}
+        </div>
+        {/* Body */}
+        {loadingState ? (
+          <TableRowSkeleton gridColsClass={gridColsClass} />
+        ) : data && data.length > 0 ? (
+          table.getRowModel().rows.length > 0 ? (
+            <div className="max-h-full" id="table-body">
+              {table.getRowModel().rows.map(row => (
+                <TableRow gridColsClass={gridColsClass} key={row.id}>
+                  {row.getVisibleCells().map(cell => (
+                    <Fragment key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </Fragment>
+                  ))}
+                </TableRow>
+              ))}
+            </div>
+          ) : (
+            <div className="px-4 py-8 text-center text-foreground">
+              {dataType
+                ? `No ${dataType} match your query`
+                : 'No data matches your query'}
+            </div>
+          )
+        ) : !data || data.length === 0 ? (
+          <div className="px-4 py-8 text-center text-foreground">
+            {dataType
+              ? `You have not created any ${dataType} yet`
+              : 'No data available'}
           </div>
         ) : (
           <div className="px-4 py-8 text-center text-foreground">
-            {dataType
-              ? `No ${dataType} match your query`
-              : 'No data matches your query'}
+            There was an error loading the data
           </div>
-        )
-      ) : !data || data.length === 0 ? (
-        <div className="px-4 py-8 text-center text-foreground">
-          {dataType
-            ? `You have not created any ${dataType} yet`
-            : 'No data available'}
-        </div>
-      ) : (
-        <div className="px-4 py-8 text-center text-foreground">
-          There was an error loading the data
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+      {showContextMenu ? (
+        <ContextMenu
+          items={contextMenuItems}
+          menuRef={menuRef}
+          onClose={closeContextMenu}
+          x={contextMenuCoords.x}
+          y={contextMenuCoords.y}
+        />
+      ) : null}
+    </>
   );
 }
 
