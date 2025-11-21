@@ -12,7 +12,7 @@ authors = [
     { name = "Konrad Rokicki", email = "rokickik@janelia.hhmi.org" }
 ]
 license = { file = "LICENSE" }
-requires-python = ">=3.12"
+requires-python = ">=3.14.0,<4"
 classifiers = [
     "License :: OSI Approved :: BSD License",
     "Programming Language :: Python",
@@ -148,7 +148,7 @@ migrate-create = "alembic revision --autogenerate"
 stamp-db = "python -m fileglancer.stamp_db"
 
 [tool.pixi.dependencies]
-python = ">=3.13.2,<4"
+python = ">=3.14.0,<4"
 pip = ">=25.0.1,<26"
 nodejs = ">=22.12.0,<23"
 aiosqlite = ">=0.21.0,<0.22"

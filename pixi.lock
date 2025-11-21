@@ -3030,8 +3030,8 @@ packages:
   timestamp: 1760972937564
 - pypi: ./
   name: fileglancer
-  version: 2.1.2
-  sha256: f975e27b37ab401c66220d582720b10a503b353b1347be80b4f0a113086e7938
+  version: 2.2.0a0
+  sha256: 8bbcc88cd659c59987d0cedb189b9768ca5d94d384d73a00d576285952379fdd
   requires_dist:
   - aiosqlite>=0.21.0
   - alembic>=1.17.0
@@ -3062,7 +3062,7 @@ packages:
   - pytest-cov ; extra == 'test'
   - pytest-html ; extra == 'test'
   - requests-mock ; extra == 'test'
-  requires_python: '>=3.12'
+  requires_python: '>=3.14.0,<4'
   editable: true
 - conda: https://conda.anaconda.org/conda-forge/noarch/filelock-3.20.0-pyhd8ed1ab_0.conda
   sha256: 19025a4078ff3940d97eb0da29983d5e0deac9c3e09b0eabf897daeaf9d1114e
