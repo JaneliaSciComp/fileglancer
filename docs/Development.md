@@ -190,7 +190,7 @@ You can also run these in UI debug mode using:
 pixi run test-ui -- --ui --debug
 ```
 
-If you are unable to use the UI mode, record a trace for inspecting in the [Playwright trace viewer](https://trace.playwright.dev):
+If you are unable to use the UI mode, record a trace for inspecting in the [Playwright trace viewer](https://playwright.dev/docs/trace-viewer-intro):
 
 ```bash
 pixi run test-ui -- --trace on
