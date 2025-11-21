@@ -340,7 +340,6 @@ function Table<TData>({
 
   // Context menu state
   const {
-    contextMenuCoords,
     showContextMenu,
     contextData,
     menuRef,
@@ -478,8 +477,6 @@ function Table<TData>({
           items={contextMenuItems}
           menuRef={menuRef}
           onClose={closeContextMenu}
-          x={contextMenuCoords.x}
-          y={contextMenuCoords.y}
         />
       ) : null}
     </>

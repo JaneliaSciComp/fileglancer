@@ -1,6 +1,7 @@
 import type { RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { Menu, Typography } from '@material-tailwind/react';
+import useContextMenu from '@/hooks/useContextMenu';
 
 export type ContextMenuItem = {
   name: string;
@@ -10,20 +11,18 @@ export type ContextMenuItem = {
 };
 
 type ContextMenuProps = {
-  readonly x: number;
-  readonly y: number;
   readonly menuRef: RefObject<HTMLDivElement | null>;
   readonly items: ContextMenuItem[];
   readonly onClose: () => void;
 };
 
 export default function ContextMenu({
-  x,
-  y,
   menuRef,
   items,
   onClose
 }: ContextMenuProps) {
+  const { contextMenuCoords } = useContextMenu();
+
   const handleItemClick = async (item: ContextMenuItem) => {
     const result = await item.action();
     if (result !== false) {
@@ -36,8 +35,8 @@ export default function ContextMenu({
       className="fixed z-[9999] min-w-40 rounded-lg space-y-0.5 border border-surface bg-background p-1"
       ref={menuRef}
       style={{
-        left: `${x}px`,
-        top: `${y}px`
+        left: `${contextMenuCoords.x}px`,
+        top: `${contextMenuCoords.y}px`
       }}
     >
       {items

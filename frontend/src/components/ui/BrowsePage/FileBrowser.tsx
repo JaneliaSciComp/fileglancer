@@ -56,13 +56,8 @@ export default function FileBrowser({
   const { displayFiles } = useHideDotFiles();
   const { handleDownload } = useHandleDownload();
 
-  const {
-    contextMenuCoords,
-    showContextMenu,
-    menuRef,
-    openContextMenu,
-    closeContextMenu
-  } = useContextMenu();
+  const { showContextMenu, menuRef, openContextMenu, closeContextMenu } =
+    useContextMenu();
 
   const {
     zarrMetadataQuery,
@@ -221,8 +216,6 @@ export default function FileBrowser({
           items={getContextMenuItems()}
           menuRef={menuRef}
           onClose={closeContextMenu}
-          x={contextMenuCoords.x}
-          y={contextMenuCoords.y}
         />
       ) : null}
     </>
