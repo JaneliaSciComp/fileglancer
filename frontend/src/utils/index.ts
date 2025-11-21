@@ -10,7 +10,7 @@ import {
   removeLastSegmentFromPath
 } from './pathHandling';
 import { shouldTriggerHealthCheck } from './serverHealth';
-import { queryClient } from '@/main';
+import { queryClient } from '@/queryClient';
 
 // Health check reporter registry with robust type safety
 export type HealthCheckReporter = (
