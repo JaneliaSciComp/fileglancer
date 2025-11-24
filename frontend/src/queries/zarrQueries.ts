@@ -6,7 +6,8 @@ import {
   getZarrArray
 } from '@/omezarr-helper';
 import type { Metadata } from '@/omezarr-helper';
-import { fetchFileAsJson, getFileURL } from '@/utils';
+import { getFileURL } from '@/utils';
+import { fetchFileAsJson } from './queryUtils';
 import { FileOrFolder } from '@/shared.types';
 
 export type OpenWithToolUrls = {

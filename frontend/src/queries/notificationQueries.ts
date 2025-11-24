@@ -1,6 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { sendFetchRequest } from '@/utils';
-import { FetchError } from './queryUtils';
 import { usePageVisibility } from '@/hooks/usePageVisibility';
 
 export type Notification = {
@@ -33,7 +32,7 @@ export function useNotificationsQuery(): UseQueryResult<Notification[], Error> {
       );
 
       if (!response.ok) {
-        throw new FetchError(response, 'Failed to fetch notifications');
+        throw new Error('Failed to fetch notifications');
       }
 
       const data = await response.json();

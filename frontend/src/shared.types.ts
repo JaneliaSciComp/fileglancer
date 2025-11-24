@@ -46,7 +46,12 @@ interface Failure {
 
 type Result<T> = Success<T> | Failure;
 
+type FetchRequestOptions = {
+  signal?: AbortSignal;
+};
+
 export type {
+  FetchRequestOptions,
   FileOrFolder,
   FileSharePath,
   Failure,
