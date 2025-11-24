@@ -323,70 +323,10 @@ function buildUrl(
   return url;
 }
 
-async function fetchFileContent(
-  fspName: string,
-  path: string,
-  options?: FetchRequestOptions
-): Promise<Uint8Array> {
-  const url = buildUrl('/api/content/', fspName, { subpath: path });
-  const response = await sendFetchRequest(url, 'GET', undefined, options);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch file: ${response.statusText}`);
-  }
-  const fileBuffer = await response.arrayBuffer();
-  return new Uint8Array(fileBuffer);
-}
-
-async function fetchFileAsText(fspName: string, path: string): Promise<string> {
-  const fileContent = await fetchFileContent(fspName, path);
-  const decoder = new TextDecoder('utf-8');
-  return decoder.decode(fileContent);
-}
-
-async function fetchFileAsJson(fspName: string, path: string): Promise<object> {
-  const fileText = await fetchFileAsText(fspName, path);
-  return JSON.parse(fileText);
-}
-
-function isLikelyTextFile(buffer: ArrayBuffer | Uint8Array): boolean {
-  const view = buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : buffer;
-
-  let controlCount = 0;
-  for (const b of view) {
-    if (b < 9 || (b > 13 && b < 32)) {
-      controlCount++;
-    }
-  }
-
-  return controlCount / view.length < 0.01;
-}
-
-async function fetchFileWithTextDetection(
-  fspName: string,
-  path: string,
-  options?: FetchRequestOptions
-): Promise<{ isText: boolean; content: string; rawData: Uint8Array }> {
-  const rawData = await fetchFileContent(fspName, path, options);
-  const isText = isLikelyTextFile(rawData);
-
-  let content: string;
-  if (isText) {
-    content = new TextDecoder('utf-8', { fatal: false }).decode(rawData);
-  } else {
-    content = 'Binary file';
-  }
-
-  return { isText, content, rawData };
-}
-
 export {
   buildUrl,
   checkSessionValidity,
   escapePathForUrl,
-  fetchFileAsJson,
-  fetchFileAsText,
-  fetchFileContent,
-  fetchFileWithTextDetection,
   formatDateString,
   formatUnixTimestamp,
   formatFileSize,
@@ -394,7 +334,6 @@ export {
   getLastSegmentFromPath,
   getPreferredPathForDisplay,
   HTTPError,
-  isLikelyTextFile,
   joinPaths,
   makeBrowseLink,
   makeMapKey,
