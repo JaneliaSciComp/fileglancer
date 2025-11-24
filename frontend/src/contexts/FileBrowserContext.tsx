@@ -170,17 +170,29 @@ export const FileBrowserContextProvider = ({
 
   // Update client state when URL changes (navigation to different file/folder)
   // Set propertiesTarget to the current directory/file being viewed
-  useEffect(() => {
-    setFileBrowserState({
-      propertiesTarget: fileQuery.data?.currentFileOrFolder || null,
-      selectedFiles: []
-    });
-  }, [
-    fspName,
-    filePath,
-    zonesAndFspQuery?.data,
-    fileQuery.data?.currentFileOrFolder
-  ]);
+  useEffect(
+    () => {
+      if (fileQuery.isLoading || fileQuery.isError) {
+        return;
+      } else {
+        setInternalState({
+          propertiesTargetPath:
+            fileQuery.data?.currentFileOrFolder?.path || null,
+          selectedFiles: []
+        });
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      fspName,
+      filePath,
+      zonesAndFspQuery?.data,
+      fileQuery.isLoading,
+      fileQuery.isError
+      // Deliberately NOT including fileQuery.data?.currentFileOrFolder
+      // so this only runs on URL changes, not query refetches
+    ]
+  );
 
   // Update propertiesTarget when the selected file's data changes in the query cache
   // This ensures optimistic updates to permissions are reflected in the properties drawer
