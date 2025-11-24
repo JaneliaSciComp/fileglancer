@@ -44,40 +44,53 @@ test.describe('Properties Panel Navigation', () => {
     ).toBeVisible();
   });
 
-  test('properties panel updates when clicking a file after navigating into directory', async ({
-    fileglancerPage: page
+  test('properties panel updates correctly when navigating up and down the file tree', async ({
+    fileglancerPage: page,
+    testDir
   }) => {
-    // Click the zarr directory row first to populate properties panel
-    await page
-      .getByRole('cell', { name: 'zarr_v2_ome.zarr' })
-      .locator('svg')
-      .click();
+    await test.step('clicking a file updates properties panel', async () => {
+      // Click the zarr directory row first to populate properties panel
+      await page
+        .getByRole('cell', { name: 'zarr_v2_ome.zarr' })
+        .locator('svg')
+        .click();
 
-    // Then double-click the link to navigate
-    await page.getByRole('link', { name: 'zarr_v2_ome.zarr' }).dblclick();
+      // Then double-click the link to navigate
+      await page.getByRole('link', { name: 'zarr_v2_ome.zarr' }).dblclick();
 
-    // Wait for navigation - verify subdirectory '0' is visible and zarr metadata is loaded
-    await expect(page.getByText('.zattrs')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('0', { exact: true })).toBeVisible();
+      // Wait for navigation - verify subdirectory '0' is visible and zarr metadata is loaded
+      await expect(page.getByText('.zattrs')).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText('0', { exact: true })).toBeVisible();
 
-    const propertiesPanel = page.locator('[role="complementary"]').filter({
-      has: page.getByText('Properties')
+      const propertiesPanel = page.locator('[role="complementary"]').filter({
+        has: page.getByText('Properties')
+      });
+
+      // Wait for properties panel to stabilize after navigation
+      await page.waitForTimeout(300);
+
+      // Properties should still show the zarr_v2_ome.zarr directory after navigation
+      await expect(
+        propertiesPanel.getByLabel('zarr_v2_ome.zarr', { exact: true })
+      ).toBeVisible({ timeout: 10000 });
+
+      // Now click on the subdirectory '0'
+      await page.getByRole('cell', { name: '0' }).locator('svg').click();
+
+      // Properties panel should update to show '0' as the target
+      await expect(
+        propertiesPanel.getByText('0', { exact: true }).first()
+      ).toBeVisible();
     });
 
-    // Wait for properties panel to stabilize after navigation
-    await page.waitForTimeout(300);
-
-    // Properties should still show the zarr_v2_ome.zarr directory after navigation
-    await expect(
-      propertiesPanel.getByLabel('zarr_v2_ome.zarr', { exact: true })
-    ).toBeVisible({ timeout: 10000 });
-
-    // Now click on the subdirectory '0'
-    await page.getByRole('cell', { name: '0' }).locator('svg').click();
-
-    // Properties panel should update to show '0' as the target
-    await expect(
-      propertiesPanel.getByText('0', { exact: true }).first()
-    ).toBeVisible();
+    await test.step('properties panel updates when clicking up one level in breadcrumbs', async () => {
+      await page.getByRole('link', { name: testDir }).dblclick();
+      await expect(
+        page.getByRole('link', { name: ZARR_TEST_FILE_INFO.v2_non_ome.dirname })
+      ).toBeVisible();
+      expect(
+        page.locator('#properties').getByText(testDir, { exact: true })
+      ).toBeVisible();
+    });
   });
 });
