@@ -3,7 +3,8 @@ import {
   useContext,
   useState,
   useCallback,
-  useEffect
+  useEffect,
+  useMemo
 } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router';
@@ -25,11 +26,17 @@ type FileBrowserContextProviderProps = {
   readonly filePath: string | undefined;
 };
 
-// Client-only state (UI state that's not fetched from server)
-interface FileBrowserState {
+// Public state - what consumers see
+type FileBrowserState = {
   propertiesTarget: FileOrFolder | null;
   selectedFiles: FileOrFolder[];
-}
+};
+
+// Internal state
+type InternalFileBrowserState = {
+  propertiesTargetPath: string | null; // Store path instead of full object
+  selectedFiles: FileOrFolder[];
+};
 
 type FileBrowserContextType = {
   // Client state (UI-only)
@@ -94,9 +101,9 @@ export const FileBrowserContextProvider = ({
 }: FileBrowserContextProviderProps) => {
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
 
-  // Client-only state for UI interactions
-  const [fileBrowserState, setFileBrowserState] = useState<FileBrowserState>({
-    propertiesTarget: null,
+  // Internal state for UI interactions
+  const [internalState, setInternalState] = useState<InternalFileBrowserState>({
+    propertiesTargetPath: null,
     selectedFiles: []
   });
 
@@ -111,10 +118,10 @@ export const FileBrowserContextProvider = ({
   const renameMutation = useRenameFileMutation();
   const changePermissionsMutation = useChangePermissionsMutation();
 
-  // Function to update fileBrowserState with complete, consistent data
-  const updateFileBrowserState = useCallback(
-    (newState: Partial<FileBrowserState>) => {
-      setFileBrowserState(prev => ({
+  // Helper to update internal state
+  const updateInternalState = useCallback(
+    (newState: Partial<InternalFileBrowserState>) => {
+      setInternalState(prev => ({
         ...prev,
         ...newState
       }));
@@ -137,33 +144,33 @@ export const FileBrowserContextProvider = ({
     }
 
     // Select the clicked file
-    const currentIndex = fileBrowserState.selectedFiles.indexOf(file);
+    const currentIndex = internalState.selectedFiles.indexOf(file);
     const newSelectedFiles =
       currentIndex === -1 ||
-      fileBrowserState.selectedFiles.length > 1 ||
+      internalState.selectedFiles.length > 1 ||
       showFilePropertiesDrawer
         ? [file]
         : [];
-    const newPropertiesTarget =
+    const newPropertiesTargetPath =
       currentIndex === -1 ||
-      fileBrowserState.selectedFiles.length > 1 ||
+      internalState.selectedFiles.length > 1 ||
       showFilePropertiesDrawer
-        ? file
+        ? file.path
         : null;
 
-    updateFileBrowserState({
-      propertiesTarget: newPropertiesTarget,
+    updateInternalState({
+      propertiesTargetPath: newPropertiesTargetPath,
       selectedFiles: newSelectedFiles
     });
   };
 
   const updateFilesWithContextMenuClick = (file: FileOrFolder) => {
-    const currentIndex = fileBrowserState.selectedFiles.indexOf(file);
+    const currentIndex = internalState.selectedFiles.indexOf(file);
     const newSelectedFiles =
-      currentIndex === -1 ? [file] : [...fileBrowserState.selectedFiles];
+      currentIndex === -1 ? [file] : [...internalState.selectedFiles];
 
-    updateFileBrowserState({
-      propertiesTarget: file,
+    updateInternalState({
+      propertiesTargetPath: file.path,
       selectedFiles: newSelectedFiles
     });
   };
@@ -194,46 +201,60 @@ export const FileBrowserContextProvider = ({
     ]
   );
 
-  // Update propertiesTarget when the selected file's data changes in the query cache
-  // This ensures optimistic updates to permissions are reflected in the properties drawer
-  // which reads from propertiesTarget, not currentFileOrFolder directly
+  // Update propertiesTargetPath when a file is renamed
+  // This runs when the mutation succeeds, updating propertiesTargetPath
+  // so useMemo can find the file with the new path after the query refetches
   useEffect(() => {
-    if (
-      !fileBrowserState.propertiesTarget ||
-      !fileQuery.data?.currentFileOrFolder
-    ) {
-      return;
+    if (renameMutation.isSuccess && renameMutation.variables) {
+      const { oldPath, newPath } = renameMutation.variables;
+
+      // If the renamed file was the propertiesTarget, update to the new path
+      if (internalState.propertiesTargetPath === oldPath) {
+        setInternalState(prev => ({
+          ...prev,
+          propertiesTargetPath: newPath
+        }));
+      }
+      // Reset mutation state to prevent re-running
+      renameMutation.reset();
+    }
+  }, [
+    renameMutation.isSuccess,
+    renameMutation.variables,
+    internalState.propertiesTargetPath,
+    renameMutation
+  ]);
+
+  // Derive propertiesTarget from propertiesTargetPath and fresh query data
+  // This ensures mutations (rename, permissions) are correctly reflected and don't use a useEffect
+  const propertiesTarget = useMemo(() => {
+    if (!internalState.propertiesTargetPath || !fileQuery.data) {
+      return null;
     }
 
-    // If we have a propertiesTarget selected, check if its data has been updated in the query
-    const updatedFile = fileQuery.data.files.find(
-      f => f.path === fileBrowserState.propertiesTarget?.path
+    // Check if propertiesTargetPath matches the current folder
+    if (
+      fileQuery.data.currentFileOrFolder?.path ===
+      internalState.propertiesTargetPath
+    ) {
+      return fileQuery.data.currentFileOrFolder;
+    }
+
+    // Otherwise, is it a child of current folder
+    const foundFile = fileQuery.data.files.find(
+      f => f.path === internalState.propertiesTargetPath
     );
 
-    // If the file exists in the files array and has been updated, update propertiesTarget
-    if (updatedFile) {
-      setFileBrowserState(prev => ({
-        ...prev,
-        propertiesTarget: updatedFile
-      }));
-    }
-    // If propertiesTarget is the current folder itself, update it from currentFileOrFolder
-    else if (
-      fileBrowserState.propertiesTarget.path ===
-      fileQuery.data.currentFileOrFolder.path
-    ) {
-      setFileBrowserState(prev => ({
-        ...prev,
-        propertiesTarget: fileQuery.data.currentFileOrFolder
-      }));
-    }
-  }, [fileQuery.data, fileBrowserState.propertiesTarget]);
+    return foundFile || null;
+  }, [internalState.propertiesTargetPath, fileQuery.data]);
 
   return (
     <FileBrowserContext.Provider
       value={{
-        // Client state
-        fileBrowserState,
+        fileBrowserState: {
+          propertiesTarget,
+          selectedFiles: internalState.selectedFiles
+        },
 
         // URL params
         fspName,
