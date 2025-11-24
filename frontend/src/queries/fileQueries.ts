@@ -327,13 +327,10 @@ async function changePermissions({
   );
 
   if (!response.ok) {
-    if (response.status === 403) {
-      throw new FetchError(response, 'Permission denied');
-    }
     const body = await response.json().catch(() => ({}));
     const errorMessage =
       body.error || `Failed to change permissions (${response.status})`;
-    throw new FetchError(response, errorMessage);
+    throw new Error(errorMessage);
   }
 }
 
