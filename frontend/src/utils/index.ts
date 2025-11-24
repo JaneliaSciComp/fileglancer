@@ -11,6 +11,7 @@ import {
 } from './pathHandling';
 import { shouldTriggerHealthCheck } from './serverHealth';
 import { queryClient } from '@/queryClient';
+import type { FetchRequestOptions } from '@/shared.types';
 
 // Health check reporter registry with robust type safety
 export type HealthCheckReporter = (
@@ -140,11 +141,6 @@ async function checkSessionValidity(): Promise<{
 
 // Define a more specific type for request body
 type RequestBody = Record<string, unknown>;
-
-// Additional options for sendFetchRequest
-type FetchRequestOptions = {
-  signal?: AbortSignal;
-};
 
 async function sendFetchRequest(
   apiPath: string,
