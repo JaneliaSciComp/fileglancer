@@ -429,6 +429,11 @@ export const PreferencesProvider = ({
       return;
     }
 
+    // Ensure fspName and filePath are defined
+    if (!fspName || !filePath) {
+      return;
+    }
+
     // Skip if this is the same folder we just processed
     if (
       lastFspNameRef.current === fspName &&
