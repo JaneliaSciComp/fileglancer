@@ -13,6 +13,8 @@ export const fileContentQueryKeys = {
     ['fileContent', fspName, filePath] as const
 };
 
+// Heuristic to determine if a file is likely a text file (as opposed to binary)
+// If text file, we decode and return the content; if binary, we return a placeholder
 function isLikelyTextFile(buffer: ArrayBuffer | Uint8Array): boolean {
   const view = buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : buffer;
 
