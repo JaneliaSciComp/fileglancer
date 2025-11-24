@@ -4,7 +4,8 @@ import {
   QueryFunctionContext
 } from '@tanstack/react-query';
 
-import { fetchFileWithTextDetection } from '@/utils';
+import { fetchFileContent } from './queryUtils';
+import type { FetchRequestOptions } from '@/shared.types';
 
 // Query keys for file content (flat structure - only invalidate specific files)
 export const fileContentQueryKeys = {
