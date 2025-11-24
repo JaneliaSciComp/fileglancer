@@ -22,7 +22,7 @@ test.describe('File Operations', () => {
     await expect(page.getByRole('dialog')).not.toBeVisible();
 
     // Verify new name is in file list; old name no longer be visible
-    await expect(page.getByText('f3_renamed')).toBeVisible();
+    expect(page.locator('#main').getByText('f3_renamed')).toBeVisible();
     await expect(
       page.getByText('f3', { exact: true }).filter({ hasNotText: 'f3_renamed' })
     ).not.toBeVisible();
