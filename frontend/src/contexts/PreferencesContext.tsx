@@ -358,11 +358,15 @@ export const PreferencesProvider = ({
   };
 
   const updateRecentlyViewedFolders = useCallback(
-    (
-      folderPath: string,
-      fspName: string,
-      currentRecentlyViewedFolders: FolderPreference[]
-    ): FolderPreference[] => {
+    ({
+      folderPath,
+      fspName,
+      currentRecentlyViewedFolders
+    }: {
+      folderPath: string;
+      fspName: string;
+      currentRecentlyViewedFolders: FolderPreference[];
+    }): FolderPreference[] => {
       const updatedFolders = [...currentRecentlyViewedFolders];
 
       // Do not save file share paths in the recently viewed folders
@@ -429,6 +433,11 @@ export const PreferencesProvider = ({
       return;
     }
 
+    // Ensure fspName and filePath are defined
+    if (!fspName || !filePath) {
+      return;
+    }
+
     // Skip if this is the same folder we just processed
     if (
       lastFspNameRef.current === fspName &&
@@ -442,11 +451,12 @@ export const PreferencesProvider = ({
     lastFolderPathRef.current = filePath;
 
     // Calculate updated folders and trigger mutation
-    const updatedFolders = updateRecentlyViewedFolders(
+    const updatedFolders = updateRecentlyViewedFolders({
+      folderPath: filePath,
       fspName,
-      filePath,
-      preferencesQuery.data?.recentlyViewedFolders || []
-    );
+      currentRecentlyViewedFolders:
+        preferencesQuery.data?.recentlyViewedFolders || []
+    });
 
     updatePreferenceListMutation.mutate({
       preferenceKey: 'recentlyViewedFolders',
