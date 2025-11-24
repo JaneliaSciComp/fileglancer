@@ -443,8 +443,8 @@ export const PreferencesProvider = ({
 
     // Calculate updated folders and trigger mutation
     const updatedFolders = updateRecentlyViewedFolders(
-      fspName,
       filePath,
+      fspName,
       preferencesQuery.data?.recentlyViewedFolders || []
     );
 
