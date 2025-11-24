@@ -26,6 +26,11 @@ test.describe('File Operations', () => {
     await expect(
       page.getByText('f3', { exact: true }).filter({ hasNotText: 'f3_renamed' })
     ).not.toBeVisible();
+
+    // Verify new name is also visible in the properties panel
+    expect(
+      page.locator('#properties').getByText('f3_renamed', { exact: true })
+    ).toBeVisible();
   });
 
   test('delete file via context menu', async ({ fileglancerPage: page }) => {
