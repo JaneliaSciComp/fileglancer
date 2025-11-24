@@ -55,6 +55,13 @@ export function useFileContentQuery(
       });
       return content;
     },
-    enabled: !!fspName && !!filePath
+    enabled: !!fspName && !!filePath,
+    retry: (failureCount, error) => {
+      // Do not retry on permission errors
+      if (error instanceof Error && error.message.includes('permission')) {
+        return false;
+      }
+      return failureCount < 3; // Default retry behavior
+    }
   });
 }
