@@ -1,16 +1,6 @@
 import { buildUrl, sendFetchRequest } from '@/utils';
 import type { FetchRequestOptions } from '@/shared.types';
 
-export class FetchError extends Error {
-  constructor(
-    public res: Response,
-    message?: string,
-    public partialData?: any
-  ) {
-    super(message);
-  }
-}
-
 export async function fetchFileContent(
   fspName: string,
   path: string,
@@ -20,17 +10,10 @@ export async function fetchFileContent(
   const response = await sendFetchRequest(url, 'GET', undefined, options);
 
   if (!response.ok) {
-    if (response.status === 403) {
-      const errorMessage = `You do not have permission to read this file.`;
-      throw new Error(errorMessage);
-    } else if (response.status === 404) {
-      throw new Error('File not found');
-    } else {
-      const body = await response.json().catch(() => ({}));
-      throw new Error(
-        body.error ? body.error : `Failed to fetch file (${response.status})`
-      );
-    }
+    const body = await response.json().catch(() => ({}));
+    throw new Error(
+      body.error ? body.error : `Failed to fetch file (${response.status})`
+    );
   }
 
   const fileBuffer = await response.arrayBuffer();

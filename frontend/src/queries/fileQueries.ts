@@ -7,7 +7,6 @@ import {
   QueryFunctionContext
 } from '@tanstack/react-query';
 
-import { FetchError } from './queryUtils';
 import { sendFetchRequest, buildUrl, makeMapKey } from '@/utils';
 import { normalizePosixStylePath } from '@/utils/pathHandling';
 import type { FileOrFolder, FileSharePath } from '@/shared.types';
@@ -173,13 +172,10 @@ async function deleteFile({
   const response = await sendFetchRequest(url, 'DELETE', undefined, { signal });
 
   if (!response.ok) {
-    if (response.status === 403) {
-      throw new FetchError(response, 'Permission denied');
-    }
     const body = await response.json().catch(() => ({}));
     const errorMessage =
       body.error || `Failed to delete file (${response.status})`;
-    throw new FetchError(response, errorMessage);
+    throw new Error(errorMessage);
   }
 }
 
@@ -223,13 +219,10 @@ async function createFolder({
   );
 
   if (!response.ok) {
-    if (response.status === 403) {
-      throw new FetchError(response, 'Permission denied');
-    }
     const body = await response.json().catch(() => ({}));
     const errorMessage =
       body.error || `Failed to create folder (${response.status})`;
-    throw new FetchError(response, errorMessage);
+    throw new Error(errorMessage);
   }
 }
 
@@ -275,13 +268,10 @@ async function renameFile({
   );
 
   if (!response.ok) {
-    if (response.status === 403) {
-      throw new FetchError(response, 'Permission denied');
-    }
     const body = await response.json().catch(() => ({}));
     const errorMessage =
       body.error || `Failed to rename file (${response.status})`;
-    throw new FetchError(response, errorMessage);
+    throw new Error(errorMessage);
   }
 }
 
