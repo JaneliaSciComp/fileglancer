@@ -160,16 +160,14 @@ export const fileMutationKeys = {
 type DeleteFileParams = {
   fspName: string;
   filePath: string;
-  signal?: AbortSignal;
 };
 
 async function deleteFile({
   fspName,
-  filePath,
-  signal
+  filePath
 }: DeleteFileParams): Promise<void> {
   const url = buildUrl('/api/files/', fspName, { subpath: filePath });
-  const response = await sendFetchRequest(url, 'DELETE', undefined, { signal });
+  const response = await sendFetchRequest(url, 'DELETE', undefined);
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -200,23 +198,16 @@ export function useDeleteFileMutation(): UseMutationResult<
 type CreateFolderParams = {
   fspName: string;
   folderPath: string;
-  signal?: AbortSignal;
 };
 
 async function createFolder({
   fspName,
-  folderPath,
-  signal
+  folderPath
 }: CreateFolderParams): Promise<void> {
   const url = buildUrl('/api/files/', fspName, { subpath: folderPath });
-  const response = await sendFetchRequest(
-    url,
-    'POST',
-    {
-      type: 'directory'
-    },
-    { signal }
-  );
+  const response = await sendFetchRequest(url, 'POST', {
+    type: 'directory'
+  });
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -248,24 +239,17 @@ type RenameFileParams = {
   fspName: string;
   oldPath: string;
   newPath: string;
-  signal?: AbortSignal;
 };
 
 async function renameFile({
   fspName,
   oldPath,
-  newPath,
-  signal
+  newPath
 }: RenameFileParams): Promise<void> {
   const url = buildUrl('/api/files/', fspName, { subpath: oldPath });
-  const response = await sendFetchRequest(
-    url,
-    'PATCH',
-    {
-      path: newPath
-    },
-    { signal }
-  );
+  const response = await sendFetchRequest(url, 'PATCH', {
+    path: newPath
+  });
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -297,24 +281,17 @@ type ChangePermissionsParams = {
   fspName: string;
   filePath: string;
   permissions: string;
-  signal?: AbortSignal;
 };
 
 async function changePermissions({
   fspName,
   filePath,
-  permissions,
-  signal
+  permissions
 }: ChangePermissionsParams): Promise<void> {
   const url = buildUrl('/api/files/', fspName, { subpath: filePath });
-  const response = await sendFetchRequest(
-    url,
-    'PATCH',
-    {
-      permissions
-    },
-    { signal }
-  );
+  const response = await sendFetchRequest(url, 'PATCH', {
+    permissions
+  });
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -333,60 +310,6 @@ export function useChangePermissionsMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: changePermissions,
-    onMutate: async variables => {
-      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-      await queryClient.cancelQueries({
-        queryKey: fileQueryKeys.fspName(variables.fspName)
-      });
-
-      // Snapshot the previous value for rollback on error
-      const previousData = queryClient.getQueriesData({
-        queryKey: fileQueryKeys.fspName(variables.fspName)
-      });
-
-      // Optimistically update all relevant queries
-      queryClient.setQueriesData(
-        { queryKey: fileQueryKeys.fspName(variables.fspName) },
-        (old: FileQueryData | undefined) => {
-          if (!old) {
-            return old;
-          }
-
-          // Update the current file/folder if it matches
-          const updatedCurrentFileOrFolder =
-            old.currentFileOrFolder?.path === variables.filePath
-              ? {
-                  ...old.currentFileOrFolder,
-                  permissions: variables.permissions
-                }
-              : old.currentFileOrFolder;
-
-          // Update the file in the files array if it exists
-          const updatedFiles = old.files.map(file =>
-            file.path === variables.filePath
-              ? { ...file, permissions: variables.permissions }
-              : file
-          );
-
-          return {
-            ...old,
-            currentFileOrFolder: updatedCurrentFileOrFolder,
-            files: updatedFiles
-          };
-        }
-      );
-
-      // Return context for rollback
-      return { previousData };
-    },
-    onError: (_err, _variables, context) => {
-      // Rollback to the previous data on error
-      if (context?.previousData) {
-        context.previousData.forEach(([queryKey, data]) => {
-          queryClient.setQueryData(queryKey, data);
-        });
-      }
-    },
     onSuccess: (_, variables) => {
       // Invalidate the parent directory's file list to ensure consistency
       queryClient.invalidateQueries({
