@@ -19,7 +19,7 @@ export default function useDataToolLinks(
   pendingToolKey: PendingToolKey,
   setPendingToolKey: Dispatch<SetStateAction<PendingToolKey>>
 ): {
-  handleCreateDataLink: () => Promise<void>;
+  handleCreateDataLink: () => Promise<boolean>;
   handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
   handleToolClick: (toolKey: PendingToolKey) => Promise<void>;
   handleDialogConfirm: () => Promise<void>;
@@ -30,7 +30,7 @@ export default function useDataToolLinks(
 export default function useDataToolLinks(
   setShowDataLinkDialog: Dispatch<SetStateAction<boolean>>
 ): {
-  handleCreateDataLink: () => Promise<void>;
+  handleCreateDataLink: () => Promise<boolean>;
   handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
   handleToolClick: (toolKey: PendingToolKey) => Promise<void>;
   handleDialogConfirm: () => Promise<void>;
@@ -58,14 +58,14 @@ export default function useDataToolLinks(
   const { areDataLinksAutomatic } = usePreferencesContext();
   const { externalDataUrlQuery } = useExternalBucketContext();
 
-  const handleCreateDataLink = async (): Promise<void> => {
+  const handleCreateDataLink = async (): Promise<boolean> => {
     if (!fileQuery.data?.currentFileSharePath) {
       toast.error('No file share path selected');
-      return;
+      return false;
     }
     if (!fileQuery.data?.currentFileOrFolder) {
       toast.error('No folder selected');
-      return;
+      return false;
     }
 
     try {
@@ -75,10 +75,12 @@ export default function useDataToolLinks(
       });
       toast.success('Data link created successfully');
       await allProxiedPathsQuery.refetch();
+      return true;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       toast.error(`Error creating data link: ${errorMessage}`);
+      return false;
     }
   };
 
@@ -128,7 +130,12 @@ export default function useDataToolLinks(
     if (!toolKey) {
       return;
     }
-    await handleCreateDataLink();
+
+    const success = await handleCreateDataLink();
+    if (!success) {
+      // If link creation fails, exit immediately without waiting or showing navigation error
+      return;
+    }
 
     // Wait for URLs to be updated and use ref to get current value
     let attempts = 0;
