@@ -1,10 +1,7 @@
-import { useState } from 'react';
-import type { MouseEvent } from 'react';
 import { IoNavigateCircleSharp } from 'react-icons/io5';
 
-import FgTooltip from '@/components/ui/widgets/FgTooltip';
+import ContainedDialogBtn from '@/components/ui/buttons/ContainedDialogBtn';
 import NavigationInput from '@/components/ui/BrowsePage/NavigateInput';
-import FgDialog from '@/components/ui/Dialogs/FgDialog';
 
 type NavigationButtonProps = {
   readonly triggerClasses: string;
@@ -13,30 +10,18 @@ type NavigationButtonProps = {
 export default function NavigationButton({
   triggerClasses
 }: NavigationButtonProps) {
-  const [showNavigationDialog, setShowNavigationDialog] = useState(false);
-
   return (
-    <>
-      <FgTooltip
-        icon={IoNavigateCircleSharp}
-        label="Navigate to a path"
-        onClick={(e: MouseEvent<HTMLButtonElement>) => {
-          setShowNavigationDialog(true);
-          e.currentTarget.blur();
-        }}
-        triggerClasses={triggerClasses}
-      />
-      {showNavigationDialog ? (
-        <FgDialog
-          onClose={() => setShowNavigationDialog(false)}
-          open={showNavigationDialog}
-        >
-          <NavigationInput
-            location="dialog"
-            setShowNavigationDialog={setShowNavigationDialog}
-          />
-        </FgDialog>
-      ) : null}
-    </>
+    <ContainedDialogBtn
+      icon={IoNavigateCircleSharp}
+      label="Navigate to a path"
+      triggerClasses={triggerClasses}
+    >
+      {closeDialog => (
+        <NavigationInput
+          location="dialog"
+          setShowNavigationDialog={closeDialog}
+        />
+      )}
+    </ContainedDialogBtn>
   );
 }
