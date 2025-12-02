@@ -24,6 +24,7 @@ export default function Links() {
         columns={linksColumns}
         data={allProxiedPathsQuery.data || []}
         dataType="data links"
+        errorState={allProxiedPathsQuery.error}
         gridColsClass="grid-cols-[1.5fr_2.5fr_1.5fr_1fr_1fr]"
         loadingState={
           allProxiedPathsQuery.isPending || preferenceQuery.isPending

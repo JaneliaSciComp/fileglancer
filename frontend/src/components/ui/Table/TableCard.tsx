@@ -70,9 +70,10 @@ type DataType = 'data links' | 'tasks';
 type TableProps<TData> = {
   readonly columns: ColumnDef<TData>[];
   readonly data: TData[];
+  readonly dataType: DataType;
+  readonly errorState: Error | unknown;
   readonly gridColsClass: string;
   readonly loadingState: boolean;
-  readonly dataType: DataType;
 };
 
 function SortIcons<TData, TValue>({
@@ -329,6 +330,7 @@ function Table<TData>({
   data,
   gridColsClass,
   loadingState,
+  errorState,
   dataType
 }: TableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -461,17 +463,20 @@ function Table<TData>({
                 : 'No data matches your query'}
             </div>
           )
+        ) : errorState ? (
+          <div className="px-4 py-8 text-center text-error">
+            Error loading data:{' '}
+            {errorState instanceof Error
+              ? errorState.message
+              : String(errorState)}
+          </div>
         ) : !data || data.length === 0 ? (
           <div className="px-4 py-8 text-center text-foreground">
             {dataType
               ? `You have not created any ${dataType} yet`
               : 'No data available'}
           </div>
-        ) : (
-          <div className="px-4 py-8 text-center text-foreground">
-            There was an error loading the data
-          </div>
-        )}
+        ) : null}
       </div>
       {showContextMenu ? (
         <ContextMenu
@@ -491,6 +496,7 @@ function TableCard<TData>({
   data,
   gridColsClass,
   loadingState,
+  errorState,
   dataType
 }: TableProps<TData>) {
   return (
@@ -499,6 +505,7 @@ function TableCard<TData>({
         columns={columns}
         data={data}
         dataType={dataType}
+        errorState={errorState}
         gridColsClass={gridColsClass}
         loadingState={loadingState}
       />

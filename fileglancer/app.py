@@ -635,6 +635,7 @@ def create_app(settings):
     async def get_proxied_paths(fsp_name: str = Query(None, description="The name of the file share path that this proxied path is associated with"),
                                 path: str = Query(None, description="The path being proxied"),
                                 username: str = Depends(get_current_user)):
+        
         with db.get_db_session(settings.db_url) as session:
             db_proxied_paths = db.get_proxied_paths(session, username, fsp_name, path)
             proxied_paths = [_convert_proxied_path(db_path, settings.external_proxy_url) for db_path in db_proxied_paths]
@@ -645,6 +646,7 @@ def create_app(settings):
              description="Retrieve a proxied path by sharing key")
     async def get_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path"),
                                username: str = Depends(get_current_user)):
+
         with db.get_db_session(settings.db_url) as session:
             path = db.get_proxied_path_by_sharing_key(session, sharing_key)
             if not path:

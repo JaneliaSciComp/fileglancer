@@ -42,7 +42,8 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       FGC_DB_URL: `sqlite:///${testDbPath}`,
-      FGC_FILE_SHARE_MOUNTS: JSON.stringify([scratchDir])
+      FGC_FILE_SHARE_MOUNTS: JSON.stringify([scratchDir]),
+      FGC_EXTERNAL_PROXY_URL: 'http://testURL/files'
     }
   }
 });

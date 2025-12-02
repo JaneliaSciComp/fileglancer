@@ -134,6 +134,14 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
           ssl_ca_certs, ssl_version, ssl_cert_reqs, ssl_ciphers, timeout_keep_alive, auto_port, no_browser):
     """Start the Fileglancer server using uvicorn."""
 
+    # Set up default external proxy URL if not already configured
+    # Need to set this before loading settings as it is required in the Settings model
+    if 'FGC_EXTERNAL_PROXY_URL' not in os.environ:
+        protocol = 'https' if ssl_keyfile else 'http'
+        external_proxy_url = f"{protocol}://{host}:{port}/files"
+        os.environ['FGC_EXTERNAL_PROXY_URL'] = external_proxy_url
+        logger.debug(f"Setting FGC_EXTERNAL_PROXY_URL={external_proxy_url}")
+
     # Configure loguru logger based on settings (if present)
     from fileglancer.settings import get_settings, reload_settings
     settings = get_settings()
