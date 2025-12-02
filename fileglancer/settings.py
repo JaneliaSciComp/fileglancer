@@ -1,7 +1,8 @@
 from typing import List, Optional
 from functools import cache
+import sys
 
-from pydantic import HttpUrl, model_validator
+from pydantic import HttpUrl, ValidationError, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -43,7 +44,7 @@ class Settings(BaseSettings):
     
     # The external URL of the proxy server for accessing proxied paths.
     # Maps to the /files/ end points of the fileglancer-central app.
-    external_proxy_url: HttpUrl
+    external_proxy_url: Optional[HttpUrl] = None
 
     # Maximum size of the sharing key LRU cache
     sharing_key_cache_size: int = 1000
@@ -73,6 +74,13 @@ class Settings(BaseSettings):
         env_nested_delimiter="__",
         env_file_encoding='utf-8'
     )
+
+    @field_validator('external_proxy_url')
+    @classmethod
+    def validate_external_proxy_url(cls, v):
+        if v is None or (isinstance(v, str) and v.strip() == ''):
+            raise ValueError("Add external_proxy_url to your config.yaml or FGC_EXTERNAL_PROXY_URL to your .env file")
+        return v
   
     @classmethod
     def settings_customise_sources(  # noqa: PLR0913
@@ -100,7 +108,25 @@ class Settings(BaseSettings):
 
 @cache
 def get_settings():
-    return Settings()
+    try:
+        return Settings()
+    except ValidationError as e:
+        # Extract and print only the custom error messages, not the full traceback
+        print("\n❌ Configuration Error:", file=sys.stderr)
+        for error in e.errors():
+            if error.get('type') == 'value_error':
+                # Custom validation error for external_proxy_url
+                print(f"  {error['msg']}", file=sys.stderr)
+            elif error.get('type') == 'missing':
+                # Required field is missing
+                field = error['loc'][0]
+                print(f"  Missing required field: {field}", file=sys.stderr)
+            else:
+                # Other validation errors
+                field = '.'.join(str(loc) for loc in error['loc'])
+                print(f"  {field}: {error['msg']}", file=sys.stderr)
+        print("", file=sys.stderr)
+        sys.exit(1)
 
 
 def reload_settings():
