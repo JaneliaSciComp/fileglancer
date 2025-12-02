@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     
     # The external URL of the proxy server for accessing proxied paths.
     # Maps to the /files/ end points of the fileglancer-central app.
-    external_proxy_url: Optional[HttpUrl] = None
+    external_proxy_url: HttpUrl = 'http://localhost:7878/files/'
 
     # Maximum size of the sharing key LRU cache
     sharing_key_cache_size: int = 1000
