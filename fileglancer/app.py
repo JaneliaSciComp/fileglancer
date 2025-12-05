@@ -40,6 +40,21 @@ from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error
 from x2s3.client_file import FileProxyClient
 
 
+class UserContextStreamingResponse(StreamingResponse):
+    """StreamingResponse that maintains a user context for the duration of the stream"""
+    def __init__(self, *args, user_context: UserContext = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user_context = user_context
+
+    async def stream_response(self, send):
+        """Override to wrap streaming in user context"""
+        if self.user_context:
+            with self.user_context:
+                await super().stream_response(send)
+        else:
+            await super().stream_response(send)
+
+
 # Read version once at module load time
 def _read_version() -> str:
     """Read version from package metadata or package.json file"""
@@ -713,8 +728,22 @@ def create_app(settings):
                 return get_error_response(400, "InvalidArgument", f"Invalid list type {list_type}", path)
         else:
             range_header = request.headers.get("range")
+            # Build the response inside context (for file stat/checks)
             with ctx:
-                return await client.get_object(path, range_header)
+                response = await client.get_object(path, range_header)
+
+            # If it's a StreamingResponse, wrap it to keep context alive during streaming
+            if isinstance(response, StreamingResponse):
+                return UserContextStreamingResponse(
+                    response.body_iterator,
+                    status_code=response.status_code,
+                    headers=dict(response.headers),
+                    media_type=response.media_type,
+                    user_context=ctx
+                )
+            else:
+                # For error responses, just return as-is
+                return response
 
 
     @app.head("/files/{sharing_key}/{sharing_name}/{path:path}")
