@@ -52,8 +52,7 @@ test.describe('Data Link Operations', () => {
       name: /delete/i
     });
 
-    // Step 1
-    await test.step('Create data link via viewer icon', async () => {
+    await test.step('Turn on automatic data links via the data link dialog', async () => {
       const neuroglancerLink = page.getByRole('link', {
         name: 'Neuroglancer logo'
       });
@@ -61,6 +60,19 @@ test.describe('Data Link Operations', () => {
 
       // Confirm the data link creation in the dialog
       await expect(confirmButton).toBeVisible({ timeout: 5000 });
+
+      // Enable automatic data links
+      const autoLinkCheckbox = page.getByRole('checkbox', {
+        name: 'Enable automatic data link creation'
+      });
+      await autoLinkCheckbox.check();
+      expect(autoLinkCheckbox).toBeChecked();
+      await expect(
+        page.getByText('Enabled automatic data links')
+      ).toBeVisible();
+    });
+
+    await test.step('Create data link via data link dialog', async () => {
       await confirmButton.click();
       await expect(
         page.getByText('Data link created successfully')
@@ -79,7 +91,6 @@ test.describe('Data Link Operations', () => {
       await expect(dataLinkToggle).toBeChecked({ timeout: 20000 });
     });
 
-    // Step 2
     await test.step('Delete data link via properties panel', async () => {
       await dataLinkToggle.click();
       await expect(confirmDeleteButton).toBeVisible({ timeout: 5000 });
@@ -90,23 +101,19 @@ test.describe('Data Link Operations', () => {
       await expect(dataLinkToggle).not.toBeChecked({ timeout: 10000 });
     });
 
-    // Step 3
     await test.step('Recreate data link via properties panel', async () => {
       await expect(
         page.getByText('Successfully deleted data link')
       ).not.toBeVisible({ timeout: 10000 });
       await dataLinkToggle.click();
-      await expect(confirmButton).toBeVisible({ timeout: 5000 });
-      await confirmButton.click();
+
       // Navigate back to the zarr directory to check data link status; the above click takes you to Neuroglancer
       await navigateToZarrDir(page, testDir, zarrDirName);
-
       await page.waitForLoadState('domcontentloaded', { timeout: 10000 });
 
       await expect(dataLinkToggle).toBeChecked({ timeout: 10000 });
     });
 
-    // Step 4
     await test.step('Delete the link via action menu on links page', async () => {
       const linksNavButton = page.getByRole('link', { name: 'Data links' });
       await linksNavButton.click();
@@ -127,6 +134,22 @@ test.describe('Data Link Operations', () => {
 
       // Verify the link is removed from the table
       await expect(linkRow).not.toBeVisible({ timeout: 10000 });
+    });
+
+    await test.step('Copy link works when automatic links is on and no data link exists yet', async () => {
+      await navigateToZarrDir(page, testDir, zarrDirName);
+      await page.waitForLoadState('domcontentloaded', { timeout: 10000 });
+
+      await expect(page.getByText('zarr.json')).toBeVisible({ timeout: 10000 });
+
+      const copyLinkIcon = page.getByRole('button', { name: 'Copy data URL' });
+      await expect(copyLinkIcon).toBeVisible({ timeout: 10000 });
+
+      await copyLinkIcon.click();
+      await expect(page.getByText('Copied!')).toBeVisible();
+      await expect(
+        page.getByText('Data link created successfully')
+      ).toBeVisible();
     });
   });
 });
