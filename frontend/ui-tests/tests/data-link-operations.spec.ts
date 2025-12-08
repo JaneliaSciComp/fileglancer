@@ -66,7 +66,7 @@ test.describe('Data Link Operations', () => {
         name: 'Enable automatic data link creation'
       });
       await autoLinkCheckbox.check();
-      expect(autoLinkCheckbox).toBeChecked();
+      await expect(autoLinkCheckbox).toBeChecked();
       await expect(
         page.getByText('Enabled automatic data links')
       ).toBeVisible();
