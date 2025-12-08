@@ -1,4 +1,4 @@
-import { useState, useRef, SetStateAction } from 'react';
+import { useRef, SetStateAction } from 'react';
 import type { Dispatch } from 'react';
 import toast from 'react-hot-toast';
 
@@ -9,8 +9,7 @@ import {
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useExternalBucketContext } from '@/contexts/ExternalBucketContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-
-import { copyToClipboard } from '@/utils/copyText';
+import useCopyTooltip from './useCopyTooltip';
 import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
 
 // Overload for ZarrPreview usage with required parameters
@@ -60,6 +59,7 @@ export default function useDataToolLinks(
 
   const { areDataLinksAutomatic } = usePreferencesContext();
   const { externalDataUrlQuery } = useExternalBucketContext();
+  const { handleCopy, showCopiedTooltip } = useCopyTooltip();
 
   const handleCreateDataLink = async (): Promise<boolean> => {
     if (!fileQuery.data?.currentFileSharePath) {
