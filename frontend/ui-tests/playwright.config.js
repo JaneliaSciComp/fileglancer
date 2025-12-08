@@ -31,7 +31,8 @@ export default defineConfig({
     baseURL: 'http://localhost:7879',
     trace: 'on-first-retry',
     video: 'on',
-    screenshot: 'only-on-failure'
+    screenshot: 'only-on-failure',
+    permissions: ['clipboard-write']
   },
   timeout: process.env.CI ? 180_000 : 20_000,
   navigationTimeout: process.env.CI ? 90_000 : 10_000,

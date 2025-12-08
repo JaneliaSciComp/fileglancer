@@ -8,14 +8,15 @@ import avivator_logo from '@/assets/vizarr_logo.png';
 import copy_logo from '@/assets/copy-link-64.png';
 import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
-import CopyTooltip from '../widgets/CopyTooltip';
 
 export default function DataToolLinks({
   onToolClick,
+  showCopiedTooltip,
   title,
   urls
 }: {
   readonly onToolClick: (toolKey: PendingToolKey) => Promise<void>;
+  readonly showCopiedTooltip: boolean;
   readonly title: string;
   readonly urls: OpenWithToolUrls | null;
 }) {
@@ -132,17 +133,22 @@ export default function DataToolLinks({
           </FgTooltip>
         ) : null}
 
-        <CopyTooltip
-          primaryLabel="Copy data URL"
-          textToCopy={urls.copy}
-          tooltipTriggerClasses={tooltipTriggerClasses}
+        <FgTooltip
+          as={Button}
+          label={showCopiedTooltip ? 'Copied!' : 'Copy data URL'}
+          onClick={async () => {
+            await onToolClick('copy');
+          }}
+          openCondition={showCopiedTooltip ? true : undefined}
+          triggerClasses={tooltipTriggerClasses}
+          variant="ghost"
         >
           <img
             alt="Copy URL icon"
             className="max-h-8 max-w-8 m-1 rounded-sm"
             src={copy_logo}
           />
-        </CopyTooltip>
+        </FgTooltip>
       </ButtonGroup>
     </div>
   );

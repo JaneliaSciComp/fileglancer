@@ -9,7 +9,7 @@ import {
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useExternalBucketContext } from '@/contexts/ExternalBucketContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-
+import useCopyTooltip from './useCopyTooltip';
 import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
 
 // Overload for ZarrPreview usage with required parameters
@@ -24,6 +24,7 @@ export default function useDataToolLinks(
   handleToolClick: (toolKey: PendingToolKey) => Promise<void>;
   handleDialogConfirm: () => Promise<void>;
   handleDialogCancel: () => void;
+  showCopiedTooltip: boolean;
 };
 
 // Overload for linksColumns and PropertiesDrawer usage with only one param
@@ -35,6 +36,7 @@ export default function useDataToolLinks(
   handleToolClick: (toolKey: PendingToolKey) => Promise<void>;
   handleDialogConfirm: () => Promise<void>;
   handleDialogCancel: () => void;
+  showCopiedTooltip: boolean;
 };
 
 export default function useDataToolLinks(
@@ -57,6 +59,7 @@ export default function useDataToolLinks(
 
   const { areDataLinksAutomatic } = usePreferencesContext();
   const { externalDataUrlQuery } = useExternalBucketContext();
+  const { handleCopy, showCopiedTooltip } = useCopyTooltip();
 
   const handleCreateDataLink = async (): Promise<boolean> => {
     if (!fileQuery.data?.currentFileSharePath) {
@@ -93,7 +96,9 @@ export default function useDataToolLinks(
     }
 
     try {
-      if (toolKey) {
+      if (toolKey === 'copy') {
+        await handleCopy(urls.copy);
+      } else if (toolKey) {
         const navigationUrl = urls[toolKey];
 
         if (navigationUrl) {
@@ -110,8 +115,6 @@ export default function useDataToolLinks(
         } else {
           toast.error('URL not available');
         }
-      } else {
-        toast.error('No tool selected');
       }
       setPendingToolKey?.(null);
     } catch (error) {
@@ -216,6 +219,7 @@ export default function useDataToolLinks(
     handleDeleteDataLink,
     handleToolClick,
     handleDialogConfirm,
-    handleDialogCancel
+    handleDialogCancel,
+    showCopiedTooltip
   };
 }
