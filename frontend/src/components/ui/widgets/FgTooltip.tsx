@@ -42,7 +42,7 @@ export default function FgTooltip({
       >
         {Icon ? <Icon className="icon-default" /> : null}
         {children}
-        <Tooltip.Content className="px-2.5 py-1.5 text-primary-foreground z-10">
+        <Tooltip.Content className="px-2.5 py-1.5 text-primary-foreground z-[9999]">
           <Typography className="opacity-90" type="small">
             {label}
           </Typography>
