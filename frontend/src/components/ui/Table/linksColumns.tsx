@@ -4,6 +4,7 @@ import { Typography } from '@material-tailwind/react';
 import type { ColumnDef } from '@tanstack/react-table';
 
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
+import DataLinkUsageDialog from '@/components/ui/Dialogs/DataLinkUsageDialog';
 import DataLinksActionsMenu from '@/components/ui/Menus/DataLinksActions';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
@@ -37,6 +38,7 @@ type ProxiedPathRowActionProps = {
   handleCopyPath: (path: string) => Promise<void>;
   handleCopyUrl: (item: ProxiedPath) => Promise<void>;
   handleUnshare: () => void;
+  handleViewDataLinkUsage: () => void;
   item: ProxiedPath;
   displayPath: string;
   pathFsp: FileSharePath | undefined;
@@ -94,6 +96,8 @@ function PathCell({
 
 function ActionsCell({ item }: { readonly item: ProxiedPath }) {
   const [showDataLinkDialog, setShowDataLinkDialog] = useState<boolean>(false);
+  const [showDataLinkUsageDialog, setShowDataLinkUsageDialog] =
+    useState<boolean>(false);
   const { handleDeleteDataLink } = useDataToolLinks(setShowDataLinkDialog);
   const { pathPreference } = usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
@@ -114,6 +118,10 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
     item.path
   );
 
+  const handleViewDataLinkUsage = () => {
+    setShowDataLinkUsageDialog(true);
+  };
+
   const menuItems: MenuItem<ProxiedPathRowActionProps>[] = [
     {
       name: 'Copy path',
@@ -128,6 +136,11 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
       }
     },
     {
+      name: 'Example code snippets',
+      action: (props: ProxiedPathRowActionProps) =>
+        props.handleViewDataLinkUsage()
+    },
+    {
       name: 'Unshare',
       action: (props: ProxiedPathRowActionProps) => props.handleUnshare(),
       color: 'text-red-600'
@@ -138,6 +151,7 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
     handleCopyPath,
     handleCopyUrl,
     handleUnshare,
+    handleViewDataLinkUsage,
     item,
     displayPath,
     pathFsp
@@ -167,6 +181,14 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
           proxiedPath={item}
           setShowDataLinkDialog={setShowDataLinkDialog}
           showDataLinkDialog={showDataLinkDialog}
+        />
+      ) : null}
+      {/* Code snippets dialog */}
+      {showDataLinkUsageDialog ? (
+        <DataLinkUsageDialog
+          dataLinkUrl={item.url}
+          onClose={() => setShowDataLinkUsageDialog(false)}
+          open={showDataLinkUsageDialog}
         />
       ) : null}
     </div>

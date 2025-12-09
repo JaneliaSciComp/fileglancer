@@ -17,6 +17,8 @@ import OverviewTable from '@/components/ui/PropertiesDrawer/OverviewTable';
 import TicketDetails from '@/components/ui/PropertiesDrawer/TicketDetails';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
+import DataLinkUsageDialog from '@/components/ui/Dialogs/DataLinkUsageDialog';
+import TextDialogBtn from '@/components/ui/buttons/DialogTextBtn';
 import { getPreferredPathForDisplay } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
@@ -276,15 +278,45 @@ export default function PropertiesDrawer({
                     </Typography>
                   </div>
                   {externalDataUrlQuery.data ? (
-                    <CopyPathButton
-                      isDataLink={true}
-                      path={externalDataUrlQuery.data}
-                    />
+                    <>
+                      <CopyPathButton
+                        isDataLink={true}
+                        path={externalDataUrlQuery.data}
+                      />
+                      <TextDialogBtn
+                        label="Example code snippets"
+                        variant="solid"
+                      >
+                        {closeDialog => (
+                          <DataLinkUsageDialog
+                            dataLinkUrl={externalDataUrlQuery.data ?? ''}
+                            onClose={closeDialog}
+                            open={true}
+                          />
+                        )}
+                      </TextDialogBtn>
+                    </>
                   ) : proxiedPathByFspAndPathQuery.data?.url ? (
-                    <CopyPathButton
-                      isDataLink={true}
-                      path={proxiedPathByFspAndPathQuery.data.url}
-                    />
+                    <>
+                      <CopyPathButton
+                        isDataLink={true}
+                        path={proxiedPathByFspAndPathQuery.data.url}
+                      />
+                      <TextDialogBtn
+                        label="Example code snippets"
+                        variant="solid"
+                      >
+                        {closeDialog => (
+                          <DataLinkUsageDialog
+                            dataLinkUrl={
+                              proxiedPathByFspAndPathQuery.data?.url ?? ''
+                            }
+                            onClose={closeDialog}
+                            open={true}
+                          />
+                        )}
+                      </TextDialogBtn>
+                    </>
                   ) : null}
                 </>
               ) : null}
