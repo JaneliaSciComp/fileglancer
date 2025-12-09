@@ -141,7 +141,8 @@ test-launch = "pixi run uvicorn fileglancer.app:app --no-access-log --port 7879"
 dev-install = { depends-on = ["node-build", "pip-install"] }
 dev-watch = { cmd = "cd frontend && NODE_ENV=development npm run watch" }
 dev-launch = "pixi run uvicorn fileglancer.app:app --no-access-log --port 7878 --reload"
-dev-launch-remote = "pixi run uvicorn fileglancer.app:app --no-access-log --host 0.0.0.0 --port 7878 --reload --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
+dev-launch-remote = "pixi run uvicorn fileglancer.app:app --host 0.0.0.0 --port 7878 --reload --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
+prod-launch-remote = "pixi run uvicorn fileglancer.app:app --workers 10 --host 0.0.0.0 --port 7878 --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
 dev-launch-secure = "python fileglancer/dev_launch.py"
 migrate = "alembic upgrade head"
 migrate-create = "alembic revision --autogenerate"

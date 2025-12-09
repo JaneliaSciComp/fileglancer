@@ -40,21 +40,6 @@ from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error
 from x2s3.client_file import FileProxyClient
 
 
-class UserContextStreamingResponse(StreamingResponse):
-    """StreamingResponse that maintains a user context for the duration of the stream"""
-    def __init__(self, *args, user_context: UserContext = None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.user_context = user_context
-
-    async def stream_response(self, send):
-        """Override to wrap streaming in user context"""
-        if self.user_context:
-            with self.user_context:
-                await super().stream_response(send)
-        else:
-            await super().stream_response(send)
-
-
 # Read version once at module load time
 def _read_version() -> str:
     """Read version from package metadata or package.json file"""
@@ -154,7 +139,7 @@ def create_app(settings):
             proxied_path = db.get_proxied_path_by_sharing_key(session, sharing_key)
             if not proxied_path:
                 return get_nosuchbucket_response(sharing_name), None
-            
+
             # Vol-E viewer sends URLs with literal % characters (not URL-encoded)
             # FastAPI automatically decodes path parameters - % chars are treated as escapes, creating a garbled sharing_name if they're present
             # We therefore need to handle two cases:
@@ -536,7 +521,7 @@ def create_app(settings):
                 if db_ticket is None:
                     raise HTTPException(status_code=500, detail="Failed to create ticket entry in database")
 
-                # Get the full ticket details from JIRA 
+                # Get the full ticket details from JIRA
                 ticket_details = get_jira_ticket_details(jira_ticket['key'])
 
                 # Return DTO with details from both JIRA and database
@@ -556,7 +541,7 @@ def create_app(settings):
                           username: str = Depends(get_current_user)):
 
         with db.get_db_session(settings.db_url) as session:
-            
+
             db_tickets = db.get_tickets(session, username, fsp_name, path)
             if not db_tickets:
                 raise HTTPException(status_code=404, detail="No tickets found for this user")
@@ -572,7 +557,7 @@ def create_app(settings):
                     logger.warning(f"Could not retrieve details for ticket {db_ticket.ticket_key}: {e}")
                     ticket.description = f"Ticket {db_ticket.ticket_key} is no longer available in JIRA"
                     ticket.status = "Deleted"
-                
+
             return TicketResponse(tickets=tickets)
 
 
@@ -650,7 +635,7 @@ def create_app(settings):
     async def get_proxied_paths(fsp_name: str = Query(None, description="The name of the file share path that this proxied path is associated with"),
                                 path: str = Query(None, description="The path being proxied"),
                                 username: str = Depends(get_current_user)):
-        
+
         with db.get_db_session(settings.db_url) as session:
             db_proxied_paths = db.get_proxied_paths(session, username, fsp_name, path)
             proxied_paths = [_convert_proxied_path(db_path, settings.external_proxy_url) for db_path in db_proxied_paths]
@@ -728,22 +713,87 @@ def create_app(settings):
                 return get_error_response(400, "InvalidArgument", f"Invalid list type {list_type}", path)
         else:
             range_header = request.headers.get("range")
-            # Build the response inside context (for file stat/checks)
-            with ctx:
-                response = await client.get_object(path, range_header)
 
-            # If it's a StreamingResponse, wrap it to keep context alive during streaming
-            if isinstance(response, StreamingResponse):
-                return UserContextStreamingResponse(
-                    response.body_iterator,
-                    status_code=response.status_code,
-                    headers=dict(response.headers),
-                    media_type=response.media_type,
-                    user_context=ctx
+            # Open file in user context, then immediately exit
+            # The file descriptor retains access rights after we switch back to root
+            with ctx:
+                import os.path as ospath
+                from pathlib import Path as PathLib
+                from fileglancer.utils import parse_range_header, format_timestamp, guess_content_type
+
+                # Get the file path and stats while we have user permissions
+                file_path = ospath.join(client.root_path, path) if path else client.root_path
+
+                if not ospath.isfile(file_path):
+                    return get_error_response(404, "NoSuchKey", "The specified key does not exist", path)
+
+                filename = ospath.basename(file_path)
+                stats = os.stat(file_path)
+                file_size = stats.st_size
+
+                # Open the file while we have user's permissions
+                file_handle = open(file_path, 'rb')
+
+            # Context exited! Now build response without holding the lock
+            content_type = guess_content_type(filename)
+            headers = {
+                'Content-Type': content_type,
+                'Accept-Ranges': 'bytes',
+                'Last-Modified': format_timestamp(stats.st_mtime)
+            }
+
+            if content_type == 'application/octet-stream':
+                headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+            # Handle range requests
+            if range_header:
+                range_result = parse_range_header(range_header, file_size)
+                if range_result is None:
+                    file_handle.close()
+                    headers["Content-Range"] = f"bytes */{file_size}"
+                    return Response(status_code=416, headers=headers)
+
+                start, end = range_result
+                content_length = end - start + 1
+                headers["Content-Length"] = str(content_length)
+                headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+
+                # Create streaming response with open file handle
+                def file_range_iterator():
+                    try:
+                        file_handle.seek(start)
+                        remaining = end - start + 1
+                        while remaining > 0:
+                            chunk_size = min(8192, remaining)
+                            chunk = file_handle.read(chunk_size)
+                            if not chunk:
+                                break
+                            yield chunk
+                            remaining -= len(chunk)
+                    finally:
+                        file_handle.close()
+
+                return StreamingResponse(
+                    file_range_iterator(),
+                    status_code=206,
+                    headers=headers,
+                    media_type=content_type
                 )
             else:
-                # For error responses, just return as-is
-                return response
+                # Full content
+                headers["Content-Length"] = str(file_size)
+
+                def file_iterator():
+                    try:
+                        yield from file_handle
+                    finally:
+                        file_handle.close()
+
+                return StreamingResponse(
+                    file_iterator(),
+                    headers=headers,
+                    media_type=content_type
+                )
 
 
     @app.head("/files/{sharing_key}/{sharing_name}/{path:path}")
@@ -790,7 +840,7 @@ def create_app(settings):
     async def get_profile(username: str = Depends(get_current_user)):
         """Get the current user's profile"""
         with _get_user_context(username):
-            
+
             # Find matching file share path for home directory
             with db.get_db_session(settings.db_url) as session:
                 paths = db.get_file_share_paths(session)
@@ -831,8 +881,8 @@ def create_app(settings):
 
     # File content endpoint
     @app.head("/api/content/{path_name:path}")
-    async def head_file_content(path_name: str, 
-                                subpath: Optional[str] = Query(''), 
+    async def head_file_content(path_name: str,
+                                subpath: Optional[str] = Query(''),
                                 username: str = Depends(get_current_user)):
         """Handle HEAD requests to get file metadata without content"""
 
@@ -873,7 +923,7 @@ def create_app(settings):
             except PermissionError:
                 raise HTTPException(status_code=403, detail="Permission denied")
 
-        
+
     @app.get("/api/content/{path_name:path}")
     async def get_file_content(request: Request, path_name: str, subpath: Optional[str] = Query(''), username: str = Depends(get_current_user)):
         """Handle GET requests to get file content, with HTTP Range header support"""
@@ -883,6 +933,8 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
+        # Open file with user's permissions, then immediately release the context
+        # The file descriptor retains the access rights after we switch back to root
         with _get_user_context(username):
             filestore, error = _get_filestore(filestore_name)
             if filestore is None:
@@ -897,62 +949,64 @@ def create_app(settings):
                     raise HTTPException(status_code=400, detail="Cannot download directory content")
 
                 file_size = file_info.size
-                range_header = request.headers.get('Range')
 
-                # Open file handle within user context before creating StreamingResponse
-                # This ensures proper permissions are set on the file handle before it
-                # is passed to the response generator
+                # Open the file while we have user's permissions
                 full_path = filestore._check_path_in_root(subpath)
                 file_handle = open(full_path, 'rb')
-
-                if range_header:
-                    range_result = parse_range_header(range_header, file_size)
-                    if range_result is None:
-                        file_handle.close()
-                        return Response(
-                            status_code=416,
-                            headers={'Content-Range': f'bytes */{file_size}'}
-                        )
-
-                    start, end = range_result
-                    content_length = end - start + 1
-
-                    headers = {
-                        'Accept-Ranges': 'bytes',
-                        'Content-Length': str(content_length),
-                        'Content-Range': f'bytes {start}-{end}/{file_size}',
-                    }
-
-                    if content_type == 'application/octet-stream' and file_name:
-                        headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
-
-                    return StreamingResponse(
-                        filestore.stream_file_range(start=start, end=end, file_handle=file_handle),
-                        status_code=206,
-                        headers=headers,
-                        media_type=content_type
-                    )
-                else:
-                    headers = {
-                        'Accept-Ranges': 'bytes',
-                        'Content-Length': str(file_size),
-                    }
-
-                    if content_type == 'application/octet-stream' and file_name:
-                        headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
-
-                    return StreamingResponse(
-                        filestore.stream_file_contents(file_handle=file_handle),
-                        status_code=200,
-                        headers=headers,
-                        media_type=content_type
-                    )
 
             except FileNotFoundError:
                 logger.error(f"File not found in {filestore_name}: {subpath}")
                 raise HTTPException(status_code=404, detail="File or directory not found")
             except PermissionError:
                 raise HTTPException(status_code=403, detail="Permission denied")
+
+        # Context exited! We're back to root, but file_handle retains user's access rights
+        # Now we can stream the file asynchronously without holding the user context lock
+
+        range_header = request.headers.get('Range')
+
+        if range_header:
+            range_result = parse_range_header(range_header, file_size)
+            if range_result is None:
+                file_handle.close()
+                return Response(
+                    status_code=416,
+                    headers={'Content-Range': f'bytes */{file_size}'}
+                )
+
+            start, end = range_result
+            content_length = end - start + 1
+
+            headers = {
+                'Accept-Ranges': 'bytes',
+                'Content-Length': str(content_length),
+                'Content-Range': f'bytes {start}-{end}/{file_size}',
+            }
+
+            if content_type == 'application/octet-stream' and file_name:
+                headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+
+            return StreamingResponse(
+                filestore.stream_file_range(start=start, end=end, file_handle=file_handle),
+                status_code=206,
+                headers=headers,
+                media_type=content_type
+            )
+        else:
+            headers = {
+                'Accept-Ranges': 'bytes',
+                'Content-Length': str(file_size),
+            }
+
+            if content_type == 'application/octet-stream' and file_name:
+                headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+
+            return StreamingResponse(
+                filestore.stream_file_contents(file_handle=file_handle),
+                status_code=200,
+                headers=headers,
+                media_type=content_type
+            )
 
 
     @app.get("/api/files/{path_name}")
@@ -1001,9 +1055,9 @@ def create_app(settings):
 
 
     @app.post("/api/files/{path_name}")
-    async def create_file_or_dir(path_name: str, 
-                                 subpath: Optional[str] = Query(''), 
-                                 body: Dict = Body(...), 
+    async def create_file_or_dir(path_name: str,
+                                 subpath: Optional[str] = Query(''),
+                                 body: Dict = Body(...),
                                  username: str = Depends(get_current_user)):
         """Handle POST requests to create a new file or directory"""
         with _get_user_context(username):
@@ -1031,8 +1085,8 @@ def create_app(settings):
 
 
     @app.patch("/api/files/{path_name}")
-    async def update_file_or_dir(path_name: str, 
-                                 subpath: Optional[str] = Query(''), 
+    async def update_file_or_dir(path_name: str,
+                                 subpath: Optional[str] = Query(''),
                                  body: Dict = Body(...),
                                  username: str = Depends(get_current_user)):
         """Handle PATCH requests to rename or update file permissions"""
@@ -1062,7 +1116,7 @@ def create_app(settings):
 
 
     @app.delete("/api/files/{fsp_name}")
-    async def delete_file_or_dir(fsp_name: str, 
+    async def delete_file_or_dir(fsp_name: str,
                                  subpath: Optional[str] = Query(''),
                                  username: str = Depends(get_current_user)):
         """Handle DELETE requests to remove a file or (empty) directory"""
