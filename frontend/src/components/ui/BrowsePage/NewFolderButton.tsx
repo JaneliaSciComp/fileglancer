@@ -37,6 +37,11 @@ export default function NewFolderButton({
     setShowNewFolderDialog(false);
   };
 
+  const handleClose = () => {
+    setNewName('');
+    setShowNewFolderDialog(false);
+  };
+
   return (
     <>
       <FgTooltip
@@ -51,10 +56,7 @@ export default function NewFolderButton({
         triggerClasses={triggerClasses}
       />
       {showNewFolderDialog ? (
-        <FgDialog
-          onClose={() => setShowNewFolderDialog(false)}
-          open={showNewFolderDialog}
-        >
+        <FgDialog onClose={handleClose} open={showNewFolderDialog}>
           <form onSubmit={formSubmit}>
             <div className="mt-8 flex flex-col gap-2">
               <Typography
