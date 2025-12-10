@@ -1,5 +1,6 @@
 import * as zarr from 'zarrita';
 import { Axis } from 'ome-zarr.js';
+import { HiQuestionMarkCircle } from 'react-icons/hi';
 
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import {
@@ -7,6 +8,7 @@ import {
   translateUnitToNeuroglancer,
   getResolvedScales
 } from '@/omezarr-helper';
+import FgTooltip from '@/components/ui/widgets/FgTooltip';
 
 type ZarrMetadataTableProps = {
   readonly metadata: Metadata;
@@ -91,7 +93,23 @@ export default function ZarrMetadataTable({
           <tr className="h-11 border-b border-surface-dark">
             <td className="px-3 py-2 font-semibold">Content (auto-detected)</td>
             {disableHeuristicalLayerTypeDetection ? (
-              <td className="px-3 py-2 capitalize">Disabled</td>
+              <td className="px-3 py-2 capitalize flex items-center gap-1">
+                Disabled
+                <FgTooltip
+                  icon={HiQuestionMarkCircle}
+                  interactiveLabel={
+                    <>
+                      Heuristical layer type detection is disabled in{' '}
+                      <a className="underline" href="/fg/preferences">
+                        preferences
+                      </a>
+                      .
+                    </>
+                  }
+                  isInteractive={true}
+                  label="Heuristical layer type detection is disabled in preferences"
+                />
+              </td>
             ) : layerType ? (
               <td className="px-3 py-2 capitalize">{layerType}</td>
             ) : null}
