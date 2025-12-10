@@ -93,7 +93,7 @@ export default function ZarrMetadataTable({
           <tr className="h-11 border-b border-surface-dark">
             <td className="px-3 py-2 font-semibold">Content (auto-detected)</td>
             {disableHeuristicalLayerTypeDetection ? (
-              <td className="px-3 py-2 capitalize flex items-center gap-1">
+              <td className="px-3 py-3 capitalize flex items-center gap-1">
                 Disabled
                 <FgTooltip
                   icon={HiQuestionMarkCircle}
