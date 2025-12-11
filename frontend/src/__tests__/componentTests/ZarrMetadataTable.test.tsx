@@ -9,6 +9,21 @@ vi.mock('@/omezarr-helper', async () => {
   return omezarrHelperMock;
 });
 
+vi.mock('@/hooks/useZarrMetadata', async () => {
+  const actual = (await vi.importActual(
+    '@/hooks/useZarrMetadata'
+  )) as typeof import('@/hooks/useZarrMetadata');
+  return {
+    default: () => {
+      const actualResult = actual.default();
+      return {
+        ...actualResult,
+        layerType: 'image'
+      };
+    }
+  };
+});
+
 // Test component that uses the actual useZarrMetadata hook
 function ZarrMetadataTableTestWrapper() {
   const { availableVersions, layerType, zarrMetadataQuery } = useZarrMetadata();
@@ -80,6 +95,51 @@ describe('ZarrMetadataTable', () => {
     // Wait for the metadata table to render
     await waitFor(() => {
       expect(screen.getByText('Zarr Array Metadata')).toBeInTheDocument();
+    });
+  });
+
+  it('should display "Disabled" when disableHeuristicalLayerTypeDetection is true', async () => {
+    // Override only the disableHeuristicalLayerTypeDetection preference for this test
+    const { server } = await import('@/__tests__/mocks/node');
+    const { http, HttpResponse } = await import('msw');
+
+    server.use(
+      http.get('/api/preference', () => {
+        return HttpResponse.json({
+          path: { value: ['linux_path'] },
+          areDataLinksAutomatic: { value: false },
+          disableHeuristicalLayerTypeDetection: { value: true },
+          hideDotFiles: { value: false },
+          disableNeuroglancerStateGeneration: { value: false },
+          useLegacyMultichannelApproach: { value: false },
+          isFilteredByGroups: { value: true },
+          layout: { value: '' },
+          zone: { value: [] },
+          fileSharePath: { value: [] },
+          folder: { value: [] },
+          recentlyViewedFolders: { value: [] }
+        });
+      })
+    );
+
+    render(<ZarrMetadataTableTestWrapper />, {
+      initialEntries: ['/browse/test_fsp/my_folder/ome_zarr_both_versions']
+    });
+
+    // Wait for the metadata table to render with "Disabled" in the Content row
+    await waitFor(() => {
+      expect(screen.getByText('Disabled')).toBeInTheDocument();
+    });
+  });
+
+  it('should display detected layer type when disableHeuristicalLayerTypeDetection is false', async () => {
+    render(<ZarrMetadataTableTestWrapper />, {
+      initialEntries: ['/browse/test_fsp/my_folder/ome_zarr_both_versions']
+    });
+
+    // 'image' is returned by the mocked useZarrMetadata hook
+    await waitFor(() => {
+      expect(screen.getByText('image')).toBeInTheDocument();
     });
   });
 });

@@ -1,10 +1,14 @@
 import * as zarr from 'zarrita';
 import { Axis } from 'ome-zarr.js';
+import { HiQuestionMarkCircle } from 'react-icons/hi';
+
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import {
   Metadata,
   translateUnitToNeuroglancer,
   getResolvedScales
-} from '../../../omezarr-helper';
+} from '@/omezarr-helper';
+import FgTooltip from '@/components/ui/widgets/FgTooltip';
 
 type ZarrMetadataTableProps = {
   readonly metadata: Metadata;
@@ -64,6 +68,7 @@ export default function ZarrMetadataTable({
   layerType,
   availableVersions
 }: ZarrMetadataTableProps) {
+  const { disableHeuristicalLayerTypeDetection } = usePreferencesContext();
   const { zarrVersion, multiscale, shapes } = metadata;
   const axisData = getAxisData(metadata);
 
@@ -85,14 +90,30 @@ export default function ZarrMetadataTable({
                 : zarrVersion}
             </td>
           </tr>
-          {layerType ? (
-            <tr className="h-11 border-b border-surface-dark">
-              <td className="px-3 py-2 font-semibold">
-                Content (auto-detected)
+          <tr className="h-11 border-b border-surface-dark">
+            <td className="px-3 py-2 font-semibold">Content (auto-detected)</td>
+            {disableHeuristicalLayerTypeDetection ? (
+              <td className="px-3 py-3 capitalize flex items-center gap-1">
+                Disabled
+                <FgTooltip
+                  icon={HiQuestionMarkCircle}
+                  interactiveLabel={
+                    <>
+                      Heuristical layer type detection is disabled in{' '}
+                      <a className="underline" href="/fg/preferences">
+                        preferences
+                      </a>
+                      .
+                    </>
+                  }
+                  isInteractive={true}
+                  label="Heuristical layer type detection is disabled in preferences"
+                />
               </td>
+            ) : layerType ? (
               <td className="px-3 py-2 capitalize">{layerType}</td>
-            </tr>
-          ) : null}
+            ) : null}
+          </tr>
           {metadata.arr ? (
             <tr className="h-11 border-b border-surface-dark">
               <td className="px-3 py-2 font-semibold">Data Type</td>

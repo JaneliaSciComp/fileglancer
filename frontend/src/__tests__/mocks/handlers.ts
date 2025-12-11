@@ -31,33 +31,22 @@ export const handlers = [
     });
   }),
 
-  // Preferences - using URL params instead of query params
-  // Base preference endpoint (in case it's called without a key)
-  http.get('/api/preference/:key', ({ params }) => {
-    const { key } = params;
-    if (key === 'path') {
-      return HttpResponse.json({
-        value: ['linux_path']
-      });
-    } else if (key === 'areDataLinksAutomatic') {
-      return HttpResponse.json({
-        value: false
-      });
-    } else if (
-      key === 'fileSharePath' ||
-      key === 'zone' ||
-      key === 'folder' ||
-      key === 'recentlyViewedFolders'
-    ) {
-      return HttpResponse.json({
-        value: []
-      });
-    } else {
-      // Fallback for any unhandled preferences
-      return HttpResponse.json({
-        value: null
-      });
-    }
+  // Preferences - Fetch all preferences at once
+  http.get('/api/preference', () => {
+    return HttpResponse.json({
+      path: { value: ['linux_path'] },
+      areDataLinksAutomatic: { value: false },
+      disableHeuristicalLayerTypeDetection: { value: false },
+      hideDotFiles: { value: false },
+      disableNeuroglancerStateGeneration: { value: false },
+      useLegacyMultichannelApproach: { value: false },
+      isFilteredByGroups: { value: true },
+      layout: { value: '' },
+      zone: { value: [] },
+      fileSharePath: { value: [] },
+      folder: { value: [] },
+      recentlyViewedFolders: { value: [] }
+    });
   }),
   http.put('/api/preference/:key', ({ params }) => {
     const { key } = params;

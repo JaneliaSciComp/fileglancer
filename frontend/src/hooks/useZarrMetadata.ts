@@ -55,20 +55,37 @@ export default function useZarrMetadata() {
 
   useEffect(() => {
     if (!thumbnailSrc || disableHeuristicalLayerTypeDetection) {
-      // Default layer type
-      setLayerType('image');
+      // Set default layer type if heuristics are disabled
+      if (disableHeuristicalLayerTypeDetection) {
+        setLayerType('image');
+      }
       return;
     }
 
-    let cancelled = false;
-    determineLayerType(true, thumbnailSrc).then(result => {
-      if (!cancelled) {
-        setLayerType(result);
+    const controller = new AbortController();
+
+    const determineType = async (signal: AbortSignal) => {
+      try {
+        const determinedLayerType = await determineLayerType(
+          !disableHeuristicalLayerTypeDetection,
+          thumbnailSrc
+        );
+        if (signal.aborted) {
+          return;
+        }
+        setLayerType(determinedLayerType);
+      } catch (error) {
+        if (!signal.aborted) {
+          console.error('Error determining layer type:', error);
+          setLayerType('image'); // Default fallback
+        }
       }
-    });
+    };
+
+    determineType(controller.signal);
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [thumbnailSrc, disableHeuristicalLayerTypeDetection]);
 
