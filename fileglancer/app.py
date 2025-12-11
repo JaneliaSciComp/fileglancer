@@ -38,6 +38,7 @@ from fileglancer.log import AccessLogMiddleware
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response
 from x2s3.client_file import FileProxyClient
+from x2s3.client import ObjectHandle
 
 
 # Read version once at module load time
@@ -717,83 +718,14 @@ def create_app(settings):
             # Open file in user context, then immediately exit
             # The file descriptor retains access rights after we switch back to root
             with ctx:
-                import os.path as ospath
-                from pathlib import Path as PathLib
-                from fileglancer.utils import parse_range_header, format_timestamp, guess_content_type
+                handle = await client.open_object(path, range_header)
 
-                # Get the file path and stats while we have user permissions
-                file_path = ospath.join(client.root_path, path) if path else client.root_path
-
-                if not ospath.isfile(file_path):
-                    return get_error_response(404, "NoSuchKey", "The specified key does not exist", path)
-
-                filename = ospath.basename(file_path)
-                stats = os.stat(file_path)
-                file_size = stats.st_size
-
-                # Open the file while we have user's permissions
-                file_handle = open(file_path, 'rb')
-
-            # Context exited! Now build response without holding the lock
-            content_type = guess_content_type(filename)
-            headers = {
-                'Content-Type': content_type,
-                'Accept-Ranges': 'bytes',
-                'Last-Modified': format_timestamp(stats.st_mtime)
-            }
-
-            if content_type == 'application/octet-stream':
-                headers['Content-Disposition'] = f'attachment; filename="{filename}"'
-
-            # Handle range requests
-            if range_header:
-                range_result = parse_range_header(range_header, file_size)
-                if range_result is None:
-                    file_handle.close()
-                    headers["Content-Range"] = f"bytes */{file_size}"
-                    return Response(status_code=416, headers=headers)
-
-                start, end = range_result
-                content_length = end - start + 1
-                headers["Content-Length"] = str(content_length)
-                headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
-
-                # Create streaming response with open file handle
-                def file_range_iterator():
-                    try:
-                        file_handle.seek(start)
-                        remaining = end - start + 1
-                        while remaining > 0:
-                            chunk_size = min(8192, remaining)
-                            chunk = file_handle.read(chunk_size)
-                            if not chunk:
-                                break
-                            yield chunk
-                            remaining -= len(chunk)
-                    finally:
-                        file_handle.close()
-
-                return StreamingResponse(
-                    file_range_iterator(),
-                    status_code=206,
-                    headers=headers,
-                    media_type=content_type
-                )
+            # Context exited! Now stream without holding the lock
+            if isinstance(handle, ObjectHandle):
+                return client.stream_object(handle)
             else:
-                # Full content
-                headers["Content-Length"] = str(file_size)
-
-                def file_iterator():
-                    try:
-                        yield from file_handle
-                    finally:
-                        file_handle.close()
-
-                return StreamingResponse(
-                    file_iterator(),
-                    headers=headers,
-                    media_type=content_type
-                )
+                # Error response (e.g., file not found, invalid range)
+                return handle
 
 
     @app.head("/files/{sharing_key}/{sharing_name}/{path:path}")
