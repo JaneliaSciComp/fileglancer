@@ -119,6 +119,36 @@ def _convert_ticket(db_ticket: db.TicketDB) -> Ticket:
     )
 
 
+def _validate_filename(name: str) -> None:
+    """
+    Validate that a filename/dirname is safe and only refers to a single item in the current directory.
+
+    Args:
+        name: The filename or directory name to validate
+
+    Raises:
+        HTTPException: If the name is invalid
+    """
+    if not name or not name.strip():
+        raise HTTPException(status_code=400, detail="File or directory name cannot be empty")
+
+    # Check for path separators (would create in subdirectory)
+    if '/' in name:
+        raise HTTPException(status_code=400, detail="File or directory name cannot contain path separators ('/')")
+
+    # Check for null bytes (security issue)
+    if '\0' in name:
+        raise HTTPException(status_code=400, detail="File or directory name cannot contain null bytes")
+
+    # Check for special directory references
+    if name == '.' or name == '..':
+        raise HTTPException(status_code=400, detail="File or directory name cannot be '.' or '..'")
+
+    # Check for leading/trailing whitespace (can cause issues)
+    if name != name.strip():
+        raise HTTPException(status_code=400, detail="File or directory name cannot have leading or trailing whitespace")
+
+
 def create_app(settings):
 
     # Initialize OAuth client for OKTA
@@ -992,6 +1022,26 @@ def create_app(settings):
                                  body: Dict = Body(...),
                                  username: str = Depends(get_current_user)):
         """Handle POST requests to create a new file or directory"""
+        # Validate and sanitize the user-provided subpath to prevent path traversal attacks
+        if not subpath:
+            raise HTTPException(status_code=400, detail="File or directory path is required")
+
+        # Normalize the path to prevent path traversal (e.g., "../../../etc/passwd")
+        # This converts relative paths to a clean form and removes redundant separators
+        normalized_path = os.path.normpath(subpath)
+
+        # Security check: Ensure normalized path doesn't start with ".." or "/"
+        # which would indicate an attempt to escape the intended directory
+        if normalized_path.startswith('..') or os.path.isabs(normalized_path):
+            raise HTTPException(status_code=400, detail="Path cannot escape the current directory")
+
+        # Validate the filename portion (basename) for invalid characters
+        filename = os.path.basename(normalized_path)
+        _validate_filename(filename)
+
+        # Use the validated and sanitized path for all operations
+        validated_subpath = normalized_path
+
         with _get_user_context(username):
             filestore, error = _get_filestore(path_name)
             if filestore is None:
@@ -1000,11 +1050,13 @@ def create_app(settings):
             try:
                 file_type = body.get("type")
                 if file_type == "directory":
-                    logger.info(f"User {username} creating directory {path_name}/{subpath}")
-                    filestore.create_dir(subpath)
+                    logger.info(f"User {username} creating directory {path_name}/{validated_subpath}")
+                    # Path is validated above - safe to use in filesystem operation
+                    filestore.create_dir(validated_subpath)
                 elif file_type == "file":
-                    logger.info(f"User {username} creating file {path_name}/{subpath}")
-                    filestore.create_empty_file(subpath)
+                    logger.info(f"User {username} creating file {path_name}/{validated_subpath}")
+                    # Path is validated above - safe to use in filesystem operation
+                    filestore.create_empty_file(validated_subpath)
                 else:
                     raise HTTPException(status_code=400, detail="Invalid file type")
 
@@ -1030,14 +1082,32 @@ def create_app(settings):
             new_path = body.get("path")
             new_permissions = body.get("permissions")
 
+            # Validate and sanitize new_path if renaming
+            validated_new_path = new_path
+            if new_path is not None and new_path != old_file_info.path:
+                # Normalize the path to prevent path traversal
+                normalized_new_path = os.path.normpath(new_path)
+
+                # Security check: Ensure normalized path doesn't escape directory
+                if normalized_new_path.startswith('..') or os.path.isabs(normalized_new_path):
+                    raise HTTPException(status_code=400, detail="New path cannot escape the current directory")
+
+                # Validate the filename portion for invalid characters
+                new_filename = os.path.basename(normalized_new_path)
+                _validate_filename(new_filename)
+
+                # Use the validated path
+                validated_new_path = normalized_new_path
+
             try:
                 if new_permissions is not None and new_permissions != old_file_info.permissions:
                     logger.info(f"User {username} changing permissions of {old_file_info.absolute_path} to {new_permissions}")
                     filestore.change_file_permissions(subpath, new_permissions)
 
                 if new_path is not None and new_path != old_file_info.path:
-                    logger.info(f"User {username} renaming {old_file_info.absolute_path} to {new_path}")
-                    filestore.rename_file_or_dir(old_file_info.path, new_path)
+                    logger.info(f"User {username} renaming {old_file_info.absolute_path} to {validated_new_path}")
+                    # Path is validated above - safe to use in filesystem operation
+                    filestore.rename_file_or_dir(old_file_info.path, validated_new_path)
 
             except PermissionError as e:
                 raise HTTPException(status_code=403, detail=str(e))
