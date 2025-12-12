@@ -1,17 +1,16 @@
 import { useState } from 'react';
 import { Typography, Tabs } from '@material-tailwind/react';
 import { HiOutlineClipboardCopy } from 'react-icons/hi';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import {
+  materialDark,
+  coy
+} from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 import FgDialog from './FgDialog';
 import FgTooltip from '../widgets/FgTooltip';
 import useCopyTooltip from '@/hooks/useCopyTooltip';
-
-type CodeSnippetBlockProps = {
-  readonly label: string;
-  readonly code: string;
-  readonly copyText: string;
-  readonly copyLabel?: string;
-};
+import useDarkMode from '@/hooks/useDarkMode';
 
 function CopyIconAndTooltip({
   copyLabel,
@@ -43,20 +42,87 @@ function CopyIconAndTooltip({
   );
 }
 
-function CodeSnippetBlock({
+type CodeBlockProps = {
+  readonly code: string;
+  readonly language?: string;
+  readonly showLineNumbers?: boolean;
+  readonly wrapLines?: boolean;
+  readonly wrapLongLines?: boolean;
+  readonly copyable?: boolean;
+  readonly copyLabel?: string;
+  readonly customStyle?: React.CSSProperties;
+};
+
+function CodeBlock({
   code,
-  copyText,
-  copyLabel = 'Copy'
-}: Omit<CodeSnippetBlockProps, 'label'>) {
+  language = 'text',
+  showLineNumbers = false,
+  wrapLines = true,
+  wrapLongLines = true,
+  copyable = false,
+  copyLabel = 'Copy code',
+  customStyle = {
+    margin: 0,
+    marginTop: 0,
+    marginRight: 0,
+    marginBottom: 0,
+    marginLeft: 0,
+    paddingTop: '1em',
+    paddingRight: '1em',
+    paddingBottom: '0',
+    paddingLeft: '1em',
+    fontSize: '14px',
+    lineHeight: '1.5'
+  }
+}: CodeBlockProps) {
+  const isDarkMode = useDarkMode();
+  const { showCopiedTooltip, handleCopy } = useCopyTooltip();
+
+  // Get the theme's code styles and merge with custom codeTagProps
+  const theme = isDarkMode ? materialDark : coy;
+  const themeCodeStyles = theme['code[class*="language-"]'] || {};
+  const mergedCodeTagProps = {
+    style: {
+      ...themeCodeStyles,
+      paddingBottom: '1em'
+    }
+  };
+
   return (
-    <div className="relative bg-surface rounded-md p-4">
-      <pre className="text-foreground text-sm font-mono break-normal whitespace-pre-wrap pr-10">
+    <>
+      <SyntaxHighlighter
+        codeTagProps={mergedCodeTagProps}
+        customStyle={customStyle}
+        language={language}
+        showLineNumbers={showLineNumbers}
+        style={isDarkMode ? materialDark : coy}
+        wrapLines={wrapLines}
+        wrapLongLines={wrapLongLines}
+      >
         {code}
-      </pre>
-      <div className="absolute top-2 right-2">
-        <CopyIconAndTooltip copyLabel={copyLabel} copyText={copyText} />
-      </div>
-    </div>
+      </SyntaxHighlighter>
+      {copyable ? (
+        <div className="absolute top-2 right-2">
+          <FgTooltip
+            icon={HiOutlineClipboardCopy}
+            label={copyLabel}
+            onClick={async () => await handleCopy(code)}
+            triggerClasses="text-foreground/50 hover:text-foreground"
+            variant="ghost"
+          >
+            {showCopiedTooltip ? (
+              <div className="absolute top-full right-0 mt-1 bg-surface-dark text-foreground text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+                {copyLabel === 'Copy data link'
+                  ? 'Data link copied!'
+                  : copyLabel === 'Copy code'
+                    ? 'Code copied!'
+                    : 'Copied!'}
+              </div>
+            ) : null}
+          </FgTooltip>
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -145,12 +211,12 @@ export default function DataLinkUsageDialog({
             value="python"
           >
             <InstructionBlock steps={['Install zarr package']} />
-            <CodeSnippetBlock
+            <CodeBlock
               code={`import zarr
 store = zarr.open("${dataLinkUrl}")`}
               copyLabel="Copy code"
-              copyText={`import zarr
-store = zarr.open("${dataLinkUrl}")`}
+              copyable={true}
+              language="python"
             />
           </Tabs.Panel>
 
@@ -159,10 +225,11 @@ store = zarr.open("${dataLinkUrl}")`}
             className="flex-1 flex flex-col gap-4 max-w-full p-4 rounded-b-lg border border-t-0 border-surface"
             value="java"
           >
-            <CodeSnippetBlock
+            <CodeBlock
               code={`String url = "${dataLinkUrl}";`}
               copyLabel="Copy code"
-              copyText={`String url = "${dataLinkUrl}";`}
+              copyable={true}
+              language="java"
             />
           </Tabs.Panel>
         </Tabs>
