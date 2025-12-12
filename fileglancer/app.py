@@ -1209,7 +1209,9 @@ def create_app(settings):
                         raise HTTPException(status_code=400, detail="Invalid file path")
                 except AttributeError:
                     # For Python < 3.9
-                    if resolved_ui_dir not in resolved_file_path.parents and resolved_file_path != resolved_ui_dir:
+                    try:
+                        resolved_file_path.relative_to(resolved_ui_dir)
+                    except ValueError:
                         raise HTTPException(status_code=400, detail="Invalid file path")
             except (ValueError, RuntimeError):
                 raise HTTPException(status_code=400, detail="Invalid file path")
