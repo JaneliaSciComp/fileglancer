@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Typography } from '@material-tailwind/react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import {
@@ -10,6 +9,7 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { formatFileSize, formatUnixTimestamp } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
 import { useFileContentQuery } from '@/queries/fileContentQueries';
+import useDarkMode from '@/hooks/useDarkMode';
 
 type FileViewerProps = {
   readonly file: FileOrFolder;
@@ -76,26 +76,8 @@ const getLanguageFromExtension = (filename: string): string => {
 
 export default function FileViewer({ file }: FileViewerProps) {
   const { fspName } = useFileBrowserContext();
-
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
-
+  const isDarkMode = useDarkMode();
   const contentQuery = useFileContentQuery(fspName, file.path);
-
-  // Detect dark mode from document
-  useEffect(() => {
-    const checkDarkMode = () => {
-      setIsDarkMode(document.documentElement.classList.contains('dark'));
-    };
-
-    checkDarkMode();
-    const observer = new MutationObserver(checkDarkMode);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class']
-    });
-
-    return () => observer.disconnect();
-  }, []);
 
   const renderViewer = () => {
     if (contentQuery.isLoading) {
