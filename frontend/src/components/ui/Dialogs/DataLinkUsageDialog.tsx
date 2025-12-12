@@ -1,28 +1,10 @@
-import { Typography } from '@material-tailwind/react';
+import { useState } from 'react';
+import { Typography, Tabs } from '@material-tailwind/react';
 import { HiOutlineClipboardCopy } from 'react-icons/hi';
 
 import FgDialog from './FgDialog';
 import FgTooltip from '../widgets/FgTooltip';
 import useCopyTooltip from '@/hooks/useCopyTooltip';
-import { copy } from '@testing-library/user-event/dist/cjs/clipboard/copy.js';
-
-type CodeSnippetItem = {
-  type: 'code';
-  label: string;
-  code: string;
-  copyText: string;
-  copyLabel?: string;
-};
-
-type InstructionItem = {
-  type: 'instructions';
-  label: string;
-  steps: string[];
-  copyText: string;
-  copyLabel?: string;
-};
-
-type DialogItem = CodeSnippetItem | InstructionItem;
 
 type CodeSnippetBlockProps = {
   readonly label: string;
@@ -62,60 +44,38 @@ function CopyIconAndTooltip({
 }
 
 function CodeSnippetBlock({
-  label,
   code,
   copyText,
   copyLabel = 'Copy'
-}: CodeSnippetBlockProps) {
+}: Omit<CodeSnippetBlockProps, 'label'>) {
   return (
-    <div className="flex flex-col gap-2">
-      <Typography className="text-foreground font-semibold">{label}</Typography>
-      <div className="relative bg-surface rounded-md p-4">
-        <pre className="text-foreground text-sm font-mono break-normal whitespace-pre-wrap pr-10">
-          {code}
-        </pre>
-        <div className="absolute top-2 right-2">
-          <CopyIconAndTooltip copyLabel={copyLabel} copyText={copyText} />
-        </div>
+    <div className="relative bg-surface rounded-md p-4">
+      <pre className="text-foreground text-sm font-mono break-normal whitespace-pre-wrap pr-10">
+        {code}
+      </pre>
+      <div className="absolute top-2 right-2">
+        <CopyIconAndTooltip copyLabel={copyLabel} copyText={copyText} />
       </div>
     </div>
   );
 }
 
 type InstructionBlockProps = {
-  readonly label: string;
   readonly steps: string[];
-  readonly copyText: string;
-  readonly copyLabel?: string;
 };
 
-function InstructionBlock({
-  label,
-  steps,
-  copyText,
-  copyLabel = 'Copy'
-}: InstructionBlockProps) {
+function InstructionBlock({ steps }: InstructionBlockProps) {
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
-        <Typography className="text-foreground font-semibold">
-          {label}
-        </Typography>
-        <CopyIconAndTooltip copyLabel={copyLabel} copyText={copyText} />
-      </div>
-      <div className="rounded-lg border border-surface p-4">
-        <ol className="space-y-3 text-foreground">
-          {steps.map((step, index) => (
-            <li className="flex items-start gap-3 text-sm" key={index}>
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-semibold">
-                {index + 1}
-              </span>
-              <span className="pt-0.5">{step}</span>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </div>
+    <ol className="space-y-3 text-foreground">
+      {steps.map((step, index) => (
+        <li className="flex items-start gap-3 text-sm" key={index}>
+          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-semibold">
+            {index + 1}
+          </span>
+          <span className="pt-0.5">{step}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -130,64 +90,82 @@ export default function DataLinkUsageDialog({
   open,
   onClose
 }: DataLinkUsageDialogProps) {
-  const items: DialogItem[] = [
-    {
-      type: 'instructions',
-      label: 'Napari',
-      steps: [
-        'Install napari-ome-zarr plugin',
-        'Launch napari',
-        'Open the data URL'
-      ],
-      copyText: dataLinkUrl,
-      copyLabel: 'Copy data link'
-    },
-    {
-      type: 'code',
-      label: 'Python',
-      code: `import zarr
-store = zarr.open("${dataLinkUrl}")`,
-      copyText: `import zarr
-store = zarr.open("${dataLinkUrl}")`,
-      copyLabel: 'Copy code'
-    },
-    {
-      type: 'code',
-      label: 'Java',
-      code: `String url = "${dataLinkUrl}";`,
-      copyText: `String url = "${dataLinkUrl}";`,
-      copyLabel: 'Copy code'
-    }
-  ];
+  const [activeTab, setActiveTab] = useState<string>('napari');
 
   return (
     <FgDialog onClose={onClose} open={open}>
-      <div className="flex flex-col gap-6 my-4">
-        <Typography className="text-foreground font-semibold text-lg">
-          How to use your data link
-        </Typography>
-        {items.map(item => {
-          if (item.type === 'code') {
-            return (
-              <CodeSnippetBlock
-                code={item.code}
-                copyLabel={item.copyLabel}
-                copyText={item.copyText}
-                key={item.label}
-                label={item.label}
-              />
-            );
-          }
-          return (
+      <div className="flex flex-col gap-4 my-4">
+        <div className="flex items-center gap-4">
+          <Typography className="text-foreground font-semibold text-lg">
+            How to use your data link
+          </Typography>
+          <CopyIconAndTooltip
+            copyLabel="Copy data link"
+            copyText={dataLinkUrl}
+          />
+        </div>
+        <Tabs
+          className="flex flex-col flex-1 min-h-0 gap-0"
+          key="data-link-usage-tabs"
+          onValueChange={setActiveTab}
+          value={activeTab}
+        >
+          <Tabs.List className="justify-start items-stretch shrink-0 min-w-fit w-full rounded-b-none bg-surface dark:bg-surface-light">
+            <Tabs.Trigger className="!text-foreground h-full" value="napari">
+              Napari
+            </Tabs.Trigger>
+
+            <Tabs.Trigger className="!text-foreground h-full" value="python">
+              Python
+            </Tabs.Trigger>
+
+            <Tabs.Trigger className="!text-foreground h-full" value="java">
+              Java
+            </Tabs.Trigger>
+            <Tabs.TriggerIndicator className="h-full" />
+          </Tabs.List>
+
+          {/* Napari panel */}
+          <Tabs.Panel
+            className="flex-1 flex flex-col gap-4 max-w-full p-4 rounded-b-lg border border-t-0 border-surface"
+            value="napari"
+          >
             <InstructionBlock
-              copyLabel={item.copyLabel}
-              copyText={item.copyText}
-              key={item.label}
-              label={item.label}
-              steps={item.steps}
+              steps={[
+                'Install napari-ome-zarr plugin',
+                'Launch napari',
+                'Open the data URL'
+              ]}
             />
-          );
-        })}
+          </Tabs.Panel>
+
+          {/* Python panel */}
+          <Tabs.Panel
+            className="flex-1 flex flex-col gap-4 max-w-full p-4 rounded-b-lg border border-t-0 border-surface"
+            value="python"
+          >
+            <InstructionBlock steps={['Install zarr package']} />
+            <CodeSnippetBlock
+              code={`import zarr
+store = zarr.open("${dataLinkUrl}")`}
+              copyLabel="Copy code"
+              copyText={`import zarr
+store = zarr.open("${dataLinkUrl}")`}
+            />
+          </Tabs.Panel>
+
+          {/* Java panel */}
+          <Tabs.Panel
+            className="flex-1 flex flex-col gap-4 max-w-full p-4 rounded-b-lg border border-t-0 border-surface"
+            value="java"
+          >
+            <CodeSnippetBlock
+              code={`String url = "${dataLinkUrl}";`}
+              copyLabel="Copy code"
+              copyText={`String url = "${dataLinkUrl}";`}
+            />
+          </Tabs.Panel>
+        </Tabs>
       </div>
     </FgDialog>
   );
