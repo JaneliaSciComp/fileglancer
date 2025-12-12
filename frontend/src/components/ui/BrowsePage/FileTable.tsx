@@ -17,14 +17,15 @@ import {
 
 import type { FileOrFolder } from '@/shared.types';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-import {
-  formatUnixTimestamp,
-  formatFileSize,
-  makeBrowseLink
-} from '@/utils/index';
+import { makeBrowseLink } from '@/utils/index';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import { FgStyledLink } from '@/components/ui/widgets/FgLink';
 import { SortIcons } from '@/components/ui/Table/TableCard';
+import {
+  typeColumn,
+  lastModifiedColumn,
+  sizeColumn
+} from '@/components/ui/BrowsePage/fileTableColumns';
 
 type TableProps = {
   readonly data: FileOrFolder[];
@@ -87,47 +88,9 @@ export default function Table({
         },
         size: 250
       },
-      {
-        accessorKey: 'is_dir',
-        header: 'Type',
-        cell: ({ getValue }) => (
-          <Typography>{getValue() ? 'Folder' : 'File'}</Typography>
-        ),
-        sortingFn: (rowA, rowB) => {
-          const a = rowA.original.is_dir;
-          const b = rowB.original.is_dir;
-          if (a === b) {
-            return 0;
-          }
-          return a ? -1 : 1; // Folders first
-        },
-        size: 80
-      },
-      {
-        accessorKey: 'last_modified',
-        header: 'Last Modified',
-        cell: ({ getValue }) => (
-          <Typography className="truncate" variant="small">
-            {formatUnixTimestamp(getValue() as number)}
-          </Typography>
-        ),
-        size: 130
-      },
-      {
-        accessorKey: 'size',
-        header: 'Size',
-        cell: ({ getValue, row }) => (
-          <Typography>
-            {row.original.is_dir ? '—' : formatFileSize(getValue() as number)}
-          </Typography>
-        ),
-        sortingFn: (rowA, rowB) => {
-          const a = rowA.original.is_dir ? -1 : rowA.original.size;
-          const b = rowB.original.is_dir ? -1 : rowB.original.size;
-          return a - b;
-        },
-        size: 75
-      },
+      typeColumn,
+      lastModifiedColumn,
+      sizeColumn,
       {
         id: 'actions',
         header: 'Actions',

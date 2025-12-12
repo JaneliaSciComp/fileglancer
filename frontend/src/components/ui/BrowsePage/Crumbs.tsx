@@ -1,16 +1,9 @@
-import { Fragment } from 'react';
-import {
-  BreadcrumbLink,
-  Breadcrumb,
-  Typography,
-  BreadcrumbSeparator,
-  IconButton
-} from '@material-tailwind/react';
+import { Breadcrumb, Typography, IconButton } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 import { HiChevronRight, HiOutlineDuplicate } from 'react-icons/hi';
-import { HiMiniSlash, HiOutlineSquares2X2 } from 'react-icons/hi2';
+import { HiOutlineSquares2X2 } from 'react-icons/hi2';
 
-import { FgStyledLink } from '../widgets/FgLink';
+import BreadcrumbSegment from './BreadcrumbSegment';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
@@ -70,53 +63,31 @@ export default function Crumbs() {
         ) : (
           dirArray.map((pathSegment, index) => {
             if (currentFileSharePath) {
-              const isFile = !fileQuery.data
-                ? false
-                : fileQuery.data?.currentFileOrFolder &&
-                  !fileQuery.data.currentFileOrFolder.is_dir &&
-                  index === dirDepth - 1;
+              const isLast = index === dirDepth - 1;
+              const isFile =
+                fileQuery.data?.currentFileOrFolder &&
+                !fileQuery.data.currentFileOrFolder.is_dir &&
+                isLast
+                  ? true
+                  : undefined;
 
-              if (index < dirDepth - 1) {
-                const path = joinPaths(...dirArray.slice(1, index + 1));
-                const link = makeBrowseLink(currentFileSharePath.name, path);
-                // Render a breadcrumb link for each segment in the parent path
-                return (
-                  <Fragment key={pathSegment + '-' + index}>
-                    <BreadcrumbLink as={FgStyledLink} to={link}>
-                      <Typography
-                        className="font-medium text-primary-light"
-                        variant="small"
-                      >
-                        {pathSegment}
-                      </Typography>
-                    </BreadcrumbLink>
-                    {/* Add separator since is not the last segment */}
-                    <BreadcrumbSeparator>
-                      {pathPreference[0] === 'windows_path' ? (
-                        <HiMiniSlash className="icon-default transform scale-x-[-1]" />
-                      ) : (
-                        <HiMiniSlash className="icon-default" />
-                      )}
-                    </BreadcrumbSeparator>
-                  </Fragment>
-                );
-              } else {
-                // Render the last path component as text only
-                // If it's a file, make it visually distinct
-                return (
-                  <Fragment key={pathSegment + '-' + index}>
-                    <Typography
-                      className={`font-medium ${
-                        isFile
-                          ? 'text-primary-default italic'
-                          : 'text-primary-default'
-                      }`}
-                    >
-                      {pathSegment}
-                    </Typography>
-                  </Fragment>
-                );
-              }
+              const path = isLast
+                ? undefined
+                : joinPaths(...dirArray.slice(1, index + 1));
+              const link = path
+                ? makeBrowseLink(currentFileSharePath.name, path)
+                : undefined;
+
+              return (
+                <BreadcrumbSegment
+                  isFile={isFile}
+                  isLast={isLast}
+                  key={pathSegment + '-' + index}
+                  label={pathSegment}
+                  pathPreference={pathPreference}
+                  to={link}
+                />
+              );
             }
           })
         )}
