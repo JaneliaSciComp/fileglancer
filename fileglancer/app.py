@@ -1200,10 +1200,18 @@ def create_app(settings):
             file_path = ui_dir / full_path
             # Validate that the resolved path is under ui_dir (prevent path traversal)
             try:
-                resolved_file_path = os.path.normpath(file_path)
-                resolved_ui_dir = ui_dir.resolve()
-                if not str(resolved_file_path).startswith(str(resolved_ui_dir)):
-                    raise HTTPException(status_code=400, detail="Invalid file path")
+                resolved_file_path = file_path.resolve(strict=False)
+                resolved_ui_dir = ui_dir.resolve(strict=True)
+                # Check if resolved_file_path is a subpath of resolved_ui_dir
+                try:
+                    if not resolved_file_path.is_relative_to(resolved_ui_dir):
+                        raise HTTPException(status_code=400, detail="Invalid file path")
+                except AttributeError:
+                    # For Python < 3.9, fallback to manual check
+                    resolved_file_path_str = str(resolved_file_path)
+                    resolved_ui_dir_str = str(resolved_ui_dir)
+                    if not resolved_file_path_str.startswith(resolved_ui_dir_str.rstrip(os.sep) + os.sep):
+                        raise HTTPException(status_code=400, detail="Invalid file path")
             except (ValueError, RuntimeError):
                 raise HTTPException(status_code=400, detail="Invalid file path")
             if resolved_file_path.exists() and resolved_file_path.is_file():
