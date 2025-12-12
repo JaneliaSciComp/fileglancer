@@ -303,7 +303,7 @@ export default function PropertiesDrawer({
                         path={proxiedPathByFspAndPathQuery.data.url}
                       />
                       <TextDialogBtn
-                        label="Example code snippets"
+                        label="How to use your data link"
                         variant="solid"
                       >
                         {closeDialog => (
