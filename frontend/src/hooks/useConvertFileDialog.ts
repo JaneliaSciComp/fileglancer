@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 import { useTicketContext } from '@/contexts/TicketsContext';
 import { createSuccess, handleError } from '@/utils/errorHandling';
@@ -9,6 +9,34 @@ export default function useConvertFileDialog() {
   const [destinationFolder, setDestinationFolder] = useState<string>('');
   const [outputFilename, setOutputFilename] = useState<string>('');
   const { createTicket, tasksEnabled } = useTicketContext();
+
+  // Validation for destination folder
+  const destinationValidation = useMemo(() => {
+    const trimmed = destinationFolder.trim();
+    const hasConsecutiveDots = /\.{2,}/.test(trimmed);
+    const isEmpty = trimmed.length === 0;
+
+    return {
+      isValid: !isEmpty && !hasConsecutiveDots,
+      isEmpty,
+      hasConsecutiveDots
+    };
+  }, [destinationFolder]);
+
+  // Validation for output filename
+  const filenameValidation = useMemo(() => {
+    const trimmed = outputFilename.trim();
+    const hasSlashes = /[/\\]/.test(trimmed);
+    const hasConsecutiveDots = /\.{2,}/.test(trimmed);
+    const isEmpty = trimmed.length === 0;
+
+    return {
+      isValid: !isEmpty && !hasSlashes && !hasConsecutiveDots,
+      isEmpty,
+      hasSlashes,
+      hasConsecutiveDots
+    };
+  }, [outputFilename]);
 
   async function handleTicketSubmit(): Promise<Result<void>> {
     if (!tasksEnabled) {
@@ -38,6 +66,8 @@ export default function useConvertFileDialog() {
     setDestinationFolder,
     outputFilename,
     setOutputFilename,
-    handleTicketSubmit
+    handleTicketSubmit,
+    destinationValidation,
+    filenameValidation
   };
 }

@@ -9,7 +9,7 @@ import { makeMapKey } from '@/utils';
 import { filterFspsByGroupMembership } from '@/utils/groupFiltering';
 import type { FileOrFolder, FileSharePath, Zone } from '@/shared.types';
 
-type FileSelectorLocation =
+export type FileSelectorLocation =
   | { type: 'zones' } // Top level: all zones
   | { type: 'zone'; zoneId: string } // Inside a single zone: File share paths (FSPs)
   | { type: 'filesystem'; fspName: string; path: string }; // Inside FSP: files/folders

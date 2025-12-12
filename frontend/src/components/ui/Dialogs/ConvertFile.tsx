@@ -30,7 +30,9 @@ export default function ConvertFileDialog({
     setDestinationFolder,
     outputFilename,
     setOutputFilename,
-    handleTicketSubmit
+    handleTicketSubmit,
+    destinationValidation,
+    filenameValidation
   } = useConvertFileDialog();
   const { pathPreference } = usePreferencesContext();
   const { fileQuery, fileBrowserState, fspName, filePath } =
@@ -122,6 +124,15 @@ export default function ConvertFileDialog({
               contact the app administrator.
             </Typography>
           ) : null}
+          {tasksEnabled &&
+          destinationFolder &&
+          !destinationValidation.isValid ? (
+            <Typography className="text-error" type="small">
+              {destinationValidation.hasConsecutiveDots
+                ? 'Destination folder cannot contain consecutive dots (..).'
+                : null}
+            </Typography>
+          ) : null}
         </div>
         <div className="flex flex-col gap-2 my-4">
           <Typography
@@ -129,7 +140,7 @@ export default function ConvertFileDialog({
             className="text-foreground font-semibold"
             htmlFor="output_filename"
           >
-            Output Filename
+            Output File or Folder Name
           </Typography>
           <input
             className="p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background disabled:cursor-not-allowed disabled:opacity-50"
@@ -142,11 +153,24 @@ export default function ConvertFileDialog({
             type="text"
             value={outputFilename}
           />
+          {tasksEnabled && outputFilename && !filenameValidation.isValid ? (
+            <Typography className="text-error" type="small">
+              {filenameValidation.hasSlashes
+                ? 'Output name cannot contain slashes. '
+                : null}
+              {filenameValidation.hasConsecutiveDots
+                ? 'Output name cannot contain consecutive dots (..). '
+                : null}
+            </Typography>
+          ) : null}
         </div>
         <Button
           className="!rounded-md"
           disabled={
             !destinationFolder ||
+            !outputFilename ||
+            !destinationValidation.isValid ||
+            !filenameValidation.isValid ||
             !tasksEnabled ||
             createTicketMutation.isPending ||
             allTicketsQuery.isFetching
