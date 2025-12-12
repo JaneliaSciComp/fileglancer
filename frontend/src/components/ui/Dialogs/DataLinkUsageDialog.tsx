@@ -67,7 +67,7 @@ function CodeBlock({
     marginRight: 0,
     marginBottom: 0,
     marginLeft: 0,
-    paddingTop: '1em',
+    paddingTop: '2em',
     paddingRight: '1em',
     paddingBottom: '0',
     paddingLeft: '1em',
@@ -89,7 +89,7 @@ function CodeBlock({
   };
 
   return (
-    <>
+    <div className="relative">
       <SyntaxHighlighter
         codeTagProps={mergedCodeTagProps}
         customStyle={customStyle}
@@ -122,7 +122,7 @@ function CodeBlock({
           </FgTooltip>
         </div>
       ) : null}
-    </>
+    </div>
   );
 }
 
@@ -158,6 +158,53 @@ export default function DataLinkUsageDialog({
 }: DataLinkUsageDialogProps) {
   const [activeTab, setActiveTab] = useState<string>('napari');
 
+  const tabs = [
+    {
+      id: 'napari',
+      label: 'Napari',
+      content: (
+        <InstructionBlock
+          steps={[
+            'Install napari-ome-zarr plugin',
+            'Launch napari',
+            'Open the data URL'
+          ]}
+        />
+      )
+    },
+    {
+      id: 'python',
+      label: 'Python',
+      content: (
+        <>
+          <InstructionBlock steps={['Install zarr package']} />
+          <CodeBlock
+            code={`import zarr\nstore = zarr.open("${dataLinkUrl}")`}
+            copyLabel="Copy code"
+            copyable={true}
+            language="python"
+          />
+        </>
+      )
+    },
+    {
+      id: 'java',
+      label: 'Java',
+      content: (
+        <CodeBlock
+          code={`String url = "${dataLinkUrl}";`}
+          copyLabel="Copy code"
+          copyable={true}
+          language="java"
+        />
+      )
+    }
+  ];
+
+  const TRIGGER_CLASSES = '!text-foreground h-full';
+  const PANEL_CLASSES =
+    'flex-1 flex flex-col gap-4 max-w-full p-4 rounded-b-lg border border-t-0 border-surface bg-surface-light';
+
   return (
     <FgDialog onClose={onClose} open={open}>
       <div className="flex flex-col gap-4 my-4">
@@ -177,61 +224,23 @@ export default function DataLinkUsageDialog({
           value={activeTab}
         >
           <Tabs.List className="justify-start items-stretch shrink-0 min-w-fit w-full rounded-b-none bg-surface dark:bg-surface-light">
-            <Tabs.Trigger className="!text-foreground h-full" value="napari">
-              Napari
-            </Tabs.Trigger>
-
-            <Tabs.Trigger className="!text-foreground h-full" value="python">
-              Python
-            </Tabs.Trigger>
-
-            <Tabs.Trigger className="!text-foreground h-full" value="java">
-              Java
-            </Tabs.Trigger>
+            {tabs.map(tab => (
+              <Tabs.Trigger
+                className={TRIGGER_CLASSES}
+                key={tab.id}
+                value={tab.id}
+              >
+                {tab.label}
+              </Tabs.Trigger>
+            ))}
             <Tabs.TriggerIndicator className="h-full" />
           </Tabs.List>
 
-          {/* Napari panel */}
-          <Tabs.Panel
-            className="flex-1 flex flex-col gap-4 max-w-full p-4 rounded-b-lg border border-t-0 border-surface"
-            value="napari"
-          >
-            <InstructionBlock
-              steps={[
-                'Install napari-ome-zarr plugin',
-                'Launch napari',
-                'Open the data URL'
-              ]}
-            />
-          </Tabs.Panel>
-
-          {/* Python panel */}
-          <Tabs.Panel
-            className="flex-1 flex flex-col gap-4 max-w-full p-4 rounded-b-lg border border-t-0 border-surface"
-            value="python"
-          >
-            <InstructionBlock steps={['Install zarr package']} />
-            <CodeBlock
-              code={`import zarr
-store = zarr.open("${dataLinkUrl}")`}
-              copyLabel="Copy code"
-              copyable={true}
-              language="python"
-            />
-          </Tabs.Panel>
-
-          {/* Java panel */}
-          <Tabs.Panel
-            className="flex-1 flex flex-col gap-4 max-w-full p-4 rounded-b-lg border border-t-0 border-surface"
-            value="java"
-          >
-            <CodeBlock
-              code={`String url = "${dataLinkUrl}";`}
-              copyLabel="Copy code"
-              copyable={true}
-              language="java"
-            />
-          </Tabs.Panel>
+          {tabs.map(tab => (
+            <Tabs.Panel className={PANEL_CLASSES} key={tab.id} value={tab.id}>
+              {tab.content}
+            </Tabs.Panel>
+          ))}
         </Tabs>
       </div>
     </FgDialog>
