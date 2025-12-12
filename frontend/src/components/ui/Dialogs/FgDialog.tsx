@@ -16,7 +16,7 @@ export default function FgDialog({
   className = ''
 }: FgDialogProps) {
   return (
-    <Dialog open={open}>
+    <Dialog onOpenChange={() => onClose()} open={open}>
       <Dialog.Overlay>
         <Dialog.Content className={`p-6 bg-surface-light ${className}`}>
           <IconButton

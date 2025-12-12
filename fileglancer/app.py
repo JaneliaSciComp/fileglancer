@@ -40,6 +40,21 @@ from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error
 from x2s3.client_file import FileProxyClient
 
 
+class UserContextStreamingResponse(StreamingResponse):
+    """StreamingResponse that maintains a user context for the duration of the stream"""
+    def __init__(self, *args, user_context: UserContext = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user_context = user_context
+
+    async def stream_response(self, send):
+        """Override to wrap streaming in user context"""
+        if self.user_context:
+            with self.user_context:
+                await super().stream_response(send)
+        else:
+            await super().stream_response(send)
+
+
 # Read version once at module load time
 def _read_version() -> str:
     """Read version from package metadata or package.json file"""
@@ -635,6 +650,7 @@ def create_app(settings):
     async def get_proxied_paths(fsp_name: str = Query(None, description="The name of the file share path that this proxied path is associated with"),
                                 path: str = Query(None, description="The path being proxied"),
                                 username: str = Depends(get_current_user)):
+        
         with db.get_db_session(settings.db_url) as session:
             db_proxied_paths = db.get_proxied_paths(session, username, fsp_name, path)
             proxied_paths = [_convert_proxied_path(db_path, settings.external_proxy_url) for db_path in db_proxied_paths]
@@ -645,6 +661,7 @@ def create_app(settings):
              description="Retrieve a proxied path by sharing key")
     async def get_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path"),
                                username: str = Depends(get_current_user)):
+
         with db.get_db_session(settings.db_url) as session:
             path = db.get_proxied_path_by_sharing_key(session, sharing_key)
             if not path:
@@ -711,8 +728,22 @@ def create_app(settings):
                 return get_error_response(400, "InvalidArgument", f"Invalid list type {list_type}", path)
         else:
             range_header = request.headers.get("range")
+            # Build the response inside context (for file stat/checks)
             with ctx:
-                return await client.get_object(path, range_header)
+                response = await client.get_object(path, range_header)
+
+            # If it's a StreamingResponse, wrap it to keep context alive during streaming
+            if isinstance(response, StreamingResponse):
+                return UserContextStreamingResponse(
+                    response.body_iterator,
+                    status_code=response.status_code,
+                    headers=dict(response.headers),
+                    media_type=response.media_type,
+                    user_context=ctx
+                )
+            else:
+                # For error responses, just return as-is
+                return response
 
 
     @app.head("/files/{sharing_key}/{sharing_name}/{path:path}")

@@ -21,6 +21,7 @@ export default function Jobs() {
         columns={jobsColumns}
         data={allTicketsQuery.data || []}
         dataType="tasks"
+        errorState={allTicketsQuery.error}
         gridColsClass="grid-cols-[3fr_3fr_1fr_2fr]"
         loadingState={allTicketsQuery.isPending}
       />

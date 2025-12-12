@@ -9,6 +9,8 @@ type FgTooltipProps = {
   readonly onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
   readonly icon?: ElementType;
   readonly label: string;
+  readonly interactiveLabel?: ReactNode;
+  readonly isInteractive?: boolean;
   readonly triggerClasses?: string;
   readonly openCondition?: boolean;
   readonly children?: ReactNode;
@@ -22,6 +24,8 @@ export default function FgTooltip({
   onClick,
   icon,
   label,
+  interactiveLabel,
+  isInteractive = false,
   triggerClasses,
   openCondition,
   children
@@ -30,7 +34,7 @@ export default function FgTooltip({
   const Icon = icon || null;
 
   return (
-    <Tooltip open={openCondition} placement="top">
+    <Tooltip interactive={isInteractive} open={openCondition} placement="top">
       <Tooltip.Trigger
         aria-label={label}
         as={Component || 'div'}
@@ -44,7 +48,7 @@ export default function FgTooltip({
         {children}
         <Tooltip.Content className="px-2.5 py-1.5 text-primary-foreground z-[9999]">
           <Typography className="opacity-90" type="small">
-            {label}
+            {interactiveLabel ? interactiveLabel : label}
           </Typography>
           <Tooltip.Arrow />
         </Tooltip.Content>
