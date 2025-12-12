@@ -103,11 +103,25 @@ export default function FileViewer({ file }: FileViewerProps) {
     const language = getLanguageFromExtension(file.name);
     const content = contentQuery.data ?? '';
 
+    // Get the theme's code styles and merge with padding bottom for scrollbar
+    const theme = isDarkMode ? materialDark : coy;
+    const themeCodeStyles = theme['code[class*="language-"]'] || {};
+    const mergedCodeTagProps = {
+      style: {
+        ...themeCodeStyles,
+        paddingBottom: '1em'
+      }
+    };
+
     return (
       <SyntaxHighlighter
+        codeTagProps={mergedCodeTagProps}
         customStyle={{
           margin: 0,
-          padding: '1rem',
+          paddingTop: '1em',
+          paddingRight: '1em',
+          paddingBottom: '0',
+          paddingLeft: '1em',
           fontSize: '14px',
           lineHeight: '1.5'
         }}
