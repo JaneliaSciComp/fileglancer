@@ -1202,12 +1202,15 @@ def create_app(settings):
             try:
                 resolved_file_path = file_path.resolve(strict=False)
                 resolved_ui_dir = ui_dir.resolve(strict=True)
-                # Use os.path.commonpath to ensure robust containment validation
-                resolved_file_path_str = str(resolved_file_path)
-                resolved_ui_dir_str = str(resolved_ui_dir)
-                common = os.path.commonpath([resolved_file_path_str, resolved_ui_dir_str])
-                if common != resolved_ui_dir_str:
-                    raise HTTPException(status_code=400, detail="Invalid file path")
+                # Ensure that the requested file path is within the ui_dir to prevent path traversal
+                try:
+                    # Python 3.9+: use is_relative_to
+                    if not resolved_file_path.is_relative_to(resolved_ui_dir):
+                        raise HTTPException(status_code=400, detail="Invalid file path")
+                except AttributeError:
+                    # For Python < 3.9
+                    if resolved_ui_dir not in resolved_file_path.parents and resolved_file_path != resolved_ui_dir:
+                        raise HTTPException(status_code=400, detail="Invalid file path")
             except (ValueError, RuntimeError):
                 raise HTTPException(status_code=400, detail="Invalid file path")
             if resolved_file_path.exists() and resolved_file_path.is_file():
