@@ -284,14 +284,14 @@ function generateSimpleNeuroglancerStateForOmeZarr(
       : 'auto';
 
   const state = {
-    layout: layout,
     layers: [
       {
         name: getLayerName(dataUrl),
         source: getNeuroglancerSource(dataUrl, zarrVersion),
         type
       }
-    ]
+    ],
+    layout: layout
   };
 
   log.debug('Simple Neuroglancer state: ', state);
@@ -337,11 +337,11 @@ function generateLegacyNeuroglancerStateForOmeZarr(
   const state: any = {
     dimensions: {},
     layers: [],
-    layout: '4panel-alt',
     selectedLayer: {
       visible: true,
       layer: defaultLayerName
-    }
+    },
+    layout: '4panel-alt'
   };
 
   const scales = getResolvedScales(multiscale);
