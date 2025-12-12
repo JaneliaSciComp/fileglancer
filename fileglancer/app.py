@@ -1197,26 +1197,25 @@ def create_app(settings):
         """Serve index.html for all SPA routes under /fg/ (client-side routing)"""
         # Serve logo.svg and other root-level static files from ui directory
         if full_path and full_path != "/":
-            file_path = ui_dir / full_path
-            # Validate that the resolved path is under ui_dir (prevent path traversal)
+            # Defensive: Disallow absolute paths entirely
+            if os.path.isabs(full_path):
+                raise HTTPException(status_code=400, detail="Invalid file path")
+            # Resolve ui_dir securely once
+            resolved_ui_dir = ui_dir.resolve(strict=True)
+            # Join but do not allow '..' or absolute segments to escape
+            file_path = (resolved_ui_dir / full_path).resolve(strict=False)
+            # Ensure the resolved file path is under the UI root
             try:
-                resolved_file_path = file_path.resolve(strict=False)
-                resolved_ui_dir = ui_dir.resolve(strict=True)
-                # Ensure that the requested file path is within the ui_dir to prevent path traversal
-                try:
-                    # Python 3.9+: use is_relative_to
-                    if not resolved_file_path.is_relative_to(resolved_ui_dir):
+                # Python 3.9+: use is_relative_to
+                if hasattr(file_path, "is_relative_to"):
+                    if not file_path.is_relative_to(resolved_ui_dir):
                         raise HTTPException(status_code=400, detail="Invalid file path")
-                except AttributeError:
-                    # For Python < 3.9
-                    try:
-                        resolved_file_path.relative_to(resolved_ui_dir)
-                    except ValueError:
-                        raise HTTPException(status_code=400, detail="Invalid file path")
+                else:
+                    file_path.relative_to(resolved_ui_dir)
             except (ValueError, RuntimeError):
                 raise HTTPException(status_code=400, detail="Invalid file path")
-            if resolved_file_path.exists() and resolved_file_path.is_file():
-                return FileResponse(resolved_file_path)
+            if file_path.exists() and file_path.is_file():
+                return FileResponse(file_path)
 
         # Otherwise serve index.html for SPA routing
         index_path = ui_dir / "index.html"
