@@ -1198,8 +1198,16 @@ def create_app(settings):
         # Serve logo.svg and other root-level static files from ui directory
         if full_path and full_path != "/":
             file_path = ui_dir / full_path
-            if file_path.exists() and file_path.is_file():
-                return FileResponse(file_path)
+            # Validate that the resolved path is under ui_dir (prevent path traversal)
+            try:
+                resolved_file_path = os.path.normpath(file_path)
+                resolved_ui_dir = ui_dir.resolve()
+                if not str(resolved_file_path).startswith(str(resolved_ui_dir)):
+                    raise HTTPException(status_code=400, detail="Invalid file path")
+            except (ValueError, RuntimeError):
+                raise HTTPException(status_code=400, detail="Invalid file path")
+            if resolved_file_path.exists() and resolved_file_path.is_file():
+                return FileResponse(resolved_file_path)
 
         # Otherwise serve index.html for SPA routing
         index_path = ui_dir / "index.html"
