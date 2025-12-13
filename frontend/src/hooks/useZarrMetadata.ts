@@ -43,6 +43,7 @@ export default function useZarrMetadata() {
     zarrMetadataQuery.data?.availableVersions.includes('v3') ? 3 : 2;
 
   const metadata = zarrMetadataQuery.data?.metadata || null;
+  const labels = zarrMetadataQuery.data?.labels || null;
   const omeZarrUrl = zarrMetadataQuery.data?.omeZarrUrl || null;
 
   // Fetch thumbnail when OME-Zarr URL is available
@@ -136,6 +137,7 @@ export default function useZarrMetadata() {
                 layerType,
                 metadata.multiscale,
                 metadata.arr,
+                labels,
                 metadata.omero,
                 useLegacyMultichannelApproach
               );

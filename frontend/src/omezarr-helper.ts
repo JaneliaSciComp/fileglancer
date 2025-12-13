@@ -307,9 +307,10 @@ function generateSimpleNeuroglancerStateForOmeZarr(
 function generateLegacyNeuroglancerStateForOmeZarr(
   dataUrl: string,
   zarrVersion: 2 | 3,
-  layerType: LayerType,
+  layerType: LayerType, 
   multiscale: omezarr.Multiscale,
   arr: zarr.Array<any>,
+  labels: string[] | null,
   omero?: omezarr.Omero | null
 ): string | null {
   if (!multiscale || !arr) {
@@ -338,10 +339,16 @@ function generateLegacyNeuroglancerStateForOmeZarr(
     dimensions: {},
     layers: [],
     selectedLayer: {
-      visible: true,
       layer: defaultLayerName
     },
-    layout: '4panel-alt'
+    layout: '4panel-alt',
+    toolPalettes: {
+      'Shader controls': {
+        side: 'left',
+        row: 3,
+        query: 'type:shaderControl'
+      }
+    }
   };
 
   const scales = getResolvedScales(multiscale);
@@ -368,6 +375,8 @@ function generateLegacyNeuroglancerStateForOmeZarr(
   if (imageDimensions.size > 0) {
     log.warn('Unused dimensions: ', Array.from(imageDimensions));
   }
+
+  const sourceUrl = getNeuroglancerSource(dataUrl, zarrVersion);
 
   let colorIndex = 0;
   const channels = [];
@@ -406,8 +415,9 @@ function generateLegacyNeuroglancerStateForOmeZarr(
   if (channels.length === 0) {
     log.trace('No channels found in metadata, using default shader');
     const layer: Record<string, any> = {
+      name: defaultLayerName,
       type: layerType,
-      source: getNeuroglancerSource(dataUrl, zarrVersion),
+      source: sourceUrl,
       tab: 'rendering',
       opacity: 1,
       blend: 'additive',
@@ -417,10 +427,7 @@ function generateLegacyNeuroglancerStateForOmeZarr(
         }
       }
     };
-    state.layers.push({
-      name: defaultLayerName,
-      ...layer
-    });
+    state.layers.push(layer);
   } else {
     // If there is only one channel, make it white
     if (channels.length === 1) {
@@ -444,12 +451,14 @@ function generateLegacyNeuroglancerStateForOmeZarr(
       const transform = { outputDimensions: localDimensions };
 
       const layer: Record<string, any> = {
+        name: channel.name,
         type: layerType,
         source: {
-          url: getNeuroglancerSource(dataUrl, zarrVersion),
+          url: sourceUrl,
           transform
         },
         tab: 'rendering',
+        archived: i >= 4, // Archive layers after the first 4
         opacity: 1,
         blend: 'additive',
         shader: getShader(color, minValue, maxValue),
@@ -459,7 +468,7 @@ function generateLegacyNeuroglancerStateForOmeZarr(
 
       // Add shader controls if contrast limits are defined
       const start = channel.contrast_limit_start ?? dtypeMin;
-      const end = (channel.contrast_limit_end ?? dtypeMax) * 0.25;
+      const end = channel.contrast_limit_end ?? dtypeMax;
       if (start !== null && end !== null) {
         layer.shaderControls = {
           normalized: {
@@ -468,14 +477,30 @@ function generateLegacyNeuroglancerStateForOmeZarr(
         };
       }
 
-      state.layers.push({
-        name: channel.name,
-        ...layer
-      });
+      state.layers.push(layer);
     });
+
+    // Show the layer list panel if there are more than 4 channels
+    if (channels.length > 4) {
+      state.layerListPanel = {
+        visible: true
+      };
+    }
 
     // Fix the selected layer name
     state.selectedLayer.layer = channels[0].name;
+  }
+
+  // Add layer for each label
+  if (labels) {
+    labels.forEach((label) => {
+      const layer: Record<string, any> = {
+        name: label,
+        source: sourceUrl+"/labels/"+label,
+        type: 'segmentation'
+      };
+      state.layers.push(layer);
+    });
   }
 
   log.debug('Neuroglancer state: ', state);
@@ -494,18 +519,20 @@ function generateNeuroglancerStateForOmeZarr(
   layerType: LayerType,
   multiscale: omezarr.Multiscale,
   arr: zarr.Array<any>,
+  labels: string[] | null,
   omero?: omezarr.Omero | null,
   useLegacyMultichannelApproach: boolean = false
 ): string | null {
-  // If using legacy multichannel approach, use the complex version
-  if (useLegacyMultichannelApproach) {
+  // If there are labels or user requested legacy multichannel approach, use the complex version
+  if (labels || useLegacyMultichannelApproach) {
     return generateLegacyNeuroglancerStateForOmeZarr(
       dataUrl,
       zarrVersion,
       layerType,
       multiscale,
       arr,
-      omero
+      labels,
+      omero,
     );
   }
 
