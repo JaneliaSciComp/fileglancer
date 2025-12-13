@@ -252,7 +252,7 @@ function generateNeuroglancerStateForZarrArray(
 }
 
 /**
- * Generate a simple Neuroglancer state for a given Zarr array (non-legacy approach).
+ * Generate a simple Neuroglancer state for a given Zarr array.
  */
 function generateSimpleNeuroglancerStateForOmeZarr(
   dataUrl: string,
@@ -265,6 +265,7 @@ function generateSimpleNeuroglancerStateForOmeZarr(
 
   // Convert axes array to a map for easier access
   const axesMap = getAxesMap(multiscale);
+  log.debug('Axes map: ', axesMap);
 
   // Determine the layout based on the z-axis
   let layout = '4panel-alt';
@@ -276,7 +277,8 @@ function generateSimpleNeuroglancerStateForOmeZarr(
     }
   }
 
-  // If the layer type is segmentation AND there is no channel axis or the channel axis has only one channel
+  // Consider this a segmentation if the layer type is segmentation 
+  // AND there is no channel axis or the channel axis has only one channel
   const type =
     layerType === 'segmentation' &&
     (!axesMap['c'] || arr.shape[axesMap['c']?.index] === 1)
@@ -302,9 +304,9 @@ function generateSimpleNeuroglancerStateForOmeZarr(
 }
 
 /**
- * Generate a legacy Neuroglancer state for a given Zarr array (multichannel approach).
+ * Generate a Neuroglancer state for a given Zarr array.
  */
-function generateLegacyNeuroglancerStateForOmeZarr(
+function generateFullNeuroglancerStateForOmeZarr(
   dataUrl: string,
   zarrVersion: 2 | 3,
   layerType: LayerType, 
@@ -329,6 +331,16 @@ function generateLegacyNeuroglancerStateForOmeZarr(
   const axesMap = getAxesMap(multiscale);
   log.debug('Axes map: ', axesMap);
 
+  // Determine the layout based on the z-axis
+  let layout = '4panel-alt';
+  if ('z' in axesMap) {
+    const zAxisIndex = axesMap['z'].index;
+    const zDimension = arr.shape[zAxisIndex];
+    if (zDimension === 1) {
+      layout = 'xy';
+    }
+  }
+
   const { min: dtypeMin, max: dtypeMax } = getMinMaxValues(arr);
   log.debug('Inferred min/max values:', dtypeMin, dtypeMax);
 
@@ -341,15 +353,22 @@ function generateLegacyNeuroglancerStateForOmeZarr(
     selectedLayer: {
       layer: defaultLayerName
     },
-    layout: '4panel-alt',
-    toolPalettes: {
+    layout: layout
+  };
+
+  if (layerType === 'segmentation') {
+    state.selectedLayer.visible = true;
+  }
+  else {
+    // Add the shader controls tool palette for images
+    state.toolPalettes = {
       'Shader controls': {
         side: 'left',
         row: 3,
         query: 'type:shaderControl'
       }
-    }
-  };
+    };
+  }
 
   const scales = getResolvedScales(multiscale);
 
@@ -525,7 +544,7 @@ function generateNeuroglancerStateForOmeZarr(
 ): string | null {
   // If there are labels or user requested legacy multichannel approach, use the complex version
   if (labels || useLegacyMultichannelApproach) {
-    return generateLegacyNeuroglancerStateForOmeZarr(
+    return generateFullNeuroglancerStateForOmeZarr(
       dataUrl,
       zarrVersion,
       layerType,

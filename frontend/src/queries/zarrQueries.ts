@@ -169,7 +169,7 @@ async function fetchZarrMetadata({
               log.info('OME-ZarrLabels: ', labels);
             }
           } catch (error) {
-            log.debug('Error fetching labels attrs: ', error);
+            log.trace('Could not fetch labels attrs: ', error);
           }
           return {
             metadata,
