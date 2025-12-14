@@ -4,28 +4,6 @@ import * as omezarr from 'ome-zarr.js';
 
 export type LayerType = 'auto' | 'image' | 'segmentation';
 
-/**
- * A single omero channel.
- */
-export interface Channel {
-  color: string;
-  window: Window;
-  lut?: string;
-  active?: boolean;
-  inverted?: boolean;
-  [k: string]: unknown;
-}
-/**
- * A single window.
- */
-export interface Window {
-  max: number;
-  min: number;
-  start?: number;
-  end?: number;
-  [k: string]: unknown;
-}
-
 export type Metadata = {
   arr: zarr.Array<any>;
   shapes: number[][] | undefined;
