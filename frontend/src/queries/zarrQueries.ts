@@ -32,6 +32,23 @@ type ZarrMetadataResult = {
   availableVersions: ('v2' | 'v3')[];
 };
 
+// Zarr v3 zarr.json structure
+type ZarrV3Attrs = {
+  node_type: 'array' | 'group';
+  attributes?: {
+    ome?: {
+      multiscales?: unknown;
+      labels?: string[];
+    };
+  };
+};
+
+// Zarr v2 .zattrs structure
+type ZarrV2Attrs = {
+  multiscales?: unknown;
+  labels?: string[];
+};
+
 /**
  * Detects which Zarr versions are supported by checking for version-specific marker files.
  * @returns Array of supported versions: ['v2'], ['v3'], or ['v2', 'v3']
@@ -85,7 +102,10 @@ async function fetchZarrMetadata({
   // Default to Zarr v3 when available
   if (availableVersions.includes('v3')) {
     const zarrJsonFile = getFile('zarr.json') as FileOrFolder;
-    const attrs = (await fetchFileAsJson(fspName, zarrJsonFile.path)) as any;
+    const attrs = (await fetchFileAsJson(
+      fspName,
+      zarrJsonFile.path
+    )) as ZarrV3Attrs;
 
     if (attrs.node_type === 'array') {
       log.info('Getting Zarr array for', imageUrl, 'with Zarr version', 3);
@@ -118,8 +138,8 @@ async function fetchZarrMetadata({
           const labelsAttrs = (await fetchFileAsJson(
             fspName,
             currentFileOrFolder.path + '/labels/zarr.json'
-          )) as any;
-          metadata.labels = labelsAttrs?.attributes?.ome?.labels as string[];
+          )) as ZarrV3Attrs;
+          metadata.labels = labelsAttrs?.attributes?.ome?.labels;
           if (metadata.labels) {
             log.info('OME-Zarr Labels found: ', metadata.labels);
           }
@@ -174,7 +194,10 @@ async function fetchZarrMetadata({
         };
         // Check for .zattrs (Zarr v2 OME-Zarr)
       } else if (zattrsFile) {
-        const attrs = (await fetchFileAsJson(fspName, zattrsFile.path)) as any;
+        const attrs = (await fetchFileAsJson(
+          fspName,
+          zattrsFile.path
+        )) as ZarrV2Attrs;
         if (attrs.multiscales) {
           log.info(
             'Getting OME-Zarr metadata for',
@@ -188,8 +211,8 @@ async function fetchZarrMetadata({
             const labelsAttrs = (await fetchFileAsJson(
               fspName,
               currentFileOrFolder.path + '/labels/.zattrs'
-            )) as any;
-            metadata.labels = labelsAttrs?.labels as string[];
+            )) as ZarrV2Attrs;
+            metadata.labels = labelsAttrs?.labels;
             if (metadata.labels) {
               log.info('OME-Zarr Labels found: ', metadata.labels);
             }
