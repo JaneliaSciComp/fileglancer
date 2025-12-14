@@ -110,6 +110,17 @@ async function fetchZarrMetadata({
           3
         );
         const metadata = await getOmeZarrMetadata(imageUrl);
+        // Check for labels
+        let labels: string[] | null = null; 
+        try {
+          const labelsAttrs = (await fetchFileAsJson(fspName, currentFileOrFolder.path+"/labels/zarr.json")) as any;
+          labels = labelsAttrs?.attributes?.ome?.labels as string[];
+          if (labels) {
+            log.info('OME-Zarr Labels: ', labels);
+          }
+        } catch (error) {
+          log.trace('Could not fetch labels attrs: ', error);
+        }
         return {
           metadata,
           labels: null,
