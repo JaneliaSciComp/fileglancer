@@ -709,26 +709,22 @@ async function determineLayerType(
   thumbnailDataUrl?: string | null
 ): Promise<LayerType> {
   const DEFAULT_LAYER_TYPE = 'image';
-  try {
-    if (!useHeuristicalDetection) {
-      log.debug('Heuristical layer type detection is disabled');
-    } else if (thumbnailDataUrl) {
-      try {
-        const edgeRatio = await analyzeThumbnailEdgeContent(thumbnailDataUrl);
-        log.debug('Thumbnail edge detection ratio:', edgeRatio);
-        // Segmentation data typically has low edge ratio
-        const layerType =
-          edgeRatio > 0.0 && edgeRatio < 0.05 ? 'segmentation' : 'image';
-        log.debug(`Layer type set to ${layerType} based on edge analysis`);
-        return layerType;
-      } catch (error) {
-        log.error('Failed to analyze thumbnail edge content:', error);
-      }
-    } else {
-      log.debug('No thumbnail available, returning image');
+  if (!useHeuristicalDetection) {
+    log.debug('Heuristical layer type detection is disabled');
+  } else if (thumbnailDataUrl) {
+    try {
+      const edgeRatio = await analyzeThumbnailEdgeContent(thumbnailDataUrl);
+      log.debug('Thumbnail edge detection ratio:', edgeRatio);
+      // Segmentation data typically has low edge ratio
+      const layerType =
+        edgeRatio > 0.0 && edgeRatio < 0.05 ? 'segmentation' : 'image';
+      log.debug(`Layer type set to ${layerType} based on edge analysis`);
+      return layerType;
+    } catch (error) {
+      log.error('Failed to analyze thumbnail edge content:', error);
     }
-  } catch (error) {
-    log.error('Error determining layer type:', error);
+  } else {
+    log.debug('No thumbnail available, returning image');
   }
   return DEFAULT_LAYER_TYPE;
 }
