@@ -28,7 +28,6 @@ type ZarrMetadataQueryParams = {
 
 type ZarrMetadataResult = {
   metadata: ZarrMetadata;
-  labels: string[] | null;
   omeZarrUrl: string | null;
   availableVersions: ('v2' | 'v3')[];
 };
@@ -70,7 +69,6 @@ async function fetchZarrMetadata({
     log.warn('Missing required parameters for Zarr metadata fetch');
     return {
       metadata: null,
-      labels: null,
       omeZarrUrl: null,
       availableVersions: []
     };
@@ -98,11 +96,11 @@ async function fetchZarrMetadata({
           arr,
           shapes,
           multiscale: undefined,
-          omero: undefined,
           scales: undefined,
+          omero: undefined,
+          labels: undefined,
           zarrVersion: 3
         },
-        labels: null,
         omeZarrUrl: null,
         availableVersions
       };
@@ -116,22 +114,20 @@ async function fetchZarrMetadata({
         );
         const metadata = await getOmeZarrMetadata(imageUrl);
         // Check for labels
-        let labels: string[] | null = null;
         try {
           const labelsAttrs = (await fetchFileAsJson(
             fspName,
             currentFileOrFolder.path + '/labels/zarr.json'
           )) as any;
-          labels = labelsAttrs?.attributes?.ome?.labels as string[];
-          if (labels) {
-            log.info('OME-Zarr Labels found: ', labels);
+          metadata.labels = labelsAttrs?.attributes?.ome?.labels as string[];
+          if (metadata.labels) {
+            log.info('OME-Zarr Labels found: ', metadata.labels);
           }
         } catch (error) {
           log.trace('Could not fetch labels attrs: ', error);
         }
         return {
           metadata,
-          labels: null,
           omeZarrUrl: imageUrl,
           availableVersions
         };
@@ -139,7 +135,6 @@ async function fetchZarrMetadata({
         log.info('Zarrv3 group has no multiscales', attrs.attributes);
         return {
           metadata: null,
-          labels: null,
           omeZarrUrl: null,
           availableVersions
         };
@@ -148,7 +143,6 @@ async function fetchZarrMetadata({
       log.warn('Unknown Zarrv3 node type', attrs.node_type);
       return {
         metadata: null,
-        labels: null,
         omeZarrUrl: null,
         availableVersions
       };
@@ -170,11 +164,11 @@ async function fetchZarrMetadata({
             arr,
             shapes,
             multiscale: undefined,
-            omero: undefined,
             scales: undefined,
+            omero: undefined,
+            labels: undefined,
             zarrVersion: 2
           },
-          labels: null,
           omeZarrUrl: null,
           availableVersions
         };
@@ -190,22 +184,20 @@ async function fetchZarrMetadata({
           );
           const metadata = await getOmeZarrMetadata(imageUrl);
           // Check for labels
-          let labels: string[] | null = null;
           try {
             const labelsAttrs = (await fetchFileAsJson(
               fspName,
               currentFileOrFolder.path + '/labels/.zattrs'
             )) as any;
-            labels = labelsAttrs?.labels as string[];
-            if (labels) {
-              log.info('OME-Zarr Labels found: ', labels);
+            metadata.labels = labelsAttrs?.labels as string[];
+            if (metadata.labels) {
+              log.info('OME-Zarr Labels found: ', metadata.labels);
             }
           } catch (error) {
             log.trace('Could not fetch labels attrs: ', error);
           }
           return {
             metadata,
-            labels,
             omeZarrUrl: imageUrl,
             availableVersions
           };
@@ -213,7 +205,6 @@ async function fetchZarrMetadata({
           log.debug('Zarrv2 .zattrs has no multiscales', attrs);
           return {
             metadata: null,
-            labels: null,
             omeZarrUrl: null,
             availableVersions
           };
@@ -223,7 +214,6 @@ async function fetchZarrMetadata({
         log.debug('No Zarr metadata files found for', imageUrl);
         return {
           metadata: null,
-          labels: null,
           omeZarrUrl: null,
           availableVersions
         };
@@ -233,7 +223,6 @@ async function fetchZarrMetadata({
       log.debug('No supported Zarr versions detected for', imageUrl);
       return {
         metadata: null,
-        labels: null,
         omeZarrUrl: null,
         availableVersions: []
       };

@@ -30,8 +30,9 @@ export type Metadata = {
   arr: zarr.Array<any>;
   shapes: number[][] | undefined;
   scales: number[][] | undefined;
-  multiscale: omezarr.Multiscale | null | undefined;
-  omero: omezarr.Omero | null | undefined;
+  multiscale: omezarr.Multiscale | undefined;
+  omero: omezarr.Omero | undefined;
+  labels: string[] | undefined;
   zarrVersion: 2 | 3;
 };
 
@@ -312,8 +313,8 @@ function generateFullNeuroglancerStateForOmeZarr(
   layerType: LayerType,
   multiscale: omezarr.Multiscale,
   arr: zarr.Array<any>,
-  labels: string[] | null,
-  omero?: omezarr.Omero | null
+  labels: string[] | undefined,
+  omero?: omezarr.Omero | undefined
 ): string | null {
   if (!multiscale || !arr) {
     throw new Error(
@@ -537,8 +538,8 @@ function generateNeuroglancerStateForOmeZarr(
   layerType: LayerType,
   multiscale: omezarr.Multiscale,
   arr: zarr.Array<any>,
-  labels: string[] | null,
-  omero?: omezarr.Omero | null,
+  labels: string[] | undefined,
+  omero?: omezarr.Omero | undefined,
   useLegacyMultichannelApproach: boolean = false
 ): string | null {
   // If there are labels or user requested legacy multichannel approach, use the complex version
@@ -587,6 +588,8 @@ async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
   });
   const { arr, shapes, multiscale, omero, scales, zarr_version } =
     await omezarr.getMultiscaleWithArray(store, 0);
+  // Normalize omero to undefined if it is null
+  const omero2 = omero ?? undefined;
   log.debug(
     'Zarr version: ',
     zarr_version,
@@ -597,17 +600,17 @@ async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
     '\nMultiscale: ',
     multiscale,
     '\nOmero: ',
-    omero,
+    omero2,
     '\nScales: ',
     scales
   );
-
   const metadata: Metadata = {
     arr,
     shapes,
     scales,
     multiscale,
-    omero,
+    omero: omero2,
+    labels: undefined,
     zarrVersion: zarr_version
   };
 

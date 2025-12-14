@@ -43,7 +43,6 @@ export default function useZarrMetadata() {
     zarrMetadataQuery.data?.availableVersions.includes('v3') ? 3 : 2;
 
   const metadata = zarrMetadataQuery.data?.metadata || null;
-  const labels = zarrMetadataQuery.data?.labels || null;
   const omeZarrUrl = zarrMetadataQuery.data?.omeZarrUrl || null;
 
   // Fetch thumbnail when OME-Zarr URL is available
@@ -137,7 +136,7 @@ export default function useZarrMetadata() {
                 layerType,
                 metadata.multiscale,
                 metadata.arr,
-                labels,
+                metadata.labels,
                 metadata.omero,
                 useLegacyMultichannelApproach
               );
@@ -193,7 +192,6 @@ export default function useZarrMetadata() {
     return openWithToolUrls;
   }, [
     metadata,
-    labels,
     proxiedPathByFspAndPathQuery.data?.url,
     externalDataUrlQuery.data,
     disableNeuroglancerStateGeneration,
