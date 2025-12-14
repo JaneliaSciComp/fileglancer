@@ -14,7 +14,7 @@ export type Metadata = {
   zarrVersion: 2 | 3;
 };
 
-const COLORS = ['magenta', 'green', 'cyan', 'white', 'red', 'green', 'blue'];
+const COLORS = ['magenta', 'green', 'cyan', 'white', 'red', 'yellow', 'blue'];
 
 const UNIT_CONVERSIONS: Record<string, string> = {
   micron: 'um', // Micron is not a valid UDUNITS-2, but some data still uses it
