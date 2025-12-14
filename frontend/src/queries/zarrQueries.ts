@@ -124,7 +124,7 @@ async function fetchZarrMetadata({
           )) as any;
           labels = labelsAttrs?.attributes?.ome?.labels as string[];
           if (labels) {
-            log.info('OME-Zarr Labels: ', labels);
+            log.info('OME-Zarr Labels found: ', labels);
           }
         } catch (error) {
           log.trace('Could not fetch labels attrs: ', error);
@@ -198,7 +198,7 @@ async function fetchZarrMetadata({
             )) as any;
             labels = labelsAttrs?.labels as string[];
             if (labels) {
-              log.info('OME-ZarrLabels: ', labels);
+              log.info('OME-Zarr Labels found: ', labels);
             }
           } catch (error) {
             log.trace('Could not fetch labels attrs: ', error);
