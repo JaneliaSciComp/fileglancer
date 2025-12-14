@@ -160,10 +160,8 @@ function getAxesMap(multiscale: omezarr.Multiscale): Record<string, any> {
  */
 function getNeuroglancerSource(dataUrl: string, zarrVersion: 2 | 3): string {
   // Neuroglancer expects a trailing slash
-  if (!dataUrl.endsWith('/')) {
-    dataUrl = dataUrl + '/';
-  }
-  return dataUrl + '|zarr' + zarrVersion + ':';
+  const normalizedDataUrl = dataUrl + (dataUrl.endsWith('/') ? '' : '/');
+  return normalizedDataUrl + '|zarr' + zarrVersion + ':';
 }
 
 /**
