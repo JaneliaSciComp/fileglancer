@@ -68,7 +68,12 @@ async function fetchZarrMetadata({
 }: ZarrMetadataQueryParams): Promise<ZarrMetadataResult> {
   if (!fspName || !currentFileOrFolder || !files) {
     log.warn('Missing required parameters for Zarr metadata fetch');
-    return { metadata: null, labels: null, omeZarrUrl: null, availableVersions: [] };
+    return {
+      metadata: null,
+      labels: null,
+      omeZarrUrl: null,
+      availableVersions: []
+    };
   }
 
   const imageUrl = getFileURL(fspName, currentFileOrFolder.path);
@@ -111,9 +116,12 @@ async function fetchZarrMetadata({
         );
         const metadata = await getOmeZarrMetadata(imageUrl);
         // Check for labels
-        let labels: string[] | null = null; 
+        let labels: string[] | null = null;
         try {
-          const labelsAttrs = (await fetchFileAsJson(fspName, currentFileOrFolder.path+"/labels/zarr.json")) as any;
+          const labelsAttrs = (await fetchFileAsJson(
+            fspName,
+            currentFileOrFolder.path + '/labels/zarr.json'
+          )) as any;
           labels = labelsAttrs?.attributes?.ome?.labels as string[];
           if (labels) {
             log.info('OME-Zarr Labels: ', labels);
@@ -129,11 +137,21 @@ async function fetchZarrMetadata({
         };
       } else {
         log.info('Zarrv3 group has no multiscales', attrs.attributes);
-        return { metadata: null, labels: null, omeZarrUrl: null, availableVersions };
+        return {
+          metadata: null,
+          labels: null,
+          omeZarrUrl: null,
+          availableVersions
+        };
       }
     } else {
       log.warn('Unknown Zarrv3 node type', attrs.node_type);
-      return { metadata: null, labels: null, omeZarrUrl: null, availableVersions };
+      return {
+        metadata: null,
+        labels: null,
+        omeZarrUrl: null,
+        availableVersions
+      };
     }
     // v3 not available, now check for v2
   } else {
@@ -146,7 +164,7 @@ async function fetchZarrMetadata({
       if (zarrayFile) {
         log.info('Getting Zarr array for', imageUrl, 'with Zarr version', 2);
         const arr = await getZarrArray(imageUrl, 2);
-        const shapes = [arr.shape];        
+        const shapes = [arr.shape];
         return {
           metadata: {
             arr,
@@ -172,9 +190,12 @@ async function fetchZarrMetadata({
           );
           const metadata = await getOmeZarrMetadata(imageUrl);
           // Check for labels
-          let labels: string[] | null = null; 
+          let labels: string[] | null = null;
           try {
-            const labelsAttrs = (await fetchFileAsJson(fspName, currentFileOrFolder.path+"/labels/.zattrs")) as any;
+            const labelsAttrs = (await fetchFileAsJson(
+              fspName,
+              currentFileOrFolder.path + '/labels/.zattrs'
+            )) as any;
             labels = labelsAttrs?.labels as string[];
             if (labels) {
               log.info('OME-ZarrLabels: ', labels);
@@ -190,17 +211,32 @@ async function fetchZarrMetadata({
           };
         } else {
           log.debug('Zarrv2 .zattrs has no multiscales', attrs);
-          return { metadata: null, labels: null, omeZarrUrl: null, availableVersions };
+          return {
+            metadata: null,
+            labels: null,
+            omeZarrUrl: null,
+            availableVersions
+          };
         }
         // No Zarr metadata found
       } else {
         log.debug('No Zarr metadata files found for', imageUrl);
-        return { metadata: null, labels: null, omeZarrUrl: null, availableVersions };
+        return {
+          metadata: null,
+          labels: null,
+          omeZarrUrl: null,
+          availableVersions
+        };
       }
       // No Zarr metadata found
     } else {
       log.debug('No supported Zarr versions detected for', imageUrl);
-      return { metadata: null, labels: null, omeZarrUrl: null, availableVersions: [] };
+      return {
+        metadata: null,
+        labels: null,
+        omeZarrUrl: null,
+        availableVersions: []
+      };
     }
   }
 }

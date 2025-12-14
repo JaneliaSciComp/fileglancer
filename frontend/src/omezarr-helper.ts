@@ -277,7 +277,7 @@ function generateSimpleNeuroglancerStateForOmeZarr(
     }
   }
 
-  // Consider this a segmentation if the layer type is segmentation 
+  // Consider this a segmentation if the layer type is segmentation
   // AND there is no channel axis or the channel axis has only one channel
   const type =
     layerType === 'segmentation' &&
@@ -309,7 +309,7 @@ function generateSimpleNeuroglancerStateForOmeZarr(
 function generateFullNeuroglancerStateForOmeZarr(
   dataUrl: string,
   zarrVersion: 2 | 3,
-  layerType: LayerType, 
+  layerType: LayerType,
   multiscale: omezarr.Multiscale,
   arr: zarr.Array<any>,
   labels: string[] | null,
@@ -358,8 +358,7 @@ function generateFullNeuroglancerStateForOmeZarr(
 
   if (layerType === 'segmentation') {
     state.selectedLayer.visible = true;
-  }
-  else {
+  } else {
     // Add the shader controls tool palette for images
     state.toolPalettes = {
       'Shader controls': {
@@ -512,10 +511,10 @@ function generateFullNeuroglancerStateForOmeZarr(
 
   // Add layer for each label
   if (labels) {
-    labels.forEach((label) => {
+    labels.forEach(label => {
       const layer: Record<string, any> = {
         name: label,
-        source: sourceUrl+"/labels/"+label,
+        source: sourceUrl + '/labels/' + label,
         type: 'segmentation'
       };
       state.layers.push(layer);
@@ -551,7 +550,7 @@ function generateNeuroglancerStateForOmeZarr(
       multiscale,
       arr,
       labels,
-      omero,
+      omero
     );
   }
 
