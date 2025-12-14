@@ -464,13 +464,11 @@ function generateFullNeuroglancerStateForOmeZarr(
       // Add shader controls if contrast limits are defined
       const start = channel.contrast_limit_start ?? dtypeMin;
       const end = channel.contrast_limit_end ?? dtypeMax;
-      if (start !== null && end !== null) {
-        layer.shaderControls = {
-          normalized: {
-            range: [start, end]
-          }
-        };
-      }
+      layer.shaderControls = {
+        normalized: {
+          range: [start, end]
+        }
+      };
 
       state.layers.push(layer);
     });
