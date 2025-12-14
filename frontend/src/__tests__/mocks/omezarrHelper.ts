@@ -27,6 +27,7 @@ export const omezarrHelperMock = {
       version: '0.4'
     },
     omero: undefined,
+    labels: undefined,
     scales: [[1.0, 0.5, 0.5]],
     zarrVersion: 2
   })),
