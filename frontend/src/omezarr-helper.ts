@@ -391,20 +391,20 @@ function generateFullNeuroglancerStateForOmeZarr(
       const channelMeta = omero.channels[i];
       const window = channelMeta.window || {};
       const channel: OmeZarrChannel = {
-        name: channelMeta.label as string || `Ch${i}`,
+        name: (channelMeta.label as string) || `Ch${i}`,
         color: channelMeta.color || COLORS[colorIndex++ % COLORS.length],
         contrast_window: undefined,
         contrast_range: undefined
-      }
+      };
       if (window.min || window.max) {
         channel.contrast_window = [
-          window.min ?? dtypeMin, 
+          window.min ?? dtypeMin,
           window.max ?? dtypeMax
         ];
       }
       if (window.start || window.end) {
         channel.contrast_range = [
-          window.start ?? (window.min || dtypeMin), 
+          window.start ?? (window.min || dtypeMin),
           window.end ?? (window.max || dtypeMax)
         ];
       }
@@ -450,7 +450,6 @@ function generateFullNeuroglancerStateForOmeZarr(
 
     // Add layers for each channel
     channels.forEach((channel, i) => {
-    
       // Format color
       let color = channel.color;
       if (/^[\dA-F]{6}$/.test(color)) {
@@ -485,7 +484,7 @@ function generateFullNeuroglancerStateForOmeZarr(
         if (!layer.shaderControls.contrast) {
           layer.shaderControls.contrast = {};
         }
-        layer.shaderControls.contrast.range = channel.contrast_range
+        layer.shaderControls.contrast.range = channel.contrast_range;
       }
 
       if (channel.contrast_window) {
@@ -494,7 +493,7 @@ function generateFullNeuroglancerStateForOmeZarr(
         }
         layer.shaderControls.contrast.window = channel.contrast_window;
       }
-      
+
       state.layers.push(layer);
     });
 
