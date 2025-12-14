@@ -41,16 +41,16 @@ export function detectZarrVersions(files: FileOrFolder[]): ('v2' | 'v3')[] {
     return [];
   }
 
-  const fileNames = files.map(f => f.name);
+  const hasFile = (name: string) => files.some(f => f.name === name);
   const versions: ('v2' | 'v3')[] = [];
 
   // Check for Zarr v2 indicators
-  if (fileNames.includes('.zarray') || fileNames.includes('.zattrs')) {
+  if (hasFile('.zarray') || hasFile('.zattrs')) {
     versions.push('v2');
   }
 
   // Check for Zarr v3 indicator
-  if (fileNames.includes('zarr.json')) {
+  if (hasFile('zarr.json')) {
     versions.push('v3');
   }
 
