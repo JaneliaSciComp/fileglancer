@@ -14,6 +14,13 @@ export type Metadata = {
   zarrVersion: 2 | 3;
 };
 
+type OmeZarrChannel = {
+  name: string;
+  color: string;
+  contrast_window: number[] | undefined;
+  contrast_range: number[] | undefined;
+};
+
 const COLORS = ['magenta', 'green', 'cyan', 'white', 'red', 'yellow', 'blue'];
 
 const UNIT_CONVERSIONS: Record<string, string> = {
@@ -28,6 +35,18 @@ const UNIT_CONVERSIONS: Record<string, string> = {
   microsecond: 'us',
   nanosecond: 'ns'
 };
+
+const SHADER = `#uicontrol invlerp contrast
+#uicontrol vec3 color color
+void main() {
+  float c = contrast();
+  if (VOLUME_RENDERING) {
+    emitRGBA(vec4(color * c, c));
+  }
+  else {
+    emitRGB(color * c);
+  }
+}`;
 
 /**
  * Convert UDUNITS-2 units to Neuroglancer SI units.
@@ -130,15 +149,6 @@ function getMinMaxValues(arr: zarr.Array<any>): { min: number; max: number } {
   }
 
   return { min: dtypeMin, max: dtypeMax };
-}
-
-/**
- * Generate a Neuroglancer shader for a given color and min/max values.
- */
-function getShader(color: string, minValue: number, maxValue: number): string {
-  return `#uicontrol vec3 hue color(default="${color}")
-#uicontrol invlerp normalized(range=[${minValue},${maxValue}])
-void main(){emitRGBA(vec4(hue*normalized(),1));}`;
 }
 
 /**
@@ -380,14 +390,25 @@ function generateFullNeuroglancerStateForOmeZarr(
     for (let i = 0; i < omero.channels.length; i++) {
       const channelMeta = omero.channels[i];
       const window = channelMeta.window || {};
-      channels.push({
-        name: channelMeta.label || `Ch${i}`,
+      const channel: OmeZarrChannel = {
+        name: channelMeta.label as string || `Ch${i}`,
         color: channelMeta.color || COLORS[colorIndex++ % COLORS.length],
-        pixel_intensity_min: window.min,
-        pixel_intensity_max: window.max,
-        contrast_limit_start: window.start,
-        contrast_limit_end: window.end
-      });
+        contrast_window: undefined,
+        contrast_range: undefined
+      }
+      if (window.min || window.max) {
+        channel.contrast_window = [
+          window.min ?? dtypeMin, 
+          window.max ?? dtypeMax
+        ];
+      }
+      if (window.start || window.end) {
+        channel.contrast_range = [
+          window.start ?? (window.min || dtypeMin), 
+          window.end ?? (window.max || dtypeMax)
+        ];
+      }
+      channels.push(channel);
     }
   } else {
     // If there is no omero metadata, try to infer channels from the axes
@@ -398,10 +419,8 @@ function generateFullNeuroglancerStateForOmeZarr(
         channels.push({
           name: `Ch${i}`,
           color: COLORS[colorIndex++ % COLORS.length],
-          pixel_intensity_min: dtypeMin,
-          pixel_intensity_max: dtypeMax,
-          contrast_limit_start: dtypeMin,
-          contrast_limit_end: dtypeMax
+          contrast_range: [dtypeMin, dtypeMax],
+          contrast_window: [dtypeMin, dtypeMax]
         });
       }
     }
@@ -431,9 +450,7 @@ function generateFullNeuroglancerStateForOmeZarr(
 
     // Add layers for each channel
     channels.forEach((channel, i) => {
-      const minValue = channel.pixel_intensity_min ?? dtypeMin;
-      const maxValue = channel.pixel_intensity_max ?? dtypeMax;
-
+    
       // Format color
       let color = channel.color;
       if (/^[\dA-F]{6}$/.test(color)) {
@@ -456,20 +473,28 @@ function generateFullNeuroglancerStateForOmeZarr(
         archived: i >= 4, // Archive layers after the first 4
         opacity: 1,
         blend: 'additive',
-        shader: getShader(color, minValue, maxValue),
+        shader: SHADER,
+        shaderControls: {
+          color: color
+        },
         localDimensions: localDimensions,
         localPosition: [i]
       };
 
-      // Add shader controls if contrast limits are defined
-      const start = channel.contrast_limit_start ?? dtypeMin;
-      const end = channel.contrast_limit_end ?? dtypeMax;
-      layer.shaderControls = {
-        normalized: {
-          range: [start, end]
+      if (channel.contrast_range) {
+        if (!layer.shaderControls.contrast) {
+          layer.shaderControls.contrast = {};
         }
-      };
+        layer.shaderControls.contrast.range = channel.contrast_range
+      }
 
+      if (channel.contrast_window) {
+        if (!layer.shaderControls.contrast) {
+          layer.shaderControls.contrast = {};
+        }
+        layer.shaderControls.contrast.window = channel.contrast_window;
+      }
+      
       state.layers.push(layer);
     });
 
