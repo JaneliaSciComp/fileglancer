@@ -193,6 +193,7 @@ export default function useZarrMetadata() {
     return openWithToolUrls;
   }, [
     metadata,
+    labels,
     proxiedPathByFspAndPathQuery.data?.url,
     externalDataUrlQuery.data,
     disableNeuroglancerStateGeneration,
