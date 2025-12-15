@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router';
-import { ButtonGroup } from '@material-tailwind/react';
+import { ButtonGroup, IconButton } from '@material-tailwind/react';
 import {
   HiRefresh,
   HiEye,
@@ -173,6 +173,7 @@ export default function Toolbar({
           {/* Refresh browser contents */}
           {currentFileSharePath ? (
             <FgTooltip
+              as={IconButton}
               icon={HiRefresh}
               label="Refresh file browser"
               onClick={refreshFileBrowser}
