@@ -1195,27 +1195,16 @@ def create_app(settings):
     @app.get("/fg", include_in_schema=False)
     async def serve_spa(full_path: str = ""):
         """Serve index.html for all SPA routes under /fg/ (client-side routing)"""
+        # append the full_path to the ui_dir and ensure it is within the ui_dir after resolving
+        resolved_dir = os.path.normpath(ui_dir / full_path)
+        # if the resolved_dir is outside of ui_dir, reject the request
+        if not resolved_dir.startswith(str(ui_dir)):
+            raise HTTPException(status_code=400, detail="Invalid file path")
+
+        resolved_path = PathLib(resolved_dir)
         # Serve logo.svg and other root-level static files from ui directory
-        if full_path and full_path != "/":
-            # Defensive: Disallow absolute paths entirely
-            if os.path.isabs(full_path):
-                raise HTTPException(status_code=400, detail="Invalid file path")
-            # Resolve ui_dir securely once
-            resolved_ui_dir = ui_dir.resolve(strict=True)
-            # Join but do not allow '..' or absolute segments to escape
-            file_path = (resolved_ui_dir / full_path).resolve(strict=False)
-            # Ensure the resolved file path is under the UI root
-            try:
-                # Python 3.9+: use is_relative_to
-                if hasattr(file_path, "is_relative_to"):
-                    if not file_path.is_relative_to(resolved_ui_dir):
-                        raise HTTPException(status_code=400, detail="Invalid file path")
-                else:
-                    file_path.relative_to(resolved_ui_dir)
-            except (ValueError, RuntimeError):
-                raise HTTPException(status_code=400, detail="Invalid file path")
-            if file_path.exists() and file_path.is_file():
-                return FileResponse(file_path)
+        if resolved_path.exists() and resolved_path.is_file():
+            return FileResponse(resolved_path)
 
         # Otherwise serve index.html for SPA routing
         index_path = ui_dir / "index.html"
