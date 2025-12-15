@@ -12,6 +12,7 @@ import {
   usePreferencesContext
 } from '@/contexts/PreferencesContext';
 import { useProfileContext } from '@/contexts/ProfileContext';
+import { filterFspsByGroupMembership } from '@/utils/groupFiltering';
 
 export default function useSearchFilter() {
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
@@ -57,11 +58,11 @@ export default function useSearchFilter() {
             );
 
             // If enabled, apply group filtering to search-matched FSPs
-            if (isFilteredByGroups && userGroups.length > 0) {
-              matchingFileSharePaths = matchingFileSharePaths.filter(
-                fsp => userGroups.includes(fsp.group) || fsp.group === 'public'
-              );
-            }
+            matchingFileSharePaths = filterFspsByGroupMembership(
+              matchingFileSharePaths,
+              userGroups,
+              isFilteredByGroups
+            );
 
             // Determine which FSPs to include in the result
             let finalFileSharePaths = matchingFileSharePaths;
@@ -69,12 +70,11 @@ export default function useSearchFilter() {
               // Zone name matches, so include all FSPs from this zone (not just search-matched ones)
               finalFileSharePaths = zone.fileSharePaths;
               // But still apply group filtering if enabled
-              if (isFilteredByGroups && userGroups.length > 0) {
-                finalFileSharePaths = finalFileSharePaths.filter(
-                  fsp =>
-                    userGroups.includes(fsp.group) || fsp.group === 'public'
-                );
-              }
+              finalFileSharePaths = filterFspsByGroupMembership(
+                finalFileSharePaths,
+                userGroups,
+                isFilteredByGroups
+              );
             }
 
             // Return the zone if there are any file share paths left after filtering
@@ -159,8 +159,10 @@ export default function useSearchFilter() {
         .map(([key, value]) => {
           if (key.startsWith('zone')) {
             const zone = value as Zone;
-            const matchingFileSharePaths = zone.fileSharePaths.filter(
-              fsp => userGroups.includes(fsp.group) || fsp.group === 'public'
+            const matchingFileSharePaths = filterFspsByGroupMembership(
+              zone.fileSharePaths,
+              userGroups,
+              isFilteredByGroups
             );
             if (matchingFileSharePaths.length > 0) {
               return [

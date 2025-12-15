@@ -66,6 +66,10 @@ describe('Convert File dialog', () => {
       screen.getByPlaceholderText('/path/to/destination/folder/'),
       '/test'
     );
+    await user.type(
+      screen.getByLabelText('Output File or Folder Name'),
+      'output_file.zarr'
+    );
     await user.click(
       screen.getByText('Submit', {
         selector: 'button[type="submit"]'
@@ -94,6 +98,10 @@ describe('Convert File dialog', () => {
     await user.type(
       screen.getByPlaceholderText('/path/to/destination/folder/'),
       '/test'
+    );
+    await user.type(
+      screen.getByLabelText('Output File or Folder Name'),
+      'output_file.zarr'
     );
     await user.click(
       screen.getByText('Submit', {
