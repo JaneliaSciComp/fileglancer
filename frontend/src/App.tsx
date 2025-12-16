@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
-import { BrowserRouter, Route, Routes } from 'react-router';
+import { useEffect } from 'react';
+import { BrowserRouter, Route, Routes, useNavigate } from 'react-router';
 import { ErrorBoundary } from 'react-error-boundary';
 
 import { AuthContextProvider, useAuthContext } from '@/contexts/AuthContext';
 import { MainLayout } from './layouts/MainLayout';
 import { BrowsePageLayout } from './layouts/BrowseLayout';
 import { OtherPagesLayout } from './layouts/OtherPagesLayout';
-import Home from '@/components/Home';
+import Login from '@/components/Login';
 import Browse from '@/components/Browse';
 import Help from '@/components/Help';
 import Jobs from '@/components/Jobs';
@@ -26,12 +27,12 @@ function RequireAuth({ children }: { readonly children: ReactNode }) {
     );
   }
 
-  // If not authenticated, redirect to home page with the current URL as 'next' parameter
+  // If not authenticated, redirect to login page with the current URL as 'next' parameter
   if (!authStatus?.authenticated) {
     const currentPath =
       window.location.pathname + window.location.search + window.location.hash;
     const encodedNext = encodeURIComponent(currentPath);
-    window.location.href = `/fg/?next=${encodedNext}`;
+    window.location.href = `/login?next=${encodedNext}`;
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-foreground">Redirecting to login...</div>
@@ -42,37 +43,53 @@ function RequireAuth({ children }: { readonly children: ReactNode }) {
   return children;
 }
 
-function getBasename() {
-  const { pathname } = window.location;
-  // Try to match /user/:username/lab
-  const userLabMatch = pathname.match(/^\/user\/[^/]+\/fg/);
-  if (userLabMatch) {
-    // Return the matched part, e.g. "/user/<username>/lab"
-    return userLabMatch[0];
-  }
-  // Otherwise, check if it starts with /lab
-  if (pathname.startsWith('/fg')) {
-    return '/fg';
-  }
-  // Fallback to root if no match is found
-  return '/fg';
+/**
+ * Root redirect component that handles smart routing based on auth status
+ * This component serves as a safe landing page after login to allow
+ * auth queries to update before navigating to protected routes
+ */
+function RootRedirect() {
+  const { loading, authStatus } = useAuthContext();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const nextUrl = urlParams.get('next');
+
+    if (authStatus?.authenticated) {
+      // User is authenticated - navigate to next URL or default to /browse
+      const destination =
+        nextUrl && nextUrl.startsWith('/') ? nextUrl : '/browse';
+      navigate(destination, { replace: true });
+    } else {
+      // User is not authenticated - redirect to login
+      const encodedNext = nextUrl ? `?next=${encodeURIComponent(nextUrl)}` : '';
+      navigate(`/login${encodedNext}`, { replace: true });
+    }
+  }, [loading, authStatus, navigate]);
+
+  // Show loading state while determining where to route
+  return (
+    <div className="flex h-screen items-center justify-center">
+      <div className="text-foreground">Loading...</div>
+    </div>
+  );
 }
 
-/**
- * React component for a counter.
- *
- * @returns The React component
- */
 const AppComponent = () => {
-  const basename = getBasename();
   const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
 
   return (
-    <BrowserRouter basename={basename}>
+    <BrowserRouter>
       <Routes>
         <Route element={<MainLayout />} path="/*">
           <Route element={<OtherPagesLayout />}>
-            <Route element={<Home />} index />
+            <Route element={<RootRedirect />} index />
+            <Route element={<Login />} path="login" />
             <Route
               element={
                 <RequireAuth>
