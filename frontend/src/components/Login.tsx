@@ -34,7 +34,8 @@ export default function Login() {
         onSuccess: data => {
           // Redirect to root with next parameter
           // Root component will handle final navigation after auth updates
-          const destination = data.redirect || `/?next=${encodeURIComponent(nextUrl)}`;
+          const destination =
+            data.redirect || `/?next=${encodeURIComponent(nextUrl)}`;
           window.location.href = destination;
         }
       }
