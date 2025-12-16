@@ -145,6 +145,7 @@ export default function Toolbar({
         <ButtonGroup className="gap-1">
           {/* Show/hide favorites and zone browser sidebar */}
           <FgTooltip
+            as={IconButton}
             icon={showSidebar ? GoSidebarExpand : GoSidebarCollapse}
             label={
               showSidebar
@@ -189,6 +190,7 @@ export default function Toolbar({
           {/* Show/hide dot files */}
           {isFolder ? (
             <FgTooltip
+              as={IconButton}
               icon={hideDotFiles ? HiEyeOff : HiEye}
               label={hideDotFiles ? 'Show dot files' : 'Hide dot files'}
               onClick={handleToggleHideDotFiles}
@@ -199,6 +201,7 @@ export default function Toolbar({
           {/* Add/remove current folder from favorites */}
           {isFolder ? (
             <FgTooltip
+              as={IconButton}
               icon={isFavorited ? HiStar : HiOutlineStar}
               label={
                 isFavorited
@@ -213,6 +216,7 @@ export default function Toolbar({
           {/* Copy path */}
           {currentFileSharePath ? (
             <FgTooltip
+              as={IconButton}
               icon={HiOutlineClipboardCopy}
               label="Copy current path"
               onClick={handleCopyPath}
@@ -223,6 +227,7 @@ export default function Toolbar({
 
         {/* Show/hide properties drawer */}
         <FgTooltip
+          as={IconButton}
           icon={showPropertiesDrawer ? GoSidebarCollapse : GoSidebarExpand}
           label={
             showPropertiesDrawer
