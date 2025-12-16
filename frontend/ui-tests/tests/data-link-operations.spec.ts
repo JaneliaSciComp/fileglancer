@@ -7,7 +7,7 @@ const navigateToZarrDir = async (
   testDir: string,
   zarrDirName: string
 ) => {
-  await page.goto('/fg/browse', {
+  await page.goto('/browse', {
     waitUntil: 'domcontentloaded'
   });
   await navigateToScratchFsp(page);
