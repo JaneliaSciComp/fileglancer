@@ -196,11 +196,11 @@ def create_app(settings):
         # Initialize database (run migrations once at startup)
         db.initialize_database(settings.db_url)
 
-        # Mount static assets (CSS, JS, images) at /fg/assets
+        # Mount static assets (CSS, JS, images) at /assets
         assets_dir = ui_dir / "assets"
         if assets_dir.exists():
-            app.mount("/fg/assets", StaticFiles(directory=str(assets_dir)), name="assets")
-            logger.debug(f"Mounted static assets at /fg/assets from {assets_dir}")
+            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+            logger.debug(f"Mounted static assets at /assets from {assets_dir}")
         else:
             logger.warning(f"Assets directory not found at {assets_dir}")
 
@@ -278,7 +278,7 @@ def create_app(settings):
             raise HTTPException(status_code=404, detail="OKTA authentication not enabled")
 
         # Store the next URL in the session for use after OAuth callback
-        if next and next.startswith("/fg/"):
+        if next and next.startswith("/"):
             request.session['next_url'] = next
 
         redirect_uri = str(settings.okta_redirect_uri)
@@ -330,11 +330,11 @@ def create_app(settings):
                 session_id = user_session.session_id
 
             # Get the next URL from session (stored during initial login redirect)
-            next_url = request.session.pop('next_url', '/fg/browse')
+            next_url = request.session.pop('next_url', '/browse')
 
             # Validate next_url to prevent open redirect vulnerabilities
-            if not next_url.startswith('/fg/'):
-                next_url = '/fg/browse'
+            if not next_url.startswith('/'):
+                next_url = '/browse'
 
             # Create redirect response
             redirect_response = RedirectResponse(url=next_url)
@@ -392,7 +392,7 @@ def create_app(settings):
             username = user_session.username
 
         # Create redirect response to browse page
-        redirect_response = RedirectResponse(url="/fg/browse")
+        redirect_response = RedirectResponse(url="/browse")
 
         # Set session cookie
         auth.create_session_cookie(redirect_response, session_id, settings)
@@ -1088,7 +1088,7 @@ def create_app(settings):
 
         # Parse JSON body
         username = body.get("username")
-        next_url = body.get("next", "/fg/browse")
+        next_url = body.get("next", "/browse")
 
         if not username or not username.strip():
             raise HTTPException(status_code=400, detail="Username is required")
@@ -1096,9 +1096,9 @@ def create_app(settings):
         username = username.strip()
 
         # Validate next_url to prevent open redirect vulnerabilities
-        # Only allow relative URLs that start with /fg/
-        if not next_url.startswith("/fg/"):
-            next_url = "/fg/browse"
+        # Only allow relative URLs that start with /
+        if not next_url.startswith("/"):
+            next_url = "/browse"
 
         # Create session in database
         expires_at = datetime.now(UTC) + timedelta(hours=settings.session_expiry_hours)
@@ -1126,19 +1126,15 @@ def create_app(settings):
         return response
 
 
-    # Home page - redirect to /fg
-    @app.get("/", include_in_schema=False)
-    async def home_page():
-        """Redirect root to /fg"""
-        return RedirectResponse(url="/fg/")
-
-
-    # Serve SPA at /fg/* for client-side routing
+    # Serve SPA at /* for client-side routing
     # This must be the LAST route registered
-    @app.get("/fg/{full_path:path}", include_in_schema=False)
-    @app.get("/fg", include_in_schema=False)
+    @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str = ""):
-        """Serve index.html for all SPA routes under /fg/ (client-side routing)"""
+        """Serve index.html for all SPA routes (client-side routing)"""
+        # Don't serve SPA for API or files paths - those should 404 if not found
+        if full_path and (full_path.startswith("api/") or full_path.startswith("files/")):
+            raise HTTPException(status_code=404, detail="Not found")
+
         # Serve logo.svg and other root-level static files from ui directory
         if full_path and full_path != "/":
             file_path = ui_dir / full_path
