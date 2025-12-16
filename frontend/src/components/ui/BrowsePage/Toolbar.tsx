@@ -92,7 +92,6 @@ export default function Toolbar({
 
   const handleToggleSidebar = (e: React.MouseEvent<HTMLButtonElement>) => {
     toggleSidebar();
-    e.currentTarget.blur();
   };
 
   const handleToggleHideDotFiles = async (
@@ -106,7 +105,6 @@ export default function Toolbar({
     } else {
       toast.error(result.error);
     }
-    e.currentTarget.blur();
   };
 
   const handleToggleFavorite = async (
@@ -136,7 +134,6 @@ export default function Toolbar({
     e: React.MouseEvent<HTMLButtonElement>
   ) => {
     togglePropertiesDrawer();
-    e.currentTarget.blur();
   };
 
   return (

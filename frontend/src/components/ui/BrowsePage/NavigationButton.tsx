@@ -24,7 +24,6 @@ export default function NavigationButton({
         label="Navigate to a path"
         onClick={(e: MouseEvent<HTMLButtonElement>) => {
           setShowNavigationDialog(true);
-          e.currentTarget.blur();
         }}
         triggerClasses={triggerClasses}
       />
