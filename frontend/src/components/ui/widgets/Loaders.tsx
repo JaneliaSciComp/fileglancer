@@ -13,7 +13,7 @@ function Spinner({
         className={`w-5 h-5 border-4 border-surface-foreground border-t-transparent rounded-full animate-spin ${customClasses}`}
         title="Loading spinner"
       />
-      <Typography>{text}</Typography>
+      <Typography className="text-foreground">{text}</Typography>
     </div>
   );
 }
