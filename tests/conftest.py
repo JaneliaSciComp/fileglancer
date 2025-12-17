@@ -7,3 +7,4 @@ def pytest_sessionstart(session):
     and entering the run test loop.
     """
     os.environ['FGC_EXTERNAL_PROXY_URL'] = 'http://localhost/files'
+    os.environ['FGC_USE_ACCESS_FLAGS'] = 'false'

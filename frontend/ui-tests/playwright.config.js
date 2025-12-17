@@ -39,12 +39,14 @@ export default defineConfig({
   workers: 1,
   webServer: {
     command: 'pixi run test-launch',
-    url: 'http://localhost:7879/fg/',
+    url: 'http://localhost:7879/',
     timeout: 120_000,
     env: {
       FGC_DB_URL: `sqlite:///${testDbPath}`,
       FGC_FILE_SHARE_MOUNTS: JSON.stringify([scratchDir]),
-      FGC_EXTERNAL_PROXY_URL: 'http://testURL/files'
+      FGC_EXTERNAL_PROXY_URL: 'http://testURL/files',
+      FGC_USE_ACCESS_FLAGS: false,
+      FGC_ENABLE_OKTA_AUTH: false
     }
   }
 });

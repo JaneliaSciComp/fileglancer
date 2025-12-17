@@ -88,7 +88,7 @@ test.describe('Data Link Table Filtering', () => {
 
     await test.step('Create a real data link', async () => {
       // Navigate to a zarr directory
-      await page.goto('/fg/browse', {
+      await page.goto('/browse', {
         waitUntil: 'domcontentloaded'
       });
       await navigateToScratchFsp(page);

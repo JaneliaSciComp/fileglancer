@@ -16,7 +16,7 @@ export type FileglancerFixtures = {
 
 const openFileglancer = async (page: Page) => {
   // Navigate directly to Fileglancer standalone app
-  await page.goto('/fg/', {
+  await page.goto('/', {
     waitUntil: 'domcontentloaded'
   });
   // Wait for the app to be ready
