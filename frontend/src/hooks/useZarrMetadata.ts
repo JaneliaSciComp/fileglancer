@@ -136,6 +136,7 @@ export default function useZarrMetadata() {
                 layerType,
                 metadata.multiscale,
                 metadata.arr,
+                metadata.labels,
                 metadata.omero,
                 useLegacyMultichannelApproach
               );
