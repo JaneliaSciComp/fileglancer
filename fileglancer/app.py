@@ -38,21 +38,7 @@ from fileglancer.log import AccessLogMiddleware
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response
 from x2s3.client_file import FileProxyClient
-
-
-class UserContextStreamingResponse(StreamingResponse):
-    """StreamingResponse that maintains a user context for the duration of the stream"""
-    def __init__(self, *args, user_context: UserContext = None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.user_context = user_context
-
-    async def stream_response(self, send):
-        """Override to wrap streaming in user context"""
-        if self.user_context:
-            with self.user_context:
-                await super().stream_response(send)
-        else:
-            await super().stream_response(send)
+from x2s3.client import ObjectHandle
 
 
 # Read version once at module load time
@@ -133,6 +119,36 @@ def _convert_ticket(db_ticket: db.TicketDB) -> Ticket:
     )
 
 
+def _validate_filename(name: str) -> None:
+    """
+    Validate that a filename/dirname is safe and only refers to a single item in the current directory.
+
+    Args:
+        name: The filename or directory name to validate
+
+    Raises:
+        HTTPException: If the name is invalid
+    """
+    if not name or not name.strip():
+        raise HTTPException(status_code=400, detail="File or directory name cannot be empty")
+
+    # Check for path separators (would create in subdirectory)
+    if '/' in name:
+        raise HTTPException(status_code=400, detail="File or directory name cannot contain path separators ('/')")
+
+    # Check for null bytes (security issue)
+    if '\0' in name:
+        raise HTTPException(status_code=400, detail="File or directory name cannot contain null bytes")
+
+    # Check for special directory references
+    if name == '.' or name == '..':
+        raise HTTPException(status_code=400, detail="File or directory name cannot be '.' or '..'")
+
+    # Check for leading/trailing whitespace (can cause issues)
+    if name != name.strip():
+        raise HTTPException(status_code=400, detail="File or directory name cannot have leading or trailing whitespace")
+
+
 def create_app(settings):
 
     # Initialize OAuth client for OKTA
@@ -154,7 +170,7 @@ def create_app(settings):
             proxied_path = db.get_proxied_path_by_sharing_key(session, sharing_key)
             if not proxied_path:
                 return get_nosuchbucket_response(sharing_name), None
-            
+
             # Vol-E viewer sends URLs with literal % characters (not URL-encoded)
             # FastAPI automatically decodes path parameters - % chars are treated as escapes, creating a garbled sharing_name if they're present
             # We therefore need to handle two cases:
@@ -536,7 +552,7 @@ def create_app(settings):
                 if db_ticket is None:
                     raise HTTPException(status_code=500, detail="Failed to create ticket entry in database")
 
-                # Get the full ticket details from JIRA 
+                # Get the full ticket details from JIRA
                 ticket_details = get_jira_ticket_details(jira_ticket['key'])
 
                 # Return DTO with details from both JIRA and database
@@ -556,7 +572,7 @@ def create_app(settings):
                           username: str = Depends(get_current_user)):
 
         with db.get_db_session(settings.db_url) as session:
-            
+
             db_tickets = db.get_tickets(session, username, fsp_name, path)
             if not db_tickets:
                 raise HTTPException(status_code=404, detail="No tickets found for this user")
@@ -572,7 +588,7 @@ def create_app(settings):
                     logger.warning(f"Could not retrieve details for ticket {db_ticket.ticket_key}: {e}")
                     ticket.description = f"Ticket {db_ticket.ticket_key} is no longer available in JIRA"
                     ticket.status = "Deleted"
-                
+
             return TicketResponse(tickets=tickets)
 
 
@@ -650,7 +666,7 @@ def create_app(settings):
     async def get_proxied_paths(fsp_name: str = Query(None, description="The name of the file share path that this proxied path is associated with"),
                                 path: str = Query(None, description="The path being proxied"),
                                 username: str = Depends(get_current_user)):
-        
+
         with db.get_db_session(settings.db_url) as session:
             db_proxied_paths = db.get_proxied_paths(session, username, fsp_name, path)
             proxied_paths = [_convert_proxied_path(db_path, settings.external_proxy_url) for db_path in db_proxied_paths]
@@ -728,22 +744,18 @@ def create_app(settings):
                 return get_error_response(400, "InvalidArgument", f"Invalid list type {list_type}", path)
         else:
             range_header = request.headers.get("range")
-            # Build the response inside context (for file stat/checks)
-            with ctx:
-                response = await client.get_object(path, range_header)
 
-            # If it's a StreamingResponse, wrap it to keep context alive during streaming
-            if isinstance(response, StreamingResponse):
-                return UserContextStreamingResponse(
-                    response.body_iterator,
-                    status_code=response.status_code,
-                    headers=dict(response.headers),
-                    media_type=response.media_type,
-                    user_context=ctx
-                )
+            # Open file in user context, then immediately exit
+            # The file descriptor retains access rights after we switch back to root
+            with ctx:
+                handle = await client.open_object(path, range_header)
+
+            # Context exited! Now stream without holding the lock
+            if isinstance(handle, ObjectHandle):
+                return client.stream_object(handle)
             else:
-                # For error responses, just return as-is
-                return response
+                # Error response (e.g., file not found, invalid range)
+                return handle
 
 
     @app.head("/files/{sharing_key}/{sharing_name}/{path:path}")
@@ -790,7 +802,7 @@ def create_app(settings):
     async def get_profile(username: str = Depends(get_current_user)):
         """Get the current user's profile"""
         with _get_user_context(username):
-            
+
             # Find matching file share path for home directory
             with db.get_db_session(settings.db_url) as session:
                 paths = db.get_file_share_paths(session)
@@ -831,8 +843,8 @@ def create_app(settings):
 
     # File content endpoint
     @app.head("/api/content/{path_name:path}")
-    async def head_file_content(path_name: str, 
-                                subpath: Optional[str] = Query(''), 
+    async def head_file_content(path_name: str,
+                                subpath: Optional[str] = Query(''),
                                 username: str = Depends(get_current_user)):
         """Handle HEAD requests to get file metadata without content"""
 
@@ -873,7 +885,7 @@ def create_app(settings):
             except PermissionError:
                 raise HTTPException(status_code=403, detail="Permission denied")
 
-        
+
     @app.get("/api/content/{path_name:path}")
     async def get_file_content(request: Request, path_name: str, subpath: Optional[str] = Query(''), username: str = Depends(get_current_user)):
         """Handle GET requests to get file content, with HTTP Range header support"""
@@ -883,6 +895,8 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
+        # Open file with user's permissions, then immediately release the context
+        # The file descriptor retains the access rights after we switch back to root
         with _get_user_context(username):
             filestore, error = _get_filestore(filestore_name)
             if filestore is None:
@@ -897,62 +911,64 @@ def create_app(settings):
                     raise HTTPException(status_code=400, detail="Cannot download directory content")
 
                 file_size = file_info.size
-                range_header = request.headers.get('Range')
 
-                # Open file handle within user context before creating StreamingResponse
-                # This ensures proper permissions are set on the file handle before it
-                # is passed to the response generator
+                # Open the file while we have user's permissions
                 full_path = filestore._check_path_in_root(subpath)
                 file_handle = open(full_path, 'rb')
-
-                if range_header:
-                    range_result = parse_range_header(range_header, file_size)
-                    if range_result is None:
-                        file_handle.close()
-                        return Response(
-                            status_code=416,
-                            headers={'Content-Range': f'bytes */{file_size}'}
-                        )
-
-                    start, end = range_result
-                    content_length = end - start + 1
-
-                    headers = {
-                        'Accept-Ranges': 'bytes',
-                        'Content-Length': str(content_length),
-                        'Content-Range': f'bytes {start}-{end}/{file_size}',
-                    }
-
-                    if content_type == 'application/octet-stream' and file_name:
-                        headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
-
-                    return StreamingResponse(
-                        filestore.stream_file_range(start=start, end=end, file_handle=file_handle),
-                        status_code=206,
-                        headers=headers,
-                        media_type=content_type
-                    )
-                else:
-                    headers = {
-                        'Accept-Ranges': 'bytes',
-                        'Content-Length': str(file_size),
-                    }
-
-                    if content_type == 'application/octet-stream' and file_name:
-                        headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
-
-                    return StreamingResponse(
-                        filestore.stream_file_contents(file_handle=file_handle),
-                        status_code=200,
-                        headers=headers,
-                        media_type=content_type
-                    )
 
             except FileNotFoundError:
                 logger.error(f"File not found in {filestore_name}: {subpath}")
                 raise HTTPException(status_code=404, detail="File or directory not found")
             except PermissionError:
                 raise HTTPException(status_code=403, detail="Permission denied")
+
+        # Context exited! We're back to root, but file_handle retains user's access rights
+        # Now we can stream the file asynchronously without holding the user context lock
+
+        range_header = request.headers.get('Range')
+
+        if range_header:
+            range_result = parse_range_header(range_header, file_size)
+            if range_result is None:
+                file_handle.close()
+                return Response(
+                    status_code=416,
+                    headers={'Content-Range': f'bytes */{file_size}'}
+                )
+
+            start, end = range_result
+            content_length = end - start + 1
+
+            headers = {
+                'Accept-Ranges': 'bytes',
+                'Content-Length': str(content_length),
+                'Content-Range': f'bytes {start}-{end}/{file_size}',
+            }
+
+            if content_type == 'application/octet-stream' and file_name:
+                headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+
+            return StreamingResponse(
+                filestore.stream_file_range(start=start, end=end, file_handle=file_handle),
+                status_code=206,
+                headers=headers,
+                media_type=content_type
+            )
+        else:
+            headers = {
+                'Accept-Ranges': 'bytes',
+                'Content-Length': str(file_size),
+            }
+
+            if content_type == 'application/octet-stream' and file_name:
+                headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+
+            return StreamingResponse(
+                filestore.stream_file_contents(file_handle=file_handle),
+                status_code=200,
+                headers=headers,
+                media_type=content_type
+            )
 
 
     @app.get("/api/files/{path_name}")
@@ -1001,11 +1017,31 @@ def create_app(settings):
 
 
     @app.post("/api/files/{path_name}")
-    async def create_file_or_dir(path_name: str, 
-                                 subpath: Optional[str] = Query(''), 
-                                 body: Dict = Body(...), 
+    async def create_file_or_dir(path_name: str,
+                                 subpath: Optional[str] = Query(''),
+                                 body: Dict = Body(...),
                                  username: str = Depends(get_current_user)):
         """Handle POST requests to create a new file or directory"""
+        # Validate and sanitize the user-provided subpath to prevent path traversal attacks
+        if not subpath:
+            raise HTTPException(status_code=400, detail="File or directory path is required")
+
+        # Normalize the path to prevent path traversal (e.g., "../../../etc/passwd")
+        # This converts relative paths to a clean form and removes redundant separators
+        normalized_path = os.path.normpath(subpath)
+
+        # Security check: Ensure normalized path doesn't start with ".." or "/"
+        # which would indicate an attempt to escape the intended directory
+        if normalized_path.startswith('..') or os.path.isabs(normalized_path):
+            raise HTTPException(status_code=400, detail="Path cannot escape the current directory")
+
+        # Validate the filename portion (basename) for invalid characters
+        filename = os.path.basename(normalized_path)
+        _validate_filename(filename)
+
+        # Use the validated and sanitized path for all operations
+        validated_subpath = normalized_path
+
         with _get_user_context(username):
             filestore, error = _get_filestore(path_name)
             if filestore is None:
@@ -1014,11 +1050,13 @@ def create_app(settings):
             try:
                 file_type = body.get("type")
                 if file_type == "directory":
-                    logger.info(f"User {username} creating directory {path_name}/{subpath}")
-                    filestore.create_dir(subpath)
+                    logger.info(f"User {username} creating directory {path_name}/{validated_subpath}")
+                    # Path is validated above - safe to use in filesystem operation
+                    filestore.create_dir(validated_subpath)
                 elif file_type == "file":
-                    logger.info(f"User {username} creating file {path_name}/{subpath}")
-                    filestore.create_empty_file(subpath)
+                    logger.info(f"User {username} creating file {path_name}/{validated_subpath}")
+                    # Path is validated above - safe to use in filesystem operation
+                    filestore.create_empty_file(validated_subpath)
                 else:
                     raise HTTPException(status_code=400, detail="Invalid file type")
 
@@ -1031,8 +1069,8 @@ def create_app(settings):
 
 
     @app.patch("/api/files/{path_name}")
-    async def update_file_or_dir(path_name: str, 
-                                 subpath: Optional[str] = Query(''), 
+    async def update_file_or_dir(path_name: str,
+                                 subpath: Optional[str] = Query(''),
                                  body: Dict = Body(...),
                                  username: str = Depends(get_current_user)):
         """Handle PATCH requests to rename or update file permissions"""
@@ -1044,14 +1082,32 @@ def create_app(settings):
             new_path = body.get("path")
             new_permissions = body.get("permissions")
 
+            # Validate and sanitize new_path if renaming
+            validated_new_path = new_path
+            if new_path is not None and new_path != old_file_info.path:
+                # Normalize the path to prevent path traversal
+                normalized_new_path = os.path.normpath(new_path)
+
+                # Security check: Ensure normalized path doesn't escape directory
+                if normalized_new_path.startswith('..') or os.path.isabs(normalized_new_path):
+                    raise HTTPException(status_code=400, detail="New path cannot escape the current directory")
+
+                # Validate the filename portion for invalid characters
+                new_filename = os.path.basename(normalized_new_path)
+                _validate_filename(new_filename)
+
+                # Use the validated path
+                validated_new_path = normalized_new_path
+
             try:
                 if new_permissions is not None and new_permissions != old_file_info.permissions:
                     logger.info(f"User {username} changing permissions of {old_file_info.absolute_path} to {new_permissions}")
                     filestore.change_file_permissions(subpath, new_permissions)
 
                 if new_path is not None and new_path != old_file_info.path:
-                    logger.info(f"User {username} renaming {old_file_info.absolute_path} to {new_path}")
-                    filestore.rename_file_or_dir(old_file_info.path, new_path)
+                    logger.info(f"User {username} renaming {old_file_info.absolute_path} to {validated_new_path}")
+                    # Path is validated above - safe to use in filesystem operation
+                    filestore.rename_file_or_dir(old_file_info.path, validated_new_path)
 
             except PermissionError as e:
                 raise HTTPException(status_code=403, detail=str(e))
@@ -1062,7 +1118,7 @@ def create_app(settings):
 
 
     @app.delete("/api/files/{fsp_name}")
-    async def delete_file_or_dir(fsp_name: str, 
+    async def delete_file_or_dir(fsp_name: str,
                                  subpath: Optional[str] = Query(''),
                                  username: str = Depends(get_current_user)):
         """Handle DELETE requests to remove a file or (empty) directory"""
@@ -1135,11 +1191,16 @@ def create_app(settings):
         if full_path and (full_path.startswith("api/") or full_path.startswith("files/")):
             raise HTTPException(status_code=404, detail="Not found")
 
+        # append the full_path to the ui_dir and ensure it is within the ui_dir after resolving
+        resolved_dir = os.path.normpath(ui_dir / full_path)
+        # if the resolved_dir is outside of ui_dir, reject the request
+        if not resolved_dir.startswith(str(ui_dir)):
+            raise HTTPException(status_code=400, detail="Invalid file path")
+
+        resolved_path = PathLib(resolved_dir)
         # Serve logo.svg and other root-level static files from ui directory
-        if full_path and full_path != "/":
-            file_path = ui_dir / full_path
-            if file_path.exists() and file_path.is_file():
-                return FileResponse(file_path)
+        if resolved_path.exists() and resolved_path.is_file():
+            return FileResponse(resolved_path)
 
         # Otherwise serve index.html for SPA routing
         index_path = ui_dir / "index.html"

@@ -168,9 +168,13 @@ class Filestore:
         if path is None or path == "":
             full_path = self.root_path
         else:
-            full_path = os.path.abspath(os.path.join(self.root_path, path))
-            if os.path.commonpath([full_path, self.root_path]) != self.root_path:
-                raise ValueError(f"Path ({full_path}) attempts to escape root directory ({self.root_path})")
+            # Resolve symlinks and normalize the path
+            full_path = os.path.realpath(os.path.join(self.root_path, path))
+            root_real = os.path.realpath(self.root_path)
+
+            # Ensure the resolved path is within the resolved root
+            if not full_path.startswith(root_real + os.sep) and full_path != root_real:
+                raise ValueError(f"Path ({full_path}) attempts to escape root directory ({root_real})")
         return full_path
 
 
