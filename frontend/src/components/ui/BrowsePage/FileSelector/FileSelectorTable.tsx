@@ -143,7 +143,7 @@ export default function FileSelectorTable({
             <tr className="border-b border-surface" key={headerGroup.id}>
               {headerGroup.headers.map(header => (
                 <th
-                  className="text-left p-3 font-bold text-sm"
+                  className="text-left p-3 font-bold text-sm text-foreground"
                   key={header.id}
                   style={{ width: header.getSize() }}
                 >
@@ -189,7 +189,7 @@ export default function FileSelectorTable({
                 >
                   {row.getVisibleCells().map(cell => (
                     <td
-                      className="p-3 text-grey-700"
+                      className="p-3 text-grey-700 text-primary-light"
                       key={cell.id}
                       style={{ width: cell.column.getSize() }}
                     >

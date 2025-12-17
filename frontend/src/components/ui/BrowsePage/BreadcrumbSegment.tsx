@@ -32,9 +32,7 @@ export default function BreadcrumbSegment({
     // Last segment is always non-clickable text
     return (
       <Typography
-        className={`font-medium ${
-          isFile ? 'text-primary-default italic' : 'text-primary-default'
-        }`}
+        className={`font-medium text-foreground ${isFile ? 'italic' : ''}`}
       >
         {label}
       </Typography>
@@ -58,7 +56,7 @@ export default function BreadcrumbSegment({
         // Callback-based navigation (for dialogs)
         <BreadcrumbLink as="button" onClick={onClick}>
           <Typography
-            className="font-medium text-primary-light hover:text-primary-default"
+            className="font-medium text-primary-light hover:underline focus:underline"
             variant="small"
           >
             {label}
