@@ -51,7 +51,6 @@ export default function NewFolderButton({
         label="New folder"
         onClick={(e: MouseEvent<HTMLButtonElement>) => {
           setShowNewFolderDialog(true);
-          e.currentTarget.blur();
         }}
         triggerClasses={triggerClasses}
       />
