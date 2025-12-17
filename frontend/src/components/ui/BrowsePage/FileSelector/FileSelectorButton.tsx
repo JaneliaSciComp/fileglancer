@@ -106,7 +106,10 @@ export default function FileSelectorButton({
           <div className="my-4 h-96">
             {zonesQuery.isPending ? (
               <div className="flex items-center justify-center h-full">
-                <Spinner text="Loading zones..." />
+                <Spinner
+                  text="Loading zones..."
+                  textClasses="text-foreground"
+                />
               </div>
             ) : zonesQuery.isError ? (
               <div className="flex items-center justify-center h-full">
@@ -117,7 +120,10 @@ export default function FileSelectorButton({
             ) : state.currentLocation.type === 'filesystem' &&
               fileQuery.isPending ? (
               <div className="flex items-center justify-center h-full">
-                <Spinner text="Loading files..." />
+                <Spinner
+                  text="Loading files..."
+                  textClasses="text-foreground"
+                />
               </div>
             ) : state.currentLocation.type === 'filesystem' &&
               fileQuery.isError ? (

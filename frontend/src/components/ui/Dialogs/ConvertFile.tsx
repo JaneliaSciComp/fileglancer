@@ -103,7 +103,7 @@ export default function ConvertFileDialog({
           <div className="flex gap-2 items-center">
             <input
               autoFocus
-              className="flex-1 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 p-2 text-foreground dark:placeholder:text-surface-light text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!tasksEnabled}
               id="destination_folder"
               onChange={(event: ChangeEvent<HTMLInputElement>) => {
@@ -143,7 +143,7 @@ export default function ConvertFileDialog({
             Output File or Folder Name
           </Typography>
           <input
-            className="p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background disabled:cursor-not-allowed disabled:opacity-50"
+            className="p-2 text-foreground dark:placeholder:text-surface-light text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!tasksEnabled}
             id="output_filename"
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
@@ -178,7 +178,11 @@ export default function ConvertFileDialog({
           type="submit"
         >
           {createTicketMutation.isPending || allTicketsQuery.isFetching ? (
-            <Spinner customClasses="border-white" text="Processing..." />
+            <Spinner
+              customClasses="border-white"
+              text="Processing..."
+              textClasses="text-white"
+            />
           ) : (
             'Submit'
           )}
