@@ -1181,6 +1181,11 @@ def create_app(settings):
 
         return response
 
+    # Return 404 error at /attributes.json
+    # Required for Neuroglancer to be able to render N5 volumes
+    @app.get("/attributes.json", include_in_schema=False)
+    async def serve_attributes_json():
+        raise HTTPException(status_code=404, detail="Not found")
 
     # Serve SPA at /* for client-side routing
     # This must be the LAST route registered
