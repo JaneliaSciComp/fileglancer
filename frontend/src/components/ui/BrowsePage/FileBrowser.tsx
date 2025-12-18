@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 
 import Crumbs from './Crumbs';
 import ZarrPreview from './ZarrPreview';
+import N5Preview from './N5Preview';
 import Table from './FileTable';
 import FileViewer from './FileViewer';
 import ContextMenu, {
@@ -12,11 +13,13 @@ import ContextMenu, {
 import { FileRowSkeleton } from '@/components/ui/widgets/Loaders';
 import useContextMenu from '@/hooks/useContextMenu';
 import useZarrMetadata from '@/hooks/useZarrMetadata';
+import useN5Metadata from '@/hooks/useN5Metadata';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
 import { useHandleDownload } from '@/hooks/useHandleDownload';
 import { detectZarrVersions } from '@/queries/zarrQueries';
+import { detectN5 } from '@/queries/n5Queries';
 import { makeMapKey } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
 
@@ -72,8 +75,13 @@ export default function FileBrowser({
     availableVersions
   } = useZarrMetadata();
 
+  const { n5MetadataQuery, openWithToolUrls: n5OpenWithToolUrls } =
+    useN5Metadata();
+
   const isZarrDir =
     detectZarrVersions(fileQuery.data?.files as FileOrFolder[]).length > 0;
+
+  const isN5Dir = detectN5(fileQuery.data?.files as FileOrFolder[]);
 
   // Handle right-click on file - FileBrowser-specific logic
   const handleFileContextMenu = (
@@ -183,6 +191,27 @@ export default function FileBrowser({
           openWithToolUrls={openWithToolUrls}
           thumbnailQuery={thumbnailQuery}
           zarrMetadataQuery={zarrMetadataQuery}
+        />
+      ) : null}
+
+      {/* N5 Preview */}
+      {isN5Dir && n5MetadataQuery.isPending ? (
+        <div className="flex shadow-sm rounded-md w-full min-h-96 bg-surface animate-appear animate-pulse animate-delay-150 opacity-0">
+          <Typography className="place-self-center text-center w-full">
+            Loading N5 metadata...
+          </Typography>
+        </div>
+      ) : n5MetadataQuery.isError ? (
+        <div className="flex shadow-sm rounded-md w-full min-h-96 bg-primary-light/30">
+          <Typography className="place-self-center text-center w-full text-warning">
+            Error loading N5 metadata
+          </Typography>
+        </div>
+      ) : n5MetadataQuery.data ? (
+        <N5Preview
+          mainPanelWidth={mainPanelWidth}
+          n5MetadataQuery={n5MetadataQuery}
+          openWithToolUrls={n5OpenWithToolUrls}
         />
       ) : null}
 
