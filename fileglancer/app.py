@@ -177,7 +177,7 @@ def create_app(settings):
             #   1. Properly encoded requests (sharing_name matches DB value of proxied_path.sharing_name)
             #   2. Vol-E's unencoded requests (unquote(proxied_path.sharing_name) matches the garbled request value)
             if proxied_path.sharing_name != sharing_name and unquote(proxied_path.sharing_name) != sharing_name:
-                return get_error_response(400, "InvalidArgument", f"Sharing name mismatch for sharing key {sharing_key}", sharing_name), None
+                return get_error_response(404, "NoSuchKey", f"Sharing name mismatch for sharing key {sharing_key}", sharing_name), None
 
             fsp = db.get_file_share_path(session, proxied_path.fsp_name)
             if not fsp:
