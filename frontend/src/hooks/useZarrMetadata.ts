@@ -55,10 +55,8 @@ export default function useZarrMetadata() {
 
   useEffect(() => {
     if (!thumbnailSrc || disableHeuristicalLayerTypeDetection) {
-      // Set default layer type if heuristics are disabled
-      if (disableHeuristicalLayerTypeDetection) {
-        setLayerType('image');
-      }
+      // Set layer type to 'image' if no thumbnail or detection disabled
+      setLayerType('image');
       return;
     }
 
