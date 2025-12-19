@@ -65,7 +65,7 @@ declare module '@tanstack/react-table' {
 }
 import type { PathCellValue } from './linksColumns';
 
-type DataType = 'data links' | 'tasks';
+type DataType = 'data links' | 'tasks' | 'views';
 
 type TableProps<TData> = {
   readonly columns: ColumnDef<TData>[];
@@ -74,6 +74,7 @@ type TableProps<TData> = {
   readonly errorState: Error | unknown;
   readonly gridColsClass: string;
   readonly loadingState: boolean;
+  readonly headerActions?: ReactNode;
 };
 
 function SortIcons<TData, TValue>({
@@ -218,13 +219,15 @@ function TableHeader({
   globalFilter,
   setGlobalFilter,
   clearSearch,
-  inputRef
+  inputRef,
+  headerActions
 }: {
   readonly table: ReturnType<typeof useReactTable>;
   readonly globalFilter: string;
   readonly setGlobalFilter: (value: string) => void;
   readonly clearSearch: () => void;
   readonly inputRef: React.RefObject<HTMLInputElement>;
+  readonly headerActions?: ReactNode;
 }) {
   return (
     <div className="shrink-0 flex flex-col md:flex-row md:items-center gap-2 py-4 px-4">
@@ -305,6 +308,9 @@ function TableHeader({
           ) : null}
         </div>
       </div>
+      {headerActions ? (
+        <div className="flex items-center justify-end">{headerActions}</div>
+      ) : null}
     </div>
   );
 }
@@ -331,7 +337,8 @@ function Table<TData>({
   gridColsClass,
   loadingState,
   errorState,
-  dataType
+  dataType,
+  headerActions
 }: TableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState<string>('');
@@ -420,6 +427,7 @@ function Table<TData>({
         <TableHeader
           clearSearch={clearSearch}
           globalFilter={inputValue}
+          headerActions={headerActions}
           inputRef={inputRef}
           setGlobalFilter={handleInputChange}
           table={table}
@@ -497,7 +505,8 @@ function TableCard<TData>({
   gridColsClass,
   loadingState,
   errorState,
-  dataType
+  dataType,
+  headerActions
 }: TableProps<TData>) {
   return (
     <Card className="min-h-48">
@@ -506,6 +515,7 @@ function TableCard<TData>({
         data={data}
         dataType={dataType}
         errorState={errorState}
+        headerActions={headerActions}
         gridColsClass={gridColsClass}
         loadingState={loadingState}
       />

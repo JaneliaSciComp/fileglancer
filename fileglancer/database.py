@@ -18,6 +18,7 @@ from fileglancer.utils import slugify_path
 
 # Constants
 SHARING_KEY_LENGTH = 12
+NEUROGLANCER_SHORT_KEY_LENGTH = 12
 
 # Global flag to track if migrations have been run
 _migrations_run = False
@@ -100,6 +101,20 @@ class ProxiedPathDB(Base):
     __table_args__ = (
         UniqueConstraint('username', 'fsp_name', 'path', name='uq_proxied_path'),
     )
+
+
+class NeuroglancerStateDB(Base):
+    """Database model for storing Neuroglancer states"""
+    __tablename__ = 'neuroglancer_states'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    short_key = Column(String, nullable=False, unique=True, index=True)
+    short_name = Column(String, nullable=True)
+    username = Column(String, nullable=False)
+    url_base = Column(String, nullable=False)
+    state = Column(JSON, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
 
 class TicketDB(Base):
@@ -569,6 +584,66 @@ def delete_proxied_path(session: Session, username: str, sharing_key: str):
 
     # Remove from cache
     _invalidate_sharing_key_cache(sharing_key)
+
+
+def _generate_unique_neuroglancer_key(session: Session) -> str:
+    """Generate a unique short key for Neuroglancer states."""
+    for _ in range(10):
+        candidate = secrets.token_urlsafe(NEUROGLANCER_SHORT_KEY_LENGTH)
+        exists = session.query(NeuroglancerStateDB).filter_by(short_key=candidate).first()
+        if not exists:
+            return candidate
+    raise RuntimeError("Failed to generate a unique Neuroglancer short key")
+
+
+def _validate_custom_neuroglancer_key(session: Session, short_key: str) -> None:
+    """Ensure the custom short key is available."""
+    exists = session.query(NeuroglancerStateDB).filter_by(short_key=short_key).first()
+    if exists:
+        raise ValueError("Short key is already in use")
+
+
+def create_neuroglancer_state(
+    session: Session,
+    username: str,
+    url_base: str,
+    state: Dict,
+    short_key: Optional[str] = None,
+    short_name: Optional[str] = None
+) -> NeuroglancerStateDB:
+    """Create a new Neuroglancer state entry and return it."""
+    if short_key:
+        _validate_custom_neuroglancer_key(session, short_key)
+    else:
+        short_key = _generate_unique_neuroglancer_key(session)
+    now = datetime.now(UTC)
+    entry = NeuroglancerStateDB(
+        short_key=short_key,
+        short_name=short_name,
+        username=username,
+        url_base=url_base,
+        state=state,
+        created_at=now,
+        updated_at=now
+    )
+    session.add(entry)
+    session.commit()
+    return entry
+
+
+def get_neuroglancer_state(session: Session, short_key: str) -> Optional[NeuroglancerStateDB]:
+    """Get a Neuroglancer state by short key."""
+    return session.query(NeuroglancerStateDB).filter_by(short_key=short_key).first()
+
+
+def get_neuroglancer_states(session: Session, username: str) -> List[NeuroglancerStateDB]:
+    """Get all Neuroglancer states for a user, newest first."""
+    return (
+        session.query(NeuroglancerStateDB)
+        .filter_by(username=username)
+        .order_by(NeuroglancerStateDB.created_at.desc())
+        .all()
+    )
 
 
 def get_tickets(session: Session, username: str, fsp_name: str = None, path: str = None) -> List[TicketDB]:
