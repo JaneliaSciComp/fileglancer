@@ -4,7 +4,7 @@ from datetime import datetime, UTC
 import os
 from functools import lru_cache
 
-from sqlalchemy import create_engine, Column, String, Integer, DateTime, JSON, UniqueConstraint
+from sqlalchemy import create_engine, Column, String, Integer, DateTime, JSON, UniqueConstraint, Text, Index
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.pool import StaticPool
@@ -135,6 +135,24 @@ class SessionDB(Base):
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     expires_at = Column(DateTime, nullable=False)
     last_accessed_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+
+
+class NeuroglancerLinkDB(Base):
+    """Database model for storing Neuroglancer short links"""
+    __tablename__ = 'neuroglancer_links'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String, nullable=False)
+    short_key = Column(String, nullable=False, unique=True)
+    title = Column(String, nullable=True)
+    ng_url_base = Column(String, nullable=False)
+    state_json = Column(Text, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+
+    __table_args__ = (
+        Index('ix_neuroglancer_links_username', 'username'),
+    )
 
 
 def run_alembic_upgrade(db_url):
@@ -658,3 +676,55 @@ def delete_expired_sessions(session: Session):
     deleted = session.query(SessionDB).filter(SessionDB.expires_at < now).delete()
     session.commit()
     return deleted
+
+
+# Neuroglancer Link functions
+def get_neuroglancer_links(session: Session, username: str) -> List[NeuroglancerLinkDB]:
+    """Get all Neuroglancer links for a user"""
+    return session.query(NeuroglancerLinkDB).filter_by(username=username).order_by(NeuroglancerLinkDB.created_at.desc()).all()
+
+
+def get_neuroglancer_link_by_key(session: Session, short_key: str) -> Optional[NeuroglancerLinkDB]:
+    """Get a Neuroglancer link by short key"""
+    return session.query(NeuroglancerLinkDB).filter_by(short_key=short_key).first()
+
+
+def create_neuroglancer_link(session: Session, username: str, title: Optional[str], ng_url_base: str, state_json: str) -> NeuroglancerLinkDB:
+    """Create a new Neuroglancer short link"""
+    short_key = secrets.token_urlsafe(SHARING_KEY_LENGTH)
+    now = datetime.now(UTC)
+    ng_link = NeuroglancerLinkDB(
+        username=username,
+        short_key=short_key,
+        title=title,
+        ng_url_base=ng_url_base,
+        state_json=state_json,
+        created_at=now,
+        updated_at=now
+    )
+    session.add(ng_link)
+    session.commit()
+    return ng_link
+
+
+def update_neuroglancer_link(session: Session, username: str, short_key: str, title: Optional[str] = None, state_json: Optional[str] = None) -> Optional[NeuroglancerLinkDB]:
+    """Update a Neuroglancer link. Returns None if not found or not owned by user."""
+    ng_link = get_neuroglancer_link_by_key(session, short_key)
+    if not ng_link or ng_link.username != username:
+        return None
+
+    if title is not None:
+        ng_link.title = title
+    if state_json is not None:
+        ng_link.state_json = state_json
+
+    ng_link.updated_at = datetime.now(UTC)
+    session.commit()
+    return ng_link
+
+
+def delete_neuroglancer_link(session: Session, username: str, short_key: str) -> bool:
+    """Delete a Neuroglancer link. Returns True if deleted, False if not found or not owned by user."""
+    deleted = session.query(NeuroglancerLinkDB).filter_by(username=username, short_key=short_key).delete()
+    session.commit()
+    return deleted > 0

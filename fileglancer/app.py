@@ -24,7 +24,7 @@ from fastapi.responses import RedirectResponse, Response, JSONResponse, PlainTex
 from fastapi.exceptions import RequestValidationError, StarletteHTTPException
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
-from urllib.parse import quote, unquote
+from urllib.parse import quote, unquote, urlparse, parse_qs
 
 from fileglancer import database as db
 from fileglancer import auth
@@ -117,6 +117,64 @@ def _convert_ticket(db_ticket: db.TicketDB) -> Ticket:
         created=db_ticket.created_at,
         updated=db_ticket.updated_at
     )
+
+
+def _convert_neuroglancer_link(db_link: db.NeuroglancerLinkDB, external_proxy_url: Optional[HttpUrl]) -> NeuroglancerLink:
+    """Convert a database NeuroglancerLinkDB model to a Pydantic NeuroglancerLink model"""
+    if external_proxy_url:
+        short_url = f"{external_proxy_url}/ng/{db_link.short_key}"
+    else:
+        logger.warning(f"No external proxy URL was provided, short links will not be available.")
+        short_url = None
+    return NeuroglancerLink(
+        short_key=db_link.short_key,
+        username=db_link.username,
+        title=db_link.title,
+        ng_url_base=db_link.ng_url_base,
+        state_json=db_link.state_json,
+        created_at=db_link.created_at,
+        updated_at=db_link.updated_at,
+        short_url=short_url
+    )
+
+
+def _parse_neuroglancer_url(ng_url: str) -> Tuple[str, str]:
+    """
+    Parse a Neuroglancer URL and extract the base URL and state JSON.
+
+    Handles formats:
+    - https://neuroglancer-demo.appspot.com/#!{JSON}
+    - https://neuroglancer-demo.appspot.com/#!%7B...%7D (URL-encoded)
+
+    Returns:
+        Tuple of (ng_url_base, state_json)
+
+    Raises:
+        ValueError: If the URL cannot be parsed
+    """
+    if '#!' not in ng_url:
+        raise ValueError("Invalid Neuroglancer URL: missing '#!' fragment")
+
+    # Split URL at the #! marker
+    base_url, fragment = ng_url.split('#!', 1)
+
+    # Ensure base URL ends with /
+    if not base_url.endswith('/'):
+        base_url = base_url + '/'
+
+    # Try to decode the fragment (it might be URL-encoded)
+    try:
+        decoded_fragment = unquote(fragment)
+    except Exception:
+        decoded_fragment = fragment
+
+    # Validate that it's valid JSON
+    try:
+        json.loads(decoded_fragment)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON state in Neuroglancer URL: {e}")
+
+    return base_url, decoded_fragment
 
 
 def _validate_filename(name: str) -> None:
@@ -711,6 +769,119 @@ def create_app(settings):
             if deleted == 0:
                 raise HTTPException(status_code=404, detail="Proxied path not found")
             return {"message": f"Proxied path {sharing_key} deleted for user {username}"}
+
+
+    # Neuroglancer short link endpoints
+    @app.post("/api/ng-link", response_model=NeuroglancerLink,
+              description="Create a new Neuroglancer short link")
+    async def create_ng_link(body: NeuroglancerLinkCreate,
+                             username: str = Depends(get_current_user)):
+        """Create a new shortened Neuroglancer link"""
+        try:
+            # Determine the URL base and state JSON
+            if body.ng_url:
+                # Parse from full Neuroglancer URL
+                ng_url_base, state_json = _parse_neuroglancer_url(body.ng_url)
+            elif body.state_json:
+                # Use provided state JSON directly
+                # Validate it's valid JSON
+                try:
+                    json.loads(body.state_json)
+                except json.JSONDecodeError as e:
+                    raise HTTPException(status_code=400, detail=f"Invalid JSON state: {e}")
+                ng_url_base = body.ng_url_base or "https://neuroglancer-demo.appspot.com/"
+                state_json = body.state_json
+            else:
+                raise HTTPException(status_code=400, detail="Either ng_url or state_json must be provided")
+
+            with db.get_db_session(settings.db_url) as session:
+                ng_link = db.create_neuroglancer_link(
+                    session=session,
+                    username=username,
+                    title=body.title,
+                    ng_url_base=ng_url_base,
+                    state_json=state_json
+                )
+                return _convert_neuroglancer_link(ng_link, settings.external_proxy_url)
+
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+
+    @app.get("/api/ng-link", response_model=NeuroglancerLinkResponse,
+             description="Get all Neuroglancer short links for the current user")
+    async def get_ng_links(username: str = Depends(get_current_user)):
+        """Get all shortened Neuroglancer links for the authenticated user"""
+        with db.get_db_session(settings.db_url) as session:
+            db_links = db.get_neuroglancer_links(session, username)
+            links = [_convert_neuroglancer_link(link, settings.external_proxy_url) for link in db_links]
+            return NeuroglancerLinkResponse(links=links)
+
+
+    @app.get("/api/ng-link/{short_key}", response_model=NeuroglancerLink,
+             description="Get a Neuroglancer short link by its short key (public, no auth required)")
+    async def get_ng_link(short_key: str = Path(..., description="The short key of the link")):
+        """Get a shortened Neuroglancer link by its key. This endpoint is public."""
+        with db.get_db_session(settings.db_url) as session:
+            ng_link = db.get_neuroglancer_link_by_key(session, short_key)
+            if not ng_link:
+                raise HTTPException(status_code=404, detail="Neuroglancer link not found")
+            return _convert_neuroglancer_link(ng_link, settings.external_proxy_url)
+
+
+    @app.put("/api/ng-link/{short_key}", response_model=NeuroglancerLink,
+             description="Update a Neuroglancer short link")
+    async def update_ng_link(short_key: str = Path(..., description="The short key of the link"),
+                             body: NeuroglancerLinkUpdate = Body(...),
+                             username: str = Depends(get_current_user)):
+        """Update a shortened Neuroglancer link. Only the owner can update."""
+        with db.get_db_session(settings.db_url) as session:
+            # Validate state_json if provided
+            if body.state_json:
+                try:
+                    json.loads(body.state_json)
+                except json.JSONDecodeError as e:
+                    raise HTTPException(status_code=400, detail=f"Invalid JSON state: {e}")
+
+            ng_link = db.update_neuroglancer_link(
+                session=session,
+                username=username,
+                short_key=short_key,
+                title=body.title,
+                state_json=body.state_json
+            )
+            if not ng_link:
+                raise HTTPException(status_code=404, detail="Neuroglancer link not found or not owned by user")
+            return _convert_neuroglancer_link(ng_link, settings.external_proxy_url)
+
+
+    @app.delete("/api/ng-link/{short_key}",
+                description="Delete a Neuroglancer short link")
+    async def delete_ng_link(short_key: str = Path(..., description="The short key of the link"),
+                             username: str = Depends(get_current_user)):
+        """Delete a shortened Neuroglancer link. Only the owner can delete."""
+        with db.get_db_session(settings.db_url) as session:
+            deleted = db.delete_neuroglancer_link(session, username, short_key)
+            if not deleted:
+                raise HTTPException(status_code=404, detail="Neuroglancer link not found or not owned by user")
+            return {"deleted": True}
+
+
+    @app.get("/ng/{short_key}",
+             description="Redirect to full Neuroglancer URL (for browser access)")
+    async def redirect_ng_link(short_key: str = Path(..., description="The short key of the link")):
+        """Redirect to the full Neuroglancer URL with state embedded"""
+        with db.get_db_session(settings.db_url) as session:
+            ng_link = db.get_neuroglancer_link_by_key(session, short_key)
+            if not ng_link:
+                raise HTTPException(status_code=404, detail="Neuroglancer link not found")
+
+            # Construct full Neuroglancer URL with state in fragment
+            # URL-encode the JSON state for the fragment
+            encoded_state = quote(ng_link.state_json, safe='')
+            full_url = f"{ng_link.ng_url_base}#!{encoded_state}"
+
+            return RedirectResponse(url=full_url, status_code=302)
 
 
     @app.get("/files/{sharing_key}/{sharing_name}")
