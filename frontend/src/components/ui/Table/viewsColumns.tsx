@@ -168,11 +168,11 @@ export function useViewsColumns(): ColumnDef<NeuroglancerShortLink>[] {
           return (
             <div
               className="flex items-center truncate w-full h-full"
+              key={cell.id}
               onContextMenu={e => {
                 e.preventDefault();
                 onContextMenu?.(e, { value: key });
               }}
-              key={cell.id}
             >
               <FgTooltip label={key} triggerClasses={TRIGGER_CLASSES}>
                 <Typography className="text-foreground truncate select-all">

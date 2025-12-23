@@ -73,7 +73,7 @@ export default function NeuroglancerViewDialog({
         url_base: urlBase.trim(),
         short_name: shortName.trim() || undefined
       });
-    } catch (err) {
+    } catch {
       setError('State JSON must be valid JSON.');
     }
   };

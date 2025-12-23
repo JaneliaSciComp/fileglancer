@@ -515,8 +515,8 @@ function TableCard<TData>({
         data={data}
         dataType={dataType}
         errorState={errorState}
-        headerActions={headerActions}
         gridColsClass={gridColsClass}
+        headerActions={headerActions}
         loadingState={loadingState}
       />
     </Card>
