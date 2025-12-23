@@ -13,6 +13,7 @@ import Help from '@/components/Help';
 import Jobs from '@/components/Jobs';
 import Preferences from '@/components/Preferences';
 import Links from '@/components/Links';
+import NeuroglancerLinks from '@/components/NeuroglancerLinks';
 import Notifications from '@/components/Notifications';
 import ErrorFallback from '@/components/ErrorFallback';
 
@@ -97,6 +98,14 @@ const AppComponent = () => {
                 </RequireAuth>
               }
               path="links"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <NeuroglancerLinks />
+                </RequireAuth>
+              }
+              path="ng-links"
             />
             {tasksEnabled ? (
               <Route

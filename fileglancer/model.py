@@ -159,6 +159,74 @@ class ProxiedPathResponse(BaseModel):
     )
 
 
+class NeuroglancerLink(BaseModel):
+    """A shortened Neuroglancer link"""
+    short_key: str = Field(
+        description="The unique short key for this link"
+    )
+    username: str = Field(
+        description="The username of the user who created this link"
+    )
+    title: Optional[str] = Field(
+        description="An optional title for this link",
+        default=None
+    )
+    ng_url_base: str = Field(
+        description="The base URL for Neuroglancer (e.g. https://neuroglancer-demo.appspot.com/)"
+    )
+    state_json: str = Field(
+        description="The Neuroglancer state as a JSON string"
+    )
+    created_at: datetime = Field(
+        description="When this link was created"
+    )
+    updated_at: datetime = Field(
+        description="When this link was last updated"
+    )
+    short_url: Optional[str] = Field(
+        description="The short URL for accessing this link",
+        default=None
+    )
+
+
+class NeuroglancerLinkCreate(BaseModel):
+    """Request body for creating a Neuroglancer short link"""
+    ng_url: Optional[str] = Field(
+        description="Full Neuroglancer URL with state in the fragment (e.g. https://neuroglancer-demo.appspot.com/#!{...})",
+        default=None
+    )
+    state_json: Optional[str] = Field(
+        description="Direct JSON state string (alternative to ng_url)",
+        default=None
+    )
+    ng_url_base: Optional[str] = Field(
+        description="The base URL for Neuroglancer when providing state_json directly",
+        default="https://neuroglancer-demo.appspot.com/"
+    )
+    title: Optional[str] = Field(
+        description="An optional title for this link",
+        default=None
+    )
+
+
+class NeuroglancerLinkUpdate(BaseModel):
+    """Request body for updating a Neuroglancer short link"""
+    title: Optional[str] = Field(
+        description="An optional title for this link",
+        default=None
+    )
+    state_json: Optional[str] = Field(
+        description="Updated JSON state string",
+        default=None
+    )
+
+
+class NeuroglancerLinkResponse(BaseModel):
+    links: List[NeuroglancerLink] = Field(
+        description="A list of Neuroglancer links"
+    )
+
+
 class ExternalBucket(BaseModel):
     """An external bucket for S3-compatible storage"""
     id: int = Field(
