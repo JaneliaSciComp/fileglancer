@@ -7,17 +7,13 @@ import {
 } from '@/queries/neuroglancerQueries';
 
 type NeuroglancerContextType = {
-  allNeuroglancerLinksQuery: ReturnType<
-    typeof useNeuroglancerShortLinksQuery
-  >;
+  allNeuroglancerLinksQuery: ReturnType<typeof useNeuroglancerShortLinksQuery>;
   createNeuroglancerShortLinkMutation: ReturnType<
     typeof useCreateNeuroglancerShortLinkMutation
   >;
 };
 
-const NeuroglancerContext = createContext<NeuroglancerContextType | null>(
-  null
-);
+const NeuroglancerContext = createContext<NeuroglancerContextType | null>(null);
 
 export const useNeuroglancerContext = () => {
   const context = useContext(NeuroglancerContext);

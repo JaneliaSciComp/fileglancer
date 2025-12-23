@@ -27,7 +27,9 @@ export default function NeuroglancerViewDialog({
   const [inputMode, setInputMode] = useState<InputMode>('url');
   const [neuroglancerUrl, setNeuroglancerUrl] = useState('');
   const [stateJson, setStateJson] = useState('');
-  const [urlBase, setUrlBase] = useState('https://neuroglancer-demo.appspot.com/');
+  const [urlBase, setUrlBase] = useState(
+    'https://neuroglancer-demo.appspot.com/'
+  );
   const [shortName, setShortName] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -139,7 +141,10 @@ export default function NeuroglancerViewDialog({
         ) : (
           <>
             <div className="flex flex-col gap-2">
-              <Typography className="text-foreground font-semibold" type="small">
+              <Typography
+                className="text-foreground font-semibold"
+                type="small"
+              >
                 Neuroglancer base URL
               </Typography>
               <Input
@@ -152,7 +157,10 @@ export default function NeuroglancerViewDialog({
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Typography className="text-foreground font-semibold" type="small">
+              <Typography
+                className="text-foreground font-semibold"
+                type="small"
+              >
                 State JSON
               </Typography>
               <Input
