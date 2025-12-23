@@ -1,8 +1,10 @@
+import json
 import os
 import tempfile
 import shutil
 from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
+from urllib.parse import quote
 
 import pytest
 from fastapi.testclient import TestClient
@@ -188,6 +190,38 @@ def test_delete_preference(test_client):
 
     response = test_client.delete("/api/preference/unknown_key")
     assert response.status_code == 404
+
+
+def test_neuroglancer_shortener(test_client):
+    """Test creating and retrieving a shortened Neuroglancer state"""
+    state = {"layers": [], "title": "Example"}
+    encoded_state = quote(json.dumps(state))
+    url = f"https://neuroglancer-demo.appspot.com/#!{encoded_state}"
+
+    response = test_client.post(
+        "/api/neuroglancer/shorten",
+        json={"url": url, "short_name": "Example View"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "short_key" in data
+    assert data["short_name"] == "Example View"
+    assert "state_url" in data
+    assert "neuroglancer_url" in data
+
+    short_key = data["short_key"]
+    assert data["state_url"].endswith(f"/ng/{short_key}")
+    assert data["neuroglancer_url"].startswith("https://neuroglancer-demo.appspot.com/#!")
+
+    state_response = test_client.get(f"/ng/{short_key}")
+    assert state_response.status_code == 200
+    assert state_response.json() == state
+
+    list_response = test_client.get("/api/neuroglancer/short-links")
+    assert list_response.status_code == 200
+    list_data = list_response.json()
+    assert "links" in list_data
+    assert any(link["short_key"] == short_key for link in list_data["links"])
 
 
 def test_create_proxied_path(test_client, temp_dir):
@@ -745,4 +779,3 @@ def test_delete_ticket_not_found(mock_delete, test_client):
     assert response.status_code == 404
     data = response.json()
     assert "error" in data
-

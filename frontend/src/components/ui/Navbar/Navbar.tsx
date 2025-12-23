@@ -13,7 +13,8 @@ import {
   HiOutlineMenu,
   HiOutlineX,
   HiOutlineShare,
-  HiOutlineSun
+  HiOutlineSun,
+  HiOutlineEye
 } from 'react-icons/hi';
 import { HiOutlineFolder, HiOutlineBriefcase } from 'react-icons/hi2';
 import { TbBrandGithub } from 'react-icons/tb';
@@ -33,6 +34,11 @@ const LINKS = [
     icon: HiOutlineShare,
     title: 'Data Links',
     href: '/links'
+  },
+  {
+    icon: HiOutlineEye,
+    title: 'Views',
+    href: '/views'
   },
   {
     icon: HiOutlineBriefcase,

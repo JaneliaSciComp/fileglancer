@@ -149,6 +149,46 @@ def _validate_filename(name: str) -> None:
         raise HTTPException(status_code=400, detail="File or directory name cannot have leading or trailing whitespace")
 
 
+def _parse_neuroglancer_url(url: str) -> Tuple[str, Dict]:
+    """
+    Parse a Neuroglancer URL and return its base URL and decoded JSON state.
+    """
+    if not url or "#!" not in url:
+        raise HTTPException(status_code=400, detail="Neuroglancer URL must include a '#!' state fragment")
+
+    url_base, encoded_state = url.split("#!", 1)
+    if not url_base.startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="Neuroglancer URL must start with http or https")
+
+    decoded_state = unquote(encoded_state)
+    if decoded_state.startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="Shortened Neuroglancer URLs are not supported; provide a full state URL")
+
+    try:
+        state = json.loads(decoded_state)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Neuroglancer state must be valid JSON")
+
+    if not isinstance(state, dict):
+        raise HTTPException(status_code=400, detail="Neuroglancer state must be a JSON object")
+
+    return url_base, state
+
+
+def _normalize_short_key(short_key: Optional[str]) -> Optional[str]:
+    if short_key is None:
+        return None
+    normalized = short_key.strip()
+    return normalized or None
+
+
+def _validate_short_key(short_key: str) -> None:
+    if len(short_key) < 4 or len(short_key) > 64:
+        raise HTTPException(status_code=400, detail="short_key must be between 4 and 64 characters")
+    if not all(ch.isalnum() or ch in ("-", "_") for ch in short_key):
+        raise HTTPException(status_code=400, detail="short_key may only contain letters, numbers, '-' or '_'")
+
+
 def create_app(settings):
 
     # Initialize OAuth client for OKTA
@@ -643,6 +683,58 @@ def create_app(settings):
             return {"message": f"Preference {key} deleted for user {username}"}
 
 
+    @app.post("/api/neuroglancer/shorten", response_model=NeuroglancerShortenResponse,
+              description="Store a Neuroglancer state and return a shortened link")
+    async def shorten_neuroglancer_state(request: Request,
+                                         payload: NeuroglancerShortenRequest,
+                                         username: str = Depends(get_current_user)):
+        short_key = _normalize_short_key(payload.short_key)
+        if short_key:
+            _validate_short_key(short_key)
+        short_name = payload.short_name.strip() if payload.short_name else None
+
+        if payload.url and payload.state:
+            raise HTTPException(status_code=400, detail="Provide either url or state, not both")
+
+        if payload.url:
+            url_base, state = _parse_neuroglancer_url(payload.url.strip())
+        elif payload.state:
+            if not payload.url_base:
+                raise HTTPException(status_code=400, detail="url_base is required when providing state directly")
+            if not isinstance(payload.state, dict):
+                raise HTTPException(status_code=400, detail="state must be a JSON object")
+            url_base = payload.url_base.strip()
+            if not url_base.startswith(("http://", "https://")):
+                raise HTTPException(status_code=400, detail="url_base must start with http or https")
+            state = payload.state
+        else:
+            raise HTTPException(status_code=400, detail="Either url or state must be provided")
+
+        with db.get_db_session(settings.db_url) as session:
+            try:
+                entry = db.create_neuroglancer_state(
+                    session,
+                    username,
+                    url_base,
+                    state,
+                    short_key=short_key,
+                    short_name=short_name
+                )
+                created_short_key = entry.short_key
+                created_short_name = entry.short_name
+            except ValueError as exc:
+                raise HTTPException(status_code=409, detail=str(exc))
+
+        state_url = str(request.url_for("get_neuroglancer_state", short_key=created_short_key))
+        neuroglancer_url = f"{url_base}#!{state_url}"
+        return NeuroglancerShortenResponse(
+            short_key=created_short_key,
+            short_name=created_short_name,
+            state_url=state_url,
+            neuroglancer_url=neuroglancer_url
+        )
+
+
     @app.post("/api/proxied-path", response_model=ProxiedPath,
               description="Create a new proxied path")
     async def create_proxied_path(fsp_name: str = Query(..., description="The name of the file share path that this proxied path is associated with"),
@@ -711,6 +803,37 @@ def create_app(settings):
             if deleted == 0:
                 raise HTTPException(status_code=404, detail="Proxied path not found")
             return {"message": f"Proxied path {sharing_key} deleted for user {username}"}
+
+
+    @app.get("/ng/{short_key}", name="get_neuroglancer_state", include_in_schema=False)
+    async def get_neuroglancer_state(short_key: str = Path(..., description="Short key for a stored Neuroglancer state")):
+        with db.get_db_session(settings.db_url) as session:
+            entry = db.get_neuroglancer_state(session, short_key)
+            if not entry:
+                raise HTTPException(status_code=404, detail="Neuroglancer state not found")
+            return JSONResponse(content=entry.state, headers={"Cache-Control": "no-store"})
+
+
+    @app.get("/api/neuroglancer/short-links", response_model=NeuroglancerShortLinkResponse,
+             description="List stored Neuroglancer short links for the current user")
+    async def get_neuroglancer_short_links(request: Request,
+                                           username: str = Depends(get_current_user)):
+        links = []
+        with db.get_db_session(settings.db_url) as session:
+            entries = db.get_neuroglancer_states(session, username)
+            for entry in entries:
+                state_url = str(request.url_for("get_neuroglancer_state", short_key=entry.short_key))
+                neuroglancer_url = f"{entry.url_base}#!{state_url}"
+                links.append(NeuroglancerShortLink(
+                    short_key=entry.short_key,
+                    short_name=entry.short_name,
+                    created_at=entry.created_at,
+                    updated_at=entry.updated_at,
+                    state_url=state_url,
+                    neuroglancer_url=neuroglancer_url
+                ))
+
+        return NeuroglancerShortLinkResponse(links=links)
 
 
     @app.get("/files/{sharing_key}/{sharing_name}")
