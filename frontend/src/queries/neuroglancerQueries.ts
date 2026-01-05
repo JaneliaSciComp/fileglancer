@@ -55,7 +55,7 @@ const fetchNeuroglancerShortLinks = async (
 ): Promise<NeuroglancerShortLink[]> => {
   try {
     const response = await sendFetchRequest(
-      '/api/neuroglancer/short-links',
+      '/api/neuroglancer/nglinks',
       'GET',
       undefined,
       { signal }
@@ -96,7 +96,7 @@ export function useCreateNeuroglancerShortLinkMutation(): UseMutationResult<
   return useMutation({
     mutationFn: async (payload: CreateShortLinkPayload) => {
       const response = await sendFetchRequest(
-        '/api/neuroglancer/shorten',
+        '/api/neuroglancer/nglinks',
         'POST',
         payload
       );
@@ -123,7 +123,7 @@ export function useUpdateNeuroglancerShortLinkMutation(): UseMutationResult<
   return useMutation({
     mutationFn: async (payload: UpdateShortLinkPayload) => {
       const response = await sendFetchRequest(
-        `/api/neuroglancer/short-links/${encodeURIComponent(payload.short_key)}`,
+        `/api/neuroglancer/nglinks/${encodeURIComponent(payload.short_key)}`,
         'PUT',
         { url: payload.url, title: payload.title }
       );

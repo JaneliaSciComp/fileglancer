@@ -38,7 +38,7 @@ const LINKS = [
   {
     icon: HiOutlineEye,
     title: 'NG Links',
-    href: '/views'
+    href: '/nglinks'
   },
   {
     icon: HiOutlineBriefcase,

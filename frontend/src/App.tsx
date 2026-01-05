@@ -105,7 +105,7 @@ const AppComponent = () => {
                   <NGLinks />
                 </RequireAuth>
               }
-              path="views"
+              path="nglinks"
             />
             {tasksEnabled ? (
               <Route

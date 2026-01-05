@@ -683,7 +683,7 @@ def create_app(settings):
             return {"message": f"Preference {key} deleted for user {username}"}
 
 
-    @app.post("/api/neuroglancer/shorten", response_model=NeuroglancerShortenResponse,
+    @app.post("/api/neuroglancer/nglinks", response_model=NeuroglancerShortenResponse,
               description="Store a Neuroglancer state and return a shortened link")
     async def shorten_neuroglancer_state(request: Request,
                                          payload: NeuroglancerShortenRequest,
@@ -745,7 +745,7 @@ def create_app(settings):
         )
 
 
-    @app.put("/api/neuroglancer/short-links/{short_key}", response_model=NeuroglancerShortenResponse,
+    @app.put("/api/neuroglancer/nglinks/{short_key}", response_model=NeuroglancerShortenResponse,
              description="Update a stored Neuroglancer state")
     async def update_neuroglancer_short_link(request: Request,
                                              short_key: str,
@@ -881,7 +881,7 @@ def create_app(settings):
             return JSONResponse(content=entry.state, headers={"Cache-Control": "no-store"})
 
 
-    @app.get("/api/neuroglancer/short-links", response_model=NeuroglancerShortLinkResponse,
+    @app.get("/api/neuroglancer/nglinks", response_model=NeuroglancerShortLinkResponse,
              description="List stored Neuroglancer short links for the current user")
     async def get_neuroglancer_short_links(request: Request,
                                            username: str = Depends(get_current_user)):

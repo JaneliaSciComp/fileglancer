@@ -200,7 +200,7 @@ def test_neuroglancer_shortener(test_client):
 
     # Test with short_name - URL should include both short_key and short_name
     response = test_client.post(
-        "/api/neuroglancer/shorten",
+        "/api/neuroglancer/nglinks",
         json={"url": url, "short_name": "example-view"}
     )
     assert response.status_code == 200
@@ -224,7 +224,7 @@ def test_neuroglancer_shortener(test_client):
     state_response_simple = test_client.get(f"/ng/{short_key}")
     assert state_response_simple.status_code == 404
 
-    list_response = test_client.get("/api/neuroglancer/short-links")
+    list_response = test_client.get("/api/neuroglancer/nglinks")
     assert list_response.status_code == 200
     list_data = list_response.json()
     assert "links" in list_data
@@ -238,7 +238,7 @@ def test_neuroglancer_shortener_no_name(test_client):
     url = f"https://neuroglancer-demo.appspot.com/#!{encoded_state}"
 
     response = test_client.post(
-        "/api/neuroglancer/shorten",
+        "/api/neuroglancer/nglinks",
         json={"url": url}
     )
     assert response.status_code == 200
