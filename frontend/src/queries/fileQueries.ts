@@ -55,7 +55,16 @@ export default function useFileQuery(
     );
 
     const response = await sendFetchRequest(url, 'GET', undefined, { signal });
-    const body = await response.json();
+
+    const body = await response.json().catch(() => {
+      if (!response.ok) {
+        throw new Error(
+          `Server returned ${response.status} ${response.statusText}`
+        );
+      }
+      // If response was OK but not JSON (unlikely for this API but good safety)
+      throw new Error('Invalid response from server');
+    });
 
     if (response.ok) {
       return body as FileBrowserResponse;
