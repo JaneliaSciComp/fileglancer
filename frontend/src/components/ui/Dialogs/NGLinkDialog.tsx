@@ -66,7 +66,7 @@ export default function NGLinkDialog({
     setError(null);
 
     if (!neuroglancerUrl.trim()) {
-      setError('Please provide a Neuroglancer URL.');
+      setError('Please provide a Neuroglancer link.');
       return;
     }
 
@@ -90,8 +90,8 @@ export default function NGLinkDialog({
       <div className="mt-8 flex flex-col gap-2">
         <Typography className="text-foreground font-semibold" type="h6">
           {isEditMode
-            ? 'Edit Neuroglancer link'
-            : 'Create short Neuroglancer link'}
+            ? 'Edit Neuroglancer Short Link'
+            : 'Create Neuroglancer Short Link'}
         </Typography>
         <Typography
           as="label"

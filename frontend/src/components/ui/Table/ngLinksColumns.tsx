@@ -116,7 +116,7 @@ export function useNGLinksColumns(
       },
       {
         accessorKey: 'neuroglancer_url',
-        header: 'Neuroglancer URL',
+        header: 'Neuroglancer Short Link',
         cell: ({ row, table }) => {
           const item = row.original;
           const onContextMenu = table.options.meta?.onCellContextMenu;
