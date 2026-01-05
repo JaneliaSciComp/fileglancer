@@ -646,6 +646,27 @@ def get_neuroglancer_states(session: Session, username: str) -> List[Neuroglance
     )
 
 
+def update_neuroglancer_state(
+    session: Session,
+    username: str,
+    short_key: str,
+    url_base: str,
+    state: Dict
+) -> Optional[NeuroglancerStateDB]:
+    """Update a Neuroglancer state entry. Returns the updated entry or None if not found."""
+    entry = session.query(NeuroglancerStateDB).filter_by(
+        short_key=short_key,
+        username=username
+    ).first()
+    if not entry:
+        return None
+    entry.url_base = url_base
+    entry.state = state
+    entry.updated_at = datetime.now(UTC)
+    session.commit()
+    return entry
+
+
 def get_tickets(session: Session, username: str, fsp_name: str = None, path: str = None) -> List[TicketDB]:
     """Get tickets for a user, optionally filtered by fsp_name and path"""
     logger.info(f"Getting tickets for {username} with fsp_name={fsp_name} and path={path}")

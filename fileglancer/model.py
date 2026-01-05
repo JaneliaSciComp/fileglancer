@@ -244,6 +244,17 @@ class NeuroglancerShortenRequest(BaseModel):
     )
 
 
+class NeuroglancerUpdateRequest(BaseModel):
+    """Request payload for updating a Neuroglancer state"""
+    url: str = Field(
+        description="Neuroglancer URL containing the encoded JSON state after #!"
+    )
+    title: Optional[str] = Field(
+        description="Optional title that appears in the Neuroglancer tab name",
+        default=None
+    )
+
+
 class NeuroglancerShortenResponse(BaseModel):
     """Response payload for shortened Neuroglancer state"""
     short_key: str = Field(

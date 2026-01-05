@@ -39,6 +39,12 @@ type CreateShortLinkPayload = {
   title?: string;
 };
 
+type UpdateShortLinkPayload = {
+  short_key: string;
+  url: string;
+  title?: string;
+};
+
 export const neuroglancerQueryKeys = {
   all: ['neuroglancerLinks'] as const,
   list: () => ['neuroglancerLinks', 'list'] as const
@@ -93,6 +99,33 @@ export function useCreateNeuroglancerShortLinkMutation(): UseMutationResult<
         '/api/neuroglancer/shorten',
         'POST',
         payload
+      );
+      if (!response.ok) {
+        throw await toHttpError(response);
+      }
+      return (await response.json()) as NeuroglancerShortenResponse;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: neuroglancerQueryKeys.all
+      });
+    }
+  });
+}
+
+export function useUpdateNeuroglancerShortLinkMutation(): UseMutationResult<
+  NeuroglancerShortenResponse,
+  Error,
+  UpdateShortLinkPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: UpdateShortLinkPayload) => {
+      const response = await sendFetchRequest(
+        `/api/neuroglancer/short-links/${encodeURIComponent(payload.short_key)}`,
+        'PUT',
+        { url: payload.url, title: payload.title }
       );
       if (!response.ok) {
         throw await toHttpError(response);

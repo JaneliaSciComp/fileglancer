@@ -3,13 +3,17 @@ import type { ReactNode } from 'react';
 
 import {
   useNeuroglancerShortLinksQuery,
-  useCreateNeuroglancerShortLinkMutation
+  useCreateNeuroglancerShortLinkMutation,
+  useUpdateNeuroglancerShortLinkMutation
 } from '@/queries/neuroglancerQueries';
 
 type NeuroglancerContextType = {
   allNeuroglancerLinksQuery: ReturnType<typeof useNeuroglancerShortLinksQuery>;
   createNeuroglancerShortLinkMutation: ReturnType<
     typeof useCreateNeuroglancerShortLinkMutation
+  >;
+  updateNeuroglancerShortLinkMutation: ReturnType<
+    typeof useUpdateNeuroglancerShortLinkMutation
   >;
 };
 
@@ -33,10 +37,13 @@ export const NeuroglancerProvider = ({
   const allNeuroglancerLinksQuery = useNeuroglancerShortLinksQuery();
   const createNeuroglancerShortLinkMutation =
     useCreateNeuroglancerShortLinkMutation();
+  const updateNeuroglancerShortLinkMutation =
+    useUpdateNeuroglancerShortLinkMutation();
 
   const value: NeuroglancerContextType = {
     allNeuroglancerLinksQuery,
-    createNeuroglancerShortLinkMutation
+    createNeuroglancerShortLinkMutation,
+    updateNeuroglancerShortLinkMutation
   };
 
   return (

@@ -15,10 +15,23 @@ const TRIGGER_CLASSES = 'h-min max-w-full';
 
 type ViewRowActionProps = {
   item: NeuroglancerShortLink;
+  onEdit: (item: NeuroglancerShortLink) => void;
 };
 
-function ActionsCell({ item }: { readonly item: NeuroglancerShortLink }) {
+function ActionsCell({
+  item,
+  onEdit
+}: {
+  readonly item: NeuroglancerShortLink;
+  readonly onEdit: (item: NeuroglancerShortLink) => void;
+}) {
   const menuItems: MenuItem<ViewRowActionProps>[] = [
+    {
+      name: 'Edit',
+      action: ({ item, onEdit }) => {
+        onEdit(item);
+      }
+    },
     {
       name: 'Copy Neuroglancer URL',
       action: async ({ item }) => {
@@ -58,7 +71,7 @@ function ActionsCell({ item }: { readonly item: NeuroglancerShortLink }) {
     <div className="min-w-0 flex items-center">
       <div onClick={e => e.stopPropagation()}>
         <DataLinksActionsMenu<ViewRowActionProps>
-          actionProps={{ item }}
+          actionProps={{ item, onEdit }}
           menuItems={menuItems}
         />
       </div>
@@ -66,7 +79,9 @@ function ActionsCell({ item }: { readonly item: NeuroglancerShortLink }) {
   );
 }
 
-export function useViewsColumns(): ColumnDef<NeuroglancerShortLink>[] {
+export function useViewsColumns(
+  onEdit: (item: NeuroglancerShortLink) => void
+): ColumnDef<NeuroglancerShortLink>[] {
   return useMemo(
     () => [
       {
@@ -187,10 +202,10 @@ export function useViewsColumns(): ColumnDef<NeuroglancerShortLink>[] {
       {
         id: 'actions',
         header: 'Actions',
-        cell: ({ row }) => <ActionsCell item={row.original} />,
+        cell: ({ row }) => <ActionsCell item={row.original} onEdit={onEdit} />,
         enableSorting: false
       }
     ],
-    []
+    [onEdit]
   );
 }

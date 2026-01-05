@@ -7,12 +7,33 @@ import { TableCard } from '@/components/ui/Table/TableCard';
 import { useViewsColumns } from '@/components/ui/Table/viewsColumns';
 import NeuroglancerViewDialog from '@/components/ui/Dialogs/NeuroglancerViewDialog';
 import { useNeuroglancerContext } from '@/contexts/NeuroglancerContext';
+import type { NeuroglancerShortLink } from '@/queries/neuroglancerQueries';
 
 export default function Views() {
-  const { allNeuroglancerLinksQuery, createNeuroglancerShortLinkMutation } =
-    useNeuroglancerContext();
-  const viewsColumns = useViewsColumns();
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const {
+    allNeuroglancerLinksQuery,
+    createNeuroglancerShortLinkMutation,
+    updateNeuroglancerShortLinkMutation
+  } = useNeuroglancerContext();
+  const [showDialog, setShowDialog] = useState(false);
+  const [editItem, setEditItem] = useState<NeuroglancerShortLink | undefined>(
+    undefined
+  );
+
+  const handleOpenCreate = () => {
+    setEditItem(undefined);
+    setShowDialog(true);
+  };
+
+  const handleOpenEdit = (item: NeuroglancerShortLink) => {
+    setEditItem(item);
+    setShowDialog(true);
+  };
+
+  const handleClose = () => {
+    setShowDialog(false);
+    setEditItem(undefined);
+  };
 
   const handleCreate = async (payload: {
     url: string;
@@ -22,13 +43,31 @@ export default function Views() {
     try {
       await createNeuroglancerShortLinkMutation.mutateAsync(payload);
       toast.success('Link created');
-      setShowCreateDialog(false);
+      handleClose();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to create link';
       toast.error(message);
     }
   };
+
+  const handleUpdate = async (payload: {
+    short_key: string;
+    url: string;
+    title?: string;
+  }) => {
+    try {
+      await updateNeuroglancerShortLinkMutation.mutateAsync(payload);
+      toast.success('Link updated');
+      handleClose();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to update link';
+      toast.error(message);
+    }
+  };
+
+  const viewsColumns = useViewsColumns(handleOpenEdit);
 
   return (
     <>
@@ -42,7 +81,7 @@ export default function Views() {
       <div className="mb-4">
         <Button
           className="bg-primary text-white hover:bg-primary/90"
-          onClick={() => setShowCreateDialog(true)}
+          onClick={handleOpenCreate}
         >
           <HiOutlinePlus className="icon-default mr-2" />
           New Link
@@ -56,12 +95,17 @@ export default function Views() {
         gridColsClass="grid-cols-[1.2fr_2.8fr_1.2fr_1fr_0.6fr]"
         loadingState={allNeuroglancerLinksQuery.isPending}
       />
-      {showCreateDialog ? (
+      {showDialog ? (
         <NeuroglancerViewDialog
-          onClose={() => setShowCreateDialog(false)}
+          editItem={editItem}
+          onClose={handleClose}
           onCreate={handleCreate}
-          open={showCreateDialog}
-          pending={createNeuroglancerShortLinkMutation.isPending}
+          onUpdate={handleUpdate}
+          open={showDialog}
+          pending={
+            createNeuroglancerShortLinkMutation.isPending ||
+            updateNeuroglancerShortLinkMutation.isPending
+          }
         />
       ) : null}
     </>

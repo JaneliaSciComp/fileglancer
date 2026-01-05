@@ -745,6 +745,48 @@ def create_app(settings):
         )
 
 
+    @app.put("/api/neuroglancer/short-links/{short_key}", response_model=NeuroglancerShortenResponse,
+             description="Update a stored Neuroglancer state")
+    async def update_neuroglancer_short_link(request: Request,
+                                             short_key: str,
+                                             payload: NeuroglancerUpdateRequest,
+                                             username: str = Depends(get_current_user)):
+        title = payload.title.strip() if payload.title else None
+        url_base, state = _parse_neuroglancer_url(payload.url.strip())
+
+        # Add title to state if provided
+        if title:
+            state = {**state, "title": title}
+
+        with db.get_db_session(settings.db_url) as session:
+            entry = db.update_neuroglancer_state(
+                session,
+                username,
+                short_key,
+                url_base,
+                state
+            )
+            if not entry:
+                raise HTTPException(status_code=404, detail="Neuroglancer state not found")
+            # Extract values before session closes
+            updated_short_key = entry.short_key
+            updated_short_name = entry.short_name
+
+        # Generate URL based on whether short_name is present
+        if updated_short_name:
+            state_url = str(request.url_for("get_neuroglancer_state", short_key=updated_short_key, short_name=updated_short_name))
+        else:
+            state_url = str(request.url_for("get_neuroglancer_state_simple", short_key=updated_short_key))
+        neuroglancer_url = f"{url_base}#!{state_url}"
+        return NeuroglancerShortenResponse(
+            short_key=updated_short_key,
+            short_name=updated_short_name,
+            title=title,
+            state_url=state_url,
+            neuroglancer_url=neuroglancer_url
+        )
+
+
     @app.post("/api/proxied-path", response_model=ProxiedPath,
               description="Create a new proxied path")
     async def create_proxied_path(fsp_name: str = Query(..., description="The name of the file share path that this proxied path is associated with"),
