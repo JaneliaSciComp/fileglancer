@@ -1,4 +1,3 @@
-
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -47,7 +46,7 @@ describe('useFileQuery 500 Error Reproduction', () => {
         vi.clearAllMocks();
     });
 
-    it('should fail when server returns 500 HTML response (reproducing bug)', async () => {
+    it('should handle 500 Internal Server Error correctly', async () => {
         // Arrange
         const fspName = 'test-fsp';
         const folderName = '';
@@ -93,5 +92,6 @@ describe('useFileQuery 500 Error Reproduction', () => {
         // This test definition asserts the correct behavior.
         // Running it on the buggy branch should FAIL this assertion.
         expect(error?.message).toBe('Server returned 500 Internal Server Error');
+        expect(error?.message).not.toContain('Unexpected token');
     });
 }, 15000);
