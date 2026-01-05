@@ -692,6 +692,7 @@ def create_app(settings):
         if short_key:
             _validate_short_key(short_key)
         short_name = payload.short_name.strip() if payload.short_name else None
+        title = payload.title.strip() if payload.title else None
 
         if payload.url and payload.state:
             raise HTTPException(status_code=400, detail="Provide either url or state, not both")
@@ -709,6 +710,10 @@ def create_app(settings):
             state = payload.state
         else:
             raise HTTPException(status_code=400, detail="Either url or state must be provided")
+
+        # Add title to state if provided
+        if title:
+            state = {**state, "title": title}
 
         with db.get_db_session(settings.db_url) as session:
             try:
@@ -730,6 +735,7 @@ def create_app(settings):
         return NeuroglancerShortenResponse(
             short_key=created_short_key,
             short_name=created_short_name,
+            title=title,
             state_url=state_url,
             neuroglancer_url=neuroglancer_url
         )
@@ -824,9 +830,12 @@ def create_app(settings):
             for entry in entries:
                 state_url = str(request.url_for("get_neuroglancer_state", short_key=entry.short_key))
                 neuroglancer_url = f"{entry.url_base}#!{state_url}"
+                # Read title from the stored state
+                title = entry.state.get("title") if isinstance(entry.state, dict) else None
                 links.append(NeuroglancerShortLink(
                     short_key=entry.short_key,
                     short_name=entry.short_name,
+                    title=title,
                     created_at=entry.created_at,
                     updated_at=entry.updated_at,
                     state_url=state_url,

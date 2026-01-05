@@ -11,6 +11,7 @@ type NeuroglancerViewDialogProps = {
   readonly onCreate: (payload: {
     url: string;
     short_name?: string;
+    title?: string;
   }) => Promise<void>;
 };
 
@@ -22,6 +23,7 @@ export default function NeuroglancerViewDialog({
 }: NeuroglancerViewDialogProps) {
   const [neuroglancerUrl, setNeuroglancerUrl] = useState('');
   const [shortName, setShortName] = useState('');
+  const [title, setTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const resetAndClose = () => {
@@ -39,7 +41,8 @@ export default function NeuroglancerViewDialog({
 
     await onCreate({
       url: neuroglancerUrl.trim(),
-      short_name: shortName.trim() || undefined
+      short_name: shortName.trim() || undefined,
+      title: title.trim() || undefined
     });
   };
 
@@ -66,6 +69,23 @@ export default function NeuroglancerViewDialog({
           placeholder="https://neuroglancer-demo.appspot.com/#!{...}"
           type="text"
           value={neuroglancerUrl}
+        />
+        <Typography
+          as="label"
+          className="text-foreground font-semibold"
+          htmlFor="title"
+        >
+          Title (optional, appears in tab name)
+        </Typography>
+        <input
+          className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background"
+          id="title"
+          onChange={(e: ChangeEvent<HTMLInputElement>) =>
+            setTitle(e.target.value)
+          }
+          placeholder="Example: Hemibrain EM"
+          type="text"
+          value={title}
         />
         <Typography
           as="label"

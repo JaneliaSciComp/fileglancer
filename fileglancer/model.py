@@ -226,6 +226,10 @@ class NeuroglancerShortenRequest(BaseModel):
         description="Optional human-friendly name for the short link",
         default=None
     )
+    title: Optional[str] = Field(
+        description="Optional title that appears in the Neuroglancer tab name",
+        default=None
+    )
     url: Optional[str] = Field(
         description="Neuroglancer URL containing the encoded JSON state after #!",
         default=None
@@ -249,6 +253,10 @@ class NeuroglancerShortenResponse(BaseModel):
         description="Optional human-friendly name for the short link",
         default=None
     )
+    title: Optional[str] = Field(
+        description="Optional title that appears in the Neuroglancer tab name",
+        default=None
+    )
     state_url: str = Field(
         description="Absolute URL to the stored state JSON"
     )
@@ -264,6 +272,10 @@ class NeuroglancerShortLink(BaseModel):
     )
     short_name: Optional[str] = Field(
         description="Optional human-friendly name for the short link",
+        default=None
+    )
+    title: Optional[str] = Field(
+        description="Optional title that appears in the Neuroglancer tab name",
         default=None
     )
     created_at: datetime = Field(

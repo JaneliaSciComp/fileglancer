@@ -12,6 +12,7 @@ import { toHttpError } from '@/utils/errorHandling';
 export type NeuroglancerShortLink = {
   short_key: string;
   short_name: string | null;
+  title: string | null;
   created_at: string;
   updated_at: string;
   state_url: string;
@@ -35,6 +36,7 @@ type CreateShortLinkPayload = {
   url_base?: string;
   short_name?: string;
   short_key?: string;
+  title?: string;
 };
 
 export const neuroglancerQueryKeys = {

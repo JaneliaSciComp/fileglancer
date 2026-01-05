@@ -17,6 +17,7 @@ export default function Views() {
   const handleCreate = async (payload: {
     url: string;
     short_name?: string;
+    title?: string;
   }) => {
     try {
       await createNeuroglancerShortLinkMutation.mutateAsync(payload);
