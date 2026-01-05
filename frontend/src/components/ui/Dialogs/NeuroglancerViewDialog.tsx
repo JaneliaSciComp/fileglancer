@@ -92,7 +92,7 @@ export default function NeuroglancerViewDialog({
           className="text-foreground font-semibold"
           htmlFor="short-name"
         >
-          Name (optional)
+          Name (optional, used in shortened URL)
         </Typography>
         <input
           className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background"
@@ -100,7 +100,7 @@ export default function NeuroglancerViewDialog({
           onChange={(e: ChangeEvent<HTMLInputElement>) =>
             setShortName(e.target.value)
           }
-          placeholder="Example: Hemibrain view"
+          placeholder="Example: hemibrain-em-1"
           type="text"
           value={shortName}
         />

@@ -730,7 +730,11 @@ def create_app(settings):
             except ValueError as exc:
                 raise HTTPException(status_code=409, detail=str(exc))
 
-        state_url = str(request.url_for("get_neuroglancer_state", short_key=created_short_key))
+        # Generate URL based on whether short_name is provided
+        if created_short_name:
+            state_url = str(request.url_for("get_neuroglancer_state", short_key=created_short_key, short_name=created_short_name))
+        else:
+            state_url = str(request.url_for("get_neuroglancer_state_simple", short_key=created_short_key))
         neuroglancer_url = f"{url_base}#!{state_url}"
         return NeuroglancerShortenResponse(
             short_key=created_short_key,
@@ -811,11 +815,26 @@ def create_app(settings):
             return {"message": f"Proxied path {sharing_key} deleted for user {username}"}
 
 
-    @app.get("/ng/{short_key}", name="get_neuroglancer_state", include_in_schema=False)
-    async def get_neuroglancer_state(short_key: str = Path(..., description="Short key for a stored Neuroglancer state")):
+    @app.get("/ng/{short_key}", name="get_neuroglancer_state_simple", include_in_schema=False)
+    async def get_neuroglancer_state_simple(short_key: str = Path(..., description="Short key for a stored Neuroglancer state")):
         with db.get_db_session(settings.db_url) as session:
             entry = db.get_neuroglancer_state(session, short_key)
             if not entry:
+                raise HTTPException(status_code=404, detail="Neuroglancer state not found")
+            # If this entry has a short_name, require it in the URL
+            if entry.short_name:
+                raise HTTPException(status_code=404, detail="Neuroglancer state not found")
+            return JSONResponse(content=entry.state, headers={"Cache-Control": "no-store"})
+
+    @app.get("/ng/{short_key}/{short_name}", name="get_neuroglancer_state", include_in_schema=False)
+    async def get_neuroglancer_state(short_key: str = Path(..., description="Short key for a stored Neuroglancer state"),
+                                     short_name: str = Path(..., description="Short name for a stored Neuroglancer state")):
+        with db.get_db_session(settings.db_url) as session:
+            entry = db.get_neuroglancer_state(session, short_key)
+            if not entry:
+                raise HTTPException(status_code=404, detail="Neuroglancer state not found")
+            # Validate short_name matches
+            if entry.short_name != short_name:
                 raise HTTPException(status_code=404, detail="Neuroglancer state not found")
             return JSONResponse(content=entry.state, headers={"Cache-Control": "no-store"})
 
@@ -828,7 +847,11 @@ def create_app(settings):
         with db.get_db_session(settings.db_url) as session:
             entries = db.get_neuroglancer_states(session, username)
             for entry in entries:
-                state_url = str(request.url_for("get_neuroglancer_state", short_key=entry.short_key))
+                # Generate URL based on whether short_name is provided
+                if entry.short_name:
+                    state_url = str(request.url_for("get_neuroglancer_state", short_key=entry.short_key, short_name=entry.short_name))
+                else:
+                    state_url = str(request.url_for("get_neuroglancer_state_simple", short_key=entry.short_key))
                 neuroglancer_url = f"{entry.url_base}#!{state_url}"
                 # Read title from the stored state
                 title = entry.state.get("title") if isinstance(entry.state, dict) else None

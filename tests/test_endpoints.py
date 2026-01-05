@@ -198,30 +198,61 @@ def test_neuroglancer_shortener(test_client):
     encoded_state = quote(json.dumps(state))
     url = f"https://neuroglancer-demo.appspot.com/#!{encoded_state}"
 
+    # Test with short_name - URL should include both short_key and short_name
     response = test_client.post(
         "/api/neuroglancer/shorten",
-        json={"url": url, "short_name": "Example View"}
+        json={"url": url, "short_name": "example-view"}
     )
     assert response.status_code == 200
     data = response.json()
     assert "short_key" in data
-    assert data["short_name"] == "Example View"
+    assert data["short_name"] == "example-view"
     assert "state_url" in data
     assert "neuroglancer_url" in data
 
     short_key = data["short_key"]
-    assert data["state_url"].endswith(f"/ng/{short_key}")
+    short_name = data["short_name"]
+    assert data["state_url"].endswith(f"/ng/{short_key}/{short_name}")
     assert data["neuroglancer_url"].startswith("https://neuroglancer-demo.appspot.com/#!")
 
-    state_response = test_client.get(f"/ng/{short_key}")
+    # Retrieving with both short_key and short_name should work
+    state_response = test_client.get(f"/ng/{short_key}/{short_name}")
     assert state_response.status_code == 200
     assert state_response.json() == state
+
+    # Retrieving with only short_key should fail (404)
+    state_response_simple = test_client.get(f"/ng/{short_key}")
+    assert state_response_simple.status_code == 404
 
     list_response = test_client.get("/api/neuroglancer/short-links")
     assert list_response.status_code == 200
     list_data = list_response.json()
     assert "links" in list_data
     assert any(link["short_key"] == short_key for link in list_data["links"])
+
+
+def test_neuroglancer_shortener_no_name(test_client):
+    """Test creating a shortened Neuroglancer state without short_name"""
+    state = {"layers": []}
+    encoded_state = quote(json.dumps(state))
+    url = f"https://neuroglancer-demo.appspot.com/#!{encoded_state}"
+
+    response = test_client.post(
+        "/api/neuroglancer/shorten",
+        json={"url": url}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "short_key" in data
+    assert data["short_name"] is None
+
+    short_key = data["short_key"]
+    assert data["state_url"].endswith(f"/ng/{short_key}")
+
+    # Retrieving with only short_key should work when no short_name was set
+    state_response = test_client.get(f"/ng/{short_key}")
+    assert state_response.status_code == 200
+    assert state_response.json() == state
 
 
 def test_create_proxied_path(test_client, temp_dir):
