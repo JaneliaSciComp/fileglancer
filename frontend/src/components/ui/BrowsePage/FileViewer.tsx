@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Typography } from '@material-tailwind/react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import {
@@ -10,6 +9,7 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { formatFileSize, formatUnixTimestamp } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
 import { useFileContentQuery } from '@/queries/fileContentQueries';
+import useDarkMode from '@/hooks/useDarkMode';
 
 type FileViewerProps = {
   readonly file: FileOrFolder;
@@ -76,26 +76,8 @@ const getLanguageFromExtension = (filename: string): string => {
 
 export default function FileViewer({ file }: FileViewerProps) {
   const { fspName } = useFileBrowserContext();
-
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
-
+  const isDarkMode = useDarkMode();
   const contentQuery = useFileContentQuery(fspName, file.path);
-
-  // Detect dark mode from document
-  useEffect(() => {
-    const checkDarkMode = () => {
-      setIsDarkMode(document.documentElement.classList.contains('dark'));
-    };
-
-    checkDarkMode();
-    const observer = new MutationObserver(checkDarkMode);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class']
-    });
-
-    return () => observer.disconnect();
-  }, []);
 
   const renderViewer = () => {
     if (contentQuery.isLoading) {
@@ -121,11 +103,25 @@ export default function FileViewer({ file }: FileViewerProps) {
     const language = getLanguageFromExtension(file.name);
     const content = contentQuery.data ?? '';
 
+    // Get the theme's code styles and merge with padding bottom for scrollbar
+    const theme = isDarkMode ? materialDark : coy;
+    const themeCodeStyles = theme['code[class*="language-"]'] || {};
+    const mergedCodeTagProps = {
+      style: {
+        ...themeCodeStyles,
+        paddingBottom: '1em'
+      }
+    };
+
     return (
       <SyntaxHighlighter
+        codeTagProps={mergedCodeTagProps}
         customStyle={{
           margin: 0,
-          padding: '1rem',
+          paddingTop: '1em',
+          paddingRight: '1em',
+          paddingBottom: '0',
+          paddingLeft: '1em',
           fontSize: '14px',
           lineHeight: '1.5'
         }}
