@@ -173,6 +173,20 @@ export default function DataLinkUsageDialog({
           ]}
         />
       )
+    },
+    {
+      id: 'vvdViewer',
+      label: 'VVDViewer',
+      content: (
+        <InstructionBlock
+          steps={[
+            'Install VVDViewer',
+            'Launch VVDViewer',
+            'Navigate to File → Open URL',
+            'Paste data link and click "OK"'
+          ]}
+        />
+      )
     }
   ];
 
