@@ -139,13 +139,13 @@ export default function FileViewer({ file }: FileViewerProps) {
       <SyntaxHighlighter
         customStyle={{
           margin: 0,
-          padding: '1rem',
+          padding: '1rem 1rem 3rem 1rem',
           fontSize: '14px',
           lineHeight: '1.5',
           overflow: 'visible',
-          maxHeight: '100%',
           width: '100%',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          minHeight: 'fit-content'
         }}
         language={language}
         showLineNumbers={false}
