@@ -159,6 +159,20 @@ export default function DataLinkUsageDialog({
           language="java"
         />
       )
+    },
+    {
+      id: 'fiji',
+      label: 'Fiji',
+      content: (
+        <InstructionBlock
+          steps={[
+            'Launch Fiji',
+            'Navigate to Plugins → BigDataViewer → HDF5/N5/Zarr/OME-NGFF Viewer',
+            'Paste data link and click "Detect datasets"',
+            'Select the multiscale image and click "OK"'
+          ]}
+        />
+      )
     }
   ];
 
