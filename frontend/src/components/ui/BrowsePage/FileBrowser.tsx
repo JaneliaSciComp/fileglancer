@@ -204,7 +204,11 @@ export default function FileBrowser({
       ) : fileQuery.data.currentFileOrFolder &&
         !fileQuery.data.currentFileOrFolder.is_dir ? (
         // If current item is a file, render the FileViewer instead of the file browser
-        <FileViewer file={fileQuery.data.currentFileOrFolder} />
+        <div className="relative flex-1 min-h-0 overflow-hidden">
+          <div className="absolute inset-0">
+            <FileViewer file={fileQuery.data.currentFileOrFolder} />
+          </div>
+        </div>
       ) : displayFiles.length > 0 ? (
         <Table
           data={displayFiles}
