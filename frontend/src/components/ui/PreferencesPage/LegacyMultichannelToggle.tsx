@@ -17,8 +17,8 @@ export default function LegacyMultichannelToggle() {
           if (result.success) {
             toast.success(
               useLegacyMultichannelApproach
-                ? 'Disabled legacy multichannel approach for Neuroglancer'
-                : 'Enabled legacy multichannel approach for Neuroglancer'
+                ? 'Disabled multichannel state generation for Neuroglancer'
+                : 'Enabled multichannel state generation for Neuroglancer'
             );
           } else {
             toast.error(result.error);
@@ -31,7 +31,7 @@ export default function LegacyMultichannelToggle() {
         className="text-foreground"
         htmlFor="use_legacy_multichannel_approach"
       >
-        Use legacy multichannel approach for Neuroglancer
+        Generate multichannel state for Neuroglancer
       </Typography>
     </div>
   );

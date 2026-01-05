@@ -18,7 +18,7 @@ test('favorite list persists after reloading page', async ({
   await expect(localFavorite).toBeVisible();
 
   // Reload page to verify favorites persist
-  await page.goto('/fg/browse', {
+  await page.goto('/browse', {
     waitUntil: 'domcontentloaded'
   });
   await expect(localFavorite).toBeVisible();

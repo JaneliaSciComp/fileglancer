@@ -4,38 +4,24 @@ import * as omezarr from 'ome-zarr.js';
 
 export type LayerType = 'auto' | 'image' | 'segmentation';
 
-/**
- * A single omero channel.
- */
-export interface Channel {
-  color: string;
-  window: Window;
-  lut?: string;
-  active?: boolean;
-  inverted?: boolean;
-  [k: string]: unknown;
-}
-/**
- * A single window.
- */
-export interface Window {
-  max: number;
-  min: number;
-  start?: number;
-  end?: number;
-  [k: string]: unknown;
-}
-
 export type Metadata = {
   arr: zarr.Array<any>;
   shapes: number[][] | undefined;
   scales: number[][] | undefined;
-  multiscale: omezarr.Multiscale | null | undefined;
-  omero: omezarr.Omero | null | undefined;
+  multiscale: omezarr.Multiscale | undefined;
+  omero: omezarr.Omero | undefined;
+  labels: string[] | undefined;
   zarrVersion: 2 | 3;
 };
 
-const COLORS = ['magenta', 'green', 'cyan', 'white', 'red', 'green', 'blue'];
+type OmeZarrChannel = {
+  name: string;
+  color: string;
+  contrast_window: number[] | undefined;
+  contrast_range: number[] | undefined;
+};
+
+const COLORS = ['magenta', 'green', 'cyan', 'white', 'red', 'yellow', 'blue'];
 
 const UNIT_CONVERSIONS: Record<string, string> = {
   micron: 'um', // Micron is not a valid UDUNITS-2, but some data still uses it
@@ -49,6 +35,18 @@ const UNIT_CONVERSIONS: Record<string, string> = {
   microsecond: 'us',
   nanosecond: 'ns'
 };
+
+const SHADER = `#uicontrol invlerp contrast
+#uicontrol vec3 color color
+void main() {
+  float c = contrast();
+  if (VOLUME_RENDERING) {
+    emitRGBA(vec4(color * c, c));
+  }
+  else {
+    emitRGB(color * c);
+  }
+}`;
 
 /**
  * Convert UDUNITS-2 units to Neuroglancer SI units.
@@ -154,15 +152,6 @@ function getMinMaxValues(arr: zarr.Array<any>): { min: number; max: number } {
 }
 
 /**
- * Generate a Neuroglancer shader for a given color and min/max values.
- */
-function getShader(color: string, minValue: number, maxValue: number): string {
-  return `#uicontrol vec3 hue color(default="${color}")
-#uicontrol invlerp normalized(range=[${minValue},${maxValue}])
-void main(){emitRGBA(vec4(hue*normalized(),1));}`;
-}
-
-/**
  * Get a map of axes names to their details.
  */
 function getAxesMap(multiscale: omezarr.Multiscale): Record<string, any> {
@@ -181,10 +170,8 @@ function getAxesMap(multiscale: omezarr.Multiscale): Record<string, any> {
  */
 function getNeuroglancerSource(dataUrl: string, zarrVersion: 2 | 3): string {
   // Neuroglancer expects a trailing slash
-  if (!dataUrl.endsWith('/')) {
-    dataUrl = dataUrl + '/';
-  }
-  return dataUrl + '|zarr' + zarrVersion + ':';
+  const normalizedDataUrl = dataUrl + (dataUrl.endsWith('/') ? '' : '/');
+  return normalizedDataUrl + '|zarr' + zarrVersion + ':';
 }
 
 /**
@@ -252,7 +239,7 @@ function generateNeuroglancerStateForZarrArray(
 }
 
 /**
- * Generate a simple Neuroglancer state for a given Zarr array (non-legacy approach).
+ * Generate a simple Neuroglancer state for a given Zarr array.
  */
 function generateSimpleNeuroglancerStateForOmeZarr(
   dataUrl: string,
@@ -265,6 +252,7 @@ function generateSimpleNeuroglancerStateForOmeZarr(
 
   // Convert axes array to a map for easier access
   const axesMap = getAxesMap(multiscale);
+  log.debug('Axes map: ', axesMap);
 
   // Determine the layout based on the z-axis
   let layout = '4panel-alt';
@@ -276,7 +264,8 @@ function generateSimpleNeuroglancerStateForOmeZarr(
     }
   }
 
-  // If the layer type is segmentation AND there is no channel axis or the channel axis has only one channel
+  // Consider this a segmentation if the layer type is segmentation
+  // AND there is no channel axis or the channel axis has only one channel
   const type =
     layerType === 'segmentation' &&
     (!axesMap['c'] || arr.shape[axesMap['c']?.index] === 1)
@@ -284,14 +273,14 @@ function generateSimpleNeuroglancerStateForOmeZarr(
       : 'auto';
 
   const state = {
-    layout: layout,
     layers: [
       {
         name: getLayerName(dataUrl),
         source: getNeuroglancerSource(dataUrl, zarrVersion),
         type
       }
-    ]
+    ],
+    layout: layout
   };
 
   log.debug('Simple Neuroglancer state: ', state);
@@ -302,15 +291,16 @@ function generateSimpleNeuroglancerStateForOmeZarr(
 }
 
 /**
- * Generate a legacy Neuroglancer state for a given Zarr array (multichannel approach).
+ * Generate a Neuroglancer state for a given Zarr array.
  */
-function generateLegacyNeuroglancerStateForOmeZarr(
+function generateFullNeuroglancerStateForOmeZarr(
   dataUrl: string,
   zarrVersion: 2 | 3,
   layerType: LayerType,
   multiscale: omezarr.Multiscale,
   arr: zarr.Array<any>,
-  omero?: omezarr.Omero | null
+  labels: string[] | undefined,
+  omero?: omezarr.Omero | undefined
 ): string | null {
   if (!multiscale || !arr) {
     throw new Error(
@@ -328,6 +318,16 @@ function generateLegacyNeuroglancerStateForOmeZarr(
   const axesMap = getAxesMap(multiscale);
   log.debug('Axes map: ', axesMap);
 
+  // Determine the layout based on the z-axis
+  let layout = '4panel-alt';
+  if ('z' in axesMap) {
+    const zAxisIndex = axesMap['z'].index;
+    const zDimension = arr.shape[zAxisIndex];
+    if (zDimension === 1) {
+      layout = 'xy';
+    }
+  }
+
   const { min: dtypeMin, max: dtypeMax } = getMinMaxValues(arr);
   log.debug('Inferred min/max values:', dtypeMin, dtypeMax);
 
@@ -337,12 +337,24 @@ function generateLegacyNeuroglancerStateForOmeZarr(
   const state: any = {
     dimensions: {},
     layers: [],
-    layout: '4panel-alt',
     selectedLayer: {
-      visible: true,
       layer: defaultLayerName
-    }
+    },
+    layout: layout
   };
+
+  if (layerType === 'segmentation') {
+    state.selectedLayer.visible = true;
+  } else {
+    // Add the shader controls tool palette for images
+    state.toolPalettes = {
+      'Shader controls': {
+        side: 'left',
+        row: 3,
+        query: 'type:shaderControl'
+      }
+    };
+  }
 
   const scales = getResolvedScales(multiscale);
 
@@ -369,6 +381,8 @@ function generateLegacyNeuroglancerStateForOmeZarr(
     log.warn('Unused dimensions: ', Array.from(imageDimensions));
   }
 
+  const sourceUrl = getNeuroglancerSource(dataUrl, zarrVersion);
+
   let colorIndex = 0;
   const channels = [];
   if (omero && omero.channels) {
@@ -376,14 +390,25 @@ function generateLegacyNeuroglancerStateForOmeZarr(
     for (let i = 0; i < omero.channels.length; i++) {
       const channelMeta = omero.channels[i];
       const window = channelMeta.window || {};
-      channels.push({
-        name: channelMeta.label || `Ch${i}`,
+      const channel: OmeZarrChannel = {
+        name: (channelMeta.label as string) || `Ch${i}`,
         color: channelMeta.color || COLORS[colorIndex++ % COLORS.length],
-        pixel_intensity_min: window.min,
-        pixel_intensity_max: window.max,
-        contrast_limit_start: window.start,
-        contrast_limit_end: window.end
-      });
+        contrast_window: undefined,
+        contrast_range: undefined
+      };
+      if (window.min || window.max) {
+        channel.contrast_window = [
+          window.min ?? dtypeMin,
+          window.max ?? dtypeMax
+        ];
+      }
+      if (window.start || window.end) {
+        channel.contrast_range = [
+          window.start ?? (window.min || dtypeMin),
+          window.end ?? (window.max || dtypeMax)
+        ];
+      }
+      channels.push(channel);
     }
   } else {
     // If there is no omero metadata, try to infer channels from the axes
@@ -394,10 +419,8 @@ function generateLegacyNeuroglancerStateForOmeZarr(
         channels.push({
           name: `Ch${i}`,
           color: COLORS[colorIndex++ % COLORS.length],
-          pixel_intensity_min: dtypeMin,
-          pixel_intensity_max: dtypeMax,
-          contrast_limit_start: dtypeMin,
-          contrast_limit_end: dtypeMax
+          contrast_range: [dtypeMin, dtypeMax],
+          contrast_window: [dtypeMin, dtypeMax]
         });
       }
     }
@@ -406,8 +429,9 @@ function generateLegacyNeuroglancerStateForOmeZarr(
   if (channels.length === 0) {
     log.trace('No channels found in metadata, using default shader');
     const layer: Record<string, any> = {
+      name: defaultLayerName,
       type: layerType,
-      source: getNeuroglancerSource(dataUrl, zarrVersion),
+      source: sourceUrl,
       tab: 'rendering',
       opacity: 1,
       blend: 'additive',
@@ -417,10 +441,7 @@ function generateLegacyNeuroglancerStateForOmeZarr(
         }
       }
     };
-    state.layers.push({
-      name: defaultLayerName,
-      ...layer
-    });
+    state.layers.push(layer);
   } else {
     // If there is only one channel, make it white
     if (channels.length === 1) {
@@ -429,9 +450,6 @@ function generateLegacyNeuroglancerStateForOmeZarr(
 
     // Add layers for each channel
     channels.forEach((channel, i) => {
-      const minValue = channel.pixel_intensity_min ?? dtypeMin;
-      const maxValue = channel.pixel_intensity_max ?? dtypeMax;
-
       // Format color
       let color = channel.color;
       if (/^[\dA-F]{6}$/.test(color)) {
@@ -444,38 +462,62 @@ function generateLegacyNeuroglancerStateForOmeZarr(
       const transform = { outputDimensions: localDimensions };
 
       const layer: Record<string, any> = {
+        name: channel.name,
         type: layerType,
         source: {
-          url: getNeuroglancerSource(dataUrl, zarrVersion),
+          url: sourceUrl,
           transform
         },
         tab: 'rendering',
+        archived: i >= 4, // Archive layers after the first 4
         opacity: 1,
         blend: 'additive',
-        shader: getShader(color, minValue, maxValue),
+        shader: SHADER,
+        shaderControls: {
+          color: color
+        },
         localDimensions: localDimensions,
         localPosition: [i]
       };
 
-      // Add shader controls if contrast limits are defined
-      const start = channel.contrast_limit_start ?? dtypeMin;
-      const end = (channel.contrast_limit_end ?? dtypeMax) * 0.25;
-      if (start !== null && end !== null) {
-        layer.shaderControls = {
-          normalized: {
-            range: [start, end]
-          }
-        };
+      if (channel.contrast_range) {
+        if (!layer.shaderControls.contrast) {
+          layer.shaderControls.contrast = {};
+        }
+        layer.shaderControls.contrast.range = channel.contrast_range;
       }
 
-      state.layers.push({
-        name: channel.name,
-        ...layer
-      });
+      if (channel.contrast_window) {
+        if (!layer.shaderControls.contrast) {
+          layer.shaderControls.contrast = {};
+        }
+        layer.shaderControls.contrast.window = channel.contrast_window;
+      }
+
+      state.layers.push(layer);
     });
+
+    // Show the layer list panel if there are more than 4 channels
+    if (channels.length > 4) {
+      state.layerListPanel = {
+        visible: true
+      };
+    }
 
     // Fix the selected layer name
     state.selectedLayer.layer = channels[0].name;
+  }
+
+  // Add layer for each label
+  if (labels) {
+    labels.forEach(label => {
+      const layer: Record<string, any> = {
+        name: label,
+        source: sourceUrl + '/labels/' + label,
+        type: 'segmentation'
+      };
+      state.layers.push(layer);
+    });
   }
 
   log.debug('Neuroglancer state: ', state);
@@ -494,17 +536,19 @@ function generateNeuroglancerStateForOmeZarr(
   layerType: LayerType,
   multiscale: omezarr.Multiscale,
   arr: zarr.Array<any>,
-  omero?: omezarr.Omero | null,
+  labels: string[] | undefined,
+  omero?: omezarr.Omero | undefined,
   useLegacyMultichannelApproach: boolean = false
 ): string | null {
-  // If using legacy multichannel approach, use the complex version
-  if (useLegacyMultichannelApproach) {
-    return generateLegacyNeuroglancerStateForOmeZarr(
+  // If there are labels or user requested legacy multichannel approach, use the complex version
+  if (labels || useLegacyMultichannelApproach) {
+    return generateFullNeuroglancerStateForOmeZarr(
       dataUrl,
       zarrVersion,
       layerType,
       multiscale,
       arr,
+      labels,
       omero
     );
   }
@@ -542,6 +586,8 @@ async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
   });
   const { arr, shapes, multiscale, omero, scales, zarr_version } =
     await omezarr.getMultiscaleWithArray(store, 0);
+  // Normalize omero to undefined if it is null
+  const omero2 = omero ?? undefined;
   log.debug(
     'Zarr version: ',
     zarr_version,
@@ -552,17 +598,17 @@ async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
     '\nMultiscale: ',
     multiscale,
     '\nOmero: ',
-    omero,
+    omero2,
     '\nScales: ',
     scales
   );
-
   const metadata: Metadata = {
     arr,
     shapes,
     scales,
     multiscale,
-    omero,
+    omero: omero2,
+    labels: undefined,
     zarrVersion: zarr_version
   };
 
@@ -685,26 +731,22 @@ async function determineLayerType(
   thumbnailDataUrl?: string | null
 ): Promise<LayerType> {
   const DEFAULT_LAYER_TYPE = 'image';
-  try {
-    if (!useHeuristicalDetection) {
-      log.debug('Heuristical layer type detection is disabled');
-    } else if (thumbnailDataUrl) {
-      try {
-        const edgeRatio = await analyzeThumbnailEdgeContent(thumbnailDataUrl);
-        log.debug('Thumbnail edge detection ratio:', edgeRatio);
-        // Segmentation data typically has low edge ratio
-        const layerType =
-          edgeRatio > 0.0 && edgeRatio < 0.05 ? 'segmentation' : 'image';
-        log.debug(`Layer type set to ${layerType} based on edge analysis`);
-        return layerType;
-      } catch (error) {
-        log.error('Failed to analyze thumbnail edge content:', error);
-      }
-    } else {
-      log.debug('No thumbnail available, returning image');
+  if (!useHeuristicalDetection) {
+    log.debug('Heuristical layer type detection is disabled');
+  } else if (thumbnailDataUrl) {
+    try {
+      const edgeRatio = await analyzeThumbnailEdgeContent(thumbnailDataUrl);
+      log.debug('Thumbnail edge detection ratio:', edgeRatio);
+      // Segmentation data typically has low edge ratio
+      const layerType =
+        edgeRatio > 0.0 && edgeRatio < 0.05 ? 'segmentation' : 'image';
+      log.debug(`Layer type set to ${layerType} based on edge analysis`);
+      return layerType;
+    } catch (error) {
+      log.error('Failed to analyze thumbnail edge content:', error);
     }
-  } catch (error) {
-    log.error('Error determining layer type:', error);
+  } else {
+    log.debug('No thumbnail available, returning image');
   }
   return DEFAULT_LAYER_TYPE;
 }

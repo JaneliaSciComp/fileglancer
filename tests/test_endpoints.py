@@ -124,24 +124,22 @@ def test_version_endpoint(test_client):
 
 
 def test_root_endpoint(test_client):
-    """Test root endpoint - should redirect to /fg/"""
+    """Test root endpoint - should serve SPA index.html"""
     response = test_client.get("/", follow_redirects=False)
-    assert response.status_code == 307  # Temporary redirect
-    assert response.headers.get('location') == '/fg/'
-
-def test_fg_endpoint(test_client):
-    """Test /fg/ endpoint - should serve SPA index.html"""
-    response = test_client.get("/fg/", follow_redirects=False)
     assert response.status_code == 200
     assert 'text/html' in response.headers.get('content-type', '')
 
-def test_fg_spa_routing(test_client):
-    """Test /fg/browse and other SPA routes - should serve SPA index.html"""
-    response = test_client.get("/fg/browse", follow_redirects=False)
+def test_spa_routing(test_client):
+    """Test /browse and other SPA routes - should serve SPA index.html"""
+    response = test_client.get("/browse", follow_redirects=False)
     assert response.status_code == 200
     assert 'text/html' in response.headers.get('content-type', '')
 
-    response = test_client.get("/fg/browse/some/path", follow_redirects=False)
+    response = test_client.get("/browse/some/path", follow_redirects=False)
+    assert response.status_code == 200
+    assert 'text/html' in response.headers.get('content-type', '')
+
+    response = test_client.get("/login", follow_redirects=False)
     assert response.status_code == 200
     assert 'text/html' in response.headers.get('content-type', '')
 

@@ -4,7 +4,7 @@ import { ZARR_TEST_FILE_INFO } from '../mocks/zarrDirs';
 
 test.describe('Navigation Input', () => {
   test.beforeEach('Navigate to browse', async ({ fileglancerPage: page }) => {
-    await page.goto('/fg/browse', {
+    await page.goto('/browse', {
       waitUntil: 'domcontentloaded'
     });
   });

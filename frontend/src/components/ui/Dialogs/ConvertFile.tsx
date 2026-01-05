@@ -10,6 +10,7 @@ import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { useTicketContext } from '@/contexts/TicketsContext';
 import { getPreferredPathForDisplay } from '@/utils/pathHandling';
+import FileSelectorButton from '@/components/ui/BrowsePage/FileSelector/FileSelectorButton';
 
 type ItemNamingDialogProps = {
   readonly showConvertFileDialog: boolean;
@@ -24,10 +25,18 @@ export default function ConvertFileDialog({
   showConvertFileDialog,
   setShowConvertFileDialog
 }: ItemNamingDialogProps) {
-  const { destinationFolder, setDestinationFolder, handleTicketSubmit } =
-    useConvertFileDialog();
+  const {
+    destinationFolder,
+    setDestinationFolder,
+    outputFilename,
+    setOutputFilename,
+    handleTicketSubmit,
+    destinationValidation,
+    filenameValidation
+  } = useConvertFileDialog();
   const { pathPreference } = usePreferencesContext();
-  const { fileQuery, fileBrowserState } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState, fspName, filePath } =
+    useFileBrowserContext();
   const { allTicketsQuery, createTicketMutation } = useTicketContext();
 
   const placeholderText =
@@ -42,6 +51,15 @@ export default function ConvertFileDialog({
         fileBrowserState.propertiesTarget?.path
       )
     : '';
+
+  // Use current browser location as initial location for FileSelector
+  const initialLocation =
+    fspName && filePath
+      ? {
+          fspName,
+          path: filePath
+        }
+      : undefined;
 
   return (
     <FgDialog
@@ -82,22 +100,67 @@ export default function ConvertFileDialog({
           >
             Destination Folder
           </Typography>
-          <input
-            autoFocus
-            className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!tasksEnabled}
-            id="destination_folder"
-            onChange={(event: ChangeEvent<HTMLInputElement>) => {
-              setDestinationFolder(event.target.value);
-            }}
-            placeholder={placeholderText}
-            type="text"
-            value={destinationFolder}
-          />
+          <div className="flex gap-2 items-center">
+            <input
+              autoFocus
+              className="flex-1 p-2 text-foreground dark:placeholder:text-surface-light text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!tasksEnabled}
+              id="destination_folder"
+              onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                setDestinationFolder(event.target.value);
+              }}
+              placeholder={placeholderText}
+              type="text"
+              value={destinationFolder}
+            />
+            <FileSelectorButton
+              initialLocation={initialLocation}
+              onSelect={path => setDestinationFolder(path)}
+            />
+          </div>
           {!tasksEnabled ? (
-            <Typography className="text-error -mt-2" type="small">
+            <Typography className="text-error" type="small">
               This functionality is disabled. If you think this is an error,
               contact the app administrator.
+            </Typography>
+          ) : null}
+          {tasksEnabled &&
+          destinationFolder &&
+          !destinationValidation.isValid ? (
+            <Typography className="text-error" type="small">
+              {destinationValidation.hasConsecutiveDots
+                ? 'Destination folder cannot contain consecutive dots (..).'
+                : null}
+            </Typography>
+          ) : null}
+        </div>
+        <div className="flex flex-col gap-2 my-4">
+          <Typography
+            as="label"
+            className="text-foreground font-semibold"
+            htmlFor="output_filename"
+          >
+            Output File or Folder Name
+          </Typography>
+          <input
+            className="p-2 text-foreground dark:placeholder:text-surface-light text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!tasksEnabled}
+            id="output_filename"
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+              setOutputFilename(event.target.value);
+            }}
+            placeholder="converted_data.zarr"
+            type="text"
+            value={outputFilename}
+          />
+          {tasksEnabled && outputFilename && !filenameValidation.isValid ? (
+            <Typography className="text-error" type="small">
+              {filenameValidation.hasSlashes
+                ? 'Output name cannot contain slashes. '
+                : null}
+              {filenameValidation.hasConsecutiveDots
+                ? 'Output name cannot contain consecutive dots (..). '
+                : null}
             </Typography>
           ) : null}
         </div>
@@ -105,6 +168,9 @@ export default function ConvertFileDialog({
           className="!rounded-md"
           disabled={
             !destinationFolder ||
+            !outputFilename ||
+            !destinationValidation.isValid ||
+            !filenameValidation.isValid ||
             !tasksEnabled ||
             createTicketMutation.isPending ||
             allTicketsQuery.isFetching
@@ -112,7 +178,11 @@ export default function ConvertFileDialog({
           type="submit"
         >
           {createTicketMutation.isPending || allTicketsQuery.isFetching ? (
-            <Spinner customClasses="border-white" text="Processing..." />
+            <Spinner
+              customClasses="border-white"
+              text="Processing..."
+              textClasses="text-white"
+            />
           ) : (
             'Submit'
           )}

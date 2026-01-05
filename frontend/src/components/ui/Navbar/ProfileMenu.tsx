@@ -21,7 +21,7 @@ export default function ProfileMenu() {
 
   const isAuthenticated = authStatus?.authenticated;
   const loginUrl =
-    authStatus?.auth_method === 'okta' ? '/api/auth/login' : '/fg/';
+    authStatus?.auth_method === 'okta' ? '/api/auth/login' : '/login';
 
   return (
     <Menu>

@@ -30,6 +30,10 @@ export const useRefreshFileBrowser = () => {
       await queryClient.invalidateQueries({
         queryKey: fileQueryKeys.filePath(fspName, filePath)
       });
+      // Invalidate zarr-related queries to refresh metadata and thumbnail
+      await queryClient.invalidateQueries({
+        queryKey: ['zarr']
+      });
       toast.success('File browser refreshed!');
     }
   };

@@ -138,6 +138,12 @@ export default function ZarrMetadataTable({
               <td className="px-3 py-2">{shapes.length}</td>
             </tr>
           ) : null}
+          {metadata.labels && metadata.labels.length > 0 ? (
+            <tr className="h-11 border-b border-surface-dark">
+              <td className="px-3 py-2 font-semibold">Labels</td>
+              <td className="px-3 py-2">{metadata.labels.join(', ')}</td>
+            </tr>
+          ) : null}
         </tbody>
       </table>
 
