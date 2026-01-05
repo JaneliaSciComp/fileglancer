@@ -142,7 +142,7 @@ export default function FileViewer({ file }: FileViewerProps) {
           padding: '1rem',
           fontSize: '14px',
           lineHeight: '1.5',
-          overflow: 'auto',
+          overflow: 'visible',
           maxHeight: '100%',
           width: '100%',
           boxSizing: 'border-box'
