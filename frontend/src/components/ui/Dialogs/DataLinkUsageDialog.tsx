@@ -8,39 +8,8 @@ import {
 } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 import FgDialog from './FgDialog';
-import FgTooltip from '../widgets/FgTooltip';
-import useCopyTooltip from '@/hooks/useCopyTooltip';
 import useDarkMode from '@/hooks/useDarkMode';
-
-function CopyIconAndTooltip({
-  copyLabel,
-  copyText
-}: {
-  readonly copyLabel: string;
-  readonly copyText: string;
-}) {
-  const { showCopiedTooltip, handleCopy } = useCopyTooltip();
-
-  return (
-    <FgTooltip
-      icon={HiOutlineClipboardCopy}
-      label={copyLabel}
-      onClick={async () => await handleCopy(copyText)}
-      triggerClasses="text-foreground/50 hover:text-foreground"
-      variant="ghost"
-    >
-      {showCopiedTooltip ? (
-        <div className="absolute top-full right-0 mt-1 bg-surface-dark text-foreground text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
-          {copyLabel === 'Copy data link'
-            ? 'Data link copied!'
-            : copyLabel === 'Copy code'
-              ? 'Code copied!'
-              : 'Copied!'}
-        </div>
-      ) : null}
-    </FgTooltip>
-  );
-}
+import CopyTooltip from '@/components/ui/widgets/CopyTooltip';
 
 type CodeBlockProps = {
   readonly code: string;
@@ -52,6 +21,9 @@ type CodeBlockProps = {
   readonly copyLabel?: string;
   readonly customStyle?: React.CSSProperties;
 };
+
+const TOOLTIP_TRIGGER_CLASSES =
+  'text-foreground/50 hover:text-foreground py-1 px-2';
 
 function CodeBlock({
   code,
@@ -67,7 +39,7 @@ function CodeBlock({
     marginRight: 0,
     marginBottom: 0,
     marginLeft: 0,
-    paddingTop: '2em',
+    paddingTop: '3em',
     paddingRight: '1em',
     paddingBottom: '0',
     paddingLeft: '1em',
@@ -76,7 +48,6 @@ function CodeBlock({
   }
 }: CodeBlockProps) {
   const isDarkMode = useDarkMode();
-  const { showCopiedTooltip, handleCopy } = useCopyTooltip();
 
   // Get the theme's code styles and merge with custom codeTagProps
   const theme = isDarkMode ? materialDark : coy;
@@ -103,23 +74,13 @@ function CodeBlock({
       </SyntaxHighlighter>
       {copyable ? (
         <div className="absolute top-2 right-2">
-          <FgTooltip
-            icon={HiOutlineClipboardCopy}
-            label={copyLabel}
-            onClick={async () => await handleCopy(code)}
-            triggerClasses="text-foreground/50 hover:text-foreground"
-            variant="ghost"
+          <CopyTooltip
+            primaryLabel={copyLabel}
+            textToCopy={code}
+            tooltipTriggerClasses={TOOLTIP_TRIGGER_CLASSES}
           >
-            {showCopiedTooltip ? (
-              <div className="absolute top-full right-0 mt-1 bg-surface-dark text-foreground text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
-                {copyLabel === 'Copy data link'
-                  ? 'Data link copied!'
-                  : copyLabel === 'Copy code'
-                    ? 'Code copied!'
-                    : 'Copied!'}
-              </div>
-            ) : null}
-          </FgTooltip>
+            <HiOutlineClipboardCopy className="icon-default" />
+          </CopyTooltip>
         </div>
       ) : null}
     </div>
@@ -201,7 +162,7 @@ export default function DataLinkUsageDialog({
     }
   ];
 
-  const TRIGGER_CLASSES = '!text-foreground h-full';
+  const TAB_TRIGGER_CLASSES = '!text-foreground h-full';
   const PANEL_CLASSES =
     'flex-1 flex flex-col gap-4 max-w-full p-4 rounded-b-lg border border-t-0 border-surface bg-surface-light';
 
@@ -212,10 +173,13 @@ export default function DataLinkUsageDialog({
           <Typography className="text-foreground font-semibold text-lg">
             How to use your data link
           </Typography>
-          <CopyIconAndTooltip
-            copyLabel="Copy data link"
-            copyText={dataLinkUrl}
-          />
+          <CopyTooltip
+            primaryLabel="Copy data link"
+            textToCopy={dataLinkUrl}
+            tooltipTriggerClasses={TOOLTIP_TRIGGER_CLASSES}
+          >
+            <HiOutlineClipboardCopy className="icon-default" />
+          </CopyTooltip>
         </div>
         <Tabs
           className="flex flex-col flex-1 min-h-0 gap-0"
@@ -226,7 +190,7 @@ export default function DataLinkUsageDialog({
           <Tabs.List className="justify-start items-stretch shrink-0 min-w-fit w-full rounded-b-none bg-surface dark:bg-surface-light">
             {tabs.map(tab => (
               <Tabs.Trigger
-                className={TRIGGER_CLASSES}
+                className={TAB_TRIGGER_CLASSES}
                 key={tab.id}
                 value={tab.id}
               >
