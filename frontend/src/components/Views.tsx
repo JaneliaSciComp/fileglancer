@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { IconButton, Typography } from '@material-tailwind/react';
+import { Button, Typography } from '@material-tailwind/react';
 import { HiOutlinePlus } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
@@ -40,21 +40,21 @@ export default function Views() {
         Views store Neuroglancer state for easy sharing. Create a short link and
         share it with collaborators.
       </Typography>
+      <div className="mb-4">
+        <Button
+          className="bg-primary text-white hover:bg-primary/90"
+          onClick={() => setShowCreateDialog(true)}
+        >
+          <HiOutlinePlus className="icon-default mr-2" />
+          New Link
+        </Button>
+      </div>
       <TableCard
         columns={viewsColumns}
         data={allNeuroglancerLinksQuery.data || []}
         dataType="views"
         errorState={allNeuroglancerLinksQuery.error}
         gridColsClass="grid-cols-[1.2fr_2.8fr_1.2fr_1fr_0.6fr]"
-        headerActions={
-          <IconButton
-            className="rounded-full bg-primary text-white hover:bg-primary/90"
-            onClick={() => setShowCreateDialog(true)}
-            variant="ghost"
-          >
-            <HiOutlinePlus className="icon-default" />
-          </IconButton>
-        }
         loadingState={allNeuroglancerLinksQuery.isPending}
       />
       {showCreateDialog ? (
