@@ -65,7 +65,7 @@ declare module '@tanstack/react-table' {
 }
 import type { PathCellValue } from './linksColumns';
 
-type DataType = 'data links' | 'tasks' | 'views';
+type DataType = 'data links' | 'tasks' | 'NG links';
 
 type TableProps<TData> = {
   readonly columns: ColumnDef<TData>[];

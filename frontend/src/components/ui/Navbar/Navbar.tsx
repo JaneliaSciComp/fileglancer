@@ -37,7 +37,7 @@ const LINKS = [
   },
   {
     icon: HiOutlineEye,
-    title: 'Views',
+    title: 'NG Links',
     href: '/views'
   },
   {

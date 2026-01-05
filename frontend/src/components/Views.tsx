@@ -15,18 +15,16 @@ export default function Views() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   const handleCreate = async (payload: {
-    url?: string;
-    state?: Record<string, unknown>;
-    url_base?: string;
+    url: string;
     short_name?: string;
   }) => {
     try {
       await createNeuroglancerShortLinkMutation.mutateAsync(payload);
-      toast.success('View created');
+      toast.success('Link created');
       setShowCreateDialog(false);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to create view';
+        error instanceof Error ? error.message : 'Failed to create link';
       toast.error(message);
     }
   };
@@ -34,11 +32,11 @@ export default function Views() {
   return (
     <>
       <Typography className="mb-6 text-foreground font-bold" type="h5">
-        Views
+        Neuroglancer Links
       </Typography>
       <Typography className="mb-6 text-foreground">
-        Views store Neuroglancer state for easy sharing. Create a short link and
-        share it with collaborators.
+        Store Neuroglancer state for easy sharing. Create a short link and share
+        it with collaborators.
       </Typography>
       <div className="mb-4">
         <Button
@@ -52,7 +50,7 @@ export default function Views() {
       <TableCard
         columns={viewsColumns}
         data={allNeuroglancerLinksQuery.data || []}
-        dataType="views"
+        dataType="NG links"
         errorState={allNeuroglancerLinksQuery.error}
         gridColsClass="grid-cols-[1.2fr_2.8fr_1.2fr_1fr_0.6fr]"
         loadingState={allNeuroglancerLinksQuery.isPending}
