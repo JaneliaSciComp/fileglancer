@@ -36,22 +36,22 @@ function ActionsCell({
       }
     },
     {
-      name: 'Copy Neuroglancer URL',
+      name: 'Copy Neuroglancer Link',
       action: async ({ item }) => {
         const result = await copyToClipboard(item.neuroglancer_url);
         if (result.success) {
-          toast.success('Neuroglancer URL copied');
+          toast.success('Neuroglancer link copied');
         } else {
           toast.error(`Failed to copy: ${result.error}`);
         }
       }
     },
     {
-      name: 'Copy JSON state URL',
+      name: 'Copy JSON state link',
       action: async ({ item }) => {
         const result = await copyToClipboard(item.state_url);
         if (result.success) {
-          toast.success('JSON state URL copied');
+          toast.success('JSON state link copied');
         } else {
           toast.error(`Failed to copy: ${result.error}`);
         }

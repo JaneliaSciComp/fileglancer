@@ -98,7 +98,7 @@ export default function NeuroglancerViewDialog({
           className="text-foreground font-semibold"
           htmlFor="neuroglancer-url"
         >
-          Neuroglancer URL
+          Original Neuroglancer Link
         </Typography>
         <input
           autoFocus
@@ -135,7 +135,7 @@ export default function NeuroglancerViewDialog({
               className="text-foreground font-semibold"
               htmlFor="short-name"
             >
-              Name (optional, used in shortened URL)
+              Name (optional, used in shortened link)
             </Typography>
             <input
               className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background"
