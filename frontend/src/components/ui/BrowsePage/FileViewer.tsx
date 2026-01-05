@@ -78,7 +78,7 @@ export default function FileViewer({ file }: FileViewerProps) {
   const { fspName } = useFileBrowserContext();
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
-  const [formatJson, setFormatJson] = useState<boolean>(false);
+  const [formatJson, setFormatJson] = useState<boolean>(true);
 
   const contentQuery = useFileContentQuery(fspName, file.path);
   const language = getLanguageFromExtension(file.name);
