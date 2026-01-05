@@ -4,12 +4,12 @@ import { HiOutlinePlus } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
 import { TableCard } from '@/components/ui/Table/TableCard';
-import { useViewsColumns } from '@/components/ui/Table/viewsColumns';
+import { useNGLinksColumns } from '@/components/ui/Table/ngLinksColumns';
 import NeuroglancerViewDialog from '@/components/ui/Dialogs/NeuroglancerViewDialog';
 import { useNeuroglancerContext } from '@/contexts/NeuroglancerContext';
 import type { NeuroglancerShortLink } from '@/queries/neuroglancerQueries';
 
-export default function Views() {
+export default function NGLinks() {
   const {
     allNeuroglancerLinksQuery,
     createNeuroglancerShortLinkMutation,
@@ -67,7 +67,7 @@ export default function Views() {
     }
   };
 
-  const viewsColumns = useViewsColumns(handleOpenEdit);
+  const ngLinksColumns = useNGLinksColumns(handleOpenEdit);
 
   return (
     <>
@@ -88,7 +88,7 @@ export default function Views() {
         </Button>
       </div>
       <TableCard
-        columns={viewsColumns}
+        columns={ngLinksColumns}
         data={allNeuroglancerLinksQuery.data || []}
         dataType="NG links"
         errorState={allNeuroglancerLinksQuery.error}

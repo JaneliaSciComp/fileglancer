@@ -13,7 +13,7 @@ import Help from '@/components/Help';
 import Jobs from '@/components/Jobs';
 import Preferences from '@/components/Preferences';
 import Links from '@/components/Links';
-import Views from '@/components/Views';
+import NGLinks from '@/components/NGLinks';
 import Notifications from '@/components/Notifications';
 import ErrorFallback from '@/components/ErrorFallback';
 
@@ -102,7 +102,7 @@ const AppComponent = () => {
             <Route
               element={
                 <RequireAuth>
-                  <Views />
+                  <NGLinks />
                 </RequireAuth>
               }
               path="views"

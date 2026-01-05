@@ -13,7 +13,7 @@ import { copyToClipboard } from '@/utils/copyText';
 
 const TRIGGER_CLASSES = 'h-min max-w-full';
 
-type ViewRowActionProps = {
+type NGLinkRowActionProps = {
   item: NeuroglancerShortLink;
   onEdit: (item: NeuroglancerShortLink) => void;
 };
@@ -25,7 +25,7 @@ function ActionsCell({
   readonly item: NeuroglancerShortLink;
   readonly onEdit: (item: NeuroglancerShortLink) => void;
 }) {
-  const menuItems: MenuItem<ViewRowActionProps>[] = [
+  const menuItems: MenuItem<NGLinkRowActionProps>[] = [
     {
       name: 'Edit',
       action: ({ item, onEdit }) => {
@@ -59,7 +59,7 @@ function ActionsCell({
   return (
     <div className="min-w-0 flex items-center">
       <div onClick={e => e.stopPropagation()}>
-        <DataLinksActionsMenu<ViewRowActionProps>
+        <DataLinksActionsMenu<NGLinkRowActionProps>
           actionProps={{ item, onEdit }}
           menuItems={menuItems}
         />
@@ -68,7 +68,7 @@ function ActionsCell({
   );
 }
 
-export function useViewsColumns(
+export function useNGLinksColumns(
   onEdit: (item: NeuroglancerShortLink) => void
 ): ColumnDef<NeuroglancerShortLink>[] {
   return useMemo(
