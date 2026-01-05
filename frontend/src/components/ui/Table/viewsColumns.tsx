@@ -44,22 +44,11 @@ function ActionsCell({
       }
     },
     {
-      name: 'Copy state URL',
+      name: 'Copy JSON state URL',
       action: async ({ item }) => {
         const result = await copyToClipboard(item.state_url);
         if (result.success) {
-          toast.success('State URL copied');
-        } else {
-          toast.error(`Failed to copy: ${result.error}`);
-        }
-      }
-    },
-    {
-      name: 'Copy short key',
-      action: async ({ item }) => {
-        const result = await copyToClipboard(item.short_key);
-        if (result.success) {
-          toast.success('Short key copied');
+          toast.success('JSON state URL copied');
         } else {
           toast.error(`Failed to copy: ${result.error}`);
         }

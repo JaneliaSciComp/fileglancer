@@ -76,7 +76,7 @@ export default function Views() {
       </Typography>
       <Typography className="mb-6 text-foreground">
         Store Neuroglancer state for easy sharing. Create a short link and share
-        it with collaborators.
+        it with internal collaborators. You can update the link later if needed.
       </Typography>
       <div className="mb-4">
         <Button
