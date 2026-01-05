@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react';
 import { Button, Typography } from '@material-tailwind/react';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
-import type { NeuroglancerShortLink } from '@/queries/neuroglancerQueries';
+import type { NGLink } from '@/queries/ngLinkQueries';
 
 type CreatePayload = {
   url: string;
@@ -17,23 +17,23 @@ type UpdatePayload = {
   title?: string;
 };
 
-type NeuroglancerViewDialogProps = {
+type NGLinkDialogProps = {
   readonly open: boolean;
   readonly pending: boolean;
   readonly onClose: () => void;
   readonly onCreate?: (payload: CreatePayload) => Promise<void>;
   readonly onUpdate?: (payload: UpdatePayload) => Promise<void>;
-  readonly editItem?: NeuroglancerShortLink;
+  readonly editItem?: NGLink;
 };
 
-export default function NeuroglancerViewDialog({
+export default function NGLinkDialog({
   open,
   pending,
   onClose,
   onCreate,
   onUpdate,
   editItem
-}: NeuroglancerViewDialogProps) {
+}: NGLinkDialogProps) {
   const isEditMode = !!editItem;
 
   const [neuroglancerUrl, setNeuroglancerUrl] = useState('');

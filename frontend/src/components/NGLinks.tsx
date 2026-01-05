@@ -5,33 +5,29 @@ import toast from 'react-hot-toast';
 
 import { TableCard } from '@/components/ui/Table/TableCard';
 import { useNGLinksColumns } from '@/components/ui/Table/ngLinksColumns';
-import NeuroglancerViewDialog from '@/components/ui/Dialogs/NeuroglancerViewDialog';
+import NGLinkDialog from '@/components/ui/Dialogs/NGLinkDialog';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import DeleteBtn from '@/components/ui/buttons/DeleteBtn';
-import { useNeuroglancerContext } from '@/contexts/NeuroglancerContext';
-import type { NeuroglancerShortLink } from '@/queries/neuroglancerQueries';
+import { useNGLinkContext } from '@/contexts/NGLinkContext';
+import type { NGLink } from '@/queries/ngLinkQueries';
 
 export default function NGLinks() {
   const {
-    allNeuroglancerLinksQuery,
-    createNeuroglancerShortLinkMutation,
-    updateNeuroglancerShortLinkMutation,
-    deleteNeuroglancerShortLinkMutation
-  } = useNeuroglancerContext();
+    allNGLinksQuery,
+    createNGLinkMutation,
+    updateNGLinkMutation,
+    deleteNGLinkMutation
+  } = useNGLinkContext();
   const [showDialog, setShowDialog] = useState(false);
-  const [editItem, setEditItem] = useState<NeuroglancerShortLink | undefined>(
-    undefined
-  );
-  const [deleteItem, setDeleteItem] = useState<
-    NeuroglancerShortLink | undefined
-  >(undefined);
+  const [editItem, setEditItem] = useState<NGLink | undefined>(undefined);
+  const [deleteItem, setDeleteItem] = useState<NGLink | undefined>(undefined);
 
   const handleOpenCreate = () => {
     setEditItem(undefined);
     setShowDialog(true);
   };
 
-  const handleOpenEdit = (item: NeuroglancerShortLink) => {
+  const handleOpenEdit = (item: NGLink) => {
     setEditItem(item);
     setShowDialog(true);
   };
@@ -47,7 +43,7 @@ export default function NGLinks() {
     title?: string;
   }) => {
     try {
-      await createNeuroglancerShortLinkMutation.mutateAsync(payload);
+      await createNGLinkMutation.mutateAsync(payload);
       toast.success('Link created');
       handleClose();
     } catch (error) {
@@ -63,7 +59,7 @@ export default function NGLinks() {
     title?: string;
   }) => {
     try {
-      await updateNeuroglancerShortLinkMutation.mutateAsync(payload);
+      await updateNGLinkMutation.mutateAsync(payload);
       toast.success('Link updated');
       handleClose();
     } catch (error) {
@@ -73,7 +69,7 @@ export default function NGLinks() {
     }
   };
 
-  const handleOpenDelete = (item: NeuroglancerShortLink) => {
+  const handleOpenDelete = (item: NGLink) => {
     setDeleteItem(item);
   };
 
@@ -86,9 +82,7 @@ export default function NGLinks() {
       return;
     }
     try {
-      await deleteNeuroglancerShortLinkMutation.mutateAsync(
-        deleteItem.short_key
-      );
+      await deleteNGLinkMutation.mutateAsync(deleteItem.short_key);
       toast.success('Link deleted');
       handleCloseDelete();
     } catch (error) {
@@ -106,8 +100,9 @@ export default function NGLinks() {
         Neuroglancer Links
       </Typography>
       <Typography className="mb-6 text-foreground">
-        Store your Neuroglancer states for easy sharing. Create a short link and share
-        it with internal collaborators. You can update the link later if needed.
+        Store your Neuroglancer states for easy sharing. Create a short link and
+        share it with internal collaborators. You can update the link later if
+        needed.
       </Typography>
       <div className="mb-4">
         <Button
@@ -120,22 +115,21 @@ export default function NGLinks() {
       </div>
       <TableCard
         columns={ngLinksColumns}
-        data={allNeuroglancerLinksQuery.data || []}
+        data={allNGLinksQuery.data || []}
         dataType="NG links"
-        errorState={allNeuroglancerLinksQuery.error}
+        errorState={allNGLinksQuery.error}
         gridColsClass="grid-cols-[1.2fr_2.8fr_1.2fr_1fr_0.6fr]"
-        loadingState={allNeuroglancerLinksQuery.isPending}
+        loadingState={allNGLinksQuery.isPending}
       />
       {showDialog ? (
-        <NeuroglancerViewDialog
+        <NGLinkDialog
           editItem={editItem}
           onClose={handleClose}
           onCreate={handleCreate}
           onUpdate={handleUpdate}
           open={showDialog}
           pending={
-            createNeuroglancerShortLinkMutation.isPending ||
-            updateNeuroglancerShortLinkMutation.isPending
+            createNGLinkMutation.isPending || updateNGLinkMutation.isPending
           }
         />
       ) : null}
@@ -151,9 +145,9 @@ export default function NGLinks() {
           </Typography>
           <div className="flex gap-3">
             <DeleteBtn
-              disabled={deleteNeuroglancerShortLinkMutation.isPending}
+              disabled={deleteNGLinkMutation.isPending}
               onClick={handleConfirmDelete}
-              pending={deleteNeuroglancerShortLinkMutation.isPending}
+              pending={deleteNGLinkMutation.isPending}
             />
             <Button
               className="!rounded-md"

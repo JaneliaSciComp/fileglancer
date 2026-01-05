@@ -3,7 +3,7 @@ import type { MouseEvent } from 'react';
 import { Typography } from '@material-tailwind/react';
 import type { ColumnDef } from '@tanstack/react-table';
 
-import type { NeuroglancerShortLink } from '@/queries/neuroglancerQueries';
+import type { NGLink } from '@/queries/ngLinkQueries';
 import { formatDateString } from '@/utils';
 import FgTooltip from '../widgets/FgTooltip';
 import DataLinksActionsMenu from '@/components/ui/Menus/DataLinksActions';
@@ -14,9 +14,9 @@ import { copyToClipboard } from '@/utils/copyText';
 const TRIGGER_CLASSES = 'h-min max-w-full';
 
 type NGLinkRowActionProps = {
-  item: NeuroglancerShortLink;
-  onEdit: (item: NeuroglancerShortLink) => void;
-  onDelete: (item: NeuroglancerShortLink) => void;
+  item: NGLink;
+  onEdit: (item: NGLink) => void;
+  onDelete: (item: NGLink) => void;
 };
 
 function ActionsCell({
@@ -24,9 +24,9 @@ function ActionsCell({
   onEdit,
   onDelete
 }: {
-  readonly item: NeuroglancerShortLink;
-  readonly onEdit: (item: NeuroglancerShortLink) => void;
-  readonly onDelete: (item: NeuroglancerShortLink) => void;
+  readonly item: NGLink;
+  readonly onEdit: (item: NGLink) => void;
+  readonly onDelete: (item: NGLink) => void;
 }) {
   const menuItems: MenuItem<NGLinkRowActionProps>[] = [
     {
@@ -79,9 +79,9 @@ function ActionsCell({
 }
 
 export function useNGLinksColumns(
-  onEdit: (item: NeuroglancerShortLink) => void,
-  onDelete: (item: NeuroglancerShortLink) => void
-): ColumnDef<NeuroglancerShortLink>[] {
+  onEdit: (item: NGLink) => void,
+  onDelete: (item: NGLink) => void
+): ColumnDef<NGLink>[] {
   return useMemo(
     () => [
       {
