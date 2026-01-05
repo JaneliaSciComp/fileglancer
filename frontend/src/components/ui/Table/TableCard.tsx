@@ -158,22 +158,7 @@ const globalFilterFn: FilterFn<unknown> = (row, _columnId, filterValue) => {
 
   const query = String(filterValue).toLowerCase();
 
-  // Special handling for URLs: if query starts with "http", only check the key column
-  if (query.startsWith('http')) {
-    const keyCell = row
-      .getVisibleCells()
-      .find(cell => cell.column.id === 'sharing_key');
-    if (keyCell) {
-      const keyValue = keyCell.getValue();
-      if (keyValue !== null && keyValue !== undefined) {
-        const strKeyValue = String(keyValue).toLowerCase();
-        return query.includes(strKeyValue);
-      }
-    }
-    return false;
-  }
-
-  // For non-URL queries, search all columns except the name column
+  // Search all columns except the name column
   // NOTE: this needs to change if we allow custom sharing names
   // For now, the sharing name is always in the file path
   const rowValues = row.getVisibleCells().flatMap(cell => {
