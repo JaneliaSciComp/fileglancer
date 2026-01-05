@@ -6,6 +6,8 @@ import toast from 'react-hot-toast';
 import { TableCard } from '@/components/ui/Table/TableCard';
 import { useNGLinksColumns } from '@/components/ui/Table/ngLinksColumns';
 import NeuroglancerViewDialog from '@/components/ui/Dialogs/NeuroglancerViewDialog';
+import FgDialog from '@/components/ui/Dialogs/FgDialog';
+import DeleteBtn from '@/components/ui/buttons/DeleteBtn';
 import { useNeuroglancerContext } from '@/contexts/NeuroglancerContext';
 import type { NeuroglancerShortLink } from '@/queries/neuroglancerQueries';
 
@@ -13,12 +15,16 @@ export default function NGLinks() {
   const {
     allNeuroglancerLinksQuery,
     createNeuroglancerShortLinkMutation,
-    updateNeuroglancerShortLinkMutation
+    updateNeuroglancerShortLinkMutation,
+    deleteNeuroglancerShortLinkMutation
   } = useNeuroglancerContext();
   const [showDialog, setShowDialog] = useState(false);
   const [editItem, setEditItem] = useState<NeuroglancerShortLink | undefined>(
     undefined
   );
+  const [deleteItem, setDeleteItem] = useState<
+    NeuroglancerShortLink | undefined
+  >(undefined);
 
   const handleOpenCreate = () => {
     setEditItem(undefined);
@@ -67,7 +73,32 @@ export default function NGLinks() {
     }
   };
 
-  const ngLinksColumns = useNGLinksColumns(handleOpenEdit);
+  const handleOpenDelete = (item: NeuroglancerShortLink) => {
+    setDeleteItem(item);
+  };
+
+  const handleCloseDelete = () => {
+    setDeleteItem(undefined);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteItem) {
+      return;
+    }
+    try {
+      await deleteNeuroglancerShortLinkMutation.mutateAsync(
+        deleteItem.short_key
+      );
+      toast.success('Link deleted');
+      handleCloseDelete();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to delete link';
+      toast.error(message);
+    }
+  };
+
+  const ngLinksColumns = useNGLinksColumns(handleOpenEdit, handleOpenDelete);
 
   return (
     <>
@@ -107,6 +138,32 @@ export default function NGLinks() {
             updateNeuroglancerShortLinkMutation.isPending
           }
         />
+      ) : null}
+      {deleteItem ? (
+        <FgDialog
+          className="flex flex-col gap-4"
+          onClose={handleCloseDelete}
+          open={!!deleteItem}
+        >
+          <Typography className="text-foreground font-semibold">
+            Are you sure you want to delete "
+            {deleteItem.short_name || deleteItem.short_key}"?
+          </Typography>
+          <div className="flex gap-3">
+            <DeleteBtn
+              disabled={deleteNeuroglancerShortLinkMutation.isPending}
+              onClick={handleConfirmDelete}
+              pending={deleteNeuroglancerShortLinkMutation.isPending}
+            />
+            <Button
+              className="!rounded-md"
+              onClick={handleCloseDelete}
+              variant="outline"
+            >
+              Cancel
+            </Button>
+          </div>
+        </FgDialog>
       ) : null}
     </>
   );

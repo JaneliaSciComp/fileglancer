@@ -667,6 +667,16 @@ def update_neuroglancer_state(
     return entry
 
 
+def delete_neuroglancer_state(session: Session, username: str, short_key: str) -> int:
+    """Delete a Neuroglancer state entry. Returns the number of deleted rows."""
+    deleted = session.query(NeuroglancerStateDB).filter_by(
+        short_key=short_key,
+        username=username
+    ).delete()
+    session.commit()
+    return deleted
+
+
 def get_tickets(session: Session, username: str, fsp_name: str = None, path: str = None) -> List[TicketDB]:
     """Get tickets for a user, optionally filtered by fsp_name and path"""
     logger.info(f"Getting tickets for {username} with fsp_name={fsp_name} and path={path}")

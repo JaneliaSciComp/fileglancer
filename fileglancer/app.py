@@ -787,6 +787,17 @@ def create_app(settings):
         )
 
 
+    @app.delete("/api/neuroglancer/nglinks/{short_key}",
+                description="Delete a stored Neuroglancer state")
+    async def delete_neuroglancer_short_link(short_key: str = Path(..., description="The short key of the Neuroglancer state"),
+                                             username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            deleted = db.delete_neuroglancer_state(session, username, short_key)
+            if deleted == 0:
+                raise HTTPException(status_code=404, detail="Neuroglancer link not found")
+            return {"message": f"Neuroglancer link {short_key} deleted"}
+
+
     @app.post("/api/proxied-path", response_model=ProxiedPath,
               description="Create a new proxied path")
     async def create_proxied_path(fsp_name: str = Query(..., description="The name of the file share path that this proxied path is associated with"),

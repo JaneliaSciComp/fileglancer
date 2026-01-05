@@ -16,14 +16,17 @@ const TRIGGER_CLASSES = 'h-min max-w-full';
 type NGLinkRowActionProps = {
   item: NeuroglancerShortLink;
   onEdit: (item: NeuroglancerShortLink) => void;
+  onDelete: (item: NeuroglancerShortLink) => void;
 };
 
 function ActionsCell({
   item,
-  onEdit
+  onEdit,
+  onDelete
 }: {
   readonly item: NeuroglancerShortLink;
   readonly onEdit: (item: NeuroglancerShortLink) => void;
+  readonly onDelete: (item: NeuroglancerShortLink) => void;
 }) {
   const menuItems: MenuItem<NGLinkRowActionProps>[] = [
     {
@@ -53,6 +56,13 @@ function ActionsCell({
           toast.error(`Failed to copy: ${result.error}`);
         }
       }
+    },
+    {
+      name: 'Delete',
+      color: 'text-error',
+      action: ({ item, onDelete }) => {
+        onDelete(item);
+      }
     }
   ];
 
@@ -60,7 +70,7 @@ function ActionsCell({
     <div className="min-w-0 flex items-center">
       <div onClick={e => e.stopPropagation()}>
         <DataLinksActionsMenu<NGLinkRowActionProps>
-          actionProps={{ item, onEdit }}
+          actionProps={{ item, onEdit, onDelete }}
           menuItems={menuItems}
         />
       </div>
@@ -69,7 +79,8 @@ function ActionsCell({
 }
 
 export function useNGLinksColumns(
-  onEdit: (item: NeuroglancerShortLink) => void
+  onEdit: (item: NeuroglancerShortLink) => void,
+  onDelete: (item: NeuroglancerShortLink) => void
 ): ColumnDef<NeuroglancerShortLink>[] {
   return useMemo(
     () => [
@@ -191,10 +202,16 @@ export function useNGLinksColumns(
       {
         id: 'actions',
         header: 'Actions',
-        cell: ({ row }) => <ActionsCell item={row.original} onEdit={onEdit} />,
+        cell: ({ row }) => (
+          <ActionsCell
+            item={row.original}
+            onDelete={onDelete}
+            onEdit={onEdit}
+          />
+        ),
         enableSorting: false
       }
     ],
-    [onEdit]
+    [onEdit, onDelete]
   );
 }

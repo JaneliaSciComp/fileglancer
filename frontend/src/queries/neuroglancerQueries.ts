@@ -139,3 +139,28 @@ export function useUpdateNeuroglancerShortLinkMutation(): UseMutationResult<
     }
   });
 }
+
+export function useDeleteNeuroglancerShortLinkMutation(): UseMutationResult<
+  void,
+  Error,
+  string
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (shortKey: string) => {
+      const response = await sendFetchRequest(
+        `/api/neuroglancer/nglinks/${encodeURIComponent(shortKey)}`,
+        'DELETE'
+      );
+      if (!response.ok) {
+        throw await toHttpError(response);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: neuroglancerQueryKeys.all
+      });
+    }
+  });
+}
