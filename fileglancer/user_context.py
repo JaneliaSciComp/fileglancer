@@ -48,6 +48,12 @@ class EffectiveUserContext(UserContext):
         gids = os.getgrouplist(self.username, gid)
         try:
             os.setegid(gid)
+        except PermissionError as e:
+            logger.error(f"Failed to set the effective gid: {e}")
+            raise UserContextConfigurationError(
+                "Server configuration error: use_access_flags requires root privileges. "
+                "Please run the server as root or set use_access_flags=false in config.yaml"
+            ) from e
         except Exception as e:
             logger.error(f"Failed to set the effective gid: {e}")
             raise e
@@ -63,6 +69,14 @@ class EffectiveUserContext(UserContext):
                     "so this may result in an error"
                 ))
             os.setgroups(gids)
+        except PermissionError as e:
+            logger.error(f"Failed to set the user groups: {e}")
+            # reset egid first
+            os.setegid(self._gid)
+            raise UserContextConfigurationError(
+                "Server configuration error: use_access_flags requires root privileges. "
+                "Please run the server as root or set use_access_flags=false in config.yaml"
+            ) from e
         except Exception as e:
             logger.error(f"Failed to set the user groups: {e}")
             # reset egid first
@@ -71,6 +85,14 @@ class EffectiveUserContext(UserContext):
 
         try:
             os.seteuid(uid)
+        except PermissionError as e:
+            logger.error(f"Failed to set euid: {e}")
+            # reset egid
+            os.setegid(self._gid)
+            raise UserContextConfigurationError(
+                "Server configuration error: use_access_flags requires root privileges. "
+                "Please run the server as root or set use_access_flags=false in config.yaml"
+            ) from e
         except Exception as e:
             logger.error(f"Failed to set euid: {e}")
             # reset egid
