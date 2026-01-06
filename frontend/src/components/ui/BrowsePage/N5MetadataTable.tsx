@@ -41,8 +41,7 @@ function getAxisData(metadata: N5Metadata) {
     const axisName = axisNames[index] || `Axis ${index}`;
 
     // Priority: resolution -> pixelResolution.dimensions
-    const res =
-      resolution?.[index] ?? pixelResolution?.dimensions?.[index];
+    const res = resolution?.[index] ?? pixelResolution?.dimensions?.[index];
 
     // Determine unit for this specific axis
     // Priority: units[index] -> pixelResolution.unit -> "um"
