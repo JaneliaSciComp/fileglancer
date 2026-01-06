@@ -5,6 +5,14 @@ from contextlib import AbstractContextManager
 from loguru import logger
 
 
+class UserContextConfigurationError(PermissionError):
+    """
+    Raised when user context setup fails due to configuration issues.
+    This happens when use_access_flags=true but the server is not running with sufficient privileges.
+    """
+    pass
+
+
 class UserContext(AbstractContextManager):
     """
     Base no-op proxy context that does nothing.
