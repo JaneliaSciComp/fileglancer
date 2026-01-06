@@ -12,7 +12,8 @@ class UserContextConfigurationError(PermissionError):
     Raised when user context setup fails due to configuration issues.
     This happens when use_access_flags=true but the server is not running with sufficient privileges.
     """
-    pass
+    def __init__(self, message: str = "Server configuration error: Run the server as root or set use_access_flags=false in config.yaml"):
+        super().__init__(message)
 
 
 class UserContext(AbstractContextManager):
@@ -54,9 +55,7 @@ class EffectiveUserContext(UserContext):
             logger.error(f"Failed to set the effective gid: {e}")
             settings = get_settings()
             if settings.use_access_flags:
-                raise UserContextConfigurationError(
-                    "Server configuration error: Run the server as root or set use_access_flags=false in config.yaml"
-                ) from e
+                raise UserContextConfigurationError() from e
             else:
                 raise
         except Exception as e:
@@ -80,9 +79,7 @@ class EffectiveUserContext(UserContext):
             os.setegid(self._gid)
             settings = get_settings()
             if settings.use_access_flags:
-                raise UserContextConfigurationError(
-                    "Server configuration error: Run the server as root or set use_access_flags=false in config.yaml"
-                ) from e
+                raise UserContextConfigurationError() from e
             else:
                 raise
         except Exception as e:
@@ -99,9 +96,7 @@ class EffectiveUserContext(UserContext):
             os.setegid(self._gid)
             settings = get_settings()
             if settings.use_access_flags:
-                raise UserContextConfigurationError(
-                    "Server configuration error: Run the server as root or set use_access_flags=false in config.yaml"
-                ) from e
+                raise UserContextConfigurationError() from e
             else:
                 raise
         except Exception as e:
