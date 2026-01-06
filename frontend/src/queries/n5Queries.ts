@@ -11,7 +11,12 @@ import type { FileOrFolder } from '@/shared.types';
 export type N5RootAttributes = {
   n5: string; // e.g., "4.0.0"
   downsamplingFactors?: number[][]; // e.g., [[1,1,1], [2,2,1], ...]
+  scales?: number[][]; // Alternative to downsamplingFactors
   resolution?: number[]; // e.g., [157, 157, 628]
+  pixelResolution?: {
+    unit?: string;
+    dimensions: number[];
+  }; // Alternative to resolution + units
   units?: string[]; // e.g., ["nm", "nm", "nm"]
   multiScale?: boolean; // e.g., true
 };
