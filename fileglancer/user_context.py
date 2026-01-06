@@ -4,6 +4,8 @@ from contextlib import AbstractContextManager
 
 from loguru import logger
 
+from fileglancer.settings import get_settings
+
 
 class UserContextConfigurationError(PermissionError):
     """
@@ -50,10 +52,13 @@ class EffectiveUserContext(UserContext):
             os.setegid(gid)
         except PermissionError as e:
             logger.error(f"Failed to set the effective gid: {e}")
-            raise UserContextConfigurationError(
-                "Server configuration error: use_access_flags requires root privileges. "
-                "Please run the server as root or set use_access_flags=false in config.yaml"
-            ) from e
+            settings = get_settings()
+            if settings.use_access_flags:
+                raise UserContextConfigurationError(
+                    "Server configuration error: Run the server as root or set use_access_flags=false in config.yaml"
+                ) from e
+            else:
+                raise
         except Exception as e:
             logger.error(f"Failed to set the effective gid: {e}")
             raise e
@@ -73,10 +78,13 @@ class EffectiveUserContext(UserContext):
             logger.error(f"Failed to set the user groups: {e}")
             # reset egid first
             os.setegid(self._gid)
-            raise UserContextConfigurationError(
-                "Server configuration error: use_access_flags requires root privileges. "
-                "Please run the server as root or set use_access_flags=false in config.yaml"
-            ) from e
+            settings = get_settings()
+            if settings.use_access_flags:
+                raise UserContextConfigurationError(
+                    "Server configuration error: Run the server as root or set use_access_flags=false in config.yaml"
+                ) from e
+            else:
+                raise
         except Exception as e:
             logger.error(f"Failed to set the user groups: {e}")
             # reset egid first
@@ -89,10 +97,13 @@ class EffectiveUserContext(UserContext):
             logger.error(f"Failed to set euid: {e}")
             # reset egid
             os.setegid(self._gid)
-            raise UserContextConfigurationError(
-                "Server configuration error: use_access_flags requires root privileges. "
-                "Please run the server as root or set use_access_flags=false in config.yaml"
-            ) from e
+            settings = get_settings()
+            if settings.use_access_flags:
+                raise UserContextConfigurationError(
+                    "Server configuration error: Run the server as root or set use_access_flags=false in config.yaml"
+                ) from e
+            else:
+                raise
         except Exception as e:
             logger.error(f"Failed to set euid: {e}")
             # reset egid
