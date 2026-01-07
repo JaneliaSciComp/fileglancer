@@ -24,11 +24,12 @@ export default function DeleteSSHKeyDialog({
     try {
       await deleteMutation.mutateAsync({ key_name: keyInfo.filename });
       toast.success(`Key "${keyInfo.filename}" deleted successfully`);
-      setShowDialog(false);
     } catch (error) {
       toast.error(
         `Failed to delete key: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
+    } finally {
+      setShowDialog(false);
     }
   };
 

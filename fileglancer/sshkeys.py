@@ -14,6 +14,10 @@ from typing import List, Optional
 from loguru import logger
 from pydantic import BaseModel, Field
 
+# Constants
+AUTHORIZED_KEYS_FILENAME = "authorized_keys"
+SSH_KEY_PREFIX = "ssh-"
+
 
 class SSHKeyInfo(BaseModel):
     """Information about an SSH key"""
@@ -195,7 +199,7 @@ def is_key_in_authorized_keys(ssh_dir: str, fingerprint: str) -> bool:
     Returns:
         True if the key is in authorized_keys, False otherwise
     """
-    authorized_keys_path = os.path.join(ssh_dir, 'authorized_keys')
+    authorized_keys_path = os.path.join(ssh_dir, AUTHORIZED_KEYS_FILENAME)
 
     if not os.path.exists(authorized_keys_path):
         return False
@@ -251,6 +255,8 @@ def list_ssh_keys(ssh_dir: str) -> List[SSHKeyInfo]:
 
     # Sort by filename
     keys.sort(key=lambda k: k.filename)
+
+    logger.info(f"Listed {len(keys)} SSH keys in {ssh_dir}")
 
     return keys
 
@@ -312,6 +318,8 @@ def generate_ssh_key(ssh_dir: str, key_name: str, comment: Optional[str] = None)
         os.chmod(key_path, 0o600)
         os.chmod(pubkey_path, 0o644)
 
+        logger.info(f"Successfully generated SSH key: {key_name}")
+
         # Parse and return the generated key info
         return parse_public_key(pubkey_path, ssh_dir)
 
@@ -336,13 +344,13 @@ def add_to_authorized_keys(ssh_dir: str, public_key: str) -> bool:
         RuntimeError: If adding the key fails
     """
     # Validate public key format (basic check)
-    if not public_key or not public_key.startswith('ssh-'):
+    if not public_key or not public_key.startswith(SSH_KEY_PREFIX):
         raise ValueError("Invalid public key format")
 
     # Ensure .ssh directory exists
     ensure_ssh_directory_exists(ssh_dir)
 
-    authorized_keys_path = os.path.join(ssh_dir, 'authorized_keys')
+    authorized_keys_path = os.path.join(ssh_dir, AUTHORIZED_KEYS_FILENAME)
 
     # Check if key is already present (by content)
     if os.path.exists(authorized_keys_path):
@@ -393,7 +401,7 @@ def remove_from_authorized_keys(ssh_dir: str, public_key: str) -> bool:
     Returns:
         True if the key was removed, False if it wasn't found
     """
-    authorized_keys_path = os.path.join(ssh_dir, 'authorized_keys')
+    authorized_keys_path = os.path.join(ssh_dir, AUTHORIZED_KEYS_FILENAME)
     backup_path = f"{authorized_keys_path}.bak"
 
     if not os.path.exists(authorized_keys_path):

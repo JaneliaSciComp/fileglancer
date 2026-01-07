@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Card, Chip, IconButton, Typography } from '@material-tailwind/react';
+import { Button, Card, Chip, Typography } from '@material-tailwind/react';
 import {
   HiOutlineClipboardCopy,
   HiOutlineKey,
@@ -79,6 +79,15 @@ export default function SSHKeyCard({ keyInfo }: SSHKeyCardProps) {
             </Button>
           )}
 
+          <CopyTooltip
+            primaryLabel="Copy SSH Public Key"
+            textToCopy={keyInfo.public_key}
+            tooltipTriggerClasses="!bg-primary hover:!bg-primary-dark !text-white"
+          >
+            <HiOutlineClipboardCopy className="icon-default mr-1" />
+            Copy Public Key
+          </CopyTooltip>
+
           {keyInfo.private_key ? (
             <CopyTooltip
               primaryLabel="Copy SSH Private Key"
@@ -86,7 +95,7 @@ export default function SSHKeyCard({ keyInfo }: SSHKeyCardProps) {
               tooltipTriggerClasses="!bg-primary hover:!bg-primary-dark !text-white"
             >
               <HiOutlineClipboardCopy className="icon-default mr-1" />
-              Copy SSH Private Key
+              Copy Private Key
             </CopyTooltip>
           ) : (
             <Typography className="text-xs text-secondary italic">
@@ -94,14 +103,15 @@ export default function SSHKeyCard({ keyInfo }: SSHKeyCardProps) {
             </Typography>
           )}
 
-          <IconButton
+          <Button
             color="error"
             onClick={() => setShowDeleteDialog(true)}
             size="sm"
-            variant="ghost"
+            variant="outline"
           >
-            <HiOutlineTrash className="icon-default" />
-          </IconButton>
+            <HiOutlineTrash className="icon-default mr-1" />
+            Delete
+          </Button>
         </div>
       </div>
 
