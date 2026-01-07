@@ -57,6 +57,8 @@ export default function useFileQuery(
       folderName ? { subpath: folderName } : null
     );
 
+    // Don't use sendRequestAndThrowForNotOk here because we want to handle certain
+    // error statuses (403, 404) differently
     const response = await sendFetchRequest(url, 'GET', undefined, { signal });
     const body = await getResponseJsonOrError(response);
 
