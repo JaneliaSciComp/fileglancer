@@ -1,4 +1,5 @@
 import { buildUrl, sendFetchRequest } from '@/utils';
+import type { RequestBody } from '@/utils';
 import type { FetchRequestOptions } from '@/shared.types';
 
 export async function getResponseJsonOrError(response: Response) {
@@ -21,21 +22,28 @@ export function throwResponseNotOkError(response: Response, body: any): never {
   );
 }
 
+// Note: do not use if you want special error handling for certain status codes
+// In that case, use sendFetchRequest + getResponseJsonOrError +
+// special handling then throwResponseNotOkError
 export async function sendRequestAndThrowForNotOk(
   url: string,
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
-  bodyObj?: any
-): Promise<void> {
+  bodyObj?: RequestBody,
+  options?: FetchRequestOptions
+): Promise<unknown> {
   const response = await sendFetchRequest(
     url,
     method,
-    bodyObj ? bodyObj : undefined
+    bodyObj ? bodyObj : undefined,
+    options
   );
 
+  const body = await getResponseJsonOrError(response);
+
   if (!response.ok) {
-    const body = await getResponseJsonOrError(response);
     throwResponseNotOkError(response, body);
   }
+  return body;
 }
 
 export async function fetchFileContent(
