@@ -344,7 +344,7 @@ def test_patch_file_permissions(test_client, temp_dir):
         "/api/files/tempdir?subpath=test_perms.txt",
         json={"permissions": "-rw-r--r--"}
     )
-    assert response.status_code == 204
+    assert response.status_code == 200
 
 
 def test_patch_file_move(test_client, temp_dir):
@@ -358,7 +358,7 @@ def test_patch_file_move(test_client, temp_dir):
         "/api/files/tempdir?subpath=move_me.txt",
         json={"path": "moved.txt"}
     )
-    assert response.status_code == 204
+    assert response.status_code == 200
     assert not os.path.exists(test_file)
     assert os.path.exists(os.path.join(temp_dir, "moved.txt"))
 
@@ -371,7 +371,7 @@ def test_delete_file(test_client, temp_dir):
         f.write("test")
 
     response = test_client.delete("/api/files/tempdir?subpath=delete_me.txt")
-    assert response.status_code == 204
+    assert response.status_code == 200
     assert not os.path.exists(test_file)
 
 
