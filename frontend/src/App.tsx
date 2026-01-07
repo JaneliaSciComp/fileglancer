@@ -14,6 +14,7 @@ import Jobs from '@/components/Jobs';
 import Preferences from '@/components/Preferences';
 import Links from '@/components/Links';
 import Notifications from '@/components/Notifications';
+import SSHKeys from '@/components/SSHKeys';
 import ErrorFallback from '@/components/ErrorFallback';
 
 function RequireAuth({ children }: { readonly children: ReactNode }) {
@@ -124,6 +125,14 @@ const AppComponent = () => {
                 </RequireAuth>
               }
               path="notifications"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <SSHKeys />
+                </RequireAuth>
+              }
+              path="ssh-keys"
             />
           </Route>
           <Route

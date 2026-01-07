@@ -2,7 +2,8 @@ import { IconButton, Menu, Typography } from '@material-tailwind/react';
 import {
   HiOutlineLogout,
   HiOutlineUserCircle,
-  HiOutlineBell
+  HiOutlineBell,
+  HiOutlineKey
 } from 'react-icons/hi';
 import { HiOutlineAdjustmentsHorizontal } from 'react-icons/hi2';
 import { Link } from 'react-router-dom';
@@ -59,6 +60,14 @@ export default function ProfileMenu() {
             >
               <HiOutlineBell className="mr-2 icon-default" />
               Notifications
+            </Menu.Item>
+            <Menu.Item
+              as={Link}
+              className="text-foreground hover:!text-foreground focus:!text-foreground hover:bg-hover-gradient hover:dark:bg-hover-gradient-dark focus:bg-hover-gradient focus:dark:bg-hover-gradient-dark"
+              to="/ssh-keys"
+            >
+              <HiOutlineKey className="mr-2 icon-default" />
+              Manage SSH Keys
             </Menu.Item>
             <Menu.Item
               className="text-error hover:bg-error/10 hover:!text-error focus:bg-error/10 focus:!text-error"
