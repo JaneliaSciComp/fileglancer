@@ -11,6 +11,11 @@ import { sendFetchRequest, buildUrl, makeMapKey } from '@/utils';
 import { normalizePosixStylePath } from '@/utils/pathHandling';
 import type { FileOrFolder, FileSharePath } from '@/shared.types';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
+import {
+  getResponseJsonOrError,
+  throwResponseNotOkError,
+  sendRequestAndThrowForNotOk
+} from './queryUtils';
 
 type FileBrowserResponse = {
   info: FileOrFolder;
@@ -41,9 +46,7 @@ export default function useFileQuery(
   // Function to fetch files for the current FSP and current folder
   const fetchFileInfo = async ({
     signal
-  }: QueryFunctionContext): Promise<
-    FileBrowserResponse & { errorMessage?: string }
-  > => {
+  }: QueryFunctionContext): Promise<FileBrowserResponse> => {
     if (!fspName) {
       throw new Error('No file share path selected');
     }
@@ -55,16 +58,7 @@ export default function useFileQuery(
     );
 
     const response = await sendFetchRequest(url, 'GET', undefined, { signal });
-
-    const body = await response.json().catch(() => {
-      if (!response.ok) {
-        throw new Error(
-          `Server returned ${response.status} ${response.statusText}`
-        );
-      }
-      // If response was OK but not JSON (unlikely for this API but good safety)
-      throw new Error('Invalid response from server');
-    });
+    const body = await getResponseJsonOrError(response);
 
     if (response.ok) {
       return body as FileBrowserResponse;
@@ -80,17 +74,11 @@ export default function useFileQuery(
     } else if (response.status === 404) {
       throw new Error('Folder not found');
     } else {
-      throw new Error(
-        body.error ? body.error : `Unknown error (${response.status})`
-      );
+      throwResponseNotOkError(response, body);
     }
   };
 
-  const transformData = (
-    data: (FileBrowserResponse | { info: FileOrFolder }) & {
-      errorMessage?: string;
-    }
-  ): FileQueryData => {
+  const transformData = (data: FileBrowserResponse): FileQueryData => {
     // This should never happen because query is disabled when !fspName
     if (!fspName) {
       throw new Error('fspName is required for transforming file query data');
@@ -127,24 +115,23 @@ export default function useFileQuery(
     return {
       currentFileSharePath,
       currentFileOrFolder,
-      files,
-      errorMessage: data.errorMessage
+      files
     };
   };
 
-  return useQuery<
-    FileBrowserResponse & { errorMessage?: string },
-    Error,
-    FileQueryData
-  >({
+  return useQuery<FileBrowserResponse, Error, FileQueryData>({
     queryKey: fileQueryKeys.filePath(fspName || '', folderName),
     queryFn: fetchFileInfo,
     select: transformData,
     enabled: !!fspName && !!zonesAndFspQuery.data,
     staleTime: 5 * 60 * 1000, // 5 minutes - file listings don't change that often
     retry: (failureCount, error) => {
-      // Do not retry on permission errors
-      if (error instanceof Error && error.message.includes('permission')) {
+      // Do not retry on permission errors or Internal Server Errors
+      if (
+        error instanceof Error &&
+        (error.message.includes('permission') ||
+          error.message.includes('Internal Server Error'))
+      ) {
         return false;
       }
       return failureCount < 3; // Default retry behavior
@@ -176,14 +163,7 @@ async function deleteFile({
   filePath
 }: DeleteFileParams): Promise<void> {
   const url = buildUrl('/api/files/', fspName, { subpath: filePath });
-  const response = await sendFetchRequest(url, 'DELETE', undefined);
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    const errorMessage =
-      body.error || `Failed to delete file (${response.status})`;
-    throw new Error(errorMessage);
-  }
+  await sendRequestAndThrowForNotOk(url, 'DELETE');
 }
 
 export function useDeleteFileMutation(): UseMutationResult<
@@ -214,16 +194,9 @@ async function createFolder({
   folderPath
 }: CreateFolderParams): Promise<void> {
   const url = buildUrl('/api/files/', fspName, { subpath: folderPath });
-  const response = await sendFetchRequest(url, 'POST', {
+  await sendRequestAndThrowForNotOk(url, 'POST', {
     type: 'directory'
   });
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    const errorMessage =
-      body.error || `Failed to create folder (${response.status})`;
-    throw new Error(errorMessage);
-  }
 }
 
 export function useCreateFolderMutation(): UseMutationResult<
@@ -256,16 +229,7 @@ async function renameFile({
   newPath
 }: RenameFileParams): Promise<void> {
   const url = buildUrl('/api/files/', fspName, { subpath: oldPath });
-  const response = await sendFetchRequest(url, 'PATCH', {
-    path: newPath
-  });
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    const errorMessage =
-      body.error || `Failed to rename file (${response.status})`;
-    throw new Error(errorMessage);
-  }
+  await sendRequestAndThrowForNotOk(url, 'PATCH', { path: newPath });
 }
 
 export function useRenameFileMutation(): UseMutationResult<
@@ -298,16 +262,7 @@ async function changePermissions({
   permissions
 }: ChangePermissionsParams): Promise<void> {
   const url = buildUrl('/api/files/', fspName, { subpath: filePath });
-  const response = await sendFetchRequest(url, 'PATCH', {
-    permissions
-  });
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    const errorMessage =
-      body.error || `Failed to change permissions (${response.status})`;
-    throw new Error(errorMessage);
-  }
+  await sendRequestAndThrowForNotOk(url, 'PATCH', { permissions });
 }
 
 export function useChangePermissionsMutation(): UseMutationResult<
