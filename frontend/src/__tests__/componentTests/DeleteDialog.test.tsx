@@ -87,7 +87,7 @@ describe('Delete dialog', () => {
     await user.click(screen.getByText('Delete'));
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
-        'Error deleting item: Could not delete item'
+        'Error deleting item: 500 Internal Server Error: Could not delete item'
       );
     });
   });
