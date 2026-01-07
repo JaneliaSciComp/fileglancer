@@ -9,7 +9,7 @@ export async function getResponseJsonOrError(response: Response) {
         `Server returned ${response.status} ${response.statusText}`
       );
     }
-    // If response was OK but not JSON (unlikely for this API but good safety)
+    // If response was OK but not JSON
     throw new Error('Invalid response from server');
   });
   return body;
