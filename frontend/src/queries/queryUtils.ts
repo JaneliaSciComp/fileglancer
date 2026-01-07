@@ -36,3 +36,40 @@ export async function fetchFileAsJson(
   const fileText = await fetchFileAsText(fspName, path);
   return JSON.parse(fileText);
 }
+
+export async function getResponseJsonOrError(response: Response) {
+  const body = await response.json().catch(() => {
+    if (!response.ok) {
+      throw new Error(
+        `Server returned ${response.status} ${response.statusText}`
+      );
+    }
+    // If response was OK but not JSON (unlikely for this API but good safety)
+    throw new Error('Invalid response from server');
+  });
+  return body;
+}
+
+export function throwResponseNotOkError(response: Response, body: any): never {
+  throw new Error(
+    `${response.status} ${response.statusText}:\n` +
+      (body.error ? `${body.error}` : ' Unknown error occurred')
+  );
+}
+
+export async function sendRequestAndThrowForNotOk(
+  url: string,
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  bodyObj?: any
+): Promise<void> {
+  const response = await sendFetchRequest(
+    url,
+    method,
+    bodyObj ? bodyObj : undefined
+  );
+
+  if (!response.ok) {
+    const body = await getResponseJsonOrError(response);
+    throwResponseNotOkError(response, body);
+  }
+}
