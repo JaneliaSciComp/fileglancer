@@ -289,6 +289,12 @@ def create_app(settings):
         return JSONResponse({"error": f"Permission denied: {error_msg}"}, status_code=403)
 
 
+    @app.exception_handler(Exception)
+    async def general_exception_handler(request, exc):
+        logger.exception(f"Unhandled exception: {exc}")
+        return JSONResponse({"error": f"{type(exc).__name__}: {str(exc)}"}, status_code=500)
+
+
     @app.get('/robots.txt', response_class=PlainTextResponse, include_in_schema=False)
     def robots():
         return """User-agent: *\nDisallow: /"""
