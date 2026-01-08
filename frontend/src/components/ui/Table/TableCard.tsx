@@ -64,6 +64,7 @@ declare module '@tanstack/react-table' {
   }
 }
 import type { PathCellValue } from './linksColumns';
+import type { ProxiedPath } from '@/contexts/ProxiedPathContext';
 
 type DataType = 'data links' | 'tasks' | 'NG links';
 
@@ -172,16 +173,21 @@ const globalFilterFn: FilterFn<unknown> = (row, _columnId, filterValue) => {
       return [''];
     }
 
-    // Special handling for path column with PathCellValue
+    // Special handling for "File Path" column in data links table
+    // We want to allow users to paste in the search bar any of the following:
+    // All path formats - linux, mac, windows (stored in pathMap)
+    // The proxied path URL (from the original row data)
     if (
       typeof value === 'object' &&
       value !== null &&
       'pathMap' in value &&
       'displayPath' in value
     ) {
+      const proxiedPath = cell.row.original as ProxiedPath;
       const pathValue = value as PathCellValue;
       // Return all three path types for searching
       return [
+        proxiedPath.url.toLowerCase(),
         pathValue.pathMap.mac_path.toLowerCase(),
         pathValue.pathMap.linux_path.toLowerCase(),
         pathValue.pathMap.windows_path.toLowerCase()
