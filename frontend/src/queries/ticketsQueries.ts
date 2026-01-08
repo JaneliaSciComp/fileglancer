@@ -6,9 +6,13 @@ import {
   UseMutationResult
 } from '@tanstack/react-query';
 
-import { sendFetchRequest, buildUrl, HTTPError } from '@/utils';
-import { toHttpError } from '@/utils/errorHandling';
+import { sendFetchRequest, buildUrl } from '@/utils';
 import type { Ticket } from '@/contexts/TicketsContext';
+import {
+  getResponseJsonOrError,
+  sendRequestAndThrowForNotOk,
+  throwResponseNotOkError
+} from './queryUtils';
 
 /**
  * Raw API response structure from /api/ticket endpoints
@@ -51,27 +55,26 @@ function sortTicketsByDate(tickets: Ticket[]): Ticket[] {
  * Returns empty array if no tickets exist (404)
  */
 const fetchAllTickets = async (signal?: AbortSignal): Promise<Ticket[]> => {
-  try {
-    const response = await sendFetchRequest('/api/ticket', 'GET', undefined, {
-      signal
-    });
-    if (response.status === 404) {
-      // Not an error, just no tickets available
-      return [];
-    }
-    if (!response.ok) {
-      throw await toHttpError(response);
-    }
-    const data = (await response.json()) as TicketsApiResponse;
+  // Don't use sendRequestAndThrowForNotOk here because we want to handle 404 specially
+  const response = await sendFetchRequest('/api/ticket', 'GET', undefined, {
+    signal
+  });
+  const data = (await getResponseJsonOrError(response)) as TicketsApiResponse;
+
+  if (response.ok) {
     if (data?.tickets) {
       return sortTicketsByDate(data.tickets);
+    } else {
+      return [];
     }
+  }
+
+  // Handle error responses
+  if (response.status === 404) {
+    // Not an error, just no tickets available
     return [];
-  } catch (error) {
-    if (error instanceof HTTPError && error.responseCode === 404) {
-      return []; // No tickets found
-    }
-    throw error;
+  } else {
+    throwResponseNotOkError(response, data);
   }
 };
 
@@ -84,29 +87,25 @@ const fetchTicketByPath = async (
   path: string,
   signal?: AbortSignal
 ): Promise<Ticket | null> => {
-  try {
-    const url = buildUrl('/api/ticket', null, { fsp_name: fspName, path });
-    const response = await sendFetchRequest(url, 'GET', undefined, { signal });
+  // Don't use sendRequestAndThrowForNotOk here because we want to handle 404 specially
+  const url = buildUrl('/api/ticket', null, { fsp_name: fspName, path });
+  const response = await sendFetchRequest(url, 'GET', undefined, { signal });
+  const data = (await getResponseJsonOrError(response)) as TicketsApiResponse;
 
-    if (response.status === 404) {
-      // Not an error, just no ticket available
-      return null;
-    }
-
-    if (!response.ok) {
-      throw await toHttpError(response);
-    }
-
-    const data = (await response.json()) as TicketsApiResponse;
+  if (response.ok) {
     if (data?.tickets && data.tickets.length > 0) {
       return data.tickets[0];
+    } else {
+      return null;
     }
+  }
+
+  // Handle error responses
+  if (response.status === 404) {
+    // Not an error, just no ticket available
     return null;
-  } catch (error) {
-    if (error instanceof HTTPError && error.responseCode === 404) {
-      return null; // No ticket found
-    }
-    throw error;
+  } else {
+    throwResponseNotOkError(response, data);
   }
 };
 
@@ -166,12 +165,12 @@ export function useCreateTicketMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: async (payload: CreateTicketPayload) => {
-      const response = await sendFetchRequest('/api/ticket', 'POST', payload);
-      if (!response.ok) {
-        throw await toHttpError(response);
-      }
-      const ticketData = (await response.json()) as Ticket;
-      return ticketData;
+      const ticketData = await sendRequestAndThrowForNotOk(
+        '/api/ticket',
+        'POST',
+        payload
+      );
+      return ticketData as Ticket;
     },
     // Optimistic update for all tickets list
     onMutate: async (newTicket: CreateTicketPayload) => {
