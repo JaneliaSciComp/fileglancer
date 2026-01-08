@@ -19,6 +19,52 @@ AUTHORIZED_KEYS_FILENAME = "authorized_keys"
 SSH_KEY_PREFIX = "ssh-"
 
 
+def validate_path_in_directory(base_dir: str, path: str) -> str:
+    """Validate that a path is within the expected base directory.
+
+    This prevents path traversal attacks by ensuring the resolved path
+    stays within the intended directory.
+
+    Args:
+        base_dir: The base directory that the path must be within
+        path: The path to validate
+
+    Returns:
+        The normalized absolute path if valid
+
+    Raises:
+        ValueError: If the path escapes the base directory
+    """
+    # Normalize both paths to resolve symlinks and collapse ..
+    real_base = os.path.realpath(base_dir)
+    real_path = os.path.realpath(path)
+
+    # Ensure the path is within the base directory
+    if not real_path.startswith(real_base + os.sep) and real_path != real_base:
+        raise ValueError(f"Path '{path}' is outside the allowed directory")
+
+    return real_path
+
+
+def safe_join_path(base_dir: str, *parts: str) -> str:
+    """Safely join path components and validate the result is within base_dir.
+
+    Args:
+        base_dir: The base directory
+        *parts: Path components to join
+
+    Returns:
+        The validated absolute path
+
+    Raises:
+        ValueError: If the resulting path escapes the base directory
+    """
+    # First normalize the path to collapse any .. components
+    joined = os.path.normpath(os.path.join(base_dir, *parts))
+    # Then validate it's within the base directory
+    return validate_path_in_directory(base_dir, joined)
+
+
 class SSHKeyInfo(BaseModel):
     """Information about an SSH key"""
     filename: str = Field(description="The key filename without extension (e.g., 'id_ed25519')")
@@ -245,10 +291,13 @@ def list_ssh_keys(ssh_dir: str) -> List[SSHKeyInfo]:
     # Find all .pub files
     for filename in os.listdir(ssh_dir):
         if filename.endswith('.pub'):
-            pubkey_path = os.path.join(ssh_dir, filename)
             try:
+                pubkey_path = safe_join_path(ssh_dir, filename)
                 key_info = parse_public_key(pubkey_path, ssh_dir)
                 keys.append(key_info)
+            except ValueError as e:
+                logger.warning(f"Skipping suspicious filename {filename}: {e}")
+                continue
             except Exception as e:
                 logger.warning(f"Could not parse key {filename}: {e}")
                 continue
@@ -282,9 +331,9 @@ def generate_ssh_key(ssh_dir: str, key_name: str, comment: Optional[str] = None)
     # Ensure .ssh directory exists
     ensure_ssh_directory_exists(ssh_dir)
 
-    # Build key path
-    key_path = os.path.join(ssh_dir, key_name)
-    pubkey_path = f"{key_path}.pub"
+    # Build and validate key paths (prevents path traversal)
+    key_path = safe_join_path(ssh_dir, key_name)
+    pubkey_path = safe_join_path(ssh_dir, f"{key_name}.pub")
 
     # Check if key already exists
     if os.path.exists(key_path) or os.path.exists(pubkey_path):
@@ -474,8 +523,9 @@ def delete_ssh_key(ssh_dir: str, key_name: str) -> bool:
     # Validate key name to prevent path traversal
     validate_key_name(key_name)
 
-    private_key_path = os.path.join(ssh_dir, key_name)
-    public_key_path = f"{private_key_path}.pub"
+    # Build and validate paths (prevents path traversal)
+    private_key_path = safe_join_path(ssh_dir, key_name)
+    public_key_path = safe_join_path(ssh_dir, f"{key_name}.pub")
 
     # Check if at least one of the key files exists
     private_exists = os.path.exists(private_key_path)

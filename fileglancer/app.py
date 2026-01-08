@@ -912,7 +912,8 @@ def create_app(settings):
                 sshkeys.validate_key_name(key_name)
 
                 ssh_dir = sshkeys.get_ssh_directory()
-                pubkey_path = os.path.join(ssh_dir, f"{key_name}.pub")
+                # Use safe_join_path to prevent path traversal
+                pubkey_path = sshkeys.safe_join_path(ssh_dir, f"{key_name}.pub")
 
                 if not os.path.exists(pubkey_path):
                     raise HTTPException(status_code=404, detail=f"Public key '{key_name}.pub' not found")
