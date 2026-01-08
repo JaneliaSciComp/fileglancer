@@ -329,7 +329,6 @@ export {
   getFileURL,
   getLastSegmentFromPath,
   getPreferredPathForDisplay,
-  HTTPError,
   joinPaths,
   makeBrowseLink,
   makeMapKey,
