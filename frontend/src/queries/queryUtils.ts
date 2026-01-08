@@ -4,13 +4,15 @@ import type { FetchRequestOptions } from '@/shared.types';
 
 export async function getResponseJsonOrError(response: Response) {
   const body = await response.json().catch(() => {
+    // This is to handle any 200 responses without JSON body
+    if (response.ok) {
+      return { message: 'Response has no JSON body or invalid JSON' };
+    }
     if (!response.ok) {
       throw new Error(
         `Server returned ${response.status} ${response.statusText}`
       );
     }
-    // If response was OK but not JSON
-    throw new Error('Invalid response from server');
   });
   return body;
 }
