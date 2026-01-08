@@ -53,7 +53,7 @@ type CellContextMenuData = {
   value: string;
 };
 
-// Extend TanStack Table's meta to include context menu handler
+// Extend TanStack Table's meta to include context menu handler and column-level search
 declare module '@tanstack/react-table' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface TableMeta<TData> {
@@ -62,9 +62,13 @@ declare module '@tanstack/react-table' {
       data: CellContextMenuData
     ) => void;
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData, TValue> {
+    // Optional function to extract searchable values from a cell
+    // Used by globalFilterFn to allow columns to define custom search behavior
+    getSearchableValues?: (value: TValue, row: TData) => string[];
+  }
 }
-import type { PathCellValue } from './linksColumns';
-import type { ProxiedPath } from '@/contexts/ProxiedPathContext';
 
 type DataType = 'data links' | 'tasks' | 'NG links';
 
@@ -152,6 +156,7 @@ const isISODate = (str: string): boolean => {
 };
 
 // Custom global filter function that searches all columns
+// Columns can define custom search behavior via meta.getSearchableValues
 const globalFilterFn: FilterFn<unknown> = (row, _columnId, filterValue) => {
   if (!filterValue) {
     return true;
@@ -173,25 +178,12 @@ const globalFilterFn: FilterFn<unknown> = (row, _columnId, filterValue) => {
       return [''];
     }
 
-    // Special handling for "File Path" column in data links table
-    // We want to allow users to paste in the search bar any of the following:
-    // All path formats - linux, mac, windows (stored in pathMap)
-    // The proxied path URL (from the original row data)
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      'pathMap' in value &&
-      'displayPath' in value
-    ) {
-      const proxiedPath = cell.row.original as ProxiedPath;
-      const pathValue = value as PathCellValue;
-      // Return all three path types for searching
-      return [
-        proxiedPath.url.toLowerCase(),
-        pathValue.pathMap.mac_path.toLowerCase(),
-        pathValue.pathMap.linux_path.toLowerCase(),
-        pathValue.pathMap.windows_path.toLowerCase()
-      ];
+    // Use column meta if available for custom searchable values
+    const meta = cell.column.columnDef.meta;
+    if (meta?.getSearchableValues) {
+      return meta
+        .getSearchableValues(value, cell.row.original)
+        .map(v => v.toLowerCase());
     }
 
     const strValue = String(value);
