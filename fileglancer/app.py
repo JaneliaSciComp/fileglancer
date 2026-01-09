@@ -32,7 +32,7 @@ from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
 from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header
-from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext
+from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext, UserContextConfigurationError
 from fileglancer.filestore import Filestore
 from fileglancer.log import AccessLogMiddleware
 
@@ -272,6 +272,27 @@ def create_app(settings):
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request, exc):
         return JSONResponse({"error":str(exc)}, status_code=400)
+
+
+    @app.exception_handler(UserContextConfigurationError)
+    async def user_context_config_error_handler(request, exc):
+        logger.error(f"User context configuration error: {exc}")
+        return JSONResponse(
+            {"error": str(exc)},
+            status_code=500
+        )
+
+    @app.exception_handler(PermissionError)
+    async def permission_error_handler(request, exc):
+        error_msg = str(exc)
+        logger.error(f"Permission error: {error_msg}")
+        return JSONResponse({"error": f"Permission denied: {error_msg}"}, status_code=403)
+
+
+    @app.exception_handler(Exception)
+    async def general_exception_handler(request, exc):
+        logger.exception(f"Unhandled exception: {exc}")
+        return JSONResponse({"error": f"{type(exc).__name__}: {str(exc)}"}, status_code=500)
 
 
     @app.get('/robots.txt', response_class=PlainTextResponse, include_in_schema=False)
@@ -1065,7 +1086,7 @@ def create_app(settings):
             except PermissionError as e:
                 raise HTTPException(status_code=403, detail=str(e))
 
-            return Response(status_code=201)
+            return JSONResponse(status_code=201, content={"message": "Item created"})
 
 
     @app.patch("/api/files/{path_name}")
@@ -1114,7 +1135,7 @@ def create_app(settings):
             except OSError as e:
                 raise HTTPException(status_code=500, detail=str(e))
 
-            return Response(status_code=204)
+            return JSONResponse(status_code=200, content={"message": "Permissions changed"})
 
 
     @app.delete("/api/files/{fsp_name}")
@@ -1133,7 +1154,7 @@ def create_app(settings):
             except PermissionError as e:
                 raise HTTPException(status_code=403, detail=str(e))
 
-            return Response(status_code=204)
+            return JSONResponse(status_code=200, content={"message": "Item deleted"})
 
 
     @app.post("/api/auth/simple-login", include_in_schema=not settings.enable_okta_auth)

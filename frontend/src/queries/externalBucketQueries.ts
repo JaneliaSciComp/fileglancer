@@ -1,21 +1,14 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 
-import { sendFetchRequest, buildUrl, HTTPError } from '@/utils';
-import { toHttpError } from '@/utils/errorHandling';
+import { sendFetchRequest, buildUrl } from '@/utils';
 import { default as log } from '@/logger';
+import { getResponseJsonOrError, throwResponseNotOkError } from './queryUtils';
 
 export type ExternalBucket = {
   full_path: string;
   external_url: string;
   fsp_name: string;
   relative_path: string;
-};
-
-/**
- * API response structure from /api/external-buckets endpoint
- */
-type ExternalBucketsApiResponse = {
-  buckets?: ExternalBucket[];
 };
 
 export const externalBucketQueryKeys = {
@@ -31,32 +24,24 @@ const fetchExternalBucket = async (
   fspName: string,
   signal?: AbortSignal
 ): Promise<ExternalBucket | null> => {
-  try {
-    const url = buildUrl('/api/external-buckets/', fspName, null);
-    const response = await sendFetchRequest(url, 'GET', undefined, { signal });
+  const url = buildUrl('/api/external-buckets/', fspName, null);
+  const response = await sendFetchRequest(url, 'GET', undefined, { signal });
+  const data = await getResponseJsonOrError(response);
 
-    if (response.status === 404) {
-      log.debug('No external bucket found for FSP');
-      return null;
-    }
-
-    if (!response.ok) {
-      throw await toHttpError(response);
-    }
-
-    const data = (await response.json()) as ExternalBucketsApiResponse;
+  if (response.ok) {
     if (data?.buckets && data.buckets.length > 0) {
       return data.buckets[0];
+    } else {
+      log.debug('No buckets found in response');
+      return null;
     }
+  }
 
-    log.debug('No buckets found in response');
+  if (response.status === 404) {
+    log.debug('No external bucket found for FSP');
     return null;
-  } catch (error) {
-    if (error instanceof HTTPError && error.responseCode === 404) {
-      return null; // No external bucket found
-    }
-    log.error('Error fetching external bucket:', error);
-    throw error;
+  } else {
+    throwResponseNotOkError(response, data);
   }
 };
 

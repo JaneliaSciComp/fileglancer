@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 
 import Crumbs from './Crumbs';
 import ZarrPreview from './ZarrPreview';
+import N5Preview from './N5Preview';
 import Table from './FileTable';
 import FileViewer from './FileViewer';
 import ContextMenu, {
@@ -12,11 +13,13 @@ import ContextMenu, {
 import { FileRowSkeleton } from '@/components/ui/widgets/Loaders';
 import useContextMenu from '@/hooks/useContextMenu';
 import useZarrMetadata from '@/hooks/useZarrMetadata';
+import useN5Metadata from '@/hooks/useN5Metadata';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
 import { useHandleDownload } from '@/hooks/useHandleDownload';
 import { detectZarrVersions } from '@/queries/zarrQueries';
+import { detectN5 } from '@/queries/n5Queries';
 import { makeMapKey } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
 
@@ -72,8 +75,13 @@ export default function FileBrowser({
     availableVersions
   } = useZarrMetadata();
 
+  const { n5MetadataQuery, openWithToolUrls: n5OpenWithToolUrls } =
+    useN5Metadata();
+
   const isZarrDir =
     detectZarrVersions(fileQuery.data?.files as FileOrFolder[]).length > 0;
+
+  const isN5Dir = detectN5(fileQuery.data?.files as FileOrFolder[]);
 
   // Handle right-click on file - FileBrowser-specific logic
   const handleFileContextMenu = (
@@ -186,6 +194,27 @@ export default function FileBrowser({
         />
       ) : null}
 
+      {/* N5 Preview */}
+      {isN5Dir && n5MetadataQuery.isPending ? (
+        <div className="flex shadow-sm rounded-md w-full min-h-96 bg-surface animate-appear animate-pulse animate-delay-150 opacity-0">
+          <Typography className="place-self-center text-center w-full">
+            Loading N5 metadata...
+          </Typography>
+        </div>
+      ) : n5MetadataQuery.isError ? (
+        <div className="flex shadow-sm rounded-md w-full min-h-96 bg-primary-light/30">
+          <Typography className="place-self-center text-center w-full text-warning">
+            Error loading N5 metadata
+          </Typography>
+        </div>
+      ) : n5MetadataQuery.data ? (
+        <N5Preview
+          mainPanelWidth={mainPanelWidth}
+          n5MetadataQuery={n5MetadataQuery}
+          openWithToolUrls={n5OpenWithToolUrls}
+        />
+      ) : null}
+
       {/* Loading state */}
       {fileQuery.isPending ? (
         <div className="min-w-full bg-background select-none">
@@ -195,16 +224,24 @@ export default function FileBrowser({
         </div>
       ) : fileQuery.isError ? (
         <div className="flex items-center pl-3 py-1">
-          <Typography>{fileQuery.error.message}</Typography>
+          <Typography className="whitespace-pre-line">
+            {fileQuery.error.message}
+          </Typography>
         </div>
       ) : displayFiles.length === 0 && fileQuery.data.errorMessage ? (
         <div className="flex items-center pl-3 py-1">
-          <Typography>{fileQuery.data.errorMessage}</Typography>
+          <Typography className="whitespace-pre-line">
+            {fileQuery.data.errorMessage}
+          </Typography>
         </div>
       ) : fileQuery.data.currentFileOrFolder &&
         !fileQuery.data.currentFileOrFolder.is_dir ? (
         // If current item is a file, render the FileViewer instead of the file browser
-        <FileViewer file={fileQuery.data.currentFileOrFolder} />
+        <div className="relative flex-1 min-h-0 overflow-hidden">
+          <div className="absolute inset-0">
+            <FileViewer file={fileQuery.data.currentFileOrFolder} />
+          </div>
+        </div>
       ) : displayFiles.length > 0 ? (
         <Table
           data={displayFiles}
