@@ -112,12 +112,11 @@ const fetchPreferences = async (
   const data = await getResponseJsonOrError(response);
   if (response.ok) {
     return data as PreferencesApiResponse;
+  }
+  if (response.status === 404) {
+    return {}; // No preferences found, return empty object
   } else {
-    if (response.status === 404) {
-      return {}; // No preferences found, return empty object
-    } else {
-      throwResponseNotOkError(response, data);
-    }
+    throwResponseNotOkError(response, data);
   }
 };
 
