@@ -1,16 +1,19 @@
 import { useQuery, QueryFunctionContext } from '@tanstack/react-query';
 
-import { sendFetchRequest } from '@/utils';
 import type { Profile } from '@/shared.types';
+import { sendRequestAndThrowForNotOk } from './queryUtils';
 
 export const useProfileQuery = () => {
   const fetchProfile = async ({
     signal
   }: QueryFunctionContext): Promise<Profile> => {
-    const response = await sendFetchRequest('/api/profile', 'GET', undefined, {
-      signal
-    });
-    return await response.json();
+    const body = await sendRequestAndThrowForNotOk(
+      '/api/profile',
+      'GET',
+      undefined,
+      { signal }
+    );
+    return body as Profile;
   };
 
   return useQuery<Profile, Error>({

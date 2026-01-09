@@ -5,7 +5,7 @@ import {
   QueryFunctionContext
 } from '@tanstack/react-query';
 
-import { sendFetchRequest } from '@/utils';
+import { sendRequestAndThrowForNotOk } from './queryUtils';
 
 export type AuthStatus = {
   authenticated: boolean;
@@ -27,15 +27,12 @@ export const useAuthStatusQuery = () => {
   const fetchAuthStatus = async ({
     signal
   }: QueryFunctionContext): Promise<AuthStatus> => {
-    const response = await sendFetchRequest(
+    return (await sendRequestAndThrowForNotOk(
       '/api/auth/status',
       'GET',
       undefined,
-      {
-        signal
-      }
-    );
-    return await response.json();
+      { signal }
+    )) as AuthStatus;
   };
 
   return useQuery<AuthStatus, Error>({
@@ -53,20 +50,14 @@ export const useSimpleLoginMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation<SimpleLoginResponse, Error, SimpleLoginPayload>({
-    mutationFn: async (payload: SimpleLoginPayload, { signal }) => {
-      const response = await sendFetchRequest(
+    mutationFn: async (payload: SimpleLoginPayload) => {
+      const data = await sendRequestAndThrowForNotOk(
         '/api/auth/simple-login',
         'POST',
-        payload,
-        { signal }
+        payload
       );
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || 'Login failed');
-      }
-
-      return await response.json();
+      return data as SimpleLoginResponse;
     },
     onSuccess: () => {
       // Invalidate auth status to refetch with new authenticated state

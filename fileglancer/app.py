@@ -289,6 +289,12 @@ def create_app(settings):
         return JSONResponse({"error": f"Permission denied: {error_msg}"}, status_code=403)
 
 
+    @app.exception_handler(Exception)
+    async def general_exception_handler(request, exc):
+        logger.exception(f"Unhandled exception: {exc}")
+        return JSONResponse({"error": f"{type(exc).__name__}: {str(exc)}"}, status_code=500)
+
+
     @app.get('/robots.txt', response_class=PlainTextResponse, include_in_schema=False)
     def robots():
         return """User-agent: *\nDisallow: /"""
@@ -1080,7 +1086,7 @@ def create_app(settings):
             except PermissionError as e:
                 raise HTTPException(status_code=403, detail=str(e))
 
-            return Response(status_code=201)
+            return JSONResponse(status_code=201, content={"message": "Item created"})
 
 
     @app.patch("/api/files/{path_name}")
@@ -1129,7 +1135,7 @@ def create_app(settings):
             except OSError as e:
                 raise HTTPException(status_code=500, detail=str(e))
 
-            return Response(status_code=204)
+            return JSONResponse(status_code=200, content={"message": "Permissions changed"})
 
 
     @app.delete("/api/files/{fsp_name}")
@@ -1148,7 +1154,7 @@ def create_app(settings):
             except PermissionError as e:
                 raise HTTPException(status_code=403, detail=str(e))
 
-            return Response(status_code=204)
+            return JSONResponse(status_code=200, content={"message": "Item deleted"})
 
 
     @app.post("/api/auth/simple-login", include_in_schema=not settings.enable_okta_auth)
