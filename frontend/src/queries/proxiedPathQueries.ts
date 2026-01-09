@@ -6,9 +6,13 @@ import {
   UseMutationResult
 } from '@tanstack/react-query';
 
-import { sendFetchRequest, buildUrl, HTTPError } from '@/utils';
-import { toHttpError } from '@/utils/errorHandling';
+import { sendFetchRequest, buildUrl } from '@/utils';
 import type { ProxiedPath } from '@/contexts/ProxiedPathContext';
+import {
+  getResponseJsonOrError,
+  sendRequestAndThrowForNotOk,
+  throwResponseNotOkError
+} from './queryUtils';
 
 /**
  * Raw API response structure from /api/proxied-path endpoints
@@ -57,30 +61,31 @@ function sortProxiedPathsByDate(paths: ProxiedPath[]): ProxiedPath[] {
 const fetchAllProxiedPaths = async (
   signal?: AbortSignal
 ): Promise<ProxiedPath[]> => {
-  try {
-    const response = await sendFetchRequest(
-      '/api/proxied-path',
-      'GET',
-      undefined,
-      { signal }
-    );
-    if (response.status === 404) {
-      // Not an error, just no proxied paths available
-      return [];
-    }
-    if (!response.ok) {
-      throw await toHttpError(response);
-    }
-    const data = (await response.json()) as ProxiedPathApiResponse;
+  // Don't use sendRequestAndThrowForNotOk here because we want to handle 404 differently
+  const response = await sendFetchRequest(
+    '/api/proxied-path',
+    'GET',
+    undefined,
+    { signal }
+  );
+  const data = (await getResponseJsonOrError(
+    response
+  )) as ProxiedPathApiResponse;
+
+  if (response.ok) {
     if (data?.paths) {
       return sortProxiedPathsByDate(data.paths);
+    } else {
+      return [];
     }
+  }
+
+  // Handle error responses
+  if (response.status === 404) {
+    // Not an error, just no proxied paths available
     return [];
-  } catch (error) {
-    if (error instanceof HTTPError && error.responseCode === 404) {
-      return []; // No proxied paths found
-    }
-    throw error;
+  } else {
+    throwResponseNotOkError(response, data);
   }
 };
 
@@ -93,32 +98,30 @@ const fetchProxiedPathByFspAndPath = async (
   path: string,
   signal?: AbortSignal
 ): Promise<ProxiedPath | null> => {
-  try {
-    const url = buildUrl('/api/proxied-path', null, {
-      fsp_name: fspName,
-      path
-    });
-    const response = await sendFetchRequest(url, 'GET', undefined, { signal });
+  const url = buildUrl('/api/proxied-path', null, {
+    fsp_name: fspName,
+    path
+  });
+  // Don't use sendRequestAndThrowForNotOk here because we want to handle 404 differently
+  const response = await sendFetchRequest(url, 'GET', undefined, { signal });
+  const data = (await getResponseJsonOrError(
+    response
+  )) as ProxiedPathApiResponse;
 
-    if (response.status === 404) {
-      // Not an error, just no proxied path found for this fsp/path
-      return null;
-    }
-
-    if (!response.ok) {
-      throw await toHttpError(response);
-    }
-
-    const data = (await response.json()) as ProxiedPathApiResponse;
+  if (response.ok) {
     if (data?.paths && data.paths.length > 0) {
       return data.paths[0];
+    } else {
+      return null;
     }
+  }
+
+  // Handle error responses
+  if (response.status === 404) {
+    // Not an error, just no proxied path found for this fsp/path
     return null;
-  } catch (error) {
-    if (error instanceof HTTPError && error.responseCode === 404) {
-      return null; // No proxied path found
-    }
-    throw error;
+  } else {
+    throwResponseNotOkError(response, data);
   }
 };
 
@@ -179,12 +182,8 @@ export function useCreateProxiedPathMutation(): UseMutationResult<
         fsp_name: payload.fsp_name,
         path: payload.path
       });
-      const response = await sendFetchRequest(url, 'POST');
-      if (!response.ok) {
-        throw await toHttpError(response);
-      }
-      const proxiedPath = (await response.json()) as ProxiedPath;
-      return proxiedPath;
+      const proxiedPath = await sendRequestAndThrowForNotOk(url, 'POST');
+      return proxiedPath as ProxiedPath;
     },
     // Optimistic update for all proxied paths list
     onMutate: async (newPath: CreateProxiedPathPayload) => {
@@ -244,10 +243,7 @@ export function useDeleteProxiedPathMutation(): UseMutationResult<
   return useMutation({
     mutationFn: async (payload: DeleteProxiedPathPayload) => {
       const url = buildUrl('/api/proxied-path/', payload.sharing_key, null);
-      const response = await sendFetchRequest(url, 'DELETE');
-      if (!response.ok) {
-        throw await toHttpError(response);
-      }
+      await sendRequestAndThrowForNotOk(url, 'DELETE');
     },
     // Optimistic update
     onMutate: async (deletedPath: DeleteProxiedPathPayload) => {

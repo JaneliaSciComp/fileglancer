@@ -4,6 +4,17 @@ from contextlib import AbstractContextManager
 
 from loguru import logger
 
+from fileglancer.settings import get_settings
+
+
+class UserContextConfigurationError(PermissionError):
+    """
+    Raised when user context setup fails due to configuration issues.
+    This happens when use_access_flags=true but the server is not running with sufficient privileges.
+    """
+    def __init__(self, message: str = "Server configuration error: Run the server as root or set use_access_flags=false in config.yaml"):
+        super().__init__(message)
+
 
 class UserContext(AbstractContextManager):
     """
@@ -40,6 +51,13 @@ class EffectiveUserContext(UserContext):
         gids = os.getgrouplist(self.username, gid)
         try:
             os.setegid(gid)
+        except PermissionError as e:
+            logger.error(f"Failed to set the effective gid: {e}")
+            settings = get_settings()
+            if settings.use_access_flags:
+                raise UserContextConfigurationError() from e
+            else:
+                raise
         except Exception as e:
             logger.error(f"Failed to set the effective gid: {e}")
             raise e
@@ -55,6 +73,15 @@ class EffectiveUserContext(UserContext):
                     "so this may result in an error"
                 ))
             os.setgroups(gids)
+        except PermissionError as e:
+            logger.error(f"Failed to set the user groups: {e}")
+            # reset egid first
+            os.setegid(self._gid)
+            settings = get_settings()
+            if settings.use_access_flags:
+                raise UserContextConfigurationError() from e
+            else:
+                raise
         except Exception as e:
             logger.error(f"Failed to set the user groups: {e}")
             # reset egid first
@@ -63,6 +90,15 @@ class EffectiveUserContext(UserContext):
 
         try:
             os.seteuid(uid)
+        except PermissionError as e:
+            logger.error(f"Failed to set euid: {e}")
+            # reset egid
+            os.setegid(self._gid)
+            settings = get_settings()
+            if settings.use_access_flags:
+                raise UserContextConfigurationError() from e
+            else:
+                raise
         except Exception as e:
             logger.error(f"Failed to set euid: {e}")
             # reset egid
