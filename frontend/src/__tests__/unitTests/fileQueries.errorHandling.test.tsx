@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import useFileQuery from './fileQueries';
+import useFileQuery from '../../queries/fileQueries';
 import * as utils from '@/utils';
 
 // Mock the utils module
