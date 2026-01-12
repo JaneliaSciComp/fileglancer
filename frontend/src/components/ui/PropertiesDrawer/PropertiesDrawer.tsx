@@ -120,7 +120,7 @@ export default function PropertiesDrawer({
   const tooltipTriggerClasses = 'max-w-[calc(100%-2rem)] truncate';
 
   return (
-    <>
+    <div data-tour="properties-drawer">
       <Card className="overflow-auto w-full h-full max-h-full p-3 rounded-none shadow-none flex flex-col border-0">
         <div className="flex items-center justify-between gap-4 mb-1 shrink-0">
           <Typography type="h6">Properties</Typography>
@@ -338,6 +338,7 @@ export default function PropertiesDrawer({
                       like Neuroglancer.
                     </Typography>
                     <Button
+                      data-tour="open-conversion-request"
                       disabled={
                         fileBrowserState.propertiesTarget.hasRead === false
                       }
@@ -379,6 +380,6 @@ export default function PropertiesDrawer({
           showDataLinkDialog={showDataLinkDialog}
         />
       ) : null}
-    </>
+    </div>
   );
 }
