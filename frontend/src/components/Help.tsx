@@ -5,9 +5,11 @@ import { SiClickup, SiSlack } from 'react-icons/si';
 import { IconType } from 'react-icons/lib';
 import { LuBookOpenText } from 'react-icons/lu';
 import { HiExternalLink } from 'react-icons/hi';
+import { MdTour } from 'react-icons/md';
 
 import useVersionQuery from '@/queries/versionQuery';
 import { buildUrl } from '@/utils';
+import StartTour from '@/components/tours/StartTour';
 
 type HelpLink = {
   icon: IconType;
@@ -86,10 +88,26 @@ export default function Help() {
         </Typography>
       </div>
       <div className="grid grid-cols-2 gap-10">
+        {/* Tour Card */}
+        <Card
+          as={StartTour}
+          className="group min-h-44 p-8 md:p-12 flex flex-col gap-2 text-left w-full hover:bg-surface-light dark:hover:bg-surface hover:border-surface"
+        >
+          <div className="flex items-center justify-start gap-2 w-full">
+            <MdTour className="hidden md:block icon-default lg:icon-large text-primary" />
+            <Typography className="text-base md:text-lg lg:text-xl text-primary font-semibold group-hover:underline">
+              Take a Tutorial
+            </Typography>
+          </div>
+          <Typography className="text-sm md:text-base text-foreground w-full">
+            Guided tours of common Fileglancer workflows
+          </Typography>
+        </Card>
+
         {helpLinks.map(({ icon: Icon, title, description, url }) => (
           <Card
             as={Link}
-            className="group min-h-44 p-8 md:p-12 flex flex-col gap-2 text-left w-full hover:shadow-lg transition-shadow duration-200"
+            className="group min-h-44 p-8 md:p-12 flex flex-col gap-2 text-left w-full hover:shadow-lg transition-shadow duration-200 hover:bg-surface-light dark:hover:bg-surface"
             key={url}
             rel="noopener noreferrer"
             target="_blank"
@@ -104,7 +122,7 @@ export default function Help() {
                 <HiExternalLink className="icon-xsmall md:icon-small text-primary" />
               </div>
             </div>
-            <Typography className="text-sm md:text-base text-muted-foreground">
+            <Typography className="text-sm md:text-base text-foreground">
               {description}
             </Typography>
           </Card>
