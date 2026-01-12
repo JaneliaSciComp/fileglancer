@@ -119,8 +119,7 @@ export const tourSteps: StepOptions[] = [
   {
     id: 'datalinks-general-zarr',
     title: 'Zarr/N5 Files',
-    text: "If a file is detected as Zarr or N5, you'll see viewer icons in the metadata at the top of the file browser.",
-    attachTo: { element: '[data-tour="file-browser"]', on: 'top' },
+    text: "If a file is detected as Zarr or N5, you'll see viewer icons in the metadata displayed at the top of the file browser. You can click on a viewer icon to open the data link in external viewers like Neuroglancer.",
     buttons: [backButton, nextButton, exitButton]
   },
   {
