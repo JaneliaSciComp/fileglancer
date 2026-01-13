@@ -3,6 +3,8 @@ import { useOutletContext } from 'react-router';
 import { default as log } from '@/logger';
 import type { OutletContextType } from '@/layouts/BrowseLayout';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
+import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
 import FileBrowser from './ui/BrowsePage/FileBrowser';
 import Toolbar from './ui/BrowsePage/Toolbar';
 import RenameDialog from './ui/Dialogs/Rename';
@@ -11,6 +13,7 @@ import ChangePermissions from './ui/Dialogs/ChangePermissions';
 import ConvertFileDialog from './ui/Dialogs/ConvertFile';
 import RecentDataLinksCard from './ui/BrowsePage/Dashboard/RecentDataLinksCard';
 import RecentlyViewedCard from './ui/BrowsePage/Dashboard/RecentlyViewedCard';
+import WelcomeTutorialCard from './ui/BrowsePage/Dashboard/WelcomeTutorialCard';
 import NavigationInput from './ui/BrowsePage/NavigateInput';
 import FgDialog from './ui/Dialogs/FgDialog';
 
@@ -27,6 +30,8 @@ export default function Browse() {
   } = useOutletContext<OutletContextType>();
 
   const { fspName } = useFileBrowserContext();
+  const { recentlyViewedFolders, showTutorial } = usePreferencesContext();
+  const { allProxiedPathsQuery } = useProxiedPathContext();
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
@@ -114,11 +119,17 @@ export default function Browse() {
         {!fspName ? (
           <div className="flex flex-col max-w-full gap-6 px-6">
             <NavigationInput location="dashboard" />
+            {showTutorial ? <WelcomeTutorialCard /> : null}
             <div
               className={`flex gap-6 ${componentWidth > 800 ? '' : 'flex-col'}`}
             >
-              <RecentlyViewedCard />
-              <RecentDataLinksCard />
+              {recentlyViewedFolders.length === 0 ? null : (
+                <RecentlyViewedCard />
+              )}
+              {allProxiedPathsQuery.isSuccess &&
+              allProxiedPathsQuery.data.length === 0 ? null : (
+                <RecentDataLinksCard />
+              )}
             </div>
           </div>
         ) : (
