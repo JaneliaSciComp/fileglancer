@@ -78,24 +78,35 @@ export function useSSHKeysQuery(): UseQueryResult<SSHKeyInfo[], Error> {
 }
 
 /**
+ * Parameters for generating an SSH key
+ */
+type GenerateKeyParams = {
+  passphrase?: string;
+};
+
+/**
  * Mutation hook for generating the default SSH key (id_ed25519)
  *
  * Creates an ed25519 key pair and adds it to authorized_keys.
  *
  * @example
  * const mutation = useGenerateSSHKeyMutation();
- * mutation.mutate();
+ * mutation.mutate({ passphrase: 'optional-passphrase' });
  */
 export function useGenerateSSHKeyMutation(): UseMutationResult<
   GenerateKeyResponse,
   Error,
-  void
+  GenerateKeyParams | void
 > {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async () => {
-      const response = await sendFetchRequest('/api/ssh-keys', 'POST');
+    mutationFn: async (params?: GenerateKeyParams) => {
+      const response = await sendFetchRequest(
+        '/api/ssh-keys',
+        'POST',
+        params?.passphrase ? { passphrase: params.passphrase } : undefined
+      );
 
       const body = await getResponseJsonOrError(response);
 

@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { Button, Typography } from '@material-tailwind/react';
+import { Button, Input, Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
@@ -16,14 +17,18 @@ export default function GenerateKeyDialog({
   setShowDialog
 }: GenerateKeyDialogProps) {
   const generateMutation = useGenerateSSHKeyMutation();
+  const [passphrase, setPassphrase] = useState('');
 
   const handleClose = () => {
     setShowDialog(false);
+    setPassphrase('');
   };
 
   const handleGenerate = async () => {
     try {
-      const result = await generateMutation.mutateAsync();
+      const result = await generateMutation.mutateAsync(
+        passphrase ? { passphrase } : undefined
+      );
       toast.success(result.message);
       handleClose();
     } catch (error) {
@@ -45,10 +50,27 @@ export default function GenerateKeyDialog({
         directory and add it to your authorized_keys file.
       </Typography>
 
-      <Typography className="text-secondary text-sm mb-6">
+      <Typography className="text-secondary text-sm mb-4">
         Once created, you can use this key to SSH to cluster nodes and copy the
         private key for use with Seqera Platform.
       </Typography>
+
+      <div className="mb-6">
+        <Typography className="text-secondary text-sm mb-2">
+          Passphrase (optional)
+        </Typography>
+        <Input
+          disabled={generateMutation.isPending}
+          onChange={e => setPassphrase(e.target.value)}
+          placeholder="Leave empty for no passphrase"
+          type="password"
+          value={passphrase}
+        />
+        <Typography className="text-secondary text-xs mt-1">
+          A passphrase adds extra security but must be entered each time you use
+          the key.
+        </Typography>
+      </div>
 
       <div className="flex gap-2 justify-end">
         <Button onClick={handleClose} type="button" variant="outline">

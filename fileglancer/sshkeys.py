@@ -90,6 +90,11 @@ class SSHKeyContent(BaseModel):
     key: str = Field(description="The requested key content")
 
 
+class GenerateKeyRequest(BaseModel):
+    """Request body for generating an SSH key"""
+    passphrase: Optional[str] = Field(default=None, description="Optional passphrase to protect the private key")
+
+
 def get_ssh_directory() -> str:
     """Get the path to the current user's .ssh directory.
 
@@ -301,11 +306,12 @@ def list_ssh_keys(ssh_dir: str) -> List[SSHKeyInfo]:
     return keys
 
 
-def generate_ssh_key(ssh_dir: str) -> SSHKeyInfo:
+def generate_ssh_key(ssh_dir: str, passphrase: Optional[str] = None) -> SSHKeyInfo:
     """Generate the default ed25519 SSH key (id_ed25519).
 
     Args:
         ssh_dir: Path to the .ssh directory
+        passphrase: Optional passphrase to protect the private key
 
     Returns:
         SSHKeyInfo for the generated key
@@ -331,7 +337,7 @@ def generate_ssh_key(ssh_dir: str) -> SSHKeyInfo:
     cmd = [
         'ssh-keygen',
         '-t', 'ed25519',
-        '-N', '',  # No passphrase
+        '-N', passphrase or '',  # Empty string if no passphrase
         '-f', key_path,
     ]
 

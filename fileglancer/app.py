@@ -880,13 +880,14 @@ def create_app(settings):
     @app.post("/api/ssh-keys", response_model=sshkeys.GenerateKeyResponse,
               description="Generate the default ed25519 SSH key (id_ed25519)")
     async def generate_ssh_key(
+        request: sshkeys.GenerateKeyRequest = Body(default=sshkeys.GenerateKeyRequest()),
         username: str = Depends(get_current_user)
     ):
         """Generate the default SSH key (id_ed25519) and add it to authorized_keys"""
         with _get_user_context(username):
             try:
                 ssh_dir = sshkeys.get_ssh_directory()
-                key_info = sshkeys.generate_ssh_key(ssh_dir)
+                key_info = sshkeys.generate_ssh_key(ssh_dir, request.passphrase)
 
                 # Read public key content to add to authorized_keys
                 pubkey_path = os.path.join(ssh_dir, f"{key_info.filename}.pub")
