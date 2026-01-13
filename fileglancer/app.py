@@ -888,8 +888,13 @@ def create_app(settings):
                 ssh_dir = sshkeys.get_ssh_directory()
                 key_info = sshkeys.generate_ssh_key(ssh_dir)
 
-                # Always add to authorized_keys
-                sshkeys.add_to_authorized_keys(ssh_dir, key_info.public_key)
+                # Read public key content to add to authorized_keys
+                pubkey_path = os.path.join(ssh_dir, f"{key_info.filename}.pub")
+                with open(pubkey_path, 'r') as f:
+                    public_key = f.read().strip()
+
+                # Add to authorized_keys
+                sshkeys.add_to_authorized_keys(ssh_dir, public_key)
 
                 # Update the is_authorized flag
                 key_info = sshkeys.SSHKeyInfo(
@@ -897,8 +902,6 @@ def create_app(settings):
                     key_type=key_info.key_type,
                     fingerprint=key_info.fingerprint,
                     comment=key_info.comment,
-                    public_key=key_info.public_key,
-                    private_key=key_info.private_key,
                     has_private_key=key_info.has_private_key,
                     is_authorized=True
                 )
@@ -945,6 +948,27 @@ def create_app(settings):
                 raise HTTPException(status_code=500, detail=str(e))
             except Exception as e:
                 logger.error(f"Error authorizing SSH key for {username}: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/ssh-keys/content", response_model=sshkeys.SSHKeyContent,
+             description="Get the content of the default SSH key (id_ed25519)")
+    async def get_ssh_key_content(
+        key_type: str = Query(..., description="Type of key to fetch: 'public' or 'private'"),
+        username: str = Depends(get_current_user)
+    ):
+        """Get the public or private key content for copying"""
+        if key_type not in ("public", "private"):
+            raise HTTPException(status_code=400, detail="key_type must be 'public' or 'private'")
+
+        with _get_user_context(username):
+            try:
+                ssh_dir = sshkeys.get_ssh_directory()
+                return sshkeys.get_key_content(ssh_dir, "id_ed25519", key_type)
+
+            except ValueError as e:
+                raise HTTPException(status_code=404, detail=str(e))
+            except Exception as e:
+                logger.error(f"Error getting SSH key content for {username}: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
 
     # File content endpoint

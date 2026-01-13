@@ -1,10 +1,10 @@
+import { useState } from 'react';
 import { Button, Card, Chip, Typography } from '@material-tailwind/react';
 import { HiOutlineClipboardCopy, HiOutlineKey, HiOutlinePlus } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
-import CopyTooltip from '@/components/ui/widgets/CopyTooltip';
 import { Spinner } from '@/components/ui/widgets/Loaders';
-import { useAuthorizeSSHKeyMutation } from '@/queries/sshKeyQueries';
+import { useAuthorizeSSHKeyMutation, fetchSSHKeyContent } from '@/queries/sshKeyQueries';
 import type { SSHKeyInfo } from '@/queries/sshKeyQueries';
 
 type SSHKeyCardProps = {
@@ -13,6 +13,8 @@ type SSHKeyCardProps = {
 
 export default function SSHKeyCard({ keyInfo }: SSHKeyCardProps) {
   const authorizeMutation = useAuthorizeSSHKeyMutation();
+  const [isCopyingPublic, setIsCopyingPublic] = useState(false);
+  const [isCopyingPrivate, setIsCopyingPrivate] = useState(false);
 
   // Truncate fingerprint for display
   const shortFingerprint =
@@ -26,6 +28,36 @@ export default function SSHKeyCard({ keyInfo }: SSHKeyCardProps) {
       toast.error(
         `Failed to authorize key: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
+    }
+  };
+
+  const handleCopyPublicKey = async () => {
+    setIsCopyingPublic(true);
+    try {
+      const content = await fetchSSHKeyContent('public');
+      await navigator.clipboard.writeText(content.key);
+      toast.success('Public key copied to clipboard');
+    } catch (error) {
+      toast.error(
+        `Failed to copy public key: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    } finally {
+      setIsCopyingPublic(false);
+    }
+  };
+
+  const handleCopyPrivateKey = async () => {
+    setIsCopyingPrivate(true);
+    try {
+      const content = await fetchSSHKeyContent('private');
+      await navigator.clipboard.writeText(content.key);
+      toast.success('Private key copied to clipboard');
+    } catch (error) {
+      toast.error(
+        `Failed to copy private key: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    } finally {
+      setIsCopyingPrivate(false);
     }
   };
 
@@ -76,24 +108,38 @@ export default function SSHKeyCard({ keyInfo }: SSHKeyCardProps) {
             </Button>
           )}
 
-          <CopyTooltip
-            primaryLabel="Copy SSH Public Key"
-            textToCopy={keyInfo.public_key}
-            tooltipTriggerClasses="!bg-primary hover:!bg-primary-dark !text-white"
+          <Button
+            color="primary"
+            disabled={isCopyingPublic}
+            onClick={handleCopyPublicKey}
+            size="sm"
           >
-            <HiOutlineClipboardCopy className="icon-default mr-1" />
-            Copy Public Key
-          </CopyTooltip>
+            {isCopyingPublic ? (
+              <Spinner text="Copying..." />
+            ) : (
+              <>
+                <HiOutlineClipboardCopy className="icon-default mr-1" />
+                Copy Public Key
+              </>
+            )}
+          </Button>
 
-          {keyInfo.private_key ? (
-            <CopyTooltip
-              primaryLabel="Copy SSH Private Key"
-              textToCopy={keyInfo.private_key}
-              tooltipTriggerClasses="!bg-primary hover:!bg-primary-dark !text-white"
+          {keyInfo.has_private_key ? (
+            <Button
+              color="primary"
+              disabled={isCopyingPrivate}
+              onClick={handleCopyPrivateKey}
+              size="sm"
             >
-              <HiOutlineClipboardCopy className="icon-default mr-1" />
-              Copy Private Key
-            </CopyTooltip>
+              {isCopyingPrivate ? (
+                <Spinner text="Copying..." />
+              ) : (
+                <>
+                  <HiOutlineClipboardCopy className="icon-default mr-1" />
+                  Copy Private Key
+                </>
+              )}
+            </Button>
           ) : (
             <Typography className="text-xs text-secondary italic">
               Private key not available

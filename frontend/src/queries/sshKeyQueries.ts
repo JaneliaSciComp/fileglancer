@@ -8,17 +8,22 @@ import {
 } from '@/queries/queryUtils';
 
 /**
- * Information about an SSH key
+ * Information about an SSH key (without sensitive content)
  */
 export type SSHKeyInfo = {
   filename: string;
   key_type: string;
   fingerprint: string;
   comment: string;
-  public_key: string;
-  private_key: string | null;
   has_private_key: boolean;
   is_authorized: boolean;
+};
+
+/**
+ * SSH key content - fetched on demand when user clicks copy
+ */
+export type SSHKeyContent = {
+  key: string;
 };
 
 /**
@@ -152,4 +157,28 @@ export function useAuthorizeSSHKeyMutation(): UseMutationResult<
       });
     }
   });
+}
+
+/**
+ * Fetch SSH key content (public or private key) on demand.
+ * This is not a hook - call it imperatively when user clicks copy.
+ *
+ * @param keyType - Type of key to fetch: 'public' or 'private'
+ * @returns Promise with the key content
+ */
+export async function fetchSSHKeyContent(
+  keyType: 'public' | 'private'
+): Promise<SSHKeyContent> {
+  const response = await sendFetchRequest(
+    `/api/ssh-keys/content?key_type=${keyType}`,
+    'GET'
+  );
+
+  const body = await getResponseJsonOrError(response);
+
+  if (!response.ok) {
+    throwResponseNotOkError(response, body);
+  }
+
+  return body as SSHKeyContent;
 }

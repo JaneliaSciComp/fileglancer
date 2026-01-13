@@ -63,15 +63,18 @@ def safe_join_path(base_dir: str, *parts: str) -> str:
 
 
 class SSHKeyInfo(BaseModel):
-    """Information about an SSH key"""
+    """Information about an SSH key (without sensitive content)"""
     filename: str = Field(description="The key filename without extension (e.g., 'id_ed25519')")
     key_type: str = Field(description="The SSH key type (e.g., 'ssh-ed25519', 'ssh-rsa')")
     fingerprint: str = Field(description="SHA256 fingerprint of the key")
     comment: str = Field(description="Comment associated with the key")
-    public_key: str = Field(description="Full public key content")
-    private_key: Optional[str] = Field(default=None, description="Private key content (if available)")
     has_private_key: bool = Field(description="Whether the corresponding private key exists")
     is_authorized: bool = Field(description="Whether this key is in authorized_keys")
+
+
+class SSHKeyContent(BaseModel):
+    """SSH key content - only fetched on demand"""
+    key: str = Field(description="The requested key content")
 
 
 class SSHKeyListResponse(BaseModel):
@@ -145,14 +148,14 @@ def get_key_fingerprint(pubkey_path: str) -> str:
 
 
 def parse_public_key(pubkey_path: str, ssh_dir: str) -> SSHKeyInfo:
-    """Parse a public key file and return its information.
+    """Parse a public key file and return its information (without key content).
 
     Args:
         pubkey_path: Path to the public key file
         ssh_dir: Path to the .ssh directory (for checking authorized_keys)
 
     Returns:
-        SSHKeyInfo object with the key details
+        SSHKeyInfo object with the key details (no sensitive content)
     """
     with open(pubkey_path, 'r') as f:
         public_key = f.read().strip()
@@ -173,16 +176,9 @@ def parse_public_key(pubkey_path: str, ssh_dir: str) -> SSHKeyInfo:
     if filename.endswith('.pub'):
         filename = filename[:-4]
 
-    # Check if private key exists and read it
+    # Check if private key exists (but don't read it)
     private_key_path = pubkey_path[:-4] if pubkey_path.endswith('.pub') else pubkey_path
     has_private_key = os.path.exists(private_key_path) and private_key_path != pubkey_path
-    private_key = None
-    if has_private_key:
-        try:
-            with open(private_key_path, 'r') as f:
-                private_key = f.read()
-        except Exception as e:
-            logger.warning(f"Could not read private key {private_key_path}: {e}")
 
     # Check if key is in authorized_keys
     is_authorized = is_key_in_authorized_keys(ssh_dir, fingerprint)
@@ -192,11 +188,40 @@ def parse_public_key(pubkey_path: str, ssh_dir: str) -> SSHKeyInfo:
         key_type=key_type,
         fingerprint=fingerprint,
         comment=comment,
-        public_key=public_key,
-        private_key=private_key,
         has_private_key=has_private_key,
         is_authorized=is_authorized
     )
+
+
+def get_key_content(ssh_dir: str, filename: str, key_type: str = "public") -> SSHKeyContent:
+    """Get the content of an SSH key (public or private).
+
+    Args:
+        ssh_dir: Path to the .ssh directory
+        filename: Key filename without extension (e.g., 'id_ed25519')
+        key_type: Type of key to fetch: 'public' or 'private'
+
+    Returns:
+        SSHKeyContent with the requested key content
+
+    Raises:
+        ValueError: If the key doesn't exist or is invalid
+    """
+    if key_type == "public":
+        pubkey_path = safe_join_path(ssh_dir, f"{filename}.pub")
+        if not os.path.exists(pubkey_path):
+            raise ValueError(f"Public key '{filename}' not found")
+        with open(pubkey_path, 'r') as f:
+            return SSHKeyContent(key=f.read().strip())
+
+    elif key_type == "private":
+        private_key_path = safe_join_path(ssh_dir, filename)
+        if not os.path.exists(private_key_path):
+            raise ValueError(f"Private key '{filename}' not found")
+        with open(private_key_path, 'r') as f:
+            return SSHKeyContent(key=f.read())
+
+    raise ValueError(f"Invalid key_type: {key_type}")
 
 
 def is_key_in_authorized_keys(ssh_dir: str, fingerprint: str) -> bool:
