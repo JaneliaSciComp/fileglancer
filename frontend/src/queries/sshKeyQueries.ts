@@ -1,13 +1,11 @@
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-  UseQueryResult,
-  UseMutationResult
-} from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { UseQueryResult, UseMutationResult } from '@tanstack/react-query';
 
 import { sendFetchRequest } from '@/utils';
-import { toHttpError } from '@/utils/errorHandling';
+import {
+  getResponseJsonOrError,
+  throwResponseNotOkError
+} from '@/queries/queryUtils';
 
 /**
  * Information about an SSH key
@@ -52,11 +50,13 @@ const fetchSSHKeys = async (signal?: AbortSignal): Promise<SSHKeyInfo[]> => {
     signal
   });
 
+  const body = await getResponseJsonOrError(response);
+
   if (!response.ok) {
-    throw await toHttpError(response);
+    throwResponseNotOkError(response, body);
   }
 
-  const data = (await response.json()) as SSHKeyListResponse;
+  const data = body as SSHKeyListResponse;
   return data.keys ?? [];
 };
 
@@ -92,11 +92,13 @@ export function useGenerateSSHKeyMutation(): UseMutationResult<
     mutationFn: async () => {
       const response = await sendFetchRequest('/api/ssh-keys', 'POST');
 
+      const body = await getResponseJsonOrError(response);
+
       if (!response.ok) {
-        throw await toHttpError(response);
+        throwResponseNotOkError(response, body);
       }
 
-      return (await response.json()) as GenerateKeyResponse;
+      return body as GenerateKeyResponse;
     },
     onSuccess: () => {
       // Invalidate and refetch the list
