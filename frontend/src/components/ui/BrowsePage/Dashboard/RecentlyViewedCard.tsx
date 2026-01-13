@@ -14,7 +14,7 @@ export default function RecentlyViewedCard() {
   const { recentlyViewedFolders, preferenceQuery } = usePreferencesContext();
 
   return (
-    <DashboardCard title="Recently viewed">
+    <DashboardCard className="h-[670px]" title="Recently viewed">
       {preferenceQuery.isPending || zonesAndFspQuery.isPending ? (
         Array(5)
           .fill(0)
