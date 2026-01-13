@@ -69,7 +69,7 @@ export default function ProfileMenu() {
                 to="/ssh-keys"
               >
                 <HiOutlineKey className="mr-2 icon-default" />
-                Manage SSH Keys
+                SSH Key
               </Menu.Item>
             ) : null}
             <Menu.Item
