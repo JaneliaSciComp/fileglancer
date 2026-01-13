@@ -32,8 +32,8 @@ export default function SSHKeys() {
           <Typography className="text-secondary text-sm">
             SSH keys allow you to securely connect to cluster nodes without
             entering a password. Specifically, you need an ed25519 SSH key to
-            use Seqera Platform to run pipelines on the cluster. This page
-            lets you view your existing ed25519 SSH key or generate a new one.
+            use Seqera Platform to run pipelines on the cluster. This page lets
+            you view your existing ed25519 SSH key or generate a new one.
           </Typography>
         </div>
       </Card>

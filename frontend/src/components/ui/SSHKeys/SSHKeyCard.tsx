@@ -1,10 +1,17 @@
 import { useState } from 'react';
 import { Button, Card, Chip, Typography } from '@material-tailwind/react';
-import { HiOutlineClipboardCopy, HiOutlineKey, HiOutlinePlus } from 'react-icons/hi';
+import {
+  HiOutlineClipboardCopy,
+  HiOutlineKey,
+  HiOutlinePlus
+} from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
 import { Spinner } from '@/components/ui/widgets/Loaders';
-import { useAuthorizeSSHKeyMutation, fetchSSHKeyContent } from '@/queries/sshKeyQueries';
+import {
+  useAuthorizeSSHKeyMutation,
+  fetchSSHKeyContent
+} from '@/queries/sshKeyQueries';
 import type { SSHKeyInfo } from '@/queries/sshKeyQueries';
 
 type SSHKeyCardProps = {
