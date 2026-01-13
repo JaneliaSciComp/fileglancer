@@ -41,6 +41,7 @@ export const handlers = [
       disableNeuroglancerStateGeneration: { value: false },
       useLegacyMultichannelApproach: { value: false },
       isFilteredByGroups: { value: true },
+      showTutorial: { value: true },
       layout: { value: '' },
       zone: { value: [] },
       fileSharePath: { value: [] },
