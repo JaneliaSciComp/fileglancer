@@ -5,7 +5,9 @@ in a user's ~/.ssh directory.
 """
 
 import os
+import shutil
 import subprocess
+import tempfile
 from typing import List, Optional
 
 from loguru import logger
@@ -72,11 +74,6 @@ class SSHKeyInfo(BaseModel):
     is_authorized: bool = Field(description="Whether this key is in authorized_keys")
 
 
-class SSHKeyContent(BaseModel):
-    """SSH key content - only fetched on demand"""
-    key: str = Field(description="The requested key content")
-
-
 class SSHKeyListResponse(BaseModel):
     """Response containing a list of SSH keys"""
     keys: List[SSHKeyInfo] = Field(description="List of SSH keys")
@@ -86,6 +83,11 @@ class GenerateKeyResponse(BaseModel):
     """Response after generating an SSH key"""
     key: SSHKeyInfo = Field(description="The generated key info")
     message: str = Field(description="Status message")
+
+
+class SSHKeyContent(BaseModel):
+    """SSH key content - only fetched on demand"""
+    key: str = Field(description="The requested key content")
 
 
 def get_ssh_directory() -> str:
@@ -362,7 +364,7 @@ def generate_ssh_key(ssh_dir: str) -> SSHKeyInfo:
 
 
 def add_to_authorized_keys(ssh_dir: str, public_key: str) -> bool:
-    """Add a public key to the authorized_keys file using cat command.
+    """Add a public key to the authorized_keys file.
 
     Args:
         ssh_dir: Path to the .ssh directory
@@ -384,31 +386,47 @@ def add_to_authorized_keys(ssh_dir: str, public_key: str) -> bool:
 
     authorized_keys_path = os.path.join(ssh_dir, AUTHORIZED_KEYS_FILENAME)
 
-    # Check if key is already present using grep
-    if os.path.exists(authorized_keys_path):
-        key_parts = public_key.split()
-        if len(key_parts) >= 2:
-            result = subprocess.run(
-                ['grep', '-qF', key_parts[1], authorized_keys_path],
-                capture_output=True,
-                timeout=10
-            )
-            if result.returncode == 0:
-                logger.info("Key already in authorized_keys")
-                return True
-
-    # Append the key using cat
+    # Get fingerprint of the key we're adding to check if already present
+    # Write key to temp file to get its fingerprint
     try:
-        result = subprocess.run(
-            ['sh', '-c', f'cat >> "{authorized_keys_path}"'],
-            input=public_key + '\n',
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.pub', delete=False) as tmp:
+            tmp.write(public_key)
+            tmp_path = tmp.name
 
-        if result.returncode != 0:
-            raise RuntimeError(f"cat failed: {result.stderr}")
+        try:
+            fingerprint = get_key_fingerprint(tmp_path)
+        finally:
+            os.unlink(tmp_path)
+
+        # Use fingerprint-based check (same as UI uses)
+        if is_key_in_authorized_keys(ssh_dir, fingerprint):
+            logger.info("Key already in authorized_keys (fingerprint match)")
+            return True
+
+    except Exception as e:
+        logger.warning(f"Could not check fingerprint, proceeding with add: {e}")
+
+    # Backup and append the key
+    try:
+        # Backup existing file before modifying
+        if os.path.exists(authorized_keys_path):
+            backup_path = authorized_keys_path + '.bak'
+            shutil.copy2(authorized_keys_path, backup_path)
+            logger.info(f"Backed up authorized_keys to {backup_path}")
+
+            # Ensure file ends with newline before appending
+            with open(authorized_keys_path, 'rb') as f:
+                f.seek(0, 2)  # Seek to end
+                if f.tell() > 0:  # File is not empty
+                    f.seek(-1, 2)  # Seek to last byte
+                    if f.read(1) != b'\n':
+                        # File doesn't end with newline, add one
+                        with open(authorized_keys_path, 'a') as af:
+                            af.write('\n')
+
+        # Append the key
+        with open(authorized_keys_path, 'a') as f:
+            f.write(public_key + '\n')
 
         # Ensure correct permissions
         os.chmod(authorized_keys_path, 0o600)
@@ -416,7 +434,5 @@ def add_to_authorized_keys(ssh_dir: str, public_key: str) -> bool:
         logger.info(f"Added key to {authorized_keys_path}")
         return True
 
-    except subprocess.TimeoutExpired:
-        raise RuntimeError("Timed out adding key to authorized_keys")
     except Exception as e:
         raise RuntimeError(f"Failed to add key to authorized_keys: {e}")
