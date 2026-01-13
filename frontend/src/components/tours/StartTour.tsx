@@ -24,18 +24,12 @@ function waitForElement(selector: string, timeoutMs = 3000): Promise<void> {
   });
 }
 
-interface StartTourProps extends Omit<ButtonProps, 'variant'> {
-  readonly variant?: 'button' | 'link';
-  readonly size?: 'sm' | 'md' | 'lg';
+interface StartTourProps extends ButtonProps {
   readonly children: React.ReactNode;
-  readonly className?: string;
 }
 
 export default function StartTour({
-  variant = 'button',
-  size = 'md',
   children,
-  className = '',
   ...buttonProps
 }: StartTourProps) {
   const navigate = useNavigate();
@@ -336,31 +330,8 @@ export default function StartTour({
     tour.start();
   };
 
-  if (variant === 'link') {
-    return (
-      <Button
-        className={`p-0 font-normal hover:underline ${
-          size === 'sm' ? 'text-sm' : size === 'lg' ? 'text-lg' : 'text-base'
-        } ${className}`}
-        color="primary"
-        onClick={handleStartTour}
-        variant="ghost"
-        {...buttonProps}
-      >
-        {children}
-      </Button>
-    );
-  }
-
   return (
-    <Button
-      className={`${
-        size === 'sm' ? 'text-sm' : size === 'lg' ? 'text-lg' : 'text-base'
-      } ${className}`}
-      color="primary"
-      onClick={handleStartTour}
-      {...buttonProps}
-    >
+    <Button color="primary" onClick={handleStartTour} {...buttonProps}>
       {children}
     </Button>
   );
