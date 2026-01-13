@@ -935,28 +935,6 @@ def create_app(settings):
                 logger.error(f"Error authorizing SSH key for {username}: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
 
-    @app.delete("/api/ssh-keys/{key_name}",
-                description="Delete an SSH key pair")
-    async def delete_ssh_key(
-        key_name: str = Path(..., description="The name of the key file (without extension)"),
-        username: str = Depends(get_current_user)
-    ):
-        """Delete an SSH key pair (both private and public key files)"""
-        with _get_user_context(username):
-            try:
-                ssh_dir = sshkeys.get_ssh_directory()
-                sshkeys.delete_ssh_key(ssh_dir, key_name)
-                return {"message": f"Key '{key_name}' deleted successfully"}
-
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail=str(e))
-            except RuntimeError as e:
-                logger.error(f"Error deleting SSH key for {username}: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
-            except Exception as e:
-                logger.error(f"Unexpected error deleting SSH key for {username}: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
-
     # File content endpoint
     @app.head("/api/content/{path_name:path}")
     async def head_file_content(path_name: str,

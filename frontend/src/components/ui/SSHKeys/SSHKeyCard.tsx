@@ -1,14 +1,8 @@
-import { useState } from 'react';
 import { Button, Card, Chip, Typography } from '@material-tailwind/react';
-import {
-  HiOutlineClipboardCopy,
-  HiOutlineKey,
-  HiOutlineTrash
-} from 'react-icons/hi';
+import { HiOutlineClipboardCopy, HiOutlineKey } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
 import CopyTooltip from '@/components/ui/widgets/CopyTooltip';
-import DeleteSSHKeyDialog from '@/components/ui/SSHKeys/DeleteSSHKeyDialog';
 import { Spinner } from '@/components/ui/widgets/Loaders';
 import { useAuthorizeSSHKeyMutation } from '@/queries/sshKeyQueries';
 import type { SSHKeyInfo } from '@/queries/sshKeyQueries';
@@ -18,7 +12,6 @@ type SSHKeyCardProps = {
 };
 
 export default function SSHKeyCard({ keyInfo }: SSHKeyCardProps) {
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const authorizeMutation = useAuthorizeSSHKeyMutation();
 
   const handleAuthorize = async () => {
@@ -102,24 +95,8 @@ export default function SSHKeyCard({ keyInfo }: SSHKeyCardProps) {
               Private key not available
             </Typography>
           )}
-
-          <Button
-            color="error"
-            onClick={() => setShowDeleteDialog(true)}
-            size="sm"
-            variant="outline"
-          >
-            <HiOutlineTrash className="icon-default mr-1" />
-            Delete
-          </Button>
         </div>
       </div>
-
-      <DeleteSSHKeyDialog
-        keyInfo={keyInfo}
-        setShowDialog={setShowDeleteDialog}
-        showDialog={showDeleteDialog}
-      />
     </Card>
   );
 }

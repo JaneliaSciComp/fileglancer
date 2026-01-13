@@ -61,20 +61,6 @@ type AuthorizeKeyResponse = {
   message: string;
 };
 
-/**
- * Payload for deleting a key
- */
-type DeleteKeyPayload = {
-  key_name: string;
-};
-
-/**
- * Response from the delete key endpoint
- */
-type DeleteKeyResponse = {
-  message: string;
-};
-
 // Query key factory for SSH keys
 export const sshKeyQueryKeys = {
   all: ['sshKeys'] as const,
@@ -171,42 +157,6 @@ export function useAuthorizeSSHKeyMutation(): UseMutationResult<
     },
     onSuccess: () => {
       // Invalidate and refetch the list to update is_authorized flags
-      queryClient.invalidateQueries({
-        queryKey: sshKeyQueryKeys.all
-      });
-    }
-  });
-}
-
-/**
- * Mutation hook for deleting an SSH key
- *
- * @example
- * const mutation = useDeleteSSHKeyMutation();
- * mutation.mutate({ key_name: 'id_ed25519' });
- */
-export function useDeleteSSHKeyMutation(): UseMutationResult<
-  DeleteKeyResponse,
-  Error,
-  DeleteKeyPayload
-> {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (payload: DeleteKeyPayload) => {
-      const response = await sendFetchRequest(
-        `/api/ssh-keys/${encodeURIComponent(payload.key_name)}`,
-        'DELETE'
-      );
-
-      if (!response.ok) {
-        throw await toHttpError(response);
-      }
-
-      return (await response.json()) as DeleteKeyResponse;
-    },
-    onSuccess: () => {
-      // Invalidate and refetch the list
       queryClient.invalidateQueries({
         queryKey: sshKeyQueryKeys.all
       });
