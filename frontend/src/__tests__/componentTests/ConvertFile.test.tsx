@@ -110,7 +110,8 @@ describe('Convert File dialog', () => {
     );
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
-        'Error creating ticket: Could not create ticket'
+        `Error creating ticket: 500 Internal Server Error:
+Could not create ticket`
       );
     });
   });

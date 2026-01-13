@@ -123,7 +123,8 @@ describe('Change Permissions dialog', () => {
     );
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
-        'Error changing permissions: Permission denied'
+        `Error changing permissions: 403 Forbidden:
+Permission denied`
       );
     });
   });
