@@ -31,33 +31,10 @@ type SSHKeyListResponse = {
 };
 
 /**
- * Payload for generating a new SSH key
- */
-type GenerateKeyPayload = {
-  key_name: string;
-  comment?: string;
-  add_to_authorized_keys: boolean;
-};
-
-/**
  * Response from the generate SSH key endpoint
  */
 type GenerateKeyResponse = {
   key: SSHKeyInfo;
-  message: string;
-};
-
-/**
- * Payload for authorizing a key
- */
-type AuthorizeKeyPayload = {
-  key_name: string;
-};
-
-/**
- * Response from the authorize key endpoint
- */
-type AuthorizeKeyResponse = {
   message: string;
 };
 
@@ -96,22 +73,24 @@ export function useSSHKeysQuery(): UseQueryResult<SSHKeyInfo[], Error> {
 }
 
 /**
- * Mutation hook for generating a new SSH key
+ * Mutation hook for generating the default SSH key (id_ed25519)
+ *
+ * Creates an ed25519 key pair and adds it to authorized_keys.
  *
  * @example
  * const mutation = useGenerateSSHKeyMutation();
- * mutation.mutate({ key_name: 'my_key', add_to_authorized_keys: true });
+ * mutation.mutate();
  */
 export function useGenerateSSHKeyMutation(): UseMutationResult<
   GenerateKeyResponse,
   Error,
-  GenerateKeyPayload
+  void
 > {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: GenerateKeyPayload) => {
-      const response = await sendFetchRequest('/api/ssh-keys', 'POST', payload);
+    mutationFn: async () => {
+      const response = await sendFetchRequest('/api/ssh-keys', 'POST');
 
       if (!response.ok) {
         throw await toHttpError(response);
@@ -121,42 +100,6 @@ export function useGenerateSSHKeyMutation(): UseMutationResult<
     },
     onSuccess: () => {
       // Invalidate and refetch the list
-      queryClient.invalidateQueries({
-        queryKey: sshKeyQueryKeys.all
-      });
-    }
-  });
-}
-
-/**
- * Mutation hook for authorizing an SSH key (adding to authorized_keys)
- *
- * @example
- * const mutation = useAuthorizeSSHKeyMutation();
- * mutation.mutate({ key_name: 'id_ed25519' });
- */
-export function useAuthorizeSSHKeyMutation(): UseMutationResult<
-  AuthorizeKeyResponse,
-  Error,
-  AuthorizeKeyPayload
-> {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (payload: AuthorizeKeyPayload) => {
-      const response = await sendFetchRequest(
-        `/api/ssh-keys/${encodeURIComponent(payload.key_name)}/authorize`,
-        'POST'
-      );
-
-      if (!response.ok) {
-        throw await toHttpError(response);
-      }
-
-      return (await response.json()) as AuthorizeKeyResponse;
-    },
-    onSuccess: () => {
-      // Invalidate and refetch the list to update is_authorized flags
       queryClient.invalidateQueries({
         queryKey: sshKeyQueryKeys.all
       });

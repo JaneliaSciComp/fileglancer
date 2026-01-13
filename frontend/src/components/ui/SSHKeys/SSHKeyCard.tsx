@@ -1,10 +1,7 @@
-import { Button, Card, Chip, Typography } from '@material-tailwind/react';
+import { Card, Chip, Typography } from '@material-tailwind/react';
 import { HiOutlineClipboardCopy, HiOutlineKey } from 'react-icons/hi';
-import toast from 'react-hot-toast';
 
 import CopyTooltip from '@/components/ui/widgets/CopyTooltip';
-import { Spinner } from '@/components/ui/widgets/Loaders';
-import { useAuthorizeSSHKeyMutation } from '@/queries/sshKeyQueries';
 import type { SSHKeyInfo } from '@/queries/sshKeyQueries';
 
 type SSHKeyCardProps = {
@@ -12,19 +9,6 @@ type SSHKeyCardProps = {
 };
 
 export default function SSHKeyCard({ keyInfo }: SSHKeyCardProps) {
-  const authorizeMutation = useAuthorizeSSHKeyMutation();
-
-  const handleAuthorize = async () => {
-    try {
-      await authorizeMutation.mutateAsync({ key_name: keyInfo.filename });
-      toast.success(`Key "${keyInfo.filename}" added to authorized_keys`);
-    } catch (error) {
-      toast.error(
-        `Failed to authorize key: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-  };
-
   // Truncate fingerprint for display
   const shortFingerprint =
     keyInfo.fingerprint.replace('SHA256:', '').slice(0, 16) + '...';
@@ -57,20 +41,7 @@ export default function SSHKeyCard({ keyInfo }: SSHKeyCardProps) {
             <Chip color="success" size="sm" variant="ghost">
               Authorized
             </Chip>
-          ) : (
-            <Button
-              disabled={authorizeMutation.isPending}
-              onClick={handleAuthorize}
-              size="sm"
-              variant="outline"
-            >
-              {authorizeMutation.isPending ? (
-                <Spinner text="Adding..." />
-              ) : (
-                'Add to authorized_keys'
-              )}
-            </Button>
-          )}
+          ) : null}
 
           <CopyTooltip
             primaryLabel="Copy SSH Public Key"

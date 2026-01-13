@@ -5,7 +5,6 @@ in a user's ~/.ssh directory.
 """
 
 import os
-import re
 import subprocess
 from typing import List, Optional
 
@@ -80,43 +79,10 @@ class SSHKeyListResponse(BaseModel):
     keys: List[SSHKeyInfo] = Field(description="List of SSH keys")
 
 
-class GenerateKeyRequest(BaseModel):
-    """Request to generate a new SSH key"""
-    key_name: str = Field(description="Name for the new key file (without extension)")
-    comment: Optional[str] = Field(default=None, description="Optional comment for the key")
-    add_to_authorized_keys: bool = Field(default=True, description="Whether to add the key to authorized_keys")
-
-
 class GenerateKeyResponse(BaseModel):
     """Response after generating an SSH key"""
     key: SSHKeyInfo = Field(description="The generated key info")
     message: str = Field(description="Status message")
-
-
-# Regex pattern for valid key names (alphanumeric, underscore, hyphen)
-KEY_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9_-]+$')
-
-
-def validate_key_name(key_name: str) -> None:
-    """Validate that a key name is safe and doesn't allow path traversal.
-
-    Args:
-        key_name: The key name to validate
-
-    Raises:
-        ValueError: If the key name is invalid
-    """
-    if not key_name:
-        raise ValueError("Key name cannot be empty")
-
-    if not KEY_NAME_PATTERN.match(key_name):
-        raise ValueError("Key name can only contain letters, numbers, underscores, and hyphens")
-
-    if key_name.startswith('.') or key_name.startswith('-'):
-        raise ValueError("Key name cannot start with '.' or '-'")
-
-    if len(key_name) > 100:
-        raise ValueError("Key name is too long (max 100 characters)")
 
 
 def get_ssh_directory() -> str:
@@ -308,34 +274,31 @@ def list_ssh_keys(ssh_dir: str) -> List[SSHKeyInfo]:
     return keys
 
 
-def generate_ssh_key(ssh_dir: str, key_name: str, comment: Optional[str] = None) -> SSHKeyInfo:
-    """Generate a new ed25519 SSH key.
+def generate_ssh_key(ssh_dir: str) -> SSHKeyInfo:
+    """Generate the default ed25519 SSH key (id_ed25519).
 
     Args:
         ssh_dir: Path to the .ssh directory
-        key_name: Name for the key file (without extension)
-        comment: Optional comment for the key
 
     Returns:
         SSHKeyInfo for the generated key
 
     Raises:
-        ValueError: If the key name is invalid or key already exists
+        ValueError: If the key already exists
         RuntimeError: If key generation fails
     """
-    # Validate key name
-    validate_key_name(key_name)
+    key_name = "id_ed25519"
 
     # Ensure .ssh directory exists
     ensure_ssh_directory_exists(ssh_dir)
 
-    # Build and validate key paths (prevents path traversal)
-    key_path = safe_join_path(ssh_dir, key_name)
-    pubkey_path = safe_join_path(ssh_dir, f"{key_name}.pub")
+    # Build key paths
+    key_path = os.path.join(ssh_dir, key_name)
+    pubkey_path = os.path.join(ssh_dir, f"{key_name}.pub")
 
     # Check if key already exists
     if os.path.exists(key_path) or os.path.exists(pubkey_path):
-        raise ValueError(f"Key '{key_name}' already exists")
+        raise ValueError(f"SSH key '{key_name}' already exists")
 
     # Build ssh-keygen command
     cmd = [
@@ -344,9 +307,6 @@ def generate_ssh_key(ssh_dir: str, key_name: str, comment: Optional[str] = None)
         '-N', '',  # No passphrase
         '-f', key_path,
     ]
-
-    if comment:
-        cmd.extend(['-C', comment])
 
     logger.info(f"Generating SSH key: {key_name}")
 
