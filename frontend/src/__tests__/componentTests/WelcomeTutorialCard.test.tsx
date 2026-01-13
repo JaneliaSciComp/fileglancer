@@ -44,7 +44,9 @@ describe('WelcomeTutorialCard', () => {
   it('checkbox reflects showTutorial preference state', async () => {
     render(<WelcomeTutorialCard />, { initialEntries: ['/browse'] });
 
-    const checkbox = await screen.findByLabelText(/hide this card.*preferences/i);
+    const checkbox = await screen.findByLabelText(
+      /hide this card.*preferences/i
+    );
 
     // showTutorial is true by default, so checkbox should be unchecked (inverse)
     expect(checkbox).not.toBeChecked();
@@ -54,7 +56,9 @@ describe('WelcomeTutorialCard', () => {
     render(<WelcomeTutorialCard />, { initialEntries: ['/browse'] });
 
     const user = userEvent.setup();
-    const checkbox = await screen.findByLabelText(/hide this card.*preferences/i);
+    const checkbox = await screen.findByLabelText(
+      /hide this card.*preferences/i
+    );
 
     await user.click(checkbox);
 
@@ -78,7 +82,9 @@ describe('WelcomeTutorialCard', () => {
     render(<WelcomeTutorialCard />, { initialEntries: ['/browse'] });
 
     const user = userEvent.setup();
-    const checkbox = await screen.findByLabelText(/hide this card.*preferences/i);
+    const checkbox = await screen.findByLabelText(
+      /hide this card.*preferences/i
+    );
 
     await user.click(checkbox);
 
