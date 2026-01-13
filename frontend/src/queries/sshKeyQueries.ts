@@ -108,3 +108,48 @@ export function useGenerateSSHKeyMutation(): UseMutationResult<
     }
   });
 }
+
+/**
+ * Response from the authorize SSH key endpoint
+ */
+type AuthorizeKeyResponse = {
+  message: string;
+};
+
+/**
+ * Mutation hook for adding the SSH key to authorized_keys
+ *
+ * @example
+ * const mutation = useAuthorizeSSHKeyMutation();
+ * mutation.mutate();
+ */
+export function useAuthorizeSSHKeyMutation(): UseMutationResult<
+  AuthorizeKeyResponse,
+  Error,
+  void
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const response = await sendFetchRequest(
+        '/api/ssh-keys/authorize',
+        'POST'
+      );
+
+      const body = await getResponseJsonOrError(response);
+
+      if (!response.ok) {
+        throwResponseNotOkError(response, body);
+      }
+
+      return body as AuthorizeKeyResponse;
+    },
+    onSuccess: () => {
+      // Invalidate and refetch the list to update is_authorized status
+      queryClient.invalidateQueries({
+        queryKey: sshKeyQueryKeys.all
+      });
+    }
+  });
+}

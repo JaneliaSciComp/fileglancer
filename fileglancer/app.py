@@ -916,6 +916,37 @@ def create_app(settings):
                 logger.error(f"Error generating SSH key for {username}: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
 
+    @app.post("/api/ssh-keys/authorize",
+              description="Add the default SSH key to authorized_keys")
+    async def authorize_ssh_key(username: str = Depends(get_current_user)):
+        """Add the id_ed25519 key to authorized_keys"""
+        with _get_user_context(username):
+            try:
+                ssh_dir = sshkeys.get_ssh_directory()
+                pubkey_path = os.path.join(ssh_dir, "id_ed25519.pub")
+
+                if not os.path.exists(pubkey_path):
+                    raise HTTPException(status_code=404, detail="SSH key not found")
+
+                # Read the public key
+                with open(pubkey_path, 'r') as f:
+                    public_key = f.read().strip()
+
+                # Add to authorized_keys
+                sshkeys.add_to_authorized_keys(ssh_dir, public_key)
+
+                return {"message": "Key added to authorized_keys"}
+
+            except HTTPException:
+                raise
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            except RuntimeError as e:
+                raise HTTPException(status_code=500, detail=str(e))
+            except Exception as e:
+                logger.error(f"Error authorizing SSH key for {username}: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
     # File content endpoint
     @app.head("/api/content/{path_name:path}")
     async def head_file_content(path_name: str,

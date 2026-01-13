@@ -1,7 +1,10 @@
-import { Card, Chip, Typography } from '@material-tailwind/react';
-import { HiOutlineClipboardCopy, HiOutlineKey } from 'react-icons/hi';
+import { Button, Card, Chip, Typography } from '@material-tailwind/react';
+import { HiOutlineClipboardCopy, HiOutlineKey, HiOutlinePlus } from 'react-icons/hi';
+import toast from 'react-hot-toast';
 
 import CopyTooltip from '@/components/ui/widgets/CopyTooltip';
+import { Spinner } from '@/components/ui/widgets/Loaders';
+import { useAuthorizeSSHKeyMutation } from '@/queries/sshKeyQueries';
 import type { SSHKeyInfo } from '@/queries/sshKeyQueries';
 
 type SSHKeyCardProps = {
@@ -9,9 +12,22 @@ type SSHKeyCardProps = {
 };
 
 export default function SSHKeyCard({ keyInfo }: SSHKeyCardProps) {
+  const authorizeMutation = useAuthorizeSSHKeyMutation();
+
   // Truncate fingerprint for display
   const shortFingerprint =
     keyInfo.fingerprint.replace('SHA256:', '').slice(0, 16) + '...';
+
+  const handleAuthorize = async () => {
+    try {
+      const result = await authorizeMutation.mutateAsync();
+      toast.success(result.message);
+    } catch (error) {
+      toast.error(
+        `Failed to authorize key: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  };
 
   return (
     <Card className="p-4 bg-surface-light">
@@ -41,7 +57,24 @@ export default function SSHKeyCard({ keyInfo }: SSHKeyCardProps) {
             <Chip color="success" size="sm" variant="ghost">
               Authorized
             </Chip>
-          ) : null}
+          ) : (
+            <Button
+              color="warning"
+              disabled={authorizeMutation.isPending}
+              onClick={handleAuthorize}
+              size="sm"
+              variant="outline"
+            >
+              {authorizeMutation.isPending ? (
+                <Spinner customClasses="border-warning" text="Adding..." />
+              ) : (
+                <>
+                  <HiOutlinePlus className="icon-default mr-1" />
+                  Add to authorized_keys
+                </>
+              )}
+            </Button>
+          )}
 
           <CopyTooltip
             primaryLabel="Copy SSH Public Key"
