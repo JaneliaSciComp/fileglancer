@@ -33,10 +33,10 @@ describe('WelcomeTutorialCard', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByLabelText(/hide this card.*preferences/i)
+        screen.getByLabelText(/hide this card.*help page/i)
       ).toBeInTheDocument();
       expect(
-        screen.getByText(/you can always start tutorials from the help page/i)
+        screen.getByText(/you can always access tutorials from the help page/i)
       ).toBeInTheDocument();
     });
   });
@@ -45,7 +45,7 @@ describe('WelcomeTutorialCard', () => {
     render(<WelcomeTutorialCard />, { initialEntries: ['/browse'] });
 
     const checkbox = await screen.findByLabelText(
-      /hide this card.*preferences/i
+      /hide this card.*help page/i
     );
 
     // showTutorial is true by default, so checkbox should be unchecked (inverse)
@@ -57,14 +57,14 @@ describe('WelcomeTutorialCard', () => {
 
     const user = userEvent.setup();
     const checkbox = await screen.findByLabelText(
-      /hide this card.*preferences/i
+      /hide this card.*help page/i
     );
 
     await user.click(checkbox);
 
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
-        'Welcome card hidden. Re-enable it anytime in Preferences.'
+        'Welcome card hidden. Access Tutorials from the Help page.'
       );
     });
   });
@@ -83,7 +83,7 @@ describe('WelcomeTutorialCard', () => {
 
     const user = userEvent.setup();
     const checkbox = await screen.findByLabelText(
-      /hide this card.*preferences/i
+      /hide this card.*help page/i
     );
 
     await user.click(checkbox);
