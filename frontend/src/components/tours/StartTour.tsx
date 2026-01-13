@@ -49,6 +49,62 @@ export default function StartTour({
 
   const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
 
+  // Helper to set up navigation input step with dynamic text including sample path
+  const setupNavigationInputStep = (tour: Tour) => {
+    const navInputStep = tour.getById('nav-navigation-input');
+    if (navInputStep) {
+      let samplePath = '';
+      if (isJaneliaFilesystem) {
+        samplePath = '/nrs/opendata';
+      } else {
+        const firstZone = Object.values(zonesAndFspQuery.data || {}).find(
+          item => 'fileSharePaths' in item
+        ) as Zone | undefined;
+        if (firstZone && firstZone.fileSharePaths.length > 0) {
+          const firstFsp = firstZone.fileSharePaths[0];
+          samplePath = firstFsp.mount_path;
+        }
+      }
+
+      navInputStep.updateStepOptions({
+        text: `Use this navigation bar to quickly jump to any path in the file system. You can type or paste a path here. Try copying this path: <code>${samplePath}</code> and hitting "Go."`
+      });
+
+      // Set up navigation detection to auto-advance when user navigates
+      let navigationCheckInterval: NodeJS.Timeout | null = null;
+      const startPath = window.location.pathname;
+
+      const checkForNavigation = () => {
+        const currentPath = window.location.pathname;
+        // If user navigated away from the starting /browse page
+        if (currentPath !== startPath && currentPath.startsWith('/browse/')) {
+          if (navigationCheckInterval) {
+            clearInterval(navigationCheckInterval);
+            navigationCheckInterval = null;
+          }
+          // Auto-advance to next step
+          if (tour.getCurrentStep()?.id === 'nav-navigation-input') {
+            tour.next();
+          }
+        }
+      };
+
+      // Add event listener when step is shown
+      navInputStep.on('show', () => {
+        // Start checking for navigation every 500ms
+        navigationCheckInterval = setInterval(checkForNavigation, 500);
+      });
+
+      // Clean up interval when step is hidden
+      navInputStep.on('hide', () => {
+        if (navigationCheckInterval) {
+          clearInterval(navigationCheckInterval);
+          navigationCheckInterval = null;
+        }
+      });
+    }
+  };
+
   // Helper to set up navigation sidebar step with conditional navigation
   const setupNavigationSidebarStep = (tour: Tour) => {
     const navSidebarStep = tour.getById('nav-sidebar');
@@ -177,6 +233,7 @@ export default function StartTour({
           const currentTour = shepherd.activeTour as Tour;
           navigate('/browse');
           await waitForElement('[data-tour="navigation-input"]');
+          setupNavigationInputStep(currentTour);
           setupNavigationSidebarStep(currentTour);
           setupCompletionButtons(currentTour);
           currentTour.show('nav-navigation-input');
