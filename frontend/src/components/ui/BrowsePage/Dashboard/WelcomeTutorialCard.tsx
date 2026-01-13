@@ -24,8 +24,7 @@ export default function WelcomeTutorialCard() {
       <div className="grid grid-cols-3 gap-6 p-6">
         <Typography className="text-foreground col-span-2">
           Fileglancer helps you browse, visualize, and share scientific imaging
-          data on network file systems. Get started with a guided tour to learn
-          the basics!
+          data. Get started with a guided tour to learn the basics!
         </Typography>
 
         <StartTour>Start Tour</StartTour>

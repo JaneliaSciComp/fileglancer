@@ -4,7 +4,6 @@ import { default as log } from '@/logger';
 import type { OutletContextType } from '@/layouts/BrowseLayout';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
-import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
 import FileBrowser from './ui/BrowsePage/FileBrowser';
 import Toolbar from './ui/BrowsePage/Toolbar';
 import RenameDialog from './ui/Dialogs/Rename';
@@ -30,8 +29,7 @@ export default function Browse() {
   } = useOutletContext<OutletContextType>();
 
   const { fspName } = useFileBrowserContext();
-  const { recentlyViewedFolders, showTutorial } = usePreferencesContext();
-  const { allProxiedPathsQuery } = useProxiedPathContext();
+  const { showTutorial } = usePreferencesContext();
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
@@ -123,13 +121,9 @@ export default function Browse() {
             <div
               className={`flex gap-6 ${componentWidth > 800 ? '' : 'flex-col'}`}
             >
-              {recentlyViewedFolders.length === 0 ? null : (
-                <RecentlyViewedCard />
-              )}
-              {allProxiedPathsQuery.isSuccess &&
-              allProxiedPathsQuery.data.length === 0 ? null : (
-                <RecentDataLinksCard />
-              )}
+              <RecentlyViewedCard />
+
+              <RecentDataLinksCard />
             </div>
           </div>
         ) : (

@@ -28,6 +28,16 @@ export default function RecentlyViewedCard() {
             {zonesAndFspQuery.error.message}
           </Typography>
         </div>
+      ) : recentlyViewedFolders.length === 0 ? (
+        <div className="px-6 pt-2 flex flex-col gap-4">
+          <Typography className="text-muted-foreground">
+            No recently viewed folders.
+          </Typography>
+          <Typography className="text-muted-foreground">
+            Start navigating the file system to see your recently viewed folders
+            appear here.
+          </Typography>
+        </div>
       ) : (
         <ul>
           {recentlyViewedFolders.map((item, index) => {
