@@ -83,6 +83,7 @@ function RootRedirect() {
 
 const AppComponent = () => {
   const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
+  const sshKeysEnabled = import.meta.env.VITE_ENABLE_SSH_KEYS === 'true';
 
   return (
     <BrowserRouter>
@@ -126,14 +127,16 @@ const AppComponent = () => {
               }
               path="notifications"
             />
-            <Route
-              element={
-                <RequireAuth>
-                  <SSHKeys />
-                </RequireAuth>
-              }
-              path="ssh-keys"
-            />
+            {sshKeysEnabled ? (
+              <Route
+                element={
+                  <RequireAuth>
+                    <SSHKeys />
+                  </RequireAuth>
+                }
+                path="ssh-keys"
+              />
+            ) : null}
           </Route>
           <Route
             element={

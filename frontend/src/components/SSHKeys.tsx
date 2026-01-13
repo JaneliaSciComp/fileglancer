@@ -29,26 +29,11 @@ export default function SSHKeys() {
       <Card className="mb-6 p-4 bg-info/10 border border-info/20">
         <div className="flex gap-3">
           <HiOutlineInformationCircle className="icon-large text-info flex-shrink-0" />
-          <div>
-            <Typography className="font-semibold text-foreground mb-1">
-              What are SSH keys?
-            </Typography>
-            <Typography className="text-secondary text-sm">
-              SSH keys allow you to securely connect to cluster nodes without
-              entering a password. When you generate a key, it is automatically
-              added to your{' '}
-              <span className="font-mono text-xs bg-surface px-1 rounded">
-                authorized_keys
-              </span>{' '}
-              file, enabling SSH access to any node that shares your home
-              directory.
-            </Typography>
-            <Typography className="text-secondary text-sm mt-2">
-              To work with Seqera Platform, click{' '}
-              <span className="font-semibold">Copy Private Key</span> and paste
-              it into the Seqera Platform credentials settings.
-            </Typography>
-          </div>
+          <Typography className="text-secondary text-sm">
+            SSH keys allow you to securely connect to cluster nodes without
+            entering a password. Specifically, you need an ed25519 SSH key to
+            use Seqera Platform to run pipelines on the cluster.
+          </Typography>
         </div>
       </Card>
 
@@ -82,8 +67,8 @@ export default function SSHKeys() {
             No ed25519 key found
           </Typography>
           <Typography className="text-secondary mb-4">
-            Generate an ed25519 SSH key to enable passwordless access to cluster nodes
-            and integration with Seqera Platform.
+            Generate an ed25519 SSH key to enable passwordless access to cluster
+            nodes and integration with Seqera Platform.
           </Typography>
           <Button onClick={() => setShowGenerateDialog(true)}>
             <HiOutlinePlus className="icon-default mr-1" />
