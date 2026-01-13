@@ -1,6 +1,6 @@
 import type { StepOptions } from 'shepherd.js';
 
-// Helper to create common button configs
+// Common button configs
 const nextButton = {
   text: 'Next',
   action: function (this: any) {
@@ -8,7 +8,9 @@ const nextButton = {
   }
 };
 
-const backButton = {
+// Exported for reuse in StartTour.tsx
+// Don't need to export next button as it's dynamically replaced in StartTour
+export const backButton = {
   text: 'Back',
   action: function (this: any) {
     return this.back();
@@ -16,7 +18,7 @@ const backButton = {
   classes: 'shepherd-button-secondary'
 };
 
-const exitButton = {
+export const exitButton = {
   text: 'Exit Tour',
   action: function (this: any) {
     return this.cancel();

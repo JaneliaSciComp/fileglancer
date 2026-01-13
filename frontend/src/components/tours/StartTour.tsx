@@ -3,7 +3,7 @@ import type { ButtonProps } from '@material-tailwind/react';
 import { useNavigate } from 'react-router';
 import { useShepherd } from 'react-shepherd';
 import type { Tour } from 'shepherd.js';
-import { tourSteps } from './tourSteps';
+import { tourSteps, backButton, exitButton } from './tourSteps';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import type { Zone } from '@/shared.types';
 
@@ -55,13 +55,7 @@ export default function StartTour({
     if (navSidebarStep) {
       navSidebarStep.updateStepOptions({
         buttons: [
-          {
-            text: 'Back',
-            action: function (this: any) {
-              return this.back();
-            },
-            classes: 'shepherd-button-secondary'
-          },
+          backButton,
           {
             text: 'Next',
             action: async function (this: any) {
@@ -84,13 +78,7 @@ export default function StartTour({
               return this.next();
             }
           },
-          {
-            text: 'Exit Tour',
-            action: function (this: any) {
-              return this.cancel();
-            },
-            classes: 'shepherd-button-secondary'
-          }
+          exitButton
         ]
       });
     }
@@ -102,13 +90,7 @@ export default function StartTour({
     if (conversionStartStep) {
       conversionStartStep.updateStepOptions({
         buttons: [
-          {
-            text: 'Back',
-            action: function (this: any) {
-              return this.back();
-            },
-            classes: 'shepherd-button-secondary'
-          },
+          backButton,
           {
             text: 'Next',
             action: async function (this: any) {
@@ -122,13 +104,7 @@ export default function StartTour({
               return this.next();
             }
           },
-          {
-            text: 'Exit Tour',
-            action: function (this: any) {
-              return this.cancel();
-            },
-            classes: 'shepherd-button-secondary'
-          }
+          exitButton
         ]
       });
     }
@@ -140,13 +116,7 @@ export default function StartTour({
     if (conversionPropertiesStep) {
       conversionPropertiesStep.updateStepOptions({
         buttons: [
-          {
-            text: 'Back',
-            action: function (this: any) {
-              return this.back();
-            },
-            classes: 'shepherd-button-secondary'
-          },
+          backButton,
           {
             text: 'Next',
             action: async function (this: any) {
@@ -155,13 +125,7 @@ export default function StartTour({
               return this.next();
             }
           },
-          {
-            text: 'Exit Tour',
-            action: function (this: any) {
-              return this.cancel();
-            },
-            classes: 'shepherd-button-secondary'
-          }
+          exitButton
         ]
       });
     }
@@ -179,15 +143,8 @@ export default function StartTour({
     completionStepIds.forEach(stepId => {
       const step = tour.getById(stepId);
       if (step) {
-        // Get existing buttons to preserve the back button behavior
         const buttons = [
-          {
-            text: 'Back',
-            action: function (this: any) {
-              return this.back();
-            },
-            classes: 'shepherd-button-secondary'
-          },
+          backButton,
           {
             text: 'Take Another Tour',
             action: function (this: any) {
@@ -198,13 +155,7 @@ export default function StartTour({
               currentTour.show('choose-workflow');
             }
           },
-          {
-            text: 'Exit Tour',
-            action: function (this: any) {
-              return this.cancel();
-            },
-            classes: 'shepherd-button-secondary'
-          }
+          exitButton
         ];
 
         step.updateStepOptions({ buttons });
