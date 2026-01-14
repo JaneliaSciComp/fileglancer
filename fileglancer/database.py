@@ -512,6 +512,8 @@ def find_fsp_from_absolute_path(session: Session, absolute_path: str) -> Optiona
             # Calculate the relative subpath
             if normalized_path == expanded_mount_path:
                 subpath = ""
+                logger.debug(f"Found exact match for path: {absolute_path} in fsp: {fsp.name} with subpath: {subpath}")
+                return (fsp, subpath)
             else:
                 # Ensure we're matching on a directory boundary
                 remainder = normalized_path[len(expanded_mount_path):]
