@@ -18,6 +18,17 @@ from .model import FileSharePath
 # Default buffer size for streaming file contents
 DEFAULT_BUFFER_SIZE = 8192
 
+
+class RootCheckError(ValueError):
+    """
+    Raised when a path attempts to escape the root directory of a Filestore.
+    This exception signals that the path may be an absolute path that belongs
+    to a different file share and should trigger fsp resolution logic.
+    """
+    def __init__(self, message: str, full_path: str):
+        super().__init__(message)
+        self.full_path = full_path
+
 class FileInfo(BaseModel):
     """
     A class that represents a file or directory in a Filestore.
@@ -163,7 +174,7 @@ class Filestore:
             str: The full path to the file or directory.
 
         Raises:
-            ValueError: If path attempts to escape root directory
+            RootCheckError: If path attempts to escape root directory
         """
         if path is None or path == "":
             full_path = self.root_path
@@ -174,7 +185,7 @@ class Filestore:
 
             # Ensure the resolved path is within the resolved root
             if not full_path.startswith(root_real + os.sep) and full_path != root_real:
-                raise ValueError(f"Path ({full_path}) attempts to escape root directory ({root_real})")
+                raise RootCheckError(f"Path ({full_path}) attempts to escape root directory ({root_real})", full_path)
         return full_path
 
 
