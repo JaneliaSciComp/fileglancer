@@ -1,41 +1,56 @@
 import os
+import tempfile
+import shutil
 import yaml
 import pytest
 from fastapi.testclient import TestClient
 from fileglancer.settings import Settings
 from fileglancer.app import create_app, get_current_user
-from fileglancer.database import create_engine, sessionmaker, Base, FileSharePathDB
+from fileglancer.database import create_engine, sessionmaker, Base, FileSharePathDB, dispose_engine
 
 TEST_USERNAME = "testuser"
 
 @pytest.fixture
-def template_settings():
+def temp_dir():
+    """Create a temporary directory for test database and files"""
+    temp_dir = tempfile.mkdtemp()
+    yield temp_dir
+    shutil.rmtree(temp_dir)
+
+@pytest.fixture
+def template_settings(temp_dir):
     """Load settings from the docs/config.yaml.template file"""
     template_path = os.path.join(os.path.dirname(__file__), "..", "docs", "config.yaml.template")
     with open(template_path, "r") as f:
         config_data = yaml.safe_load(f)
-    
+
     # We need to provide a valid external_proxy_url if it's required by validation
     # The template has http://localhost:7878/files which should be fine
-    
-    # Use a memory database for testing
-    config_data['db_url'] = "sqlite:///:memory:"
-    
+
+    # Use a file-based database for testing. In-memory SQLite (sqlite:///:memory:)
+    # creates a separate database per create_engine() call, so data added by the
+    # test fixture would not be visible to the app which uses _get_engine().
+    db_path = os.path.join(temp_dir, "test.db")
+    config_data['db_url'] = f"sqlite:///{db_path}"
+
+    # Don't use file_share_mounts from template - we'll add test data to DB instead
+    config_data['file_share_mounts'] = []
+
     # Ensure use_access_flags is False (this is what we are testing is the default)
     # We don't explicitly set it here because we want to see what's in the template.
     # But if the template HAS it, yaml.safe_load will grab it.
-    
+
     return Settings(**config_data)
 
 @pytest.fixture
-def template_app(template_settings):
+def template_app(template_settings, temp_dir):
     """Create a FastAPI app using the template settings"""
-    # Initialize the in-memory database
+    # Initialize the database
     engine = create_engine(template_settings.db_url)
     Session = sessionmaker(bind=engine)
     db_session = Session()
     Base.metadata.create_all(engine)
-    
+
     # Add a default file share path so we can test viewing files
     # By default Settings uses ["~/"] which is hard to test deterministically
     # So we'll add one to the DB
@@ -44,27 +59,28 @@ def template_app(template_settings):
         zone="testzone",
         group="testgroup",
         storage="local",
-        mount_path="/tmp", # Use /tmp as a safe bet for a directory that exists
+        mount_path=temp_dir,
         mac_path="smb://tmp",
         windows_path="\\\\tmp",
         linux_path="/tmp"
     )
     db_session.add(fsp)
     db_session.commit()
-    
+
     app = create_app(template_settings)
-    
+
     # Override authentication
     def override_get_current_user():
         return TEST_USERNAME
-    
+
     app.dependency_overrides[get_current_user] = override_get_current_user
-    
+
     yield app
-    
+
     app.dependency_overrides.clear()
     db_session.close()
     engine.dispose()
+    dispose_engine(template_settings.db_url)
 
 @pytest.fixture
 def client(template_app):
