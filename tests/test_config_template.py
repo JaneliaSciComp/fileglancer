@@ -30,41 +30,59 @@ def template_settings():
 @pytest.fixture
 def template_app(template_settings):
     """Create a FastAPI app using the template settings"""
-    # Initialize the in-memory database
-    engine = create_engine(template_settings.db_url)
-    Session = sessionmaker(bind=engine)
-    db_session = Session()
-    Base.metadata.create_all(engine)
+    import fileglancer.database
+
+    # Dispose of any cached engines for this database URL
+    fileglancer.database.dispose_engine(template_settings.db_url)
+
+    # For in-memory databases, use Base.metadata.create_all instead of Alembic migrations
+    # because Alembic creates a separate in-memory database
+    # Then, when trying to commit to the db later, it fails because it's committing to a 
+    # different database where the tables don't exist.
+    engine = fileglancer.database._get_engine(template_settings.db_url)
+    fileglancer.database.Base.metadata.create_all(engine)
+
+    # Mark migrations as run to prevent double initialization via create_app 
+    # > initialize_database > run_alembic_upgrade
+    fileglancer.database._migrations_run = True  
     
-    # Add a default file share path so we can test viewing files
-    # By default Settings uses ["~/"] which is hard to test deterministically
-    # So we'll add one to the DB
-    fsp = FileSharePathDB(
-        name="test_home",
-        zone="testzone",
-        group="testgroup",
-        storage="local",
-        mount_path="/tmp", # Use /tmp as a safe bet for a directory that exists
-        mac_path="smb://tmp",
-        windows_path="\\\\tmp",
-        linux_path="/tmp"
-    )
-    db_session.add(fsp)
-    db_session.commit()
-    
+    # Create the app
     app = create_app(template_settings)
-    
+
     # Override authentication
     def override_get_current_user():
         return TEST_USERNAME
-    
+
     app.dependency_overrides[get_current_user] = override_get_current_user
-    
+
+    # Now add test data after the app has initialized the database
+    session = fileglancer.database.get_db_session(template_settings.db_url)
+    try:
+        # Add a default file share path so we can test viewing files
+        # By default Settings uses ["~/"] which is hard to test deterministically
+        # So we'll add one to the DB
+        fsp = FileSharePathDB(
+            name="test_home",
+            zone="testzone",
+            group="testgroup",
+            storage="local",
+            mount_path="/tmp", # Use /tmp as a safe bet for a directory that exists
+            mac_path="smb://tmp",
+            windows_path="\\\\tmp",
+            linux_path="/tmp"
+        )
+        session.add(fsp)
+        session.commit()
+    finally:
+        session.close()
+
     yield app
-    
+
     app.dependency_overrides.clear()
-    db_session.close()
-    engine.dispose()
+
+    # Clean up: dispose the engine and reset the flag
+    fileglancer.database.dispose_engine(template_settings.db_url)
+    fileglancer.database._migrations_run = False
 
 @pytest.fixture
 def client(template_app):
