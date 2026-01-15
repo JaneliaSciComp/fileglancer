@@ -33,7 +33,7 @@ from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
 from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header
 from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext, UserContextConfigurationError
-from fileglancer.filestore import Filestore
+from fileglancer.filestore import Filestore, RootCheckError
 from fileglancer.log import AccessLogMiddleware
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response
@@ -937,6 +937,30 @@ def create_app(settings):
                 full_path = filestore._check_path_in_root(subpath)
                 file_handle = open(full_path, 'rb')
 
+            except RootCheckError as e:
+                # Path attempts to escape root directory - try to find a valid fsp for this absolute path
+                logger.info(f"RootCheckError caught for {filestore_name}/{subpath}: {e}")
+
+                # Use the full_path from the exception
+                full_path = e.full_path
+
+                with db.get_db_session(settings.db_url) as session:
+                    match = db.find_fsp_from_absolute_path(session, full_path)
+
+                if match:
+                    fsp, relative_subpath = match
+                    # Construct the correct URL
+                    if relative_subpath:
+                        redirect_url = f"/api/content/{fsp.name}?subpath={relative_subpath}"
+                    else:
+                        redirect_url = f"/api/content/{fsp.name}"
+
+                    logger.info(f"Redirecting from /api/content/{filestore_name}?subpath={subpath} to {redirect_url}")
+                    return RedirectResponse(url=redirect_url, status_code=307)
+
+                # If no match found, return the original error message
+                logger.error(f"No valid file share found for path: {full_path}")
+                raise HTTPException(status_code=400, detail=str(e))
             except FileNotFoundError:
                 logger.error(f"File not found in {filestore_name}: {subpath}")
                 raise HTTPException(status_code=404, detail="File or directory not found")
@@ -1030,6 +1054,29 @@ def create_app(settings):
 
                 return result
 
+            except RootCheckError as e:
+                # Path attempts to escape root directory - try to find a valid fsp for this absolute path
+                logger.info(f"RootCheckError caught for {filestore_name}/{subpath}: {e}")
+
+                full_path = e.full_path
+
+                with db.get_db_session(settings.db_url) as session:
+                    match = db.find_fsp_from_absolute_path(session, full_path)
+
+                if match:
+                    fsp, relative_subpath = match
+                    # Construct the correct URL
+                    if relative_subpath:
+                        redirect_url = f"/api/files/{fsp.name}?subpath={relative_subpath}"
+                    else:
+                        redirect_url = f"/api/files/{fsp.name}"
+
+                    logger.info(f"Redirecting from /api/files/{filestore_name}?subpath={subpath} to {redirect_url}")
+                    return RedirectResponse(url=redirect_url, status_code=307)
+
+                # If no match found, return the original error message
+                logger.error(f"No valid file share found for path: {full_path}")
+                raise HTTPException(status_code=400, detail=str(e))
             except FileNotFoundError:
                 logger.error(f"File or directory not found: {subpath}")
                 raise HTTPException(status_code=404, detail="File or directory not found")
