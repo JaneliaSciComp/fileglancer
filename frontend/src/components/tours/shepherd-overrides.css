@@ -6,7 +6,7 @@
 /* Override default Shepherd theme */
 .shepherd-element {
   max-width: 600px;
-  min-width: fit-content;
+  width: fit-content;
 }
 
 /* Style the tour content container like FgDialog */
