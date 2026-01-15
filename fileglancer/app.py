@@ -35,6 +35,7 @@ from fileglancer.utils import format_timestamp, guess_content_type, parse_range_
 from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext, UserContextConfigurationError
 from fileglancer.filestore import Filestore, RootCheckError
 from fileglancer.log import AccessLogMiddleware
+from fileglancer import sshkeys
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response
 from x2s3.client_file import FileProxyClient
@@ -861,6 +862,115 @@ def create_app(settings):
                 "homeDirectoryName": home_directory_name,
                 "groups": user_groups,
             }
+
+    # SSH Key Management endpoints
+    @app.get("/api/ssh-keys", response_model=sshkeys.SSHKeyListResponse,
+             description="List all SSH keys in the user's ~/.ssh directory")
+    async def list_ssh_keys(username: str = Depends(get_current_user)):
+        """List SSH keys for the authenticated user"""
+        with _get_user_context(username):
+            try:
+                ssh_dir = sshkeys.get_ssh_directory()
+                keys = sshkeys.list_ssh_keys(ssh_dir)
+                return sshkeys.SSHKeyListResponse(keys=keys)
+            except Exception as e:
+                logger.error(f"Error listing SSH keys for {username}: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/ssh-keys", response_model=sshkeys.GenerateKeyResponse,
+              description="Generate the default ed25519 SSH key (id_ed25519)")
+    async def generate_ssh_key(
+        request: sshkeys.GenerateKeyRequest = Body(default=sshkeys.GenerateKeyRequest()),
+        username: str = Depends(get_current_user)
+    ):
+        """Generate the default SSH key (id_ed25519) and add it to authorized_keys"""
+        with _get_user_context(username):
+            try:
+                ssh_dir = sshkeys.get_ssh_directory()
+                key_info = sshkeys.generate_ssh_key(ssh_dir, request.passphrase)
+
+                # Read public key content to add to authorized_keys
+                pubkey_path = os.path.join(ssh_dir, f"{key_info.filename}.pub")
+                with open(pubkey_path, 'r') as f:
+                    public_key = f.read().strip()
+
+                # Add to authorized_keys
+                sshkeys.add_to_authorized_keys(ssh_dir, public_key)
+
+                # Update the is_authorized flag
+                key_info = sshkeys.SSHKeyInfo(
+                    filename=key_info.filename,
+                    key_type=key_info.key_type,
+                    fingerprint=key_info.fingerprint,
+                    comment=key_info.comment,
+                    has_private_key=key_info.has_private_key,
+                    is_authorized=True
+                )
+
+                return sshkeys.GenerateKeyResponse(
+                    key=key_info,
+                    message="SSH key generated and added to authorized_keys"
+                )
+
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            except RuntimeError as e:
+                raise HTTPException(status_code=500, detail=str(e))
+            except Exception as e:
+                logger.error(f"Error generating SSH key for {username}: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/ssh-keys/authorize",
+              description="Add the default SSH key to authorized_keys")
+    async def authorize_ssh_key(username: str = Depends(get_current_user)):
+        """Add the id_ed25519 key to authorized_keys"""
+        with _get_user_context(username):
+            try:
+                ssh_dir = sshkeys.get_ssh_directory()
+                pubkey_path = os.path.join(ssh_dir, "id_ed25519.pub")
+
+                if not os.path.exists(pubkey_path):
+                    raise HTTPException(status_code=404, detail="SSH key not found")
+
+                # Read the public key
+                with open(pubkey_path, 'r') as f:
+                    public_key = f.read().strip()
+
+                # Add to authorized_keys
+                sshkeys.add_to_authorized_keys(ssh_dir, public_key)
+
+                return {"message": "Key added to authorized_keys"}
+
+            except HTTPException:
+                raise
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            except RuntimeError as e:
+                raise HTTPException(status_code=500, detail=str(e))
+            except Exception as e:
+                logger.error(f"Error authorizing SSH key for {username}: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/ssh-keys/content", response_model=sshkeys.SSHKeyContent,
+             description="Get the content of the default SSH key (id_ed25519)")
+    async def get_ssh_key_content(
+        key_type: str = Query(..., description="Type of key to fetch: 'public' or 'private'"),
+        username: str = Depends(get_current_user)
+    ):
+        """Get the public or private key content for copying"""
+        if key_type not in ("public", "private"):
+            raise HTTPException(status_code=400, detail="key_type must be 'public' or 'private'")
+
+        with _get_user_context(username):
+            try:
+                ssh_dir = sshkeys.get_ssh_directory()
+                return sshkeys.get_key_content(ssh_dir, "id_ed25519", key_type)
+
+            except ValueError as e:
+                raise HTTPException(status_code=404, detail=str(e))
+            except Exception as e:
+                logger.error(f"Error getting SSH key content for {username}: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
 
     # File content endpoint
     @app.head("/api/content/{path_name:path}")

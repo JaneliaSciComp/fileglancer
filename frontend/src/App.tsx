@@ -14,6 +14,7 @@ import Jobs from '@/components/Jobs';
 import Preferences from '@/components/Preferences';
 import Links from '@/components/Links';
 import Notifications from '@/components/Notifications';
+import SSHKeys from '@/components/SSHKeys';
 import ErrorFallback from '@/components/ErrorFallback';
 
 function RequireAuth({ children }: { readonly children: ReactNode }) {
@@ -82,6 +83,7 @@ function RootRedirect() {
 
 const AppComponent = () => {
   const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
+  const sshKeysEnabled = import.meta.env.VITE_ENABLE_SSH_KEYS === 'true';
 
   return (
     <BrowserRouter>
@@ -125,6 +127,16 @@ const AppComponent = () => {
               }
               path="notifications"
             />
+            {sshKeysEnabled ? (
+              <Route
+                element={
+                  <RequireAuth>
+                    <SSHKeys />
+                  </RequireAuth>
+                }
+                path="ssh-keys"
+              />
+            ) : null}
           </Route>
           <Route
             element={
