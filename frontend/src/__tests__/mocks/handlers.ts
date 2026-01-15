@@ -183,10 +183,13 @@ export const handlers = [
   // Default to successful PATCH request for permission changes
   // 204 = successful, no content in response
   http.patch('/api/files/:fspName', () => {
-    return HttpResponse.json(null, { status: 204 });
+    return HttpResponse.json(
+      { message: 'Permissions changed' },
+      { status: 200 }
+    );
   }),
   http.delete('/api/files/:fspName', () => {
-    return HttpResponse.json(null, { status: 200 });
+    return HttpResponse.json({ message: 'Item deleted' }, { status: 200 });
   }),
 
   // Tickets

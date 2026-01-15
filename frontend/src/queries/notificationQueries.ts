@@ -1,5 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { sendFetchRequest } from '@/utils';
+import { sendRequestAndThrowForNotOk } from './queryUtils';
 import { usePageVisibility } from '@/hooks/usePageVisibility';
 
 export type Notification = {
@@ -22,21 +22,13 @@ export function useNotificationsQuery(): UseQueryResult<Notification[], Error> {
   return useQuery({
     queryKey: notificationQueryKeys.all,
     queryFn: async ({ signal }): Promise<Notification[]> => {
-      const response = await sendFetchRequest(
+      const data = (await sendRequestAndThrowForNotOk(
         '/api/notifications',
         'GET',
         undefined,
-        {
-          signal
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch notifications');
-      }
-
-      const data = await response.json();
-      return (data?.notifications as Notification[]) || [];
+        { signal }
+      )) as { notifications: Notification[] };
+      return data.notifications || [];
     },
     refetchInterval: 60000, // 60 seconds
     refetchIntervalInBackground: false, // Pause when page is hidden

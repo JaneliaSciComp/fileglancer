@@ -27,7 +27,7 @@ db_url: sqlite:///fileglancer.db
 # If true, use seteuid/setegid for file access
 # Set to False for local testing
 #
-use_access_flags: True
+use_access_flags: False
 
 #
 # File share mount paths to view in the UI. 

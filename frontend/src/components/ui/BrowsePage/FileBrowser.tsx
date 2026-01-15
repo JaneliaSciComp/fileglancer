@@ -224,11 +224,15 @@ export default function FileBrowser({
         </div>
       ) : fileQuery.isError ? (
         <div className="flex items-center pl-3 py-1">
-          <Typography>{fileQuery.error.message}</Typography>
+          <Typography className="whitespace-pre-line">
+            {fileQuery.error.message}
+          </Typography>
         </div>
       ) : displayFiles.length === 0 && fileQuery.data.errorMessage ? (
         <div className="flex items-center pl-3 py-1">
-          <Typography>{fileQuery.data.errorMessage}</Typography>
+          <Typography className="whitespace-pre-line">
+            {fileQuery.data.errorMessage}
+          </Typography>
         </div>
       ) : fileQuery.data.currentFileOrFolder &&
         !fileQuery.data.currentFileOrFolder.is_dir ? (

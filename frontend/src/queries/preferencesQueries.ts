@@ -7,8 +7,7 @@ import {
   UseMutationResult
 } from '@tanstack/react-query';
 
-import { sendFetchRequest, buildUrl, makeMapKey, HTTPError } from '@/utils';
-import { toHttpError } from '@/utils/errorHandling';
+import { sendFetchRequest, buildUrl, makeMapKey } from '@/utils';
 import type {
   FileSharePath,
   Zone,
@@ -20,6 +19,11 @@ import type {
   FolderPreference,
   FolderFavorite
 } from '@/contexts/PreferencesContext';
+import {
+  getResponseJsonOrError,
+  sendRequestAndThrowForNotOk,
+  throwResponseNotOkError
+} from './queryUtils';
 
 /**
  * Raw API response structure from /api/preference endpoint
@@ -102,22 +106,17 @@ export const preferencesQueryKeys = {
 const fetchPreferences = async (
   signal?: AbortSignal
 ): Promise<PreferencesApiResponse> => {
-  try {
-    const response = await sendFetchRequest(
-      '/api/preference',
-      'GET',
-      undefined,
-      { signal }
-    );
-    if (!response.ok && response.status === 404) {
-      return {}; // No preferences found, return empty object
-    }
-    return await response.json();
-  } catch (error) {
-    if (error instanceof HTTPError && error.responseCode === 404) {
-      return {}; // No preferences found
-    }
-    throw error;
+  const response = await sendFetchRequest('/api/preference', 'GET', undefined, {
+    signal
+  });
+  const data = await getResponseJsonOrError(response);
+  if (response.ok) {
+    return data as PreferencesApiResponse;
+  }
+  if (response.status === 404) {
+    return {}; // No preferences found, return empty object
+  } else {
+    throwResponseNotOkError(response, data);
   }
 };
 
@@ -276,12 +275,7 @@ export function useUpdatePreferenceMutation(): UseMutationResult<
   return useMutation({
     mutationFn: async <T>({ key, value }: UpdatePreferencePayload<T>) => {
       const url = buildUrl('/api/preference/', key, null);
-      const response = await sendFetchRequest(url, 'PUT', { value });
-      if (!response.ok) {
-        throw await toHttpError(response);
-      }
-      // Don't return the Response object - it can't be cloned by devtools
-      return;
+      await sendRequestAndThrowForNotOk(url, 'PUT', { value });
     },
     // Optimistic update for immediate UI feedback
     onMutate: async ({ key, value }) => {
@@ -374,11 +368,7 @@ export function useUpdatePreferenceListMutation(): UseMutationResult<
       }
 
       const url = buildUrl('/api/preference/', preferenceKey, null);
-      const response = await sendFetchRequest(url, 'PUT', { value });
-      if (!response.ok) {
-        throw await toHttpError(response);
-      }
-      // Don't return the Response object - it can't be cloned by devtools
+      await sendRequestAndThrowForNotOk(url, 'PUT', { value });
       return;
     },
     // Optimistic update for immediate UI feedback
