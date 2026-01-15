@@ -381,3 +381,41 @@ def test_find_fsp_from_absolute_path_boundary_check(db_session, temp_dir):
     # This should not match because similar_path is not a subdirectory of temp_dir
     assert result is None or result[0].mount_path != temp_dir
 
+
+def test_find_fsp_from_absolute_path_with_symlink_resolution(db_session, temp_dir):
+    """Test that find_fsp_from_absolute_path resolves symlinks correctly. 
+    This addresses macOS symlink behavior. E.g., /var -> /private/var."""
+    # Create a file share path in temp_dir
+    fsp = FileSharePathDB(
+        name="test_mount",
+        zone="testzone",
+        group="testgroup",
+        storage="local",
+        mount_path=temp_dir,
+        mac_path=temp_dir,
+        windows_path=temp_dir,
+        linux_path=temp_dir
+    )
+    db_session.add(fsp)
+    db_session.commit()
+
+    # Create a subdirectory that we'll link to
+    target_dir = os.path.join(temp_dir, "target")
+    os.makedirs(target_dir, exist_ok=True)
+
+    # Create another temporary directory to hold the symlink
+    symlink_container = tempfile.mkdtemp()
+    try:
+        # Create a symlink pointing to the target directory
+        symlink_path = os.path.join(symlink_container, "link_to_target")
+        os.symlink(target_dir, symlink_path)
+
+        # When we resolve the symlink path, it should find the FSP
+        # This tests that the function uses realpath() to resolve symlinks
+        result = find_fsp_from_absolute_path(db_session, symlink_path)
+        assert result is not None, "Should find FSP through symlink resolution"
+        assert result[0].name == "test_mount"
+        assert result[1] == "target"
+    finally:
+        shutil.rmtree(symlink_container)
+
