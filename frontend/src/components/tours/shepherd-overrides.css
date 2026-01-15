@@ -131,3 +131,28 @@
   background-color: rgb(var(--color-secondary));
   color: rgb(var(--color-surface));
 }
+
+/* Style the arrow pointing to the highlighted element */
+.shepherd-element .shepherd-arrow {
+  content: url(../../assets/arrow-up.svg);
+  display: inline-block;
+  transform: scale(1.5);
+  z-index: 8888;
+}
+
+/* Rotate arrow based on tooltip placement */
+
+/* Left of the target placement: arrow points right (90deg) */
+.shepherd-element[data-popper-placement^='left'] .shepherd-arrow {
+  transform: scale(1.5) rotate(90deg);
+}
+
+/* Top of the target placement: arrow points down (180deg) */
+.shepherd-element[data-popper-placement^='top'] .shepherd-arrow {
+  transform: scale(1.5) rotate(180deg);
+}
+
+/* Right of the target placement: arrow points left (270deg) */
+.shepherd-element[data-popper-placement^='right'] .shepherd-arrow {
+  transform: scale(1.5) rotate(270deg);
+}
