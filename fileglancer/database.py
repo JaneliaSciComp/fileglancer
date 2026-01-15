@@ -496,16 +496,16 @@ def find_fsp_from_absolute_path(session: Session, absolute_path: str) -> Optiona
     Returns:
         Tuple of (FileSharePath, relative_subpath) if an exact match is found, None otherwise
     """
-    # Normalize the input path
-    normalized_path = os.path.normpath(absolute_path)
+    # Resolve symlinks in the input path (e.g., /var -> /private/var on macOS)
+    normalized_path = os.path.realpath(absolute_path)
 
     # Get all file share paths
     paths = get_file_share_paths(session)
 
     for fsp in paths:
-        # Expand ~ to user's home directory before matching
+        # Expand ~ to user's home directory and resolve symlinks to match Filestore behavior
         expanded_mount_path = os.path.expanduser(fsp.mount_path)
-        expanded_mount_path = os.path.normpath(expanded_mount_path)
+        expanded_mount_path = os.path.realpath(expanded_mount_path)
 
         # Check if the normalized path starts with this mount path
         if normalized_path.startswith(expanded_mount_path):
