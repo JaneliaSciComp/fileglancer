@@ -318,7 +318,9 @@ export default function StartTour({
           scrollTo: true,
           cancelIcon: {
             enabled: true
-          }
+          },
+          modalOverlayOpeningPadding: 8,
+          modalOverlayOpeningRadius: 4
         }
       });
       shepherd.activeTour = tour;
