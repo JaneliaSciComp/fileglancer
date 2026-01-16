@@ -28,7 +28,7 @@ export default function DataToolLinks({
   }
 
   return (
-    <div className="my-1">
+    <div className="my-1" data-tour="data-tool-links">
       <Typography className="font-semibold text-sm text-surface-foreground">
         {title}
       </Typography>

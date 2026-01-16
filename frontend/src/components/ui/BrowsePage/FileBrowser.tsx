@@ -243,11 +243,13 @@ export default function FileBrowser({
           </div>
         </div>
       ) : displayFiles.length > 0 ? (
-        <Table
-          data={displayFiles}
-          handleContextMenuClick={handleFileContextMenu}
-          showPropertiesDrawer={showPropertiesDrawer}
-        />
+        <div data-tour="file-browser">
+          <Table
+            data={displayFiles}
+            handleContextMenuClick={handleFileContextMenu}
+            showPropertiesDrawer={showPropertiesDrawer}
+          />
+        </div>
       ) : displayFiles.length === 0 && !fileQuery.data.errorMessage ? (
         <div className="flex items-center pl-3 py-1">
           <Typography>No files available for display.</Typography>

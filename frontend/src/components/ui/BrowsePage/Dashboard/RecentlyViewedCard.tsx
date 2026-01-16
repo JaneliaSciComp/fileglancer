@@ -14,7 +14,7 @@ export default function RecentlyViewedCard() {
   const { recentlyViewedFolders, preferenceQuery } = usePreferencesContext();
 
   return (
-    <DashboardCard title="Recently viewed">
+    <DashboardCard className="h-[670px]" title="Recently viewed">
       {preferenceQuery.isPending || zonesAndFspQuery.isPending ? (
         Array(5)
           .fill(0)
@@ -26,6 +26,16 @@ export default function RecentlyViewedCard() {
           <Typography className="text-error">
             Error loading zones and file share paths:{' '}
             {zonesAndFspQuery.error.message}
+          </Typography>
+        </div>
+      ) : recentlyViewedFolders.length === 0 ? (
+        <div className="px-6 pt-2 flex flex-col gap-4">
+          <Typography className="text-muted-foreground">
+            No recently viewed folders.
+          </Typography>
+          <Typography className="text-muted-foreground">
+            Start navigating the file system to see your recently viewed folders
+            appear here.
           </Typography>
         </div>
       ) : (

@@ -17,7 +17,9 @@ export default function Preferences() {
     toggleDisableNeuroglancerStateGeneration,
     disableHeuristicalLayerTypeDetection,
     toggleDisableHeuristicalLayerTypeDetection,
-    toggleFilterByGroups
+    toggleFilterByGroups,
+    showTutorial,
+    toggleShowTutorial
   } = usePreferencesContext();
 
   return (
@@ -28,7 +30,7 @@ export default function Preferences() {
 
       <Card className="min-h-max shrink-0">
         <Card.Header>
-          <Typography className="font-semibold">
+          <Typography className="font-semibold" type="lead">
             Format to use for file paths:
           </Typography>
         </Card.Header>
@@ -123,9 +125,13 @@ export default function Preferences() {
 
       <Card className="mt-6 min-h-max shrink-0">
         <Card.Header>
-          <Typography className="font-semibold">Options:</Typography>
+          <Typography className="font-semibold" type="lead">
+            Options:
+          </Typography>
         </Card.Header>
         <Card.Body className="flex flex-col gap-4 pb-4">
+          <Typography className="font-semibold"> Display</Typography>
+
           <div className="flex items-center gap-2">
             <input
               checked={isFilteredByGroups}
@@ -183,8 +189,40 @@ export default function Preferences() {
           </div>
 
           <div className="flex items-center gap-2">
+            <input
+              checked={showTutorial}
+              className="icon-small checked:accent-secondary-light"
+              id="show_tutorial"
+              onChange={async () => {
+                const result = await toggleShowTutorial();
+                if (result.success) {
+                  toast.success(
+                    showTutorial
+                      ? 'Tutorial welcome card will no longer be shown on Browse page'
+                      : 'Tutorial welcome card will be shown on Browse page'
+                  );
+                } else {
+                  toast.error(result.error);
+                }
+              }}
+              type="checkbox"
+            />
+            <Typography
+              as="label"
+              className="text-foreground"
+              htmlFor="show_tutorial"
+            >
+              Show tutorial welcome card on Browse page
+            </Typography>
+          </div>
+
+          <Typography className="font-semibold"> Data Links</Typography>
+
+          <div className="flex items-center gap-2">
             <AutomaticLinksToggle />
           </div>
+
+          <Typography className="font-semibold"> Neuroglancer</Typography>
 
           <div className="flex items-center gap-2">
             <LegacyMultichannelToggle />

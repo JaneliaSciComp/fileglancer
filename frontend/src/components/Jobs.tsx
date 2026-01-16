@@ -7,7 +7,7 @@ import { jobsColumns } from './ui/Table/jobsColumns';
 export default function Jobs() {
   const { allTicketsQuery } = useTicketContext();
   return (
-    <>
+    <div data-tour="tasks-page">
       <Typography className="mb-6 text-foreground font-bold" type="h5">
         Tasks
       </Typography>
@@ -25,6 +25,6 @@ export default function Jobs() {
         gridColsClass="grid-cols-[3fr_3fr_1fr_2fr]"
         loadingState={allTicketsQuery.isPending}
       />
-    </>
+    </div>
   );
 }

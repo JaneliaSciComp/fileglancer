@@ -4,6 +4,9 @@
 import { Outlet, useParams } from 'react-router';
 import { Toaster } from 'react-hot-toast';
 import { ErrorBoundary } from 'react-error-boundary';
+import { ShepherdJourneyProvider } from 'react-shepherd';
+import 'shepherd.js/dist/css/shepherd.css';
+import '@/components/tours/shepherd-overrides.css';
 
 import { ZonesAndFspMapContextProvider } from '@/contexts/ZonesAndFspMapContext';
 import { FileBrowserContextProvider } from '@/contexts/FileBrowserContext';
@@ -26,7 +29,7 @@ const MainLayoutContent = () => {
     useServerHealthContext();
 
   return (
-    <>
+    <ShepherdJourneyProvider>
       <Toaster
         position="bottom-center"
         toastOptions={{
@@ -50,7 +53,7 @@ const MainLayoutContent = () => {
         onRetry={checkHealth}
         open={showWarningOverlay}
       />
-    </>
+    </ShepherdJourneyProvider>
   );
 };
 

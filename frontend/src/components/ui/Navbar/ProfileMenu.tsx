@@ -29,6 +29,7 @@ export default function ProfileMenu() {
         as={IconButton}
         className="text-foreground hover:!text-foreground focus:!text-foreground hover:bg-hover-gradient hover:dark:bg-hover-gradient-dark focus:bg-hover-gradient focus:dark:bg-hover-gradient-dark"
         color="secondary"
+        data-tour="profile-menu"
         size="sm"
         variant="ghost"
       >
@@ -47,6 +48,7 @@ export default function ProfileMenu() {
             <Menu.Item
               as={Link}
               className="text-foreground hover:!text-foreground focus:!text-foreground hover:bg-hover-gradient hover:dark:bg-hover-gradient-dark focus:bg-hover-gradient focus:dark:bg-hover-gradient-dark"
+              data-tour="preferences-link"
               to="/preferences"
             >
               <HiOutlineAdjustmentsHorizontal className="mr-2 icon-default" />
