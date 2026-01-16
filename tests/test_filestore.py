@@ -47,7 +47,8 @@ def test_unmounted_filestore():
 
 
 def test_get_root_path(filestore, test_dir):
-    assert filestore.get_root_path() == test_dir
+    # Root path should be the canonicalized/resolved version of test_dir
+    assert filestore.get_root_path() == os.path.realpath(test_dir)
 
 
 def test_get_root_info(filestore, test_dir):

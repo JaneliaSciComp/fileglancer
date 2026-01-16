@@ -160,7 +160,8 @@ class Filestore:
         """
         # Expand ~/ to the user's home directory (within user context)
         expanded_path = os.path.expanduser(file_share_path.mount_path)
-        self.root_path = os.path.abspath(expanded_path)
+        # Use realpath to resolve symlinks for consistent path operations (e.g., /var -> /private/var on macOS)
+        self.root_path = os.path.realpath(expanded_path)
 
 
     def _check_path_in_root(self, path: Optional[str]) -> str:
