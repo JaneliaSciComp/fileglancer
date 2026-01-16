@@ -141,7 +141,7 @@ pixi run container-claude
 
 # Or from inside a container shell
 pixi run container-shell
-claude --dangerously-skip-permissions
+pixi run claude --dangerously-skip-permissions
 ```
 
 ### Stop the Container
@@ -207,7 +207,7 @@ sudo /usr/local/bin/init-firewall.sh
 pixi install
 pixi run dev-install
 pixi run npm install -g @anthropic-ai/claude-code
-claude --dangerously-skip-permissions
+pixi run claude --dangerously-skip-permissions
 ```
 
 ## GPU Support (Linux only)
