@@ -25,15 +25,20 @@ export function cleanDatabase(testTempDir: string): void {
         });
         console.log(`[DB Cleanup] Cleared table: ${table}`);
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
 
         // Check if it's a "table doesn't exist" error (expected for new databases)
         if (errorMessage.includes('no such table')) {
           console.log(`[DB Cleanup] Skipped ${table} (table does not exist)`);
         } else {
           // Unexpected error - this indicates a real problem (e.g., sqlite3 not installed)
-          console.error(`[DB Cleanup] Failed to clear ${table}: ${errorMessage}`);
-          throw new Error(`Database cleanup failed for table ${table}: ${errorMessage}`);
+          console.error(
+            `[DB Cleanup] Failed to clear ${table}: ${errorMessage}`
+          );
+          throw new Error(
+            `Database cleanup failed for table ${table}: ${errorMessage}`
+          );
         }
       }
     }
