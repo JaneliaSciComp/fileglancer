@@ -40,6 +40,7 @@ export default function NGLinkDialog({
   const [shortName, setShortName] = useState('');
   const [title, setTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [shortNameError, setShortNameError] = useState<string | null>(null);
 
   // Initialize form values when editItem changes
   useEffect(() => {
@@ -54,8 +55,27 @@ export default function NGLinkDialog({
     }
   }, [editItem]);
 
+  const validateShortName = (value: string): string | null => {
+    if (!value.trim()) {
+      return null; // Empty is allowed (optional field)
+    }
+    // Only allow alphanumeric characters, hyphens, and underscores
+    const validPattern = /^[a-zA-Z0-9_-]+$/;
+    if (!validPattern.test(value.trim())) {
+      return 'Name can only contain letters, numbers, hyphens, and underscores';
+    }
+    return null;
+  };
+
+  const handleShortNameChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setShortName(value);
+    setShortNameError(validateShortName(value));
+  };
+
   const resetAndClose = () => {
     setError(null);
+    setShortNameError(null);
     setNeuroglancerUrl('');
     setShortName('');
     setTitle('');
@@ -67,6 +87,12 @@ export default function NGLinkDialog({
 
     if (!neuroglancerUrl.trim()) {
       setError('Please provide a Neuroglancer link.');
+      return;
+    }
+
+    // Check for short_name validation error
+    if (shortNameError) {
+      setError('Please fix the errors before submitting.');
       return;
     }
 
@@ -138,15 +164,24 @@ export default function NGLinkDialog({
               Name (optional, used in shortened link)
             </Typography>
             <input
-              className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background"
+              className={`mb-1 p-2 text-foreground text-lg border rounded-sm focus:outline-none bg-background ${
+                shortNameError
+                  ? 'border-error focus:border-error'
+                  : 'border-primary-light focus:border-primary'
+              }`}
               id="short-name"
-              onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                setShortName(e.target.value)
-              }
+              onChange={handleShortNameChange}
               placeholder="Example: hemibrain-em-1"
               type="text"
               value={shortName}
             />
+            {shortNameError ? (
+              <Typography className="text-error mb-4" type="small">
+                {shortNameError}
+              </Typography>
+            ) : (
+              <div className="mb-4" />
+            )}
           </>
         ) : null}
         {error ? (
