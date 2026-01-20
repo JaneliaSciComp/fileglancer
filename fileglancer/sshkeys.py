@@ -200,6 +200,47 @@ def parse_public_key(pubkey_path: str, ssh_dir: str) -> SSHKeyInfo:
     )
 
 
+def _read_file_secure(file_path: str) -> str:
+    """Read a file securely using a mutable bytearray that is cleared after use.
+
+    This function reads sensitive data (like private keys) into a mutable bytearray
+    which is explicitly overwritten with zeros after converting to a string. This
+    reduces the window during which the sensitive data exists in memory and prevents
+    it from persisting in immutable strings that could appear in core dumps.
+
+    Args:
+        file_path: Path to the file to read
+
+    Returns:
+        The file contents as a string
+
+    Note:
+        While the returned string is still immutable and will exist in memory,
+        this approach minimizes the exposure by clearing the mutable buffer
+        immediately after use.
+    """
+    # Get file size to allocate bytearray
+    file_size = os.path.getsize(file_path)
+
+    # Read into mutable bytearray
+    sensitive_buffer = bytearray(file_size)
+
+    try:
+        with open(file_path, 'rb') as f:
+            bytes_read = f.readinto(sensitive_buffer)
+            if bytes_read != file_size:
+                raise IOError(f"Expected to read {file_size} bytes, but read {bytes_read}")
+
+        # Convert to string (this creates an immutable copy)
+        result = sensitive_buffer.decode('utf-8')
+
+        return result
+    finally:
+        # Explicitly overwrite the mutable buffer with zeros
+        for i in range(len(sensitive_buffer)):
+            sensitive_buffer[i] = 0
+
+
 def get_key_content(ssh_dir: str, filename: str, key_type: str = "public") -> SSHKeyContent:
     """Get the content of an SSH key (public or private).
 
@@ -225,8 +266,9 @@ def get_key_content(ssh_dir: str, filename: str, key_type: str = "public") -> SS
         private_key_path = safe_join_path(ssh_dir, filename)
         if not os.path.exists(private_key_path):
             raise ValueError(f"Private key '{filename}' not found")
-        with open(private_key_path, 'r') as f:
-            return SSHKeyContent(key=f.read())
+        # Use secure reading for private keys
+        key_content = _read_file_secure(private_key_path)
+        return SSHKeyContent(key=key_content)
 
     raise ValueError(f"Invalid key_type: {key_type}")
 
