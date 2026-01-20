@@ -12,8 +12,67 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: Build and Test
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pixi
+        uses: prefix-dev/setup-pixi@v0.9.1
+        with:
+          pixi-version: v0.63.2
+          cache: true
+          manifest-path: pyproject.toml
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('frontend/package.json', 'frontend/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: |
+          pixi run dev-install
+
+      - name: Lint
+        run: |
+          set -eux
+          pixi run node-prettier-write && pixi run node-prettier-check && pixi run node-eslint-check
+
+      - name: Test the frontend
+        run: |
+          set -eux
+          pixi run test-frontend
+
+      - name: Test the backend
+        run: |
+          set -eux
+          pixi run test-backend
+
+      - name: Build the frontend
+        run: |
+          set -eux
+          pixi run node-build
+
+      - name: Package the app
+        run: |
+          set -eux
+          pixi run pypi-build
+
+      - name: Upload package to GH
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-artifacts
+          path: dist/fileglancer*
+          if-no-files-found: error
+
+  integration-tests:
+    name: Integration tests
     runs-on: ubuntu-latest
 
     env:
@@ -55,21 +114,6 @@ jobs:
         run: npx playwright install chromium
         working-directory: frontend/ui-tests
 
-      - name: Lint
-        run: |
-          set -eux
-          pixi run node-prettier-write && pixi run node-prettier-check && pixi run node-eslint-check
-
-      - name: Test the frontend
-        run: |
-          set -eux
-          pixi run test-frontend
-
-      - name: Test the backend
-        run: |
-          set -eux
-          pixi run test-backend
-
       - name: Execute integration tests
         run: |
           pixi run test-ui
@@ -82,23 +126,6 @@ jobs:
           path: |
             frontend/ui-tests/test-results
             frontend/ui-tests/playwright-report
-
-      - name: Build the frontend
-        run: |
-          set -eux
-          pixi run node-build
-
-      - name: Package the app
-        run: |
-          set -eux
-          pixi run pypi-build
-
-      - name: Upload package to GH
-        uses: actions/upload-artifact@v4
-        with:
-          name: extension-artifacts
-          path: dist/fileglancer*
-          if-no-files-found: error
 
   check_links:
     name: Check README links
