@@ -44,15 +44,12 @@ jobs:
           set -eux
           pixi run node-prettier-write && pixi run node-prettier-check && pixi run node-eslint-check
 
-      - name: Test the frontend
+      - name: Test frontend and backend in parallel
         run: |
           set -eux
-          pixi run test-frontend
-
-      - name: Test the backend
-        run: |
-          set -eux
-          pixi run test-backend
+          pixi run test-frontend &
+          pixi run test-backend &
+          wait
 
       - name: Build the frontend
         run: |
@@ -72,7 +69,7 @@ jobs:
           if-no-files-found: error
 
   integration-tests:
-    name: Integration tests
+    name: Integration Tests
     runs-on: ubuntu-latest
 
     env:
