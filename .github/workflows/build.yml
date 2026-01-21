@@ -70,19 +70,6 @@ jobs:
           set -eux
           pixi run test-backend
 
-      - name: Execute integration tests
-        run: |
-          pixi run test-ui
-
-      - name: Upload Playwright Test report
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: fileglancer-playwright-tests
-          path: |
-            frontend/ui-tests/test-results
-            frontend/ui-tests/playwright-report
-
       - name: Build the frontend
         run: |
           set -eux
@@ -99,6 +86,19 @@ jobs:
           name: extension-artifacts
           path: dist/fileglancer*
           if-no-files-found: error
+
+      - name: Execute integration tests
+        run: |
+          pixi run test-ui
+
+      - name: Upload Playwright Test report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fileglancer-playwright-tests
+          path: |
+            frontend/ui-tests/test-results
+            frontend/ui-tests/playwright-report
 
   check_links:
     name: Check README links
