@@ -30,15 +30,15 @@ jobs:
           cache: false
           manifest-path: pyproject.toml
 
-      - name: Cache node modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            frontend/node_modules
-            frontend/ui-tests/node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('frontend/package.json', 'frontend/ui-tests/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+      # - name: Cache node modules
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: |
+      #       frontend/node_modules
+      #       frontend/ui-tests/node_modules
+      #     key: ${{ runner.os }}-node-${{ hashFiles('frontend/package.json', 'frontend/ui-tests/yarn.lock') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-node-
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
