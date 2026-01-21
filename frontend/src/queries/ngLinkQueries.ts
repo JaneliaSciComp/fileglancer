@@ -40,7 +40,7 @@ type NGLinkResponse = {
 /**
  * Payload for creating a Neuroglancer link
  */
-type CreateNGLinkPayload = {
+export type CreateNGLinkPayload = {
   url?: string;
   state?: Record<string, unknown>;
   url_base?: string;
@@ -51,7 +51,7 @@ type CreateNGLinkPayload = {
 /**
  * Payload for updating a Neuroglancer link
  */
-type UpdateNGLinkPayload = {
+export type UpdateNGLinkPayload = {
   short_key: string;
   url: string;
   title?: string;

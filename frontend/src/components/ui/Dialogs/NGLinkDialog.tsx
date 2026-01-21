@@ -3,33 +3,23 @@ import type { ChangeEvent } from 'react';
 import { Button, Typography } from '@material-tailwind/react';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
-import type { NGLink } from '@/queries/ngLinkQueries';
+import type {
+  NGLink,
+  CreateNGLinkPayload,
+  UpdateNGLinkPayload
+} from '@/queries/ngLinkQueries';
 import {
   parseNeuroglancerUrl,
   validateJsonState,
   constructNeuroglancerUrl
 } from '@/utils';
 
-type CreatePayload = {
-  url?: string;
-  state?: Record<string, unknown>;
-  url_base?: string;
-  short_name?: string;
-  title?: string;
-};
-
-type UpdatePayload = {
-  short_key: string;
-  url: string;
-  title?: string;
-};
-
 type NGLinkDialogProps = {
   readonly open: boolean;
   readonly pending: boolean;
   readonly onClose: () => void;
-  readonly onCreate?: (payload: CreatePayload) => Promise<void>;
-  readonly onUpdate?: (payload: UpdatePayload) => Promise<void>;
+  readonly onCreate?: (payload: CreateNGLinkPayload) => Promise<void>;
+  readonly onUpdate?: (payload: UpdateNGLinkPayload) => Promise<void>;
   readonly editItem?: NGLink;
 };
 
