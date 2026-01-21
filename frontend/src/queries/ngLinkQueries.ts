@@ -6,8 +6,11 @@ import {
   UseMutationResult
 } from '@tanstack/react-query';
 
-import { sendFetchRequest, HTTPError } from '@/utils';
-import { toHttpError } from '@/utils/errorHandling';
+import { sendFetchRequest } from '@/utils';
+import {
+  getResponseJsonOrError,
+  throwResponseNotOkError
+} from './queryUtils';
 
 export type NGLink = {
   short_key: string;
@@ -51,26 +54,24 @@ export const ngLinkQueryKeys = {
 };
 
 const fetchNGLinks = async (signal?: AbortSignal): Promise<NGLink[]> => {
-  try {
-    const response = await sendFetchRequest(
-      '/api/neuroglancer/nglinks',
-      'GET',
-      undefined,
-      { signal }
-    );
-    if (response.status === 404) {
-      return [];
-    }
-    if (!response.ok) {
-      throw await toHttpError(response);
-    }
-    const data = (await response.json()) as NGLinksResponse;
+  const response = await sendFetchRequest(
+    '/api/neuroglancer/nglinks',
+    'GET',
+    undefined,
+    { signal }
+  );
+  const data = (await getResponseJsonOrError(response)) as NGLinksResponse;
+
+  if (response.ok) {
     return data.links ?? [];
-  } catch (error) {
-    if (error instanceof HTTPError && error.responseCode === 404) {
-      return [];
-    }
-    throw error;
+  }
+
+  // Handle error responses
+  if (response.status === 404) {
+    // Not an error, just no links available
+    return [];
+  } else {
+    throwResponseNotOkError(response, data);
   }
 };
 
@@ -95,10 +96,12 @@ export function useCreateNGLinkMutation(): UseMutationResult<
         'POST',
         payload
       );
+      const data = (await getResponseJsonOrError(response)) as NGLinkResponse;
+
       if (!response.ok) {
-        throw await toHttpError(response);
+        throwResponseNotOkError(response, data);
       }
-      return (await response.json()) as NGLinkResponse;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -122,10 +125,12 @@ export function useUpdateNGLinkMutation(): UseMutationResult<
         'PUT',
         { url: payload.url, title: payload.title }
       );
+      const data = (await getResponseJsonOrError(response)) as NGLinkResponse;
+
       if (!response.ok) {
-        throw await toHttpError(response);
+        throwResponseNotOkError(response, data);
       }
-      return (await response.json()) as NGLinkResponse;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -148,8 +153,10 @@ export function useDeleteNGLinkMutation(): UseMutationResult<
         `/api/neuroglancer/nglinks/${encodeURIComponent(shortKey)}`,
         'DELETE'
       );
+      const data = await getResponseJsonOrError(response);
+
       if (!response.ok) {
-        throw await toHttpError(response);
+        throwResponseNotOkError(response, data);
       }
     },
     onSuccess: () => {
