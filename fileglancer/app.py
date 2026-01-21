@@ -182,11 +182,10 @@ def _normalize_short_key(short_key: Optional[str]) -> Optional[str]:
     return normalized or None
 
 
-def _validate_short_key(short_key: str) -> None:
-    if len(short_key) < 4 or len(short_key) > 64:
-        raise HTTPException(status_code=400, detail="short_key must be between 4 and 64 characters")
-    if not all(ch.isalnum() or ch in ("-", "_") for ch in short_key):
-        raise HTTPException(status_code=400, detail="short_key may only contain letters, numbers, '-' or '_'")
+def _validate_short_name(short_name: str) -> None:
+    """Validate short_name: only letters, numbers, hyphens, and underscores allowed."""
+    if not all(ch.isalnum() or ch in ("-", "_") for ch in short_name):
+        raise HTTPException(status_code=400, detail="short_name can only contain letters, numbers, hyphens, and underscores")
 
 
 def create_app(settings):
@@ -710,9 +709,9 @@ def create_app(settings):
                                          payload: NeuroglancerShortenRequest,
                                          username: str = Depends(get_current_user)):
         short_key = _normalize_short_key(payload.short_key)
-        if short_key:
-            _validate_short_key(short_key)
         short_name = payload.short_name.strip() if payload.short_name else None
+        if short_name:
+            _validate_short_name(short_name)
         title = payload.title.strip() if payload.title else None
 
         if payload.url and payload.state:
