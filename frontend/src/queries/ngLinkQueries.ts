@@ -45,7 +45,6 @@ type CreateNGLinkPayload = {
   state?: Record<string, unknown>;
   url_base?: string;
   short_name?: string;
-  short_key?: string;
   title?: string;
 };
 

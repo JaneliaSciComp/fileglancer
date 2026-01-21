@@ -218,10 +218,6 @@ class NotificationResponse(BaseModel):
 
 class NeuroglancerShortenRequest(BaseModel):
     """Request payload for creating a shortened Neuroglancer state"""
-    short_key: Optional[str] = Field(
-        description="Optional short key to use instead of a generated one",
-        default=None
-    )
     short_name: Optional[str] = Field(
         description="Optional human-friendly name for the short link",
         default=None

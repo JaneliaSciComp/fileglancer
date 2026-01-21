@@ -639,26 +639,15 @@ def _generate_unique_neuroglancer_key(session: Session) -> str:
     raise RuntimeError("Failed to generate a unique Neuroglancer short key")
 
 
-def _validate_custom_neuroglancer_key(session: Session, short_key: str) -> None:
-    """Ensure the custom short key is available."""
-    exists = session.query(NeuroglancerStateDB).filter_by(short_key=short_key).first()
-    if exists:
-        raise ValueError("Short key is already in use")
-
-
 def create_neuroglancer_state(
     session: Session,
     username: str,
     url_base: str,
     state: Dict,
-    short_key: Optional[str] = None,
     short_name: Optional[str] = None
 ) -> NeuroglancerStateDB:
     """Create a new Neuroglancer state entry and return it."""
-    if short_key:
-        _validate_custom_neuroglancer_key(session, short_key)
-    else:
-        short_key = _generate_unique_neuroglancer_key(session)
+    short_key = _generate_unique_neuroglancer_key(session)
     now = datetime.now(UTC)
     entry = NeuroglancerStateDB(
         short_key=short_key,

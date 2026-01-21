@@ -175,13 +175,6 @@ def _parse_neuroglancer_url(url: str) -> Tuple[str, Dict]:
     return url_base, state
 
 
-def _normalize_short_key(short_key: Optional[str]) -> Optional[str]:
-    if short_key is None:
-        return None
-    normalized = short_key.strip()
-    return normalized or None
-
-
 def _validate_short_name(short_name: str) -> None:
     """Validate short_name: only letters, numbers, hyphens, and underscores allowed."""
     if not all(ch.isalnum() or ch in ("-", "_") for ch in short_name):
@@ -708,7 +701,6 @@ def create_app(settings):
     async def shorten_neuroglancer_state(request: Request,
                                          payload: NeuroglancerShortenRequest,
                                          username: str = Depends(get_current_user)):
-        short_key = _normalize_short_key(payload.short_key)
         short_name = payload.short_name.strip() if payload.short_name else None
         if short_name:
             _validate_short_name(short_name)
@@ -742,7 +734,6 @@ def create_app(settings):
                     username,
                     url_base,
                     state,
-                    short_key=short_key,
                     short_name=short_name
                 )
                 created_short_key = entry.short_key
