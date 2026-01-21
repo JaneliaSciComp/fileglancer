@@ -5,7 +5,7 @@ on:
   push:
     branches: main
   pull_request:
-    branches: '*'
+    branches: "*"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -20,8 +20,8 @@ jobs:
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/pw-browsers
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Install pixi
         uses: prefix-dev/setup-pixi@v0.9.1
@@ -30,75 +30,75 @@ jobs:
           cache: false
           manifest-path: pyproject.toml
 
-    - name: Cache node modules
-      uses: actions/cache@v4
-      with:
-        path: |
-          frontend/node_modules
-          frontend/ui-tests/node_modules
-        key: ${{ runner.os }}-node-${{ hashFiles('frontend/package.json', 'frontend/ui-tests/yarn.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            frontend/node_modules
+            frontend/ui-tests/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('frontend/package.json', 'frontend/ui-tests/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
-    - name: Cache Playwright browsers
-      uses: actions/cache@v4
-      with:
-        path: ${{ github.workspace }}/pw-browsers
-        key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/ui-tests/yarn.lock') }}
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/pw-browsers
+          key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/ui-tests/yarn.lock') }}
 
-    - name: Install dependencies
-      run: |
-        pixi run dev-install
-        pixi run node-install-ui-tests
+      - name: Install dependencies
+        run: |
+          pixi run dev-install
+          pixi run node-install-ui-tests
 
-    - name: Install Playwright browser
-      run: npx playwright install chromium
-      working-directory: frontend/ui-tests
+      - name: Install Playwright browser
+        run: npx playwright install chromium
+        working-directory: frontend/ui-tests
 
-    - name: Lint
-      run: |
-        set -eux
-        pixi run node-prettier-write && pixi run node-prettier-check && pixi run node-eslint-check
+      - name: Lint
+        run: |
+          set -eux
+          pixi run node-prettier-write && pixi run node-prettier-check && pixi run node-eslint-check
 
-    - name: Test the frontend
-      run: |
-        set -eux
-        pixi run test-frontend
+      - name: Test the frontend
+        run: |
+          set -eux
+          pixi run test-frontend
 
-    - name: Test the backend
-      run: |
-        set -eux
-        pixi run test-backend
+      - name: Test the backend
+        run: |
+          set -eux
+          pixi run test-backend
 
-    - name: Execute integration tests
-      run: |
-        pixi run test-ui
+      - name: Execute integration tests
+        run: |
+          pixi run test-ui
 
-    - name: Upload Playwright Test report
-      if: ${{ !cancelled() }}
-      uses: actions/upload-artifact@v4
-      with:
-        name: fileglancer-playwright-tests
-        path: |
-          frontend/ui-tests/test-results
-          frontend/ui-tests/playwright-report
+      - name: Upload Playwright Test report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fileglancer-playwright-tests
+          path: |
+            frontend/ui-tests/test-results
+            frontend/ui-tests/playwright-report
 
-    - name: Build the frontend
-      run: |
-        set -eux
-        pixi run node-build
+      - name: Build the frontend
+        run: |
+          set -eux
+          pixi run node-build
 
-    - name: Package the app
-      run: |
-        set -eux
-        pixi run pypi-build
+      - name: Package the app
+        run: |
+          set -eux
+          pixi run pypi-build
 
-    - name: Upload package to GH
-      uses: actions/upload-artifact@v4
-      with:
-        name: extension-artifacts
-        path: dist/fileglancer*
-        if-no-files-found: error
+      - name: Upload package to GH
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-artifacts
+          path: dist/fileglancer*
+          if-no-files-found: error
 
   check_links:
     name: Check README links
