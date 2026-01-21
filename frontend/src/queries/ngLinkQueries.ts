@@ -7,10 +7,7 @@ import {
 } from '@tanstack/react-query';
 
 import { sendFetchRequest } from '@/utils';
-import {
-  getResponseJsonOrError,
-  throwResponseNotOkError
-} from './queryUtils';
+import { getResponseJsonOrError, throwResponseNotOkError } from './queryUtils';
 
 export type NGLink = {
   short_key: string;
