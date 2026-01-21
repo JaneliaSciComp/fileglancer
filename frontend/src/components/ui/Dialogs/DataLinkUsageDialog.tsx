@@ -140,7 +140,46 @@ export default function DataLinkUsageDialog({
         <>
           <InstructionBlock steps={['Install zarr package']} />
           <CodeBlock
-            code={`import zarr\nstore = zarr.open("${dataLinkUrl}")`}
+            code={`import zarr
+from zarr.storage import FsspecStore
+from ome_zarr_models.v04.image import Image
+
+url = ${dataLinkUrl}
+
+# Open the zarr store using fsspec for HTTP access
+store = FsspecStore.from_url(url)
+root = zarr.open_group(store, mode='r')
+
+# Read OME-ZARR metadata using ome-zarr-models
+ome_image = Image.from_zarr(root)
+ome_image_metadata = ome_image.attributes
+multiscales = ome_image_metadata.multiscales
+print(f'Version: {multiscales[0].version}')
+print(f'Name: {multiscales[0].name}')
+print(f'Axes: {[(ax.name, ax.type, ax.unit) for ax in multiscales[0].axes]}')
+print(f'Datasets: {[ds.path for ds in multiscales[0].datasets]}')
+
+# Print coordinate transforms for each scale level
+for ds in multiscales[0].datasets:
+    if ds.coordinateTransformations:
+        for ct in ds.coordinateTransformations:
+            if hasattr(ct, 'scale'):
+                print(f'{ds.path} scale: {ct.scale}')
+            if hasattr(ct, 'translation'):
+                print(f'{ds.path} translation: {ct.translation}')
+
+# Access the highest resolution array
+if '0' in root:
+    arr = root['0']
+    print(f'\\nHighest resolution array shape: {arr.shape}')
+    print(f'Array dtype: {arr.dtype}')
+    print(f'Array chunks: {arr.chunks}')
+
+# Read a small slice of data
+if '0' in root:
+    data = arr[0,0,500:600,1000:1100,1000:1100]
+    print(f'\\nLoaded slice shape: {data.shape}')
+    print(f'Data min: {data.min()}, max: {data.max()}')`}
             copyLabel="Copy code"
             copyable={true}
             language="python"
