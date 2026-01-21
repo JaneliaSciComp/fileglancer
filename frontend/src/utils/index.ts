@@ -346,3 +346,16 @@ export type {
   RetryCallbacks,
   RetryState
 } from './retryWithBackoff';
+
+// Re-export Neuroglancer URL utilities
+export {
+  parseNeuroglancerUrl,
+  validateJsonState,
+  normalizeJsonString,
+  constructNeuroglancerUrl
+} from './neuroglancerUrl';
+export type {
+  ParsedNeuroglancerUrl,
+  NeuroglancerParseError,
+  JsonValidationResult
+} from './neuroglancerUrl';

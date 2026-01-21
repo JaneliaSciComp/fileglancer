@@ -214,3 +214,92 @@ class NotificationResponse(BaseModel):
     notifications: List[Notification] = Field(
         description="A list of active notifications"
     )
+
+
+class NeuroglancerShortenRequest(BaseModel):
+    """Request payload for creating a shortened Neuroglancer state"""
+    short_name: Optional[str] = Field(
+        description="Optional human-friendly name for the short link",
+        default=None
+    )
+    title: Optional[str] = Field(
+        description="Optional title that appears in the Neuroglancer tab name",
+        default=None
+    )
+    url: Optional[str] = Field(
+        description="Neuroglancer URL containing the encoded JSON state after #!",
+        default=None
+    )
+    state: Optional[Dict] = Field(
+        description="Neuroglancer state as a JSON object",
+        default=None
+    )
+    url_base: Optional[str] = Field(
+        description="Base Neuroglancer URL, required when providing state directly",
+        default=None
+    )
+
+
+class NeuroglancerUpdateRequest(BaseModel):
+    """Request payload for updating a Neuroglancer state"""
+    url: str = Field(
+        description="Neuroglancer URL containing the encoded JSON state after #!"
+    )
+    title: Optional[str] = Field(
+        description="Optional title that appears in the Neuroglancer tab name",
+        default=None
+    )
+
+
+class NeuroglancerShortenResponse(BaseModel):
+    """Response payload for shortened Neuroglancer state"""
+    short_key: str = Field(
+        description="Short key for retrieving the stored state"
+    )
+    short_name: Optional[str] = Field(
+        description="Optional human-friendly name for the short link",
+        default=None
+    )
+    title: Optional[str] = Field(
+        description="Optional title that appears in the Neuroglancer tab name",
+        default=None
+    )
+    state_url: str = Field(
+        description="Absolute URL to the stored state JSON"
+    )
+    neuroglancer_url: str = Field(
+        description="Neuroglancer URL that references the stored state"
+    )
+
+
+class NeuroglancerShortLink(BaseModel):
+    """Stored Neuroglancer short link"""
+    short_key: str = Field(
+        description="Short key for retrieving the stored state"
+    )
+    short_name: Optional[str] = Field(
+        description="Optional human-friendly name for the short link",
+        default=None
+    )
+    title: Optional[str] = Field(
+        description="Optional title that appears in the Neuroglancer tab name",
+        default=None
+    )
+    created_at: datetime = Field(
+        description="When this short link was created"
+    )
+    updated_at: datetime = Field(
+        description="When this short link was last updated"
+    )
+    state_url: str = Field(
+        description="Absolute URL to the stored state JSON"
+    )
+    neuroglancer_url: str = Field(
+        description="Neuroglancer URL that references the stored state"
+    )
+
+
+class NeuroglancerShortLinkResponse(BaseModel):
+    links: List[NeuroglancerShortLink] = Field(
+        description="A list of stored Neuroglancer short links"
+    )

@@ -13,8 +13,10 @@ import Help from '@/components/Help';
 import Jobs from '@/components/Jobs';
 import Preferences from '@/components/Preferences';
 import Links from '@/components/Links';
+import NGLinks from '@/components/NGLinks';
 import Notifications from '@/components/Notifications';
 import ErrorFallback from '@/components/ErrorFallback';
+import { NGLinkProvider } from '@/contexts/NGLinkContext';
 
 function RequireAuth({ children }: { readonly children: ReactNode }) {
   const { loading, authStatus } = useAuthContext();
@@ -97,6 +99,16 @@ const AppComponent = () => {
                 </RequireAuth>
               }
               path="links"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <NGLinkProvider>
+                    <NGLinks />
+                  </NGLinkProvider>
+                </RequireAuth>
+              }
+              path="nglinks"
             />
             {tasksEnabled ? (
               <Route

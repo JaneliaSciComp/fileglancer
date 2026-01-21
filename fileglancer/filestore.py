@@ -195,8 +195,13 @@ class Filestore:
         Get the FileInfo for a file or directory at the given path.
         """
         stat_result = os.stat(full_path)
-        # Regenerate the relative path to ensure it is not empty (None and empty string are converted to '.' here)
-        rel_path = os.path.relpath(full_path, self.root_path)
+        # Use real paths to avoid /var vs /private/var mismatches on macOS.
+        root_real = os.path.realpath(self.root_path)
+        full_real = os.path.realpath(full_path)
+        if full_real == root_real:
+            rel_path = '.'
+        else:
+            rel_path = os.path.relpath(full_real, root_real)
         return FileInfo.from_stat(rel_path, full_path, stat_result, current_user)
 
 
