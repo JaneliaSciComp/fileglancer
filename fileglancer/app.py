@@ -32,8 +32,8 @@ from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
 from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header
-from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext
-from fileglancer.filestore import Filestore
+from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext, UserContextConfigurationError
+from fileglancer.filestore import Filestore, RootCheckError
 from fileglancer.log import AccessLogMiddleware
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response
@@ -312,6 +312,27 @@ def create_app(settings):
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request, exc):
         return JSONResponse({"error":str(exc)}, status_code=400)
+
+
+    @app.exception_handler(UserContextConfigurationError)
+    async def user_context_config_error_handler(request, exc):
+        logger.error(f"User context configuration error: {exc}")
+        return JSONResponse(
+            {"error": str(exc)},
+            status_code=500
+        )
+
+    @app.exception_handler(PermissionError)
+    async def permission_error_handler(request, exc):
+        error_msg = str(exc)
+        logger.error(f"Permission error: {error_msg}")
+        return JSONResponse({"error": f"Permission denied: {error_msg}"}, status_code=403)
+
+
+    @app.exception_handler(Exception)
+    async def general_exception_handler(request, exc):
+        logger.exception(f"Unhandled exception: {exc}")
+        return JSONResponse({"error": f"{type(exc).__name__}: {str(exc)}"}, status_code=500)
 
 
     @app.get('/robots.txt', response_class=PlainTextResponse, include_in_schema=False)
@@ -1124,6 +1145,30 @@ def create_app(settings):
                 full_path = filestore._check_path_in_root(subpath)
                 file_handle = open(full_path, 'rb')
 
+            except RootCheckError as e:
+                # Path attempts to escape root directory - try to find a valid fsp for this absolute path
+                logger.info(f"RootCheckError caught for {filestore_name}/{subpath}: {e}")
+
+                # Use the full_path from the exception
+                full_path = e.full_path
+
+                with db.get_db_session(settings.db_url) as session:
+                    match = db.find_fsp_from_absolute_path(session, full_path)
+
+                if match:
+                    fsp, relative_subpath = match
+                    # Construct the correct URL
+                    if relative_subpath:
+                        redirect_url = f"/api/content/{fsp.name}?subpath={relative_subpath}"
+                    else:
+                        redirect_url = f"/api/content/{fsp.name}"
+
+                    logger.info(f"Redirecting from /api/content/{filestore_name}?subpath={subpath} to {redirect_url}")
+                    return RedirectResponse(url=redirect_url, status_code=307)
+
+                # If no match found, return the original error message
+                logger.error(f"No valid file share found for path: {full_path}")
+                raise HTTPException(status_code=400, detail=str(e))
             except FileNotFoundError:
                 logger.error(f"File not found in {filestore_name}: {subpath}")
                 raise HTTPException(status_code=404, detail="File or directory not found")
@@ -1217,6 +1262,29 @@ def create_app(settings):
 
                 return result
 
+            except RootCheckError as e:
+                # Path attempts to escape root directory - try to find a valid fsp for this absolute path
+                logger.info(f"RootCheckError caught for {filestore_name}/{subpath}: {e}")
+
+                full_path = e.full_path
+
+                with db.get_db_session(settings.db_url) as session:
+                    match = db.find_fsp_from_absolute_path(session, full_path)
+
+                if match:
+                    fsp, relative_subpath = match
+                    # Construct the correct URL
+                    if relative_subpath:
+                        redirect_url = f"/api/files/{fsp.name}?subpath={relative_subpath}"
+                    else:
+                        redirect_url = f"/api/files/{fsp.name}"
+
+                    logger.info(f"Redirecting from /api/files/{filestore_name}?subpath={subpath} to {redirect_url}")
+                    return RedirectResponse(url=redirect_url, status_code=307)
+
+                # If no match found, return the original error message
+                logger.error(f"No valid file share found for path: {full_path}")
+                raise HTTPException(status_code=400, detail=str(e))
             except FileNotFoundError:
                 logger.error(f"File or directory not found: {subpath}")
                 raise HTTPException(status_code=404, detail="File or directory not found")
@@ -1273,7 +1341,7 @@ def create_app(settings):
             except PermissionError as e:
                 raise HTTPException(status_code=403, detail=str(e))
 
-            return Response(status_code=201)
+            return JSONResponse(status_code=201, content={"message": "Item created"})
 
 
     @app.patch("/api/files/{path_name}")
@@ -1322,7 +1390,7 @@ def create_app(settings):
             except OSError as e:
                 raise HTTPException(status_code=500, detail=str(e))
 
-            return Response(status_code=204)
+            return JSONResponse(status_code=200, content={"message": "Permissions changed"})
 
 
     @app.delete("/api/files/{fsp_name}")
@@ -1341,7 +1409,7 @@ def create_app(settings):
             except PermissionError as e:
                 raise HTTPException(status_code=403, detail=str(e))
 
-            return Response(status_code=204)
+            return JSONResponse(status_code=200, content={"message": "Item deleted"})
 
 
     @app.post("/api/auth/simple-login", include_in_schema=not settings.enable_okta_auth)

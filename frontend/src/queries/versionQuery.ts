@@ -1,6 +1,6 @@
 import { useQuery, QueryFunctionContext } from '@tanstack/react-query';
 
-import { sendFetchRequest } from '@/utils';
+import { sendRequestAndThrowForNotOk } from './queryUtils';
 
 interface VersionResponse {
   version: string;
@@ -10,10 +10,15 @@ export default function useVersionQuery() {
   const fetchVersion = async ({
     signal
   }: QueryFunctionContext): Promise<VersionResponse> => {
-    const response = await sendFetchRequest('/api/version', 'GET', undefined, {
-      signal
-    });
-    return await response.json();
+    const body = await sendRequestAndThrowForNotOk(
+      '/api/version',
+      'GET',
+      undefined,
+      {
+        signal
+      }
+    );
+    return body as VersionResponse;
   };
 
   return useQuery<VersionResponse, Error>({
