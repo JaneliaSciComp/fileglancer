@@ -15,7 +15,6 @@ import { ExternalBucketProvider } from '@/contexts/ExternalBucketContext';
 import { ProfileContextProvider } from '@/contexts/ProfileContext';
 import { NotificationProvider } from '@/contexts/NotificationsContext';
 import { ServerHealthProvider } from '@/contexts/ServerHealthContext';
-import { NGLinkProvider } from '@/contexts/NGLinkContext';
 import FileglancerNavbar from '@/components/ui/Navbar/Navbar';
 import Notifications from '@/components/ui/Notifications/Notifications';
 import ErrorFallback from '@/components/ErrorFallback';
@@ -68,15 +67,13 @@ export const MainLayout = () => {
             <PreferencesProvider>
               <ExternalBucketProvider>
                 <ProxiedPathProvider>
-                  <NGLinkProvider>
-                    <ProfileContextProvider>
-                      <NotificationProvider>
-                        <TicketProvider>
-                          <MainLayoutContent />
-                        </TicketProvider>
-                      </NotificationProvider>
-                    </ProfileContextProvider>
-                  </NGLinkProvider>
+                  <ProfileContextProvider>
+                    <NotificationProvider>
+                      <TicketProvider>
+                        <MainLayoutContent />
+                      </TicketProvider>
+                    </NotificationProvider>
+                  </ProfileContextProvider>
                 </ProxiedPathProvider>
               </ExternalBucketProvider>
             </PreferencesProvider>

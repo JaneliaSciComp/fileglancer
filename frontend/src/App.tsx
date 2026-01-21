@@ -16,6 +16,7 @@ import Links from '@/components/Links';
 import NGLinks from '@/components/NGLinks';
 import Notifications from '@/components/Notifications';
 import ErrorFallback from '@/components/ErrorFallback';
+import { NGLinkProvider } from '@/contexts/NGLinkContext';
 
 function RequireAuth({ children }: { readonly children: ReactNode }) {
   const { loading, authStatus } = useAuthContext();
@@ -102,7 +103,9 @@ const AppComponent = () => {
             <Route
               element={
                 <RequireAuth>
-                  <NGLinks />
+                  <NGLinkProvider>
+                    <NGLinks />
+                  </NGLinkProvider>
                 </RequireAuth>
               }
               path="nglinks"
