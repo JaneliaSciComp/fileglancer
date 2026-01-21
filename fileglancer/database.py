@@ -482,6 +482,49 @@ def _clear_sharing_key_cache():
         logger.debug(f"Cleared entire sharing key cache, removed {old_size} entries")
 
 
+def find_fsp_from_absolute_path(session: Session, absolute_path: str) -> Optional[tuple[FileSharePath, str]]:
+    """
+    Find the file share path that exactly matches the given absolute path.
+
+    This function iterates through all file share paths and checks if the absolute
+    path exists within any of them. Returns the first exact match found.
+
+    Args:
+        session: Database session
+        absolute_path: Absolute file path to match against file shares
+
+    Returns:
+        Tuple of (FileSharePath, relative_subpath) if an exact match is found, None otherwise
+    """
+    # Resolve symlinks in the input path (e.g., /var -> /private/var on macOS)
+    normalized_path = os.path.realpath(absolute_path)
+
+    # Get all file share paths
+    paths = get_file_share_paths(session)
+
+    for fsp in paths:
+        # Expand ~ to user's home directory and resolve symlinks to match Filestore behavior
+        expanded_mount_path = os.path.expanduser(fsp.mount_path)
+        expanded_mount_path = os.path.realpath(expanded_mount_path)
+
+        # Check if the normalized path starts with this mount path
+        if normalized_path.startswith(expanded_mount_path):
+            # Calculate the relative subpath
+            if normalized_path == expanded_mount_path:
+                subpath = ""
+                logger.debug(f"Found exact match for path: {absolute_path} in fsp: {fsp.name} with subpath: {subpath}")
+                return (fsp, subpath)
+            else:
+                # Ensure we're matching on a directory boundary
+                remainder = normalized_path[len(expanded_mount_path):]
+                if remainder.startswith(os.sep):
+                    subpath = remainder.lstrip(os.sep)
+                    logger.debug(f"Found exact match for path: {absolute_path} in fsp: {fsp.name} with subpath: {subpath}")
+                    return (fsp, subpath)
+
+    return None
+
+
 def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
     """Validate a proxied path exists and is accessible"""
     # Get mount path - check database first using existing session, then check local mounts

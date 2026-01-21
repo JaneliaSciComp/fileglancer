@@ -329,7 +329,6 @@ export {
   getFileURL,
   getLastSegmentFromPath,
   getPreferredPathForDisplay,
-  HTTPError,
   joinPaths,
   makeBrowseLink,
   makeMapKey,
@@ -338,6 +337,7 @@ export {
   removeLastSegmentFromPath,
   sendFetchRequest
 };
+export type { RequestBody };
 
 // Re-export retry utility
 export { createRetryWithBackoff } from './retryWithBackoff';
