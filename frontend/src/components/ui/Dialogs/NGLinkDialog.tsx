@@ -54,7 +54,7 @@ export default function NGLinkDialog({
   useEffect(() => {
     if (editItem) {
       setInputMode('url');
-      setNeuroglancerUrl(editItem.neuroglancer_url);
+      setNeuroglancerUrl('');
       setShortName(editItem.short_name || '');
       setTitle(editItem.title || '');
       setStateJson('');
