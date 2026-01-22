@@ -249,7 +249,7 @@ if '0' in root:
           </CopyTooltip>
         </div>
         <Tabs
-          className="flex flex-col flex-1 min-h-0 gap-0"
+          className="flex flex-col flex-1 min-h-0 gap-0 max-h-[50vh]"
           key="data-link-usage-tabs"
           onValueChange={setActiveTab}
           value={activeTab}
