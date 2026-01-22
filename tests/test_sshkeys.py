@@ -162,28 +162,25 @@ class TestGetKeyContent:
 
 
 class TestSSHKeyContentResponse:
-    """Tests for the SSHKeyContentResponse secure response class."""
+    """Tests for the SSHKeyContentResponse secure streaming response class."""
 
     @pytest.mark.asyncio
-    async def test_response_sends_bytearray_content(self):
-        """Verify the response sends the bytearray content."""
-        key_content = bytearray(b"test private key content")
+    async def test_response_streams_content_line_by_line(self):
+        """Verify the response streams content line by line with more_body flag."""
+        key_content = bytearray(b"line1\nline2\nline3\n")
         response = SSHKeyContentResponse(key_content)
 
-        # Capture what gets sent via ASGI
-        # We need to capture a COPY of the body since the bytearray gets wiped
         sent_messages = []
-        captured_body = None
+        captured_bodies = []
 
         async def mock_receive():
             return {"type": "http.request", "body": b""}
 
         async def mock_send(message):
-            nonlocal captured_body
             sent_messages.append(message)
             # Capture a copy of the body before it gets wiped
             if message.get("type") == "http.response.body":
-                captured_body = bytes(message["body"])
+                captured_bodies.append(bytes(message["body"]))
 
         scope = {"type": "http"}
 
@@ -193,14 +190,64 @@ class TestSSHKeyContentResponse:
         assert sent_messages[0]["type"] == "http.response.start"
         assert sent_messages[0]["status"] == 200
 
-        # Verify body was sent with correct content (captured before wipe)
-        assert sent_messages[1]["type"] == "http.response.body"
-        assert captured_body == b"test private key content"
+        # Verify streaming: multiple body messages with more_body=True
+        # 3 lines + 1 final empty message = 4 body messages
+        body_messages = [m for m in sent_messages if m.get("type") == "http.response.body"]
+        assert len(body_messages) == 4
+
+        # All but the last should have more_body=True
+        for msg in body_messages[:-1]:
+            assert msg["more_body"] is True
+
+        # Final message should have more_body=False and empty body
+        assert body_messages[-1]["more_body"] is False
+        assert captured_bodies[-1] == b""
+
+        # Reassembled content should match original
+        reassembled = b"".join(captured_bodies[:-1])  # Exclude final empty
+        assert reassembled == b"line1\nline2\nline3\n"
 
     @pytest.mark.asyncio
-    async def test_response_wipes_bytearray_after_sending(self):
-        """Verify the bytearray is wiped after the response is sent."""
-        key_content = bytearray(b"sensitive private key")
+    async def test_response_sends_single_line_content(self):
+        """Verify the response handles content without newlines."""
+        key_content = bytearray(b"single line no newline")
+        response = SSHKeyContentResponse(key_content)
+
+        sent_messages = []
+        captured_bodies = []
+
+        async def mock_receive():
+            return {"type": "http.request", "body": b""}
+
+        async def mock_send(message):
+            sent_messages.append(message)
+            if message.get("type") == "http.response.body":
+                captured_bodies.append(bytes(message["body"]))
+
+        scope = {"type": "http"}
+
+        await response(scope, mock_receive, mock_send)
+
+        # Verify response start was sent
+        assert sent_messages[0]["type"] == "http.response.start"
+        assert sent_messages[0]["status"] == 200
+
+        # 1 content chunk + 1 final empty = 2 body messages
+        body_messages = [m for m in sent_messages if m.get("type") == "http.response.body"]
+        assert len(body_messages) == 2
+
+        # First should have more_body=True, second more_body=False
+        assert body_messages[0]["more_body"] is True
+        assert body_messages[1]["more_body"] is False
+
+        # Content should match
+        assert captured_bodies[0] == b"single line no newline"
+        assert captured_bodies[1] == b""
+
+    @pytest.mark.asyncio
+    async def test_response_wipes_bytearray_after_streaming(self):
+        """Verify the bytearray is wiped after streaming completes."""
+        key_content = bytearray(b"sensitive\nprivate\nkey\n")
         original_length = len(key_content)
         response = SSHKeyContentResponse(key_content)
 
@@ -220,8 +267,8 @@ class TestSSHKeyContentResponse:
 
     @pytest.mark.asyncio
     async def test_response_wipes_bytearray_even_on_error(self):
-        """Verify the bytearray is wiped even if sending fails."""
-        key_content = bytearray(b"sensitive data")
+        """Verify the bytearray is wiped even if streaming fails."""
+        key_content = bytearray(b"sensitive\ndata\n")
         response = SSHKeyContentResponse(key_content)
 
         async def mock_receive():
@@ -255,6 +302,92 @@ class TestSSHKeyContentResponse:
         response = SSHKeyContentResponse(key_content, status_code=201)
 
         assert response.status_code == 201
+
+        # Clean up
+        _wipe_bytearray(key_content)
+
+    @pytest.mark.asyncio
+    async def test_response_streams_realistic_ssh_key(self):
+        """Verify streaming works with a realistic SSH private key format."""
+        key_content = bytearray(
+            b"-----BEGIN OPENSSH PRIVATE KEY-----\n"
+            b"b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtz\n"
+            b"c2gtZWQyNTUxOQAAACBGVmJsZnRtcm5yYmx0c21ibmRjc2xibmRzY21ibmRzYwAA\n"
+            b"AIhkc21ibmRzY21ibmRzY21ibmRzY21ibmRzY21ibmRzY2RzbWJuZHNjbWJuZHNj\n"
+            b"-----END OPENSSH PRIVATE KEY-----\n"
+        )
+        expected_content = bytes(key_content)
+        response = SSHKeyContentResponse(key_content)
+
+        sent_messages = []
+        captured_bodies = []
+
+        async def mock_receive():
+            return {"type": "http.request", "body": b""}
+
+        async def mock_send(message):
+            sent_messages.append(message)
+            if message.get("type") == "http.response.body":
+                captured_bodies.append(bytes(message["body"]))
+
+        scope = {"type": "http"}
+
+        await response(scope, mock_receive, mock_send)
+
+        # Should have 5 lines + 1 final empty = 6 body messages
+        body_messages = [m for m in sent_messages if m.get("type") == "http.response.body"]
+        assert len(body_messages) == 6
+
+        # Verify each line message has more_body=True
+        for msg in body_messages[:-1]:
+            assert msg["more_body"] is True
+
+        # Final message should be empty with more_body=False
+        assert body_messages[-1]["more_body"] is False
+        assert captured_bodies[-1] == b""
+
+        # Reassembled content should match original
+        reassembled = b"".join(captured_bodies[:-1])
+        assert reassembled == expected_content
+
+        # Verify bytearray was wiped
+        assert all(b == 0 for b in key_content)
+
+    def test_iter_lines_yields_memoryview_slices(self):
+        """Verify _iter_lines yields memoryview slices without copying."""
+        key_content = bytearray(b"line1\nline2\nline3\n")
+        response = SSHKeyContentResponse(key_content)
+
+        lines = list(response._iter_lines())
+
+        # Should have 3 lines
+        assert len(lines) == 3
+
+        # Each should be a memoryview
+        for line in lines:
+            assert isinstance(line, memoryview)
+
+        # Content should be correct
+        assert bytes(lines[0]) == b"line1\n"
+        assert bytes(lines[1]) == b"line2\n"
+        assert bytes(lines[2]) == b"line3\n"
+
+        # Clean up
+        _wipe_bytearray(key_content)
+
+    def test_iter_lines_handles_no_trailing_newline(self):
+        """Verify _iter_lines handles content without trailing newline."""
+        key_content = bytearray(b"line1\nline2\nfinal")
+        response = SSHKeyContentResponse(key_content)
+
+        lines = list(response._iter_lines())
+
+        # Should have 3 lines
+        assert len(lines) == 3
+
+        assert bytes(lines[0]) == b"line1\n"
+        assert bytes(lines[1]) == b"line2\n"
+        assert bytes(lines[2]) == b"final"  # No newline
 
         # Clean up
         _wipe_bytearray(key_content)

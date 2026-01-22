@@ -102,14 +102,16 @@ def _wipe_bytearray(data: bytearray) -> None:
 
 
 class SSHKeyContentResponse(Response):
-    """Secure response for SSH key content that wipes sensitive data after sending.
+    """Secure streaming response for SSH key content that minimizes memory exposure.
 
-    This response class stores the key content in a mutable bytearray and
-    explicitly overwrites it with zeros after the response has been sent.
-    This minimizes the time sensitive key material exists in memory.
+    This response class streams the key content line-by-line via ASGI to minimize
+    buffering in h11/uvicorn. By sending each chunk with "more_body": True, h11
+    can flush each line immediately rather than buffering the entire key in memory.
 
-    The response body is sent as plain text (the raw key content) to avoid
-    creating immutable string copies during JSON serialization.
+    After streaming completes, the original bytearray is wiped with zeros and
+    garbage collection is triggered to clean up any intermediate copies.
+
+    Uses memoryview to avoid creating unnecessary copies when iterating over lines.
     """
 
     media_type = "text/plain"
@@ -143,12 +145,38 @@ class SSHKeyContentResponse(Response):
             media_type=self.media_type,
         )
 
-    async def __call__(self, scope, receive, send):
-        """Send the response and then wipe the sensitive buffer.
+    def _iter_lines(self):
+        """Yield memoryview slices of the key buffer line by line.
 
-        Overrides the parent __call__ to send the bytearray directly via ASGI
-        without converting to immutable bytes, then wipes the buffer and
-        invokes garbage collection to clean up any intermediate copies.
+        Using memoryview avoids creating copies of the data. Each yielded
+        view is a reference to a slice of the original bytearray.
+
+        Yields:
+            memoryview: A view into the buffer for each line (including newline)
+        """
+        buffer = self._key_buffer
+        view = memoryview(buffer)
+        start = 0
+
+        while start < len(buffer):
+            # Find next newline
+            try:
+                end = buffer.index(b'\n', start) + 1
+            except ValueError:
+                # No more newlines, yield the rest
+                end = len(buffer)
+
+            yield view[start:end]
+            start = end
+
+    async def __call__(self, scope, receive, send):
+        """Stream the response line-by-line, then wipe the sensitive buffer.
+
+        Sends each line with "more_body": True to signal h11 that it can flush
+        immediately, reducing memory buffering. After all lines are sent, sends
+        an empty body with "more_body": False to complete the response.
+
+        The bytearray is wiped in the finally block regardless of success or error.
         """
         await send({
             "type": "http.response.start",
@@ -156,9 +184,17 @@ class SSHKeyContentResponse(Response):
             "headers": self.raw_headers,
         })
         try:
+            for line in self._iter_lines():
+                await send({
+                    "type": "http.response.body",
+                    "body": line,
+                    "more_body": True,
+                })
+            # Final empty body to signal end of response
             await send({
                 "type": "http.response.body",
-                "body": self._key_buffer,
+                "body": b"",
+                "more_body": False,
             })
         finally:
             _wipe_bytearray(self._key_buffer)
