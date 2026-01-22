@@ -132,7 +132,7 @@ export default function Preferences() {
         <Card.Body className="flex flex-col gap-4 pb-4">
           <Typography className="font-semibold"> Display</Typography>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pl-4">
             <input
               checked={isFilteredByGroups}
               className="icon-small checked:accent-secondary-light"
@@ -160,7 +160,7 @@ export default function Preferences() {
             </Typography>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pl-4">
             <input
               checked={hideDotFiles}
               className="icon-small checked:accent-secondary-light"
@@ -188,7 +188,7 @@ export default function Preferences() {
             </Typography>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pl-4">
             <input
               checked={showTutorial}
               className="icon-small checked:accent-secondary-light"
@@ -218,17 +218,17 @@ export default function Preferences() {
 
           <Typography className="font-semibold"> Data Links</Typography>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pl-4">
             <AutomaticLinksToggle />
           </div>
 
           <Typography className="font-semibold"> Neuroglancer</Typography>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pl-4">
             <LegacyMultichannelToggle />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pl-4">
             <input
               checked={disableNeuroglancerStateGeneration}
               className="icon-small checked:accent-secondary-light"
@@ -256,7 +256,7 @@ export default function Preferences() {
             </Typography>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pl-4">
             <input
               checked={disableHeuristicalLayerTypeDetection ?? false}
               className="icon-small checked:accent-secondary-light"
