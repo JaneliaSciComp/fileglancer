@@ -18,7 +18,10 @@ export default function Sidebar() {
   } = useFilteredZonesAndFavorites();
 
   return (
-    <Card className="min-w-full h-full overflow-hidden rounded-none bg-surface shadow-lg flex flex-col pl-3">
+    <Card
+      className="min-w-full h-full overflow-hidden rounded-none bg-surface shadow-lg flex flex-col pl-3"
+      data-tour="sidebar"
+    >
       <div className="my-3 short:my-1 relative">
         <Input
           className="bg-background text-foreground short:text-xs [&::-webkit-search-cancel-button]:appearance-none"

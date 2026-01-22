@@ -40,6 +40,7 @@ export default function NavigationInput({
   return (
     <div
       className={`flex w-full items-center ${location === 'dashboard' ? '' : 'gap-3 mt-8'}`}
+      data-tour="navigation-input"
     >
       <Typography
         as="label"
