@@ -477,6 +477,8 @@ def generate_ssh_key(ssh_dir: str, passphrase: Optional[SecretStr] = None) -> SS
 def add_to_authorized_keys(ssh_dir: str, public_key: str) -> bool:
     """Add a public key to the authorized_keys file.
 
+    Enforces 'restrict' option and ensures 'fileglancer' is in the comment.
+
     Args:
         ssh_dir: Path to the .ssh directory
         public_key: The public key content to add
@@ -489,8 +491,43 @@ def add_to_authorized_keys(ssh_dir: str, public_key: str) -> bool:
         RuntimeError: If adding the key fails
     """
     # Validate public key format (basic check)
-    if not public_key or not public_key.startswith(SSH_KEY_PREFIX):
-        raise ValueError("Invalid public key format")
+    if not public_key:
+        raise ValueError("Invalid public key format: empty")
+
+    parts = public_key.strip().split()
+
+    # Find the key type index (ssh-...) to handle existing options
+    try:
+        type_idx = next(i for i, part in enumerate(parts) if part.startswith(SSH_KEY_PREFIX))
+    except StopIteration:
+        raise ValueError("Invalid public key format: key type not found")
+
+    # Handle options
+    if type_idx > 0:
+        options = parts[0].split(',')
+        if "restrict" not in options:
+            options.insert(0, "restrict")
+        new_options = ",".join(options)
+    else:
+        new_options = "restrict"
+
+    # Handle comment
+    key_parts = parts[type_idx:]
+    # key_parts is [type, blob, comment...]
+    if len(key_parts) < 2:
+         raise ValueError("Invalid public key format: incomplete")
+
+    key_type = key_parts[0]
+    key_blob = key_parts[1]
+    comment_parts = key_parts[2:]
+
+    if not any("fileglancer" in p for p in comment_parts):
+        comment_parts.append("fileglancer")
+
+    new_comment = " ".join(comment_parts)
+
+    # Reconstruct key line
+    final_key_line = f"{new_options} {key_type} {key_blob} {new_comment}"
 
     # Ensure .ssh directory exists
     ensure_ssh_directory_exists(ssh_dir)
@@ -498,7 +535,7 @@ def add_to_authorized_keys(ssh_dir: str, public_key: str) -> bool:
     authorized_keys_path = os.path.join(ssh_dir, AUTHORIZED_KEYS_FILENAME)
 
     # Get fingerprint of the key we're adding to check if already present
-    # Write key to temp file to get its fingerprint
+    # We use the ORIGINAL key content for fingerprinting as options don't affect it
     try:
         with tempfile.NamedTemporaryFile(mode='w', suffix='.pub', delete=False) as tmp:
             tmp.write(public_key)
@@ -517,7 +554,7 @@ def add_to_authorized_keys(ssh_dir: str, public_key: str) -> bool:
     except Exception as e:
         logger.warning(f"Could not check fingerprint, proceeding with add: {e}")
 
-    # Backup and append the key
+    # Backup and append the modified key
     try:
         # Backup existing file before modifying
         if os.path.exists(authorized_keys_path):
@@ -537,12 +574,12 @@ def add_to_authorized_keys(ssh_dir: str, public_key: str) -> bool:
 
         # Append the key
         with open(authorized_keys_path, 'a') as f:
-            f.write(public_key + '\n')
+            f.write(final_key_line + '\n')
 
         # Ensure correct permissions
         os.chmod(authorized_keys_path, 0o600)
 
-        logger.info(f"Added key to {authorized_keys_path}")
+        logger.info(f"Added restricted key to {authorized_keys_path}")
         return True
 
     except Exception as e:
