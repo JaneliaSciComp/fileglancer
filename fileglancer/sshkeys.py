@@ -87,11 +87,6 @@ class GenerateKeyResponse(BaseModel):
     message: str = Field(description="Status message")
 
 
-class SSHKeyContent(BaseModel):
-    """SSH key content - only fetched on demand"""
-    key: str = Field(description="The requested key content")
-
-
 class GenerateKeyRequest(BaseModel):
     """Request body for generating an SSH key"""
     passphrase: Optional[str] = Field(default=None, description="Optional passphrase to protect the private key")
