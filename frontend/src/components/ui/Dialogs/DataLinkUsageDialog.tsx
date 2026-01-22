@@ -198,6 +198,34 @@ if '0' in root:
           language="java"
         />
       )
+    },
+    {
+      id: 'fiji',
+      label: 'Fiji',
+      content: (
+        <InstructionBlock
+          steps={[
+            'Launch Fiji',
+            'Navigate to Plugins → BigDataViewer → HDF5/N5/Zarr/OME-NGFF Viewer',
+            'Paste data link and click "Detect datasets"',
+            'Select the multiscale image and click "OK"'
+          ]}
+        />
+      )
+    },
+    {
+      id: 'vvdViewer',
+      label: 'VVDViewer',
+      content: (
+        <InstructionBlock
+          steps={[
+            'Install VVDViewer',
+            'Launch VVDViewer',
+            'Navigate to File → Open URL',
+            'Paste data link and click "OK"'
+          ]}
+        />
+      )
     }
   ];
 
