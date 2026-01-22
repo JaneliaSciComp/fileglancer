@@ -951,20 +951,25 @@ def create_app(settings):
                 logger.error(f"Error authorizing SSH key for {username}: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
 
-    @app.get("/api/ssh-keys/content", response_model=sshkeys.SSHKeyContent,
+    @app.get("/api/ssh-keys/content",
              description="Get the content of the default SSH key (id_ed25519)")
     async def get_ssh_key_content(
         key_type: str = Query(..., description="Type of key to fetch: 'public' or 'private'"),
         username: str = Depends(get_current_user)
     ):
-        """Get the public or private key content for copying"""
+        """Get the public or private key content for copying.
+
+        Returns plain text response with secure bytearray handling that wipes
+        the key content from memory after sending.
+        """
         if key_type not in ("public", "private"):
             raise HTTPException(status_code=400, detail="key_type must be 'public' or 'private'")
 
         with _get_user_context(username):
             try:
                 ssh_dir = sshkeys.get_ssh_directory()
-                return sshkeys.get_key_content(ssh_dir, "id_ed25519", key_type)
+                key_buffer = sshkeys.get_key_content(ssh_dir, "id_ed25519", key_type)
+                return sshkeys.SSHKeyContentResponse(key_buffer)
 
             except ValueError as e:
                 raise HTTPException(status_code=404, detail=str(e))

@@ -174,6 +174,9 @@ export function useAuthorizeSSHKeyMutation(): UseMutationResult<
  * Fetch SSH key content (public or private key) on demand.
  * This is not a hook - call it imperatively when user clicks copy.
  *
+ * Backend uses secure bytearray handling that wipes key content from
+ * memory after sending. Response is plain text for both key types.
+ *
  * @param keyType - Type of key to fetch: 'public' or 'private'
  * @returns Promise with the key content
  */
@@ -185,11 +188,11 @@ export async function fetchSSHKeyContent(
     'GET'
   );
 
-  const body = await getResponseJsonOrError(response);
-
   if (!response.ok) {
+    const body = await getResponseJsonOrError(response);
     throwResponseNotOkError(response, body);
   }
 
-  return body as SSHKeyContent;
+  const keyText = await response.text();
+  return { key: keyText };
 }

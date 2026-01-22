@@ -4,12 +4,14 @@ This module provides functions for listing, generating, and managing SSH keys
 in a user's ~/.ssh directory.
 """
 
+import gc
 import os
 import shutil
 import subprocess
 import tempfile
-from typing import List, Optional
+from typing import Dict, List, Optional
 
+from fastapi.responses import Response
 from loguru import logger
 from pydantic import BaseModel, Field
 
@@ -93,6 +95,79 @@ class SSHKeyContent(BaseModel):
 class GenerateKeyRequest(BaseModel):
     """Request body for generating an SSH key"""
     passphrase: Optional[str] = Field(default=None, description="Optional passphrase to protect the private key")
+
+
+def _wipe_bytearray(data: bytearray) -> None:
+    """Securely wipe a bytearray by overwriting with zeros.
+
+    Args:
+        data: The bytearray to wipe
+    """
+    data[:] = b'\x00' * len(data)
+
+
+class SSHKeyContentResponse(Response):
+    """Secure response for SSH key content that wipes sensitive data after sending.
+
+    This response class stores the key content in a mutable bytearray and
+    explicitly overwrites it with zeros after the response has been sent.
+    This minimizes the time sensitive key material exists in memory.
+
+    The response body is sent as plain text (the raw key content) to avoid
+    creating immutable string copies during JSON serialization.
+    """
+
+    media_type = "text/plain"
+    charset = "utf-8"
+
+    def __init__(
+        self,
+        key_content: bytearray,
+        status_code: int = 200,
+        headers: Optional[Dict[str, str]] = None,
+    ):
+        """Initialize the response with key content stored in a bytearray.
+
+        Args:
+            key_content: The SSH key content as a mutable bytearray
+            status_code: HTTP status code (default 200)
+            headers: Optional additional headers
+        """
+        # Store the key buffer - do NOT convert to bytes
+        self._key_buffer = key_content
+
+        # Merge Content-Length header with any provided headers
+        # This is required because we don't pass content to the parent
+        all_headers = dict(headers) if headers else {}
+        all_headers["content-length"] = str(len(key_content))
+
+        # Initialize parent without content - we'll send body directly in __call__
+        super().__init__(
+            status_code=status_code,
+            headers=all_headers,
+            media_type=self.media_type,
+        )
+
+    async def __call__(self, scope, receive, send):
+        """Send the response and then wipe the sensitive buffer.
+
+        Overrides the parent __call__ to send the bytearray directly via ASGI
+        without converting to immutable bytes, then wipes the buffer and
+        invokes garbage collection to clean up any intermediate copies.
+        """
+        await send({
+            "type": "http.response.start",
+            "status": self.status_code,
+            "headers": self.raw_headers,
+        })
+        try:
+            await send({
+                "type": "http.response.body",
+                "body": self._key_buffer,
+            })
+        finally:
+            _wipe_bytearray(self._key_buffer)
+            gc.collect()
 
 
 def get_ssh_directory() -> str:
@@ -200,49 +275,45 @@ def parse_public_key(pubkey_path: str, ssh_dir: str) -> SSHKeyInfo:
     )
 
 
-def _read_file_secure(file_path: str) -> str:
-    """Read a file securely using a mutable bytearray that is cleared after use.
+def read_file_to_bytearray(file_path: str) -> bytearray:
+    """Read a file into a mutable bytearray for secure handling.
 
-    This function reads sensitive data (like private keys) into a mutable bytearray
-    which is explicitly overwritten with zeros after converting to a string. This
-    reduces the window during which the sensitive data exists in memory and prevents
-    it from persisting in immutable strings that could appear in core dumps.
+    This function reads file contents into a mutable bytearray that can be
+    explicitly wiped from memory when no longer needed. The caller is responsible
+    for wiping the bytearray when done (e.g., by passing it to SSHKeyContentResponse
+    which wipes it after sending).
 
     Args:
         file_path: Path to the file to read
 
     Returns:
-        The file contents as a string
+        The file contents as a mutable bytearray
 
     Note:
-        While the returned string is still immutable and will exist in memory,
-        this approach minimizes the exposure by clearing the mutable buffer
-        immediately after use.
+        The returned bytearray should be wiped with _wipe_bytearray() when no
+        longer needed. SSHKeyContentResponse handles this automatically.
     """
     # Get file size to allocate bytearray
     file_size = os.path.getsize(file_path)
 
     # Read into mutable bytearray
-    sensitive_buffer = bytearray(file_size)
+    key_buffer = bytearray(file_size)
 
-    try:
-        with open(file_path, 'rb') as f:
-            bytes_read = f.readinto(sensitive_buffer)
-            if bytes_read != file_size:
-                raise IOError(f"Expected to read {file_size} bytes, but read {bytes_read}")
+    with open(file_path, 'rb') as f:
+        bytes_read = f.readinto(key_buffer)
+        if bytes_read != file_size:
+            # Wipe partial data on error
+            _wipe_bytearray(key_buffer)
+            raise IOError(f"Expected to read {file_size} bytes, but read {bytes_read}")
 
-        # Convert to string (this creates an immutable copy)
-        result = sensitive_buffer.decode('utf-8')
-
-        return result
-    finally:
-        # Explicitly overwrite the mutable buffer with zeros
-        for i in range(len(sensitive_buffer)):
-            sensitive_buffer[i] = 0
+    return key_buffer
 
 
-def get_key_content(ssh_dir: str, filename: str, key_type: str = "public") -> SSHKeyContent:
-    """Get the content of an SSH key (public or private).
+def get_key_content(ssh_dir: str, filename: str, key_type: str = "public") -> bytearray:
+    """Get the content of an SSH key as a mutable bytearray.
+
+    The returned bytearray should be passed to SSHKeyContentResponse, which
+    will wipe it after sending the response. Do not convert to str or bytes.
 
     Args:
         ssh_dir: Path to the .ssh directory
@@ -250,27 +321,23 @@ def get_key_content(ssh_dir: str, filename: str, key_type: str = "public") -> SS
         key_type: Type of key to fetch: 'public' or 'private'
 
     Returns:
-        SSHKeyContent with the requested key content
+        bytearray containing the key content (caller must wipe when done)
 
     Raises:
-        ValueError: If the key doesn't exist or is invalid
+        ValueError: If the key doesn't exist or key_type is invalid
     """
     if key_type == "public":
-        pubkey_path = safe_join_path(ssh_dir, f"{filename}.pub")
-        if not os.path.exists(pubkey_path):
+        key_path = safe_join_path(ssh_dir, f"{filename}.pub")
+        if not os.path.exists(key_path):
             raise ValueError(f"Public key '{filename}' not found")
-        with open(pubkey_path, 'r') as f:
-            return SSHKeyContent(key=f.read().strip())
-
     elif key_type == "private":
-        private_key_path = safe_join_path(ssh_dir, filename)
-        if not os.path.exists(private_key_path):
+        key_path = safe_join_path(ssh_dir, filename)
+        if not os.path.exists(key_path):
             raise ValueError(f"Private key '{filename}' not found")
-        # Use secure reading for private keys
-        key_content = _read_file_secure(private_key_path)
-        return SSHKeyContent(key=key_content)
+    else:
+        raise ValueError(f"Invalid key_type: {key_type}")
 
-    raise ValueError(f"Invalid key_type: {key_type}")
+    return read_file_to_bytearray(key_path)
 
 
 def is_key_in_authorized_keys(ssh_dir: str, fingerprint: str) -> bool:
