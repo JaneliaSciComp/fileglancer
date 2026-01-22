@@ -3,24 +3,13 @@ import { Card, Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
-import AutomaticLinksToggle from '@/components/ui/PreferencesPage/AutomaticLinksToggle';
-import LegacyMultichannelToggle from '@/components/ui/PreferencesPage/LegacyMultichannelToggle';
+import DataLinkOptions from '@/components/ui/PreferencesPage/DataLinkOptions';
+import DisplayOptions from '@/components/ui/PreferencesPage/DisplayOptions';
+import NeuroglancerOptions from '@/components/ui/PreferencesPage/NeuroglancerOptions';
 
 export default function Preferences() {
-  const {
-    pathPreference,
-    handlePathPreferenceSubmit,
-    hideDotFiles,
-    isFilteredByGroups,
-    toggleHideDotFiles,
-    disableNeuroglancerStateGeneration,
-    toggleDisableNeuroglancerStateGeneration,
-    disableHeuristicalLayerTypeDetection,
-    toggleDisableHeuristicalLayerTypeDetection,
-    toggleFilterByGroups,
-    showTutorial,
-    toggleShowTutorial
-  } = usePreferencesContext();
+  const { pathPreference, handlePathPreferenceSubmit } =
+    usePreferencesContext();
 
   return (
     <>
@@ -130,160 +119,9 @@ export default function Preferences() {
           </Typography>
         </Card.Header>
         <Card.Body className="flex flex-col gap-4 pb-4">
-          <Typography className="font-semibold"> Display</Typography>
-
-          <div className="flex items-center gap-2 pl-4">
-            <input
-              checked={isFilteredByGroups}
-              className="icon-small checked:accent-secondary-light"
-              id="is_filtered_by_groups"
-              onChange={async () => {
-                const result = await toggleFilterByGroups();
-                if (result.success) {
-                  toast.success(
-                    !isFilteredByGroups
-                      ? 'Only Zones for groups you have membership in are now visible'
-                      : 'All Zones are now visible'
-                  );
-                } else {
-                  toast.error(result.error);
-                }
-              }}
-              type="checkbox"
-            />
-            <Typography
-              as="label"
-              className="text-foreground"
-              htmlFor="is_filtered_by_groups"
-            >
-              Display Zones for your groups only
-            </Typography>
-          </div>
-
-          <div className="flex items-center gap-2 pl-4">
-            <input
-              checked={hideDotFiles}
-              className="icon-small checked:accent-secondary-light"
-              id="hide_dot_files"
-              onChange={async () => {
-                const result = await toggleHideDotFiles();
-                if (result.success) {
-                  toast.success(
-                    hideDotFiles
-                      ? 'Dot files are now visible'
-                      : 'Dot files are now hidden'
-                  );
-                } else {
-                  toast.error(result.error);
-                }
-              }}
-              type="checkbox"
-            />
-            <Typography
-              as="label"
-              className="text-foreground"
-              htmlFor="hide_dot_files"
-            >
-              Hide dot files (files and folders starting with ".")
-            </Typography>
-          </div>
-
-          <div className="flex items-center gap-2 pl-4">
-            <input
-              checked={showTutorial}
-              className="icon-small checked:accent-secondary-light"
-              id="show_tutorial"
-              onChange={async () => {
-                const result = await toggleShowTutorial();
-                if (result.success) {
-                  toast.success(
-                    showTutorial
-                      ? 'Tutorial welcome card will no longer be shown on Browse page'
-                      : 'Tutorial welcome card will be shown on Browse page'
-                  );
-                } else {
-                  toast.error(result.error);
-                }
-              }}
-              type="checkbox"
-            />
-            <Typography
-              as="label"
-              className="text-foreground"
-              htmlFor="show_tutorial"
-            >
-              Show tutorial welcome card on Browse page
-            </Typography>
-          </div>
-
-          <Typography className="font-semibold"> Data Links</Typography>
-
-          <div className="flex items-center gap-2 pl-4">
-            <AutomaticLinksToggle />
-          </div>
-
-          <Typography className="font-semibold"> Neuroglancer</Typography>
-
-          <div className="flex items-center gap-2 pl-4">
-            <LegacyMultichannelToggle />
-          </div>
-
-          <div className="flex items-center gap-2 pl-4">
-            <input
-              checked={disableNeuroglancerStateGeneration}
-              className="icon-small checked:accent-secondary-light"
-              id="disable_neuroglancer_state_generation"
-              onChange={async () => {
-                const result = await toggleDisableNeuroglancerStateGeneration();
-                if (result.success) {
-                  toast.success(
-                    disableNeuroglancerStateGeneration
-                      ? 'Neuroglancer state generation is now enabled'
-                      : 'Neuroglancer state generation is now disabled'
-                  );
-                } else {
-                  toast.error(result.error);
-                }
-              }}
-              type="checkbox"
-            />
-            <Typography
-              as="label"
-              className="text-foreground"
-              htmlFor="disable_neuroglancer_state_generation"
-            >
-              Disable Neuroglancer state generation
-            </Typography>
-          </div>
-
-          <div className="flex items-center gap-2 pl-4">
-            <input
-              checked={disableHeuristicalLayerTypeDetection ?? false}
-              className="icon-small checked:accent-secondary-light"
-              id="disable_heuristical_layer_type_detection"
-              onChange={async () => {
-                const result =
-                  await toggleDisableHeuristicalLayerTypeDetection();
-                if (result.success) {
-                  toast.success(
-                    disableHeuristicalLayerTypeDetection
-                      ? 'Heuristical layer type determination is now enabled'
-                      : 'Heuristical layer type determination is now disabled'
-                  );
-                } else {
-                  toast.error(result.error);
-                }
-              }}
-              type="checkbox"
-            />
-            <Typography
-              as="label"
-              className="text-foreground"
-              htmlFor="disable_heuristical_layer_type_detection"
-            >
-              Disable heuristical layer type determination
-            </Typography>
-          </div>
+          <DisplayOptions />
+          <DataLinkOptions />
+          <NeuroglancerOptions />
         </Card.Body>
       </Card>
     </>
