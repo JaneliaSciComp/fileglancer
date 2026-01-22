@@ -13,7 +13,7 @@ from typing import Dict, List, Optional
 
 from fastapi.responses import Response
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 # Constants
 AUTHORIZED_KEYS_FILENAME = "authorized_keys"
@@ -89,7 +89,7 @@ class GenerateKeyResponse(BaseModel):
 
 class GenerateKeyRequest(BaseModel):
     """Request body for generating an SSH key"""
-    passphrase: Optional[str] = Field(default=None, description="Optional passphrase to protect the private key")
+    passphrase: Optional[SecretStr] = Field(default=None, description="Optional passphrase to protect the private key")
 
 
 def _wipe_bytearray(data: bytearray) -> None:
@@ -410,7 +410,7 @@ def list_ssh_keys(ssh_dir: str) -> List[SSHKeyInfo]:
     return keys
 
 
-def generate_ssh_key(ssh_dir: str, passphrase: Optional[str] = None) -> SSHKeyInfo:
+def generate_ssh_key(ssh_dir: str, passphrase: Optional[SecretStr] = None) -> SSHKeyInfo:
     """Generate the default ed25519 SSH key (id_ed25519).
 
     Args:
@@ -438,10 +438,11 @@ def generate_ssh_key(ssh_dir: str, passphrase: Optional[str] = None) -> SSHKeyIn
         raise ValueError(f"SSH key '{key_name}' already exists")
 
     # Build ssh-keygen command
+    passphrase_str = passphrase.get_secret_value() if passphrase else ""
     cmd = [
         'ssh-keygen',
         '-t', 'ed25519',
-        '-N', passphrase or '',  # Empty string if no passphrase
+        '-N', passphrase_str,
         '-f', key_path,
     ]
 

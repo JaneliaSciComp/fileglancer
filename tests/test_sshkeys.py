@@ -1,14 +1,17 @@
-"""Tests for SSH key management utilities with secure bytearray handling."""
+"Tests for SSH key management utilities with secure bytearray handling."
 
 import os
+import subprocess
 import tempfile
 import pytest
+from pydantic import SecretStr
 
 from fileglancer.sshkeys import (
     _wipe_bytearray,
     read_file_to_bytearray,
     get_key_content,
     SSHKeyContentResponse,
+    generate_ssh_key,
 )
 
 
@@ -309,3 +312,55 @@ class TestSSHKeyContentResponse:
                 break
 
         assert content_length == expected_length
+
+
+class TestGenerateSSHKey:
+    """Tests for the generate_ssh_key function."""
+
+    def test_generate_key_no_passphrase(self):
+        """Verify generating a key with no passphrase."""
+        with tempfile.TemporaryDirectory() as ssh_dir:
+            key_info = generate_ssh_key(ssh_dir, passphrase=None)
+
+            assert key_info.filename == "id_ed25519"
+            key_path = os.path.join(ssh_dir, "id_ed25519")
+            assert os.path.exists(key_path)
+            assert os.path.exists(key_path + ".pub")
+
+            # Verify it is NOT encrypted
+            check_cmd = ['ssh-keygen', '-y', '-f', key_path, '-P', '']
+            result = subprocess.run(check_cmd, capture_output=True)
+            assert result.returncode == 0
+
+    def test_generate_key_with_passphrase(self):
+        """Verify generating a key with a passphrase."""
+        with tempfile.TemporaryDirectory() as ssh_dir:
+            passphrase_str = "test-passphrase"
+            passphrase = SecretStr(passphrase_str)
+            key_info = generate_ssh_key(ssh_dir, passphrase=passphrase)
+
+            assert key_info.filename == "id_ed25519"
+            key_path = os.path.join(ssh_dir, "id_ed25519")
+            assert os.path.exists(key_path)
+            assert os.path.exists(key_path + ".pub")
+
+            # Verify it IS encrypted (fails with empty passphrase)
+            check_cmd_empty = ['ssh-keygen', '-y', '-f', key_path, '-P', '']
+            result_empty = subprocess.run(check_cmd_empty, capture_output=True)
+            assert result_empty.returncode != 0
+
+            # Verify it accepts the correct passphrase
+            check_cmd_correct = ['ssh-keygen', '-y', '-f', key_path, '-P', passphrase_str]
+            result_correct = subprocess.run(check_cmd_correct, capture_output=True)
+            assert result_correct.returncode == 0
+
+    def test_generate_key_already_exists_raises(self):
+        """Verify generating a key when one already exists raises ValueError."""
+        with tempfile.TemporaryDirectory() as ssh_dir:
+            # Create a dummy key file
+            key_path = os.path.join(ssh_dir, "id_ed25519")
+            with open(key_path, 'w') as f:
+                f.write("dummy key")
+
+            with pytest.raises(ValueError, match="already exists"):
+                generate_ssh_key(ssh_dir)
