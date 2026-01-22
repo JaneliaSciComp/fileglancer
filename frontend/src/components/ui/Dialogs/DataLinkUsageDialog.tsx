@@ -188,18 +188,6 @@ if '0' in root:
       )
     },
     {
-      id: 'java',
-      label: 'Java',
-      content: (
-        <CodeBlock
-          code={`String url = "${dataLinkUrl}";`}
-          copyLabel="Copy code"
-          copyable={true}
-          language="java"
-        />
-      )
-    },
-    {
       id: 'fiji',
       label: 'Fiji',
       content: (
