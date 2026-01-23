@@ -3,12 +3,19 @@ import toast from 'react-hot-toast';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import OptionsSection from '@/components/ui/PreferencesPage/OptionsSection';
 
-export default function AutomaticLinksToggle() {
+type AutomaticLinksToggleProps = {
+  readonly checkboxesOnly?: boolean;
+};
+
+export default function AutomaticLinksToggle({
+  checkboxesOnly = false
+}: AutomaticLinksToggleProps) {
   const { areDataLinksAutomatic, toggleAutomaticDataLinks } =
     usePreferencesContext();
 
   return (
     <OptionsSection
+      checkboxesOnly={checkboxesOnly}
       header="Data Links"
       options={[
         {

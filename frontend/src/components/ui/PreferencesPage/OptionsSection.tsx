@@ -1,27 +1,38 @@
 import { Typography } from '@material-tailwind/react';
 
-export interface Option {
+export type Option = {
   checked: boolean;
   id: string;
   label: string;
   onChange: () => Promise<void> | void;
-}
+};
 
-interface OptionsSectionProps {
-  readonly header: string;
+type OptionsSectionProps = {
+  readonly header?: string;
   readonly options: readonly Option[];
-}
+  readonly checkboxesOnly?: boolean;
+};
 
 export default function OptionsSection({
   header,
-  options
+  options,
+  checkboxesOnly = false
 }: OptionsSectionProps) {
   return (
     <>
-      <Typography className="font-semibold">{header}</Typography>
+      {!checkboxesOnly && header ? (
+        <Typography className="font-semibold">{header}</Typography>
+      ) : null}
 
       {options.map(option => (
-        <div className="flex items-center gap-2 pl-4" key={option.id}>
+        <div
+          className={
+            checkboxesOnly
+              ? 'flex items-center gap-2'
+              : 'flex items-center gap-2 pl-4'
+          }
+          key={option.id}
+        >
           <input
             checked={option.checked}
             className="icon-small checked:accent-secondary-light"

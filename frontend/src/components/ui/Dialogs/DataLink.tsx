@@ -157,7 +157,7 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               <Typography className="font-semibold text-foreground">
                 Don't ask me this again:
               </Typography>
-              <AutomaticLinksToggle />
+              <AutomaticLinksToggle checkboxesOnly />
             </div>
             <BtnContainer>
               <CreateLinkBtn onConfirm={props.onConfirm} />
