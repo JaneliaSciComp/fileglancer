@@ -95,7 +95,7 @@ ignore = ["W002"]
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
-platforms = ["osx-arm64", "osx-64", "linux-64"]
+platforms = ["osx-arm64", "osx-64", "linux-64", "linux-aarch64"]
 
 [tool.pixi.feature.test.tasks]
 test-pip-install = "pip install -e ."
@@ -147,6 +147,10 @@ dev-launch-secure = "python fileglancer/dev_launch.py"
 migrate = "alembic upgrade head"
 migrate-create = "alembic revision --autogenerate"
 stamp-db = "python -m fileglancer.stamp_db"
+container-rebuild = "npx @devcontainers/cli up --workspace-folder . --remove-existing-container"
+container-shell = "npx @devcontainers/cli exec --workspace-folder . bash"
+container-claude = "npx @devcontainers/cli exec --workspace-folder . bash -lc 'pixi run claude --dangerously-skip-permissions'"
+claude = "claude"
 
 [tool.pixi.dependencies]
 python = ">=3.14.0,<4"
