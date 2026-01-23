@@ -2,6 +2,8 @@ import secrets
 import hashlib
 from datetime import datetime, UTC
 import os
+import fcntl
+import tempfile
 from functools import lru_cache
 
 from sqlalchemy import create_engine, Column, String, Integer, DateTime, JSON, UniqueConstraint
@@ -19,9 +21,6 @@ from fileglancer.utils import slugify_path
 # Constants
 SHARING_KEY_LENGTH = 12
 NEUROGLANCER_SHORT_KEY_LENGTH = 12
-
-# Global flag to track if migrations have been run
-_migrations_run = False
 
 # Engine cache - maintain multiple engines for different database URLs
 _engine_cache = {}
@@ -154,58 +153,77 @@ class SessionDB(Base):
 
 def run_alembic_upgrade(db_url):
     """Run Alembic migrations to upgrade database to latest version"""
-    global _migrations_run
+    # Use a file lock to ensure only one process runs migrations
+    # Hash the db_url to create a unique lock file per database
+    db_hash = hashlib.sha256(db_url.encode()).hexdigest()[:16]
+    lock_file_path = os.path.join(tempfile.gettempdir(), f"fileglancer_migration_{db_hash}.lock")
 
-    if _migrations_run:
-        logger.debug("Migrations already run, skipping")
-        return
+    logger.debug(f"Attempting to acquire migration lock: {lock_file_path}")
 
+    lock_file = open(lock_file_path, 'w')
     try:
-        from alembic.config import Config
-        from alembic import command
-        import os
+        # Try to acquire an exclusive lock (non-blocking first to check)
+        try:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            logger.info("Acquired migration lock, running migrations")
+            lock_acquired = True
+        except BlockingIOError:
+            # Another process is running migrations, wait for it
+            logger.info("Another process is running migrations, waiting...")
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            logger.info("Migration lock acquired after waiting, migrations should already be complete")
+            lock_acquired = False
 
-        alembic_cfg_path = None
+        # Only run migrations if we were the first to acquire the lock
+        if lock_acquired:
+            try:
+                from alembic.config import Config
+                from alembic import command
 
-        # Try to find alembic.ini - first in package directory, then development setup
-        current_dir = os.path.dirname(os.path.abspath(__file__))
+                alembic_cfg_path = None
 
-        # Check if alembic.ini is in the package directory (installed package)
-        pkg_alembic_cfg_path = os.path.join(current_dir, "alembic.ini")
-        if os.path.exists(pkg_alembic_cfg_path):
-            alembic_cfg_path = pkg_alembic_cfg_path
-            logger.debug("Using packaged alembic.ini")
-        else:
-            # Fallback to development setup
-            project_root = os.path.dirname(current_dir)
-            dev_alembic_cfg_path = os.path.join(project_root, "alembic.ini")
-            if os.path.exists(dev_alembic_cfg_path):
-                alembic_cfg_path = dev_alembic_cfg_path
-                logger.debug("Using development alembic.ini")
+                # Try to find alembic.ini - first in package directory, then development setup
+                current_dir = os.path.dirname(os.path.abspath(__file__))
 
-        if alembic_cfg_path and os.path.exists(alembic_cfg_path):
-            alembic_cfg = Config(alembic_cfg_path)
-            alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+                # Check if alembic.ini is in the package directory (installed package)
+                pkg_alembic_cfg_path = os.path.join(current_dir, "alembic.ini")
+                if os.path.exists(pkg_alembic_cfg_path):
+                    alembic_cfg_path = pkg_alembic_cfg_path
+                    logger.debug("Using packaged alembic.ini")
+                else:
+                    # Fallback to development setup
+                    project_root = os.path.dirname(current_dir)
+                    dev_alembic_cfg_path = os.path.join(project_root, "alembic.ini")
+                    if os.path.exists(dev_alembic_cfg_path):
+                        alembic_cfg_path = dev_alembic_cfg_path
+                        logger.debug("Using development alembic.ini")
 
-            # Update script_location for packaged installations
-            if alembic_cfg_path == pkg_alembic_cfg_path:
-                # Using packaged alembic.ini, also update script_location
-                pkg_alembic_dir = os.path.join(current_dir, "alembic")
-                if os.path.exists(pkg_alembic_dir):
-                    alembic_cfg.set_main_option("script_location", pkg_alembic_dir)
+                if alembic_cfg_path and os.path.exists(alembic_cfg_path):
+                    alembic_cfg = Config(alembic_cfg_path)
+                    alembic_cfg.set_main_option("sqlalchemy.url", db_url)
 
-            command.upgrade(alembic_cfg, "head")
-            logger.info("Alembic migrations completed successfully")
-        else:
-            logger.warning("Alembic configuration not found, falling back to create_all")
-            engine = _get_engine(db_url)
-            Base.metadata.create_all(engine)
-    except Exception as e:
-        logger.warning(f"Alembic migration failed, falling back to create_all: {e}")
-        engine = _get_engine(db_url)
-        Base.metadata.create_all(engine)
+                    # Update script_location for packaged installations
+                    if alembic_cfg_path == pkg_alembic_cfg_path:
+                        # Using packaged alembic.ini, also update script_location
+                        pkg_alembic_dir = os.path.join(current_dir, "alembic")
+                        if os.path.exists(pkg_alembic_dir):
+                            alembic_cfg.set_main_option("script_location", pkg_alembic_dir)
+
+                    command.upgrade(alembic_cfg, "head")
+                    logger.info("Alembic migrations completed successfully")
+                else:
+                    logger.warning("Alembic configuration not found, falling back to create_all")
+                    engine = _get_engine(db_url)
+                    Base.metadata.create_all(engine)
+            except Exception as e:
+                logger.warning(f"Alembic migration failed, falling back to create_all: {e}")
+                engine = _get_engine(db_url)
+                Base.metadata.create_all(engine)
     finally:
-        _migrations_run = True
+        # Release the lock
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        lock_file.close()
+        logger.debug("Released migration lock")
 
 
 def initialize_database(db_url):
