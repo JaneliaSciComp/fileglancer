@@ -582,6 +582,8 @@ def generate_ssh_key(ssh_dir: str, passphrase: Optional[SecretStr] = None) -> SS
 
     logger.info(f"Generating SSH key: {key_name}")
 
+    # Set restrictive umask to ensure private key is created with secure permissions
+    old_umask = os.umask(0o077)
     try:
         result = subprocess.run(
             cmd,
@@ -593,7 +595,7 @@ def generate_ssh_key(ssh_dir: str, passphrase: Optional[SecretStr] = None) -> SS
         if result.returncode != 0:
             raise RuntimeError(f"ssh-keygen failed: {result.stderr}")
 
-        # Set correct permissions
+        # Set correct permissions explicitly as well
         os.chmod(key_path, 0o600)
         os.chmod(pubkey_path, 0o644)
 
@@ -606,6 +608,8 @@ def generate_ssh_key(ssh_dir: str, passphrase: Optional[SecretStr] = None) -> SS
         raise RuntimeError("Key generation timed out")
     except FileNotFoundError:
         raise RuntimeError("ssh-keygen not found on system")
+    finally:
+        os.umask(old_umask)
 
 
 def regenerate_public_key(
@@ -1001,6 +1005,8 @@ def generate_temp_key_and_authorize(
     temp_key_path = os.path.join(temp_dir, "temp_key")
     temp_pubkey_path = os.path.join(temp_dir, "temp_key.pub")
 
+    # Set restrictive umask to ensure private key is created with secure permissions
+    old_umask = os.umask(0o077)
     try:
         # Generate key to temp location
         passphrase_str = passphrase.get_secret_value() if passphrase else ""
@@ -1024,7 +1030,7 @@ def generate_temp_key_and_authorize(
         if result.returncode != 0:
             raise RuntimeError(f"ssh-keygen failed: {result.stderr}")
 
-        # Set correct permissions
+        # Set correct permissions explicitly as well
         os.chmod(temp_key_path, 0o600)
         os.chmod(temp_pubkey_path, 0o644)
 
@@ -1078,3 +1084,5 @@ def generate_temp_key_and_authorize(
         except Exception:
             pass
         raise RuntimeError(f"Failed to generate temporary key: {e}")
+    finally:
+        os.umask(old_umask)
