@@ -372,14 +372,14 @@ def get_key_content(ssh_dir: str, filename: str, key_type: str = "public") -> by
 
 
 def is_key_in_authorized_keys(ssh_dir: str, fingerprint: str) -> bool:
-    """Check if a key with the given fingerprint is in authorized_keys.
+    """Check if a key with the given fingerprint is in authorized_keys with 'fileglancer' comment.
 
     Args:
         ssh_dir: Path to the .ssh directory
         fingerprint: The SHA256 fingerprint to look for
 
     Returns:
-        True if the key is in authorized_keys, False otherwise
+        True if the key is in authorized_keys with 'fileglancer' in the comment, False otherwise
     """
     authorized_keys_path = os.path.join(ssh_dir, AUTHORIZED_KEYS_FILENAME)
 
@@ -388,6 +388,7 @@ def is_key_in_authorized_keys(ssh_dir: str, fingerprint: str) -> bool:
 
     try:
         # Get fingerprints of all keys in authorized_keys
+        # Output format: "256 SHA256:xxxxx comment (ED25519)"
         result = subprocess.run(
             ['ssh-keygen', '-lf', authorized_keys_path],
             capture_output=True,
@@ -399,9 +400,9 @@ def is_key_in_authorized_keys(ssh_dir: str, fingerprint: str) -> bool:
             logger.warning(f"Could not check authorized_keys: {result.stderr}")
             return False
 
-        # Check each line for the fingerprint
+        # Check each line for the fingerprint AND 'fileglancer' in comment
         for line in result.stdout.strip().split('\n'):
-            if fingerprint in line:
+            if fingerprint in line and 'fileglancer' in line:
                 return True
 
         return False
@@ -410,27 +411,109 @@ def is_key_in_authorized_keys(ssh_dir: str, fingerprint: str) -> bool:
         return False
 
 
-def list_ssh_keys(ssh_dir: str) -> List[SSHKeyInfo]:
-    """List all SSH keys in the given directory.
+def _parse_authorized_keys_fileglancer(ssh_dir: str) -> Dict[str, SSHKeyInfo]:
+    """Parse authorized_keys and return keys with 'fileglancer' in the comment.
 
     Args:
         ssh_dir: Path to the .ssh directory
 
     Returns:
-        List of SSHKeyInfo objects
+        Dict mapping fingerprint to SSHKeyInfo for keys with 'fileglancer' comment
     """
-    keys = []
+    keys_by_fingerprint: Dict[str, SSHKeyInfo] = {}
+    authorized_keys_path = os.path.join(ssh_dir, AUTHORIZED_KEYS_FILENAME)
+
+    if not os.path.exists(authorized_keys_path):
+        return keys_by_fingerprint
+
+    try:
+        # Use ssh-keygen to get fingerprints and comments from authorized_keys
+        # Output format: "256 SHA256:xxxxx comment (ED25519)"
+        result = subprocess.run(
+            ['ssh-keygen', '-lf', authorized_keys_path],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        if result.returncode != 0:
+            logger.warning(f"Could not read authorized_keys: {result.stderr}")
+            return keys_by_fingerprint
+
+        for line in result.stdout.strip().split('\n'):
+            if not line or 'fileglancer' not in line:
+                continue
+
+            # Parse: "256 SHA256:xxxxx comment text (ED25519)"
+            parts = line.split()
+            if len(parts) < 4:
+                continue
+
+            fingerprint = parts[1]
+            key_type_raw = parts[-1]  # e.g., "(ED25519)"
+
+            # Extract key type, converting to ssh- format
+            key_type = key_type_raw.strip('()')
+            if key_type == "ED25519":
+                key_type = "ssh-ed25519"
+            elif key_type == "RSA":
+                key_type = "ssh-rsa"
+            elif key_type == "ECDSA":
+                key_type = "ecdsa-sha2-nistp256"
+            elif key_type == "DSA":
+                key_type = "ssh-dss"
+            else:
+                key_type = f"ssh-{key_type.lower()}"
+
+            # Comment is everything between fingerprint and key type
+            comment = " ".join(parts[2:-1])
+
+            keys_by_fingerprint[fingerprint] = SSHKeyInfo(
+                filename=fingerprint,  # Use fingerprint as filename placeholder
+                key_type=key_type,
+                fingerprint=fingerprint,
+                comment=comment,
+                has_private_key=False,  # Don't search for private keys
+                is_authorized=True
+            )
+
+    except Exception as e:
+        logger.warning(f"Error parsing authorized_keys: {e}")
+
+    return keys_by_fingerprint
+
+
+def list_ssh_keys(ssh_dir: str) -> List[SSHKeyInfo]:
+    """List SSH keys with 'fileglancer' in the comment.
+
+    Collects keys from both .pub files and authorized_keys, filtering to only
+    those with 'fileglancer' in the comment. Keys are deduplicated by fingerprint,
+    preferring .pub file info when available.
+
+    Args:
+        ssh_dir: Path to the .ssh directory
+
+    Returns:
+        List of SSHKeyInfo objects for fileglancer-managed keys
+    """
+    keys_by_fingerprint: Dict[str, SSHKeyInfo] = {}
 
     if not os.path.exists(ssh_dir):
-        return keys
+        return []
 
-    # Find all .pub files
+    # First, get keys from authorized_keys with 'fileglancer' comment
+    keys_by_fingerprint = _parse_authorized_keys_fileglancer(ssh_dir)
+
+    # Then, scan .pub files and override/add entries with 'fileglancer' comment
+    # .pub files take precedence since they have better filename info
     for filename in os.listdir(ssh_dir):
         if filename.endswith('.pub'):
             try:
                 pubkey_path = safe_join_path(ssh_dir, filename)
                 key_info = parse_public_key(pubkey_path, ssh_dir)
-                keys.append(key_info)
+                # Only include keys with 'fileglancer' in the comment
+                if 'fileglancer' in key_info.comment:
+                    keys_by_fingerprint[key_info.fingerprint] = key_info
             except ValueError as e:
                 logger.warning(f"Skipping suspicious filename {filename}: {e}")
                 continue
@@ -438,10 +521,12 @@ def list_ssh_keys(ssh_dir: str) -> List[SSHKeyInfo]:
                 logger.warning(f"Could not parse key {filename}: {e}")
                 continue
 
+    keys = list(keys_by_fingerprint.values())
+
     # Sort by filename
     keys.sort(key=lambda k: k.filename)
 
-    logger.info(f"Listed {len(keys)} SSH keys in {ssh_dir}")
+    logger.info(f"Listed {len(keys)} SSH keys with 'fileglancer' comment in {ssh_dir}")
 
     return keys
 
@@ -480,6 +565,7 @@ def generate_ssh_key(ssh_dir: str, passphrase: Optional[SecretStr] = None) -> SS
         '-t', 'ed25519',
         '-N', passphrase_str,
         '-f', key_path,
+        '-C', 'fileglancer',
     ]
 
     logger.info(f"Generating SSH key: {key_name}")
