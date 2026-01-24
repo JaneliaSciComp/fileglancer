@@ -15,14 +15,14 @@ export default function SSHKeys() {
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
   const { data: keys, isLoading, error, refetch } = useSSHKeysQuery();
 
-  // Only show the id_ed25519 key
-  const defaultKey = keys?.find(key => key.filename === 'id_ed25519');
+  // Show all keys with 'fileglancer' in the comment (filtered by backend)
+  const hasKeys = keys && keys.length > 0;
 
   return (
     <>
       <div className="pb-6">
         <Typography className="text-foreground" type="h5">
-          SSH Key
+          Fileglancer-managed SSH Keys
         </Typography>
       </div>
 
@@ -30,24 +30,25 @@ export default function SSHKeys() {
         <div className="flex gap-3">
           <HiOutlineInformationCircle className="icon-large text-info flex-shrink-0" />
           <Typography className="text-secondary text-sm">
-            SSH keys allow you to securely connect to cluster nodes without
-            entering a password. Specifically, you need an ed25519 SSH key to
-            use Seqera Platform to run pipelines on the cluster. This page lets
-            you view your existing ed25519 SSH key or generate a new one.
+            Fileglancer-managed SSH keys allow you to securely connect to
+            cluster nodes without entering a password. Specifically, you need an
+            ed25519 SSH key to use Seqera Platform to run pipelines on the
+            cluster. This page shows SSH keys with "fileglancer" in the comment
+            and lets you generate a new one.
           </Typography>
         </div>
       </Card>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Spinner text="Loading SSH key..." />
+          <Spinner text="Loading Fileglancer-managed SSH keys..." />
         </div>
       ) : null}
 
       {error ? (
         <Card className="p-4 bg-error/10 border border-error/20">
           <Typography className="text-error">
-            Failed to load SSH key: {error.message}
+            Failed to load Fileglancer-managed SSH keys: {error.message}
           </Typography>
           <Button
             className="mt-2"
@@ -61,11 +62,11 @@ export default function SSHKeys() {
         </Card>
       ) : null}
 
-      {!isLoading && !error && !defaultKey ? (
+      {!isLoading && !error && !hasKeys ? (
         <Card className="mb-6 p-8 text-center">
           <HiOutlineKey className="mx-auto h-12 w-12 text-secondary mb-4" />
           <Typography className="text-foreground font-semibold mb-2">
-            No ed25519 SSH key found
+            No Fileglancer-managed SSH key found
           </Typography>
           <Typography className="text-secondary mb-4">
             Generate an ed25519 SSH key to enable passwordless access to cluster
@@ -78,8 +79,12 @@ export default function SSHKeys() {
         </Card>
       ) : null}
 
-      {!isLoading && !error && defaultKey ? (
-        <SSHKeyCard keyInfo={defaultKey} />
+      {!isLoading && !error && hasKeys ? (
+        <div className="space-y-4">
+          {keys.map(key => (
+            <SSHKeyCard key={key.fingerprint} keyInfo={key} />
+          ))}
+        </div>
       ) : null}
 
       <GenerateKeyDialog
