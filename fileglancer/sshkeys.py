@@ -79,6 +79,18 @@ class SSHKeyInfo(BaseModel):
 class SSHKeyListResponse(BaseModel):
     """Response containing a list of SSH keys"""
     keys: List[SSHKeyInfo] = Field(description="List of SSH keys")
+    unmanaged_id_ed25519_exists: bool = Field(
+        default=False,
+        description="True if id_ed25519 exists but is not managed by fileglancer"
+    )
+    id_ed25519_exists: bool = Field(
+        default=False,
+        description="True if id_ed25519 private key exists"
+    )
+    id_ed25519_missing_pubkey: bool = Field(
+        default=False,
+        description="True if id_ed25519 exists and is managed but .pub file is missing"
+    )
 
 
 class GenerateKeyResponse(BaseModel):
@@ -523,8 +535,8 @@ def list_ssh_keys(ssh_dir: str) -> List[SSHKeyInfo]:
 
     keys = list(keys_by_fingerprint.values())
 
-    # Sort by filename
-    keys.sort(key=lambda k: k.filename)
+    # Sort by filename, but put id_ed25519 first
+    keys.sort(key=lambda k: (0 if k.filename == "id_ed25519" else 1, k.filename))
 
     logger.info(f"Listed {len(keys)} SSH keys with 'fileglancer' comment in {ssh_dir}")
 
@@ -596,6 +608,77 @@ def generate_ssh_key(ssh_dir: str, passphrase: Optional[SecretStr] = None) -> SS
         raise RuntimeError("ssh-keygen not found on system")
 
 
+def regenerate_public_key(
+    ssh_dir: str,
+    key_name: str = "id_ed25519",
+    passphrase: Optional[SecretStr] = None
+) -> SSHKeyInfo:
+    """Regenerate a public key from an existing private key.
+
+    Uses ssh-keygen -y to extract the public key from the private key.
+    If the private key is encrypted, a passphrase must be provided.
+
+    Args:
+        ssh_dir: Path to the .ssh directory
+        key_name: Name of the key (without extension), defaults to "id_ed25519"
+        passphrase: Passphrase for the private key (if encrypted)
+
+    Returns:
+        SSHKeyInfo for the regenerated key
+
+    Raises:
+        ValueError: If the private key doesn't exist
+        RuntimeError: If public key regeneration fails (e.g., wrong passphrase)
+    """
+    privkey_path = os.path.join(ssh_dir, key_name)
+    pubkey_path = os.path.join(ssh_dir, f"{key_name}.pub")
+
+    if not os.path.exists(privkey_path):
+        raise ValueError(f"Private key '{key_name}' not found")
+
+    # Build ssh-keygen command to extract public key
+    # ssh-keygen -y -f private_key [-P passphrase]
+    passphrase_str = passphrase.get_secret_value() if passphrase else ""
+
+    try:
+        # Use -y to read private key and output public key
+        result = subprocess.run(
+            ['ssh-keygen', '-y', '-P', passphrase_str, '-f', privkey_path],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        if result.returncode != 0:
+            if "incorrect passphrase" in result.stderr.lower() or \
+               "bad passphrase" in result.stderr.lower():
+                raise RuntimeError("Incorrect passphrase for private key")
+            raise RuntimeError(f"Failed to extract public key: {result.stderr}")
+
+        # The output is just "type base64key" without comment
+        # We need to add the comment
+        public_key_content = result.stdout.strip()
+        if not public_key_content:
+            raise RuntimeError("No public key output from ssh-keygen")
+
+        # Write the public key file
+        with open(pubkey_path, 'w') as f:
+            f.write(public_key_content + '\n')
+
+        # Set correct permissions
+        os.chmod(pubkey_path, 0o644)
+
+        logger.info(f"Regenerated public key: {pubkey_path}")
+
+        # Parse and return the key info
+        return parse_public_key(pubkey_path, ssh_dir)
+
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("Public key regeneration timed out")
+    except FileNotFoundError:
+        raise RuntimeError("ssh-keygen not found on system")
+
+
 def add_to_authorized_keys(ssh_dir: str, public_key: str) -> bool:
     """Add a public key to the authorized_keys file.
 
@@ -628,10 +711,10 @@ def add_to_authorized_keys(ssh_dir: str, public_key: str) -> bool:
     if type_idx > 0:
         options = parts[0].split(',')
         if "restrict" not in options:
-            options.insert(0, "restrict")
+            options.insert(0, "restrict,pty")
         new_options = ",".join(options)
     else:
-        new_options = "restrict"
+        new_options = "restrict,pty"
 
     # Handle comment
     key_parts = parts[type_idx:]
@@ -706,3 +789,292 @@ def add_to_authorized_keys(ssh_dir: str, public_key: str) -> bool:
 
     except Exception as e:
         raise RuntimeError(f"Failed to add key to authorized_keys: {e}")
+
+
+def _get_key_info_line(key_path: str) -> Optional[str]:
+    """Get the ssh-keygen info line for a key (public or private).
+
+    Args:
+        key_path: Path to the key file
+
+    Returns:
+        The output line from ssh-keygen -lf, or None if it fails.
+        Format: "256 SHA256:xxxxx comment (ED25519)"
+    """
+    try:
+        result = subprocess.run(
+            ['ssh-keygen', '-lf', key_path],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+        return None
+    except Exception:
+        return None
+
+
+def check_unmanaged_id_ed25519(ssh_dir: str) -> bool:
+    """Check if id_ed25519 exists but is not managed by fileglancer.
+
+    Args:
+        ssh_dir: Path to the .ssh directory
+
+    Returns:
+        True if id_ed25519 or id_ed25519.pub exists but isn't fileglancer-managed
+    """
+    privkey_path = os.path.join(ssh_dir, "id_ed25519")
+    pubkey_path = os.path.join(ssh_dir, "id_ed25519.pub")
+
+    privkey_exists = os.path.exists(privkey_path)
+    pubkey_exists = os.path.exists(pubkey_path)
+
+    # If neither file exists, not unmanaged
+    if not privkey_exists and not pubkey_exists:
+        return False
+
+    # If public key exists, check if it has 'fileglancer' in the comment
+    if pubkey_exists:
+        try:
+            with open(pubkey_path, 'r') as f:
+                content = f.read().strip()
+
+            # If 'fileglancer' is in the comment, it's managed
+            if 'fileglancer' in content:
+                return False
+            # Otherwise it's unmanaged
+            return True
+        except Exception as e:
+            logger.warning(f"Error checking id_ed25519.pub: {e}")
+            # If we can't read it, assume it's unmanaged to be safe
+            return True
+
+    # Public key doesn't exist but private key does
+    # Get the key info line which includes the comment
+    # Output format: "256 SHA256:xxxxx comment (ED25519)"
+    info_line = _get_key_info_line(privkey_path)
+    if info_line and 'fileglancer' in info_line:
+        return False  # It's managed (has fileglancer in comment)
+
+    # Could not get info or 'fileglancer' not in comment
+    return True
+
+
+def check_id_ed25519_status(ssh_dir: str) -> tuple:
+    """Check the status of id_ed25519 key.
+
+    Args:
+        ssh_dir: Path to the .ssh directory
+
+    Returns:
+        Tuple of (exists, unmanaged, missing_pubkey):
+        - exists: True if id_ed25519 private key exists
+        - unmanaged: True if id_ed25519 exists but is not managed by fileglancer
+        - missing_pubkey: True if id_ed25519 is managed but .pub file is missing
+    """
+    privkey_path = os.path.join(ssh_dir, "id_ed25519")
+    pubkey_path = os.path.join(ssh_dir, "id_ed25519.pub")
+
+    privkey_exists = os.path.exists(privkey_path)
+    pubkey_exists = os.path.exists(pubkey_path)
+
+    # If private key doesn't exist
+    if not privkey_exists:
+        # Check if only pubkey exists (unusual but possible)
+        if pubkey_exists:
+            try:
+                with open(pubkey_path, 'r') as f:
+                    content = f.read().strip()
+                if 'fileglancer' in content:
+                    return (True, False, False)  # Managed via pubkey only
+                return (True, True, False)  # Unmanaged
+            except Exception:
+                return (True, True, False)  # Assume unmanaged
+        return (False, False, False)  # Nothing exists
+
+    # Private key exists
+    exists = True
+
+    # Check if public key exists and has fileglancer
+    if pubkey_exists:
+        try:
+            with open(pubkey_path, 'r') as f:
+                content = f.read().strip()
+            if 'fileglancer' in content:
+                return (exists, False, False)  # Managed, has pubkey
+            return (exists, True, False)  # Unmanaged
+        except Exception:
+            return (exists, True, False)  # Assume unmanaged
+
+    # Private key exists but public key doesn't
+    # Check if private key has fileglancer in comment
+    info_line = _get_key_info_line(privkey_path)
+    if info_line and 'fileglancer' in info_line:
+        return (exists, False, True)  # Managed but missing pubkey
+
+    return (exists, True, False)  # Unmanaged
+
+
+class TempKeyResponse(SSHKeyContentResponse):
+    """Secure streaming response for temporary SSH key that deletes files after sending.
+
+    Extends SSHKeyContentResponse to also delete the temporary key files
+    after the private key content has been streamed and wiped.
+    """
+
+    def __init__(
+        self,
+        key_content: bytearray,
+        temp_key_path: str,
+        temp_pubkey_path: str,
+        key_info: SSHKeyInfo,
+        status_code: int = 200,
+    ):
+        """Initialize the response with key content and paths to delete.
+
+        Args:
+            key_content: The private key content as a mutable bytearray
+            temp_key_path: Path to temporary private key file to delete
+            temp_pubkey_path: Path to temporary public key file to delete
+            key_info: SSHKeyInfo to include in response headers
+            status_code: HTTP status code (default 200)
+        """
+        self._temp_key_path = temp_key_path
+        self._temp_pubkey_path = temp_pubkey_path
+
+        # Include key info in headers
+        headers = {
+            "X-SSH-Key-Filename": key_info.filename,
+            "X-SSH-Key-Type": key_info.key_type,
+            "X-SSH-Key-Fingerprint": key_info.fingerprint,
+            "X-SSH-Key-Comment": key_info.comment,
+        }
+
+        super().__init__(key_content, status_code, headers)
+
+    async def __call__(self, scope, receive, send):
+        """Stream the response, then wipe buffer and delete temp files."""
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            # Delete temporary files
+            self._cleanup_temp_files()
+
+    def _cleanup_temp_files(self):
+        """Securely delete temporary key files."""
+        for path in (self._temp_key_path, self._temp_pubkey_path):
+            try:
+                if os.path.exists(path):
+                    # Overwrite with zeros before deleting
+                    file_size = os.path.getsize(path)
+                    with open(path, 'wb') as f:
+                        f.write(b'\x00' * file_size)
+                    os.unlink(path)
+                    logger.info(f"Deleted temporary key file: {path}")
+            except Exception as e:
+                logger.warning(f"Failed to delete temp file {path}: {e}")
+
+
+def generate_temp_key_and_authorize(
+    ssh_dir: str,
+    passphrase: Optional[SecretStr] = None
+) -> TempKeyResponse:
+    """Generate a temporary SSH key, add to authorized_keys, and return private key.
+
+    The key is generated to a temporary location, the public key is added to
+    authorized_keys with 'fileglancer' comment, and the private key is returned
+    via TempKeyResponse which will delete the temp files after streaming.
+
+    Args:
+        ssh_dir: Path to the .ssh directory
+        passphrase: Optional passphrase to protect the private key
+
+    Returns:
+        TempKeyResponse containing the private key (streams and deletes files)
+
+    Raises:
+        RuntimeError: If key generation fails
+    """
+    # Create temporary directory for key generation
+    temp_dir = tempfile.mkdtemp(prefix="fileglancer_ssh_")
+    temp_key_path = os.path.join(temp_dir, "temp_key")
+    temp_pubkey_path = os.path.join(temp_dir, "temp_key.pub")
+
+    try:
+        # Generate key to temp location
+        passphrase_str = passphrase.get_secret_value() if passphrase else ""
+        cmd = [
+            'ssh-keygen',
+            '-t', 'ed25519',
+            '-N', passphrase_str,
+            '-f', temp_key_path,
+            '-C', 'fileglancer',
+        ]
+
+        logger.info("Generating temporary SSH key")
+
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(f"ssh-keygen failed: {result.stderr}")
+
+        # Set correct permissions
+        os.chmod(temp_key_path, 0o600)
+        os.chmod(temp_pubkey_path, 0o644)
+
+        # Read public key and add to authorized_keys
+        with open(temp_pubkey_path, 'r') as f:
+            public_key = f.read().strip()
+
+        ensure_ssh_directory_exists(ssh_dir)
+        add_to_authorized_keys(ssh_dir, public_key)
+
+        # Get key info for headers
+        fingerprint = get_key_fingerprint(temp_pubkey_path)
+
+        # Parse public key for type and comment
+        parts = public_key.split(None, 2)
+        key_type = parts[0] if len(parts) >= 1 else "ssh-ed25519"
+        comment = parts[2] if len(parts) > 2 else "fileglancer"
+
+        key_info = SSHKeyInfo(
+            filename="temporary",
+            key_type=key_type,
+            fingerprint=fingerprint,
+            comment=comment,
+            has_private_key=False,  # Not persisted
+            is_authorized=True
+        )
+
+        # Read private key into bytearray
+        private_key_buffer = read_file_to_bytearray(temp_key_path)
+
+        logger.info("Temporary SSH key generated and added to authorized_keys")
+
+        # Return response that will stream private key and delete temp files
+        # Note: temp_dir cleanup happens in TempKeyResponse._cleanup_temp_files
+        return TempKeyResponse(
+            private_key_buffer,
+            temp_key_path,
+            temp_pubkey_path,
+            key_info
+        )
+
+    except Exception as e:
+        # Clean up on error
+        try:
+            if os.path.exists(temp_key_path):
+                os.unlink(temp_key_path)
+            if os.path.exists(temp_pubkey_path):
+                os.unlink(temp_pubkey_path)
+            if os.path.exists(temp_dir):
+                os.rmdir(temp_dir)
+        except Exception:
+            pass
+        raise RuntimeError(f"Failed to generate temporary key: {e}")

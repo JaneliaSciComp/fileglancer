@@ -31,6 +31,9 @@ export type SSHKeyContent = {
  */
 type SSHKeyListResponse = {
   keys: SSHKeyInfo[];
+  unmanaged_id_ed25519_exists: boolean;
+  id_ed25519_exists: boolean;
+  id_ed25519_missing_pubkey: boolean;
 };
 
 /**
@@ -48,9 +51,19 @@ export const sshKeyQueryKeys = {
 };
 
 /**
+ * Result from fetching SSH keys including metadata
+ */
+export type SSHKeysResult = {
+  keys: SSHKeyInfo[];
+  unmanaged_id_ed25519_exists: boolean;
+  id_ed25519_exists: boolean;
+  id_ed25519_missing_pubkey: boolean;
+};
+
+/**
  * Fetches all SSH keys from the backend
  */
-const fetchSSHKeys = async (signal?: AbortSignal): Promise<SSHKeyInfo[]> => {
+const fetchSSHKeys = async (signal?: AbortSignal): Promise<SSHKeysResult> => {
   const response = await sendFetchRequest('/api/ssh-keys', 'GET', undefined, {
     signal
   });
@@ -62,16 +75,21 @@ const fetchSSHKeys = async (signal?: AbortSignal): Promise<SSHKeyInfo[]> => {
   }
 
   const data = body as SSHKeyListResponse;
-  return data.keys ?? [];
+  return {
+    keys: data.keys ?? [],
+    unmanaged_id_ed25519_exists: data.unmanaged_id_ed25519_exists ?? false,
+    id_ed25519_exists: data.id_ed25519_exists ?? false,
+    id_ed25519_missing_pubkey: data.id_ed25519_missing_pubkey ?? false
+  };
 };
 
 /**
  * Query hook for fetching all SSH keys
  *
- * @returns Query result with all SSH keys
+ * @returns Query result with SSH keys and metadata
  */
-export function useSSHKeysQuery(): UseQueryResult<SSHKeyInfo[], Error> {
-  return useQuery<SSHKeyInfo[], Error>({
+export function useSSHKeysQuery(): UseQueryResult<SSHKeysResult, Error> {
+  return useQuery<SSHKeysResult, Error>({
     queryKey: sshKeyQueryKeys.list(),
     queryFn: ({ signal }) => fetchSSHKeys(signal)
   });
@@ -195,4 +213,115 @@ export async function fetchSSHKeyContent(
 
   const keyText = await response.text();
   return { key: keyText };
+}
+
+/**
+ * Result from generating a temporary SSH key
+ */
+export type TempKeyResult = {
+  privateKey: string;
+  keyInfo: SSHKeyInfo;
+};
+
+/**
+ * Parameters for generating a temporary SSH key
+ */
+type GenerateTempKeyParams = {
+  passphrase?: string;
+};
+
+/**
+ * Mutation hook for generating a temporary SSH key.
+ *
+ * Generates a key, adds public key to authorized_keys, and returns
+ * the private key for one-time display. The temporary files are
+ * deleted on the server after the response is sent.
+ */
+export function useGenerateTempKeyMutation(): UseMutationResult<
+  TempKeyResult,
+  Error,
+  GenerateTempKeyParams | void
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params?: GenerateTempKeyParams) => {
+      const response = await sendFetchRequest(
+        '/api/ssh-keys/generate-temp',
+        'POST',
+        params?.passphrase ? { passphrase: params.passphrase } : undefined
+      );
+
+      if (!response.ok) {
+        const body = await getResponseJsonOrError(response);
+        throwResponseNotOkError(response, body);
+      }
+
+      // Private key is in response body
+      const privateKey = await response.text();
+
+      // Key info is in response headers
+      const keyInfo: SSHKeyInfo = {
+        filename: response.headers.get('X-SSH-Key-Filename') ?? 'temporary',
+        key_type: response.headers.get('X-SSH-Key-Type') ?? 'ssh-ed25519',
+        fingerprint: response.headers.get('X-SSH-Key-Fingerprint') ?? '',
+        comment: response.headers.get('X-SSH-Key-Comment') ?? 'fileglancer',
+        has_private_key: false,
+        is_authorized: true
+      };
+
+      return { privateKey, keyInfo };
+    },
+    onSuccess: () => {
+      // Invalidate and refetch the list to show the new key
+      queryClient.invalidateQueries({
+        queryKey: sshKeyQueryKeys.all
+      });
+    }
+  });
+}
+
+/**
+ * Parameters for regenerating a public key
+ */
+type RegeneratePublicKeyParams = {
+  passphrase?: string;
+};
+
+/**
+ * Mutation hook for regenerating the public key from the private key.
+ *
+ * Use this when the .pub file is missing but the private key exists.
+ * If the private key is encrypted, provide the passphrase.
+ */
+export function useRegeneratePublicKeyMutation(): UseMutationResult<
+  SSHKeyInfo,
+  Error,
+  RegeneratePublicKeyParams | void
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params?: RegeneratePublicKeyParams) => {
+      const response = await sendFetchRequest(
+        '/api/ssh-keys/regenerate-public',
+        'POST',
+        params?.passphrase ? { passphrase: params.passphrase } : undefined
+      );
+
+      const body = await getResponseJsonOrError(response);
+
+      if (!response.ok) {
+        throwResponseNotOkError(response, body);
+      }
+
+      return body as SSHKeyInfo;
+    },
+    onSuccess: () => {
+      // Invalidate and refetch the list
+      queryClient.invalidateQueries({
+        queryKey: sshKeyQueryKeys.all
+      });
+    }
+  });
 }
