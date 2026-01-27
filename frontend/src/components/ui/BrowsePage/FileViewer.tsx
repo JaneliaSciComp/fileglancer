@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Switch, Typography } from '@material-tailwind/react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import {
@@ -10,6 +10,7 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { formatFileSize, formatUnixTimestamp } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
 import { useFileContentQuery } from '@/queries/fileContentQueries';
+import useDarkMode from '@/hooks/useDarkMode';
 
 type FileViewerProps = {
   readonly file: FileOrFolder;
@@ -76,29 +77,11 @@ const getLanguageFromExtension = (filename: string): string => {
 
 export default function FileViewer({ file }: FileViewerProps) {
   const { fspName } = useFileBrowserContext();
-
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+  const isDarkMode = useDarkMode();
   const [formatJson, setFormatJson] = useState<boolean>(true);
-
   const contentQuery = useFileContentQuery(fspName, file.path);
   const language = getLanguageFromExtension(file.name);
   const isJsonFile = language === 'json';
-
-  // Detect dark mode from document
-  useEffect(() => {
-    const checkDarkMode = () => {
-      setIsDarkMode(document.documentElement.classList.contains('dark'));
-    };
-
-    checkDarkMode();
-    const observer = new MutationObserver(checkDarkMode);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class']
-    });
-
-    return () => observer.disconnect();
-  }, []);
 
   const renderViewer = () => {
     if (contentQuery.isLoading) {
@@ -150,7 +133,10 @@ export default function FileViewer({ file }: FileViewerProps) {
         codeTagProps={mergedCodeTagProps}
         customStyle={{
           margin: 0,
-          padding: '1rem',
+          paddingTop: '1em',
+          paddingRight: '1em',
+          paddingBottom: '0',
+          paddingLeft: '1em',
           fontSize: '14px',
           lineHeight: '1.5',
           overflow: 'visible',
