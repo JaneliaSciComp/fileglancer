@@ -144,7 +144,7 @@ export default function DataLinkUsageDialog({
 from zarr.storage import FsspecStore
 from ome_zarr_models.v04.image import Image
 
-url = ${dataLinkUrl}
+url = '${dataLinkUrl}'
 
 # Open the zarr store using fsspec for HTTP access
 store = FsspecStore.from_url(url)
@@ -225,7 +225,7 @@ import java.util.stream.Collectors;
  * Simple example to read OME-ZARR from an HTTP URL using N5-Zarr.
  */
 public class ReadOmeZarr {
-    private static final String URL = ${dataLinkUrl};
+    private static final String URL = '${dataLinkUrl}';
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     public static void main(String[] args) {
