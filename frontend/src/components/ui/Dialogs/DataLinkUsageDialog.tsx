@@ -44,7 +44,8 @@ function CodeBlock({
     paddingBottom: '0',
     paddingLeft: '1em',
     fontSize: '14px',
-    lineHeight: '1.5'
+    lineHeight: '1.5',
+    width: 'max-content'
   }
 }: CodeBlockProps) {
   const isDarkMode = useDarkMode();
@@ -495,7 +496,7 @@ public class ReadOmeZarr {
 
   const TAB_TRIGGER_CLASSES = '!text-foreground h-full';
   const PANEL_CLASSES =
-    'flex-1 flex flex-col gap-4 max-w-full p-4 rounded-b-lg border border-t-0 border-surface bg-surface-light';
+    'flex-1 flex flex-col gap-4 max-w-full p-4 rounded-b-lg border border-t-0 border-surface bg-surface-light overflow-auto';
 
   return (
     <FgDialog onClose={onClose} open={open}>
