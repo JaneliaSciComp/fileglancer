@@ -17,6 +17,61 @@ import {
 } from '@/omezarr-helper';
 import { buildUrl } from '@/utils';
 import * as zarr from 'zarrita';
+import {
+  getCompatibleViewers,
+  type OmeZarrMetadata
+} from '@bioimagetools/capability-manifest';
+
+/**
+ * Convert Fileglancer's internal Metadata to the library's OmeZarrMetadata format
+ * Only converts if this is a valid OME-Zarr dataset (has version)
+ */
+function convertToOmeZarrMetadata(
+  metadata: ZarrMetadata
+): OmeZarrMetadata | null {
+  if (!metadata?.multiscale) {
+    return null;
+  }
+
+  // If version is null/undefined, this is not a proper OME-Zarr dataset
+  // Return null to fall back to legacy logic
+  const version = metadata.multiscale.version;
+  if (!version) {
+    return null;
+  }
+
+  // Convert axes from multiscale to the expected format, ensuring no null values
+  const axes =
+    metadata.multiscale.axes?.map((axis: any) => ({
+      name: axis.name,
+      type: axis.type ?? undefined,
+      unit: axis.unit ?? undefined
+    })) || [];
+
+  // Build the OmeZarrMetadata object
+  const omeZarrMetadata: OmeZarrMetadata = {
+    version: version as '0.4' | '0.5',
+    axes,
+    multiscales: [
+      {
+        ...metadata.multiscale,
+        version,
+        axes
+      }
+    ]
+  };
+
+  // Add optional fields if they exist
+  if (metadata.omero) {
+    omeZarrMetadata.omero = metadata.omero;
+  }
+
+  if (metadata.labels && metadata.labels.length > 0) {
+    omeZarrMetadata.labels = metadata.labels;
+  }
+
+  return omeZarrMetadata;
+}
 
 export type { OpenWithToolUrls, ZarrMetadata };
 export type PendingToolKey = keyof OpenWithToolUrls | null;
@@ -102,62 +157,93 @@ export default function useZarrMetadata() {
       copy: url || ''
     } as OpenWithToolUrls;
 
-    // Determine which tools should be available based on metadata type
-    if (metadata?.multiscale) {
-      // OME-Zarr - all urls for v2; no avivator for v3
+    // Convert metadata to OmeZarrMetadata format and get compatible viewers
+    const omeZarrMetadata = convertToOmeZarrMetadata(metadata);
+    let compatibleViewers: string[] = [];
+
+    if (omeZarrMetadata) {
+      try {
+        compatibleViewers = getCompatibleViewers(omeZarrMetadata);
+        log.debug('Compatible viewers from library:', compatibleViewers);
+      } catch (error) {
+        log.error('Error getting compatible viewers:', error);
+        // Fall back to assuming it's OME-Zarr if we have multiscale
+        compatibleViewers = metadata?.multiscale ? ['Neuroglancer'] : [];
+      }
+    }
+
+    // Determine which tools should be available based on compatible viewers
+    const isOmeZarr = omeZarrMetadata !== null;
+
+    if (isOmeZarr) {
+      // OME-Zarr dataset
+      const hasNeuroglancer = compatibleViewers.includes('Neuroglancer');
+      const hasAvivator =
+        compatibleViewers.includes('Vizarr') ||
+        compatibleViewers.includes('Avivator');
+
       if (url) {
-        if (effectiveZarrVersion === 2) {
+        // Avivator/Vizarr - only for v2 and if compatible
+        if (effectiveZarrVersion === 2 && hasAvivator) {
           openWithToolUrls.avivator = buildUrl(avivatorBaseUrl, null, {
             image_url: url
           });
         } else {
           openWithToolUrls.avivator = null;
         }
-        // Populate with actual URLs when proxied path is available
+
+        // Validator - always available for OME-Zarr
         openWithToolUrls.validator = buildUrl(validatorBaseUrl, null, {
           source: url
         });
+
+        // Vol-E - keep as-is for now (not in library)
         openWithToolUrls.vole = buildUrl(voleBaseUrl, null, {
           url
         });
-        if (disableNeuroglancerStateGeneration) {
-          openWithToolUrls.neuroglancer =
-            neuroglancerBaseUrl +
-            generateNeuroglancerStateForDataURL(url, effectiveZarrVersion);
-        } else if (layerType) {
-          try {
-            openWithToolUrls.neuroglancer =
-              neuroglancerBaseUrl +
-              generateNeuroglancerStateForOmeZarr(
-                url,
-                effectiveZarrVersion,
-                layerType,
-                metadata.multiscale,
-                metadata.arr,
-                metadata.labels,
-                metadata.omero,
-                useLegacyMultichannelApproach
-              );
-          } catch (error) {
-            log.error(
-              'Error generating Neuroglancer state for OME-Zarr:',
-              error
-            );
+
+        // Neuroglancer - if compatible
+        if (hasNeuroglancer) {
+          if (disableNeuroglancerStateGeneration) {
             openWithToolUrls.neuroglancer =
               neuroglancerBaseUrl +
               generateNeuroglancerStateForDataURL(url, effectiveZarrVersion);
+          } else if (layerType && metadata.multiscale) {
+            try {
+              openWithToolUrls.neuroglancer =
+                neuroglancerBaseUrl +
+                generateNeuroglancerStateForOmeZarr(
+                  url,
+                  effectiveZarrVersion,
+                  layerType,
+                  metadata.multiscale,
+                  metadata.arr,
+                  metadata.labels,
+                  metadata.omero,
+                  useLegacyMultichannelApproach
+                );
+            } catch (error) {
+              log.error(
+                'Error generating Neuroglancer state for OME-Zarr:',
+                error
+              );
+              openWithToolUrls.neuroglancer =
+                neuroglancerBaseUrl +
+                generateNeuroglancerStateForDataURL(url, effectiveZarrVersion);
+            }
+          } else {
+            openWithToolUrls.neuroglancer = '';
           }
+        } else {
+          openWithToolUrls.neuroglancer = '';
         }
       } else {
-        // No proxied URL - show all tools as available but empty
+        // No proxied URL - show compatible tools as available but empty
         openWithToolUrls.validator = '';
         openWithToolUrls.vole = '';
-        // if this is a zarr version 2, then set the url to blank which will show
-        // the icon before a data link has been generated. Setting it to null for
-        // all other versions, eg zarr v3 means the icon will not be present before
-        // a data link is generated.
-        openWithToolUrls.avivator = effectiveZarrVersion === 2 ? '' : null;
-        openWithToolUrls.neuroglancer = '';
+        openWithToolUrls.avivator =
+          effectiveZarrVersion === 2 && hasAvivator ? '' : null;
+        openWithToolUrls.neuroglancer = hasNeuroglancer ? '' : '';
       }
     } else {
       // Non-OME Zarr - only Neuroglancer available
