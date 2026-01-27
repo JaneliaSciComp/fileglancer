@@ -53,7 +53,7 @@ type CellContextMenuData = {
   value: string;
 };
 
-// Extend TanStack Table's meta to include context menu handler
+// Extend TanStack Table's meta to include context menu handler and column-level search
 declare module '@tanstack/react-table' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface TableMeta<TData> {
@@ -62,10 +62,15 @@ declare module '@tanstack/react-table' {
       data: CellContextMenuData
     ) => void;
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData, TValue> {
+    // Optional function to extract searchable values from a cell
+    // Used by globalFilterFn to allow columns to define custom search behavior
+    getSearchableValues?: (value: TValue, row: TData) => string[];
+  }
 }
-import type { PathCellValue } from './linksColumns';
 
-type DataType = 'data links' | 'tasks';
+type DataType = 'data links' | 'tasks' | 'NG links';
 
 type TableProps<TData> = {
   readonly columns: ColumnDef<TData>[];
@@ -74,6 +79,7 @@ type TableProps<TData> = {
   readonly errorState: Error | unknown;
   readonly gridColsClass: string;
   readonly loadingState: boolean;
+  readonly headerActions?: ReactNode;
 };
 
 function SortIcons<TData, TValue>({
@@ -150,6 +156,7 @@ const isISODate = (str: string): boolean => {
 };
 
 // Custom global filter function that searches all columns
+// Columns can define custom search behavior via meta.getSearchableValues
 const globalFilterFn: FilterFn<unknown> = (row, _columnId, filterValue) => {
   if (!filterValue) {
     return true;
@@ -157,22 +164,7 @@ const globalFilterFn: FilterFn<unknown> = (row, _columnId, filterValue) => {
 
   const query = String(filterValue).toLowerCase();
 
-  // Special handling for URLs: if query starts with "http", only check the key column
-  if (query.startsWith('http')) {
-    const keyCell = row
-      .getVisibleCells()
-      .find(cell => cell.column.id === 'sharing_key');
-    if (keyCell) {
-      const keyValue = keyCell.getValue();
-      if (keyValue !== null && keyValue !== undefined) {
-        const strKeyValue = String(keyValue).toLowerCase();
-        return query.includes(strKeyValue);
-      }
-    }
-    return false;
-  }
-
-  // For non-URL queries, search all columns except the name column
+  // Search all columns except the name column
   // NOTE: this needs to change if we allow custom sharing names
   // For now, the sharing name is always in the file path
   const rowValues = row.getVisibleCells().flatMap(cell => {
@@ -186,20 +178,12 @@ const globalFilterFn: FilterFn<unknown> = (row, _columnId, filterValue) => {
       return [''];
     }
 
-    // Special handling for path column with PathCellValue
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      'pathMap' in value &&
-      'displayPath' in value
-    ) {
-      const pathValue = value as PathCellValue;
-      // Return all three path types for searching
-      return [
-        pathValue.pathMap.mac_path.toLowerCase(),
-        pathValue.pathMap.linux_path.toLowerCase(),
-        pathValue.pathMap.windows_path.toLowerCase()
-      ];
+    // Use column meta if available for custom searchable values
+    const meta = cell.column.columnDef.meta;
+    if (meta?.getSearchableValues) {
+      return meta
+        .getSearchableValues(value, cell.row.original)
+        .map(v => v.toLowerCase());
     }
 
     const strValue = String(value);
@@ -218,13 +202,15 @@ function TableHeader({
   globalFilter,
   setGlobalFilter,
   clearSearch,
-  inputRef
+  inputRef,
+  headerActions
 }: {
   readonly table: ReturnType<typeof useReactTable>;
   readonly globalFilter: string;
   readonly setGlobalFilter: (value: string) => void;
   readonly clearSearch: () => void;
   readonly inputRef: React.RefObject<HTMLInputElement>;
+  readonly headerActions?: ReactNode;
 }) {
   return (
     <div className="shrink-0 flex flex-col md:flex-row md:items-center gap-2 py-4 px-4">
@@ -305,6 +291,9 @@ function TableHeader({
           ) : null}
         </div>
       </div>
+      {headerActions ? (
+        <div className="flex items-center justify-end">{headerActions}</div>
+      ) : null}
     </div>
   );
 }
@@ -331,7 +320,8 @@ function Table<TData>({
   gridColsClass,
   loadingState,
   errorState,
-  dataType
+  dataType,
+  headerActions
 }: TableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState<string>('');
@@ -420,6 +410,7 @@ function Table<TData>({
         <TableHeader
           clearSearch={clearSearch}
           globalFilter={inputValue}
+          headerActions={headerActions}
           inputRef={inputRef}
           setGlobalFilter={handleInputChange}
           table={table}
@@ -497,7 +488,8 @@ function TableCard<TData>({
   gridColsClass,
   loadingState,
   errorState,
-  dataType
+  dataType,
+  headerActions
 }: TableProps<TData>) {
   return (
     <Card className="min-h-48">
@@ -507,6 +499,7 @@ function TableCard<TData>({
         dataType={dataType}
         errorState={errorState}
         gridColsClass={gridColsClass}
+        headerActions={headerActions}
         loadingState={loadingState}
       />
     </Card>

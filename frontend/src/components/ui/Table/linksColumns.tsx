@@ -260,7 +260,16 @@ export function useLinksColumns(): ColumnDef<ProxiedPath>[] {
           const b = rowB.getValue(columnId) as PathCellValue;
           return a.displayPath.localeCompare(b.displayPath);
         },
-        enableSorting: true
+        enableSorting: true,
+        meta: {
+          // Allow searching by URL and all path formats (linux, mac, windows)
+          getSearchableValues: (value: PathCellValue, row: ProxiedPath) => [
+            row.url,
+            value.pathMap.mac_path,
+            value.pathMap.linux_path,
+            value.pathMap.windows_path
+          ]
+        }
       },
       {
         accessorKey: 'created_at',

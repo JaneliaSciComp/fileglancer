@@ -14,7 +14,7 @@ import type { FileSharePath } from '@/shared.types';
 import type { PendingToolKey } from '@/hooks/useZarrMetadata';
 import FgDialog from './FgDialog';
 import TextWithFilePath from './TextWithFilePath';
-import AutomaticLinksToggle from '@/components/ui/PreferencesPage/AutomaticLinksToggle';
+import AutomaticLinksToggle from '@/components/ui/PreferencesPage/DataLinkOptions';
 import DeleteBtn from '@/components/ui/buttons/DeleteBtn';
 
 interface CommonDataLinkDialogProps {
@@ -157,7 +157,7 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               <Typography className="font-semibold text-foreground">
                 Don't ask me this again:
               </Typography>
-              <AutomaticLinksToggle />
+              <AutomaticLinksToggle checkboxesOnly />
             </div>
             <BtnContainer>
               <CreateLinkBtn onConfirm={props.onConfirm} />

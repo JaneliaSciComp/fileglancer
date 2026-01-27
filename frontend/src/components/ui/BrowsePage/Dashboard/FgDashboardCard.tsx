@@ -3,13 +3,17 @@ import { Card, Typography } from '@material-tailwind/react';
 
 export default function DashboardCard({
   title,
-  children
+  children,
+  className = ''
 }: {
   readonly title: string;
   readonly children: ReactNode;
+  readonly className?: string;
 }) {
   return (
-    <Card className="flex flex-col w-full border bg-background border-surface h-[670px]">
+    <Card
+      className={`flex flex-col w-full border bg-background border-surface ${className}`}
+    >
       <div className="mb-auto p-4">
         <Card.Header className="px-8">
           <Typography
