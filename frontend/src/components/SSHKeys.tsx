@@ -67,8 +67,8 @@ export default function SSHKeys() {
             Fileglancer-managed SSH keys allow you to securely connect to
             cluster nodes without entering a password. Specifically, you need an
             ed25519 SSH key to use Seqera Platform to run pipelines on the
-            cluster. This page shows SSH keys with "fileglancer" in the comment
-            and lets you generate a new one.
+            cluster. This page allows you to generate keys for use with Seqera Platform.
+            Generated keys are added to your authorized_keys file.
           </Typography>
         </div>
       </Card>
