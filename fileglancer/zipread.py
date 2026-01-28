@@ -98,6 +98,8 @@ class ZipReader:
         self._cd_entries_count: int = 0
         self._is_zip64: bool = False
         self._cd_parsed: bool = False
+        self._cd_next_offset: int = 0
+        self._cd_entries_read_count: int = 0
 
     def open(self) -> 'ZipReader':
         """Open the file and parse EOCD.
@@ -155,20 +157,23 @@ class ZipReader:
     def parse_central_directory(
         self,
         stop_condition: Optional[Callable[[ZipEntry, int], bool]] = None,
-        max_entries: Optional[int] = None
+        max_new_entries: Optional[int] = None
     ) -> Dict[str, ZipEntry]:
         """
         Parse the central directory.
+
+        Supports partial parsing and resuming. If called multiple times,
+        it resumes from where it left off, unless already fully parsed.
 
         Args:
             stop_condition: Optional callback that receives each ZipEntry and its
                            0-based index. If it returns True, parsing stops early.
                            Useful for optimizations like stopping after metadata files.
-            max_entries: Optional maximum number of entries to parse. If specified,
-                        parsing stops after this many entries are processed.
+            max_new_entries: Optional maximum number of entries to parse in this call.
+                        If specified, parsing stops after this many NEW entries are processed.
 
         Returns:
-            Dictionary mapping filenames to ZipEntry objects
+            Dictionary mapping filenames to ZipEntry objects (accumulated)
 
         Raises:
             InvalidZipError: If central directory is corrupted
@@ -179,19 +184,19 @@ class ZipReader:
         if self._cd_parsed:
             return self._entries
 
-        self._fh.seek(self._cd_offset)
-        entries: Dict[str, ZipEntry] = {}
+        self._fh.seek(self._cd_next_offset)
 
-        # Determine the maximum entries to process
-        entries_to_process = self._cd_entries_count
-        if max_entries is not None:
-            entries_to_process = min(entries_to_process, max_entries)
+        start_index = self._cd_entries_read_count
+        remaining_entries = self._cd_entries_count - start_index
 
-        for i in range(self._cd_entries_count):
-            # Check max_entries limit
-            if max_entries is not None and i >= max_entries:
-                logger.debug(f"Reached max_entries limit ({max_entries})")
-                break
+        entries_to_read = remaining_entries
+        if max_new_entries is not None:
+            entries_to_read = min(remaining_entries, max_new_entries)
+
+        entries_read_this_call = 0
+
+        while entries_read_this_call < entries_to_read:
+            i = start_index + entries_read_this_call
 
             # Read CD file header (46 bytes minimum)
             header = self._fh.read(46)
@@ -215,6 +220,9 @@ class ZipReader:
             if comment_len > 0:
                 self._fh.seek(comment_len, 1)
 
+            # Update next offset
+            self._cd_next_offset = self._fh.tell()
+
             # Handle ZIP64 extra field if needed
             if comp_size == ZIP64_MARKER or uncomp_size == ZIP64_MARKER or local_offset == ZIP64_MARKER:
                 comp_size, uncomp_size, local_offset = self._parse_zip64_extra(
@@ -230,18 +238,19 @@ class ZipReader:
                 extra_field=extra
             )
 
-            entries[filename] = entry
+            self._entries[filename] = entry
+            self._cd_entries_read_count += 1
+            entries_read_this_call += 1
 
             # Check stop condition
             if stop_condition and stop_condition(entry, i):
                 logger.debug(f"Stop condition met at index {i}, filename: {filename}")
                 break
 
-        self._entries.update(entries)
-        if stop_condition is None and max_entries is None:
+        if self._cd_entries_read_count >= self._cd_entries_count:
             self._cd_parsed = True
 
-        return entries
+        return self._entries
 
     def list_files(self, prefix: str = "") -> List[str]:
         """List files in archive, optionally filtered by prefix.
@@ -270,8 +279,20 @@ class ZipReader:
         Returns:
             ZipEntry if found, None otherwise
         """
-        if not self._cd_parsed:
-            self.parse_central_directory()
+        # Check if we already have it
+        if path in self._entries:
+            return self._entries[path]
+
+        # If fully parsed and not found, it doesn't exist
+        if self._cd_parsed:
+            return None
+
+        # Scan forward until we find it or finish
+        def stop_on_find(entry, idx):
+            return entry.filename == path
+
+        self.parse_central_directory(stop_condition=stop_on_find)
+
         return self._entries.get(path)
 
     def read_file(self, path: str) -> bytes:
@@ -515,6 +536,10 @@ class ZipReader:
             self._cd_offset = cd_offset
             self._cd_size = cd_size
             self._cd_entries_count = cd_entries_total
+
+        # Initialize partial parsing state
+        self._cd_next_offset = self._cd_offset
+        self._cd_entries_read_count = 0
 
     def _parse_zip64_eocd(self, eocd_pos: int):
         """Parse ZIP64 End of Central Directory records.

@@ -257,35 +257,35 @@ class TestCentralDirectory:
             reader.parse_central_directory(stop_condition=track_indices)
             assert indices_seen == [0, 1, 2]  # 3 files in temp_zip_file
 
-    def test_max_entries(self, temp_zip_file):
-        """Test limiting entries with max_entries parameter."""
+    def test_max_new_entries(self, temp_zip_file):
+        """Test limiting entries with max_new_entries parameter."""
         with ZipReader(temp_zip_file) as reader:
-            entries = reader.parse_central_directory(max_entries=2)
+            entries = reader.parse_central_directory(max_new_entries=2)
             assert len(entries) == 2
 
-    def test_max_entries_zero(self, temp_zip_file):
-        """Test max_entries=0 returns no entries."""
+    def test_max_new_entries_zero(self, temp_zip_file):
+        """Test max_new_entries=0 returns no entries."""
         with ZipReader(temp_zip_file) as reader:
-            entries = reader.parse_central_directory(max_entries=0)
+            entries = reader.parse_central_directory(max_new_entries=0)
             assert len(entries) == 0
 
-    def test_max_entries_exceeds_total(self, temp_zip_file):
-        """Test max_entries larger than total entries."""
+    def test_max_new_entries_exceeds_total(self, temp_zip_file):
+        """Test max_new_entries larger than total entries."""
         with ZipReader(temp_zip_file) as reader:
             # Archive has 3 files, requesting 100
-            entries = reader.parse_central_directory(max_entries=100)
+            entries = reader.parse_central_directory(max_new_entries=100)
             assert len(entries) == 3
 
-    def test_max_entries_with_stop_condition(self, temp_zip_file):
-        """Test that stop_condition and max_entries work together."""
+    def test_max_new_entries_with_stop_condition(self, temp_zip_file):
+        """Test that stop_condition and max_new_entries work together."""
         with ZipReader(temp_zip_file) as reader:
-            # Stop condition would stop at index 2, but max_entries=1 should stop first
+            # Stop condition would stop at index 2, but max_new_entries=1 should stop first
             def stop_at_two(entry, index):
                 return index >= 2
 
             entries = reader.parse_central_directory(
                 stop_condition=stop_at_two,
-                max_entries=1
+                max_new_entries=1
             )
             assert len(entries) == 1
 

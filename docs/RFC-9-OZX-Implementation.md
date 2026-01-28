@@ -14,27 +14,27 @@ This document describes the implementation of RFC-9 support for reading OME-Zarr
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         Frontend                                 │
-│  ┌─────────────────┐    ┌──────────────┐    ┌────────────────┐ │
+│                         Frontend                                │
+│  ┌─────────────────┐    ┌──────────────┐    ┌─────────────────┐ │
 │  │ ozxDetection.ts │───▶│ OzxFetchStore│───▶│ zarrita/ome-zarr│ │
-│  │ (detection)     │    │ (custom store)│    │ (existing)     │ │
-│  └─────────────────┘    └──────────────┘    └────────────────┘ │
-│                               │                                  │
-└───────────────────────────────│──────────────────────────────────┘
+│  │ (detection)     │    │(custom store)│    │ (existing)      │ │
+│  └─────────────────┘    └──────────────┘    └─────────────────┘ │
+│                               │                                 │
+└───────────────────────────────│─────────────────────────────────┘
                                 │ HTTP + Range requests
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                         Backend                                  │
-│  ┌──────────────────────┐    ┌─────────────────────────────┐   │
-│  │ /api/ozx-content/    │    │ OZXReader (ozxzip.py)       │   │
-│  │ /api/ozx-metadata/   │───▶│ - OME metadata parsing      │   │
-│  │ /api/ozx-list/       │    │ - jsonFirst optimization    │   │
-│  └──────────────────────┘    ├─────────────────────────────┤   │
-│                              │ ZipReader (zipread.py)      │   │
-│                              │ - ZIP64 support             │   │
-│                              │ - Partial CD parsing        │   │
-│                              │ - Range request streaming   │   │
-│                              └─────────────────────────────┘   │
+│                         Backend                                 │
+│  ┌──────────────────────┐    ┌─────────────────────────────┐    │
+│  │ /api/ozx-content/    │    │ OZXReader (ozxzip.py)       │    │
+│  │ /api/ozx-metadata/   │───▶│ - OME metadata parsing      │    │
+│  │ /api/ozx-list/       │    │ - jsonFirst optimization    │    │
+│  └──────────────────────┘    ├─────────────────────────────┤    │
+│                              │ ZipReader (zipread.py)      │    │
+│                              │ - ZIP64 support             │    │
+│                              │ - Partial CD parsing        │    │
+│                              │ - Range request streaming   │    │
+│                              └─────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -72,7 +72,7 @@ Generic ZIP file reader providing:
 2. **ZIP64 Support**: Handles large archives with ZIP64 extended fields
 3. **Compression**: Supports STORE (uncompressed) and DEFLATE compression methods
 4. **Range Streaming**: Efficient byte-range streaming for HTTP Range requests
-5. **Flexible Parsing**: Supports `stop_condition` callback and `max_entries` limit
+5. **Flexible Parsing**: Supports `stop_condition` callback and `max_new_entries` limit
 
 Key classes and functions:
 
@@ -86,7 +86,7 @@ Key classes and functions:
 def parse_central_directory(
     self,
     stop_condition: Optional[Callable[[ZipEntry, int], bool]] = None,
-    max_entries: Optional[int] = None
+    max_new_entries: Optional[int] = None
 ) -> Dict[str, ZipEntry]:
     """
     Parse the central directory.
@@ -94,7 +94,7 @@ def parse_central_directory(
     Args:
         stop_condition: Optional callback receiving (entry, index).
                        Returns True to stop parsing after the current entry.
-        max_entries: Optional maximum number of entries to parse.
+        max_new_entries: Optional maximum number of entries to parse.
 
     Returns:
         Dictionary mapping filenames to ZipEntry objects
@@ -108,7 +108,7 @@ def parse_central_directory(
 entries = reader.parse_central_directory()
 
 # Stop after 100 entries
-entries = reader.parse_central_directory(max_entries=100)
+entries = reader.parse_central_directory(max_new_entries=100)
 
 # Stop when finding a specific file
 def stop_at_target(entry, index):
@@ -263,15 +263,15 @@ The implementation separates generic ZIP functionality from OZX-specific feature
 
 ```
 ┌──────────────────────────────────────┐
-│           OZXReader                   │
+│           OZXReader                  │
 │  - OME metadata parsing              │
 │  - jsonFirst optimization            │
 │  - is_json_metadata_file()           │
 ├──────────────────────────────────────┤
-│           ZipReader                   │
+│           ZipReader                  │
 │  - EOCD/ZIP64 parsing                │
 │  - Central directory parsing         │
-│  - stop_condition & max_entries      │
+│  - stop_condition & max_new_entries  │
 │  - File streaming & range requests   │
 │  - STORE/DEFLATE compression         │
 └──────────────────────────────────────┘
@@ -325,8 +325,8 @@ Tests cover:
 - Basic reader operations (open, close, context manager)
 - Central directory parsing
 - `stop_condition` callback with index parameter
-- `max_entries` limit parameter
-- Combined `stop_condition` and `max_entries`
+- `max_new_entries` limit parameter
+- Combined `stop_condition` and `max_new_entries`
 - File reading and streaming
 - Range request streaming
 - DEFLATE compression

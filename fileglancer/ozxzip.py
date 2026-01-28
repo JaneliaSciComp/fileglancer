@@ -124,7 +124,12 @@ class OZXReader(ZipReader):
         """Alias for get_ome_metadata() for backward compatibility."""
         return self.get_ome_metadata()
 
-    def parse_central_directory(self, json_only: bool = False) -> Dict[str, ZipEntry]:
+    def parse_central_directory(
+        self,
+        json_only: bool = False,
+        stop_condition: Optional[Callable[[ZipEntry, int], bool]] = None,
+        max_new_entries: Optional[int] = None
+    ) -> Dict[str, ZipEntry]:
         """
         Parse the central directory with optional jsonFirst optimization.
 
@@ -132,6 +137,8 @@ class OZXReader(ZipReader):
             json_only: If True and jsonFirst=True in metadata, stop parsing
                       after the last JSON metadata file. This is the RFC-9
                       optimization for efficient metadata discovery.
+            stop_condition: Optional callback (passed to parent).
+            max_new_entries: Optional maximum number of entries to parse (passed to parent).
 
         Returns:
             Dictionary mapping filenames to ZipEntry objects
@@ -142,13 +149,17 @@ class OZXReader(ZipReader):
         if json_only and self._ome_metadata and self._ome_metadata.json_first:
             # Use the stop condition to implement jsonFirst optimization
             def stop_at_non_json(entry: ZipEntry, index: int) -> bool:
+                # Check user's stop condition first
+                if stop_condition and stop_condition(entry, index):
+                    return True
+
                 if entry.is_directory:
                     return False
                 return not is_json_metadata_file(entry.filename)
 
-            return super().parse_central_directory(stop_condition=stop_at_non_json)
+            return super().parse_central_directory(stop_condition=stop_at_non_json, max_new_entries=max_new_entries)
         else:
-            return super().parse_central_directory()
+            return super().parse_central_directory(stop_condition=stop_condition, max_new_entries=max_new_entries)
 
     def _parse_ome_comment(self, comment: str) -> Optional[OZXMetadata]:
         """Parse ZIP comment for RFC-9 OME metadata.
