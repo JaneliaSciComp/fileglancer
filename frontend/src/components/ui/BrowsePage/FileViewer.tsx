@@ -45,6 +45,7 @@ const InternalFileViewer = ({
     internalPath
   );
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+  const [formatJson, setFormatJson] = useState<boolean>(true);
 
   useEffect(() => {
     const checkDarkMode = () =>
@@ -67,10 +68,23 @@ const InternalFileViewer = ({
 
   const content = data ? new TextDecoder().decode(data) : '';
   const language = getLanguageFromExtension(internalPath);
+  const isJsonFile = language === 'json';
+
+  // Format JSON if toggle is enabled and content is valid JSON
+  let displayContent = content;
+  if (isJsonFile && formatJson && content) {
+    try {
+      const parsed = JSON.parse(content);
+      displayContent = JSON.stringify(parsed, null, 2);
+    } catch {
+      // If JSON parsing fails, show original content
+      displayContent = content;
+    }
+  }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 p-2 bg-surface-light border-b border-surface">
+    <div className="flex flex-col h-full bg-background overflow-hidden">
+      <div className="flex items-center gap-2 p-2 bg-surface-light border-b border-surface shrink-0">
         <IconButton
           className="text-foreground"
           onClick={onBack}
@@ -79,18 +93,38 @@ const InternalFileViewer = ({
         >
           <HiArrowLeft className="h-4 w-4" />
         </IconButton>
-        <Typography className="font-mono truncate" type="small">
+        <Typography className="font-mono truncate flex-1" type="small">
           {internalPath}
         </Typography>
+        {isJsonFile ? (
+          <div className="flex items-center gap-2 shrink-0">
+            <Typography className="text-foreground text-xs whitespace-nowrap">
+              Format JSON
+            </Typography>
+            <Switch
+              checked={formatJson}
+              onChange={() => setFormatJson(!formatJson)}
+            />
+          </div>
+        ) : null}
       </div>
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto p-0 min-h-0">
         <SyntaxHighlighter
-          customStyle={{ margin: 0, padding: '1rem' }}
+          customStyle={{
+            margin: 0,
+            padding: '1rem',
+            fontSize: '14px',
+            lineHeight: '1.5',
+            overflow: 'visible',
+            width: '100%',
+            boxSizing: 'border-box',
+            minHeight: 'fit-content'
+          }}
           language={language}
           style={isDarkMode ? materialDark : coy}
           wrapLongLines={true}
         >
-          {content}
+          {displayContent}
         </SyntaxHighlighter>
       </div>
     </div>
