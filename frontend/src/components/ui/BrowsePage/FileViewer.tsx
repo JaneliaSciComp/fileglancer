@@ -17,10 +17,11 @@ import { formatFileSize, formatUnixTimestamp } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
 import { useFileContentQuery } from '@/queries/fileContentQueries';
 import {
-  useOzxFileEntriesQuery,
+  useOzxFileEntriesInfiniteQuery,
   useOzxFileContentQuery,
   buildOzxContentUrl
 } from '@/queries/ozxQueries';
+import type { OzxFileEntry } from '@/queries/ozxQueries';
 import { isAnyZipFile, getOzxFilePath } from '@/utils/ozxDetection';
 
 type FileViewerProps = {
@@ -107,15 +108,30 @@ const ZipBrowser = ({ file }: { readonly file: FileOrFolder }) => {
   const { fspName } = useFileBrowserContext();
   const ozxPath = getOzxFilePath(file);
   const {
-    data: allEntries,
+    data,
     isLoading,
-    error
-  } = useOzxFileEntriesQuery(fspName, ozxPath);
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage
+  } = useOzxFileEntriesInfiniteQuery(fspName, ozxPath, 100);
   const [internalPath, setInternalPath] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
+  // Flatten all pages into a single array of entries
+  const allEntries = useMemo<OzxFileEntry[]>(() => {
+    if (!data?.pages) {
+      return [];
+    }
+    return data.pages.flatMap(page => page.entries);
+  }, [data]);
+
+  // Get total count from the first page (same across all pages)
+  const totalCount = data?.pages[0]?.total_count ?? 0;
+  const loadedCount = allEntries.length;
+
   const items = useMemo<ZipBrowserItem[]>(() => {
-    if (!allEntries) {
+    if (!allEntries.length) {
       return [];
     }
 
@@ -213,7 +229,7 @@ const ZipBrowser = ({ file }: { readonly file: FileOrFolder }) => {
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Breadcrumb header */}
+      {/* Breadcrumb header with progress indicator */}
       <div className="p-2 bg-surface-light border-b border-surface flex items-center gap-2">
         {internalPath ? (
           <IconButton
@@ -225,9 +241,17 @@ const ZipBrowser = ({ file }: { readonly file: FileOrFolder }) => {
             <HiArrowLeft className="h-4 w-4" />
           </IconButton>
         ) : null}
-        <Typography className="font-mono truncate" type="small">
+        <Typography className="font-mono truncate flex-1" type="small">
           {file.name}/{internalPath}
         </Typography>
+        {totalCount > 0 ? (
+          <Typography
+            className="text-surface-dark whitespace-nowrap"
+            type="small"
+          >
+            {loadedCount} of {totalCount} entries
+          </Typography>
+        ) : null}
       </div>
 
       {/* Table view */}
@@ -304,7 +328,7 @@ const ZipBrowser = ({ file }: { readonly file: FileOrFolder }) => {
                 </td>
               </tr>
             ))}
-            {items.length === 0 ? (
+            {items.length === 0 && !hasNextPage ? (
               <tr>
                 <td className="p-4 text-center text-surface-dark" colSpan={4}>
                   This folder is empty
@@ -313,6 +337,22 @@ const ZipBrowser = ({ file }: { readonly file: FileOrFolder }) => {
             ) : null}
           </tbody>
         </table>
+
+        {/* Load more button */}
+        {hasNextPage ? (
+          <div className="p-4 text-center border-t border-surface">
+            <button
+              className="px-4 py-2 text-sm font-medium text-foreground bg-surface-light hover:bg-surface border border-surface rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              disabled={isFetchingNextPage}
+              onClick={() => fetchNextPage()}
+              type="button"
+            >
+              {isFetchingNextPage
+                ? 'Loading...'
+                : `Load more entries (${loadedCount} of ${totalCount})`}
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

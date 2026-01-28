@@ -1446,12 +1446,24 @@ def create_app(settings):
         path_name: str,
         prefix: str = Query('', description="Filter files by prefix"),
         details: bool = Query(False, description="Include file details (size, compression)"),
+        offset: int = Query(0, ge=0, description="Number of entries to skip"),
+        limit: int = Query(100, ge=1, le=1000, description="Maximum entries to return"),
         username: str = Depends(get_current_user)
     ):
         """
-        List files in an OZX archive.
+        List files in an OZX archive with pagination support.
         Optionally filter by path prefix.
         If details=True, returns full file entry information including size.
+
+        Pagination:
+        - offset: Number of entries to skip (default 0)
+        - limit: Maximum entries to return (default 100, max 1000)
+
+        Response includes:
+        - total_count: Total number of entries in the archive
+        - offset: Current offset
+        - limit: Current limit
+        - has_more: Whether more entries exist beyond this page
         """
 
         filestore_name, _, ozx_subpath = path_name.partition('/')
@@ -1479,13 +1491,29 @@ def create_app(settings):
 
         # List files outside user context
         try:
+            # Get total count from central directory metadata (available after open)
+            total_count = reader.cd_entries_count
+
+            # Parse entries up to offset + limit
+            reader.parse_central_directory(max_new_entries=offset + limit)
+
+            # Get all parsed entries as a list (preserves CD order)
+            all_entries = list(reader.entries.values())
+
+            # Apply offset and limit
+            paginated_entries = all_entries[offset:offset + limit]
+
+            # Calculate has_more
+            has_more = offset + limit < total_count
+
             if details:
-                # Return full file entry details
-                reader.parse_central_directory()
+                # Apply prefix filter if specified
+                if prefix:
+                    paginated_entries = [e for e in paginated_entries if e.filename.startswith(prefix)]
+
+                # Return full file entry details with pagination info
                 entries = []
-                for filename, entry in reader.entries.items():
-                    if prefix and not filename.startswith(prefix):
-                        continue
+                for entry in paginated_entries:
                     entries.append({
                         "filename": entry.filename,
                         "compressed_size": entry.compressed_size,
@@ -1494,12 +1522,28 @@ def create_app(settings):
                         "is_directory": entry.is_directory
                     })
                 reader.close()
-                return {"entries": entries}
+                return {
+                    "entries": entries,
+                    "total_count": total_count,
+                    "offset": offset,
+                    "limit": limit,
+                    "has_more": has_more
+                }
             else:
-                # Return just filenames for backward compatibility
-                files = reader.list_files(prefix)
+                # Apply prefix filter if specified
+                if prefix:
+                    paginated_entries = [e for e in paginated_entries if e.filename.startswith(prefix)]
+
+                # Return just filenames with pagination info
+                files = [e.filename for e in paginated_entries if not e.is_directory]
                 reader.close()
-                return {"files": files}
+                return {
+                    "files": files,
+                    "total_count": total_count,
+                    "offset": offset,
+                    "limit": limit,
+                    "has_more": has_more
+                }
 
         except Exception as e:
             reader.close()

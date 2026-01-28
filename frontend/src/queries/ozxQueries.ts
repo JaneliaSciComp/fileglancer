@@ -4,8 +4,12 @@
  * RFC-9 Spec: https://ngff.openmicroscopy.org/rfc/9/index.html
  */
 
-import { useQuery } from '@tanstack/react-query';
-import type { UseQueryResult } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
+import type {
+  UseQueryResult,
+  UseInfiniteQueryResult,
+  InfiniteData
+} from '@tanstack/react-query';
 import { default as log } from '@/logger';
 import { buildUrl, sendFetchRequest } from '@/utils';
 import { sendRequestAndThrowForNotOk } from './queryUtils';
@@ -29,6 +33,17 @@ export type OzxFileEntry = {
   uncompressed_size: number;
   compression_method: number;
   is_directory: boolean;
+};
+
+/**
+ * Paginated response for file entries from OZX archive.
+ */
+export type OzxFileEntriesPage = {
+  entries: OzxFileEntry[];
+  total_count: number;
+  offset: number;
+  limit: number;
+  has_more: boolean;
 };
 
 /**
@@ -80,12 +95,21 @@ export function buildOzxMetadataUrl(
 
 /**
  * Build URL for listing files in an OZX archive.
+ *
+ * @param fspName - The file share path name
+ * @param ozxFilePath - Path to the OZX file within the FSP
+ * @param prefix - Optional prefix to filter files
+ * @param details - If true, include full file entry details
+ * @param offset - Number of entries to skip (for pagination)
+ * @param limit - Maximum entries to return (for pagination)
  */
 export function buildOzxListUrl(
   fspName: string,
   ozxFilePath: string,
   prefix?: string,
-  details?: boolean
+  details?: boolean,
+  offset?: number,
+  limit?: number
 ): string {
   const pathSegment = `${fspName}/${ozxFilePath}`;
   const params: Record<string, string> = {};
@@ -94,6 +118,12 @@ export function buildOzxListUrl(
   }
   if (details) {
     params.details = 'true';
+  }
+  if (offset !== undefined) {
+    params.offset = String(offset);
+  }
+  if (limit !== undefined) {
+    params.limit = String(limit);
   }
   return buildUrl(
     '/api/ozx-list/',
@@ -226,6 +256,77 @@ export function useOzxFileEntriesQuery(
         throw new Error('fspName and ozxFilePath are required');
       }
       return await fetchOzxFileEntries(fspName, ozxFilePath, prefix);
+    },
+    enabled: enabled && !!fspName && !!ozxFilePath,
+    staleTime: 5 * 60 * 1000
+  });
+}
+
+/**
+ * Fetch a page of detailed file entries from an OZX archive.
+ */
+async function fetchOzxFileEntriesPage(
+  fspName: string,
+  ozxFilePath: string,
+  offset: number,
+  limit: number,
+  prefix?: string
+): Promise<OzxFileEntriesPage> {
+  const url = buildOzxListUrl(
+    fspName,
+    ozxFilePath,
+    prefix,
+    true,
+    offset,
+    limit
+  );
+  const response = (await sendRequestAndThrowForNotOk(
+    url,
+    'GET'
+  )) as OzxFileEntriesPage;
+  return response;
+}
+
+/**
+ * Hook to fetch detailed file entries from an OZX archive with infinite scrolling.
+ * Loads entries progressively as user requests more.
+ *
+ * @param fspName - The file share path name
+ * @param ozxFilePath - Path to the OZX file within the FSP
+ * @param pageSize - Number of entries per page (default 100)
+ * @param enabled - Whether the query should be enabled
+ */
+export function useOzxFileEntriesInfiniteQuery(
+  fspName: string | undefined,
+  ozxFilePath: string | undefined,
+  pageSize: number = 100,
+  enabled: boolean = true
+): UseInfiniteQueryResult<InfiniteData<OzxFileEntriesPage>, Error> {
+  return useInfiniteQuery({
+    queryKey: [
+      'ozx',
+      'entries-infinite',
+      fspName || '',
+      ozxFilePath || '',
+      pageSize
+    ],
+    queryFn: async ({ pageParam = 0 }) => {
+      if (!fspName || !ozxFilePath) {
+        throw new Error('fspName and ozxFilePath are required');
+      }
+      return await fetchOzxFileEntriesPage(
+        fspName,
+        ozxFilePath,
+        pageParam,
+        pageSize
+      );
+    },
+    initialPageParam: 0,
+    getNextPageParam: lastPage => {
+      if (lastPage.has_more) {
+        return lastPage.offset + lastPage.limit;
+      }
+      return undefined;
     },
     enabled: enabled && !!fspName && !!ozxFilePath,
     staleTime: 5 * 60 * 1000

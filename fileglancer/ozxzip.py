@@ -10,7 +10,7 @@ This module extends the generic ZipReader with OZX-specific functionality:
 
 import json
 from dataclasses import dataclass
-from typing import Optional, Dict
+from typing import Optional, Dict, Callable
 
 from loguru import logger
 
