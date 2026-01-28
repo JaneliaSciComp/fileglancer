@@ -26,9 +26,9 @@ This document describes the implementation of RFC-9 support for reading OME-Zarr
 ┌─────────────────────────────────────────────────────────────────┐
 │                         Backend                                 │
 │  ┌──────────────────────┐    ┌─────────────────────────────┐    │
-│  │ /api/ozx-content/    │    │ OZXReader (ozxzip.py)       │    │
+│  │ /api/zip-content/    │    │ OZXReader (ozxzip.py)       │    │
 │  │ /api/ozx-metadata/   │───▶│ - OME metadata parsing      │    │
-│  │ /api/ozx-list/       │    │ - jsonFirst optimization    │    │
+│  │ /api/zip-list/       │    │ - jsonFirst optimization    │    │
 │  └──────────────────────┘    ├─────────────────────────────┤    │
 │                              │ ZipReader (zipread.py)      │    │
 │                              │ - ZIP64 support             │    │
@@ -154,7 +154,7 @@ with OZXReader(path) as reader:
 
 ### API Endpoints
 
-#### `GET /api/ozx-content/{path_name:path}?subpath={internal_path}`
+#### `GET /api/zip-content/{path_name:path}?subpath={internal_path}`
 
 Streams file content from within an OZX archive. Supports HTTP Range requests for efficient chunk access.
 
@@ -164,7 +164,7 @@ Streams file content from within an OZX archive. Supports HTTP Range requests fo
 - `Content-Length: {size}`
 - `Content-Range: bytes {start}-{end}/{total}` (for 206 responses)
 
-#### `HEAD /api/ozx-content/{path_name:path}?subpath={internal_path}`
+#### `HEAD /api/zip-content/{path_name:path}?subpath={internal_path}`
 
 Returns file metadata without content body.
 
@@ -181,7 +181,7 @@ Returns OZX archive metadata:
 }
 ```
 
-#### `GET /api/ozx-list/{path_name:path}?prefix={optional_prefix}`
+#### `GET /api/zip-list/{path_name:path}?prefix={optional_prefix}`
 
 Lists files in the OZX archive:
 
@@ -389,14 +389,14 @@ function ZarrViewer({ file, fspName }) {
 curl http://localhost:7878/api/ozx-metadata/myFSP/path/to/data.ozx
 
 # List files
-curl http://localhost:7878/api/ozx-list/myFSP/path/to/data.ozx
+curl http://localhost:7878/api/zip-list/myFSP/path/to/data.ozx
 
 # Get file content
-curl http://localhost:7878/api/ozx-content/myFSP/path/to/data.ozx?subpath=zarr.json
+curl http://localhost:7878/api/zip-content/myFSP/path/to/data.ozx?subpath=zarr.json
 
 # Get range (for chunk access)
 curl -H "Range: bytes=0-1023" \
-  http://localhost:7878/api/ozx-content/myFSP/path/to/data.ozx?subpath=0/c/0/0/0
+  http://localhost:7878/api/zip-content/myFSP/path/to/data.ozx?subpath=0/c/0/0/0
 ```
 
 ## Future Enhancements

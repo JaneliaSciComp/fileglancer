@@ -1215,15 +1215,15 @@ def create_app(settings):
             )
 
 
-    @app.head("/api/ozx-content/{path_name:path}")
-    async def head_ozx_file_content(
+    @app.head("/api/zip-content/{path_name:path}")
+    async def head_zip_file_content(
         path_name: str,
-        subpath: str = Query(..., description="Path within the OZX file"),
+        subpath: str = Query(..., description="Path within the ZIP file"),
         username: str = Depends(get_current_user)
     ):
-        """HEAD request for OZX file content (returns size, supports Range)."""
+        """HEAD request for ZIP file content (returns size, supports Range)."""
 
-        filestore_name, _, ozx_subpath = path_name.partition('/')
+        filestore_name, _, zip_subpath = path_name.partition('/')
 
         with _get_user_context(username):
             filestore, error = _get_filestore(filestore_name)
@@ -1231,20 +1231,20 @@ def create_app(settings):
                 raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
 
             try:
-                ozx_file_path = filestore._check_path_in_root(ozx_subpath)
+                zip_file_path = filestore._check_path_in_root(zip_subpath)
             except RootCheckError as e:
                 raise HTTPException(status_code=400, detail=str(e))
 
-            if not is_zip_file(ozx_file_path):
-                raise HTTPException(status_code=400, detail="Not an OZX file")
+            if not is_zip_file(zip_file_path):
+                raise HTTPException(status_code=400, detail="Not a ZIP file")
 
             try:
-                reader = OZXReader(ozx_file_path)
+                reader = OZXReader(zip_file_path)
                 reader.open()
             except FileNotFoundError:
-                raise HTTPException(status_code=404, detail="OZX file not found")
+                raise HTTPException(status_code=404, detail="ZIP file not found")
             except (InvalidZipError, OZXReaderError) as e:
-                raise HTTPException(status_code=400, detail=f"Invalid OZX file: {e}")
+                raise HTTPException(status_code=400, detail=f"Invalid ZIP file: {e}")
 
         # Parse central directory and get entry (outside user context)
         try:
@@ -1252,7 +1252,7 @@ def create_app(settings):
             entry = reader.get_entry(subpath)
             if entry is None:
                 reader.close()
-                raise HTTPException(status_code=404, detail="File not found in OZX archive")
+                raise HTTPException(status_code=404, detail="File not found in ZIP archive")
 
             file_size = entry.uncompressed_size
             content_type = guess_content_type(subpath)
@@ -1274,19 +1274,19 @@ def create_app(settings):
             raise HTTPException(status_code=500, detail=str(e))
 
 
-    @app.get("/api/ozx-content/{path_name:path}")
-    async def get_ozx_file_content(
+    @app.get("/api/zip-content/{path_name:path}")
+    async def get_zip_file_content(
         request: Request,
         path_name: str,
-        subpath: str = Query(..., description="Path within the OZX file"),
+        subpath: str = Query(..., description="Path within the ZIP file"),
         username: str = Depends(get_current_user)
     ):
         """
-        Stream file content from within an OZX archive.
+        Stream file content from within a ZIP archive.
         Supports HTTP Range requests for efficient chunk access.
         """
 
-        filestore_name, _, ozx_subpath = path_name.partition('/')
+        filestore_name, _, zip_subpath = path_name.partition('/')
 
         with _get_user_context(username):
             filestore, error = _get_filestore(filestore_name)
@@ -1294,20 +1294,20 @@ def create_app(settings):
                 raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
 
             try:
-                ozx_file_path = filestore._check_path_in_root(ozx_subpath)
+                zip_file_path = filestore._check_path_in_root(zip_subpath)
             except RootCheckError as e:
                 raise HTTPException(status_code=400, detail=str(e))
 
-            if not is_zip_file(ozx_file_path):
-                raise HTTPException(status_code=400, detail="Not an OZX file")
+            if not is_zip_file(zip_file_path):
+                raise HTTPException(status_code=400, detail="Not a ZIP file")
 
             try:
-                reader = OZXReader(ozx_file_path)
+                reader = OZXReader(zip_file_path)
                 reader.open()
             except FileNotFoundError:
-                raise HTTPException(status_code=404, detail="OZX file not found")
+                raise HTTPException(status_code=404, detail="ZIP file not found")
             except (InvalidZipError, OZXReaderError) as e:
-                raise HTTPException(status_code=400, detail=f"Invalid OZX file: {e}")
+                raise HTTPException(status_code=400, detail=f"Invalid ZIP file: {e}")
 
         # Parse central directory and get entry (outside user context)
         # The file handle retains access rights
@@ -1316,7 +1316,7 @@ def create_app(settings):
             entry = reader.get_entry(subpath)
             if entry is None:
                 reader.close()
-                raise HTTPException(status_code=404, detail="File not found in OZX archive")
+                raise HTTPException(status_code=404, detail="File not found in ZIP archive")
 
             content_type = guess_content_type(subpath)
             file_size = entry.uncompressed_size
@@ -1380,10 +1380,10 @@ def create_app(settings):
 
         except FileNotFoundError:
             reader.close()
-            raise HTTPException(status_code=404, detail="File not found in OZX archive")
+            raise HTTPException(status_code=404, detail="File not found in ZIP archive")
         except Exception as e:
             reader.close()
-            logger.exception(f"Error reading OZX content: {e}")
+            logger.exception(f"Error reading ZIP content: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1441,8 +1441,8 @@ def create_app(settings):
             raise HTTPException(status_code=500, detail=str(e))
 
 
-    @app.get("/api/ozx-list/{path_name:path}")
-    async def list_ozx_files(
+    @app.get("/api/zip-list/{path_name:path}")
+    async def list_zip_files(
         path_name: str,
         prefix: str = Query('', description="Filter files by prefix"),
         details: bool = Query(False, description="Include file details (size, compression)"),
@@ -1451,7 +1451,7 @@ def create_app(settings):
         username: str = Depends(get_current_user)
     ):
         """
-        List files in an OZX archive with pagination support.
+        List files in a ZIP archive with pagination support.
         Optionally filter by path prefix.
         If details=True, returns full file entry information including size.
 
@@ -1466,7 +1466,7 @@ def create_app(settings):
         - has_more: Whether more entries exist beyond this page
         """
 
-        filestore_name, _, ozx_subpath = path_name.partition('/')
+        filestore_name, _, zip_subpath = path_name.partition('/')
 
         with _get_user_context(username):
             filestore, error = _get_filestore(filestore_name)
@@ -1474,20 +1474,20 @@ def create_app(settings):
                 raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
 
             try:
-                ozx_file_path = filestore._check_path_in_root(ozx_subpath)
+                zip_file_path = filestore._check_path_in_root(zip_subpath)
             except RootCheckError as e:
                 raise HTTPException(status_code=400, detail=str(e))
 
-            if not is_zip_file(ozx_file_path):
-                raise HTTPException(status_code=400, detail="Not an OZX file")
+            if not is_zip_file(zip_file_path):
+                raise HTTPException(status_code=400, detail="Not a ZIP file")
 
             try:
-                reader = OZXReader(ozx_file_path)
+                reader = OZXReader(zip_file_path)
                 reader.open()
             except FileNotFoundError:
-                raise HTTPException(status_code=404, detail="OZX file not found")
+                raise HTTPException(status_code=404, detail="ZIP file not found")
             except (InvalidZipError, OZXReaderError) as e:
-                raise HTTPException(status_code=400, detail=f"Invalid OZX file: {e}")
+                raise HTTPException(status_code=400, detail=f"Invalid ZIP file: {e}")
 
         # List files outside user context
         try:
@@ -1547,7 +1547,7 @@ def create_app(settings):
 
         except Exception as e:
             reader.close()
-            logger.exception(f"Error listing OZX files: {e}")
+            logger.exception(f"Error listing ZIP files: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
 

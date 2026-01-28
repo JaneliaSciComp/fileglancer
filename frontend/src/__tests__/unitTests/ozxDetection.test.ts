@@ -4,7 +4,7 @@ import {
   isOzxFilename,
   hasOzxFiles,
   getOzxFiles,
-  getOzxFilePath
+  getZipFilePath
 } from '@/utils/ozxDetection';
 import { detectOzxZarrVersions } from '@/queries/zarrQueries';
 import type { FileOrFolder } from '@/shared.types';
@@ -109,15 +109,15 @@ describe('getOzxFiles', () => {
   });
 });
 
-describe('getOzxFilePath', () => {
+describe('getZipFilePath', () => {
   it('should return path without leading slash', () => {
     const file = createFile('data.ozx', '/path/to/data.ozx');
-    expect(getOzxFilePath(file)).toBe('path/to/data.ozx');
+    expect(getZipFilePath(file)).toBe('path/to/data.ozx');
   });
 
   it('should return path unchanged if no leading slash', () => {
     const file = createFile('data.ozx', 'path/to/data.ozx');
-    expect(getOzxFilePath(file)).toBe('path/to/data.ozx');
+    expect(getZipFilePath(file)).toBe('path/to/data.ozx');
   });
 });
 

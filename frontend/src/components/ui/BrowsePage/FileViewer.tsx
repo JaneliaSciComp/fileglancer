@@ -17,12 +17,12 @@ import { formatFileSize, formatUnixTimestamp } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
 import { useFileContentQuery } from '@/queries/fileContentQueries';
 import {
-  useOzxFileEntriesInfiniteQuery,
-  useOzxFileContentQuery,
-  buildOzxContentUrl
+  useZipFileEntriesInfiniteQuery,
+  useZipFileContentQuery,
+  buildZipContentUrl
 } from '@/queries/ozxQueries';
-import type { OzxFileEntry } from '@/queries/ozxQueries';
-import { isAnyZipFile, getOzxFilePath } from '@/utils/ozxDetection';
+import type { ZipFileEntry } from '@/queries/ozxQueries';
+import { isAnyZipFile, getZipFilePath } from '@/utils/ozxDetection';
 
 type FileViewerProps = {
   readonly file: FileOrFolder;
@@ -39,7 +39,7 @@ const InternalFileViewer = ({
   readonly internalPath: string;
   readonly onBack: () => void;
 }) => {
-  const { data, isLoading, error } = useOzxFileContentQuery(
+  const { data, isLoading, error } = useZipFileContentQuery(
     fspName,
     ozxPath,
     internalPath
@@ -106,7 +106,7 @@ type ZipBrowserItem = {
 
 const ZipBrowser = ({ file }: { readonly file: FileOrFolder }) => {
   const { fspName } = useFileBrowserContext();
-  const ozxPath = getOzxFilePath(file);
+  const ozxPath = getZipFilePath(file);
   const {
     data,
     isLoading,
@@ -114,12 +114,12 @@ const ZipBrowser = ({ file }: { readonly file: FileOrFolder }) => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage
-  } = useOzxFileEntriesInfiniteQuery(fspName, ozxPath, 100);
+  } = useZipFileEntriesInfiniteQuery(fspName, ozxPath, 100);
   const [internalPath, setInternalPath] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
   // Flatten all pages into a single array of entries
-  const allEntries = useMemo<OzxFileEntry[]>(() => {
+  const allEntries = useMemo<ZipFileEntry[]>(() => {
     if (!data?.pages) {
       return [];
     }
@@ -218,7 +218,7 @@ const ZipBrowser = ({ file }: { readonly file: FileOrFolder }) => {
     if (!fspName) {
       return;
     }
-    const url = buildOzxContentUrl(fspName, ozxPath, itemPath);
+    const url = buildZipContentUrl(fspName, ozxPath, itemPath);
     const link = document.createElement('a');
     link.href = url;
     link.download = itemName;

@@ -25,9 +25,9 @@ export type OzxMetadataResponse = {
 };
 
 /**
- * A file entry within an OZX archive with full details.
+ * A file entry within a ZIP archive with full details.
  */
-export type OzxFileEntry = {
+export type ZipFileEntry = {
   filename: string;
   compressed_size: number;
   uncompressed_size: number;
@@ -36,10 +36,10 @@ export type OzxFileEntry = {
 };
 
 /**
- * Paginated response for file entries from OZX archive.
+ * Paginated response for file entries from a ZIP archive.
  */
-export type OzxFileEntriesPage = {
-  entries: OzxFileEntry[];
+export type ZipFileEntriesPage = {
+  entries: ZipFileEntry[];
   total_count: number;
   offset: number;
   limit: number;
@@ -47,38 +47,38 @@ export type OzxFileEntriesPage = {
 };
 
 /**
- * Build URL for accessing content within an OZX file.
+ * Build URL for accessing content within a ZIP file.
  *
  * @param fspName - The file share path name
- * @param ozxFilePath - Path to the OZX file within the FSP
- * @param internalPath - Path within the OZX archive
- * @returns Properly encoded URL for the OZX content endpoint
+ * @param zipFilePath - Path to the ZIP file within the FSP
+ * @param internalPath - Path within the ZIP archive
+ * @returns Properly encoded URL for the ZIP content endpoint
  */
-export function buildOzxContentUrl(
+export function buildZipContentUrl(
   fspName: string,
-  ozxFilePath: string,
+  zipFilePath: string,
   internalPath: string
 ): string {
-  // Build the path segment: fspName/ozxFilePath
-  const pathSegment = `${fspName}/${ozxFilePath}`;
-  return buildUrl('/api/ozx-content/', pathSegment, { subpath: internalPath });
+  // Build the path segment: fspName/zipFilePath
+  const pathSegment = `${fspName}/${zipFilePath}`;
+  return buildUrl('/api/zip-content/', pathSegment, { subpath: internalPath });
 }
 
 /**
- * Build full URL for accessing content within an OZX file.
+ * Build full URL for accessing content within a ZIP file.
  * Returns absolute URL suitable for external use (e.g., zarrita stores).
  *
  * @param fspName - The file share path name
- * @param ozxFilePath - Path to the OZX file within the FSP
- * @param internalPath - Path within the OZX archive
+ * @param zipFilePath - Path to the ZIP file within the FSP
+ * @param internalPath - Path within the ZIP archive
  * @returns Absolute URL
  */
-export function getOzxContentUrl(
+export function getZipContentUrl(
   fspName: string,
-  ozxFilePath: string,
+  zipFilePath: string,
   internalPath: string
 ): string {
-  const relativePath = buildOzxContentUrl(fspName, ozxFilePath, internalPath);
+  const relativePath = buildZipContentUrl(fspName, zipFilePath, internalPath);
   return new URL(relativePath, window.location.origin).href;
 }
 
@@ -94,24 +94,24 @@ export function buildOzxMetadataUrl(
 }
 
 /**
- * Build URL for listing files in an OZX archive.
+ * Build URL for listing files in a ZIP archive.
  *
  * @param fspName - The file share path name
- * @param ozxFilePath - Path to the OZX file within the FSP
+ * @param zipFilePath - Path to the ZIP file within the FSP
  * @param prefix - Optional prefix to filter files
  * @param details - If true, include full file entry details
  * @param offset - Number of entries to skip (for pagination)
  * @param limit - Maximum entries to return (for pagination)
  */
-export function buildOzxListUrl(
+export function buildZipListUrl(
   fspName: string,
-  ozxFilePath: string,
+  zipFilePath: string,
   prefix?: string,
   details?: boolean,
   offset?: number,
   limit?: number
 ): string {
-  const pathSegment = `${fspName}/${ozxFilePath}`;
+  const pathSegment = `${fspName}/${zipFilePath}`;
   const params: Record<string, string> = {};
   if (prefix) {
     params.prefix = prefix;
@@ -126,7 +126,7 @@ export function buildOzxListUrl(
     params.limit = String(limit);
   }
   return buildUrl(
-    '/api/ozx-list/',
+    '/api/zip-list/',
     pathSegment,
     Object.keys(params).length > 0 ? params : null
   );
@@ -173,14 +173,14 @@ export function useOzxMetadataQuery(
 }
 
 /**
- * Fetch list of files in an OZX archive.
+ * Fetch list of files in a ZIP archive.
  */
-async function fetchOzxFileList(
+async function fetchZipFileList(
   fspName: string,
-  ozxFilePath: string,
+  zipFilePath: string,
   prefix?: string
 ): Promise<string[]> {
-  const url = buildOzxListUrl(fspName, ozxFilePath, prefix);
+  const url = buildZipListUrl(fspName, zipFilePath, prefix);
   const response = (await sendRequestAndThrowForNotOk(url, 'GET')) as {
     files: string[];
   };
@@ -188,93 +188,93 @@ async function fetchOzxFileList(
 }
 
 /**
- * Fetch detailed file entries from an OZX archive.
+ * Fetch detailed file entries from a ZIP archive.
  */
-async function fetchOzxFileEntries(
+async function fetchZipFileEntries(
   fspName: string,
-  ozxFilePath: string,
+  zipFilePath: string,
   prefix?: string
-): Promise<OzxFileEntry[]> {
-  const url = buildOzxListUrl(fspName, ozxFilePath, prefix, true);
+): Promise<ZipFileEntry[]> {
+  const url = buildZipListUrl(fspName, zipFilePath, prefix, true);
   const response = (await sendRequestAndThrowForNotOk(url, 'GET')) as {
-    entries: OzxFileEntry[];
+    entries: ZipFileEntry[];
   };
   return response.entries;
 }
 
 /**
- * Hook to fetch list of files in an OZX archive.
+ * Hook to fetch list of files in a ZIP archive.
  *
  * @param fspName - The file share path name
- * @param ozxFilePath - Path to the OZX file within the FSP
+ * @param zipFilePath - Path to the ZIP file within the FSP
  * @param prefix - Optional prefix to filter files
  * @param enabled - Whether the query should be enabled
  */
-export function useOzxFileListQuery(
+export function useZipFileListQuery(
   fspName: string | undefined,
-  ozxFilePath: string | undefined,
+  zipFilePath: string | undefined,
   prefix?: string,
   enabled: boolean = true
 ): UseQueryResult<string[], Error> {
   return useQuery({
-    queryKey: ['ozx', 'files', fspName || '', ozxFilePath || '', prefix || ''],
+    queryKey: ['zip', 'files', fspName || '', zipFilePath || '', prefix || ''],
     queryFn: async () => {
-      if (!fspName || !ozxFilePath) {
-        throw new Error('fspName and ozxFilePath are required');
+      if (!fspName || !zipFilePath) {
+        throw new Error('fspName and zipFilePath are required');
       }
-      return await fetchOzxFileList(fspName, ozxFilePath, prefix);
+      return await fetchZipFileList(fspName, zipFilePath, prefix);
     },
-    enabled: enabled && !!fspName && !!ozxFilePath,
+    enabled: enabled && !!fspName && !!zipFilePath,
     staleTime: 5 * 60 * 1000
   });
 }
 
 /**
- * Hook to fetch detailed file entries from an OZX archive.
+ * Hook to fetch detailed file entries from a ZIP archive.
  *
  * @param fspName - The file share path name
- * @param ozxFilePath - Path to the OZX file within the FSP
+ * @param zipFilePath - Path to the ZIP file within the FSP
  * @param prefix - Optional prefix to filter files
  * @param enabled - Whether the query should be enabled
  */
-export function useOzxFileEntriesQuery(
+export function useZipFileEntriesQuery(
   fspName: string | undefined,
-  ozxFilePath: string | undefined,
+  zipFilePath: string | undefined,
   prefix?: string,
   enabled: boolean = true
-): UseQueryResult<OzxFileEntry[], Error> {
+): UseQueryResult<ZipFileEntry[], Error> {
   return useQuery({
     queryKey: [
-      'ozx',
+      'zip',
       'entries',
       fspName || '',
-      ozxFilePath || '',
+      zipFilePath || '',
       prefix || ''
     ],
     queryFn: async () => {
-      if (!fspName || !ozxFilePath) {
-        throw new Error('fspName and ozxFilePath are required');
+      if (!fspName || !zipFilePath) {
+        throw new Error('fspName and zipFilePath are required');
       }
-      return await fetchOzxFileEntries(fspName, ozxFilePath, prefix);
+      return await fetchZipFileEntries(fspName, zipFilePath, prefix);
     },
-    enabled: enabled && !!fspName && !!ozxFilePath,
+    enabled: enabled && !!fspName && !!zipFilePath,
     staleTime: 5 * 60 * 1000
   });
 }
 
 /**
- * Fetch a page of detailed file entries from an OZX archive.
+ * Fetch a page of detailed file entries from a ZIP archive.
  */
-async function fetchOzxFileEntriesPage(
+async function fetchZipFileEntriesPage(
   fspName: string,
-  ozxFilePath: string,
+  zipFilePath: string,
   offset: number,
   limit: number,
   prefix?: string
-): Promise<OzxFileEntriesPage> {
-  const url = buildOzxListUrl(
+): Promise<ZipFileEntriesPage> {
+  const url = buildZipListUrl(
     fspName,
-    ozxFilePath,
+    zipFilePath,
     prefix,
     true,
     offset,
@@ -283,40 +283,40 @@ async function fetchOzxFileEntriesPage(
   const response = (await sendRequestAndThrowForNotOk(
     url,
     'GET'
-  )) as OzxFileEntriesPage;
+  )) as ZipFileEntriesPage;
   return response;
 }
 
 /**
- * Hook to fetch detailed file entries from an OZX archive with infinite scrolling.
+ * Hook to fetch detailed file entries from a ZIP archive with infinite scrolling.
  * Loads entries progressively as user requests more.
  *
  * @param fspName - The file share path name
- * @param ozxFilePath - Path to the OZX file within the FSP
+ * @param zipFilePath - Path to the ZIP file within the FSP
  * @param pageSize - Number of entries per page (default 100)
  * @param enabled - Whether the query should be enabled
  */
-export function useOzxFileEntriesInfiniteQuery(
+export function useZipFileEntriesInfiniteQuery(
   fspName: string | undefined,
-  ozxFilePath: string | undefined,
+  zipFilePath: string | undefined,
   pageSize: number = 100,
   enabled: boolean = true
-): UseInfiniteQueryResult<InfiniteData<OzxFileEntriesPage>, Error> {
+): UseInfiniteQueryResult<InfiniteData<ZipFileEntriesPage>, Error> {
   return useInfiniteQuery({
     queryKey: [
-      'ozx',
+      'zip',
       'entries-infinite',
       fspName || '',
-      ozxFilePath || '',
+      zipFilePath || '',
       pageSize
     ],
     queryFn: async ({ pageParam = 0 }) => {
-      if (!fspName || !ozxFilePath) {
-        throw new Error('fspName and ozxFilePath are required');
+      if (!fspName || !zipFilePath) {
+        throw new Error('fspName and zipFilePath are required');
       }
-      return await fetchOzxFileEntriesPage(
+      return await fetchZipFileEntriesPage(
         fspName,
-        ozxFilePath,
+        zipFilePath,
         pageParam,
         pageSize
       );
@@ -328,18 +328,18 @@ export function useOzxFileEntriesInfiniteQuery(
       }
       return undefined;
     },
-    enabled: enabled && !!fspName && !!ozxFilePath,
+    enabled: enabled && !!fspName && !!zipFilePath,
     staleTime: 5 * 60 * 1000
   });
 }
 
 /**
- * Fetch content from within an OZX file.
+ * Fetch content from within a ZIP file.
  * Supports optional range requests.
  */
-export async function fetchOzxContent(
+export async function fetchZipContent(
   fspName: string,
-  ozxFilePath: string,
+  zipFilePath: string,
   internalPath: string,
   options?: {
     signal?: AbortSignal;
@@ -347,7 +347,7 @@ export async function fetchOzxContent(
     rangeEnd?: number;
   }
 ): Promise<Uint8Array> {
-  const url = buildOzxContentUrl(fspName, ozxFilePath, internalPath);
+  const url = buildZipContentUrl(fspName, zipFilePath, internalPath);
 
   const headers: HeadersInit = {};
   if (options?.rangeStart !== undefined && options?.rangeEnd !== undefined) {
@@ -362,7 +362,7 @@ export async function fetchOzxContent(
   });
 
   if (!response.ok && response.status !== 206) {
-    throw new Error(`Failed to fetch OZX content: ${response.status}`);
+    throw new Error(`Failed to fetch ZIP content: ${response.status}`);
   }
 
   return new Uint8Array(await response.arrayBuffer());
@@ -389,7 +389,7 @@ export class OzxFetchStore {
     this.fspName = fspName;
     this.ozxPath = ozxPath;
     // Compute base URL for logging
-    this.baseUrl = getOzxContentUrl(fspName, ozxPath, '');
+    this.baseUrl = getZipContentUrl(fspName, ozxPath, '');
     log.debug('Created OzxFetchStore for', this.baseUrl);
   }
 
@@ -401,7 +401,7 @@ export class OzxFetchStore {
    */
   async get(key: string): Promise<Uint8Array | undefined> {
     try {
-      const url = buildOzxContentUrl(this.fspName, this.ozxPath, key);
+      const url = buildZipContentUrl(this.fspName, this.ozxPath, key);
       const response = await sendFetchRequest(url, 'GET');
 
       if (!response.ok) {
@@ -433,7 +433,7 @@ export class OzxFetchStore {
     length: number
   ): Promise<Uint8Array | undefined> {
     try {
-      const url = buildOzxContentUrl(this.fspName, this.ozxPath, key);
+      const url = buildZipContentUrl(this.fspName, this.ozxPath, key);
       const response = await fetch(url, {
         method: 'GET',
         credentials: 'include',
@@ -469,7 +469,7 @@ export class OzxFetchStore {
    */
   async has(key: string): Promise<boolean> {
     try {
-      const url = buildOzxContentUrl(this.fspName, this.ozxPath, key);
+      const url = buildZipContentUrl(this.fspName, this.ozxPath, key);
       const response = await fetch(url, {
         method: 'HEAD',
         credentials: 'include'
@@ -487,7 +487,7 @@ export class OzxFetchStore {
    * @returns Array of file paths
    */
   async list(prefix?: string): Promise<string[]> {
-    return await fetchOzxFileList(this.fspName, this.ozxPath, prefix);
+    return await fetchZipFileList(this.fspName, this.ozxPath, prefix);
   }
 
   /**
@@ -499,29 +499,29 @@ export class OzxFetchStore {
 }
 
 /**
- * Hook to fetch content of a file within an OZX archive.
+ * Hook to fetch content of a file within a ZIP archive.
  */
-export function useOzxFileContentQuery(
+export function useZipFileContentQuery(
   fspName: string | undefined,
-  ozxFilePath: string | undefined,
+  zipFilePath: string | undefined,
   internalPath: string | undefined,
   enabled: boolean = true
 ): UseQueryResult<Uint8Array, Error> {
   return useQuery({
     queryKey: [
-      'ozx',
+      'zip',
       'content',
       fspName || '',
-      ozxFilePath || '',
+      zipFilePath || '',
       internalPath || ''
     ],
     queryFn: async () => {
-      if (!fspName || !ozxFilePath || !internalPath) {
-        throw new Error('fspName, ozxFilePath, and internalPath are required');
+      if (!fspName || !zipFilePath || !internalPath) {
+        throw new Error('fspName, zipFilePath, and internalPath are required');
       }
-      return await fetchOzxContent(fspName, ozxFilePath, internalPath);
+      return await fetchZipContent(fspName, zipFilePath, internalPath);
     },
-    enabled: enabled && !!fspName && !!ozxFilePath && !!internalPath,
+    enabled: enabled && !!fspName && !!zipFilePath && !!internalPath,
     staleTime: 5 * 60 * 1000
   });
 }

@@ -11,8 +11,8 @@ import { fetchFileAsJson } from './queryUtils';
 import { isOzxFile } from '@/utils/ozxDetection';
 import {
   OzxFetchStore,
-  getOzxContentUrl,
-  useOzxFileListQuery
+  getZipContentUrl,
+  useZipFileListQuery
 } from './ozxQueries';
 import type { FileOrFolder } from '@/shared.types';
 
@@ -372,7 +372,7 @@ async function fetchOzxZarrMetadata(
   const availableVersions = detectOzxZarrVersions(files);
 
   // Get the base URL for OME-Zarr viewers (using empty internal path)
-  const baseUrl = getOzxContentUrl(fspName, ozxFilePath, '');
+  const baseUrl = getZipContentUrl(fspName, ozxFilePath, '');
 
   // Default to Zarr v3 when available
   if (availableVersions.includes('v3')) {
@@ -483,7 +483,7 @@ export function useOzxZarrMetadataQuery(
   const { fspName, ozxFile } = params;
 
   // First, get the file list from the OZX
-  const fileListQuery = useOzxFileListQuery(
+  const fileListQuery = useZipFileListQuery(
     fspName,
     ozxFile?.path,
     undefined,
@@ -519,4 +519,4 @@ export function useOzxZarrMetadataQuery(
 
 // Re-export OZX detection utilities for convenience
 export { isOzxFile } from '@/utils/ozxDetection';
-export { OzxFetchStore, getOzxContentUrl } from './ozxQueries';
+export { OzxFetchStore, getZipContentUrl } from './ozxQueries';

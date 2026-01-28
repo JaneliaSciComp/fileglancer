@@ -67,13 +67,13 @@ export function getOzxFiles(files: FileOrFolder[]): FileOrFolder[] {
 }
 
 /**
- * Extract the path from a file for OZX API calls.
+ * Extract the path from a file for ZIP/OZX API calls.
  * Removes leading slashes and normalizes the path.
  *
  * @param file - The file to get the path from
  * @returns Normalized path suitable for API calls
  */
-export function getOzxFilePath(file: FileOrFolder): string {
+export function getZipFilePath(file: FileOrFolder): string {
   let path = file.path;
   // Remove leading slash if present
   if (path.startsWith('/')) {
