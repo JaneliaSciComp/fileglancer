@@ -96,24 +96,6 @@ export default function SSHKeys() {
         </Card>
       ) : null}
 
-      {!isLoading && !error && unmanagedExists ? (
-        <Card className="mb-6 p-4 bg-warning/10 border border-warning/20">
-          <div className="flex gap-3">
-            <HiOutlineExclamation className="icon-large text-warning flex-shrink-0" />
-            <div>
-              <Typography className="text-foreground font-semibold mb-1">
-                Existing id_ed25519 key detected
-              </Typography>
-              <Typography className="text-secondary text-sm">
-                An id_ed25519 SSH key exists but is not managed by Fileglancer.
-                Use the "Generate Temporary Key" option below to create a new
-                key for Fileglancer use.
-              </Typography>
-            </div>
-          </div>
-        </Card>
-      ) : null}
-
       {!isLoading && !error && id_ed25519_missing_pubkey ? (
         <Card className="mb-6 p-4 bg-warning/10 border border-warning/20">
           <div className="flex gap-3">
