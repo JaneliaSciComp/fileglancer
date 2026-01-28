@@ -230,6 +230,19 @@ def is_ozx_file(filename: str) -> bool:
     return filename.lower().endswith('.ozx')
 
 
+def is_zip_file(filename: str) -> bool:
+    """Check if a filename has a .zip or .ozx extension.
+
+    Args:
+        filename: Filename to check
+
+    Returns:
+        True if the file has a .zip or .ozx extension
+    """
+    name = filename.lower()
+    return name.endswith('.zip') or name.endswith('.ozx')
+
+
 # Re-export commonly used items from zipread for convenience
 __all__ = [
     'OZXReader',
@@ -237,6 +250,7 @@ __all__ = [
     'OZXReaderError',
     'InvalidOZXError',
     'is_ozx_file',
+    'is_zip_file',
     'is_json_metadata_file',
     # Re-exports from zipread
     'ZipReader',

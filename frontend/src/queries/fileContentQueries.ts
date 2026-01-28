@@ -48,7 +48,8 @@ async function fetchFileWithTextDetection(
 
 export function useFileContentQuery(
   fspName: string | undefined,
-  filePath: string
+  filePath: string,
+  enabled: boolean = true
 ): UseQueryResult<string, Error> {
   return useQuery<string, Error>({
     queryKey: fileContentQueryKeys.detail(fspName || '', filePath),
@@ -58,7 +59,7 @@ export function useFileContentQuery(
       });
       return content;
     },
-    enabled: !!fspName && !!filePath,
+    enabled: enabled && !!fspName && !!filePath,
     retry: (failureCount, error) => {
       // Do not retry on permission errors
       if (

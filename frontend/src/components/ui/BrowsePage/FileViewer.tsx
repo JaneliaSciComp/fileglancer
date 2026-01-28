@@ -1,5 +1,11 @@
-import { useEffect, useState } from 'react';
-import { Switch, Typography } from '@material-tailwind/react';
+import { useEffect, useState, useMemo } from 'react';
+import { Switch, Typography, IconButton } from '@material-tailwind/react';
+import {
+  HiOutlineFolder,
+  HiOutlineDocument,
+  HiArrowLeft,
+  HiOutlineDownload
+} from 'react-icons/hi';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import {
   materialDark,
@@ -10,9 +16,306 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { formatFileSize, formatUnixTimestamp } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
 import { useFileContentQuery } from '@/queries/fileContentQueries';
+import {
+  useOzxFileEntriesQuery,
+  useOzxFileContentQuery,
+  buildOzxContentUrl
+} from '@/queries/ozxQueries';
+import { isAnyZipFile, getOzxFilePath } from '@/utils/ozxDetection';
 
 type FileViewerProps = {
   readonly file: FileOrFolder;
+};
+
+const InternalFileViewer = ({
+  fspName,
+  ozxPath,
+  internalPath,
+  onBack
+}: {
+  readonly fspName: string;
+  readonly ozxPath: string;
+  readonly internalPath: string;
+  readonly onBack: () => void;
+}) => {
+  const { data, isLoading, error } = useOzxFileContentQuery(
+    fspName,
+    ozxPath,
+    internalPath
+  );
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+
+  useEffect(() => {
+    const checkDarkMode = () =>
+      setIsDarkMode(document.documentElement.classList.contains('dark'));
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  if (isLoading) {
+    return <div className="p-4">Loading content...</div>;
+  }
+  if (error) {
+    return <div className="p-4 text-error">Error: {error.message}</div>;
+  }
+
+  const content = data ? new TextDecoder().decode(data) : '';
+  const language = getLanguageFromExtension(internalPath);
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-2 p-2 bg-surface-light border-b border-surface">
+        <IconButton
+          className="text-foreground"
+          onClick={onBack}
+          size="sm"
+          variant="ghost"
+        >
+          <HiArrowLeft className="h-4 w-4" />
+        </IconButton>
+        <Typography className="font-mono truncate" type="small">
+          {internalPath}
+        </Typography>
+      </div>
+      <div className="flex-1 overflow-auto">
+        <SyntaxHighlighter
+          customStyle={{ margin: 0, padding: '1rem' }}
+          language={language}
+          style={isDarkMode ? materialDark : coy}
+          wrapLongLines={true}
+        >
+          {content}
+        </SyntaxHighlighter>
+      </div>
+    </div>
+  );
+};
+
+type ZipBrowserItem = {
+  name: string;
+  path: string;
+  isDir: boolean;
+  size: number;
+};
+
+const ZipBrowser = ({ file }: { readonly file: FileOrFolder }) => {
+  const { fspName } = useFileBrowserContext();
+  const ozxPath = getOzxFilePath(file);
+  const {
+    data: allEntries,
+    isLoading,
+    error
+  } = useOzxFileEntriesQuery(fspName, ozxPath);
+  const [internalPath, setInternalPath] = useState<string>('');
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+
+  const items = useMemo<ZipBrowserItem[]>(() => {
+    if (!allEntries) {
+      return [];
+    }
+
+    const folders = new Map<string, number>(); // path -> total size of contents
+    const files: ZipBrowserItem[] = [];
+
+    allEntries.forEach(entry => {
+      const filename = entry.filename;
+      if (!filename.startsWith(internalPath)) {
+        return;
+      }
+
+      const relative = filename.slice(internalPath.length);
+      const slashIndex = relative.indexOf('/');
+
+      if (slashIndex === -1) {
+        // Direct file in current directory
+        if (relative !== '' && !entry.is_directory) {
+          files.push({
+            name: relative,
+            path: filename,
+            isDir: false,
+            size: entry.uncompressed_size
+          });
+        }
+      } else {
+        // File in a subdirectory - track the folder
+        const folderPath = internalPath + relative.slice(0, slashIndex + 1);
+        const currentSize = folders.get(folderPath) || 0;
+        folders.set(folderPath, currentSize + entry.uncompressed_size);
+      }
+    });
+
+    const folderItems: ZipBrowserItem[] = Array.from(folders.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([path, size]) => ({
+        name: path.slice(internalPath.length).replace(/\/$/, ''),
+        path,
+        isDir: true,
+        size
+      }));
+
+    const fileItems = files.sort((a, b) => a.name.localeCompare(b.name));
+
+    return [...folderItems, ...fileItems];
+  }, [allEntries, internalPath]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Typography className="text-foreground">
+          Loading archive contents...
+        </Typography>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Typography className="text-error">Error: {error.message}</Typography>
+      </div>
+    );
+  }
+
+  if (selectedFile && fspName) {
+    return (
+      <InternalFileViewer
+        fspName={fspName}
+        internalPath={selectedFile}
+        onBack={() => setSelectedFile(null)}
+        ozxPath={ozxPath}
+      />
+    );
+  }
+
+  const navigateUp = () => {
+    const parts = internalPath.split('/').filter(Boolean);
+    parts.pop();
+    setInternalPath(parts.length > 0 ? parts.join('/') + '/' : '');
+  };
+
+  const handleDownload = (itemPath: string, itemName: string) => {
+    if (!fspName) {
+      return;
+    }
+    const url = buildOzxContentUrl(fspName, ozxPath, itemPath);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = itemName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-background">
+      {/* Breadcrumb header */}
+      <div className="p-2 bg-surface-light border-b border-surface flex items-center gap-2">
+        {internalPath ? (
+          <IconButton
+            className="text-foreground"
+            onClick={navigateUp}
+            size="sm"
+            variant="ghost"
+          >
+            <HiArrowLeft className="h-4 w-4" />
+          </IconButton>
+        ) : null}
+        <Typography className="font-mono truncate" type="small">
+          {file.name}/{internalPath}
+        </Typography>
+      </div>
+
+      {/* Table view */}
+      <div className="flex-1 overflow-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-surface-light sticky top-0">
+            <tr className="border-b border-surface">
+              <th className="text-left p-2 font-medium text-foreground">
+                Name
+              </th>
+              <th className="text-left p-2 font-medium text-foreground w-20">
+                Type
+              </th>
+              <th className="text-right p-2 font-medium text-foreground w-24">
+                Size
+              </th>
+              <th className="text-center p-2 font-medium text-foreground w-20">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map(item => (
+              <tr
+                className="border-b border-surface hover:bg-surface-light transition-colors cursor-pointer"
+                key={item.path}
+                onClick={() => {
+                  if (item.isDir) {
+                    setInternalPath(item.path);
+                  } else {
+                    setSelectedFile(item.path);
+                  }
+                }}
+              >
+                <td className="p-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {item.isDir ? (
+                      <HiOutlineFolder className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                    ) : (
+                      <HiOutlineDocument className="h-5 w-5 text-gray-500 flex-shrink-0" />
+                    )}
+                    <Typography
+                      className="font-mono text-foreground truncate"
+                      type="small"
+                    >
+                      {item.name}
+                    </Typography>
+                  </div>
+                </td>
+                <td className="p-2">
+                  <Typography className="text-foreground" type="small">
+                    {item.isDir ? 'Folder' : 'File'}
+                  </Typography>
+                </td>
+                <td className="p-2 text-right">
+                  <Typography className="text-foreground" type="small">
+                    {formatFileSize(item.size)}
+                  </Typography>
+                </td>
+                <td className="p-2 text-center">
+                  {!item.isDir ? (
+                    <IconButton
+                      className="text-foreground"
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleDownload(item.path, item.name);
+                      }}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      <HiOutlineDownload className="h-4 w-4" />
+                    </IconButton>
+                  ) : null}
+                </td>
+              </tr>
+            ))}
+            {items.length === 0 ? (
+              <tr>
+                <td className="p-4 text-center text-surface-dark" colSpan={4}>
+                  This folder is empty
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 };
 
 // Map file extensions to syntax highlighter languages
@@ -80,7 +383,8 @@ export default function FileViewer({ file }: FileViewerProps) {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [formatJson, setFormatJson] = useState<boolean>(true);
 
-  const contentQuery = useFileContentQuery(fspName, file.path);
+  const isZip = isAnyZipFile(file);
+  const contentQuery = useFileContentQuery(fspName, file.path, !isZip);
   const language = getLanguageFromExtension(file.name);
   const isJsonFile = language === 'json';
 
@@ -101,6 +405,10 @@ export default function FileViewer({ file }: FileViewerProps) {
   }, []);
 
   const renderViewer = () => {
+    if (isAnyZipFile(file)) {
+      return <ZipBrowser file={file} />;
+    }
+
     if (contentQuery.isLoading) {
       return (
         <div className="flex items-center justify-center h-64">

@@ -27,6 +27,26 @@ export function isOzxFilename(filename: string): boolean {
 }
 
 /**
+ * Check if a file is a regular ZIP file by extension.
+ *
+ * @param file - The file to check
+ * @returns True if the file has a .zip extension
+ */
+export function isZipFile(file: FileOrFolder): boolean {
+  return !file.is_dir && file.name.toLowerCase().endsWith('.zip');
+}
+
+/**
+ * Check if a file is either an OZX or a ZIP file.
+ *
+ * @param file - The file to check
+ * @returns True if the file is an OZX or a ZIP file
+ */
+export function isAnyZipFile(file: FileOrFolder): boolean {
+  return isOzxFile(file) || isZipFile(file);
+}
+
+/**
  * Check if a list of files contains any OZX files.
  *
  * @param files - Array of files to check

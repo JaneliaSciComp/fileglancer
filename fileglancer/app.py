@@ -34,7 +34,7 @@ from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, dele
 from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header
 from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext, UserContextConfigurationError
 from fileglancer.filestore import Filestore, RootCheckError
-from fileglancer.ozxzip import OZXReader, OZXReaderError, InvalidZipError, is_ozx_file
+from fileglancer.ozxzip import OZXReader, OZXReaderError, InvalidZipError, is_ozx_file, is_zip_file
 from fileglancer.log import AccessLogMiddleware
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response
@@ -1235,7 +1235,7 @@ def create_app(settings):
             except RootCheckError as e:
                 raise HTTPException(status_code=400, detail=str(e))
 
-            if not is_ozx_file(ozx_file_path):
+            if not is_zip_file(ozx_file_path):
                 raise HTTPException(status_code=400, detail="Not an OZX file")
 
             try:
@@ -1298,7 +1298,7 @@ def create_app(settings):
             except RootCheckError as e:
                 raise HTTPException(status_code=400, detail=str(e))
 
-            if not is_ozx_file(ozx_file_path):
+            if not is_zip_file(ozx_file_path):
                 raise HTTPException(status_code=400, detail="Not an OZX file")
 
             try:
@@ -1409,7 +1409,7 @@ def create_app(settings):
             except RootCheckError as e:
                 raise HTTPException(status_code=400, detail=str(e))
 
-            if not is_ozx_file(ozx_file_path):
+            if not is_zip_file(ozx_file_path):
                 raise HTTPException(status_code=400, detail="Not an OZX file")
 
             try:
@@ -1445,11 +1445,13 @@ def create_app(settings):
     async def list_ozx_files(
         path_name: str,
         prefix: str = Query('', description="Filter files by prefix"),
+        details: bool = Query(False, description="Include file details (size, compression)"),
         username: str = Depends(get_current_user)
     ):
         """
         List files in an OZX archive.
         Optionally filter by path prefix.
+        If details=True, returns full file entry information including size.
         """
 
         filestore_name, _, ozx_subpath = path_name.partition('/')
@@ -1464,7 +1466,7 @@ def create_app(settings):
             except RootCheckError as e:
                 raise HTTPException(status_code=400, detail=str(e))
 
-            if not is_ozx_file(ozx_file_path):
+            if not is_zip_file(ozx_file_path):
                 raise HTTPException(status_code=400, detail="Not an OZX file")
 
             try:
@@ -1477,9 +1479,27 @@ def create_app(settings):
 
         # List files outside user context
         try:
-            files = reader.list_files(prefix)
-            reader.close()
-            return {"files": files}
+            if details:
+                # Return full file entry details
+                reader.parse_central_directory()
+                entries = []
+                for filename, entry in reader.entries.items():
+                    if prefix and not filename.startswith(prefix):
+                        continue
+                    entries.append({
+                        "filename": entry.filename,
+                        "compressed_size": entry.compressed_size,
+                        "uncompressed_size": entry.uncompressed_size,
+                        "compression_method": entry.compression_method,
+                        "is_directory": entry.is_directory
+                    })
+                reader.close()
+                return {"entries": entries}
+            else:
+                # Return just filenames for backward compatibility
+                files = reader.list_files(prefix)
+                reader.close()
+                return {"files": files}
 
         except Exception as e:
             reader.close()
