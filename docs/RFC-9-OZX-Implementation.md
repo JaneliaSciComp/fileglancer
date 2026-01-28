@@ -26,10 +26,14 @@ This document describes the implementation of RFC-9 support for reading OME-Zarr
 ┌─────────────────────────────────────────────────────────────────┐
 │                         Backend                                  │
 │  ┌──────────────────────┐    ┌─────────────────────────────┐   │
-│  │ /api/ozx-content/    │───▶│ OZXReader (ozxzip.py)       │   │
-│  │ /api/ozx-metadata/   │    │ - ZIP64 support             │   │
-│  │ /api/ozx-list/       │    │ - Partial CD parsing        │   │
-│  └──────────────────────┘    │ - Range request streaming   │   │
+│  │ /api/ozx-content/    │    │ OZXReader (ozxzip.py)       │   │
+│  │ /api/ozx-metadata/   │───▶│ - OME metadata parsing      │   │
+│  │ /api/ozx-list/       │    │ - jsonFirst optimization    │   │
+│  └──────────────────────┘    ├─────────────────────────────┤   │
+│                              │ ZipReader (zipread.py)      │   │
+│                              │ - ZIP64 support             │   │
+│                              │ - Partial CD parsing        │   │
+│                              │ - Range request streaming   │   │
 │                              └─────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -38,12 +42,14 @@ This document describes the implementation of RFC-9 support for reading OME-Zarr
 
 ### Backend (Python)
 
-| File                    | Action     | Description                              |
-| ----------------------- | ---------- | ---------------------------------------- |
-| `fileglancer/ozxzip.py` | **CREATE** | RFC-9 ZIP reader with partial CD parsing |
-| `fileglancer/app.py`    | MODIFY     | Add `/api/ozx-*` endpoints               |
-| `fileglancer/model.py`  | MODIFY     | Add OZX Pydantic models                  |
-| `tests/test_ozxzip.py`  | **CREATE** | Unit tests for OZXReader (31 tests)      |
+| File                     | Action     | Description                                   |
+| ------------------------ | ---------- | --------------------------------------------- |
+| `fileglancer/zipread.py` | **CREATE** | Generic ZIP reader with streaming support     |
+| `fileglancer/ozxzip.py`  | **CREATE** | RFC-9 OZX layer extending ZipReader           |
+| `fileglancer/app.py`     | MODIFY     | Add `/api/ozx-*` endpoints                    |
+| `fileglancer/model.py`   | MODIFY     | Add OZX Pydantic models                       |
+| `tests/test_zipread.py`  | **CREATE** | Unit tests for generic ZipReader (27 tests)   |
+| `tests/test_ozxzip.py`   | **CREATE** | Unit tests for OZXReader (31 tests)           |
 
 ### Frontend (TypeScript)
 
@@ -56,22 +62,95 @@ This document describes the implementation of RFC-9 support for reading OME-Zarr
 
 ## Backend Implementation Details
 
-### OZXReader (`fileglancer/ozxzip.py`)
+The backend uses a two-layer architecture separating generic ZIP functionality from OZX-specific features.
 
-The core ZIP reader implements:
+### ZipReader (`fileglancer/zipread.py`)
+
+Generic ZIP file reader providing:
 
 1. **EOCD Parsing**: Locates End of Central Directory record by scanning backwards from file end
 2. **ZIP64 Support**: Handles large archives with ZIP64 extended fields
-3. **OME Metadata**: Parses ZIP comment for RFC-9 OME metadata JSON
-4. **jsonFirst Optimization**: When `jsonFirst=true` in metadata, stops parsing central directory after last JSON file
-5. **Compression**: Supports STORE (uncompressed) and DEFLATE compression methods
-6. **Range Streaming**: Efficient byte-range streaming for HTTP Range requests
+3. **Compression**: Supports STORE (uncompressed) and DEFLATE compression methods
+4. **Range Streaming**: Efficient byte-range streaming for HTTP Range requests
+5. **Flexible Parsing**: Supports `stop_condition` callback and `max_entries` limit
 
-Key classes:
+Key classes and functions:
 
-- `OZXReader`: Main reader class with context manager support
-- `OZXMetadata`: Parsed OME metadata from ZIP comment
+- `ZipReader`: Generic ZIP reader with context manager support
 - `ZipEntry`: Individual file entry from central directory
+- `ZipReaderError`, `InvalidZipError`: Exception classes
+
+#### Central Directory Parsing API
+
+```python
+def parse_central_directory(
+    self,
+    stop_condition: Optional[Callable[[ZipEntry, int], bool]] = None,
+    max_entries: Optional[int] = None
+) -> Dict[str, ZipEntry]:
+    """
+    Parse the central directory.
+
+    Args:
+        stop_condition: Optional callback receiving (entry, index).
+                       Returns True to stop parsing after the current entry.
+        max_entries: Optional maximum number of entries to parse.
+
+    Returns:
+        Dictionary mapping filenames to ZipEntry objects
+    """
+```
+
+**Examples**:
+
+```python
+# Parse all entries
+entries = reader.parse_central_directory()
+
+# Stop after 100 entries
+entries = reader.parse_central_directory(max_entries=100)
+
+# Stop when finding a specific file
+def stop_at_target(entry, index):
+    return entry.filename == "target.json"
+entries = reader.parse_central_directory(stop_condition=stop_at_target)
+
+# Stop after processing 5 JSON files
+json_count = [0]
+def stop_after_5_json(entry, index):
+    if entry.filename.endswith('.json'):
+        json_count[0] += 1
+    return json_count[0] >= 5
+entries = reader.parse_central_directory(stop_condition=stop_after_5_json)
+```
+
+### OZXReader (`fileglancer/ozxzip.py`)
+
+Extends `ZipReader` with RFC-9 OZX-specific functionality:
+
+1. **OME Metadata**: Parses ZIP comment for RFC-9 OME metadata JSON
+2. **jsonFirst Optimization**: When `jsonFirst=true` in metadata, stops parsing central directory after last JSON metadata file
+3. **Metadata File Detection**: Identifies `.json`, `.zattrs`, `.zarray`, `.zgroup` files
+
+Key classes and functions:
+
+- `OZXReader`: Extends ZipReader with OZX-specific methods
+- `OZXMetadata`: Parsed OME metadata from ZIP comment
+- `is_json_metadata_file()`: Check if filename is a JSON metadata file
+- `is_ozx_file()`: Check if filename has `.ozx` extension
+
+#### jsonFirst Optimization
+
+```python
+with OZXReader(path) as reader:
+    metadata = reader.get_ome_metadata()
+
+    # Parse only JSON metadata files (efficient for large archives)
+    if metadata and metadata.json_first:
+        entries = reader.parse_central_directory(json_only=True)
+    else:
+        entries = reader.parse_central_directory()
+```
 
 ### API Endpoints
 
@@ -178,6 +257,33 @@ detectOzxZarrVersions(files: string[]): ('v3')[]
 
 Note: Unlike regular Zarr directories which can be v2 or v3, OZX files per RFC-9 only support Zarr v3 (OME-Zarr v0.5). The detection function only looks for `zarr.json` files and ignores Zarr v2 markers (`.zarray`, `.zattrs`, `.zgroup`).
 
+## Modular Architecture
+
+The implementation separates generic ZIP functionality from OZX-specific features:
+
+```
+┌──────────────────────────────────────┐
+│           OZXReader                   │
+│  - OME metadata parsing              │
+│  - jsonFirst optimization            │
+│  - is_json_metadata_file()           │
+├──────────────────────────────────────┤
+│           ZipReader                   │
+│  - EOCD/ZIP64 parsing                │
+│  - Central directory parsing         │
+│  - stop_condition & max_entries      │
+│  - File streaming & range requests   │
+│  - STORE/DEFLATE compression         │
+└──────────────────────────────────────┘
+```
+
+**Benefits**:
+
+1. **Reusability**: `ZipReader` can be used for any ZIP file, not just OZX
+2. **Testability**: Each layer has focused unit tests
+3. **Extensibility**: New ZIP-based formats can extend `ZipReader`
+4. **Separation of Concerns**: Generic ZIP logic is decoupled from OME-specific features
+
 ## RFC-9 ZIP Comment Format
 
 The OZX file's ZIP comment contains OME metadata:
@@ -202,19 +308,41 @@ When `jsonFirst` is true, JSON metadata files (.json, .zattrs, .zarray, .zgroup)
 ### Backend Tests
 
 ```bash
+# Run all ZIP/OZX tests
+pixi run -e test pytest tests/test_zipread.py tests/test_ozxzip.py -v
+
+# Run only generic ZIP tests
+pixi run -e test pytest tests/test_zipread.py -v
+
+# Run only OZX-specific tests
 pixi run -e test pytest tests/test_ozxzip.py -v
 ```
+
+#### Generic ZipReader Tests (`test_zipread.py`)
 
 Tests cover:
 
 - Basic reader operations (open, close, context manager)
-- Metadata parsing (valid, missing, invalid JSON)
-- Central directory parsing and jsonFirst optimization
+- Central directory parsing
+- `stop_condition` callback with index parameter
+- `max_entries` limit parameter
+- Combined `stop_condition` and `max_entries`
+- File reading and streaming
+- Range request streaming
+- DEFLATE compression
+- Edge cases (empty archive, unopened reader)
+
+#### OZX-Specific Tests (`test_ozxzip.py`)
+
+Tests cover:
+
+- OZX file detection utilities
+- OME metadata parsing (valid, missing, invalid JSON)
+- jsonFirst optimization
 - File reading (text, binary, compressed)
 - Range request streaming
-- ZIP64 handling
 - Unicode filenames
-- Edge cases (empty archive, unopened reader)
+- Edge cases
 
 ### Frontend Tests
 
