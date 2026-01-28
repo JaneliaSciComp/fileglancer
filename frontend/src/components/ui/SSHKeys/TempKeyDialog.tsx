@@ -50,18 +50,19 @@ export default function TempKeyDialog({
       <div className="flex items-center gap-2 mb-4">
         <HiOutlineExclamation className="text-warning h-6 w-6" />
         <Typography className="text-foreground font-semibold text-lg">
-          Temporary SSH Key Generated
+          SSH Key Generated
         </Typography>
       </div>
 
       <div className="space-y-4">
         <div className="p-3 bg-warning/10 border border-warning/20 rounded-md">
-          <Typography className="text-warning font-semibold text-sm">
+          <Typography className="text-warning font-semibold text-md">
             Copy this private key now - it will not be available again!
           </Typography>
-          <Typography className="text-secondary text-xs mt-1">
-            The private key is not stored on the server. You must copy it now
-            and save it securely on your local machine or intended application.
+          <Typography className="text-secondary mt-1">
+            The private key is not stored anywhere. You must copy it now by 
+            clicking the "Copy Private Key" button and then save it somewhere safe 
+            (e.g. paste it into Seqera Platform's 'Managed Identities' page).
           </Typography>
         </div>
 

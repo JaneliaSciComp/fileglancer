@@ -44,13 +44,12 @@ export default function GenerateTempKeyDialog({
   return (
     <FgDialog onClose={handleClose} open={showDialog}>
       <Typography className="text-foreground font-semibold text-lg mb-4">
-        Generate Temporary SSH Key
+        Generate SSH Key
       </Typography>
 
       <Typography className="text-secondary text-sm mb-4">
-        This will create a temporary ed25519 SSH key pair and add the public key
-        to your authorized_keys file. The private key will be shown once for you
-        to copy - it will not be stored on the server.
+        This will create a new ed25519 SSH key pair and add the public key to
+        your authorized_keys file. 
       </Typography>
 
       <div className="mb-6">
