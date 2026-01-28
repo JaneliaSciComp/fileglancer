@@ -11,11 +11,16 @@ import pytest
 from fileglancer.ozxzip import (
     OZXReader,
     OZXMetadata,
-    ZipEntry,
     OZXReaderError,
-    InvalidZipError,
     InvalidOZXError,
     is_ozx_file,
+    is_json_metadata_file,
+)
+from fileglancer.zipread import (
+    ZipReader,
+    ZipEntry,
+    ZipReaderError,
+    InvalidZipError,
     ZIP_LOCAL_HEADER_SIG,
     ZIP_CD_SIG,
     ZIP_EOCD_SIG,
@@ -295,11 +300,11 @@ class TestCentralDirectory:
             entries = reader.parse_central_directory()
 
             json_entry = entries['zarr.json']
-            assert json_entry.is_json_file is True
+            assert is_json_metadata_file(json_entry.filename) is True
             assert json_entry.is_directory is False
 
             chunk_entry = entries['0/c/0/0/0']
-            assert chunk_entry.is_json_file is False
+            assert is_json_metadata_file(chunk_entry.filename) is False
             assert chunk_entry.uncompressed_size == 100
 
     def test_json_first_optimization(self, temp_ozx_file):
@@ -484,8 +489,8 @@ class TestZipEntry:
         )
         assert file_entry.is_directory is False
 
-    def test_is_json_file(self):
-        """Test is_json_file property."""
+    def test_is_json_metadata_file(self):
+        """Test is_json_metadata_file function."""
         test_cases = [
             ('zarr.json', True),
             ('.zarray', True),
@@ -498,15 +503,7 @@ class TestZipEntry:
         ]
 
         for filename, expected in test_cases:
-            entry = ZipEntry(
-                filename=filename,
-                compressed_size=0,
-                uncompressed_size=0,
-                compression_method=0,
-                local_header_offset=0,
-                crc32=0
-            )
-            assert entry.is_json_file is expected, f"Failed for {filename}"
+            assert is_json_metadata_file(filename) is expected, f"Failed for {filename}"
 
 
 class TestOZXMetadata:
@@ -549,7 +546,7 @@ class TestEdgeCases:
     def test_reader_not_opened(self):
         """Test error when reader not opened."""
         reader = OZXReader('/some/path.ozx')
-        with pytest.raises(OZXReaderError):
+        with pytest.raises(ZipReaderError):
             reader.parse_central_directory()
 
     def test_unicode_filenames(self):
