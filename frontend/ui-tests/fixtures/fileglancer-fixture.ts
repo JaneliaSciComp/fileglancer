@@ -22,6 +22,19 @@ const openFileglancer = async (page: Page) => {
   // Wait for the app to be ready
   await page.waitForSelector('text=Log In', { timeout: 10000 });
 
+  // Initialize viewer manifests before login
+  // We call this via page.evaluate() because initializeViewerManifests uses browser APIs
+  // (fetch) and must run in the browser context, not the Node.js context where Playwright runs
+  await page.evaluate(async () => {
+    // @ts-ignore - accessing window-scoped function from main.tsx
+    if (window.initializeViewerManifests) {
+      await window.initializeViewerManifests();
+      console.log('[Test] Viewer manifests initialized');
+    } else {
+      console.warn('[Test] initializeViewerManifests not found on window');
+    }
+  });
+
   // Perform login
   const loginForm = page.getByRole('textbox', { name: 'Username' });
   const loginSubmitBtn = page.getByRole('button', { name: 'Log In' });
