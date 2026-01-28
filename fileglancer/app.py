@@ -34,6 +34,7 @@ from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, dele
 from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header
 from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext, UserContextConfigurationError
 from fileglancer.filestore import Filestore, RootCheckError
+from fileglancer.ozxzip import OZXReader, OZXReaderError, InvalidZipError, is_ozx_file
 from fileglancer.log import AccessLogMiddleware
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response
@@ -1212,6 +1213,278 @@ def create_app(settings):
                 headers=headers,
                 media_type=content_type
             )
+
+
+    @app.head("/api/ozx-content/{path_name:path}")
+    async def head_ozx_file_content(
+        path_name: str,
+        subpath: str = Query(..., description="Path within the OZX file"),
+        username: str = Depends(get_current_user)
+    ):
+        """HEAD request for OZX file content (returns size, supports Range)."""
+
+        filestore_name, _, ozx_subpath = path_name.partition('/')
+
+        with _get_user_context(username):
+            filestore, error = _get_filestore(filestore_name)
+            if filestore is None:
+                raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
+
+            try:
+                ozx_file_path = filestore._check_path_in_root(ozx_subpath)
+            except RootCheckError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+
+            if not is_ozx_file(ozx_file_path):
+                raise HTTPException(status_code=400, detail="Not an OZX file")
+
+            try:
+                reader = OZXReader(ozx_file_path)
+                reader.open()
+            except FileNotFoundError:
+                raise HTTPException(status_code=404, detail="OZX file not found")
+            except (InvalidZipError, OZXReaderError) as e:
+                raise HTTPException(status_code=400, detail=f"Invalid OZX file: {e}")
+
+        # Parse central directory and get entry (outside user context)
+        try:
+            reader.parse_central_directory()
+            entry = reader.get_entry(subpath)
+            if entry is None:
+                reader.close()
+                raise HTTPException(status_code=404, detail="File not found in OZX archive")
+
+            file_size = entry.uncompressed_size
+            content_type = guess_content_type(subpath)
+            file_name = subpath.split('/')[-1] if subpath else ''
+
+            headers = {
+                'Accept-Ranges': 'bytes',
+                'Content-Length': str(file_size),
+            }
+
+            if content_type == 'application/octet-stream' and file_name:
+                headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+
+            reader.close()
+            return Response(status_code=200, headers=headers, media_type=content_type)
+
+        except Exception as e:
+            reader.close()
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+    @app.get("/api/ozx-content/{path_name:path}")
+    async def get_ozx_file_content(
+        request: Request,
+        path_name: str,
+        subpath: str = Query(..., description="Path within the OZX file"),
+        username: str = Depends(get_current_user)
+    ):
+        """
+        Stream file content from within an OZX archive.
+        Supports HTTP Range requests for efficient chunk access.
+        """
+
+        filestore_name, _, ozx_subpath = path_name.partition('/')
+
+        with _get_user_context(username):
+            filestore, error = _get_filestore(filestore_name)
+            if filestore is None:
+                raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
+
+            try:
+                ozx_file_path = filestore._check_path_in_root(ozx_subpath)
+            except RootCheckError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+
+            if not is_ozx_file(ozx_file_path):
+                raise HTTPException(status_code=400, detail="Not an OZX file")
+
+            try:
+                reader = OZXReader(ozx_file_path)
+                reader.open()
+            except FileNotFoundError:
+                raise HTTPException(status_code=404, detail="OZX file not found")
+            except (InvalidZipError, OZXReaderError) as e:
+                raise HTTPException(status_code=400, detail=f"Invalid OZX file: {e}")
+
+        # Parse central directory and get entry (outside user context)
+        # The file handle retains access rights
+        try:
+            reader.parse_central_directory()
+            entry = reader.get_entry(subpath)
+            if entry is None:
+                reader.close()
+                raise HTTPException(status_code=404, detail="File not found in OZX archive")
+
+            content_type = guess_content_type(subpath)
+            file_size = entry.uncompressed_size
+            file_name = subpath.split('/')[-1] if subpath else ''
+            range_header = request.headers.get('Range')
+
+            if range_header:
+                # Handle Range request (HTTP 206)
+                range_result = parse_range_header(range_header, file_size)
+                if range_result is None:
+                    reader.close()
+                    return Response(status_code=416, headers={'Content-Range': f'bytes */{file_size}'})
+
+                start, end = range_result
+
+                async def stream_range():
+                    try:
+                        for chunk in reader.stream_file_range(subpath, start, end):
+                            yield chunk
+                    finally:
+                        reader.close()
+
+                headers = {
+                    'Accept-Ranges': 'bytes',
+                    'Content-Length': str(end - start + 1),
+                    'Content-Range': f'bytes {start}-{end}/{file_size}',
+                }
+
+                if content_type == 'application/octet-stream' and file_name:
+                    headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+
+                return StreamingResponse(
+                    stream_range(),
+                    status_code=206,
+                    headers=headers,
+                    media_type=content_type
+                )
+            else:
+                # Full file (HTTP 200)
+                async def stream_full():
+                    try:
+                        for chunk in reader.stream_file(subpath):
+                            yield chunk
+                    finally:
+                        reader.close()
+
+                headers = {
+                    'Accept-Ranges': 'bytes',
+                    'Content-Length': str(file_size),
+                }
+
+                if content_type == 'application/octet-stream' and file_name:
+                    headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+
+                return StreamingResponse(
+                    stream_full(),
+                    status_code=200,
+                    headers=headers,
+                    media_type=content_type
+                )
+
+        except FileNotFoundError:
+            reader.close()
+            raise HTTPException(status_code=404, detail="File not found in OZX archive")
+        except Exception as e:
+            reader.close()
+            logger.exception(f"Error reading OZX content: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+    @app.get("/api/ozx-metadata/{path_name:path}")
+    async def get_ozx_metadata(
+        path_name: str,
+        username: str = Depends(get_current_user)
+    ):
+        """
+        Get metadata about an OZX archive.
+        Returns OME version, jsonFirst flag, file count, and ZIP64 status.
+        """
+
+        filestore_name, _, ozx_subpath = path_name.partition('/')
+
+        with _get_user_context(username):
+            filestore, error = _get_filestore(filestore_name)
+            if filestore is None:
+                raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
+
+            try:
+                ozx_file_path = filestore._check_path_in_root(ozx_subpath)
+            except RootCheckError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+
+            if not is_ozx_file(ozx_file_path):
+                raise HTTPException(status_code=400, detail="Not an OZX file")
+
+            try:
+                reader = OZXReader(ozx_file_path)
+                reader.open()
+            except FileNotFoundError:
+                raise HTTPException(status_code=404, detail="OZX file not found")
+            except (InvalidZipError, OZXReaderError) as e:
+                raise HTTPException(status_code=400, detail=f"Invalid OZX file: {e}")
+
+        # Get metadata outside user context
+        try:
+            metadata = reader.get_metadata()
+            entries = reader.parse_central_directory(json_only=metadata.json_first if metadata else False)
+
+            result = {
+                "version": metadata.version if metadata else None,
+                "json_first": metadata.json_first if metadata else False,
+                "file_count": len(entries),
+                "is_zip64": reader.is_zip64
+            }
+
+            reader.close()
+            return result
+
+        except Exception as e:
+            reader.close()
+            logger.exception(f"Error reading OZX metadata: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+    @app.get("/api/ozx-list/{path_name:path}")
+    async def list_ozx_files(
+        path_name: str,
+        prefix: str = Query('', description="Filter files by prefix"),
+        username: str = Depends(get_current_user)
+    ):
+        """
+        List files in an OZX archive.
+        Optionally filter by path prefix.
+        """
+
+        filestore_name, _, ozx_subpath = path_name.partition('/')
+
+        with _get_user_context(username):
+            filestore, error = _get_filestore(filestore_name)
+            if filestore is None:
+                raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
+
+            try:
+                ozx_file_path = filestore._check_path_in_root(ozx_subpath)
+            except RootCheckError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+
+            if not is_ozx_file(ozx_file_path):
+                raise HTTPException(status_code=400, detail="Not an OZX file")
+
+            try:
+                reader = OZXReader(ozx_file_path)
+                reader.open()
+            except FileNotFoundError:
+                raise HTTPException(status_code=404, detail="OZX file not found")
+            except (InvalidZipError, OZXReaderError) as e:
+                raise HTTPException(status_code=400, detail=f"Invalid OZX file: {e}")
+
+        # List files outside user context
+        try:
+            files = reader.list_files(prefix)
+            reader.close()
+            return {"files": files}
+
+        except Exception as e:
+            reader.close()
+            logger.exception(f"Error listing OZX files: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
 
 
     @app.get("/api/files/{path_name}")

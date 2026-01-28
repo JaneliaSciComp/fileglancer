@@ -122,27 +122,26 @@ describe('getOzxFilePath', () => {
 });
 
 describe('detectOzxZarrVersions', () => {
+  // RFC-9 OZX is for OME-Zarr v0.5 which requires Zarr v3 only
+
   it('should detect zarr v3 when zarr.json exists at root', () => {
     const files = ['zarr.json', '0/zarr.json', '0/c/0/0/0'];
     expect(detectOzxZarrVersions(files)).toEqual(['v3']);
   });
 
-  it('should detect zarr v2 when .zarray exists at root', () => {
+  it('should NOT detect zarr v2 - RFC-9 requires Zarr v3', () => {
+    // .zarray and .zattrs are Zarr v2 markers, not supported in RFC-9 OZX
     const files = ['.zarray', '.zattrs', '0/0'];
-    expect(detectOzxZarrVersions(files)).toEqual(['v2']);
+    expect(detectOzxZarrVersions(files)).toEqual([]);
   });
 
-  it('should detect zarr v2 when .zattrs exists at root', () => {
-    const files = ['.zattrs', '0/.zarray', '0/0/0'];
-    expect(detectOzxZarrVersions(files)).toEqual(['v2']);
-  });
-
-  it('should detect both versions when both exist', () => {
+  it('should only detect v3 even when v2 markers also exist', () => {
+    // RFC-9 OZX is Zarr v3 only, so v2 markers are ignored
     const files = ['zarr.json', '.zarray', '0/c/0/0/0'];
-    expect(detectOzxZarrVersions(files)).toEqual(['v2', 'v3']);
+    expect(detectOzxZarrVersions(files)).toEqual(['v3']);
   });
 
-  it('should return empty array when no zarr files', () => {
+  it('should return empty array when no zarr.json files', () => {
     const files = ['data.txt', 'image.png'];
     expect(detectOzxZarrVersions(files)).toEqual([]);
   });
@@ -151,20 +150,17 @@ describe('detectOzxZarrVersions', () => {
     expect(detectOzxZarrVersions([])).toEqual([]);
   });
 
-  it('should detect version from nested paths', () => {
+  it('should detect zarr.json from nested paths', () => {
     const files = ['folder/zarr.json', 'folder/.zattrs'];
-    // Nested paths are detected because we check for files ending with /name
-    // This allows detection of zarr data at any level in the archive
+    // Nested zarr.json is detected, .zattrs is ignored (v2 only)
     const result = detectOzxZarrVersions(files);
-    expect(result).toContain('v3'); // folder/zarr.json
-    expect(result).toContain('v2'); // folder/.zattrs
+    expect(result).toEqual(['v3']);
   });
 
-  it('should detect from paths ending with marker files', () => {
+  it('should detect zarr.json from paths ending with /zarr.json', () => {
     const files = ['root/zarr.json', 'root/.zattrs'];
-    // Paths ending with /zarr.json should be detected
+    // Only zarr.json is detected for RFC-9 OZX
     const result = detectOzxZarrVersions(files);
-    expect(result).toContain('v3');
-    expect(result).toContain('v2');
+    expect(result).toEqual(['v3']);
   });
 });

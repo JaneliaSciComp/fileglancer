@@ -8,7 +8,13 @@ import {
 import type { Metadata } from '@/omezarr-helper';
 import { getFileURL } from '@/utils';
 import { fetchFileAsJson } from './queryUtils';
-import { FileOrFolder } from '@/shared.types';
+import { isOzxFile } from '@/utils/ozxDetection';
+import {
+  OzxFetchStore,
+  getOzxContentUrl,
+  useOzxFileListQuery
+} from './ozxQueries';
+import type { FileOrFolder } from '@/shared.types';
 
 export type OpenWithToolUrls = {
   copy: string;
@@ -319,3 +325,198 @@ export function useOmeZarrThumbnailQuery(
     retry: false
   });
 }
+
+// OZX (Zipped OME-Zarr) types
+type OzxZarrMetadataQueryParams = {
+  fspName: string | undefined;
+  ozxFile: FileOrFolder | undefined | null;
+};
+
+type OzxZarrMetadataResult = {
+  metadata: ZarrMetadata;
+  omeZarrUrl: string | null;
+  availableVersions: ('v2' | 'v3')[];
+  store: OzxFetchStore | null;
+};
+
+/**
+ * Detects if an OZX archive contains Zarr v3 data.
+ * RFC-9 OZX files are specifically for OME-Zarr v0.5 which requires Zarr v3.
+ * @param files - Array of file paths within the OZX archive
+ * @returns Array containing ['v3'] if zarr.json found, empty array otherwise
+ */
+export function detectOzxZarrVersions(files: string[]): 'v3'[] {
+  if (!files || files.length === 0) {
+    return [];
+  }
+
+  // RFC-9 OZX is for OME-Zarr v0.5 which is Zarr v3 only
+  // Check for zarr.json at root or in subdirectories
+  const hasZarrJson = files.some(
+    f => f === 'zarr.json' || f.endsWith('/zarr.json')
+  );
+
+  return hasZarrJson ? ['v3'] : [];
+}
+
+/**
+ * Fetches Zarr metadata from an OZX archive.
+ * Uses OzxFetchStore to read files from within the ZIP archive.
+ */
+async function fetchOzxZarrMetadata(
+  fspName: string,
+  ozxFilePath: string,
+  files: string[]
+): Promise<OzxZarrMetadataResult> {
+  const store = new OzxFetchStore(fspName, ozxFilePath);
+  const availableVersions = detectOzxZarrVersions(files);
+
+  // Get the base URL for OME-Zarr viewers (using empty internal path)
+  const baseUrl = getOzxContentUrl(fspName, ozxFilePath, '');
+
+  // Default to Zarr v3 when available
+  if (availableVersions.includes('v3')) {
+    const zarrJsonContent = await store.get('zarr.json');
+    if (!zarrJsonContent) {
+      log.warn('Could not read zarr.json from OZX');
+      return {
+        metadata: null,
+        omeZarrUrl: null,
+        availableVersions,
+        store
+      };
+    }
+
+    const attrs = JSON.parse(
+      new TextDecoder().decode(zarrJsonContent)
+    ) as ZarrV3Attrs;
+
+    if (attrs.node_type === 'array') {
+      log.info('Getting Zarr array from OZX with Zarr version 3');
+      // For OZX arrays, we need a custom store - use baseUrl which routes through OZX API
+      const arr = await getZarrArray(baseUrl, 3);
+      const shapes = [arr.shape];
+      return {
+        metadata: {
+          arr,
+          shapes,
+          multiscale: undefined,
+          scales: undefined,
+          omero: undefined,
+          labels: undefined,
+          zarrVersion: 3
+        },
+        omeZarrUrl: null,
+        availableVersions,
+        store
+      };
+    } else if (attrs.node_type === 'group') {
+      if (attrs.attributes?.ome?.multiscales) {
+        log.info('Getting OME-Zarr metadata from OZX with Zarr version 3');
+        // Use the OZX content URL as the base for OME-Zarr
+        const metadata = await getOmeZarrMetadata(baseUrl);
+
+        // Check for labels
+        try {
+          const labelsContent = await store.get('labels/zarr.json');
+          if (labelsContent) {
+            const labelsAttrs = JSON.parse(
+              new TextDecoder().decode(labelsContent)
+            ) as ZarrV3Attrs;
+            metadata.labels = labelsAttrs?.attributes?.ome?.labels;
+            if (metadata.labels) {
+              log.info('OME-Zarr Labels found in OZX: ', metadata.labels);
+            }
+          }
+        } catch (error) {
+          log.trace('Could not fetch labels attrs from OZX: ', error);
+        }
+
+        return {
+          metadata,
+          omeZarrUrl: baseUrl,
+          availableVersions,
+          store
+        };
+      } else {
+        log.info('OZX Zarrv3 group has no multiscales', attrs.attributes);
+        return {
+          metadata: null,
+          omeZarrUrl: null,
+          availableVersions,
+          store
+        };
+      }
+    } else {
+      log.warn('Unknown OZX Zarrv3 node type', attrs.node_type);
+      return {
+        metadata: null,
+        omeZarrUrl: null,
+        availableVersions,
+        store
+      };
+    }
+  }
+
+  // RFC-9 OZX is for OME-Zarr v0.5 which requires Zarr v3
+  // If we reach here, no valid zarr.json was found
+  log.debug('No Zarr v3 data detected in OZX (RFC-9 requires Zarr v3)');
+  return {
+    metadata: null,
+    omeZarrUrl: null,
+    availableVersions: [],
+    store
+  };
+}
+
+/**
+ * Hook to fetch Zarr metadata from an OZX (Zipped OME-Zarr) file.
+ * This hook handles:
+ * 1. Listing files within the OZX archive
+ * 2. Detecting Zarr version
+ * 3. Reading metadata
+ * 4. Providing an OzxFetchStore for chunk access
+ */
+export function useOzxZarrMetadataQuery(
+  params: OzxZarrMetadataQueryParams
+): UseQueryResult<OzxZarrMetadataResult, Error> {
+  const { fspName, ozxFile } = params;
+
+  // First, get the file list from the OZX
+  const fileListQuery = useOzxFileListQuery(
+    fspName,
+    ozxFile?.path,
+    undefined,
+    !!fspName && !!ozxFile && isOzxFile(ozxFile)
+  );
+
+  return useQuery({
+    queryKey: ['ozx', 'zarr', 'metadata', fspName || '', ozxFile?.path || ''],
+    queryFn: async () => {
+      if (!fspName || !ozxFile) {
+        throw new Error('fspName and ozxFile are required');
+      }
+      if (!fileListQuery.data) {
+        throw new Error('File list not available');
+      }
+      return await fetchOzxZarrMetadata(
+        fspName,
+        ozxFile.path,
+        fileListQuery.data
+      );
+    },
+    enabled:
+      !!fspName &&
+      !!ozxFile &&
+      isOzxFile(ozxFile) &&
+      !!fileListQuery.data &&
+      fileListQuery.data.length > 0 &&
+      detectOzxZarrVersions(fileListQuery.data).length > 0,
+    staleTime: 5 * 60 * 1000,
+    retry: false
+  });
+}
+
+// Re-export OZX detection utilities for convenience
+export { isOzxFile } from '@/utils/ozxDetection';
+export { OzxFetchStore, getOzxContentUrl } from './ozxQueries';
