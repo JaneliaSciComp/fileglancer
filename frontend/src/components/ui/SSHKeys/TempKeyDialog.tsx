@@ -59,7 +59,7 @@ export default function TempKeyDialog({
           <Typography className="text-warning font-semibold text-md">
             Copy this private key now - it will not be available again!
           </Typography>
-          <Typography className="mt-1">
+          <Typography className="text-warning mt-1">
             The private key is not stored anywhere. You must copy it now by
             clicking the "Copy Private Key" button and then save it somewhere
             safe (e.g. paste it into Seqera Platform's 'Managed Identities'

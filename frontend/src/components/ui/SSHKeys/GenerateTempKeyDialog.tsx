@@ -47,7 +47,7 @@ export default function GenerateTempKeyDialog({
         Generate SSH Key
       </Typography>
 
-      <Typography className="mb-4">
+      <Typography className="text-foreground mb-4">
         This will create a new ed25519 SSH key pair and add the public key to
         your authorized_keys file.
       </Typography>
@@ -63,7 +63,7 @@ export default function GenerateTempKeyDialog({
           type="password"
           value={passphrase}
         />
-        <Typography className="text-muted text-xs ml-1 mt-1">
+        <Typography className="text-foreground text-xs ml-1 mt-1">
           A passphrase adds extra security but must be entered each time you use
           the key.
         </Typography>
