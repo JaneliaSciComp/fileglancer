@@ -35,6 +35,7 @@ from fileglancer.utils import format_timestamp, guess_content_type, parse_range_
 from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext, UserContextConfigurationError
 from fileglancer.filestore import Filestore, RootCheckError
 from fileglancer.log import AccessLogMiddleware
+from fileglancer import sshkeys
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response
 from x2s3.client_file import FileProxyClient
@@ -1059,6 +1060,46 @@ def create_app(settings):
                 "homeDirectoryName": home_directory_name,
                 "groups": user_groups,
             }
+
+    # SSH Key Management endpoints
+    @app.get("/api/ssh-keys", response_model=sshkeys.SSHKeyListResponse,
+             description="List Fileglancer-managed SSH keys")
+    async def list_ssh_keys(username: str = Depends(get_current_user)):
+        """List SSH keys with 'fileglancer' in the comment from authorized_keys"""
+        with _get_user_context(username):
+            try:
+                ssh_dir = sshkeys.get_ssh_directory()
+                keys = sshkeys.list_ssh_keys(ssh_dir)
+                return sshkeys.SSHKeyListResponse(keys=keys)
+            except Exception as e:
+                logger.error(f"Error listing SSH keys for {username}: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/ssh-keys/generate-temp",
+              description="Generate a temporary SSH key and return private key for one-time copy")
+    async def generate_temp_ssh_key(
+        request: sshkeys.GenerateKeyRequest = Body(default=sshkeys.GenerateKeyRequest()),
+        username: str = Depends(get_current_user)
+    ):
+        """Generate a temporary SSH key, add to authorized_keys, return private key.
+
+        The private key is streamed securely and the temporary files are deleted
+        after the response is sent. Key info is included in response headers:
+        - X-SSH-Key-Filename
+        - X-SSH-Key-Type
+        - X-SSH-Key-Fingerprint
+        - X-SSH-Key-Comment
+        """
+        with _get_user_context(username):
+            try:
+                ssh_dir = sshkeys.get_ssh_directory()
+                return sshkeys.generate_temp_key_and_authorize(ssh_dir, request.passphrase)
+
+            except RuntimeError as e:
+                raise HTTPException(status_code=500, detail=str(e))
+            except Exception as e:
+                logger.error(f"Error generating temp SSH key for {username}: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
 
     # File content endpoint
     @app.head("/api/content/{path_name:path}")

@@ -9,6 +9,7 @@ import { server } from './mocks/node';
 expect.extend(matchers);
 
 import.meta.env.VITE_ENABLE_TASKS = true;
+import.meta.env.VITE_ENABLE_SSH_KEYS = true;
 
 // Define mock functions using vi.hoisted to ensure they're available to vi.mock,
 // which is hoisted to be executed before all imports
