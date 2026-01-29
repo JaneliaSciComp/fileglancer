@@ -418,11 +418,13 @@ class TempKeyResponse(SSHKeyContentResponse):
         key_content: bytearray,
         temp_key_path: str,
         temp_pubkey_path: str,
+        temp_dir: str,
         key_info: SSHKeyInfo,
         status_code: int = 200,
     ):
         self._temp_key_path = temp_key_path
         self._temp_pubkey_path = temp_pubkey_path
+        self._temp_dir = temp_dir
 
         headers = {
             "X-SSH-Key-Filename": key_info.filename,
@@ -441,7 +443,7 @@ class TempKeyResponse(SSHKeyContentResponse):
             self._cleanup_temp_files()
 
     def _cleanup_temp_files(self):
-        """Securely delete temporary key files."""
+        """Securely delete temporary key files and directory."""
         for path in (self._temp_key_path, self._temp_pubkey_path):
             try:
                 if os.path.exists(path):
@@ -452,6 +454,14 @@ class TempKeyResponse(SSHKeyContentResponse):
                     logger.info(f"Deleted temporary key file: {path}")
             except Exception as e:
                 logger.warning(f"Failed to delete temp file {path}: {e}")
+
+        # Clean up the temp directory
+        try:
+            if os.path.exists(self._temp_dir):
+                os.rmdir(self._temp_dir)
+                logger.info(f"Deleted temporary directory: {self._temp_dir}")
+        except Exception as e:
+            logger.warning(f"Failed to delete temp directory {self._temp_dir}: {e}")
 
 
 def generate_temp_key_and_authorize(
@@ -531,6 +541,7 @@ def generate_temp_key_and_authorize(
             private_key_buffer,
             temp_key_path,
             temp_pubkey_path,
+            temp_dir,
             key_info
         )
 
