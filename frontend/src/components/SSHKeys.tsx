@@ -21,13 +21,11 @@ export default function SSHKeys() {
 
   return (
     <>
-      <div className="pb-6">
-        <Typography className="text-foreground" type="h5">
-          Authorized SSH Keys
-        </Typography>
-      </div>
+      <Typography className="mb-6 text-foreground font-bold" type="h5">
+        Authorized SSH Keys
+      </Typography>
 
-      <Typography className="text-secondary mb-6">
+      <Typography className="mb-6 text-foreground">
         This page allows you to generate SSH keys and shows any keys you have
         already generated. Generated keys are tagged with 'fileglancer' and
         added to your
