@@ -65,6 +65,25 @@ export default function TempKeyDialog({
             safe (e.g. paste it into Seqera Platform's 'Managed Identities'
             page).
           </Typography>
+          <div className="flex justify-center mt-3">
+            <Button
+              color={copied ? 'success' : 'primary'}
+              onClick={handleCopy}
+              size="sm"
+            >
+              {copied ? (
+                <>
+                  <HiOutlineCheck className="icon-default mr-1" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <HiOutlineClipboardCopy className="icon-default mr-1" />
+                  Copy Private Key
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
         <div>
@@ -87,24 +106,7 @@ export default function TempKeyDialog({
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 pt-2">
-          <Button
-            color={copied ? 'success' : 'primary'}
-            onClick={handleCopy}
-            size="sm"
-          >
-            {copied ? (
-              <>
-                <HiOutlineCheck className="icon-default mr-1" />
-                Copied
-              </>
-            ) : (
-              <>
-                <HiOutlineClipboardCopy className="icon-default mr-1" />
-                Copy Private Key
-              </>
-            )}
-          </Button>
+        <div className="flex justify-start pt-2">
           <Button onClick={handleClose} size="sm" variant="outline">
             Close
           </Button>
