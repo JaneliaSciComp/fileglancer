@@ -28,10 +28,11 @@ export default function SSHKeys() {
       </div>
 
       <Typography className="text-secondary mb-6">
-        This page allows you to generate keys for use with Seqera Platform, and
-        shows any keys you have already generated. Generated keys are tagged
-        with 'fileglancer' and added to your <code>~/.ssh/authorized_keys</code>{' '}
-        file. This interface does not allow you to remove keys from your{' '}
+        This page allows you to generate SSH keys and shows any keys you have
+        already generated. Generated keys are tagged with 'fileglancer' and
+        added to your
+        <code>~/.ssh/authorized_keys</code> file. This interface does not allow
+        you to remove keys from your
         <code>authorized_keys</code> file, but you can do so manually.
       </Typography>
 

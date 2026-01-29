@@ -49,7 +49,7 @@ export default function GenerateTempKeyDialog({
 
       <Typography className="mb-4">
         This will create a new ed25519 SSH key pair and add the public key to
-        your authorized_keys file. 
+        your authorized_keys file.
       </Typography>
 
       <div className="mb-6">
