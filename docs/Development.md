@@ -194,7 +194,8 @@ To execute the UI integration tests:
 Install test dependencies (needed only once):
 
 ```bash
-pixi run npm --prefix frontend/ui-tests npx playwright install
+pixi run node-install-ui-tests
+cd frontend/ui-tests && pixi run npx playwright install
 ```
 
 Then run the tests with:

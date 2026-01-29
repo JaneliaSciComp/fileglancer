@@ -18,7 +18,7 @@ export default function RecentDataLinksCard() {
   const recentDataLinks = allProxiedPathsQuery.data?.slice(0, 10) || [];
 
   return (
-    <DashboardCard title="Recently created data links">
+    <DashboardCard className="h-[670px]" title="Recently created data links">
       {allProxiedPathsQuery.isPending || zonesAndFspQuery.isPending ? (
         Array(5)
           .fill(0)

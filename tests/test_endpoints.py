@@ -1,8 +1,10 @@
+import json
 import os
 import tempfile
 import shutil
 from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
+from urllib.parse import quote
 
 import pytest
 from fastapi.testclient import TestClient
@@ -188,6 +190,69 @@ def test_delete_preference(test_client):
 
     response = test_client.delete("/api/preference/unknown_key")
     assert response.status_code == 404
+
+
+def test_neuroglancer_shortener(test_client):
+    """Test creating and retrieving a shortened Neuroglancer state"""
+    state = {"layers": [], "title": "Example"}
+    encoded_state = quote(json.dumps(state))
+    url = f"https://neuroglancer-demo.appspot.com/#!{encoded_state}"
+
+    # Test with short_name - URL should include both short_key and short_name
+    response = test_client.post(
+        "/api/neuroglancer/nglinks",
+        json={"url": url, "short_name": "example-view"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "short_key" in data
+    assert data["short_name"] == "example-view"
+    assert "state_url" in data
+    assert "neuroglancer_url" in data
+
+    short_key = data["short_key"]
+    short_name = data["short_name"]
+    assert data["state_url"].endswith(f"/ng/{short_key}/{short_name}")
+    assert data["neuroglancer_url"].startswith("https://neuroglancer-demo.appspot.com/#!")
+
+    # Retrieving with both short_key and short_name should work
+    state_response = test_client.get(f"/ng/{short_key}/{short_name}")
+    assert state_response.status_code == 200
+    assert state_response.json() == state
+
+    # Retrieving with only short_key should fail (404)
+    state_response_simple = test_client.get(f"/ng/{short_key}")
+    assert state_response_simple.status_code == 404
+
+    list_response = test_client.get("/api/neuroglancer/nglinks")
+    assert list_response.status_code == 200
+    list_data = list_response.json()
+    assert "links" in list_data
+    assert any(link["short_key"] == short_key for link in list_data["links"])
+
+
+def test_neuroglancer_shortener_no_name(test_client):
+    """Test creating a shortened Neuroglancer state without short_name"""
+    state = {"layers": []}
+    encoded_state = quote(json.dumps(state))
+    url = f"https://neuroglancer-demo.appspot.com/#!{encoded_state}"
+
+    response = test_client.post(
+        "/api/neuroglancer/nglinks",
+        json={"url": url}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "short_key" in data
+    assert data["short_name"] is None
+
+    short_key = data["short_key"]
+    assert data["state_url"].endswith(f"/ng/{short_key}")
+
+    # Retrieving with only short_key should work when no short_name was set
+    state_response = test_client.get(f"/ng/{short_key}")
+    assert state_response.status_code == 200
+    assert state_response.json() == state
 
 
 def test_create_proxied_path(test_client, temp_dir):
@@ -746,3 +811,297 @@ def test_delete_ticket_not_found(mock_delete, test_client):
     data = response.json()
     assert "error" in data
 
+
+# Symlink tests for /api/files and /api/content endpoints
+
+def test_get_files_with_symlink_to_same_fsp(test_client, temp_dir):
+    """Test /api/files endpoint with a symlink pointing within the same FSP"""
+    # Create a target directory within the FSP
+    target_dir = os.path.join(temp_dir, "target_directory")
+    os.makedirs(target_dir, exist_ok=True)
+
+    # Create a file in the target directory
+    target_file = os.path.join(target_dir, "target_file.txt")
+    with open(target_file, "w") as f:
+        f.write("content in target")
+
+    # Create a symlink within the FSP pointing to the target directory
+    symlink_path = os.path.join(temp_dir, "link_to_target")
+    os.symlink(target_dir, symlink_path)
+
+    # Request files through the symlink
+    response = test_client.get("/api/files/tempdir?subpath=link_to_target")
+    assert response.status_code == 200
+    data = response.json()
+    assert "files" in data
+
+    # Verify we can see the target file through the symlink
+    file_names = [f["name"] for f in data["files"]]
+    assert "target_file.txt" in file_names
+
+
+def test_get_files_with_symlink_outside_fsp(test_client, temp_dir):
+    """Test /api/files endpoint with a symlink pointing outside the FSP"""
+    # Create a separate directory outside the temp_dir (FSP root)
+    external_dir = tempfile.mkdtemp()
+
+    try:
+        # Create a file in the external directory
+        external_file = os.path.join(external_dir, "external_file.txt")
+        with open(external_file, "w") as f:
+            f.write("external content")
+
+        # Create another FSP for the external directory
+        from fileglancer.database import FileSharePathDB, get_db_session
+        from fileglancer.settings import get_settings
+        settings = get_settings()
+
+        with get_db_session(settings.db_url) as session:
+            external_fsp = FileSharePathDB(
+                name="external",
+                zone="testzone",
+                group="testgroup",
+                storage="local",
+                mount_path=external_dir,
+                mac_path=external_dir,
+                windows_path=external_dir,
+                linux_path=external_dir
+            )
+            session.add(external_fsp)
+            session.commit()
+
+            # Create a symlink in the original FSP pointing to the external directory
+            symlink_path = os.path.join(temp_dir, "link_to_external")
+            os.symlink(external_dir, symlink_path)
+
+            # Request files through the symlink - should get a redirect (307) that gets followed
+            response = test_client.get("/api/files/tempdir?subpath=link_to_external", follow_redirects=False)
+            assert response.status_code == 307
+
+            # Verify redirect location
+            assert "location" in response.headers
+            expected_location = "/api/files/external"
+            assert response.headers["location"] == expected_location
+
+            # Follow the redirect and verify we get the external directory listing
+            response_followed = test_client.get("/api/files/tempdir?subpath=link_to_external", follow_redirects=True)
+            assert response_followed.status_code == 200
+            data = response_followed.json()
+            assert "files" in data
+            file_names = [f["name"] for f in data["files"]]
+            assert "external_file.txt" in file_names
+
+    finally:
+        # Clean up external directory
+        shutil.rmtree(external_dir)
+
+
+def test_get_files_with_nested_symlink_outside_fsp(test_client, temp_dir):
+    """Test /api/files endpoint with a symlink pointing outside FSP to a subdirectory"""
+    # Create a separate directory outside the temp_dir (FSP root - created above)
+    external_dir = tempfile.mkdtemp()
+
+    try:
+        # Create a subdirectory in the external directory
+        external_subdir = os.path.join(external_dir, "subdir")
+        os.makedirs(external_subdir, exist_ok=True)
+
+        # Create a file in the external subdirectory
+        external_file = os.path.join(external_subdir, "external_file.txt")
+        with open(external_file, "w") as f:
+            f.write("external nested content")
+
+        # Create another FSP for the external directory
+        from fileglancer.database import FileSharePathDB, get_db_session
+        from fileglancer.settings import get_settings
+        settings = get_settings()
+
+        with get_db_session(settings.db_url) as session:
+            external_fsp = FileSharePathDB(
+                name="external",
+                zone="testzone",
+                group="testgroup",
+                storage="local",
+                mount_path=external_dir,
+                mac_path=external_dir,
+                windows_path=external_dir,
+                linux_path=external_dir
+            )
+            session.add(external_fsp)
+            session.commit()
+
+            # Create a symlink in the original FSP pointing to the external subdirectory
+            symlink_path = os.path.join(temp_dir, "link_to_external_subdir")
+            os.symlink(external_subdir, symlink_path)
+
+            # Request files through the symlink - should get a redirect (307) that gets followed
+            response = test_client.get("/api/files/tempdir?subpath=link_to_external_subdir", follow_redirects=False)
+            assert response.status_code == 307
+
+            # Verify redirect location
+            assert "location" in response.headers
+            expected_location = "/api/files/external?subpath=subdir"
+            assert response.headers["location"] == expected_location
+
+            # Follow the redirect and verify we get the external subdirectory listing
+            response_followed = test_client.get("/api/files/tempdir?subpath=link_to_external_subdir", follow_redirects=True)
+            assert response_followed.status_code == 200
+            data = response_followed.json()
+            assert "files" in data
+            file_names = [f["name"] for f in data["files"]]
+            assert "external_file.txt" in file_names
+
+    finally:
+        # Clean up external directory
+        shutil.rmtree(external_dir)
+
+
+def test_get_files_with_symlink_no_matching_fsp(test_client, temp_dir):
+    """Test /api/files endpoint with a symlink pointing to a path with no matching FSP"""
+    # Create a separate directory outside the temp_dir
+    external_dir = tempfile.mkdtemp()
+
+    try:
+        # Create a file in the external directory
+        external_file = os.path.join(external_dir, "orphan_file.txt")
+        with open(external_file, "w") as f:
+            f.write("orphan content")
+
+        # Create a symlink in the original FSP pointing to the external directory
+        # But DON'T create an FSP for it
+        symlink_path = os.path.join(temp_dir, "link_to_orphan")
+        os.symlink(external_dir, symlink_path)
+
+        # Request files through the symlink - should get a 400 error (path escapes root)
+        response = test_client.get("/api/files/tempdir?subpath=link_to_orphan")
+        assert response.status_code == 400
+        data = response.json()
+        assert "error" in data
+        # The error message comes from RootCheckError
+        assert "path" in data["error"].lower()
+
+    finally:
+        # Clean up external directory
+        shutil.rmtree(external_dir)
+
+
+def test_get_content_with_symlink_to_same_fsp(test_client, temp_dir):
+    """Test /api/content endpoint with a symlink pointing within the same FSP"""
+    # Create a target file within the FSP
+    target_file = os.path.join(temp_dir, "target_content.txt")
+    target_content = "This is the target file content"
+    with open(target_file, "w") as f:
+        f.write(target_content)
+
+    # Create a symlink within the FSP pointing to the target file
+    symlink_path = os.path.join(temp_dir, "link_to_content")
+    os.symlink(target_file, symlink_path)
+
+    # Request content through the symlink
+    response = test_client.get("/api/content/tempdir?subpath=link_to_content")
+    assert response.status_code == 200
+    assert response.text == target_content
+
+
+def test_get_content_with_symlink_outside_fsp(test_client, temp_dir):
+    """Test /api/content endpoint with a symlink pointing outside the FSP"""
+    # Create a separate directory outside the temp_dir (FSP root)
+    external_dir = tempfile.mkdtemp()
+
+    try:
+        # Create a file in the external directory
+        external_file = os.path.join(external_dir, "external_content.txt")
+        external_content = "This is external content"
+        with open(external_file, "w") as f:
+            f.write(external_content)
+
+        # Create another FSP for the external directory
+        from fileglancer.database import FileSharePathDB, get_db_session
+        from fileglancer.settings import get_settings
+        settings = get_settings()
+
+        with get_db_session(settings.db_url) as session:
+            external_fsp = FileSharePathDB(
+                name="external",
+                zone="testzone",
+                group="testgroup",
+                storage="local",
+                mount_path=external_dir,
+                mac_path=external_dir,
+                windows_path=external_dir,
+                linux_path=external_dir
+            )
+            session.add(external_fsp)
+            session.commit()
+
+            # Create a symlink in the original FSP pointing to the external file
+            symlink_path = os.path.join(temp_dir, "link_to_external_content")
+            os.symlink(external_file, symlink_path)
+
+            # Request content through the symlink - should get a redirect (307) that gets followed
+            response = test_client.get("/api/content/tempdir?subpath=link_to_external_content", follow_redirects=False)
+            assert response.status_code == 307
+
+            # Verify redirect location
+            assert "location" in response.headers
+            expected_location = "/api/content/external?subpath=external_content.txt"
+            assert response.headers["location"] == expected_location
+
+            # Follow the redirect and verify we get the external file content
+            response_followed = test_client.get("/api/content/tempdir?subpath=link_to_external_content", follow_redirects=True)
+            assert response_followed.status_code == 200
+            assert response_followed.text == external_content
+
+    finally:
+        # Clean up external directory
+        shutil.rmtree(external_dir)
+
+
+def test_get_content_with_symlink_no_matching_fsp(test_client, temp_dir):
+    """Test /api/content endpoint with a symlink pointing to a path with no matching FSP"""
+    # Create a separate directory outside the temp_dir
+    external_dir = tempfile.mkdtemp()
+
+    try:
+        # Create a file in the external directory
+        external_file = os.path.join(external_dir, "orphan_content.txt")
+        with open(external_file, "w") as f:
+            f.write("orphan content")
+
+        # Create a symlink in the original FSP pointing to the external file
+        # But DON'T create an FSP for it
+        symlink_path = os.path.join(temp_dir, "link_to_orphan_content")
+        os.symlink(external_file, symlink_path)
+
+        # Request content through the symlink - should get a 400 error (path escapes root)
+        response = test_client.get("/api/content/tempdir?subpath=link_to_orphan_content")
+        assert response.status_code == 400
+        data = response.json()
+        assert "error" in data
+        # The error message comes from RootCheckError
+        assert "path" in data["error"].lower()
+
+    finally:
+        # Clean up external directory
+        shutil.rmtree(external_dir)
+
+
+def test_head_content_with_symlink(test_client, temp_dir):
+    """Test HEAD request to /api/content endpoint with a symlink"""
+    # Create a target file within the FSP
+    target_file = os.path.join(temp_dir, "target_head.txt")
+    target_content = "Content for HEAD request"
+    with open(target_file, "w") as f:
+        f.write(target_content)
+
+    # Create a symlink within the FSP pointing to the target file
+    symlink_path = os.path.join(temp_dir, "link_to_head")
+    os.symlink(target_file, symlink_path)
+
+    # HEAD request through the symlink
+    response = test_client.head("/api/content/tempdir?subpath=link_to_head")
+    assert response.status_code == 200
+    assert "Accept-Ranges" in response.headers
+    assert response.headers["Accept-Ranges"] == "bytes"
+    assert "Content-Length" in response.headers
+    assert int(response.headers["Content-Length"]) == len(target_content)

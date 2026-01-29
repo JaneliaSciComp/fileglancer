@@ -228,3 +228,194 @@ def test_create_proxied_path_with_home_dir(db_session, temp_dir):
         if os.path.exists(test_path):
             os.rmdir(test_path)
 
+
+def test_find_fsp_from_absolute_path_exact_match(db_session, temp_dir):
+    """Test finding FSP from absolute path with exact match"""
+    # Create a file share path
+    fsp = FileSharePathDB(
+        name="test_mount",
+        zone="testzone",
+        group="testgroup",
+        storage="local",
+        mount_path=temp_dir,
+        mac_path=temp_dir,
+        windows_path=temp_dir,
+        linux_path=temp_dir
+    )
+    db_session.add(fsp)
+    db_session.commit()
+
+    # Test exact match at mount root
+    result = find_fsp_from_absolute_path(db_session, temp_dir)
+    assert result is not None
+    assert result[0].name == "test_mount"
+    assert result[1] == ""
+
+    # Test with subdirectory
+    subdir = os.path.join(temp_dir, "subdir")
+    os.makedirs(subdir, exist_ok=True)
+    result = find_fsp_from_absolute_path(db_session, subdir)
+    assert result is not None
+    assert result[0].name == "test_mount"
+    assert result[1] == "subdir"
+
+    # Test with nested subdirectory
+    nested_dir = os.path.join(temp_dir, "subdir", "nested")
+    os.makedirs(nested_dir, exist_ok=True)
+    result = find_fsp_from_absolute_path(db_session, nested_dir)
+    assert result is not None
+    assert result[0].name == "test_mount"
+    assert result[1] == os.path.join("subdir", "nested")
+
+
+def test_find_fsp_from_absolute_path_no_match(db_session, temp_dir):
+    """Test finding FSP from absolute path with no match"""
+    # Create a file share path
+    fsp = FileSharePathDB(
+        name="test_mount",
+        zone="testzone",
+        group="testgroup",
+        storage="local",
+        mount_path=temp_dir,
+        mac_path=temp_dir,
+        windows_path=temp_dir,
+        linux_path=temp_dir
+    )
+    db_session.add(fsp)
+    db_session.commit()
+
+    # Test with path that doesn't match any FSP
+    non_matching_path = "/completely/different/path"
+    result = find_fsp_from_absolute_path(db_session, non_matching_path)
+    assert result is None
+
+
+def test_find_fsp_from_absolute_path_with_home_dir(db_session):
+    """Test finding FSP from absolute path with ~/ mount path"""
+    # Create a file share path using ~/ which should expand to current user's home
+    home_fsp = FileSharePathDB(
+        name="home",
+        zone="testzone",
+        group="testgroup",
+        storage="home",
+        mount_path="~/",
+        mac_path="~/",
+        windows_path="~/",
+        linux_path="~/"
+    )
+    db_session.add(home_fsp)
+    db_session.commit()
+
+    # Test with expanded home directory
+    home_dir = os.path.expanduser("~/")
+    result = find_fsp_from_absolute_path(db_session, home_dir)
+    assert result is not None
+    assert result[0].name == "home"
+    assert result[1] == ""
+
+    # Test with subdirectory in home
+    test_subpath = "test_subdir"
+    test_path = os.path.join(home_dir, test_subpath)
+    result = find_fsp_from_absolute_path(db_session, test_path)
+    assert result is not None
+    assert result[0].name == "home"
+    assert result[1] == test_subpath
+
+
+def test_find_fsp_from_absolute_path_normalization(db_session, temp_dir):
+    """Test that path normalization works correctly"""
+    # Create a file share path
+    fsp = FileSharePathDB(
+        name="test_mount",
+        zone="testzone",
+        group="testgroup",
+        storage="local",
+        mount_path=temp_dir,
+        mac_path=temp_dir,
+        windows_path=temp_dir,
+        linux_path=temp_dir
+    )
+    db_session.add(fsp)
+    db_session.commit()
+
+    # Test with trailing slashes
+    path_with_trailing_slash = temp_dir + "/"
+    result = find_fsp_from_absolute_path(db_session, path_with_trailing_slash)
+    assert result is not None
+    assert result[0].name == "test_mount"
+    assert result[1] == ""
+
+    # Test with double slashes
+    subdir = os.path.join(temp_dir, "subdir")
+    os.makedirs(subdir, exist_ok=True)
+    path_with_double_slash = temp_dir + "//subdir"
+    result = find_fsp_from_absolute_path(db_session, path_with_double_slash)
+    assert result is not None
+    assert result[0].name == "test_mount"
+    assert result[1] == "subdir"
+
+
+def test_find_fsp_from_absolute_path_boundary_check(db_session, temp_dir):
+    """Test that function correctly checks directory boundaries"""
+    # Create a file share path
+    fsp = FileSharePathDB(
+        name="test_mount",
+        zone="testzone",
+        group="testgroup",
+        storage="local",
+        mount_path=temp_dir,
+        mac_path=temp_dir,
+        windows_path=temp_dir,
+        linux_path=temp_dir
+    )
+    db_session.add(fsp)
+    db_session.commit()
+
+    # Test with a path that starts with the mount path but isn't a subdirectory
+    # For example, if temp_dir is "/tmp/test", then "/tmp/test2" should NOT match
+    parent_dir = os.path.dirname(temp_dir)
+    similar_path = temp_dir + "2"  # e.g., /tmp/test2
+
+    # Only test if the similar path actually exists or if we can determine it won't match
+    result = find_fsp_from_absolute_path(db_session, similar_path)
+    # This should not match because similar_path is not a subdirectory of temp_dir
+    assert result is None or result[0].mount_path != temp_dir
+
+
+def test_find_fsp_from_absolute_path_with_symlink_resolution(db_session, temp_dir):
+    """Test that find_fsp_from_absolute_path resolves symlinks correctly. 
+    This addresses macOS symlink behavior. E.g., /var -> /private/var."""
+    # Create a file share path in temp_dir
+    fsp = FileSharePathDB(
+        name="test_mount",
+        zone="testzone",
+        group="testgroup",
+        storage="local",
+        mount_path=temp_dir,
+        mac_path=temp_dir,
+        windows_path=temp_dir,
+        linux_path=temp_dir
+    )
+    db_session.add(fsp)
+    db_session.commit()
+
+    # Create a subdirectory that we'll link to
+    target_dir = os.path.join(temp_dir, "target")
+    os.makedirs(target_dir, exist_ok=True)
+
+    # Create another temporary directory to hold the symlink
+    symlink_container = tempfile.mkdtemp()
+    try:
+        # Create a symlink pointing to the target directory
+        symlink_path = os.path.join(symlink_container, "link_to_target")
+        os.symlink(target_dir, symlink_path)
+
+        # When we resolve the symlink path, it should find the FSP
+        # This tests that the function uses realpath() to resolve symlinks
+        result = find_fsp_from_absolute_path(db_session, symlink_path)
+        assert result is not None, "Should find FSP through symlink resolution"
+        assert result[0].name == "test_mount"
+        assert result[1] == "target"
+    finally:
+        shutil.rmtree(symlink_container)
+

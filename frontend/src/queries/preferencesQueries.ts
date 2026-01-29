@@ -37,6 +37,7 @@ type PreferencesApiResponse = {
   disableHeuristicalLayerTypeDetection?: { value: boolean };
   useLegacyMultichannelApproach?: { value: boolean };
   isFilteredByGroups?: { value: boolean };
+  showTutorial?: { value: boolean };
   zone?: { value: ZonePreference[] };
   fileSharePath?: { value: FileSharePathPreference[] };
   folder?: { value: FolderPreference[] };
@@ -66,6 +67,7 @@ export type PreferencesQueryData = {
   disableHeuristicalLayerTypeDetection: boolean;
   useLegacyMultichannelApproach: boolean;
   isFilteredByGroups: boolean;
+  showTutorial: boolean;
 };
 
 /**
@@ -229,7 +231,8 @@ const createTransformPreferences = (
         rawData.disableHeuristicalLayerTypeDetection?.value || false,
       useLegacyMultichannelApproach:
         rawData.useLegacyMultichannelApproach?.value || false,
-      isFilteredByGroups: rawData.isFilteredByGroups?.value ?? true
+      isFilteredByGroups: rawData.isFilteredByGroups?.value ?? true,
+      showTutorial: rawData.showTutorial?.value ?? true
     };
   };
 };

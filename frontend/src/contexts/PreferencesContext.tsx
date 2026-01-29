@@ -52,6 +52,7 @@ type PreferencesContextType = {
   disableHeuristicalLayerTypeDetection: boolean;
   useLegacyMultichannelApproach: boolean;
   isFilteredByGroups: boolean;
+  showTutorial: boolean;
 
   // Favorites
   zoneFavorites: Zone[];
@@ -78,6 +79,7 @@ type PreferencesContextType = {
   toggleDisableHeuristicalLayerTypeDetection: () => Promise<Result<void>>;
   toggleUseLegacyMultichannelApproach: () => Promise<Result<void>>;
   toggleFilterByGroups: () => Promise<Result<void>>;
+  toggleShowTutorial: () => Promise<Result<void>>;
   handleFavoriteChange: (
     item: Zone | FileSharePath | FolderFavorite,
     type: 'zone' | 'fileSharePath' | 'folder'
@@ -230,6 +232,13 @@ export const PreferencesProvider = ({
     return togglePreference(
       'useLegacyMultichannelApproach',
       preferencesQuery.data?.useLegacyMultichannelApproach || false
+    );
+  };
+
+  const toggleShowTutorial = async (): Promise<Result<void>> => {
+    return togglePreference(
+      'showTutorial',
+      preferencesQuery.data?.showTutorial ?? true
     );
   };
 
@@ -490,6 +499,7 @@ export const PreferencesProvider = ({
     useLegacyMultichannelApproach:
       preferencesQuery.data?.useLegacyMultichannelApproach || false,
     isFilteredByGroups: preferencesQuery.data?.isFilteredByGroups ?? true,
+    showTutorial: preferencesQuery.data?.showTutorial ?? true,
 
     // Favorites
     zoneFavorites: preferencesQuery.data?.zoneFavorites || [],
@@ -515,6 +525,7 @@ export const PreferencesProvider = ({
     toggleDisableHeuristicalLayerTypeDetection,
     toggleUseLegacyMultichannelApproach,
     toggleFilterByGroups,
+    toggleShowTutorial,
     handleFavoriteChange,
     handleContextMenuFavorite
   };

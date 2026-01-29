@@ -18,6 +18,7 @@ from fileglancer.utils import slugify_path
 
 # Constants
 SHARING_KEY_LENGTH = 12
+NEUROGLANCER_SHORT_KEY_LENGTH = 12
 
 # Global flag to track if migrations have been run
 _migrations_run = False
@@ -100,6 +101,20 @@ class ProxiedPathDB(Base):
     __table_args__ = (
         UniqueConstraint('username', 'fsp_name', 'path', name='uq_proxied_path'),
     )
+
+
+class NeuroglancerStateDB(Base):
+    """Database model for storing Neuroglancer states"""
+    __tablename__ = 'neuroglancer_states'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    short_key = Column(String, nullable=False, unique=True, index=True)
+    short_name = Column(String, nullable=True)
+    username = Column(String, nullable=False)
+    url_base = Column(String, nullable=False)
+    state = Column(JSON, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
 
 class TicketDB(Base):
@@ -482,6 +497,49 @@ def _clear_sharing_key_cache():
         logger.debug(f"Cleared entire sharing key cache, removed {old_size} entries")
 
 
+def find_fsp_from_absolute_path(session: Session, absolute_path: str) -> Optional[tuple[FileSharePath, str]]:
+    """
+    Find the file share path that exactly matches the given absolute path.
+
+    This function iterates through all file share paths and checks if the absolute
+    path exists within any of them. Returns the first exact match found.
+
+    Args:
+        session: Database session
+        absolute_path: Absolute file path to match against file shares
+
+    Returns:
+        Tuple of (FileSharePath, relative_subpath) if an exact match is found, None otherwise
+    """
+    # Resolve symlinks in the input path (e.g., /var -> /private/var on macOS)
+    normalized_path = os.path.realpath(absolute_path)
+
+    # Get all file share paths
+    paths = get_file_share_paths(session)
+
+    for fsp in paths:
+        # Expand ~ to user's home directory and resolve symlinks to match Filestore behavior
+        expanded_mount_path = os.path.expanduser(fsp.mount_path)
+        expanded_mount_path = os.path.realpath(expanded_mount_path)
+
+        # Check if the normalized path starts with this mount path
+        if normalized_path.startswith(expanded_mount_path):
+            # Calculate the relative subpath
+            if normalized_path == expanded_mount_path:
+                subpath = ""
+                logger.debug(f"Found exact match for path: {absolute_path} in fsp: {fsp.name} with subpath: {subpath}")
+                return (fsp, subpath)
+            else:
+                # Ensure we're matching on a directory boundary
+                remainder = normalized_path[len(expanded_mount_path):]
+                if remainder.startswith(os.sep):
+                    subpath = remainder.lstrip(os.sep)
+                    logger.debug(f"Found exact match for path: {absolute_path} in fsp: {fsp.name} with subpath: {subpath}")
+                    return (fsp, subpath)
+
+    return None
+
+
 def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
     """Validate a proxied path exists and is accessible"""
     # Get mount path - check database first using existing session, then check local mounts
@@ -569,6 +627,86 @@ def delete_proxied_path(session: Session, username: str, sharing_key: str):
 
     # Remove from cache
     _invalidate_sharing_key_cache(sharing_key)
+
+
+def _generate_unique_neuroglancer_key(session: Session) -> str:
+    """Generate a unique short key for Neuroglancer states."""
+    for _ in range(10):
+        candidate = secrets.token_urlsafe(NEUROGLANCER_SHORT_KEY_LENGTH)
+        exists = session.query(NeuroglancerStateDB).filter_by(short_key=candidate).first()
+        if not exists:
+            return candidate
+    raise RuntimeError("Failed to generate a unique Neuroglancer short key")
+
+
+def create_neuroglancer_state(
+    session: Session,
+    username: str,
+    url_base: str,
+    state: Dict,
+    short_name: Optional[str] = None
+) -> NeuroglancerStateDB:
+    """Create a new Neuroglancer state entry and return it."""
+    short_key = _generate_unique_neuroglancer_key(session)
+    now = datetime.now(UTC)
+    entry = NeuroglancerStateDB(
+        short_key=short_key,
+        short_name=short_name,
+        username=username,
+        url_base=url_base,
+        state=state,
+        created_at=now,
+        updated_at=now
+    )
+    session.add(entry)
+    session.commit()
+    return entry
+
+
+def get_neuroglancer_state(session: Session, short_key: str) -> Optional[NeuroglancerStateDB]:
+    """Get a Neuroglancer state by short key."""
+    return session.query(NeuroglancerStateDB).filter_by(short_key=short_key).first()
+
+
+def get_neuroglancer_states(session: Session, username: str) -> List[NeuroglancerStateDB]:
+    """Get all Neuroglancer states for a user, newest first."""
+    return (
+        session.query(NeuroglancerStateDB)
+        .filter_by(username=username)
+        .order_by(NeuroglancerStateDB.created_at.desc())
+        .all()
+    )
+
+
+def update_neuroglancer_state(
+    session: Session,
+    username: str,
+    short_key: str,
+    url_base: str,
+    state: Dict
+) -> Optional[NeuroglancerStateDB]:
+    """Update a Neuroglancer state entry. Returns the updated entry or None if not found."""
+    entry = session.query(NeuroglancerStateDB).filter_by(
+        short_key=short_key,
+        username=username
+    ).first()
+    if not entry:
+        return None
+    entry.url_base = url_base
+    entry.state = state
+    entry.updated_at = datetime.now(UTC)
+    session.commit()
+    return entry
+
+
+def delete_neuroglancer_state(session: Session, username: str, short_key: str) -> int:
+    """Delete a Neuroglancer state entry. Returns the number of deleted rows."""
+    deleted = session.query(NeuroglancerStateDB).filter_by(
+        short_key=short_key,
+        username=username
+    ).delete()
+    session.commit()
+    return deleted
 
 
 def get_tickets(session: Session, username: str, fsp_name: str = None, path: str = None) -> List[TicketDB]:
