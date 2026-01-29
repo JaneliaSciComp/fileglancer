@@ -47,13 +47,13 @@ export default function GenerateTempKeyDialog({
         Generate SSH Key
       </Typography>
 
-      <Typography className="text-secondary text-sm mb-4">
+      <Typography className="mb-4">
         This will create a new ed25519 SSH key pair and add the public key to
         your authorized_keys file. 
       </Typography>
 
       <div className="mb-6">
-        <Typography className="text-secondary text-sm mb-2">
+        <Typography className="text-foreground font-semibold">
           Passphrase (optional)
         </Typography>
         <Input
@@ -63,16 +63,13 @@ export default function GenerateTempKeyDialog({
           type="password"
           value={passphrase}
         />
-        <Typography className="text-secondary text-xs mt-1">
+        <Typography className="text-muted text-xs ml-1 mt-1">
           A passphrase adds extra security but must be entered each time you use
           the key.
         </Typography>
       </div>
 
-      <div className="flex gap-2 justify-end">
-        <Button onClick={handleClose} type="button" variant="outline">
-          Cancel
-        </Button>
+      <div className="flex gap-2 justify-start">
         <Button
           disabled={generateMutation.isPending}
           onClick={handleGenerate}
@@ -83,6 +80,9 @@ export default function GenerateTempKeyDialog({
           ) : (
             'Generate Key'
           )}
+        </Button>
+        <Button onClick={handleClose} type="button" variant="outline">
+          Cancel
         </Button>
       </div>
     </FgDialog>

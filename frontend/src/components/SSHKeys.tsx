@@ -1,10 +1,6 @@
 import { useState } from 'react';
 import { Button, Card, Typography } from '@material-tailwind/react';
-import {
-  HiOutlinePlus,
-  HiOutlineKey,
-  HiOutlineInformationCircle
-} from 'react-icons/hi';
+import { HiOutlinePlus, HiOutlineKey } from 'react-icons/hi';
 
 import { useSSHKeysQuery } from '@/queries/sshKeyQueries';
 import type { TempKeyResult } from '@/queries/sshKeyQueries';
@@ -31,17 +27,13 @@ export default function SSHKeys() {
         </Typography>
       </div>
 
-      <Card className="mb-6 p-4 bg-info/10 border border-info/20">
-        <div className="flex gap-3">
-          <HiOutlineInformationCircle className="icon-large text-info flex-shrink-0" />
-          <Typography className="text-secondary text-sm">
-            This page allows you to generate keys for use with Seqera Platform, and shows any keys you have already generated.
-            Generated keys are tagged with 'fileglancer' and added to your <code>~/.ssh/authorized_keys</code> file.
-            This interface does not allow you to remove keys from your <code>authorized_keys</code> file, 
-            but you can do so manually.
-          </Typography>
-        </div>
-      </Card>
+      <Typography className="text-secondary mb-6">
+        This page allows you to generate keys for use with Seqera Platform, and
+        shows any keys you have already generated. Generated keys are tagged
+        with 'fileglancer' and added to your <code>~/.ssh/authorized_keys</code>{' '}
+        file. This interface does not allow you to remove keys from your{' '}
+        <code>authorized_keys</code> file, but you can do so manually.
+      </Typography>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">

@@ -248,13 +248,13 @@ export default function NGLinkDialog({
 
   return (
     <FgDialog onClose={resetAndClose} open={open}>
-      <div className="mt-8 flex flex-col gap-2">
-        <Typography className="text-foreground font-semibold" type="h6">
-          {isEditMode
-            ? 'Edit Neuroglancer Short Link'
-            : 'Create Neuroglancer Short Link'}
-        </Typography>
+      <Typography className="text-foreground font-semibold text-lg mb-4">
+        {isEditMode
+          ? 'Edit Neuroglancer Short Link'
+          : 'Create Neuroglancer Short Link'}
+      </Typography>
 
+      <div className="flex flex-col gap-2">
         {/* Mode Selector */}
         <div className="mb-4 flex gap-4">
           <label className="flex items-center gap-2 cursor-pointer">
