@@ -448,15 +448,16 @@ class TestTempKeyResponse:
             comment="fileglancer",
         )
 
-        with tempfile.NamedTemporaryFile(delete=False) as f1, \
-             tempfile.NamedTemporaryFile(delete=False) as f2:
+        temp_dir = tempfile.mkdtemp()
+        with tempfile.NamedTemporaryFile(delete=False, dir=temp_dir) as f1, \
+             tempfile.NamedTemporaryFile(delete=False, dir=temp_dir) as f2:
             f1.write(b"private")
             f2.write(b"public")
             temp_key = f1.name
             temp_pub = f2.name
 
         try:
-            response = TempKeyResponse(key_content, temp_key, temp_pub, key_info)
+            response = TempKeyResponse(key_content, temp_key, temp_pub, temp_dir, key_info)
 
             sent_messages = []
 
