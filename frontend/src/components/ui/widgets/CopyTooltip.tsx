@@ -7,12 +7,14 @@ export default function CopyTooltip({
   children,
   primaryLabel,
   textToCopy,
-  tooltipTriggerClasses
+  tooltipTriggerClasses,
+  variant = 'ghost'
 }: {
   readonly children: React.ReactNode;
   readonly primaryLabel: string;
   readonly textToCopy: string;
   readonly tooltipTriggerClasses?: string;
+  readonly variant?: 'outline' | 'ghost';
 }) {
   const { showCopiedTooltip, handleCopy } = useCopyTooltip();
 
@@ -25,7 +27,7 @@ export default function CopyTooltip({
       }}
       openCondition={showCopiedTooltip ? true : undefined}
       triggerClasses={tooltipTriggerClasses}
-      variant="ghost"
+      variant={variant}
     >
       {children}
     </FgTooltip>
