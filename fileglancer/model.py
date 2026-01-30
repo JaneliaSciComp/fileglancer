@@ -303,3 +303,41 @@ class NeuroglancerShortLinkResponse(BaseModel):
     links: List[NeuroglancerShortLink] = Field(
         description="A list of stored Neuroglancer short links"
     )
+
+
+class OZXFileEntry(BaseModel):
+    """A file entry within an OZX archive"""
+    filename: str = Field(
+        description="The path of the file within the OZX archive"
+    )
+    compressed_size: int = Field(
+        description="The compressed size of the file in bytes"
+    )
+    uncompressed_size: int = Field(
+        description="The uncompressed size of the file in bytes"
+    )
+    compression_method: int = Field(
+        description="The compression method (0=STORE, 8=DEFLATE)"
+    )
+    is_directory: bool = Field(
+        description="Whether this entry is a directory"
+    )
+
+
+class OZXMetadataResponse(BaseModel):
+    """Metadata about an OZX archive"""
+    version: Optional[str] = Field(
+        description="The OME version from the ZIP comment",
+        default=None
+    )
+    json_first: bool = Field(
+        description="Whether JSON files are sorted first in the central directory",
+        default=False
+    )
+    file_count: int = Field(
+        description="Number of files in the archive"
+    )
+    is_zip64: bool = Field(
+        description="Whether the archive uses ZIP64 format",
+        default=False
+    )
