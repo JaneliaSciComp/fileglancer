@@ -34,6 +34,7 @@ from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, dele
 from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header
 from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext, UserContextConfigurationError
 from fileglancer.filestore import Filestore, RootCheckError
+from fileglancer.ozxzip import OZXReader, OZXReaderError, InvalidZipError, is_ozx_file, is_zip_file
 from fileglancer.log import AccessLogMiddleware
 from fileglancer import sshkeys
 
@@ -1253,6 +1254,342 @@ def create_app(settings):
                 headers=headers,
                 media_type=content_type
             )
+
+
+    @app.head("/api/zip-content/{path_name:path}")
+    async def head_zip_file_content(
+        path_name: str,
+        subpath: str = Query(..., description="Path within the ZIP file"),
+        username: str = Depends(get_current_user)
+    ):
+        """HEAD request for ZIP file content (returns size, supports Range)."""
+
+        filestore_name, _, zip_subpath = path_name.partition('/')
+
+        with _get_user_context(username):
+            filestore, error = _get_filestore(filestore_name)
+            if filestore is None:
+                raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
+
+            try:
+                zip_file_path = filestore._check_path_in_root(zip_subpath)
+            except RootCheckError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+
+            if not is_zip_file(zip_file_path):
+                raise HTTPException(status_code=400, detail="Not a ZIP file")
+
+            try:
+                reader = OZXReader(zip_file_path)
+                reader.open()
+            except FileNotFoundError:
+                raise HTTPException(status_code=404, detail="ZIP file not found")
+            except (InvalidZipError, OZXReaderError) as e:
+                raise HTTPException(status_code=400, detail=f"Invalid ZIP file: {e}")
+
+        # Parse central directory and get entry (outside user context)
+        try:
+            reader.parse_central_directory()
+            entry = reader.get_entry(subpath)
+            if entry is None:
+                reader.close()
+                raise HTTPException(status_code=404, detail="File not found in ZIP archive")
+
+            file_size = entry.uncompressed_size
+            content_type = guess_content_type(subpath)
+            file_name = subpath.split('/')[-1] if subpath else ''
+
+            headers = {
+                'Accept-Ranges': 'bytes',
+                'Content-Length': str(file_size),
+            }
+
+            if content_type == 'application/octet-stream' and file_name:
+                headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+
+            reader.close()
+            return Response(status_code=200, headers=headers, media_type=content_type)
+
+        except Exception as e:
+            reader.close()
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+    @app.get("/api/zip-content/{path_name:path}")
+    async def get_zip_file_content(
+        request: Request,
+        path_name: str,
+        subpath: str = Query(..., description="Path within the ZIP file"),
+        username: str = Depends(get_current_user)
+    ):
+        """
+        Stream file content from within a ZIP archive.
+        Supports HTTP Range requests for efficient chunk access.
+        """
+
+        filestore_name, _, zip_subpath = path_name.partition('/')
+
+        with _get_user_context(username):
+            filestore, error = _get_filestore(filestore_name)
+            if filestore is None:
+                raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
+
+            try:
+                zip_file_path = filestore._check_path_in_root(zip_subpath)
+            except RootCheckError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+
+            if not is_zip_file(zip_file_path):
+                raise HTTPException(status_code=400, detail="Not a ZIP file")
+
+            try:
+                reader = OZXReader(zip_file_path)
+                reader.open()
+            except FileNotFoundError:
+                raise HTTPException(status_code=404, detail="ZIP file not found")
+            except (InvalidZipError, OZXReaderError) as e:
+                raise HTTPException(status_code=400, detail=f"Invalid ZIP file: {e}")
+
+        # Parse central directory and get entry (outside user context)
+        # The file handle retains access rights
+        try:
+            reader.parse_central_directory()
+            entry = reader.get_entry(subpath)
+            if entry is None:
+                reader.close()
+                raise HTTPException(status_code=404, detail="File not found in ZIP archive")
+
+            content_type = guess_content_type(subpath)
+            file_size = entry.uncompressed_size
+            file_name = subpath.split('/')[-1] if subpath else ''
+            range_header = request.headers.get('Range')
+
+            if range_header:
+                # Handle Range request (HTTP 206)
+                range_result = parse_range_header(range_header, file_size)
+                if range_result is None:
+                    reader.close()
+                    return Response(status_code=416, headers={'Content-Range': f'bytes */{file_size}'})
+
+                start, end = range_result
+
+                async def stream_range():
+                    try:
+                        for chunk in reader.stream_file_range(subpath, start, end):
+                            yield chunk
+                    finally:
+                        reader.close()
+
+                headers = {
+                    'Accept-Ranges': 'bytes',
+                    'Content-Length': str(end - start + 1),
+                    'Content-Range': f'bytes {start}-{end}/{file_size}',
+                }
+
+                if content_type == 'application/octet-stream' and file_name:
+                    headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+
+                return StreamingResponse(
+                    stream_range(),
+                    status_code=206,
+                    headers=headers,
+                    media_type=content_type
+                )
+            else:
+                # Full file (HTTP 200)
+                async def stream_full():
+                    try:
+                        for chunk in reader.stream_file(subpath):
+                            yield chunk
+                    finally:
+                        reader.close()
+
+                headers = {
+                    'Accept-Ranges': 'bytes',
+                    'Content-Length': str(file_size),
+                }
+
+                if content_type == 'application/octet-stream' and file_name:
+                    headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+
+                return StreamingResponse(
+                    stream_full(),
+                    status_code=200,
+                    headers=headers,
+                    media_type=content_type
+                )
+
+        except FileNotFoundError:
+            reader.close()
+            raise HTTPException(status_code=404, detail="File not found in ZIP archive")
+        except Exception as e:
+            reader.close()
+            logger.exception(f"Error reading ZIP content: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+    @app.get("/api/ozx-metadata/{path_name:path}")
+    async def get_ozx_metadata(
+        path_name: str,
+        username: str = Depends(get_current_user)
+    ):
+        """
+        Get metadata about an OZX archive.
+        Returns OME version, jsonFirst flag, file count, and ZIP64 status.
+        """
+
+        filestore_name, _, ozx_subpath = path_name.partition('/')
+
+        with _get_user_context(username):
+            filestore, error = _get_filestore(filestore_name)
+            if filestore is None:
+                raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
+
+            try:
+                ozx_file_path = filestore._check_path_in_root(ozx_subpath)
+            except RootCheckError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+
+            if not is_zip_file(ozx_file_path):
+                raise HTTPException(status_code=400, detail="Not an OZX file")
+
+            try:
+                reader = OZXReader(ozx_file_path)
+                reader.open()
+            except FileNotFoundError:
+                raise HTTPException(status_code=404, detail="OZX file not found")
+            except (InvalidZipError, OZXReaderError) as e:
+                raise HTTPException(status_code=400, detail=f"Invalid OZX file: {e}")
+
+        # Get metadata outside user context
+        try:
+            metadata = reader.get_metadata()
+            entries = reader.parse_central_directory(json_only=metadata.json_first if metadata else False)
+
+            result = {
+                "version": metadata.version if metadata else None,
+                "json_first": metadata.json_first if metadata else False,
+                "file_count": len(entries),
+                "is_zip64": reader.is_zip64
+            }
+
+            reader.close()
+            return result
+
+        except Exception as e:
+            reader.close()
+            logger.exception(f"Error reading OZX metadata: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+    @app.get("/api/zip-list/{path_name:path}")
+    async def list_zip_files(
+        path_name: str,
+        prefix: str = Query('', description="Filter files by prefix"),
+        details: bool = Query(False, description="Include file details (size, compression)"),
+        offset: int = Query(0, ge=0, description="Number of entries to skip"),
+        limit: int = Query(100, ge=1, le=1000, description="Maximum entries to return"),
+        username: str = Depends(get_current_user)
+    ):
+        """
+        List files in a ZIP archive with pagination support.
+        Optionally filter by path prefix.
+        If details=True, returns full file entry information including size.
+
+        Pagination:
+        - offset: Number of entries to skip (default 0)
+        - limit: Maximum entries to return (default 100, max 1000)
+
+        Response includes:
+        - total_count: Total number of entries in the archive
+        - offset: Current offset
+        - limit: Current limit
+        - has_more: Whether more entries exist beyond this page
+        """
+
+        filestore_name, _, zip_subpath = path_name.partition('/')
+
+        with _get_user_context(username):
+            filestore, error = _get_filestore(filestore_name)
+            if filestore is None:
+                raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
+
+            try:
+                zip_file_path = filestore._check_path_in_root(zip_subpath)
+            except RootCheckError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+
+            if not is_zip_file(zip_file_path):
+                raise HTTPException(status_code=400, detail="Not a ZIP file")
+
+            try:
+                reader = OZXReader(zip_file_path)
+                reader.open()
+            except FileNotFoundError:
+                raise HTTPException(status_code=404, detail="ZIP file not found")
+            except (InvalidZipError, OZXReaderError) as e:
+                raise HTTPException(status_code=400, detail=f"Invalid ZIP file: {e}")
+
+        # List files outside user context
+        try:
+            # Get total count from central directory metadata (available after open)
+            total_count = reader.cd_entries_count
+
+            # Parse entries up to offset + limit
+            reader.parse_central_directory(max_new_entries=offset + limit)
+
+            # Get all parsed entries as a list (preserves CD order)
+            all_entries = list(reader.entries.values())
+
+            # Apply offset and limit
+            paginated_entries = all_entries[offset:offset + limit]
+
+            # Calculate has_more
+            has_more = offset + limit < total_count
+
+            if details:
+                # Apply prefix filter if specified
+                if prefix:
+                    paginated_entries = [e for e in paginated_entries if e.filename.startswith(prefix)]
+
+                # Return full file entry details with pagination info
+                entries = []
+                for entry in paginated_entries:
+                    entries.append({
+                        "filename": entry.filename,
+                        "compressed_size": entry.compressed_size,
+                        "uncompressed_size": entry.uncompressed_size,
+                        "compression_method": entry.compression_method,
+                        "is_directory": entry.is_directory
+                    })
+                reader.close()
+                return {
+                    "entries": entries,
+                    "total_count": total_count,
+                    "offset": offset,
+                    "limit": limit,
+                    "has_more": has_more
+                }
+            else:
+                # Apply prefix filter if specified
+                if prefix:
+                    paginated_entries = [e for e in paginated_entries if e.filename.startswith(prefix)]
+
+                # Return just filenames with pagination info
+                files = [e.filename for e in paginated_entries if not e.is_directory]
+                reader.close()
+                return {
+                    "files": files,
+                    "total_count": total_count,
+                    "offset": offset,
+                    "limit": limit,
+                    "has_more": has_more
+                }
+
+        except Exception as e:
+            reader.close()
+            logger.exception(f"Error listing ZIP files: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
 
 
     @app.get("/api/files/{path_name}")
