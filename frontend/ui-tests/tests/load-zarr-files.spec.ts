@@ -33,9 +33,9 @@ test.describe('Zarr File Type Representation', () => {
     await expect(page.getByText('zarr.json')).toBeVisible({ timeout: 10000 });
 
     await expect(
-      page.getByRole('link', { name: 'Neuroglancer logo' })
+      page.getByRole('img', { name: /neuroglancer logo/i })
     ).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('link', { name: 'Vol-E logo' })).toHaveCount(0);
+    await expect(page.getByRole('img', { name: /vole logo/i })).toHaveCount(0);
   });
 
   test('Zarr V3 OME-Zarr should show all viewers except avivator', async ({
@@ -52,13 +52,13 @@ test.describe('Zarr File Type Representation', () => {
     await expect(page.getByText('zarr.json')).toBeVisible({ timeout: 10000 });
 
     await expect(
-      page.getByRole('link', { name: 'Neuroglancer logo' })
+      page.getByRole('img', { name: /neuroglancer logo/i })
     ).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('link', { name: 'Vol-E logo' })).toBeVisible();
+    await expect(page.getByRole('img', { name: /vole logo/i })).toBeVisible();
     await expect(
-      page.getByRole('link', { name: 'OME-Zarr Validator logo' })
+      page.getByRole('img', { name: /validator logo/i })
     ).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Avivator logo' })).toHaveCount(
+    await expect(page.getByRole('img', { name: /avivator logo/i })).toHaveCount(
       0
     );
   });
@@ -77,9 +77,9 @@ test.describe('Zarr File Type Representation', () => {
     await expect(page.getByText('.zarray')).toBeVisible({ timeout: 10000 });
 
     await expect(
-      page.getByRole('link', { name: 'Neuroglancer logo' })
+      page.getByRole('img', { name: /neuroglancer logo/i })
     ).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('link', { name: 'Vol-E logo' })).toHaveCount(0);
+    await expect(page.getByRole('img', { name: /vole logo/i })).toHaveCount(0);
   });
 
   test('Zarr V2 OME-Zarr should display all viewers including avivator', async ({
@@ -96,14 +96,14 @@ test.describe('Zarr File Type Representation', () => {
     await expect(page.getByText('.zattrs')).toBeVisible({ timeout: 10000 });
 
     await expect(
-      page.getByRole('link', { name: 'Neuroglancer logo' })
+      page.getByRole('img', { name: /neuroglancer logo/i })
     ).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('link', { name: 'Vol-E logo' })).toBeVisible();
+    await expect(page.getByRole('img', { name: /vole logo/i })).toBeVisible();
     await expect(
-      page.getByRole('link', { name: 'OME-Zarr Validator logo' })
+      page.getByRole('img', { name: /validator logo/i })
     ).toBeVisible();
     await expect(
-      page.getByRole('link', { name: 'Avivator logo' })
+      page.getByRole('img', { name: /avivator logo/i })
     ).toBeVisible();
   });
 
