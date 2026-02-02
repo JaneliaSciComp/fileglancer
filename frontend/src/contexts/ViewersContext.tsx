@@ -110,6 +110,9 @@ export function ViewersProvider({ children }: { children: ReactNode }) {
           );
         } catch (manifestError) {
           log.warn('Failed to load capability manifests:', manifestError);
+          log.warn(
+            'Continuing without capability manifests. Only custom viewers with explicit configuration will be available.'
+          );
         }
 
         const viewersWithManifests = loadedManifests.map(m => m.viewer.name);
@@ -188,7 +191,11 @@ export function ViewersProvider({ children }: { children: ReactNode }) {
         const errorMessage =
           err instanceof Error ? err.message : 'Unknown error';
         log.error('Failed to initialize viewers:', errorMessage);
+        log.error(
+          'Application will continue with no viewers available. Check viewers.config.yaml for errors.'
+        );
         setError(errorMessage);
+        setValidViewers([]); // Ensure empty viewer list on error
         setIsInitialized(true); // Still mark as initialized to prevent hanging
       }
     }
