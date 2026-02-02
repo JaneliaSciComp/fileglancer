@@ -169,6 +169,20 @@ Key settings:
 - `db_url`: Database connection string
 - SSL certificates for HTTPS mode
 
+## Viewers Configuration
+
+Fileglancer supports dynamic viewer configuration through `viewers.config.yaml`.
+
+- **Configuration file**: `frontend/src/config/viewers.config.yaml`
+- **Documentation**: See `docs/ViewersConfiguration.md`
+
+To customize viewers:
+
+1. Edit `frontend/src/config/viewers.config.yaml`
+2. Rebuild application: `pixi run node-build`
+
+The default configuration includes Neuroglancer, Avivator, OME-Zarr Validator, and Vol-E viewers. The config file is bundled at build time.
+
 ## Pixi Environments
 
 - `default`: Standard development
