@@ -43,16 +43,16 @@ By default, Fileglancer provides access to each user's home directory without re
 
 ```yaml
 file_share_mounts:
-  - "~/"    # User's home directory (default)
+  - "~/" # User's home directory (default)
 ```
 
 You can add additional file share paths by editing your `config.yaml`:
 
 ```yaml
 file_share_mounts:
-  - "~/"                              # User's home directory
-  - "/groups/scicomp/data"            # Shared data directory
-  - "/opt/data"                       # Another shared directory
+  - "~/" # User's home directory
+  - "/groups/scicomp/data" # Shared data directory
+  - "/opt/data" # Another shared directory
 ```
 
 **How Home Directories Work:**
@@ -79,6 +79,25 @@ Fileglancer supports dynamic configuration of OME-Zarr viewers through `viewers.
 **Note:** The configuration file is bundled at build time, so changes require rebuilding the application. The default configuration includes Neuroglancer, Avivator, OME-Zarr Validator, and Vol-E viewers.
 
 For detailed configuration options, examples, and documentation on adding custom viewers, see [ViewersConfiguration.md](ViewersConfiguration.md).
+
+### Feature Flags
+
+Optional features can be enabled via Vite environment variables. Create or edit `frontend/.env`:
+
+```bash
+# Enable background tasks/jobs feature
+VITE_ENABLE_TASKS=true
+
+# Enable SSH key management feature
+VITE_ENABLE_SSH_KEYS=true
+```
+
+After changing `.env`, rebuild the frontend and restart the dev server:
+
+```bash
+pixi run node-build
+pixi run dev-launch
+```
 
 ### Running with SSL/HTTPS (Secure Mode)
 
