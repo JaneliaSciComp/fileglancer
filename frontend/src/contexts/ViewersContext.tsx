@@ -65,6 +65,7 @@ async function loadViewersConfig(
     log.info(
       'Using custom viewers configuration from src/config/viewers.config.yaml'
     );
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {
     log.info(
       'No custom viewers.config.yaml found, using default configuration (neuroglancer only)'
@@ -89,11 +90,14 @@ function normalizeViewerName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-export function ViewersProvider({ children }: { children: ReactNode }) {
+export function ViewersProvider({
+  children
+}: {
+  readonly children: ReactNode;
+}) {
   const [validViewers, setValidViewers] = useState<ValidViewer[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [manifests, setManifests] = useState<ViewerManifest[]>([]);
 
   useEffect(() => {
     async function initialize() {
@@ -104,7 +108,6 @@ export function ViewersProvider({ children }: { children: ReactNode }) {
         let loadedManifests: ViewerManifest[] = [];
         try {
           loadedManifests = await initializeViewerManifests();
-          setManifests(loadedManifests);
           log.info(
             `Loaded ${loadedManifests.length} viewer capability manifests`
           );
