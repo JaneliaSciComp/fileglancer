@@ -3,6 +3,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useCallback,
   type ReactNode
 } from 'react';
 import {
@@ -195,35 +196,39 @@ export function ViewersProvider({ children }: { children: ReactNode }) {
     initialize();
   }, []);
 
-  const getCompatibleViewers = (metadata: OmeZarrMetadata): ValidViewer[] => {
-    if (!isInitialized || !metadata) {
-      return [];
-    }
-
-    return validViewers.filter(viewer => {
-      if (viewer.manifest) {
-        const compatibleNames = getCompatibleViewersFromManifest(metadata);
-        return compatibleNames.includes(viewer.manifest.viewer.name);
-      } else {
-        // Manual version check for viewers without manifests
-        // Custom viewers require both correct ome-zarr version AND OME metadata (multiscales)
-        const zarrVersion = metadata.version
-          ? parseFloat(metadata.version)
-          : null;
-        if (zarrVersion === null || !viewer.supportedVersions) {
-          return false;
-        }
-
-        // Check if dataset has OME metadata (multiscales array)
-        const hasOmeMetadata = metadata.multiscales && metadata.multiscales.length > 0;
-        if (!hasOmeMetadata) {
-          return false;
-        }
-
-        return viewer.supportedVersions.includes(zarrVersion);
+  const getCompatibleViewers = useCallback(
+    (metadata: OmeZarrMetadata): ValidViewer[] => {
+      if (!isInitialized || !metadata) {
+        return [];
       }
-    });
-  };
+
+      return validViewers.filter(viewer => {
+        if (viewer.manifest) {
+          const compatibleNames = getCompatibleViewersFromManifest(metadata);
+          return compatibleNames.includes(viewer.manifest.viewer.name);
+        } else {
+          // Manual version check for viewers without manifests
+          // Custom viewers require both correct ome-zarr version AND OME metadata (multiscales)
+          const zarrVersion = metadata.version
+            ? parseFloat(metadata.version)
+            : null;
+          if (zarrVersion === null || !viewer.supportedVersions) {
+            return false;
+          }
+
+          // Check if dataset has OME metadata (multiscales array)
+          const hasOmeMetadata =
+            metadata.multiscales && metadata.multiscales.length > 0;
+          if (!hasOmeMetadata) {
+            return false;
+          }
+
+          return viewer.supportedVersions.includes(zarrVersion);
+        }
+      });
+    },
+    [validViewers, isInitialized]
+  );
 
   return (
     <ViewersContext.Provider
