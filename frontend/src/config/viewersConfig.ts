@@ -19,6 +19,11 @@ export interface ViewersConfigYaml {
 }
 
 /**
+ * Valid OME-Zarr versions supported by the application
+ */
+const VALID_OME_ZARR_VERSIONS = [0.4, 0.5];
+
+/**
  * Parse and validate viewers configuration YAML
  * @param yamlContent - The YAML content to parse
  * @param viewersWithManifests - Array of viewer names that have capability manifests (from initializeViewerManifests)
@@ -103,6 +108,20 @@ export function parseViewersConfig(
       throw new Error(
         `Viewer "${v.name}": "ome_zarr_versions" must be an array`
       );
+    }
+
+    // Validate ome_zarr_versions values if present
+    if (
+      v.ome_zarr_versions !== undefined &&
+      Array.isArray(v.ome_zarr_versions)
+    ) {
+      for (const version of v.ome_zarr_versions) {
+        if (!VALID_OME_ZARR_VERSIONS.includes(version)) {
+          throw new Error(
+            `Viewer "${v.name}": invalid ome_zarr_version "${version}". Valid versions are: ${VALID_OME_ZARR_VERSIONS.join(', ')}`
+          );
+        }
+      }
     }
   }
 
