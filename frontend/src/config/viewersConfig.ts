@@ -1,4 +1,4 @@
-import yaml from "js-yaml";
+import yaml from 'js-yaml';
 
 /**
  * Viewer entry from viewers.config.yaml
@@ -25,7 +25,7 @@ export interface ViewersConfigYaml {
  */
 export function parseViewersConfig(
   yamlContent: string,
-  viewersWithManifests: string[] = [],
+  viewersWithManifests: string[] = []
 ): ViewersConfigYaml {
   let parsed: unknown;
 
@@ -33,12 +33,12 @@ export function parseViewersConfig(
     parsed = yaml.load(yamlContent);
   } catch (error) {
     throw new Error(
-      `Failed to parse viewers configuration YAML: ${error instanceof Error ? error.message : "Unknown error"}`,
+      `Failed to parse viewers configuration YAML: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
   }
 
-  if (!parsed || typeof parsed !== "object") {
-    throw new Error("Configuration must be an object");
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('Configuration must be an object');
   }
 
   const config = parsed as Record<string, unknown>;
@@ -48,32 +48,32 @@ export function parseViewersConfig(
   }
 
   // Normalize viewer names for comparison (case-insensitive)
-  const normalizedManifestViewers = viewersWithManifests.map((name) =>
-    name.toLowerCase(),
+  const normalizedManifestViewers = viewersWithManifests.map(name =>
+    name.toLowerCase()
   );
 
   // Validate each viewer entry
   for (const viewer of config.viewers) {
-    if (!viewer || typeof viewer !== "object") {
-      throw new Error("Each viewer must be an object");
+    if (!viewer || typeof viewer !== 'object') {
+      throw new Error('Each viewer must be an object');
     }
 
     const v = viewer as Record<string, unknown>;
 
-    if (typeof v.name !== "string") {
+    if (typeof v.name !== 'string') {
       throw new Error('Each viewer must have a "name" field (string)');
     }
 
     // Check if this viewer has a capability manifest
     const hasManifest = normalizedManifestViewers.includes(
-      v.name.toLowerCase(),
+      v.name.toLowerCase()
     );
 
     // If this viewer doesn't have a capability manifest, require additional fields
     if (!hasManifest) {
-      if (typeof v.url !== "string") {
+      if (typeof v.url !== 'string') {
         throw new Error(
-          `Viewer "${v.name}" does not have a capability manifest and must specify "url"`,
+          `Viewer "${v.name}" does not have a capability manifest and must specify "url"`
         );
       }
       if (
@@ -81,19 +81,19 @@ export function parseViewersConfig(
         v.ome_zarr_versions.length === 0
       ) {
         throw new Error(
-          `Viewer "${v.name}" does not have a capability manifest and must specify "ome_zarr_versions" (array of numbers)`,
+          `Viewer "${v.name}" does not have a capability manifest and must specify "ome_zarr_versions" (array of numbers)`
         );
       }
     }
 
     // Validate optional fields if present
-    if (v.url !== undefined && typeof v.url !== "string") {
+    if (v.url !== undefined && typeof v.url !== 'string') {
       throw new Error(`Viewer "${v.name}": "url" must be a string`);
     }
-    if (v.label !== undefined && typeof v.label !== "string") {
+    if (v.label !== undefined && typeof v.label !== 'string') {
       throw new Error(`Viewer "${v.name}": "label" must be a string`);
     }
-    if (v.logo !== undefined && typeof v.logo !== "string") {
+    if (v.logo !== undefined && typeof v.logo !== 'string') {
       throw new Error(`Viewer "${v.name}": "logo" must be a string`);
     }
     if (
@@ -101,10 +101,13 @@ export function parseViewersConfig(
       !Array.isArray(v.ome_zarr_versions)
     ) {
       throw new Error(
-        `Viewer "${v.name}": "ome_zarr_versions" must be an array`,
+        `Viewer "${v.name}": "ome_zarr_versions" must be an array`
       );
     }
   }
 
+  // Type assertion is safe here because we've performed comprehensive runtime validation above.
+  // TypeScript sees 'config' as Record<string, unknown> but our validation ensures it matches
+  // ViewersConfigYaml structure. The intermediate 'unknown' cast is required for type compatibility.
   return config as unknown as ViewersConfigYaml;
 }
