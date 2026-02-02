@@ -4,6 +4,7 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
 import { useExternalBucketContext } from '@/contexts/ExternalBucketContext';
+import { useViewersContext } from '@/contexts/ViewersContext';
 import {
   useZarrMetadataQuery,
   useOmeZarrThumbnailQuery
@@ -31,6 +32,11 @@ export default function useZarrMetadata() {
     disableHeuristicalLayerTypeDetection,
     useLegacyMultichannelApproach
   } = usePreferencesContext();
+  const {
+    validViewers,
+    isInitialized: viewersInitialized,
+    getCompatibleViewers
+  } = useViewersContext();
 
   // Fetch Zarr metadata
   const zarrMetadataQuery = useZarrMetadataQuery({
@@ -88,103 +94,116 @@ export default function useZarrMetadata() {
   }, [thumbnailSrc, disableHeuristicalLayerTypeDetection]);
 
   const openWithToolUrls = useMemo(() => {
-    if (!metadata) {
+    if (!metadata || !viewersInitialized) {
       return null;
     }
-    const validatorBaseUrl = 'https://ome.github.io/ome-ngff-validator/';
-    const neuroglancerBaseUrl = 'https://neuroglancer-demo.appspot.com/#!';
-    const voleBaseUrl = 'https://volumeviewer.allencell.org/viewer';
-    const avivatorBaseUrl = 'https://janeliascicomp.github.io/viv/';
 
     const url =
       externalDataUrlQuery.data || proxiedPathByFspAndPathQuery.data?.url;
+
     const openWithToolUrls = {
       copy: url || ''
     } as OpenWithToolUrls;
 
-    // Determine which tools should be available based on metadata type
-    if (metadata?.multiscale) {
-      // OME-Zarr - all urls for v2; no avivator for v3
-      if (url) {
-        if (effectiveZarrVersion === 2) {
-          openWithToolUrls.avivator = buildUrl(avivatorBaseUrl, null, {
-            image_url: url
-          });
-        } else {
-          openWithToolUrls.avivator = null;
-        }
-        // Populate with actual URLs when proxied path is available
-        openWithToolUrls.validator = buildUrl(validatorBaseUrl, null, {
-          source: url
-        });
-        openWithToolUrls.vole = buildUrl(voleBaseUrl, null, {
-          url
-        });
-        if (disableNeuroglancerStateGeneration) {
-          openWithToolUrls.neuroglancer =
-            neuroglancerBaseUrl +
-            generateNeuroglancerStateForDataURL(url, effectiveZarrVersion);
-        } else if (layerType) {
-          try {
-            openWithToolUrls.neuroglancer =
-              neuroglancerBaseUrl +
-              generateNeuroglancerStateForOmeZarr(
-                url,
-                effectiveZarrVersion,
-                layerType,
-                metadata.multiscale,
-                metadata.arr,
-                metadata.labels,
-                metadata.omero,
-                useLegacyMultichannelApproach
-              );
-          } catch (error) {
-            log.error(
-              'Error generating Neuroglancer state for OME-Zarr:',
-              error
-            );
-            openWithToolUrls.neuroglancer =
+    // Get compatible viewers for this dataset
+    let compatibleViewers = validViewers;
+
+    // If we have metadata, use capability checking to filter
+    if (metadata) {
+      // Convert our metadata to OmeZarrMetadata format for capability checking
+      const omeZarrMetadata = {
+        version: effectiveZarrVersion === 3 ? '0.5' : '0.4',
+        axes: metadata.multiscale?.axes,
+        multiscales: metadata.multiscale ? [metadata.multiscale] : undefined,
+        omero: metadata.omero,
+        labels: metadata.labels
+      } as any; // Type assertion needed due to internal type differences
+
+      compatibleViewers = getCompatibleViewers(omeZarrMetadata);
+    }
+
+    // Create a Set for lookup of compatible viewer keys
+    // Needed to mark incompatible but valid (as defined by the viewer config) viewers as null in openWithToolUrls
+    const compatibleKeys = new Set(compatibleViewers.map(v => v.key));
+
+    for (const viewer of validViewers) {
+      if (!compatibleKeys.has(viewer.key)) {
+        openWithToolUrls[viewer.key] = null;
+      }
+    }
+
+    // For compatible viewers, generate URLs
+    for (const viewer of compatibleViewers) {
+      if (!url) {
+        // Compatible but no data URL yet - show as available (empty string)
+        openWithToolUrls[viewer.key] = '';
+        continue;
+      }
+
+      // Generate the viewer URL
+      let viewerUrl = viewer.urlTemplate;
+
+      // Special handling for Neuroglancer to maintain existing state generation logic
+      if (viewer.key === 'neuroglancer') {
+        const neuroglancerBaseUrl = viewer.urlTemplate;
+
+        if (metadata?.multiscale) {
+          // OME-Zarr with multiscales
+          if (disableNeuroglancerStateGeneration) {
+            viewerUrl =
               neuroglancerBaseUrl +
               generateNeuroglancerStateForDataURL(url, effectiveZarrVersion);
+          } else if (layerType) {
+            try {
+              viewerUrl =
+                neuroglancerBaseUrl +
+                generateNeuroglancerStateForOmeZarr(
+                  url,
+                  effectiveZarrVersion,
+                  layerType,
+                  metadata.multiscale,
+                  metadata.arr,
+                  metadata.labels,
+                  metadata.omero,
+                  useLegacyMultichannelApproach
+                );
+            } catch (error) {
+              log.error(
+                'Error generating Neuroglancer state for OME-Zarr:',
+                error
+              );
+              viewerUrl =
+                neuroglancerBaseUrl +
+                generateNeuroglancerStateForDataURL(url, effectiveZarrVersion);
+            }
+          }
+        } else {
+          // Non-OME Zarr array
+          if (disableNeuroglancerStateGeneration) {
+            viewerUrl =
+              neuroglancerBaseUrl +
+              generateNeuroglancerStateForDataURL(url, effectiveZarrVersion);
+          } else if (layerType) {
+            viewerUrl =
+              neuroglancerBaseUrl +
+              generateNeuroglancerStateForZarrArray(
+                url,
+                effectiveZarrVersion,
+                layerType
+              );
           }
         }
       } else {
-        // No proxied URL - show all tools as available but empty
-        openWithToolUrls.validator = '';
-        openWithToolUrls.vole = '';
-        // if this is a zarr version 2, then set the url to blank which will show
-        // the icon before a data link has been generated. Setting it to null for
-        // all other versions, eg zarr v3 means the icon will not be present before
-        // a data link is generated.
-        openWithToolUrls.avivator = effectiveZarrVersion === 2 ? '' : null;
-        openWithToolUrls.neuroglancer = '';
-      }
-    } else {
-      // Non-OME Zarr - only Neuroglancer available
-      if (url) {
-        openWithToolUrls.validator = null;
-        openWithToolUrls.vole = null;
-        openWithToolUrls.avivator = null;
-        if (disableNeuroglancerStateGeneration) {
-          openWithToolUrls.neuroglancer =
-            neuroglancerBaseUrl +
-            generateNeuroglancerStateForDataURL(url, effectiveZarrVersion);
-        } else if (layerType) {
-          openWithToolUrls.neuroglancer =
-            neuroglancerBaseUrl +
-            generateNeuroglancerStateForZarrArray(
-              url,
-              effectiveZarrVersion,
-              layerType
-            );
+        // For other viewers, replace {dataLink} placeholder if present
+        if (viewerUrl.includes('{dataLink}')) {
+          viewerUrl = viewerUrl.replace(/{dataLink}/g, encodeURIComponent(url));
+        } else {
+          // If no placeholder, use buildUrl with 'url' query param
+          viewerUrl = buildUrl(viewerUrl, null, { url });
         }
-      } else {
-        // No proxied URL - only show Neuroglancer as available but empty
-        openWithToolUrls.validator = null;
-        openWithToolUrls.vole = null;
-        openWithToolUrls.avivator = null;
-        openWithToolUrls.neuroglancer = '';
       }
+
+      openWithToolUrls[viewer.key] = viewerUrl;
     }
 
     return openWithToolUrls;
@@ -195,7 +214,10 @@ export default function useZarrMetadata() {
     disableNeuroglancerStateGeneration,
     useLegacyMultichannelApproach,
     layerType,
-    effectiveZarrVersion
+    effectiveZarrVersion,
+    validViewers,
+    viewersInitialized,
+    getCompatibleViewers
   ]);
 
   return {
