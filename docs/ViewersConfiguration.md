@@ -12,23 +12,17 @@ The viewer system uses:
 
 ## Quick Start
 
-1. Copy the template to the config directory:
+1. Edit the configuration file at `frontend/src/config/viewers.config.yaml` to enable/disable viewers or customize URLs
 
-```bash
-cp docs/viewers.config.yaml.template frontend/src/config/viewers.config.yaml
-```
-
-2. Edit `frontend/src/config/viewers.config.yaml` to enable/disable viewers or customize URLs
-
-3. Build the application - configuration is bundled at build time
+2. Build the application - configuration is bundled at build time
 
 ## Configuration File Location
 
-Place `viewers.config.yaml` in `frontend/src/config/` directory.
+The configuration file is located at `frontend/src/config/viewers.config.yaml`.
 
 **Important:** This file is bundled at build time. Changes require rebuilding the application.
 
-If no configuration file exists, Fileglancer defaults to Neuroglancer only.
+The default configuration includes Neuroglancer, Avivator, OME-Zarr Validator, and Vol-E viewers. You can modify this file to add, remove, or customize viewers for your deployment.
 
 ## Viewer Types
 
@@ -139,11 +133,9 @@ Simple version matching:
 
 When developing with custom configurations:
 
-1. Create/edit `frontend/src/config/viewers.config.yaml`
+1. Edit `frontend/src/config/viewers.config.yaml`
 2. Rebuild frontend: `pixi run node-build` or use watch mode: `pixi run dev-watch`
 3. Check console for initialization messages
-
-**Note:** The config file is gitignored to allow per-deployment customization without committing changes.
 
 ## Copy URL Tool
 

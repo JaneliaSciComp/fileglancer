@@ -4,11 +4,6 @@
 # The @bioimagetools/capability-manifest library is used to determine compatibility
 # for viewers that have a capability manifest.
 #
-# To use this file:
-# 1. Copy this template to the project root: cp docs/viewers.config.yaml.template viewers.config.yaml
-# 2. Uncommented viewers will be shown in your deployment
-# 3. Check the values provided for each viewer - see guidelines below.
-#
 # For viewers with capability manifests, you must provide:
 # - name: must match name value in capability manifest
 # Optionally:
@@ -31,21 +26,19 @@ viewers:
   - name: avivator
     # Optional: Override the viewer URL from the capability manifest
     # In this example, override to use Janelia's custom deployment
-    url: "https://janeliascicomp.github.io/viv/"
+    url: 'https://janeliascicomp.github.io/viv/'
 
-  # # OME-Zarr viewers without capability manifests
-  # # Example:
+  # OME-Zarr viewers without capability manifests
   # OME-Zarr Validator
   # Logo will automatically resolve to @/assets/validator.png
   - name: validator
-    url: "https://ome.github.io/ome-ngff-validator/?source={dataLink}"
+    url: 'https://ome.github.io/ome-ngff-validator/?source={dataLink}'
     ome_zarr_versions: [0.4, 0.5]
-    label: "View in OME-Zarr Validator"
+    label: 'View in OME-Zarr Validator'
 
-  # # Example:
-  # # Vol-E - Allen Cell Explorer 3D viewer
-  # # Logo will automatically resolve to @/assets/vole.png
+  # Vol-E - Allen Cell Explorer 3D viewer
+  # Logo will automatically resolve to @/assets/vole.png
   - name: vole
-    url: "https://volumeviewer.allencell.org/viewer?url={dataLink}"
-    ome_zarr_versions: [0.4]
-    label: "View in Vol-E"
+    url: 'https://volumeviewer.allencell.org/viewer?url={dataLink}'
+    ome_zarr_versions: [0.4, 0.5]
+    label: 'View in Vol-E'
