@@ -106,5 +106,5 @@ export function parseViewersConfig(
     }
   }
 
-  return config as ViewersConfigYaml;
+  return config as unknown as ViewersConfigYaml;
 }
