@@ -66,6 +66,25 @@ file_share_mounts:
 
 Instead of using the `file_share_mounts` setting, you can configure file share paths in the database. This is useful for production deployments where you want centralized management of file share paths. To use the paths in the database, set `file_share_mounts: []`. See [fileglancer-janelia](https://github.com/JaneliaSciComp/fileglancer-janelia) for an example of populating the file share paths in the database, using a private wiki source.
 
+### Viewers Configuration
+
+Fileglancer supports dynamic configuration of OME-Zarr viewers through `viewers.config.yaml`. This allows you to customize which viewers are available in your deployment and configure custom viewer URLs.
+
+**Quick Setup:**
+
+1. Copy the template to the config directory:
+   ```bash
+   cp docs/viewers.config.yaml.template frontend/src/config/viewers.config.yaml
+   ```
+
+2. Edit `frontend/src/config/viewers.config.yaml` to enable/disable viewers or customize URLs
+
+3. Rebuild the application: `pixi run node-build` or use watch mode in development: `pixi run dev-watch`
+
+**Note:** The configuration file is bundled at build time, so changes require rebuilding the application.
+
+For detailed configuration options, examples, and documentation on adding custom viewers, see [ViewersConfiguration.md](ViewersConfiguration.md).
+
 ### Running with SSL/HTTPS (Secure Mode)
 
 By default, `pixi run dev-launch` runs the server in insecure HTTP mode on port 7878. This is suitable for most local development scenarios.
