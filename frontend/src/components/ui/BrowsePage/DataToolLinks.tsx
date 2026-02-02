@@ -1,13 +1,12 @@
 import { Button, ButtonGroup, Typography } from '@material-tailwind/react';
 import { Link } from 'react-router';
-
-import neuroglancer_logo from '@/assets/neuroglancer.png';
-import validator_logo from '@/assets/ome-ngff-validator.png';
-import volE_logo from '@/assets/aics_website-3d-cell-viewer.png';
-import avivator_logo from '@/assets/vizarr_logo.png';
 import copy_logo from '@/assets/copy-link-64.png';
-import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
+import type {
+  OpenWithToolUrls,
+  PendingToolKey
+} from '@/hooks/useZarrMetadata';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
+import { useViewersContext } from '@/contexts/ViewersContext';
 
 export default function DataToolLinks({
   onToolClick,
@@ -20,6 +19,8 @@ export default function DataToolLinks({
   readonly title: string;
   readonly urls: OpenWithToolUrls | null;
 }) {
+  const { validViewers } = useViewersContext();
+
   const tooltipTriggerClasses =
     'rounded-sm m-0 p-0 transform active:scale-90 transition-transform duration-75';
 
@@ -33,106 +34,42 @@ export default function DataToolLinks({
         {title}
       </Typography>
       <ButtonGroup className="relative">
-        {urls.neuroglancer !== null ? (
-          <FgTooltip
-            as={Button}
-            label="View in Neuroglancer"
-            triggerClasses={tooltipTriggerClasses}
-            variant="ghost"
-          >
-            <Link
-              onClick={async e => {
-                e.preventDefault();
-                await onToolClick('neuroglancer');
-              }}
-              rel="noopener noreferrer"
-              target="_blank"
-              to={urls.neuroglancer}
-            >
-              <img
-                alt="Neuroglancer logo"
-                className="max-h-8 max-w-8 m-1 rounded-sm"
-                src={neuroglancer_logo}
-              />
-            </Link>
-          </FgTooltip>
-        ) : null}
+        {validViewers.map(viewer => {
+          const url = urls[viewer.key];
 
-        {urls.vole !== null ? (
-          <FgTooltip
-            as={Button}
-            label="View in Vol-E"
-            triggerClasses={tooltipTriggerClasses}
-            variant="ghost"
-          >
-            <Link
-              onClick={async e => {
-                e.preventDefault();
-                await onToolClick('vole');
-              }}
-              rel="noopener noreferrer"
-              target="_blank"
-              to={urls.vole}
-            >
-              <img
-                alt="Vol-E logo"
-                className="max-h-8 max-w-8 m-1 rounded-sm"
-                src={volE_logo}
-              />
-            </Link>
-          </FgTooltip>
-        ) : null}
+          // null means incompatible, don't show
+          if (url === null) {
+            return null;
+          }
 
-        {urls.avivator !== null ? (
-          <FgTooltip
-            as={Button}
-            label="View in Avivator"
-            triggerClasses={tooltipTriggerClasses}
-            variant="ghost"
-          >
-            <Link
-              onClick={async e => {
-                e.preventDefault();
-                await onToolClick('avivator');
-              }}
-              rel="noopener noreferrer"
-              target="_blank"
-              to={urls.avivator}
+          return (
+            <FgTooltip
+              key={viewer.key}
+              as={Button}
+              label={viewer.label}
+              triggerClasses={tooltipTriggerClasses}
+              variant="ghost"
             >
-              <img
-                alt="Avivator logo"
-                className="max-h-8 max-w-8 m-1 rounded-sm"
-                src={avivator_logo}
-              />
-            </Link>
-          </FgTooltip>
-        ) : null}
+              <Link
+                onClick={async e => {
+                  e.preventDefault();
+                  await onToolClick(viewer.key as PendingToolKey);
+                }}
+                rel="noopener noreferrer"
+                target="_blank"
+                to={url}
+              >
+                <img
+                  alt={viewer.label}
+                  className="max-h-8 max-w-8 m-1 rounded-sm"
+                  src={viewer.logoPath}
+                />
+              </Link>
+            </FgTooltip>
+          );
+        })}
 
-        {urls.validator !== null ? (
-          <FgTooltip
-            as={Button}
-            label="View in OME-Zarr Validator"
-            triggerClasses={tooltipTriggerClasses}
-            variant="ghost"
-          >
-            <Link
-              onClick={async e => {
-                e.preventDefault();
-                await onToolClick('validator');
-              }}
-              rel="noopener noreferrer"
-              target="_blank"
-              to={urls.validator}
-            >
-              <img
-                alt="OME-Zarr Validator logo"
-                className="max-h-8 max-w-8 m-1 rounded-sm"
-                src={validator_logo}
-              />
-            </Link>
-          </FgTooltip>
-        ) : null}
-
+        {/* Copy URL tool - always available when there's a data URL */}
         <FgTooltip
           as={Button}
           label={showCopiedTooltip ? 'Copied!' : 'Copy data URL'}
