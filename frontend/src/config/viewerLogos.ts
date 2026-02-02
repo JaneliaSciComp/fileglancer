@@ -1,4 +1,4 @@
-import fallback_logo from "@/assets/error_icon_gradient.png";
+import fallback_logo from '@/assets/fallback_logo.png';
 
 /**
  * Fallback logo for viewers without a specified logo
@@ -18,7 +18,7 @@ export const FALLBACK_LOGO = fallback_logo;
  */
 export function getViewerLogo(
   viewerName: string,
-  customLogoPath?: string,
+  customLogoPath?: string
 ): string {
   const logoFileName = customLogoPath || `${viewerName.toLowerCase()}.png`;
 
@@ -27,6 +27,7 @@ export function getViewerLogo(
     // This will be resolved at build time by Vite
     const logo = new URL(`../assets/${logoFileName}`, import.meta.url).href;
     return logo;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {
     // If logo not found, return fallback
     return FALLBACK_LOGO;

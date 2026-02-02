@@ -1,10 +1,7 @@
 import { Button, ButtonGroup, Typography } from '@material-tailwind/react';
 import { Link } from 'react-router';
 import copy_logo from '@/assets/copy-link-64.png';
-import type {
-  OpenWithToolUrls,
-  PendingToolKey
-} from '@/hooks/useZarrMetadata';
+import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import { useViewersContext } from '@/contexts/ViewersContext';
 
@@ -44,8 +41,8 @@ export default function DataToolLinks({
 
           return (
             <FgTooltip
-              key={viewer.key}
               as={Button}
+              key={viewer.key}
               label={viewer.label}
               triggerClasses={tooltipTriggerClasses}
               variant="ghost"

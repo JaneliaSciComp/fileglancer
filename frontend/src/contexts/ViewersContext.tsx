@@ -3,20 +3,20 @@ import {
   useContext,
   useState,
   useEffect,
-  type ReactNode,
-} from "react";
+  type ReactNode
+} from 'react';
 import {
   initializeViewerManifests,
   getCompatibleViewers as getCompatibleViewersFromManifest,
   type ViewerManifest,
-  type OmeZarrMetadata,
-} from "@bioimagetools/capability-manifest";
-import { default as log } from "@/logger";
+  type OmeZarrMetadata
+} from '@bioimagetools/capability-manifest';
+import { default as log } from '@/logger';
 import {
   parseViewersConfig,
-  type ViewerConfigEntry,
-} from "@/config/viewersConfig";
-import { getViewerLogo } from "@/config/viewerLogos";
+  type ViewerConfigEntry
+} from '@/config/viewersConfig';
+import { getViewerLogo } from '@/config/viewerLogos';
 
 /**
  * Validated viewer with all necessary information
@@ -52,31 +52,31 @@ const ViewersContext = createContext<ViewersContextType | undefined>(undefined);
  * @param viewersWithManifests - Array of viewer names that have capability manifests
  */
 async function loadViewersConfig(
-  viewersWithManifests: string[],
+  viewersWithManifests: string[]
 ): Promise<ViewerConfigEntry[]> {
   let configYaml: string;
 
   try {
     // Try to dynamically import the config file
     // This will be resolved at build time by Vite
-    const module = await import("@/config/viewers.config.yaml?raw");
+    const module = await import('@/config/viewers.config.yaml?raw');
     configYaml = module.default;
     log.info(
-      "Using custom viewers configuration from src/config/viewers.config.yaml",
+      'Using custom viewers configuration from src/config/viewers.config.yaml'
     );
   } catch (error) {
     log.info(
-      "No custom viewers.config.yaml found, using default configuration (neuroglancer only)",
+      'No custom viewers.config.yaml found, using default configuration (neuroglancer only)'
     );
     // Return default configuration
-    return [{ name: "neuroglancer" }];
+    return [{ name: 'neuroglancer' }];
   }
 
   try {
     const config = parseViewersConfig(configYaml, viewersWithManifests);
     return config.viewers;
   } catch (error) {
-    log.error("Error parsing viewers configuration:", error);
+    log.error('Error parsing viewers configuration:', error);
     throw error;
   }
 }
@@ -85,7 +85,7 @@ async function loadViewersConfig(
  * Normalize viewer name to a valid key
  */
 function normalizeViewerName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 export function ViewersProvider({ children }: { children: ReactNode }) {
@@ -97,7 +97,7 @@ export function ViewersProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function initialize() {
       try {
-        log.info("Initializing viewers configuration...");
+        log.info('Initializing viewers configuration...');
 
         // Load capability manifests
         let loadedManifests: ViewerManifest[] = [];
@@ -105,13 +105,13 @@ export function ViewersProvider({ children }: { children: ReactNode }) {
           loadedManifests = await initializeViewerManifests();
           setManifests(loadedManifests);
           log.info(
-            `Loaded ${loadedManifests.length} viewer capability manifests`,
+            `Loaded ${loadedManifests.length} viewer capability manifests`
           );
         } catch (manifestError) {
-          log.warn("Failed to load capability manifests:", manifestError);
+          log.warn('Failed to load capability manifests:', manifestError);
         }
 
-        const viewersWithManifests = loadedManifests.map((m) => m.viewer.name);
+        const viewersWithManifests = loadedManifests.map(m => m.viewer.name);
 
         // Load viewer config entries
         const configEntries = await loadViewersConfig(viewersWithManifests);
@@ -123,12 +123,12 @@ export function ViewersProvider({ children }: { children: ReactNode }) {
         for (const entry of configEntries) {
           const key = normalizeViewerName(entry.name);
           const manifest = loadedManifests.find(
-            (m) => normalizeViewerName(m.viewer.name) === key,
+            m => normalizeViewerName(m.viewer.name) === key
           );
 
           let urlTemplate: string | undefined = entry.url;
           let shouldInclude = true;
-          let skipReason = "";
+          let skipReason = '';
 
           if (manifest) {
             if (!urlTemplate) {
@@ -166,7 +166,7 @@ export function ViewersProvider({ children }: { children: ReactNode }) {
             logoPath,
             label,
             manifest,
-            supportedVersions: entry.ome_zarr_versions,
+            supportedVersions: entry.ome_zarr_versions
           });
 
           log.info(`Viewer "${entry.name}" registered successfully`);
@@ -174,18 +174,19 @@ export function ViewersProvider({ children }: { children: ReactNode }) {
 
         if (validated.length === 0) {
           throw new Error(
-            "No valid viewers configured. Check viewers.config.yaml or console for errors.",
+            'No valid viewers configured. Check viewers.config.yaml or console for errors.'
           );
         }
 
         setValidViewers(validated);
         setIsInitialized(true);
         log.info(
-          `Viewers initialization complete: ${validated.length} viewers available`,
+          `Viewers initialization complete: ${validated.length} viewers available`
         );
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Unknown error";
-        log.error("Failed to initialize viewers:", errorMessage);
+        const errorMessage =
+          err instanceof Error ? err.message : 'Unknown error';
+        log.error('Failed to initialize viewers:', errorMessage);
         setError(errorMessage);
         setIsInitialized(true); // Still mark as initialized to prevent hanging
       }
@@ -199,7 +200,7 @@ export function ViewersProvider({ children }: { children: ReactNode }) {
       return [];
     }
 
-    return validViewers.filter((viewer) => {
+    return validViewers.filter(viewer => {
       if (viewer.manifest) {
         const compatibleNames = getCompatibleViewersFromManifest(metadata);
         return compatibleNames.includes(viewer.manifest.viewer.name);
@@ -228,7 +229,7 @@ export function ViewersProvider({ children }: { children: ReactNode }) {
 export function useViewersContext() {
   const context = useContext(ViewersContext);
   if (!context) {
-    throw new Error("useViewersContext must be used within ViewersProvider");
+    throw new Error('useViewersContext must be used within ViewersProvider');
   }
   return context;
 }
