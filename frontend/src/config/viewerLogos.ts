@@ -1,9 +1,21 @@
 import fallback_logo from '@/assets/fallback_logo.png';
 
 /**
- * Fallback logo for viewers without a specified logo
+ * Map of all available logo files in the assets directory
+ * This is populated at build time by Vite's glob import
  */
-export const FALLBACK_LOGO = fallback_logo;
+const LOGO_MODULES = import.meta.glob<{ default: string }>('@/assets/*.png', {
+  eager: true
+});
+
+/**
+ * Extract filename from glob import path
+ * Converts '/src/assets/neuroglancer.png' to 'neuroglancer.png'
+ */
+function extractFileName(path: string): string {
+  const parts = path.split('/');
+  return parts[parts.length - 1];
+}
 
 /**
  * Get logo path for a viewer
@@ -22,14 +34,14 @@ export function getViewerLogo(
 ): string {
   const logoFileName = customLogoPath || `${viewerName.toLowerCase()}.png`;
 
-  try {
-    // Try to dynamically import the logo from assets
-    // This will be resolved at build time by Vite
-    const logo = new URL(`../assets/${logoFileName}`, import.meta.url).href;
-    return logo;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (error) {
-    // If logo not found, return fallback
-    return FALLBACK_LOGO;
+  // Search through available logos
+  for (const [path, module] of Object.entries(LOGO_MODULES)) {
+    const fileName = extractFileName(path);
+    if (fileName === logoFileName) {
+      return module.default;
+    }
   }
+
+  // If logo not found, return fallback
+  return fallback_logo;
 }
