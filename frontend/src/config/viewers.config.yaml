@@ -4,6 +4,9 @@
 # The @bioimagetools/capability-manifest library is used to determine compatibility
 # for viewers that have a capability manifest.
 #
+# Global Configuration:
+# - valid_ome_zarr_versions: Array of OME-Zarr versions supported by the application (e.g., `[0.4, 0.5]`)
+#
 # For viewers with capability manifests, you must provide:
 # - name: must match name value in capability manifest
 # Optionally:
@@ -18,6 +21,9 @@
 # Optionally:
 # - logo: Filename of logo in `frontend/src/assets/` (defaults to `{name}.png` if not specified)
 # - label: Custom tooltip text (defaults to "View in {Name}")
+
+# Valid OME-Zarr versions supported by this application
+valid_ome_zarr_versions: [0.4, 0.5]
 
 viewers:
   # OME-Zarr viewers with capability manifests
