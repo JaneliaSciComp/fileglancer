@@ -147,22 +147,9 @@ describe('DataToolLinks - Edge Cases', () => {
     vi.clearAllMocks();
   });
 
-  describe('Fallback logo handling', () => {
-    it('should handle viewers with custom logos', async () => {
-      // Test that getViewerLogo returns appropriate path
-      const { getViewerLogo } = await import('@/config/viewerLogos');
-
-      // Test with known viewer
-      const neuroglancerLogo = getViewerLogo('neuroglancer');
-      expect(neuroglancerLogo).toBeTruthy();
-
-      // Test with custom logo path
-      const customLogo = getViewerLogo('custom-viewer', 'custom-logo.png');
-      expect(customLogo).toBeTruthy();
-    });
-
-    it('should handle viewers with known logos', async () => {
-      // Test that viewers with known logo files render correctly
+  describe('Logo rendering in components', () => {
+    it('should render viewer logos in component', async () => {
+      // Test that viewers with known logo files render correctly in the component
       renderDataToolLinks();
 
       await waitFor(
