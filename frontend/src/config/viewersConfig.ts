@@ -1,27 +1,72 @@
 import yaml from 'js-yaml';
+import { z } from 'zod';
 
 /**
- * Viewer entry from viewers.config.yaml
+ * Zod schema for viewer entry from viewers.config.yaml
  */
-export interface ViewerConfigEntry {
-  name: string;
-  url?: string;
-  label?: string;
-  logo?: string;
-  ome_zarr_versions?: number[];
-}
+const ViewerConfigEntrySchema = z.object(
+  {
+    name: z.string({
+      message: 'Each viewer must have a "name" field (string)'
+    }),
+    url: z.string({ message: '"url" must be a string' }).optional(),
+    label: z.string({ message: '"label" must be a string' }).optional(),
+    logo: z.string({ message: '"logo" must be a string' }).optional(),
+    ome_zarr_versions: z
+      .array(z.number(), { message: '"ome_zarr_versions" must be an array' })
+      .optional()
+  },
+  {
+    error: iss => {
+      // When the viewer entry itself isn't an object
+      if (iss.code === 'invalid_type' && iss.expected === 'object') {
+        return 'Each viewer must have a "name" field (string)';
+      }
+      // Return undefined to use default behavior for other errors
+      return undefined;
+    }
+  }
+);
 
 /**
- * Structure of viewers.config.yaml
+ * Zod schema for viewers.config.yaml structure
  */
-export interface ViewersConfigYaml {
-  viewers: ViewerConfigEntry[];
-}
+const ViewersConfigYamlSchema = z.object(
+  {
+    valid_ome_zarr_versions: z
+      .array(
+        z.number({
+          message: '"valid_ome_zarr_versions" must contain only numbers'
+        }),
+        {
+          message:
+            'Configuration must have a "valid_ome_zarr_versions" field containing an array of numbers'
+        }
+      )
+      .min(1, {
+        message: '"valid_ome_zarr_versions" must not be empty'
+      }),
+    viewers: z.array(ViewerConfigEntrySchema, {
+      message:
+        'Configuration must have a "viewers" field containing an array of viewers'
+    })
+  },
+  {
+    error: iss => {
+      if (iss.code === 'invalid_type') {
+        return {
+          message:
+            'Configuration must have "valid_ome_zarr_versions" and "viewers" fields'
+        };
+      }
+    }
+  }
+);
 
-/**
- * Valid OME-Zarr versions supported by the application
- */
-const VALID_OME_ZARR_VERSIONS = [0.4, 0.5];
+// exported for use in ViewersContext
+export type ViewerConfigEntry = z.infer<typeof ViewerConfigEntrySchema>;
+
+type ViewersConfigYaml = z.infer<typeof ViewersConfigYamlSchema>;
 
 /**
  * Parse and validate viewers configuration YAML
@@ -42,91 +87,81 @@ export function parseViewersConfig(
     );
   }
 
-  if (!parsed || typeof parsed !== 'object') {
-    throw new Error('Configuration must be an object');
+  // First pass: validate basic structure with Zod
+  const baseValidation = ViewersConfigYamlSchema.safeParse(parsed);
+
+  if (!baseValidation.success) {
+    // Extract the first error message with path context to extract viewer name if possible
+    const firstError = baseValidation.error.issues[0];
+
+    // Check if the error is nested within a specific viewer
+    if (firstError.path.length > 0 && firstError.path[0] === 'viewers') {
+      // Extract viewer index from path (e.g., ['viewers', 0, 'ome_zarr_versions'])
+      const viewerIndex = firstError.path[1];
+
+      if (
+        typeof viewerIndex === 'number' &&
+        parsed &&
+        typeof parsed === 'object'
+      ) {
+        const configData = parsed as { viewers?: unknown[] };
+        const viewer = configData.viewers?.[viewerIndex];
+
+        // Try to get viewer name if it exists
+        if (viewer && typeof viewer === 'object' && 'name' in viewer) {
+          const viewerName = (viewer as { name: unknown }).name;
+          if (typeof viewerName === 'string') {
+            throw new Error(`Viewer "${viewerName}": ${firstError.message}`);
+          }
+        }
+      }
+    }
+
+    // Fallback to original error message
+    throw new Error(firstError.message);
   }
 
-  const config = parsed as Record<string, unknown>;
-
-  if (!Array.isArray(config.viewers)) {
-    throw new Error('Configuration must have a "viewers" array');
-  }
+  const config = baseValidation.data;
 
   // Normalize viewer names for comparison (case-insensitive)
   const normalizedManifestViewers = viewersWithManifests.map(name =>
     name.toLowerCase()
   );
 
-  // Validate each viewer entry
-  for (const viewer of config.viewers) {
-    if (!viewer || typeof viewer !== 'object') {
-      throw new Error('Each viewer must be an object');
-    }
-
-    const v = viewer as Record<string, unknown>;
-
-    if (typeof v.name !== 'string') {
-      throw new Error('Each viewer must have a "name" field (string)');
-    }
+  // Second pass: validate manifest-dependent requirements and cross-field constraints
+  for (let i = 0; i < config.viewers.length; i++) {
+    const viewer = config.viewers[i];
 
     // Check if this viewer has a capability manifest
     const hasManifest = normalizedManifestViewers.includes(
-      v.name.toLowerCase()
+      viewer.name.toLowerCase()
     );
 
     // If this viewer doesn't have a capability manifest, require additional fields
     if (!hasManifest) {
-      if (typeof v.url !== 'string') {
+      if (!viewer.url) {
         throw new Error(
-          `Viewer "${v.name}" does not have a capability manifest and must specify "url"`
+          `Viewer "${viewer.name}" does not have a capability manifest and must specify "url"`
         );
       }
-      if (
-        !Array.isArray(v.ome_zarr_versions) ||
-        v.ome_zarr_versions.length === 0
-      ) {
+      if (!viewer.ome_zarr_versions || viewer.ome_zarr_versions.length === 0) {
         throw new Error(
-          `Viewer "${v.name}" does not have a capability manifest and must specify "ome_zarr_versions" (array of numbers)`
+          `Viewer "${viewer.name}" does not have a capability manifest and must specify "ome_zarr_versions" (array of numbers)`
         );
       }
-    }
-
-    // Validate optional fields if present
-    if (v.url !== undefined && typeof v.url !== 'string') {
-      throw new Error(`Viewer "${v.name}": "url" must be a string`);
-    }
-    if (v.label !== undefined && typeof v.label !== 'string') {
-      throw new Error(`Viewer "${v.name}": "label" must be a string`);
-    }
-    if (v.logo !== undefined && typeof v.logo !== 'string') {
-      throw new Error(`Viewer "${v.name}": "logo" must be a string`);
-    }
-    if (
-      v.ome_zarr_versions !== undefined &&
-      !Array.isArray(v.ome_zarr_versions)
-    ) {
-      throw new Error(
-        `Viewer "${v.name}": "ome_zarr_versions" must be an array`
-      );
     }
 
     // Validate ome_zarr_versions values if present
-    if (
-      v.ome_zarr_versions !== undefined &&
-      Array.isArray(v.ome_zarr_versions)
-    ) {
-      for (const version of v.ome_zarr_versions) {
-        if (!VALID_OME_ZARR_VERSIONS.includes(version)) {
+    if (viewer.ome_zarr_versions) {
+      for (const version of viewer.ome_zarr_versions) {
+        if (!config.valid_ome_zarr_versions.includes(version)) {
           throw new Error(
-            `Viewer "${v.name}": invalid ome_zarr_version "${version}". Valid versions are: ${VALID_OME_ZARR_VERSIONS.join(', ')}`
+            `Viewer "${viewer.name}": invalid ome_zarr_version "${version}". Valid versions are: ${config.valid_ome_zarr_versions.join(', ')}`
           );
         }
       }
     }
   }
 
-  // Type assertion is safe here because we've performed comprehensive runtime validation above.
-  // TypeScript sees 'config' as Record<string, unknown> but our validation ensures it matches
-  // ViewersConfigYaml structure. The intermediate 'unknown' cast is required for type compatibility.
-  return config as unknown as ViewersConfigYaml;
+  return config;
 }
