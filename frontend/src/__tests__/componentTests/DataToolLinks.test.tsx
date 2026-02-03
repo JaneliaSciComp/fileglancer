@@ -115,6 +115,7 @@ describe('DataToolLinks - Error Scenarios', () => {
       const { parseViewersConfig } = await import('@/config/viewersConfig');
 
       const configMissingUrl = `
+valid_ome_zarr_versions: [0.4, 0.5]
 viewers:
   - name: custom-viewer
     # Missing url for viewer without manifest
@@ -129,6 +130,7 @@ viewers:
       const { parseViewersConfig } = await import('@/config/viewersConfig');
 
       const configMissingVersions = `
+valid_ome_zarr_versions: [0.4, 0.5]
 viewers:
   - name: custom-viewer
     url: https://example.com
