@@ -24,6 +24,29 @@ The configuration file is located at `frontend/src/config/viewers.config.yaml`.
 
 The default configuration includes Neuroglancer, Avivator, OME-Zarr Validator, and Vol-E viewers. You can modify this file to add, remove, or customize viewers for your deployment.
 
+## Configuration Structure
+
+### Global Configuration
+
+At the top level of the YAML file, you must specify:
+
+- `valid_ome_zarr_versions`: Array of OME-Zarr versions supported by the application (e.g., `[0.4, 0.5]`)
+  - **Required field** - must be present and cannot be empty
+  - This defines which OME-Zarr versions are valid across all viewers
+  - Individual viewer `ome_zarr_versions` will be validated against this list
+  - **Default value**: `[0.4, 0.5]` (set in the default config file)
+
+### Example:
+
+```yaml
+# Valid OME-Zarr versions supported by this application
+valid_ome_zarr_versions: [0.4, 0.5]
+
+viewers:
+  - name: neuroglancer
+  # ... more viewers
+```
+
 ## Viewer Types
 
 ### Viewers with Capability Manifests (Recommended)
@@ -37,6 +60,7 @@ For viewers without capability manifests, you must provide:
 - `name`: Viewer identifier
 - `url`: URL template (use `{dataLink}` placeholder for dataset URL)
 - `ome_zarr_versions`: Array of supported OME-Zarr versions (e.g., `[0.4, 0.5]`)
+  - These values must be in the `valid_ome_zarr_versions` list
 
 Optionally:
 
@@ -48,6 +72,8 @@ Optionally:
 ### Enable default viewers
 
 ```yaml
+valid_ome_zarr_versions: [0.4, 0.5]
+
 viewers:
   - name: neuroglancer
   - name: avivator
@@ -56,6 +82,8 @@ viewers:
 ### Override viewer URL
 
 ```yaml
+valid_ome_zarr_versions: [0.4, 0.5]
+
 viewers:
   - name: avivator
     url: "https://my-avivator-instance.example.com/?image_url={dataLink}"
@@ -64,6 +92,8 @@ viewers:
 ### Add custom viewer (with convention-based logo)
 
 ```yaml
+valid_ome_zarr_versions: [0.4, 0.5]
+
 viewers:
   - name: my-viewer
     url: "https://viewer.example.com/?data={dataLink}"
@@ -75,12 +105,27 @@ viewers:
 ### Add custom viewer (with explicit logo)
 
 ```yaml
+valid_ome_zarr_versions: [0.4, 0.5]
+
 viewers:
   - name: my-viewer
     url: "https://viewer.example.com/?data={dataLink}"
     ome_zarr_versions: [0.4, 0.5]
     logo: "custom-logo.png" # Use @/assets/custom-logo.png
     label: "Open in My Viewer"
+```
+
+### Supporting additional OME-Zarr versions
+
+If you want to support additional OME-Zarr versions beyond 0.4 and 0.5:
+
+```yaml
+valid_ome_zarr_versions: [0.4, 0.5, 0.6]
+
+viewers:
+  - name: my-viewer
+    url: "https://viewer.example.com/?data={dataLink}"
+    ome_zarr_versions: [0.5, 0.6]  # Only supports newer versions
 ```
 
 ## Adding Custom Viewer Logos
@@ -96,6 +141,8 @@ Logo resolution follows this order:
 **Using the naming convention (recommended):**
 
 ```yaml
+valid_ome_zarr_versions: [0.4, 0.5]
+
 viewers:
   - name: my-viewer
     # Logo will automatically resolve to @/assets/my-viewer.png
@@ -106,6 +153,8 @@ Just add `frontend/src/assets/my-viewer.png` - no config needed!
 **Using a custom logo filename:**
 
 ```yaml
+valid_ome_zarr_versions: [0.4, 0.5]
+
 viewers:
   - name: my-viewer
     logo: "custom-logo.png" # Will use @/assets/custom-logo.png
