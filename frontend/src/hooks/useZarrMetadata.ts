@@ -108,8 +108,8 @@ export default function useZarrMetadata() {
     // Get compatible viewers for this dataset
     let compatibleViewers = validViewers;
 
-    // If we have metadata, use capability checking to filter
-    if (metadata) {
+    // If we have multiscales metadata (OME-Zarr), use capability checking to filter
+    if (metadata?.multiscale) {
       // Convert our metadata to OmeZarrMetadata format for capability checking
       const omeZarrMetadata = {
         version: effectiveZarrVersion === 3 ? '0.5' : '0.4',
@@ -120,35 +120,32 @@ export default function useZarrMetadata() {
       } as any; // Type assertion needed due to internal type differences
 
       compatibleViewers = getCompatibleViewers(omeZarrMetadata);
-    }
 
-    // Create a Set for lookup of compatible viewer keys
-    // Needed to mark incompatible but valid (as defined by the viewer config) viewers as null in openWithToolUrls
-    const compatibleKeys = new Set(compatibleViewers.map(v => v.key));
+      // Create a Set for lookup of compatible viewer keys
+      // Needed to mark incompatible but valid (as defined by the viewer config) viewers as null in openWithToolUrls
+      const compatibleKeys = new Set(compatibleViewers.map(v => v.key));
 
-    for (const viewer of validViewers) {
-      if (!compatibleKeys.has(viewer.key)) {
-        openWithToolUrls[viewer.key] = null;
-      }
-    }
-
-    // For compatible viewers, generate URLs
-    for (const viewer of compatibleViewers) {
-      if (!url) {
-        // Compatible but no data URL yet - show as available (empty string)
-        openWithToolUrls[viewer.key] = '';
-        continue;
+      for (const viewer of validViewers) {
+        if (!compatibleKeys.has(viewer.key)) {
+          openWithToolUrls[viewer.key] = null;
+        }
       }
 
-      // Generate the viewer URL
-      let viewerUrl = viewer.urlTemplate;
+      // For compatible viewers, generate URLs
+      for (const viewer of compatibleViewers) {
+        if (!url) {
+          // Compatible but no data URL yet - show as available (empty string)
+          openWithToolUrls[viewer.key] = '';
+          continue;
+        }
 
-      // Special handling for Neuroglancer to maintain existing state generation logic
-      if (viewer.key === 'neuroglancer') {
-        const neuroglancerBaseUrl = viewer.urlTemplate;
+        // Generate the viewer URL
+        let viewerUrl = viewer.urlTemplate;
 
-        if (metadata?.multiscale) {
-          // OME-Zarr with multiscales
+        // Special handling for Neuroglancer to maintain existing state generation logic
+        if (viewer.key === 'neuroglancer') {
+          // Extract base URL from template (everything before #!)
+          const neuroglancerBaseUrl = viewer.urlTemplate.split('#!')[0] + '#!';
           if (disableNeuroglancerStateGeneration) {
             viewerUrl =
               neuroglancerBaseUrl +
@@ -178,34 +175,57 @@ export default function useZarrMetadata() {
             }
           }
         } else {
-          // Non-OME Zarr array
-          if (disableNeuroglancerStateGeneration) {
-            viewerUrl =
-              neuroglancerBaseUrl +
-              generateNeuroglancerStateForDataURL(url, effectiveZarrVersion);
-          } else if (layerType) {
-            viewerUrl =
-              neuroglancerBaseUrl +
-              generateNeuroglancerStateForZarrArray(
-                url,
-                effectiveZarrVersion,
-                layerType
-              );
+          // For other viewers, replace {dataLink} placeholder if present
+          if (viewerUrl.includes('{dataLink}')) {
+            viewerUrl = viewerUrl.replace(
+              /{dataLink}/g,
+              encodeURIComponent(url)
+            );
+          } else {
+            // If no placeholder, use buildUrl with 'url' query param
+            viewerUrl = buildUrl(viewerUrl, null, { url });
           }
         }
-      } else {
-        // For other viewers, replace {dataLink} placeholder if present
-        if (viewerUrl.includes('{dataLink}')) {
-          viewerUrl = viewerUrl.replace(/{dataLink}/g, encodeURIComponent(url));
+
+        openWithToolUrls[viewer.key] = viewerUrl;
+      }
+    } else {
+      // Non-OME Zarr - only Neuroglancer available
+      // Mark all non-Neuroglancer viewers as incompatible
+      for (const viewer of validViewers) {
+        if (viewer.key !== 'neuroglancer') {
+          openWithToolUrls[viewer.key] = null;
         } else {
-          // If no placeholder, use buildUrl with 'url' query param
-          viewerUrl = buildUrl(viewerUrl, null, { url });
+          // Neuroglancer
+          if (url) {
+            // Extract base URL from template (everything before #!)
+            const neuroglancerBaseUrl =
+              viewer.urlTemplate.split('#!')[0] + '#!';
+            if (disableNeuroglancerStateGeneration) {
+              openWithToolUrls.neuroglancer =
+                neuroglancerBaseUrl +
+                generateNeuroglancerStateForDataURL(url, effectiveZarrVersion);
+            } else if (layerType) {
+              openWithToolUrls.neuroglancer =
+                neuroglancerBaseUrl +
+                generateNeuroglancerStateForZarrArray(
+                  url,
+                  effectiveZarrVersion,
+                  layerType
+                );
+            } else {
+              // layerType not yet determined - use fallback
+              openWithToolUrls.neuroglancer =
+                neuroglancerBaseUrl +
+                generateNeuroglancerStateForDataURL(url, effectiveZarrVersion);
+            }
+          } else {
+            // No proxied URL - show Neuroglancer as available but empty
+            openWithToolUrls.neuroglancer = '';
+          }
         }
       }
-
-      openWithToolUrls[viewer.key] = viewerUrl;
     }
-
     return openWithToolUrls;
   }, [
     metadata,

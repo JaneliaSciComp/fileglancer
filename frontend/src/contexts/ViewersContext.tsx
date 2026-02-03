@@ -218,18 +218,10 @@ export function ViewersProvider({
           return compatibleNames.includes(viewer.manifest.viewer.name);
         } else {
           // Manual version check for viewers without manifests
-          // Custom viewers require both correct ome-zarr version AND OME metadata (multiscales)
           const zarrVersion = metadata.version
             ? parseFloat(metadata.version)
             : null;
           if (zarrVersion === null || !viewer.supportedVersions) {
-            return false;
-          }
-
-          // Check if dataset has OME metadata (multiscales array)
-          const hasOmeMetadata =
-            metadata.multiscales && metadata.multiscales.length > 0;
-          if (!hasOmeMetadata) {
             return false;
           }
 
