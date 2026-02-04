@@ -44,9 +44,12 @@ class FileInfo(BaseModel):
     last_modified: Optional[float] = None
     hasRead: Optional[bool] = None
     hasWrite: Optional[bool] = None
+    is_symlink: bool = False
+    symlink_target_fsp: Optional[dict] = None  # {"fsp_name": str, "subpath": str}
 
     @classmethod
-    def from_stat(cls, path: str, absolute_path: str, stat_result: os.stat_result, current_user: str = None):
+    def from_stat(cls, path: str, absolute_path: str, stat_result: os.stat_result,
+                  current_user: str = None, session = None):
         """Create FileInfo from os.stat_result"""
         if path is None or path == "":
             raise ValueError("Path cannot be None or empty")
@@ -76,6 +79,27 @@ class FileInfo(BaseModel):
             hasRead = cls._has_read_permission(stat_result, current_user, owner, group)
             hasWrite = cls._has_write_permission(stat_result, current_user, owner, group)
 
+        # Use lstat to detect symlinks without following them
+        lstat_result = os.lstat(absolute_path)
+        is_symlink = stat.S_ISLNK(lstat_result.st_mode)
+        symlink_target_fsp = None
+
+        if is_symlink and session is not None:
+            # Read the symlink target
+            target = os.readlink(absolute_path)
+
+            # Resolve to absolute path (relative symlinks need dirname context)
+            if not os.path.isabs(target):
+                target = os.path.join(os.path.dirname(absolute_path), target)
+            target = os.path.abspath(target)
+
+            # Find which file share contains this target
+            from fileglancer.database import find_fsp_from_absolute_path
+            match = find_fsp_from_absolute_path(session, target)
+            if match:
+                fsp, subpath = match
+                symlink_target_fsp = {"fsp_name": fsp.name, "subpath": subpath}
+
         return cls(
             name=name,
             path=path,
@@ -87,7 +111,9 @@ class FileInfo(BaseModel):
             group=group,
             last_modified=last_modified,
             hasRead=hasRead,
-            hasWrite=hasWrite
+            hasWrite=hasWrite,
+            is_symlink=is_symlink,
+            symlink_target_fsp=symlink_target_fsp
         )
 
     @staticmethod
@@ -190,7 +216,7 @@ class Filestore:
         return full_path
 
 
-    def _get_file_info_from_path(self, full_path: str, current_user: str = None) -> FileInfo:
+    def _get_file_info_from_path(self, full_path: str, current_user: str = None, session = None) -> FileInfo:
         """
         Get the FileInfo for a file or directory at the given path.
         """
@@ -202,7 +228,7 @@ class Filestore:
             rel_path = '.'
         else:
             rel_path = os.path.relpath(full_real, root_real)
-        return FileInfo.from_stat(rel_path, full_path, stat_result, current_user)
+        return FileInfo.from_stat(rel_path, full_path, stat_result, current_user, session)
 
 
     def get_root_path(self) -> str:
@@ -228,7 +254,7 @@ class Filestore:
         return os.path.abspath(os.path.join(self.root_path, relative_path))
 
 
-    def get_file_info(self, path: Optional[str] = None, current_user: str = None) -> FileInfo:
+    def get_file_info(self, path: Optional[str] = None, current_user: str = None, session = None) -> FileInfo:
         """
         Get the FileInfo for a file or directory at the given path.
 
@@ -237,12 +263,14 @@ class Filestore:
                 May be None, in which case the root directory is used.
             current_user (str): The username of the current user for permission checking.
                 May be None, in which case hasRead and hasWrite will be None.
+            session: Database session for symlink resolution.
+                May be None, in which case symlink_target_fsp will be None.
 
         Raises:
             ValueError: If path attempts to escape root directory
         """
         full_path = self._check_path_in_root(path)
-        return self._get_file_info_from_path(full_path, current_user)
+        return self._get_file_info_from_path(full_path, current_user, session)
 
 
     def check_is_binary(self, path: Optional[str] = None, sample_size: int = 4096) -> bool:
@@ -281,7 +309,43 @@ class Filestore:
             return True
 
 
-    def yield_file_infos(self, path: Optional[str] = None, current_user: str = None) -> Generator[FileInfo, None, None]:
+    def check_is_binary(self, path: Optional[str] = None, sample_size: int = 4096) -> bool:
+        """
+        Check if a file is likely binary by reading a sample of its contents.
+
+        Args:
+            path (str): The relative path to the file to check.
+                May be None, in which case the root is checked (always returns False for directories).
+            sample_size (int): Number of bytes to read for binary detection. Defaults to 4096.
+
+        Returns:
+            bool: True if the file appears to be binary, False otherwise.
+                Returns False for directories.
+
+        Raises:
+            ValueError: If path attempts to escape root directory
+            FileNotFoundError: If the file does not exist
+            PermissionError: If the file cannot be read
+        """
+        from .utils import is_likely_binary
+
+        full_path = self._check_path_in_root(path)
+
+        # Directories are not binary
+        if os.path.isdir(full_path):
+            return False
+
+        try:
+            with open(full_path, 'rb') as f:
+                sample = f.read(sample_size)
+                return is_likely_binary(sample)
+        except Exception as e:
+            # If we can't read the file, assume it's binary to be safe
+            logger.warning(f"Could not read file sample for binary detection: {e}")
+            return True
+
+
+    def yield_file_infos(self, path: Optional[str] = None, current_user: str = None, session = None) -> Generator[FileInfo, None, None]:
         """
         Yield a FileInfo object for each child of the given path.
 
@@ -290,6 +354,8 @@ class Filestore:
                 May be None, in which case the root directory is listed.
             current_user (str): The username of the current user for permission checking.
                 May be None, in which case hasRead and hasWrite will be None.
+            session: Database session for symlink resolution.
+                May be None, in which case symlink_target_fsp will be None for symlinks.
 
         Raises:
             PermissionError: If the path is not accessible due to permissions.
@@ -304,7 +370,7 @@ class Filestore:
         for entry in entries:
             entry_path = os.path.join(full_path, entry)
             try:
-                yield self._get_file_info_from_path(entry_path, current_user)
+                yield self._get_file_info_from_path(entry_path, current_user, session)
             except (FileNotFoundError, PermissionError, OSError) as e:
                 logger.error(f"Error accessing entry: {entry_path}: {e}")
                 continue
