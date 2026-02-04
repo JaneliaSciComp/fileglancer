@@ -142,9 +142,10 @@ test.describe('Symlink Navigation and Display', () => {
     // Double-click on a symlink that points to a directory in the same file share
     // Note: We use double-click since that's how directory navigation works
     await page.getByRole('link', { name: 'symlink_to_subdir' }).dblclick();
-
-    // Wait for navigation to complete and verify we can see the target file inside the target directory
-    await expect(page.getByText('target_file.txt', { exact: true })).toBeVisible({ timeout: 10000 });
+    const targetFileRow = page
+      .getByRole('row')
+      .filter({ hasText: 'target_file' });
+    await expect(targetFileRow).toBeVisible();
   });
 
   test('directory symlink displays as Symlink type, not Folder', async ({ fileglancerPage: page }) => {
