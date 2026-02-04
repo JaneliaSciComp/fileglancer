@@ -31,7 +31,7 @@ from fileglancer import auth
 from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
-from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header
+from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header, is_likely_binary
 from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext, UserContextConfigurationError
 from fileglancer.filestore import Filestore, RootCheckError
 from fileglancer.log import AccessLogMiddleware
@@ -1124,8 +1124,23 @@ def create_app(settings):
             try:
                 file_info = filestore.get_file_info(subpath)
 
+                # Only check binary status for files, not directories
+                is_binary = False
+                if not file_info.is_dir:
+                    try:
+                        # Read first 4KB to determine if file is binary
+                        full_path = filestore._check_path_in_root(subpath)
+                        with open(full_path, 'rb') as f:
+                            sample = f.read(4096)
+                            is_binary = is_likely_binary(sample)
+                    except Exception as e:
+                        # If we can't read the file, assume it's binary to be safe
+                        logger.warning(f"Could not read file sample for binary detection: {e}")
+                        is_binary = True
+
                 headers = {
                     'Accept-Ranges': 'bytes',
+                    'X-Is-Binary': 'true' if is_binary else 'false',
                 }
 
                 if content_type == 'application/octet-stream' and file_name:
