@@ -47,6 +47,21 @@ class FileInfo(BaseModel):
     is_symlink: bool = False
     symlink_target_fsp: Optional[dict] = None  # {"fsp_name": str, "subpath": str}
 
+    @staticmethod
+    def _safe_readlink(path: str) -> Optional[str]:
+        """
+        Safely read a symlink target.
+
+        This wrapper exists so that any filesystem access based on paths that may
+        originate from user input is centralized and error-tolerant. Callers are
+        expected to have already validated that 'path' is within an allowed root.
+        """
+        try:
+            return os.readlink(path)
+        except OSError as e:
+            logger.warning(f"Failed to read symlink target for {path}: {e}")
+            return None
+
     @classmethod
     def from_stat(cls, path: str, absolute_path: str, stat_result: os.stat_result,
                   current_user: str = None, session = None):
@@ -85,20 +100,20 @@ class FileInfo(BaseModel):
         symlink_target_fsp = None
 
         if is_symlink and session is not None:
-            # Read the symlink target
-            target = os.readlink(absolute_path)
+            # Read the symlink target safely
+            target = cls._safe_readlink(absolute_path)
+            if target is not None:
+                # Resolve to absolute path (relative symlinks need dirname context)
+                if not os.path.isabs(target):
+                    target = os.path.join(os.path.dirname(absolute_path), target)
+                target = os.path.abspath(target)
 
-            # Resolve to absolute path (relative symlinks need dirname context)
-            if not os.path.isabs(target):
-                target = os.path.join(os.path.dirname(absolute_path), target)
-            target = os.path.abspath(target)
-
-            # Find which file share contains this target
-            from fileglancer.database import find_fsp_from_absolute_path
-            match = find_fsp_from_absolute_path(session, target)
-            if match:
-                fsp, subpath = match
-                symlink_target_fsp = {"fsp_name": fsp.name, "subpath": subpath}
+                # Find which file share contains this target
+                from fileglancer.database import find_fsp_from_absolute_path
+                match = find_fsp_from_absolute_path(session, target)
+                if match:
+                    fsp, subpath = match
+                    symlink_target_fsp = {"fsp_name": fsp.name, "subpath": subpath}
 
         return cls(
             name=name,
