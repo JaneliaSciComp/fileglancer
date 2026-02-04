@@ -141,21 +141,17 @@ export default function FileViewer({ file }: FileViewerProps) {
 
     if (contentQuery.isLoading) {
       return (
-        <div className="flex items-center justify-center h-64">
-          <Typography className="text-foreground">
-            Loading file content...
-          </Typography>
-        </div>
+        <Typography className="p-4 text-foreground">
+          Loading file content...
+        </Typography>
       );
     }
 
     if (contentQuery.error) {
       return (
-        <div className="flex items-center justify-center h-64">
-          <Typography className="text-error">
-            Error: {contentQuery.error.message}
-          </Typography>
-        </div>
+        <Typography className="p-4 text-error">
+          Error: {contentQuery.error.message}
+        </Typography>
       );
     }
 
