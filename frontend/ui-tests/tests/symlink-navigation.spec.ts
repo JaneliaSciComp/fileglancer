@@ -191,24 +191,22 @@ test.describe('Symlink Navigation and Display', () => {
     await expect(page.getByText('symlink_to_file', { exact: true })).toBeVisible();
   });
 
-  test('clicking symlink row selects it and shows in properties panel', async ({ fileglancerPage: page }) => {
+  test('clicking a directory symlink row selects it and shows in properties panel', async ({
+    fileglancerPage: page
+  }) => {
     // Verify properties panel is visible first
     const propertiesPanel = page.locator('[role="complementary"]').filter({ hasText: 'Properties' });
     await expect(propertiesPanel).toBeVisible();
 
-    // For symlinks, clicking the SVG navigates to the target (since symlinks are clickable)
-    // Instead, we click directly on the row but on the "Type" column (which says "Symlink")
-    // This selects the row without triggering navigation
-    const symlinkRow = page.getByRole('row').filter({ hasText: 'symlink_to_file' });
-    await symlinkRow.getByText('Symlink').click();
+    // Click on the "Type" column to select without triggering the hyperlink
+    const symlinkRow = page
+      .getByRole('row')
+      .filter({ hasText: 'symlink_to_subdir' });
+    await symlinkRow.getByText('Symlink', { exact: true }).click();
 
-    // Wait for the properties panel to update
-    await page.waitForTimeout(300);
-
-    // Verify properties panel shows the symlink name
-    // The name is displayed in a FgTooltip which adds aria-label attribute
+    // Verify properties panel shows the symlink name in the header
     await expect(
-      propertiesPanel.getByLabel('symlink_to_file', { exact: true })
+      propertiesPanel.getByText('symlink_to_subdir', { exact: true })
     ).toBeVisible({ timeout: 10000 });
   });
 });
