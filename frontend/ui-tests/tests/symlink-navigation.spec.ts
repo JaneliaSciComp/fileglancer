@@ -129,11 +129,13 @@ test.describe('Symlink Navigation and Display', () => {
     const symlinkRow = page.getByRole('row').filter({ hasText: 'symlink_to_file' });
     await expect(symlinkRow).toBeVisible();
 
-    // Verify symlink icon is visible (TbLink icon renders as svg)
-    await expect(symlinkRow.locator('svg').first()).toBeVisible();
+    // Verify symlink icon is visible (TbLink icon renders as svg with text-primary class)
+    await expect(symlinkRow.locator('svg.text-primary')).toBeVisible();
 
-    // Verify Type column shows "Symlink"
-    await expect(symlinkRow.getByText('Symlink')).toBeVisible();
+    // Verify Type column shows "Symlink" (use exact match to avoid matching filename)
+    await expect(
+      symlinkRow.getByText('Symlink', { exact: true })
+    ).toBeVisible();
   });
 
   test('navigates to symlink target within same share', async ({ fileglancerPage: page }) => {
