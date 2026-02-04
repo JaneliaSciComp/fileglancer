@@ -1128,8 +1128,8 @@ def create_app(settings):
                 is_binary = False
                 if not file_info.is_dir:
                     try:
-                        # Read first 4KB to determine if file is binary
-                        full_path = filestore._check_path_in_root(subpath)
+                        # Read first 4KB to determine if file is binary, using validated path
+                        full_path = os.path.realpath(file_info.absolute_path)
                         with open(full_path, 'rb') as f:
                             sample = f.read(4096)
                             is_binary = is_likely_binary(sample)
