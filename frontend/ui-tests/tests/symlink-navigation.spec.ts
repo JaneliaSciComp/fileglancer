@@ -45,7 +45,10 @@ async function createSymlinkTestFixtures(testDir: string): Promise<void> {
   );
 
   // Create broken symlink - pointing to nonexistent path
-  await symlink('/nonexistent/path/that/does/not/exist', join(testDir, 'broken_symlink'));
+  await symlink(
+    '/nonexistent/path/that/does/not/exist',
+    join(testDir, 'broken_symlink')
+  );
 
   // Create a regular file for comparison
   await writeFile(join(testDir, 'regular_file.txt'), 'Regular file content');
@@ -80,7 +83,9 @@ const test = base.extend<SymlinkFixtures>({
     const testDir = `symlink-test-${uniqueId}`;
     const fullPath = join(scratchDir, testDir);
 
-    console.log(`[Symlink Fixture] Creating unique test directory: ${fullPath}`);
+    console.log(
+      `[Symlink Fixture] Creating unique test directory: ${fullPath}`
+    );
 
     // Create test directory and populate with symlink fixtures
     await mkdir(fullPath, { recursive: true });
@@ -119,14 +124,20 @@ const test = base.extend<SymlinkFixtures>({
 });
 
 test.describe('Symlink Navigation and Display', () => {
-  test.beforeEach('Verify symlink test environment is loaded', async ({ fileglancerPage: page }) => {
-    // Wait for files to load - verify regular_file.txt is visible
-    await expect(page.getByText('regular_file.txt', { exact: true })).toBeVisible({ timeout: 10000 });
-  });
+  test.beforeEach(
+    'Verify symlink test environment is loaded',
+    async ({ fileglancerPage: page }) => {
+      await expect(
+        page.getByText('regular_file.txt', { exact: true })
+      ).toBeVisible({ timeout: 10000 });
+    }
+  );
 
   test('displays symlink icon and type', async ({ fileglancerPage: page }) => {
     // Look for a symlink in the file table - symlink_to_file should exist
-    const symlinkRow = page.getByRole('row').filter({ hasText: 'symlink_to_file' });
+    const symlinkRow = page
+      .getByRole('row')
+      .filter({ hasText: 'symlink_to_file' });
     await expect(symlinkRow).toBeVisible();
 
     // Verify symlink icon is visible (TbLink icon renders as svg with text-primary class)
@@ -138,9 +149,9 @@ test.describe('Symlink Navigation and Display', () => {
     ).toBeVisible();
   });
 
-  test('navigates to symlink target within same share', async ({ fileglancerPage: page }) => {
-    // Double-click on a symlink that points to a directory in the same file share
-    // Note: We use double-click since that's how directory navigation works
+  test('navigates to symlink target within same share', async ({
+    fileglancerPage: page
+  }) => {
     await page.getByRole('link', { name: 'symlink_to_subdir' }).dblclick();
     const targetFileRow = page
       .getByRole('row')
@@ -148,9 +159,13 @@ test.describe('Symlink Navigation and Display', () => {
     await expect(targetFileRow).toBeVisible();
   });
 
-  test('directory symlink displays as Symlink type, not Folder', async ({ fileglancerPage: page }) => {
+  test('directory symlink displays as Symlink type, not Folder', async ({
+    fileglancerPage: page
+  }) => {
     // The symlink to a directory should still show as Symlink type, not Folder
-    const symlinkDirRow = page.getByRole('row').filter({ hasText: 'symlink_to_subdir' });
+    const symlinkDirRow = page
+      .getByRole('row')
+      .filter({ hasText: 'symlink_to_subdir' });
     await expect(symlinkDirRow).toBeVisible();
 
     // Should show "Symlink" type even though it points to a directory (use exact match)
@@ -170,32 +185,46 @@ test.describe('Symlink Navigation and Display', () => {
   test('context menu works on symlinks', async ({ fileglancerPage: page }) => {
     // Right-click on the symlink text in the table to open context menu
     // Following the pattern from file-operations.spec.ts
-    await page.getByText('symlink_to_file', { exact: true }).click({ button: 'right' });
+    await page
+      .getByText('symlink_to_file', { exact: true })
+      .click({ button: 'right' });
 
     // Verify context menu appears - wait for it to be visible
-    await expect(page.getByRole('menuitem', { name: /rename/i })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('menuitem', { name: /rename/i })).toBeVisible({
+      timeout: 5000
+    });
     await expect(page.getByRole('menuitem', { name: /delete/i })).toBeVisible();
 
     // Close the menu by pressing Escape
     await page.keyboard.press('Escape');
   });
 
-  test('broken symlinks are not displayed', async ({ fileglancerPage: page }) => {
+  test('broken symlinks are not displayed', async ({
+    fileglancerPage: page
+  }) => {
     // The broken_symlink was created pointing to /nonexistent/path
     // It should NOT appear in the file list because os.stat() fails on broken symlinks
     // and the backend catches that error and skips the entry
-    await expect(page.getByText('broken_symlink', { exact: true })).not.toBeVisible();
+    await expect(
+      page.getByText('broken_symlink', { exact: true })
+    ).not.toBeVisible();
 
     // But valid files should still be visible
-    await expect(page.getByText('regular_file.txt', { exact: true })).toBeVisible();
-    await expect(page.getByText('symlink_to_file', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText('regular_file.txt', { exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByText('symlink_to_file', { exact: true })
+    ).toBeVisible();
   });
 
   test('clicking a directory symlink row selects it and shows in properties panel', async ({
     fileglancerPage: page
   }) => {
     // Verify properties panel is visible first
-    const propertiesPanel = page.locator('[role="complementary"]').filter({ hasText: 'Properties' });
+    const propertiesPanel = page
+      .locator('[role="complementary"]')
+      .filter({ hasText: 'Properties' });
     await expect(propertiesPanel).toBeVisible();
 
     // Click on the "Type" column to select without triggering the hyperlink
@@ -210,5 +239,3 @@ test.describe('Symlink Navigation and Display', () => {
     ).toBeVisible({ timeout: 10000 });
   });
 });
-
-export { test, expect };
