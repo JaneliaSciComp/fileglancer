@@ -9,7 +9,10 @@ import {
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { formatFileSize, formatUnixTimestamp } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
-import { useFileContentQuery } from '@/queries/fileContentQueries';
+import {
+  useFileContentQuery,
+  useFileMetadataQuery
+} from '@/queries/fileContentQueries';
 
 type FileViewerProps = {
   readonly file: FileOrFolder;
@@ -80,7 +83,17 @@ export default function FileViewer({ file }: FileViewerProps) {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [formatJson, setFormatJson] = useState<boolean>(true);
 
-  const contentQuery = useFileContentQuery(fspName, file.path);
+  // First, fetch metadata to check if file is binary
+  const metadataQuery = useFileMetadataQuery(fspName, file.path);
+
+  // Only fetch content if metadata indicates it's not binary
+  const shouldFetchContent =
+    metadataQuery.isSuccess && !metadataQuery.data.isBinary;
+  const contentQuery = useFileContentQuery(
+    shouldFetchContent ? fspName : undefined,
+    file.path
+  );
+
   const language = getLanguageFromExtension(file.name);
   const isJsonFile = language === 'json';
 
@@ -101,6 +114,31 @@ export default function FileViewer({ file }: FileViewerProps) {
   }, []);
 
   const renderViewer = () => {
+    if (metadataQuery.isLoading) {
+      return (
+        <Typography className="p-4 text-foreground">
+          Loading file content...
+        </Typography>
+      );
+    }
+
+    if (metadataQuery.error) {
+      return (
+        <Typography className="p-4 text-error">
+          Error: {metadataQuery.error.message}
+        </Typography>
+      );
+    }
+
+    // If file is binary, show a message instead of trying to load content
+    if (metadataQuery.data?.isBinary) {
+      return (
+        <Typography className="p-4 text-foreground">
+          Binary file - preview not available
+        </Typography>
+      );
+    }
+
     if (contentQuery.isLoading) {
       return (
         <div className="flex items-center justify-center h-64">
@@ -169,6 +207,10 @@ export default function FileViewer({ file }: FileViewerProps) {
     );
   };
 
+  // Determine if we should show JSON format toggle
+  const showJsonToggle =
+    isJsonFile && metadataQuery.isSuccess && !metadataQuery.data.isBinary;
+
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
       {/* File info header */}
@@ -182,7 +224,7 @@ export default function FileViewer({ file }: FileViewerProps) {
             {formatUnixTimestamp(file.last_modified)}
           </Typography>
         </div>
-        {isJsonFile ? (
+        {showJsonToggle ? (
           <div className="flex items-center gap-2 shrink-0">
             <Typography className="text-foreground text-sm whitespace-nowrap">
               Format JSON
