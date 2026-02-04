@@ -153,12 +153,18 @@ test.describe('Symlink Navigation and Display', () => {
     const symlinkDirRow = page.getByRole('row').filter({ hasText: 'symlink_to_subdir' });
     await expect(symlinkDirRow).toBeVisible();
 
-    // Should show "Symlink" type even though it points to a directory
-    await expect(symlinkDirRow.getByText('Symlink')).toBeVisible();
+    // Should show "Symlink" type even though it points to a directory (use exact match)
+    await expect(
+      symlinkDirRow.getByText('Symlink', { exact: true })
+    ).toBeVisible();
 
     // Verify the regular directory shows as "Folder"
-    const regularDirRow = page.getByRole('row').filter({ hasText: 'target_subdir' });
-    await expect(regularDirRow.getByText('Folder')).toBeVisible();
+    const regularDirRow = page
+      .getByRole('row')
+      .filter({ hasText: 'target_subdir' });
+    await expect(
+      regularDirRow.getByText('Folder', { exact: true })
+    ).toBeVisible();
   });
 
   test('context menu works on symlinks', async ({ fileglancerPage: page }) => {
