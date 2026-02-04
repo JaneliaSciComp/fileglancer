@@ -48,15 +48,26 @@ class FileInfo(BaseModel):
     symlink_target_fsp: Optional[dict] = None  # {"fsp_name": str, "subpath": str}
 
     @staticmethod
-    def _safe_readlink(path: str) -> Optional[str]:
+    def _safe_readlink(path: str, root_path: Optional[str] = None) -> Optional[str]:
         """
         Safely read a symlink target.
 
-        This wrapper exists so that any filesystem access based on paths that may
-        originate from user input is centralized and error-tolerant. Callers are
-        expected to have already validated that 'path' is within an allowed root.
+        This wrapper centralizes symlink reading with defense-in-depth validation.
+        When root_path is provided, verifies the symlink's parent directory is
+        within the allowed root before calling os.readlink(). This check uses
+        the parent directory (not realpath of the symlink itself) because
+        realpath would resolve the symlink to its target, which may legitimately
+        be outside root for cross-share symlinks.
         """
         try:
+            if root_path is not None:
+                root_real = os.path.realpath(root_path)
+                # Check the symlink's parent directory is within root
+                # (don't resolve the symlink itself - that would check the target)
+                parent_real = os.path.realpath(os.path.dirname(path))
+                if not (parent_real == root_real or parent_real.startswith(root_real + os.sep)):
+                    logger.warning(f"Refusing to read symlink outside root: {path}")
+                    return None
             return os.readlink(path)
         except OSError as e:
             logger.warning(f"Failed to read symlink target for {path}: {e}")
@@ -64,7 +75,7 @@ class FileInfo(BaseModel):
 
     @classmethod
     def from_stat(cls, path: str, absolute_path: str, stat_result: os.stat_result,
-                  current_user: str = None, session = None):
+                  current_user: str = None, session = None, root_path: Optional[str] = None):
         """Create FileInfo from os.stat_result"""
         if path is None or path == "":
             raise ValueError("Path cannot be None or empty")
@@ -101,7 +112,7 @@ class FileInfo(BaseModel):
 
         if is_symlink and session is not None:
             # Read the symlink target safely
-            target = cls._safe_readlink(absolute_path)
+            target = cls._safe_readlink(absolute_path, root_path=root_path)
             if target is not None:
                 # Resolve to absolute path (relative symlinks need dirname context)
                 if not os.path.isabs(target):
@@ -253,7 +264,8 @@ class Filestore:
         else:
             rel_path = os.path.relpath(full_real, root_real)
         # Pass original full_path so lstat() in from_stat can detect symlinks
-        return FileInfo.from_stat(rel_path, full_path, stat_result, current_user, session)
+        # Pass root_path for defense-in-depth validation in _safe_readlink
+        return FileInfo.from_stat(rel_path, full_path, stat_result, current_user, session, root_path=self.root_path)
 
 
     def get_root_path(self) -> str:
