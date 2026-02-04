@@ -219,6 +219,15 @@ class Filestore:
     def _get_file_info_from_path(self, full_path: str, current_user: str = None, session = None) -> FileInfo:
         """
         Get the FileInfo for a file or directory at the given path.
+
+        Security note: full_path comes from either:
+        1. _check_path_in_root() which validates user input against the root
+        2. os.path.join(verified_directory, entry) where entry is from os.listdir()
+
+        In both cases, the path has been validated or constructed from validated
+        components. We pass full_path (not realpath) to from_stat so that lstat()
+        can detect symlinks. Symlink targets may be outside the root (cross-fileshare
+        symlinks), which is valid - we detect and report them without following.
         """
         stat_result = os.stat(full_path)
         # Use real paths to avoid /var vs /private/var mismatches on macOS.
@@ -228,6 +237,7 @@ class Filestore:
             rel_path = '.'
         else:
             rel_path = os.path.relpath(full_real, root_real)
+        # Pass original full_path so lstat() in from_stat can detect symlinks
         return FileInfo.from_stat(rel_path, full_path, stat_result, current_user, session)
 
 
