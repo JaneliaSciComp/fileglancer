@@ -38,7 +38,6 @@ class FileInfo(BaseModel):
     absolute_path: Optional[str] = None
     size: int
     is_dir: bool
-    is_binary: Optional[bool] = None
     permissions: str
     owner: Optional[str] = None
     group: Optional[str] = None
