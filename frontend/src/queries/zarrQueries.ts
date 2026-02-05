@@ -12,11 +12,11 @@ import { FileOrFolder } from '@/shared.types';
 
 export type OpenWithToolUrls = {
   copy: string;
-  validator: string | null;
-  neuroglancer: string;
-  vole: string | null;
-  avivator: string | null;
-};
+} & Record<string, string | null>;
+
+// The 'copy' key is always present, all other keys are viewer-specific
+// null means the viewer is incompatible with this dataset
+// empty string means the viewer is compatible but no data URL is available yet
 
 export type ZarrMetadata = Metadata | null;
 
