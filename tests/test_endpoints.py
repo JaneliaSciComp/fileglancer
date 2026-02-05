@@ -527,6 +527,89 @@ def test_head_file_content(test_client, temp_dir):
     assert int(response.headers["Content-Length"]) == len(test_content)
 
 
+def test_head_file_content_text_file_is_not_binary(test_client, temp_dir):
+    """Test HEAD request returns X-Is-Binary: false for text files"""
+    # Create a text file
+    test_file = os.path.join(temp_dir, "text_file.txt")
+    test_content = "This is a text file with regular content.\n" * 100
+    with open(test_file, "w") as f:
+        f.write(test_content)
+
+    response = test_client.head("/api/content/tempdir?subpath=text_file.txt")
+    assert response.status_code == 200
+    assert "X-Is-Binary" in response.headers
+    assert response.headers["X-Is-Binary"] == "false"
+
+
+def test_head_file_content_json_file_is_not_binary(test_client, temp_dir):
+    """Test HEAD request returns X-Is-Binary: false for JSON files"""
+    # Create a JSON file
+    test_file = os.path.join(temp_dir, "data.json")
+    test_content = '{"key": "value", "number": 123, "array": [1, 2, 3]}'
+    with open(test_file, "w") as f:
+        f.write(test_content)
+
+    response = test_client.head("/api/content/tempdir?subpath=data.json")
+    assert response.status_code == 200
+    assert "X-Is-Binary" in response.headers
+    assert response.headers["X-Is-Binary"] == "false"
+
+
+def test_head_file_content_binary_file_is_binary(test_client, temp_dir):
+    """Test HEAD request returns X-Is-Binary: true for binary files"""
+    # Create a binary file with null bytes and control characters
+    test_file = os.path.join(temp_dir, "binary_file.bin")
+    binary_content = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x10'
+    with open(test_file, "wb") as f:
+        f.write(binary_content)
+
+    response = test_client.head("/api/content/tempdir?subpath=binary_file.bin")
+    assert response.status_code == 200
+    assert "X-Is-Binary" in response.headers
+    assert response.headers["X-Is-Binary"] == "true"
+
+
+def test_head_file_content_large_text_file_is_not_binary(test_client, temp_dir):
+    """Test HEAD request checks only first 4KB for large text files"""
+    # Create a large text file (10KB)
+    test_file = os.path.join(temp_dir, "large_text.txt")
+    # Repeat text to create a 10KB file
+    test_content = "This is line number {}\n".format(1) * 500
+    with open(test_file, "w") as f:
+        f.write(test_content)
+
+    response = test_client.head("/api/content/tempdir?subpath=large_text.txt")
+    assert response.status_code == 200
+    assert "X-Is-Binary" in response.headers
+    assert response.headers["X-Is-Binary"] == "false"
+
+
+def test_head_file_content_directory_no_binary_check(test_client, temp_dir):
+    """Test HEAD request for directory doesn't include X-Is-Binary header"""
+    # Create a subdirectory
+    test_dir = os.path.join(temp_dir, "test_subdir")
+    os.makedirs(test_dir, exist_ok=True)
+
+    response = test_client.head("/api/content/tempdir?subpath=test_subdir")
+    assert response.status_code == 200
+    # For directories, is_binary should be false (default)
+    assert "X-Is-Binary" in response.headers
+    assert response.headers["X-Is-Binary"] == "false"
+
+
+def test_head_file_content_empty_file_is_not_binary(test_client, temp_dir):
+    """Test HEAD request returns X-Is-Binary: false for empty files"""
+    # Create an empty file
+    test_file = os.path.join(temp_dir, "empty_file.txt")
+    with open(test_file, "w") as f:
+        pass  # Empty file
+
+    response = test_client.head("/api/content/tempdir?subpath=empty_file.txt")
+    assert response.status_code == 200
+    assert "X-Is-Binary" in response.headers
+    assert response.headers["X-Is-Binary"] == "false"
+
+
 def test_get_file_content(test_client, temp_dir):
     """Test GET request for file content"""
     # Create a test file

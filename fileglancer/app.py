@@ -1124,8 +1124,11 @@ def create_app(settings):
             try:
                 file_info = filestore.get_file_info(subpath)
 
+                is_binary = filestore.check_is_binary(subpath)
+
                 headers = {
                     'Accept-Ranges': 'bytes',
+                    'X-Is-Binary': 'true' if is_binary else 'false',
                 }
 
                 if content_type == 'application/octet-stream' and file_name:
