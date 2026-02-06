@@ -186,10 +186,9 @@ def test_symlink_detection(test_dir):
     symlink_path = os.path.join(test_dir, "link_to_target")
     os.symlink(target_file, symlink_path)
 
-    # Get FileInfo using stat (follow symlink for stat_result)
-    # Note: pass the symlink path as absolute_path so lstat can detect it
+    lstat_result = os.lstat(symlink_path)
     stat_result = os.stat(symlink_path)
-    file_info = FileInfo.from_stat("link_to_target", symlink_path, stat_result)
+    file_info = FileInfo.from_stat("link_to_target", symlink_path, lstat_result, stat_result)
 
     assert file_info.is_symlink is True
     assert file_info.name == "link_to_target"
@@ -364,8 +363,8 @@ def test_yield_file_infos_with_symlinks(filestore, test_dir):
         database.find_fsp_from_absolute_path = original_find
 
 
-def test_broken_symlink_not_listed(filestore, test_dir):
-    """Test that broken symlinks are not listed (caught by OSError)"""
+def test_broken_symlink_is_listed(filestore, test_dir):
+    """Test that broken symlinks are listed with is_symlink=True and symlink_target_fsp=None"""
     # Create a broken symlink
     broken_link = os.path.join(test_dir, "broken_link")
     os.symlink("/nonexistent/path", broken_link)
@@ -374,12 +373,18 @@ def test_broken_symlink_not_listed(filestore, test_dir):
     with open(os.path.join(test_dir, "valid_file.txt"), "w") as f:
         f.write("valid")
 
-    # List directory - broken symlink should not appear
+    # List directory - broken symlink should now appear
     files = list(filestore.yield_file_infos(""))
     file_names = [f.name for f in files]
 
     assert "valid_file.txt" in file_names
-    assert "broken_link" not in file_names  # Broken symlink should be skipped
+    assert "broken_link" in file_names  # Broken symlink is now listed
+
+    # Find the broken symlink and verify its properties
+    broken_link_info = next((f for f in files if f.name == "broken_link"), None)
+    assert broken_link_info is not None
+    assert broken_link_info.is_symlink is True
+    assert broken_link_info.symlink_target_fsp is None  # Target not resolvable
 
 
 def test_symlink_to_directory(filestore, test_dir):
@@ -413,3 +418,20 @@ def test_symlink_to_directory(filestore, test_dir):
         assert symlink_info.symlink_target_fsp is not None
     finally:
         database.find_fsp_from_absolute_path = original_find
+
+
+def test_broken_symlink_detection(test_dir, filestore):
+    """Test that broken symlinks are detected and returned with is_symlink=True"""
+    # Create a broken symlink
+    broken_link_path = os.path.join(test_dir, "broken_link")
+    os.symlink("/nonexistent/path", broken_link_path)
+
+    # Get file infos - broken symlink should be included
+    file_infos = list(filestore.yield_file_infos(None))
+
+    # Find the broken symlink in results
+    broken_link_info = next((f for f in file_infos if f.name == "broken_link"), None)
+
+    assert broken_link_info is not None, "Broken symlink should be returned"
+    assert broken_link_info.is_symlink is True, "Should be marked as symlink"
+    assert broken_link_info.symlink_target_fsp is None, "Target should be None for broken symlink"
