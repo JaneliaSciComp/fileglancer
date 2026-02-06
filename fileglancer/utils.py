@@ -33,6 +33,34 @@ def guess_content_type(filename):
             return 'application/octet-stream'
 
 
+def is_likely_binary(data: bytes) -> bool:
+    """
+    Heuristic to determine if data is likely binary (as opposed to text).
+
+    Checks the proportion of control characters in the data. If more than 1%
+    of bytes are control characters (excluding common whitespace like tab,
+    newline, carriage return), the file is likely binary.
+
+    Args:
+        data: Bytes to analyze (typically first few KB of a file)
+
+    Returns:
+        True if data appears to be binary, False if it appears to be text
+    """
+    if not data:
+        return False
+
+    control_count = 0
+    for byte in data:
+        # Count control characters, excluding common whitespace:
+        # 9 (tab), 10 (LF), 11 (VT), 12 (FF), 13 (CR)
+        if byte < 9 or (byte > 13 and byte < 32):
+            control_count += 1
+
+    # If more than 1% of bytes are control characters, consider it binary
+    return control_count / len(data) >= 0.01
+
+
 def parse_range_header(range_header: str, file_size: int):
     """Parse HTTP Range header and return start and end byte positions."""
     if not range_header or not range_header.startswith('bytes='):

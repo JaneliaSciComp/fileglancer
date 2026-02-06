@@ -144,7 +144,7 @@ type RequestBody = Record<string, unknown>;
 
 async function sendFetchRequest(
   apiPath: string,
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD',
   body?: RequestBody,
   options?: FetchRequestOptions
 ): Promise<Response> {
@@ -153,9 +153,11 @@ async function sendFetchRequest(
     credentials: 'include',
     headers: {
       ...(method !== 'GET' &&
+        method !== 'HEAD' &&
         method !== 'DELETE' && { 'Content-Type': 'application/json' })
     },
     ...(method !== 'GET' &&
+      method !== 'HEAD' &&
       method !== 'DELETE' &&
       body && { body: JSON.stringify(body) }),
     ...(options?.signal && { signal: options.signal })
