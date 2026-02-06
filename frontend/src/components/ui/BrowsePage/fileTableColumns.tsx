@@ -13,6 +13,7 @@ export const typeColumn: ColumnDef<FileOrFolder> = {
   cell: ({ row }) => {
     const file = row.original;
     if (file.is_symlink) {
+      // Valid symlink
       return <Typography>Symlink</Typography>;
     }
     return <Typography>{file.is_dir ? 'Folder' : 'File'}</Typography>;
