@@ -134,14 +134,20 @@ export default function FileBrowser({
             toast.success(`Favorite ${isFavorite ? 'removed!' : 'added!'}`);
           }
         },
-        shouldShow: fileBrowserState.selectedFiles[0]?.is_dir ?? false
+        shouldShow:
+          (fileBrowserState.selectedFiles[0]?.is_dir &&
+            !fileBrowserState.selectedFiles[0].is_symlink) ??
+          false
       },
       {
         name: 'Convert images to OME-Zarr',
         action: () => {
           setShowConvertFileDialog(true);
         },
-        shouldShow: tasksEnabled && propertiesTarget.is_dir
+        shouldShow:
+          tasksEnabled &&
+          propertiesTarget.is_dir &&
+          !propertiesTarget.is_symlink
       },
       {
         name: 'Rename',

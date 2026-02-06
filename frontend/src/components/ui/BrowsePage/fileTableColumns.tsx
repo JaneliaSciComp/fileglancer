@@ -10,9 +10,14 @@ import { formatUnixTimestamp, formatFileSize } from '@/utils';
 export const typeColumn: ColumnDef<FileOrFolder> = {
   accessorKey: 'is_dir',
   header: 'Type',
-  cell: ({ getValue }) => (
-    <Typography>{getValue() ? 'Folder' : 'File'}</Typography>
-  ),
+  cell: ({ row }) => {
+    const file = row.original;
+    if (file.is_symlink) {
+      // Valid symlink
+      return <Typography>Symlink</Typography>;
+    }
+    return <Typography>{file.is_dir ? 'Folder' : 'File'}</Typography>;
+  },
   sortingFn: (rowA, rowB) => {
     const a = rowA.original.is_dir;
     const b = rowB.original.is_dir;

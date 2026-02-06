@@ -133,8 +133,13 @@ export const FileBrowserContextProvider = ({
     file: FileOrFolder,
     showFilePropertiesDrawer: boolean
   ) => {
+    const isBrokenSymlink = file.is_symlink && !file.symlink_target_fsp;
     // If clicking on a file (not directory), navigate to the file URL
-    if (!file.is_dir && fileQuery.data?.currentFileSharePath) {
+    if (
+      !file.is_dir &&
+      fileQuery.data?.currentFileSharePath &&
+      !isBrokenSymlink
+    ) {
       const fileLink = makeBrowseLink(
         fileQuery.data?.currentFileSharePath.name,
         file.path
