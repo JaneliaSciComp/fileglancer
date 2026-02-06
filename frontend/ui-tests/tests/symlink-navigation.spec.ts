@@ -199,17 +199,35 @@ test.describe('Symlink Navigation and Display', () => {
     await page.keyboard.press('Escape');
   });
 
-  test('broken symlinks are not displayed', async ({
+  test('broken symlinks are displayed with broken link icon', async ({
     fileglancerPage: page
   }) => {
     // The broken_symlink was created pointing to /nonexistent/path
-    // It should NOT appear in the file list because os.stat() fails on broken symlinks
-    // and the backend catches that error and skips the entry
-    await expect(
-      page.getByText('broken_symlink', { exact: true })
-    ).not.toBeVisible();
+    // It should now appear in the file list with a broken link icon
+    const brokenLinkRow = page
+      .getByRole('row')
+      .filter({ hasText: 'broken_symlink' });
 
-    // But valid files should still be visible
+    await expect(brokenLinkRow).toBeVisible();
+
+    // Verify broken link icon is visible (TbLinkOff with text-error class)
+    await expect(brokenLinkRow.locator('svg.text-error')).toBeVisible();
+
+    // Verify Type column shows "Symlink"
+    await expect(
+      brokenLinkRow.getByText('Symlink', { exact: true })
+    ).toBeVisible();
+
+    // Verify the name is NOT a hyperlink (should be plain Typography)
+    // Get the text element and verify it's not an anchor
+    const nameCell = brokenLinkRow.locator('td').first();
+    const linkElement = nameCell.locator('a');
+    await expect(linkElement).not.toBeVisible();
+
+    // But the text itself should be visible
+    await expect(nameCell.getByText('broken_symlink')).toBeVisible();
+
+    // Verify valid files are still visible
     await expect(
       page.getByText('regular_file.txt', { exact: true })
     ).toBeVisible();
