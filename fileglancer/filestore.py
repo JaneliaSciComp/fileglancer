@@ -73,16 +73,85 @@ class FileInfo(BaseModel):
             logger.warning(f"Failed to read symlink target for {path}: {e}")
             return None
 
+    @staticmethod
+    def _get_stat_result(absolute_path: str, is_symlink: bool, lstat_result: os.stat_result) -> os.stat_result:
+        """
+        Get the appropriate stat result for a file, handling broken symlinks.
+
+        For symlinks, attempts to stat the target. If that fails (broken symlink),
+        returns the lstat result instead.
+        """
+        if is_symlink:
+            try:
+                # Try to stat the target for file metadata
+                return os.stat(absolute_path)
+            except (FileNotFoundError, PermissionError, OSError) as e:
+                # Broken symlink - use lstat_result as the stat_result
+                logger.warning(f"Broken symlink detected: {absolute_path}: {e}")
+                return lstat_result
+        else:
+            # Not a symlink, stat it normally
+            return os.stat(absolute_path)
+
     @classmethod
-    def from_stat(cls, path: str, absolute_path: str, stat_result: os.stat_result,
-                  current_user: str = None, session = None, root_path: Optional[str] = None):
-        """Create FileInfo from os.stat_result"""
+    def _get_symlink_target_fsp(cls, absolute_path: str, is_symlink: bool, session,
+                                root_path: Optional[str]) -> Optional[dict]:
+        """
+        Resolve a symlink target to a file share path.
+
+        Returns a dict with fsp_name and subpath if the target is in a known file share,
+        or None if not a symlink, target not found, or target not in any file share.
+        """
+        if not is_symlink or session is None:
+            return None
+
+        # Read the symlink target safely
+        target = cls._safe_readlink(absolute_path, root_path=root_path)
+        if target is None:
+            return None
+
+        # Resolve to absolute path (relative symlinks need dirname context)
+        if not os.path.isabs(target):
+            target = os.path.join(os.path.dirname(absolute_path), target)
+        target = os.path.abspath(target)
+
+        # Try to find which file share contains this target
+        # If stat failed earlier (broken symlink), we won't find a match
+        try:
+            from fileglancer.database import find_fsp_from_absolute_path
+            match = find_fsp_from_absolute_path(session, target)
+            if match:
+                fsp, subpath = match
+                return {"fsp_name": fsp.name, "subpath": subpath}
+        except (FileNotFoundError, PermissionError, OSError):
+            # Target doesn't exist or isn't accessible
+            pass
+
+        return None
+
+    @classmethod
+    def from_stat(cls, path: str, absolute_path: str, current_user: str = None,
+                  session = None, root_path: Optional[str] = None):
+        """
+        Create FileInfo by stat'ing the given path, handling broken symlinks gracefully.
+
+        Uses lstat to detect symlinks, then attempts to stat the target. For broken
+        symlinks, falls back to using lstat data.
+        """
         if path is None or path == "":
             raise ValueError("Path cannot be None or empty")
+
+        # Use lstat to detect symlinks without following them
+        lstat_result = os.lstat(absolute_path)
+        is_symlink = stat.S_ISLNK(lstat_result.st_mode)
+
+        # Get the appropriate stat result (handles broken symlinks)
+        stat_result = cls._get_stat_result(absolute_path, is_symlink, lstat_result)
+
         is_dir = stat.S_ISDIR(stat_result.st_mode)
         size = 0 if is_dir else stat_result.st_size
         # Do not expose the name of the root directory
-        name = '' if path=='.' else os.path.basename(absolute_path)
+        name = '' if path == '.' else os.path.basename(absolute_path)
         permissions = stat.filemode(stat_result.st_mode)
         last_modified = stat_result.st_mtime
 
@@ -105,26 +174,8 @@ class FileInfo(BaseModel):
             hasRead = cls._has_read_permission(stat_result, current_user, owner, group)
             hasWrite = cls._has_write_permission(stat_result, current_user, owner, group)
 
-        # Use lstat to detect symlinks without following them
-        lstat_result = os.lstat(absolute_path)
-        is_symlink = stat.S_ISLNK(lstat_result.st_mode)
-        symlink_target_fsp = None
-
-        if is_symlink and session is not None:
-            # Read the symlink target safely
-            target = cls._safe_readlink(absolute_path, root_path=root_path)
-            if target is not None:
-                # Resolve to absolute path (relative symlinks need dirname context)
-                if not os.path.isabs(target):
-                    target = os.path.join(os.path.dirname(absolute_path), target)
-                target = os.path.abspath(target)
-
-                # Find which file share contains this target
-                from fileglancer.database import find_fsp_from_absolute_path
-                match = find_fsp_from_absolute_path(session, target)
-                if match:
-                    fsp, subpath = match
-                    symlink_target_fsp = {"fsp_name": fsp.name, "subpath": subpath}
+        # Resolve symlink target to file share path if applicable
+        symlink_target_fsp = cls._get_symlink_target_fsp(absolute_path, is_symlink, session, root_path)
 
         return cls(
             name=name,
@@ -255,7 +306,6 @@ class Filestore:
         can detect symlinks. Symlink targets may be outside the root (cross-fileshare
         symlinks), which is valid - we detect and report them without following.
         """
-        stat_result = os.stat(full_path)
         # Use real paths to avoid /var vs /private/var mismatches on macOS.
         root_real = os.path.realpath(self.root_path)
         full_real = os.path.realpath(full_path)
@@ -263,9 +313,11 @@ class Filestore:
             rel_path = '.'
         else:
             rel_path = os.path.relpath(full_real, root_real)
-        # Pass original full_path so lstat() in from_stat can detect symlinks
+        # Let from_stat handle all stat/lstat logic internally
+        # This allows it to handle broken symlinks gracefully
         # Pass root_path for defense-in-depth validation in _safe_readlink
-        return FileInfo.from_stat(rel_path, full_path, stat_result, current_user, session, root_path=self.root_path)
+        return FileInfo.from_stat(rel_path, full_path, current_user=current_user,
+                                 session=session, root_path=self.root_path)
 
 
     def get_root_path(self) -> str:
@@ -336,8 +388,9 @@ class Filestore:
             entry_path = os.path.join(full_path, entry)
             try:
                 yield self._get_file_info_from_path(entry_path, current_user, session)
-            except (FileNotFoundError, PermissionError, OSError) as e:
-                logger.error(f"Error accessing entry: {entry_path}: {e}")
+            except PermissionError as e:
+                # Skip files we don't have permission to access
+                logger.error(f"Permission denied accessing entry: {entry_path}: {e}")
                 continue
 
 
