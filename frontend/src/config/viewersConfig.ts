@@ -90,11 +90,10 @@ export function parseViewersConfig(yamlContent: string): ViewersConfigYaml {
         const viewer = configData.viewers?.[viewerIndex];
 
         if (viewer && typeof viewer === 'object' && 'manifest_url' in viewer) {
-          const manifestUrl = (viewer as { manifest_url: unknown }).manifest_url;
+          const manifestUrl = (viewer as { manifest_url: unknown })
+            .manifest_url;
           if (typeof manifestUrl === 'string') {
-            throw new Error(
-              `Viewer "${manifestUrl}": ${firstError.message}`
-            );
+            throw new Error(`Viewer "${manifestUrl}": ${firstError.message}`);
           }
         }
       }

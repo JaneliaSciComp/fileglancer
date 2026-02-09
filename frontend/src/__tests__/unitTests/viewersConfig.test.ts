@@ -190,7 +190,9 @@ viewers:
     label: 123
 `;
 
-      expect(() => parseViewersConfig(yaml)).toThrow(/"label" must be a string/);
+      expect(() => parseViewersConfig(yaml)).toThrow(
+        /"label" must be a string/
+      );
     });
 
     it('should throw error when logo is not a string', () => {
