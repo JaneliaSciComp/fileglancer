@@ -393,9 +393,10 @@ async def submit_job(
             parameters=parameters,
             resources=resources_dict,
         )
+        job_id = db_job.id
 
     # Build work directory and wrap command
-    work_dir = _build_work_dir(db_job.id, manifest.name, entry_point.id)
+    work_dir = _build_work_dir(job_id, manifest.name, entry_point.id)
     command = f"mkdir -p {work_dir} && cd {work_dir} && {command}"
 
     # Set work_dir on resource spec for LSF -cwd support
@@ -410,13 +411,14 @@ async def submit_job(
         resources=resource_spec,
     )
 
-    # Update DB with cluster job ID
+    # Update DB with cluster job ID and return fresh object
     with db.get_db_session(settings.db_url) as session:
         db.update_job_status(
-            session, db_job.id, "PENDING",
+            session, job_id, "PENDING",
             cluster_job_id=cluster_job.job_id,
         )
-        db_job = db.get_job(session, db_job.id, username)
+        db_job = db.get_job(session, job_id, username)
+        session.expunge(db_job)
 
     logger.info(f"Job {db_job.id} submitted for user {username} in {work_dir}: {command}")
     return db_job
@@ -476,6 +478,7 @@ async def cancel_job(job_id: int, username: str) -> db.JobDB:
         now = datetime.now(UTC)
         db.update_job_status(session, db_job.id, "KILLED", finished_at=now)
         db_job = db.get_job(session, db_job.id, username)
+        session.expunge(db_job)
 
     logger.info(f"Job {job_id} cancelled by user {username}")
     return db_job
@@ -515,6 +518,7 @@ async def get_job_file_content(job_id: int, username: str, file_type: str) -> Op
         db_job = db.get_job(session, job_id, username)
         if db_job is None:
             raise ValueError(f"Job {job_id} not found")
+        session.expunge(db_job)
 
     if file_type == "script":
         # Try executor's tracked script_path first
