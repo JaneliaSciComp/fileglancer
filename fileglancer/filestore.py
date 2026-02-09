@@ -73,26 +73,6 @@ class FileInfo(BaseModel):
             logger.warning(f"Failed to read symlink target for {path}: {e}")
             return None
 
-    @staticmethod
-    def _get_stat_result(absolute_path: str, is_symlink: bool, lstat_result: os.stat_result) -> os.stat_result:
-        """
-        Get the appropriate stat result for a file, handling broken symlinks.
-
-        For symlinks, attempts to stat the target. If that fails (broken symlink),
-        returns the lstat result instead.
-        """
-        if is_symlink:
-            try:
-                # Try to stat the target for file metadata
-                return os.stat(absolute_path)
-            except (FileNotFoundError, PermissionError, OSError) as e:
-                # Broken symlink - use lstat_result as the stat_result
-                logger.warning(f"Broken symlink detected: {absolute_path}: {e}")
-                return lstat_result
-        else:
-            # Not a symlink, stat it normally
-            return os.stat(absolute_path)
-
     @classmethod
     def _get_symlink_target_fsp(cls, absolute_path: str, is_symlink: bool, session,
                                 root_path: Optional[str]) -> Optional[dict]:
@@ -307,6 +287,11 @@ class Filestore:
         components. We pass full_path (not realpath) to from_stat so that lstat()
         can detect symlinks. Symlink targets may be outside the root (cross-fileshare
         symlinks), which is valid - we detect and report them without following.
+
+        All filesystem I/O (lstat/stat) is performed here rather than in
+        FileInfo.from_stat so that path validation and I/O are in the same
+        method, which allows static analysis tools (CodeQL) to see that the
+        path is sanitized before use.
         """
         root_real = os.path.realpath(self.root_path)
 
@@ -343,11 +328,17 @@ class Filestore:
         else:
             rel_path = os.path.relpath(full_real, root_real)
 
-        # Perform filesystem stat calls here, after validation, so that
-        # the sanitizer and the I/O are in the same method.
+        # Perform all filesystem stat calls here, after validation.
         lstat_result = os.lstat(full_path)
         is_symlink = stat.S_ISLNK(lstat_result.st_mode)
-        stat_result = FileInfo._get_stat_result(full_path, is_symlink, lstat_result)
+        if is_symlink:
+            try:
+                stat_result = os.stat(full_path)
+            except (FileNotFoundError, PermissionError, OSError) as e:
+                logger.warning(f"Broken symlink detected: {full_path}: {e}")
+                stat_result = lstat_result
+        else:
+            stat_result = os.stat(full_path)
 
         return FileInfo.from_stat(
             rel_path, full_path, lstat_result, stat_result,
