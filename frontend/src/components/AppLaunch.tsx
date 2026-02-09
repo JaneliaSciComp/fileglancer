@@ -11,6 +11,7 @@ import { useSubmitJobMutation } from '@/queries/jobsQueries';
 import type { AppEntryPoint, AppResourceDefaults } from '@/shared.types';
 
 type LaunchState = {
+  appUrl?: string;
   entryPointId?: string;
   parameters?: Record<string, unknown>;
 } | null;
@@ -25,7 +26,12 @@ export default function AppLaunch() {
     useState<AppEntryPoint | null>(null);
 
   const launchState = (location.state as LaunchState) || null;
-  const appUrl = encodedUrl ? decodeURIComponent(encodedUrl) : '';
+  // Prefer app URL from state (relaunch), fall back to path param (normal launch)
+  const appUrl = launchState?.appUrl
+    ? launchState.appUrl
+    : encodedUrl
+      ? decodeURIComponent(encodedUrl)
+      : '';
 
   useEffect(() => {
     if (appUrl) {

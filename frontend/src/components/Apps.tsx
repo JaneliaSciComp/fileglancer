@@ -60,9 +60,9 @@ export default function Apps() {
   };
 
   const handleRelaunch = (job: Job) => {
-    const encodedUrl = btoa(job.app_url);
-    navigate(`/apps/launch/${encodedUrl}`, {
+    navigate('/apps/launch/relaunch', {
       state: {
+        appUrl: job.app_url,
         entryPointId: job.entry_point_id,
         parameters: job.parameters
       }

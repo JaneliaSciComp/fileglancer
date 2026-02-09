@@ -16,8 +16,9 @@ export default function AppCard({ app, onRemove, removing }: AppCardProps) {
   const navigate = useNavigate();
 
   const handleLaunch = () => {
-    const encodedUrl = encodeURIComponent(app.url);
-    navigate(`/apps/launch/${encodedUrl}`);
+    navigate('/apps/launch/app', {
+      state: { appUrl: app.url }
+    });
   };
 
   return (

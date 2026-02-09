@@ -1466,6 +1466,7 @@ def create_app(settings):
     async def fetch_manifest(body: ManifestFetchRequest,
                              username: str = Depends(get_current_user)):
         try:
+            logger.info(f"Fetching manifest for URL: '{body.url}'")
             manifest = await apps_module.fetch_app_manifest(body.url)
             return manifest
         except httpx.HTTPStatusError as e:
