@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 
-import { Button, Typography } from '@material-tailwind/react';
+import { Button, Tabs, Typography } from '@material-tailwind/react';
 import { HiOutlineArrowLeft } from 'react-icons/hi';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import {
@@ -14,39 +14,27 @@ import { formatDateString } from '@/utils';
 import { useJobQuery, useJobFileQuery } from '@/queries/jobsQueries';
 
 function FilePreview({
-  title,
   content,
   language,
   isDarkMode
 }: {
-  readonly title: string;
   readonly content: string | null | undefined;
   readonly language: string;
   readonly isDarkMode: boolean;
 }) {
   if (content === undefined) {
     return (
-      <div className="mb-6">
-        <Typography className="text-foreground font-medium mb-2" type="h6">
-          {title}
-        </Typography>
-        <Typography className="text-secondary p-4" type="small">
-          Loading...
-        </Typography>
-      </div>
+      <Typography className="text-secondary p-4" type="small">
+        Loading...
+      </Typography>
     );
   }
 
   if (content === null) {
     return (
-      <div className="mb-6">
-        <Typography className="text-foreground font-medium mb-2" type="h6">
-          {title}
-        </Typography>
-        <Typography className="text-secondary p-4 italic" type="small">
-          File not available
-        </Typography>
-      </div>
+      <Typography className="text-secondary p-4 italic" type="small">
+        File not available
+      </Typography>
     );
   }
 
@@ -54,37 +42,32 @@ function FilePreview({
   const themeCodeStyles = theme['code[class*="language-"]'] || {};
 
   return (
-    <div className="mb-6">
-      <Typography className="text-foreground font-medium mb-2" type="h6">
-        {title}
-      </Typography>
-      <div className="border border-primary-light rounded overflow-auto max-h-96">
-        <SyntaxHighlighter
-          codeTagProps={{
-            style: {
-              ...themeCodeStyles,
-              paddingBottom: '2em'
-            }
-          }}
-          customStyle={{
-            margin: 0,
-            padding: '1rem',
-            fontSize: '14px',
-            lineHeight: '1.5',
-            overflow: 'visible',
-            width: '100%',
-            boxSizing: 'border-box',
-            minHeight: 'fit-content'
-          }}
-          language={language}
-          showLineNumbers={false}
-          style={theme}
-          wrapLines={true}
-          wrapLongLines={true}
-        >
-          {content}
-        </SyntaxHighlighter>
-      </div>
+    <div className="border border-primary-light rounded overflow-auto max-h-[70vh]">
+      <SyntaxHighlighter
+        codeTagProps={{
+          style: {
+            ...themeCodeStyles,
+            paddingBottom: '2em'
+          }
+        }}
+        customStyle={{
+          margin: 0,
+          padding: '1rem',
+          fontSize: '14px',
+          lineHeight: '1.5',
+          overflow: 'visible',
+          width: '100%',
+          boxSizing: 'border-box',
+          minHeight: 'fit-content'
+        }}
+        language={language}
+        showLineNumbers={false}
+        style={theme}
+        wrapLines={true}
+        wrapLongLines={true}
+      >
+        {content}
+      </SyntaxHighlighter>
     </div>
   );
 }
@@ -93,6 +76,7 @@ export default function JobDetail() {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [activeTab, setActiveTab] = useState('parameters');
 
   const id = jobId ? parseInt(jobId) : 0;
   const jobQuery = useJobQuery(id);
@@ -164,58 +148,81 @@ export default function JobDetail() {
             </div>
           </div>
 
-          {/* Parameters */}
-          {Object.keys(job.parameters).length > 0 ? (
-            <div className="mb-6">
-              <Typography
-                className="text-foreground font-medium mb-2"
-                type="h6"
+          {/* Tabs */}
+          <Tabs onValueChange={setActiveTab} value={activeTab}>
+            <Tabs.List className="justify-start items-stretch shrink-0 min-w-fit w-full py-2 bg-surface dark:bg-surface-light">
+              <Tabs.Trigger
+                className="!text-foreground h-full"
+                value="parameters"
               >
                 Parameters
-              </Typography>
-              <div className="border border-primary-light rounded p-3 bg-surface/30">
-                {Object.entries(job.parameters).map(([key, value]) => (
-                  <div className="flex gap-2 py-1" key={key}>
-                    <Typography
-                      className="text-secondary font-medium"
-                      type="small"
-                    >
-                      {key}:
-                    </Typography>
-                    <Typography className="text-foreground" type="small">
-                      {String(value)}
-                    </Typography>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
+              </Tabs.Trigger>
+              <Tabs.Trigger className="!text-foreground h-full" value="script">
+                Script
+              </Tabs.Trigger>
+              <Tabs.Trigger className="!text-foreground h-full" value="stdout">
+                Output Log
+              </Tabs.Trigger>
+              <Tabs.Trigger className="!text-foreground h-full" value="stderr">
+                Error Log
+              </Tabs.Trigger>
+              <Tabs.TriggerIndicator className="h-full" />
+            </Tabs.List>
 
-          {/* File Previews */}
-          <FilePreview
-            content={
-              scriptQuery.isPending ? undefined : (scriptQuery.data ?? null)
-            }
-            isDarkMode={isDarkMode}
-            language="bash"
-            title="Script"
-          />
-          <FilePreview
-            content={
-              stdoutQuery.isPending ? undefined : (stdoutQuery.data ?? null)
-            }
-            isDarkMode={isDarkMode}
-            language="text"
-            title="Standard Output"
-          />
-          <FilePreview
-            content={
-              stderrQuery.isPending ? undefined : (stderrQuery.data ?? null)
-            }
-            isDarkMode={isDarkMode}
-            language="text"
-            title="Standard Error"
-          />
+            <Tabs.Panel className="pt-4" value="parameters">
+              {Object.keys(job.parameters).length > 0 ? (
+                <div className="border border-primary-light rounded p-3 bg-surface/30">
+                  {Object.entries(job.parameters).map(([key, value]) => (
+                    <div className="flex gap-2 py-1" key={key}>
+                      <Typography
+                        className="text-secondary font-medium"
+                        type="small"
+                      >
+                        {key}:
+                      </Typography>
+                      <Typography className="text-foreground" type="small">
+                        {String(value)}
+                      </Typography>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Typography className="text-secondary italic" type="small">
+                  No parameters
+                </Typography>
+              )}
+            </Tabs.Panel>
+
+            <Tabs.Panel className="pt-4" value="script">
+              <FilePreview
+                content={
+                  scriptQuery.isPending ? undefined : (scriptQuery.data ?? null)
+                }
+                isDarkMode={isDarkMode}
+                language="bash"
+              />
+            </Tabs.Panel>
+
+            <Tabs.Panel className="pt-4" value="stdout">
+              <FilePreview
+                content={
+                  stdoutQuery.isPending ? undefined : (stdoutQuery.data ?? null)
+                }
+                isDarkMode={isDarkMode}
+                language="text"
+              />
+            </Tabs.Panel>
+
+            <Tabs.Panel className="pt-4" value="stderr">
+              <FilePreview
+                content={
+                  stderrQuery.isPending ? undefined : (stderrQuery.data ?? null)
+                }
+                isDarkMode={isDarkMode}
+                language="text"
+              />
+            </Tabs.Panel>
+          </Tabs>
         </div>
       ) : null}
     </div>
