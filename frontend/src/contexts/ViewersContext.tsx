@@ -7,8 +7,8 @@ import {
   type ReactNode
 } from 'react';
 import {
-  initializeViewerManifests,
-  getCompatibleViewers as getCompatibleViewersFromManifest,
+  loadManifestsFromUrls,
+  isCompatible,
   type ViewerManifest,
   type OmeZarrMetadata
 } from '@bioimagetools/capability-manifest';
@@ -33,10 +33,8 @@ export interface ValidViewer {
   logoPath: string;
   /** Tooltip/alt text label */
   label: string;
-  /** Associated capability manifest (if available) */
-  manifest?: ViewerManifest;
-  /** Supported OME-Zarr versions (for viewers without manifests) */
-  supportedVersions?: number[];
+  /** Associated capability manifest (required) */
+  manifest: ViewerManifest;
 }
 
 interface ViewersContextType {
@@ -50,32 +48,30 @@ const ViewersContext = createContext<ViewersContextType | undefined>(undefined);
 
 /**
  * Load viewers configuration from build-time config file
- * @param viewersWithManifests - Array of viewer names that have capability manifests
  */
-async function loadViewersConfig(
-  viewersWithManifests: string[]
-): Promise<ViewerConfigEntry[]> {
+async function loadViewersConfig(): Promise<ViewerConfigEntry[]> {
   let configYaml: string;
 
   try {
-    // Try to dynamically import the config file
-    // This will be resolved at build time by Vite
     const module = await import('@/config/viewers.config.yaml?raw');
     configYaml = module.default;
     log.info(
       'Using custom viewers configuration from src/config/viewers.config.yaml'
     );
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {
     log.info(
-      'No custom viewers.config.yaml found, using default configuration (neuroglancer only)'
+      'No custom viewers.config.yaml found, using default configuration'
     );
-    // Return default configuration
-    return [{ name: 'neuroglancer' }];
+    return [
+      {
+        manifest_url:
+          'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/neuroglancer.yaml'
+      }
+    ];
   }
 
   try {
-    const config = parseViewersConfig(configYaml, viewersWithManifests);
+    const config = parseViewersConfig(configYaml);
     return config.viewers;
   } catch (error) {
     log.error('Error parsing viewers configuration:', error);
@@ -104,79 +100,71 @@ export function ViewersProvider({
       try {
         log.info('Initializing viewers configuration...');
 
+        // Load viewer config entries
+        const configEntries = await loadViewersConfig();
+        log.info(`Loaded configuration for ${configEntries.length} viewers`);
+
+        // Extract manifest URLs
+        const manifestUrls = configEntries.map(entry => entry.manifest_url);
+
         // Load capability manifests
-        let loadedManifests: ViewerManifest[] = [];
+        let manifestsMap: Map<string, ViewerManifest>;
         try {
-          loadedManifests = await initializeViewerManifests();
-          log.info(
-            `Loaded ${loadedManifests.length} viewer capability manifests`
-          );
+          manifestsMap = await loadManifestsFromUrls(manifestUrls);
+          log.info(`Loaded ${manifestsMap.size} viewer capability manifests`);
         } catch (manifestError) {
-          log.warn('Failed to load capability manifests:', manifestError);
-          log.warn(
-            'Continuing without capability manifests. Only custom viewers with explicit configuration will be available.'
+          log.error('Failed to load capability manifests:', manifestError);
+          throw new Error(
+            `Failed to load viewer manifests: ${manifestError instanceof Error ? manifestError.message : 'Unknown error'}`
           );
         }
-
-        const viewersWithManifests = loadedManifests.map(m => m.viewer.name);
-
-        // Load viewer config entries
-        const configEntries = await loadViewersConfig(viewersWithManifests);
-        log.info(`Loaded configuration for ${configEntries.length} viewers`);
 
         const validated: ValidViewer[] = [];
 
         // Map through viewer config entries to validate
         for (const entry of configEntries) {
-          const key = normalizeViewerName(entry.name);
-          const manifest = loadedManifests.find(
-            m => normalizeViewerName(m.viewer.name) === key
-          );
+          const manifest = manifestsMap.get(entry.manifest_url);
 
-          let urlTemplate: string | undefined = entry.url;
-          let shouldInclude = true;
-          let skipReason = '';
-
-          if (manifest) {
-            if (!urlTemplate) {
-              // Use manifest template URL if no override
-              urlTemplate = manifest.viewer.template_url;
-            }
-
-            if (!urlTemplate) {
-              shouldInclude = false;
-              skipReason = `has capability manifest but no template_url and no URL override in config`;
-            }
-          } else {
-            // No capability manifest
-            if (!urlTemplate) {
-              shouldInclude = false;
-              skipReason = `does not have a capability manifest and no URL provided in config`;
-            }
-          }
-
-          if (!shouldInclude) {
-            log.warn(`Viewer "${entry.name}" excluded: ${skipReason}`);
+          if (!manifest) {
+            log.warn(
+              `Viewer manifest from "${entry.manifest_url}" failed to load, skipping`
+            );
             continue;
           }
 
+          // Determine URL template
+          const urlTemplate =
+            entry.instance_template_url ?? manifest.viewer.template_url;
+
+          if (!urlTemplate) {
+            log.warn(
+              `Viewer "${manifest.viewer.name}" has no template_url in manifest and no instance_template_url override, skipping`
+            );
+            continue;
+          }
+
+          // Replace {DATA_URL} with {dataLink} for consistency with existing code
+          const normalizedUrlTemplate = urlTemplate.replace(
+            /{DATA_URL}/g,
+            '{dataLink}'
+          );
+
           // Create valid viewer entry
-          const displayName =
-            entry.name.charAt(0).toUpperCase() + entry.name.slice(1);
+          const key = normalizeViewerName(manifest.viewer.name);
+          const displayName = manifest.viewer.name;
           const label = entry.label || `View in ${displayName}`;
-          const logoPath = getViewerLogo(entry.name, entry.logo);
+          const logoPath = getViewerLogo(manifest.viewer.name, entry.logo);
 
           validated.push({
             key,
             displayName,
-            urlTemplate: urlTemplate!,
+            urlTemplate: normalizedUrlTemplate,
             logoPath,
             label,
-            manifest,
-            supportedVersions: entry.ome_zarr_versions
+            manifest
           });
 
-          log.info(`Viewer "${entry.name}" registered successfully`);
+          log.info(`Viewer "${manifest.viewer.name}" registered successfully`);
         }
 
         if (validated.length === 0) {
@@ -212,22 +200,9 @@ export function ViewersProvider({
         return [];
       }
 
-      return validViewers.filter(viewer => {
-        if (viewer.manifest) {
-          const compatibleNames = getCompatibleViewersFromManifest(metadata);
-          return compatibleNames.includes(viewer.manifest.viewer.name);
-        } else {
-          // Manual version check for viewers without manifests
-          const zarrVersion = metadata.version
-            ? parseFloat(metadata.version)
-            : null;
-          if (zarrVersion === null || !viewer.supportedVersions) {
-            return false;
-          }
-
-          return viewer.supportedVersions.includes(zarrVersion);
-        }
-      });
+      return validViewers.filter(viewer =>
+        isCompatible(viewer.manifest, metadata)
+      );
     },
     [validViewers, isInitialized]
   );
