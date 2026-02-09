@@ -14,6 +14,7 @@ from typing import Optional, Generator
 from loguru import logger
 
 from .model import FileSharePath
+from .utils import is_likely_binary
 
 # Default buffer size for streaming file contents
 DEFAULT_BUFFER_SIZE = 8192
@@ -410,8 +411,6 @@ class Filestore:
             FileNotFoundError: If the file does not exist
             PermissionError: If the file cannot be read
         """
-        from .utils import is_likely_binary
-
         full_path = self._check_path_in_root(path)
 
         # Directories are not binary
