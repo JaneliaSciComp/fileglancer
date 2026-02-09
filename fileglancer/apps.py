@@ -210,7 +210,7 @@ def build_command(entry_point: AppEntryPoint, parameters: dict) -> str:
             else:
                 parts.append(f"--{param.id} {shlex.quote(validated)}")
 
-    return " ".join(parts)
+    return (" \\\n  ").join(parts)
 
 
 # --- Executor Management ---
@@ -397,7 +397,7 @@ async def submit_job(
 
     # Build work directory and wrap command
     work_dir = _build_work_dir(job_id, manifest.name, entry_point.id)
-    command = f"mkdir -p {work_dir} && cd {work_dir} && {command}"
+    command = f"mkdir -p {work_dir}\ncd {work_dir}\n\n{command}"
 
     # Set work_dir on resource spec for LSF -cwd support
     resource_spec.work_dir = work_dir
