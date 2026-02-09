@@ -1601,8 +1601,8 @@ def create_app(settings):
                 raise HTTPException(status_code=404, detail="Job not found")
             return _convert_job(db_job)
 
-    @app.delete("/api/jobs/{job_id}",
-                description="Cancel a running job")
+    @app.post("/api/jobs/{job_id}/cancel",
+              description="Cancel a running job")
     async def cancel_job(job_id: int,
                          username: str = Depends(get_current_user)):
         try:
@@ -1610,6 +1610,31 @@ def create_app(settings):
             return _convert_job(db_job)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
+
+    @app.delete("/api/jobs/{job_id}",
+                description="Delete a job record")
+    async def delete_job(job_id: int,
+                         username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            deleted = db.delete_job(session, job_id, username)
+            if not deleted:
+                raise HTTPException(status_code=404, detail="Job not found")
+        return {"message": "Job deleted"}
+
+    @app.get("/api/jobs/{job_id}/files/{file_type}",
+             description="Get job file content (script, stdout, or stderr)")
+    async def get_job_file(job_id: int,
+                           file_type: str = Path(..., description="File type: script, stdout, or stderr"),
+                           username: str = Depends(get_current_user)):
+        if file_type not in ("script", "stdout", "stderr"):
+            raise HTTPException(status_code=400, detail="file_type must be script, stdout, or stderr")
+        try:
+            content = await apps_module.get_job_file_content(job_id, username, file_type)
+            if content is None:
+                raise HTTPException(status_code=404, detail=f"File not found: {file_type}")
+            return PlainTextResponse(content)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
 
     def _convert_job(db_job: db.JobDB) -> Job:
         """Convert a database JobDB to a Pydantic Job model."""

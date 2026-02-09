@@ -10,6 +10,7 @@ import { OtherPagesLayout } from './layouts/OtherPagesLayout';
 import Login from '@/components/Login';
 import Apps from '@/components/Apps';
 import AppLaunch from '@/components/AppLaunch';
+import JobDetail from '@/components/JobDetail';
 import Browse from '@/components/Browse';
 import Help from '@/components/Help';
 import Jobs from '@/components/Jobs';
@@ -129,6 +130,14 @@ const AppComponent = () => {
                 </RequireAuth>
               }
               path="apps/launch/:encodedUrl"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <JobDetail />
+                </RequireAuth>
+              }
+              path="apps/jobs/:jobId"
             />
             {tasksEnabled ? (
               <Route

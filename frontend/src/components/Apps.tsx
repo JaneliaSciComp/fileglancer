@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
 
 import { Button, Typography } from '@material-tailwind/react';
 import { HiOutlinePlus } from 'react-icons/hi';
@@ -8,21 +9,28 @@ import AppCard from '@/components/ui/AppsPage/AppCard';
 import AddAppDialog from '@/components/ui/AppsPage/AddAppDialog';
 import { TableCard } from '@/components/ui/Table/TableCard';
 import { createAppsJobsColumns } from '@/components/ui/Table/appsJobsColumns';
+import type { Job } from '@/shared.types';
 import {
   useAppsQuery,
   useAddAppMutation,
   useRemoveAppMutation
 } from '@/queries/appsQueries';
-import { useJobsQuery, useCancelJobMutation } from '@/queries/jobsQueries';
+import {
+  useJobsQuery,
+  useCancelJobMutation,
+  useDeleteJobMutation
+} from '@/queries/jobsQueries';
 
 export default function Apps() {
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const navigate = useNavigate();
 
   const appsQuery = useAppsQuery();
   const jobsQuery = useJobsQuery();
   const addAppMutation = useAddAppMutation();
   const removeAppMutation = useRemoveAppMutation();
   const cancelJobMutation = useCancelJobMutation();
+  const deleteJobMutation = useDeleteJobMutation();
 
   const handleAddApp = async (url: string) => {
     try {
@@ -47,6 +55,15 @@ export default function Apps() {
     }
   };
 
+  const handleViewJobDetail = (jobId: number) => {
+    navigate(`/apps/jobs/${jobId}`);
+  };
+
+  const handleRelaunch = (job: Job) => {
+    const encodedUrl = btoa(job.app_url);
+    navigate(`/apps/launch/${encodedUrl}`);
+  };
+
   const handleCancelJob = async (jobId: number) => {
     try {
       await cancelJobMutation.mutateAsync(jobId);
@@ -58,8 +75,25 @@ export default function Apps() {
     }
   };
 
+  const handleDeleteJob = async (jobId: number) => {
+    try {
+      await deleteJobMutation.mutateAsync(jobId);
+      toast.success('Job deleted');
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to delete job';
+      toast.error(message);
+    }
+  };
+
   const jobsColumns = useMemo(
-    () => createAppsJobsColumns(handleCancelJob),
+    () =>
+      createAppsJobsColumns({
+        onViewDetail: handleViewJobDetail,
+        onRelaunch: handleRelaunch,
+        onCancel: handleCancelJob,
+        onDelete: handleDeleteJob
+      }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );

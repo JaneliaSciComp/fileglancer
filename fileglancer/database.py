@@ -883,6 +883,13 @@ def update_job_status(session: Session, job_id: int, status: str,
     return job
 
 
+def delete_job(session: Session, job_id: int, username: str) -> bool:
+    """Delete a single job record. Returns True if deleted, False if not found."""
+    deleted = session.query(JobDB).filter_by(id=job_id, username=username).delete()
+    session.commit()
+    return deleted > 0
+
+
 def delete_old_jobs(session: Session, days: int = 30) -> int:
     """Delete completed/failed jobs older than the specified number of days"""
     cutoff = datetime.now(UTC) - timedelta(days=days)

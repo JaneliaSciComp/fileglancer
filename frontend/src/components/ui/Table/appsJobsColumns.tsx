@@ -1,11 +1,10 @@
 import type { ColumnDef } from '@tanstack/react-table';
 
-import { Button } from '@material-tailwind/react';
-import { HiOutlineX } from 'react-icons/hi';
-
+import DataLinksActionsMenu from '@/components/ui/Menus/DataLinksActions';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import JobStatusBadge from '@/components/ui/AppsPage/JobStatusBadge';
 import { formatDateString } from '@/utils';
+import type { MenuItem } from '@/components/ui/Menus/FgMenuItems';
 import type { Job } from '@/shared.types';
 
 function formatDuration(job: Job): string {
@@ -31,14 +30,25 @@ function formatDuration(job: Job): string {
   return `${hours}h ${minutes % 60}m`;
 }
 
+type JobActionCallbacks = {
+  onViewDetail: (jobId: number) => void;
+  onRelaunch: (job: Job) => void;
+  onCancel: (jobId: number) => void;
+  onDelete: (jobId: number) => void;
+};
+
+type JobRowActionProps = JobActionCallbacks & {
+  job: Job;
+};
+
 export function createAppsJobsColumns(
-  onCancel: (jobId: number) => void
+  callbacks: JobActionCallbacks
 ): ColumnDef<Job>[] {
   return [
     {
       accessorKey: 'app_name',
       header: 'App',
-      cell: ({ getValue, row, table }) => {
+      cell: ({ getValue, table }) => {
         const value = getValue() as string;
         const onContextMenu = table.options.meta?.onCellContextMenu;
         return (
@@ -126,27 +136,43 @@ export function createAppsJobsColumns(
     },
     {
       id: 'actions',
-      header: '',
+      header: 'Actions',
       cell: ({ row }) => {
         const job = row.original;
         const canCancel = job.status === 'PENDING' || job.status === 'RUNNING';
-        if (!canCancel) {
-          return null;
-        }
+
+        const menuItems: MenuItem<JobRowActionProps>[] = [
+          {
+            name: 'View Details',
+            action: props => props.onViewDetail(props.job.id)
+          },
+          {
+            name: 'Relaunch',
+            action: props => props.onRelaunch(props.job)
+          },
+          {
+            name: 'Cancel',
+            action: props => props.onCancel(props.job.id),
+            shouldShow: canCancel
+          },
+          {
+            name: 'Delete',
+            color: 'text-error',
+            action: props => props.onDelete(props.job.id)
+          }
+        ];
+
+        const actionProps: JobRowActionProps = {
+          job,
+          ...callbacks
+        };
+
         return (
           <div className="flex items-center justify-end h-full">
-            <FgTooltip label="Cancel job">
-              <Button
-                className="!rounded-md"
-                color="error"
-                onClick={() => onCancel(job.id)}
-                size="sm"
-                variant="outline"
-              >
-                <HiOutlineX className="icon-small mr-1" />
-                Cancel
-              </Button>
-            </FgTooltip>
+            <DataLinksActionsMenu<JobRowActionProps>
+              actionProps={actionProps}
+              menuItems={menuItems}
+            />
           </div>
         );
       },

@@ -1,9 +1,11 @@
 """Apps module for fetching manifests, building commands, and managing cluster jobs."""
 
 import asyncio
+import os
 import re
 import shlex
 import time
+from pathlib import Path
 from datetime import datetime, UTC
 from typing import Optional
 
@@ -477,3 +479,69 @@ async def cancel_job(job_id: int, username: str) -> db.JobDB:
 
     logger.info(f"Job {job_id} cancelled by user {username}")
     return db_job
+
+
+# --- Job File Access ---
+
+def _resolve_work_dir(db_job: db.JobDB) -> Path:
+    """Resolve a job's work directory to an absolute path."""
+    work_dir = _build_work_dir(db_job.id, db_job.app_name, db_job.entry_point_id)
+    # Replace $HOME with actual home directory
+    return Path(work_dir.replace("$HOME", os.path.expanduser("~")))
+
+
+def _get_job_log_paths(db_job: db.JobDB) -> dict[str, Path]:
+    """Get the expected log file paths for a job."""
+    settings = get_settings()
+    log_dir = Path(settings.cluster_log_directory).expanduser()
+    job_name = f"fg-{db_job.app_name}-{db_job.entry_point_id}"
+    safe_name = re.sub(r"[^\w\-.]", "_", job_name)
+
+    return {
+        "stdout": log_dir / f"{job_name}.out",
+        "stderr": log_dir / f"{job_name}.err",
+        "script": log_dir / f"{safe_name}.sh",
+    }
+
+
+async def get_job_file_content(job_id: int, username: str, file_type: str) -> Optional[str]:
+    """Read the content of a job file (script, stdout, or stderr).
+
+    Returns the file content as a string, or None if the file doesn't exist.
+    """
+    settings = get_settings()
+
+    with db.get_db_session(settings.db_url) as session:
+        db_job = db.get_job(session, job_id, username)
+        if db_job is None:
+            raise ValueError(f"Job {job_id} not found")
+
+    if file_type == "script":
+        # Try executor's tracked script_path first
+        if db_job.cluster_job_id:
+            executor = await get_executor()
+            tracked = executor.jobs.get(db_job.cluster_job_id)
+            if tracked and tracked.script_path:
+                path = Path(tracked.script_path)
+                if path.is_file():
+                    return path.read_text()
+
+        # Fall back to expected path
+        paths = _get_job_log_paths(db_job)
+        # Try matching any .sh file with the safe_name prefix
+        log_dir = paths["script"].parent
+        safe_name = paths["script"].stem
+        if log_dir.is_dir():
+            for f in sorted(log_dir.iterdir()):
+                if f.name.startswith(safe_name) and f.suffix == ".sh":
+                    return f.read_text()
+        return None
+
+    if file_type in ("stdout", "stderr"):
+        paths = _get_job_log_paths(db_job)
+        path = paths[file_type]
+        if path.is_file():
+            return path.read_text()
+        return None
+
+    raise ValueError(f"Unknown file type: {file_type}")
