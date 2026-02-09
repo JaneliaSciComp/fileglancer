@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 
 import { Button, Tabs, Typography } from '@material-tailwind/react';
-import { HiOutlineArrowLeft } from 'react-icons/hi';
+import { HiOutlineArrowLeft, HiOutlineRefresh } from 'react-icons/hi';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import {
   materialDark,
@@ -99,6 +99,19 @@ export default function JobDetail() {
 
   const job = jobQuery.data;
 
+  const handleRelaunch = () => {
+    if (!job) {
+      return;
+    }
+    const encodedUrl = btoa(job.app_url);
+    navigate(`/apps/launch/${encodedUrl}`, {
+      state: {
+        entryPointId: job.entry_point_id,
+        parameters: job.parameters
+      }
+    });
+  };
+
   return (
     <div>
       <Button
@@ -191,6 +204,14 @@ export default function JobDetail() {
                   No parameters
                 </Typography>
               )}
+              <Button
+                className="!rounded-md mt-4"
+                onClick={handleRelaunch}
+                variant="outline"
+              >
+                <HiOutlineRefresh className="icon-small mr-2" />
+                Relaunch with these parameters
+              </Button>
             </Tabs.Panel>
 
             <Tabs.Panel className="pt-4" value="script">

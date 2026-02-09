@@ -72,7 +72,7 @@ class Settings(BaseSettings):
     cluster_queue: Optional[str] = None
     cluster_account: Optional[str] = None
     cluster_poll_interval: float = 10.0
-    cluster_log_directory: str = './logs'
+    cluster_log_directory: str = '~/.fileglancer/logs'
     cluster_default_memory: Optional[str] = None    # e.g. "8 GB"
     cluster_default_walltime: Optional[str] = None  # e.g. "04:00"
     cluster_default_cpus: Optional[int] = None

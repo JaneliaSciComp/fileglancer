@@ -20,6 +20,7 @@ interface AppLaunchFormProps {
     resources?: AppResourceDefaults
   ) => Promise<void>;
   readonly submitting: boolean;
+  readonly initialValues?: Record<string, unknown>;
 }
 
 function ParameterField({
@@ -123,17 +124,21 @@ export default function AppLaunchForm({
   manifest,
   entryPoint,
   onSubmit,
-  submitting
+  submitting,
+  initialValues: externalValues
 }: AppLaunchFormProps) {
-  // Initialize parameter values from defaults
-  const initialValues: Record<string, unknown> = {};
+  // Initialize parameter values: external values override defaults
+  const defaultValues: Record<string, unknown> = {};
   for (const param of entryPoint.parameters) {
     if (param.default !== undefined) {
-      initialValues[param.id] = param.default;
+      defaultValues[param.id] = param.default;
     }
   }
+  const startingValues = externalValues
+    ? { ...defaultValues, ...externalValues }
+    : defaultValues;
 
-  const [values, setValues] = useState<Record<string, unknown>>(initialValues);
+  const [values, setValues] = useState<Record<string, unknown>>(startingValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showResources, setShowResources] = useState(false);
   const [resources, setResources] = useState<AppResourceDefaults>({

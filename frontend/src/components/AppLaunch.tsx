@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
 
 import { Button, Typography } from '@material-tailwind/react';
 import { HiOutlineArrowLeft, HiOutlinePlay } from 'react-icons/hi';
@@ -10,14 +10,21 @@ import { useManifestPreviewMutation } from '@/queries/appsQueries';
 import { useSubmitJobMutation } from '@/queries/jobsQueries';
 import type { AppEntryPoint, AppResourceDefaults } from '@/shared.types';
 
+type LaunchState = {
+  entryPointId?: string;
+  parameters?: Record<string, unknown>;
+} | null;
+
 export default function AppLaunch() {
   const { encodedUrl } = useParams<{ encodedUrl: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const manifestMutation = useManifestPreviewMutation();
   const submitJobMutation = useSubmitJobMutation();
   const [selectedEntryPoint, setSelectedEntryPoint] =
     useState<AppEntryPoint | null>(null);
 
+  const launchState = (location.state as LaunchState) || null;
   const appUrl = encodedUrl ? decodeURIComponent(encodedUrl) : '';
 
   useEffect(() => {
@@ -30,11 +37,24 @@ export default function AppLaunch() {
 
   const manifest = manifestMutation.data;
 
-  // Auto-select if there's only one entry point
+  // Auto-select entry point from relaunch state, or if there's only one
   useEffect(() => {
-    if (manifest?.entryPoints.length === 1) {
+    if (!manifest) {
+      return;
+    }
+    if (launchState?.entryPointId) {
+      const ep = manifest.entryPoints.find(
+        e => e.id === launchState.entryPointId
+      );
+      if (ep) {
+        setSelectedEntryPoint(ep);
+        return;
+      }
+    }
+    if (manifest.entryPoints.length === 1) {
       setSelectedEntryPoint(manifest.entryPoints[0]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manifest]);
 
   const handleSubmit = async (
@@ -94,6 +114,7 @@ export default function AppLaunch() {
           ) : null}
           <AppLaunchForm
             entryPoint={selectedEntryPoint}
+            initialValues={launchState?.parameters}
             manifest={manifest}
             onSubmit={handleSubmit}
             submitting={submitJobMutation.isPending}

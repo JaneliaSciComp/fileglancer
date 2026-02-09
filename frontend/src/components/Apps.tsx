@@ -61,7 +61,12 @@ export default function Apps() {
 
   const handleRelaunch = (job: Job) => {
     const encodedUrl = btoa(job.app_url);
-    navigate(`/apps/launch/${encodedUrl}`);
+    navigate(`/apps/launch/${encodedUrl}`, {
+      state: {
+        entryPointId: job.entry_point_id,
+        parameters: job.parameters
+      }
+    });
   };
 
   const handleCancelJob = async (jobId: number) => {
