@@ -332,11 +332,11 @@ def _sanitize_for_path(s: str) -> str:
     return re.sub(r'[^a-zA-Z0-9._-]', '_', s)
 
 
-def _build_work_dir(job_id: int, app_name: str, entry_point_id: str) -> str:
+def _build_work_dir(job_id: int, app_name: str, entry_point_id: str) -> Path:
     """Build a working directory path under ~/.fileglancer/jobs/."""
     safe_app = _sanitize_for_path(app_name)
     safe_ep = _sanitize_for_path(entry_point_id)
-    return f"$HOME/.fileglancer/jobs/{job_id}-{safe_app}-{safe_ep}"
+    return Path(os.path.expanduser(f"~/.fileglancer/jobs/{job_id}-{safe_app}-{safe_ep}"))
 
 
 async def submit_job(
@@ -395,18 +395,25 @@ async def submit_job(
         )
         job_id = db_job.id
 
-    # Build work directory and wrap command
+    # Create work directory and write readable script
     work_dir = _build_work_dir(job_id, manifest.name, entry_point.id)
-    command = f"mkdir -p {work_dir}\ncd {work_dir}\n\n{command}"
+    work_dir.mkdir(parents=True, exist_ok=True)
+
+    script_path = work_dir / "script.sh"
+    script_path.write_text(f"#!/bin/bash\ncd {work_dir}\n\n{command}\n")
+    script_path.chmod(0o755)
+
+    # Wrap command with cd into work dir
+    full_command = f"cd {work_dir}\n\n{command}"
 
     # Set work_dir on resource spec for LSF -cwd support
-    resource_spec.work_dir = work_dir
+    resource_spec.work_dir = str(work_dir)
 
     # Submit to executor
     executor = await get_executor()
     job_name = f"fg-{manifest.name}-{entry_point.id}"
     cluster_job = await executor.submit(
-        command=command,
+        command=full_command,
         name=job_name,
         resources=resource_spec,
     )
@@ -488,9 +495,7 @@ async def cancel_job(job_id: int, username: str) -> db.JobDB:
 
 def _resolve_work_dir(db_job: db.JobDB) -> Path:
     """Resolve a job's work directory to an absolute path."""
-    work_dir = _build_work_dir(db_job.id, db_job.app_name, db_job.entry_point_id)
-    # Replace $HOME with actual home directory
-    return Path(work_dir.replace("$HOME", os.path.expanduser("~")))
+    return _build_work_dir(db_job.id, db_job.app_name, db_job.entry_point_id)
 
 
 def _get_job_log_paths(db_job: db.JobDB) -> dict[str, Path]:
@@ -520,28 +525,17 @@ async def get_job_file_content(job_id: int, username: str, file_type: str) -> Op
             raise ValueError(f"Job {job_id} not found")
         session.expunge(db_job)
 
-    if file_type == "script":
-        # Try executor's tracked script_path first
-        if db_job.cluster_job_id:
-            executor = await get_executor()
-            tracked = executor.jobs.get(db_job.cluster_job_id)
-            if tracked and tracked.script_path:
-                path = Path(tracked.script_path)
-                if path.is_file():
-                    return path.read_text()
+    work_dir = _resolve_work_dir(db_job)
 
-        # Fall back to expected path
-        paths = _get_job_log_paths(db_job)
-        # Try matching any .sh file with the safe_name prefix
-        log_dir = paths["script"].parent
-        safe_name = paths["script"].stem
-        if log_dir.is_dir():
-            for f in sorted(log_dir.iterdir()):
-                if f.name.startswith(safe_name) and f.suffix == ".sh":
-                    return f.read_text()
+    if file_type == "script":
+        # Look for our readable script in the work directory
+        script_in_work_dir = work_dir / "script.sh"
+        if script_in_work_dir.is_file():
+            return script_in_work_dir.read_text()
         return None
 
     if file_type in ("stdout", "stderr"):
+        # Check log directory for executor-managed log files
         paths = _get_job_log_paths(db_job)
         path = paths[file_type]
         if path.is_file():
