@@ -17,30 +17,19 @@ vi.mock('@/logger', () => ({
 }));
 
 // Mock capability manifest to avoid network requests in tests
-vi.mock('@bioimagetools/capability-manifest', () => ({
-  initializeViewerManifests: vi.fn(async () => [
-    {
-      viewer: {
-        name: 'neuroglancer',
-        template_url: 'https://neuroglancer.com/#{dataLink}'
-      }
-    },
-    {
-      viewer: {
-        name: 'avivator',
-        template_url: 'https://avivator.com/?url={dataLink}'
-      }
-    }
-  ]),
-  getCompatibleViewers: vi.fn(() => ['neuroglancer', 'avivator'])
+const mockCapabilityManifest = vi.hoisted(() => ({
+  loadManifestsFromUrls: vi.fn(),
+  isCompatible: vi.fn()
 }));
+
+vi.mock('@bioimagetools/capability-manifest', () => mockCapabilityManifest);
 
 const mockOpenWithToolUrls: OpenWithToolUrls = {
   copy: 'http://localhost:3000/test/copy/url',
   validator: 'http://localhost:3000/test/validator/url',
   neuroglancer: 'http://localhost:3000/test/neuroglancer/url',
   vole: 'http://localhost:3000/test/vole/url',
-  avivator: 'http://localhost:3000/test/avivator/url'
+  vizarr: 'http://localhost:3000/test/vizarr/url'
 };
 
 // Helper component to wrap DataToolLinks with ViewersProvider
@@ -77,6 +66,10 @@ function renderDataToolLinks(
 describe('DataToolLinks - Error Scenarios', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Default mock: return empty Map (no manifests loaded)
+    mockCapabilityManifest.loadManifestsFromUrls.mockResolvedValue(new Map());
+    mockCapabilityManifest.isCompatible.mockReturnValue(false);
   });
 
   describe('Invalid YAML syntax', () => {
@@ -87,9 +80,9 @@ describe('DataToolLinks - Error Scenarios', () => {
       // Import the parseViewersConfig function to test it directly
       const { parseViewersConfig } = await import('@/config/viewersConfig');
 
-      const invalidYaml = 'viewers:\n  - name: test\n    invalid: [[[';
+      const invalidYaml = 'viewers:\n  - manifest_url: test\n    invalid: [[[';
 
-      expect(() => parseViewersConfig(invalidYaml, [])).toThrow(
+      expect(() => parseViewersConfig(invalidYaml)).toThrow(
         /Failed to parse viewers configuration YAML/
       );
     });
@@ -111,34 +104,29 @@ describe('DataToolLinks - Error Scenarios', () => {
   });
 
   describe('Missing required fields', () => {
-    it('should throw error when custom viewer lacks required url field', async () => {
+    it('should throw error when viewer lacks required manifest_url field', async () => {
       const { parseViewersConfig } = await import('@/config/viewersConfig');
 
-      const configMissingUrl = `
-valid_ome_zarr_versions: [0.4, 0.5]
+      const configMissingManifestUrl = `
 viewers:
-  - name: custom-viewer
-    # Missing url for viewer without manifest
+  - label: Custom Label
+    # Missing manifest_url
 `;
 
-      expect(() => parseViewersConfig(configMissingUrl, [])).toThrow(
-        /does not have a capability manifest and must specify "url"/
+      expect(() => parseViewersConfig(configMissingManifestUrl)).toThrow(
+        /Each viewer must have a "manifest_url" field/
       );
     });
 
-    it('should throw error when custom viewer lacks ome_zarr_versions', async () => {
+    it('should throw error when viewers array is empty', async () => {
       const { parseViewersConfig } = await import('@/config/viewersConfig');
 
-      const configMissingVersions = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: custom-viewer
-    url: https://example.com
-    # Missing ome_zarr_versions for viewer without manifest
+      const configEmptyViewers = `
+viewers: []
 `;
 
-      expect(() => parseViewersConfig(configMissingVersions, [])).toThrow(
-        /does not have a capability manifest and must specify "ome_zarr_versions"/
+      expect(() => parseViewersConfig(configEmptyViewers)).toThrow(
+        /"viewers" must contain at least one viewer/
       );
     });
   });
@@ -147,6 +135,34 @@ viewers:
 describe('DataToolLinks - Edge Cases', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Mock loadManifestsFromUrls to return Map with manifests
+    // URLs must match those in viewers.config.yaml
+    mockCapabilityManifest.loadManifestsFromUrls.mockResolvedValue(
+      new Map([
+        [
+          'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/neuroglancer.yaml',
+          {
+            viewer: {
+              name: 'Neuroglancer',
+              template_url: 'https://neuroglancer.com/#!{DATA_URL}'
+            }
+          }
+        ],
+        [
+          'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/vizarr.yaml',
+          {
+            viewer: {
+              name: 'Avivator',
+              template_url: 'https://vizarr.com/?url={DATA_URL}'
+            }
+          }
+        ]
+      ])
+    );
+
+    // Mock isCompatible to return true for all viewers
+    mockCapabilityManifest.isCompatible.mockReturnValue(true);
   });
 
   describe('Logo rendering in components', () => {
@@ -171,16 +187,16 @@ describe('DataToolLinks - Edge Cases', () => {
       expect(neuroglancerLogo).toBeTruthy();
       expect(neuroglancerLogo?.getAttribute('src')).toContain('neuroglancer');
 
-      // Check for avivator logo (known viewer with logo)
-      const avivatorLogo = images.find(
+      // Check for avivator logo (name for viewer in vizarr.yaml)
+      const vizarrLogo = images.find(
         img => img.getAttribute('alt') === 'Avivator logo'
       );
-      expect(avivatorLogo).toBeTruthy();
-      expect(avivatorLogo?.getAttribute('src')).toContain('avivator');
+      expect(vizarrLogo).toBeTruthy();
+      expect(vizarrLogo?.getAttribute('src')).toContain('avivator');
     });
   });
 
-  describe('Custom viewer without ome_zarr_versions', () => {
+  describe('Custom viewer compatibility', () => {
     it('should exclude viewer URL when set to null in OpenWithToolUrls', async () => {
       const urls: OpenWithToolUrls = {
         copy: 'http://localhost:3000/copy',
@@ -228,7 +244,36 @@ describe('DataToolLinks - Edge Cases', () => {
 describe('DataToolLinks - Expected Behavior', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Mock loadManifestsFromUrls to return Map with manifests
+    // URLs must match those in viewers.config.yaml
+    mockCapabilityManifest.loadManifestsFromUrls.mockResolvedValue(
+      new Map([
+        [
+          'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/neuroglancer.yaml',
+          {
+            viewer: {
+              name: 'Neuroglancer',
+              template_url: 'https://neuroglancer.com/#!{DATA_URL}'
+            }
+          }
+        ],
+        [
+          'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/vizarr.yaml',
+          {
+            viewer: {
+              name: 'Avivator',
+              template_url: 'https://vizarr.com/?url={DATA_URL}'
+            }
+          }
+        ]
+      ])
+    );
+
+    // Mock isCompatible to return true for all viewers
+    mockCapabilityManifest.isCompatible.mockReturnValue(true);
   });
+
   describe('Component behavior with valid viewers', () => {
     it('should render valid viewer icons and copy icon', async () => {
       renderDataToolLinks();
@@ -291,19 +336,19 @@ describe('DataToolLinks - Expected Behavior', () => {
 
       const images = screen.getAllByRole('img');
 
-      // Should have neuroglancer, avivator, and copy icons at minimum
+      // Should have neuroglancer, vizarr, and copy icons at minimum
       expect(images.length).toBeGreaterThanOrEqual(3);
 
       // Verify specific logos are present
       const neuroglancerLogo = images.find(
         img => img.getAttribute('alt') === 'Neuroglancer logo'
       );
-      const avivatorLogo = images.find(
+      const vizarrLogo = images.find(
         img => img.getAttribute('alt') === 'Avivator logo'
       );
 
       expect(neuroglancerLogo).toBeTruthy();
-      expect(avivatorLogo).toBeTruthy();
+      expect(vizarrLogo).toBeTruthy();
     });
   });
 
@@ -337,8 +382,8 @@ describe('DataToolLinks - Expected Behavior', () => {
       const neuroglancerButton = screen.getByLabelText('View in Neuroglancer');
       expect(neuroglancerButton).toBeInTheDocument();
 
-      const avivatorButton = screen.getByLabelText('View in Avivator');
-      expect(avivatorButton).toBeInTheDocument();
+      const vizarrButton = screen.getByLabelText('View in Avivator');
+      expect(vizarrButton).toBeInTheDocument();
     });
   });
 });
