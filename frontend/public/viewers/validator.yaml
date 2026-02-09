@@ -1,0 +1,41 @@
+viewer:
+  name: "validator"
+  version: "1.0.0"
+  repo: "https://github.com/ome/ome-ngff-validator"
+  template_url: "https://ome.github.io/ome-ngff-validator/?source={DATA_URL}"
+
+capabilities:
+  # Enumeration of OME-Zarr versions that can be loaded
+  ome_zarr_versions: [0.4, 0.5]
+
+  compression_codecs: []
+
+  # Which additional RFCs are supported?
+  rfcs_supported: []
+
+  # Are axis names and units respected?
+  axes: true
+
+  # Are scaling factors respected on multiscales?
+  scale: true
+
+  # Are translation factors respected on multiscales (including subpixel offsets for lower scale levels)?
+  translation: true
+
+  # Does the tool support multiple channels?
+  channels: true
+
+  # Does the tool support multiple timepoints?
+  timepoints: true
+
+  # Are labels loaded when available?
+  labels: true
+
+  # Are HCS plates loaded when available?
+  hcs_plates: true
+
+  # Does the viewer handle multiple images in a bioformats2raw layout?
+  bioformats2raw_layout: false
+
+  # Is the OMERO metadata used to e.g. color the channels?
+  omero_metadata: true
