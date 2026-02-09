@@ -397,6 +397,16 @@ class JobSubmitRequest(BaseModel):
     resources: Optional[AppResourceDefaults] = Field(description="Resource overrides", default=None)
 
 
+class PathValidationRequest(BaseModel):
+    """Request to validate file/directory paths"""
+    paths: Dict[str, str] = Field(description="Map of parameter ID to path value")
+
+
+class PathValidationResponse(BaseModel):
+    """Response with path validation results"""
+    errors: Dict[str, str] = Field(description="Map of parameter ID to error message (empty if all valid)")
+
+
 class JobResponse(BaseModel):
     """Response containing a list of jobs"""
     jobs: List[Job] = Field(description="A list of jobs")

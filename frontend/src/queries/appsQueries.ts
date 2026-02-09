@@ -76,6 +76,19 @@ export function useAddAppMutation(): UseMutationResult<UserApp, Error, string> {
   });
 }
 
+export async function validatePaths(
+  paths: Record<string, string>
+): Promise<Record<string, string>> {
+  const response = await sendFetchRequest('/api/apps/validate-paths', 'POST', {
+    paths
+  });
+  const data = await getResponseJsonOrError(response);
+  if (!response.ok) {
+    throwResponseNotOkError(response, data);
+  }
+  return (data as { errors: Record<string, string> }).errors;
+}
+
 export function useRemoveAppMutation(): UseMutationResult<
   unknown,
   Error,

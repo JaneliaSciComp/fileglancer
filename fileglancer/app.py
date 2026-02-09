@@ -1560,6 +1560,19 @@ def create_app(settings):
 
         return {"message": "App removed"}
 
+    @app.post("/api/apps/validate-paths", response_model=PathValidationResponse,
+              description="Validate file/directory paths for app parameters")
+    async def validate_paths(body: PathValidationRequest,
+                             username: str = Depends(get_current_user)):
+        errors = {}
+        for param_id, path_value in body.paths.items():
+            expanded = os.path.expanduser(path_value)
+            if not os.path.exists(expanded):
+                errors[param_id] = f"Path does not exist: {path_value}"
+            elif not os.access(expanded, os.R_OK):
+                errors[param_id] = f"Path is not accessible: {path_value}"
+        return PathValidationResponse(errors=errors)
+
     @app.post("/api/jobs", response_model=Job,
               description="Submit a new job")
     async def submit_job(body: JobSubmitRequest,

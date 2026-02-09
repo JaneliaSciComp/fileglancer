@@ -4,6 +4,7 @@ import { Button, Typography } from '@material-tailwind/react';
 import { HiOutlinePlay } from 'react-icons/hi';
 
 import FileSelectorButton from '@/components/ui/BrowsePage/FileSelector/FileSelectorButton';
+import { validatePaths } from '@/queries/appsQueries';
 import { convertBackToForwardSlash } from '@/utils/pathHandling';
 import type {
   AppEntryPoint,
@@ -189,6 +190,8 @@ export default function AppLaunchForm({
     return Object.keys(newErrors).length === 0;
   };
 
+  const [validating, setValidating] = useState(false);
+
   const handleSubmit = async () => {
     if (!validate()) {
       return;
@@ -199,6 +202,7 @@ export default function AppLaunchForm({
 
     // Filter out undefined/empty values and normalize paths to Linux format
     const params: Record<string, unknown> = {};
+    const pathParams: Record<string, string> = {};
     for (const [key, val] of Object.entries(values)) {
       if (val !== undefined && val !== null && val !== '') {
         const paramDef = paramDefs.get(key);
@@ -207,11 +211,34 @@ export default function AppLaunchForm({
           (paramDef.type === 'file' || paramDef.type === 'directory') &&
           typeof val === 'string'
         ) {
-          params[key] = convertBackToForwardSlash(val);
+          const normalized = convertBackToForwardSlash(val);
+          params[key] = normalized;
+          pathParams[key] = normalized;
         } else {
           params[key] = val;
         }
       }
+    }
+
+    // Validate paths on the server before submitting
+    if (Object.keys(pathParams).length > 0) {
+      setValidating(true);
+      try {
+        const pathErrors = await validatePaths(pathParams);
+        if (Object.keys(pathErrors).length > 0) {
+          setErrors(prev => ({ ...prev, ...pathErrors }));
+          setValidating(false);
+          return;
+        }
+      } catch {
+        setErrors(prev => ({
+          ...prev,
+          _general: 'Failed to validate paths'
+        }));
+        setValidating(false);
+        return;
+      }
+      setValidating(false);
     }
 
     // Only pass resources if user modified them
@@ -341,11 +368,15 @@ export default function AppLaunchForm({
       {/* Submit */}
       <Button
         className="!rounded-md"
-        disabled={submitting}
+        disabled={submitting || validating}
         onClick={handleSubmit}
       >
         <HiOutlinePlay className="icon-small mr-2" />
-        {submitting ? 'Submitting...' : 'Submit Job'}
+        {validating
+          ? 'Validating...'
+          : submitting
+            ? 'Submitting...'
+            : 'Submit Job'}
       </Button>
     </div>
   );
