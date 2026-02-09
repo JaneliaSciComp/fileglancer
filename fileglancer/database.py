@@ -1,6 +1,6 @@
 import secrets
 import hashlib
-from datetime import datetime, UTC
+from datetime import datetime, timedelta, UTC
 import os
 from functools import lru_cache
 
@@ -134,6 +134,26 @@ class TicketDB(Base):
     # __table_args__ = (
     #     UniqueConstraint('username', 'fsp_name', 'path', name='uq_ticket_path'),
     # )
+
+
+class JobDB(Base):
+    """Database model for storing cluster jobs"""
+    __tablename__ = 'jobs'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String, nullable=False, index=True)
+    cluster_job_id = Column(String, nullable=True, index=True)
+    app_url = Column(String, nullable=False)
+    app_name = Column(String, nullable=False)
+    entry_point_id = Column(String, nullable=False)
+    entry_point_name = Column(String, nullable=False)
+    parameters = Column(JSON, nullable=False)
+    status = Column(String, nullable=False, default="PENDING")
+    exit_code = Column(Integer, nullable=True)
+    resources = Column(JSON, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)
 
 
 class SessionDB(Base):
@@ -794,5 +814,81 @@ def delete_expired_sessions(session: Session):
     """Delete all expired sessions"""
     now = datetime.now(UTC)
     deleted = session.query(SessionDB).filter(SessionDB.expires_at < now).delete()
+    session.commit()
+    return deleted
+
+
+# --- Job database functions ---
+
+def create_job(session: Session, username: str, app_url: str, app_name: str,
+               entry_point_id: str, entry_point_name: str, parameters: Dict,
+               resources: Optional[Dict] = None) -> JobDB:
+    """Create a new job record"""
+    now = datetime.now(UTC)
+    job = JobDB(
+        username=username,
+        app_url=app_url,
+        app_name=app_name,
+        entry_point_id=entry_point_id,
+        entry_point_name=entry_point_name,
+        parameters=parameters,
+        resources=resources,
+        status="PENDING",
+        created_at=now
+    )
+    session.add(job)
+    session.commit()
+    return job
+
+
+def get_jobs_by_username(session: Session, username: str, status: Optional[str] = None) -> List[JobDB]:
+    """Get all jobs for a user, newest first"""
+    query = session.query(JobDB).filter_by(username=username)
+    if status:
+        query = query.filter_by(status=status)
+    return query.order_by(JobDB.created_at.desc()).all()
+
+
+def get_job(session: Session, job_id: int, username: str) -> Optional[JobDB]:
+    """Get a single job by ID and username"""
+    return session.query(JobDB).filter_by(id=job_id, username=username).first()
+
+
+def get_active_jobs(session: Session) -> List[JobDB]:
+    """Get all jobs with PENDING or RUNNING status"""
+    return session.query(JobDB).filter(
+        JobDB.status.in_(["PENDING", "RUNNING"])
+    ).all()
+
+
+def update_job_status(session: Session, job_id: int, status: str,
+                      exit_code: Optional[int] = None,
+                      cluster_job_id: Optional[str] = None,
+                      started_at: Optional[datetime] = None,
+                      finished_at: Optional[datetime] = None) -> Optional[JobDB]:
+    """Update a job's status and related fields"""
+    job = session.query(JobDB).filter_by(id=job_id).first()
+    if not job:
+        return None
+    job.status = status
+    if exit_code is not None:
+        job.exit_code = exit_code
+    if cluster_job_id is not None:
+        job.cluster_job_id = cluster_job_id
+    if started_at is not None:
+        job.started_at = started_at
+    if finished_at is not None:
+        job.finished_at = finished_at
+    session.commit()
+    return job
+
+
+def delete_old_jobs(session: Session, days: int = 30) -> int:
+    """Delete completed/failed jobs older than the specified number of days"""
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+    deleted = session.query(JobDB).filter(
+        JobDB.status.in_(["DONE", "FAILED", "KILLED"]),
+        JobDB.created_at < cutoff
+    ).delete(synchronize_session='fetch')
     session.commit()
     return deleted

@@ -43,7 +43,8 @@ dependencies = [
     "cryptography >=41.0.0",
     "sqlalchemy >=2.0.44",
     "uvicorn >=0.38.0",
-    "x2s3 >=1.1.0"
+    "x2s3 >=1.1.0",
+    "py-cluster-api >=0.1.0"
 ]
 
 [project.scripts]

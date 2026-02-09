@@ -50,14 +50,96 @@ type FetchRequestOptions = {
   signal?: AbortSignal;
 };
 
+// --- App / Job types ---
+
+type AppParameter = {
+  id: string;
+  name: string;
+  type:
+    | 'string'
+    | 'integer'
+    | 'number'
+    | 'boolean'
+    | 'file'
+    | 'directory'
+    | 'enum';
+  description?: string;
+  required?: boolean;
+  default?: unknown;
+  options?: string[];
+  min?: number;
+  max?: number;
+  pattern?: string;
+};
+
+type AppResourceDefaults = {
+  cpus?: number;
+  memory?: string;
+  walltime?: string;
+};
+
+type AppEntryPoint = {
+  id: string;
+  name: string;
+  description?: string;
+  command: string;
+  parameters: AppParameter[];
+  resources?: AppResourceDefaults;
+};
+
+type AppManifest = {
+  name: string;
+  description?: string;
+  version?: string;
+  entryPoints: AppEntryPoint[];
+};
+
+type UserApp = {
+  url: string;
+  name: string;
+  description?: string;
+  added_at: string;
+  manifest?: AppManifest;
+};
+
+type Job = {
+  id: number;
+  app_url: string;
+  app_name: string;
+  entry_point_id: string;
+  entry_point_name: string;
+  parameters: Record<string, unknown>;
+  status: 'PENDING' | 'RUNNING' | 'DONE' | 'FAILED' | 'KILLED';
+  exit_code?: number;
+  resources?: Record<string, unknown>;
+  cluster_job_id?: string;
+  created_at: string;
+  started_at?: string;
+  finished_at?: string;
+};
+
+type JobSubmitRequest = {
+  app_url: string;
+  entry_point_id: string;
+  parameters: Record<string, unknown>;
+  resources?: AppResourceDefaults;
+};
+
 export type {
+  AppEntryPoint,
+  AppManifest,
+  AppParameter,
+  AppResourceDefaults,
   FetchRequestOptions,
   FileOrFolder,
   FileSharePath,
   Failure,
+  Job,
+  JobSubmitRequest,
   Profile,
   Result,
   Success,
+  UserApp,
   Zone,
   ZonesAndFileSharePathsMap
 };

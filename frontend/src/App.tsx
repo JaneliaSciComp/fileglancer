@@ -8,6 +8,8 @@ import { MainLayout } from './layouts/MainLayout';
 import { BrowsePageLayout } from './layouts/BrowseLayout';
 import { OtherPagesLayout } from './layouts/OtherPagesLayout';
 import Login from '@/components/Login';
+import Apps from '@/components/Apps';
+import AppLaunch from '@/components/AppLaunch';
 import Browse from '@/components/Browse';
 import Help from '@/components/Help';
 import Jobs from '@/components/Jobs';
@@ -111,6 +113,22 @@ const AppComponent = () => {
                 </RequireAuth>
               }
               path="nglinks"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <Apps />
+                </RequireAuth>
+              }
+              path="apps"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <AppLaunch />
+                </RequireAuth>
+              }
+              path="apps/launch/:encodedUrl"
             />
             {tasksEnabled ? (
               <Route

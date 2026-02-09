@@ -67,6 +67,16 @@ class Settings(BaseSettings):
     # CLI mode - enables auto-login endpoint for standalone CLI usage
     cli_mode: bool = False
 
+    # Cluster / Apps settings
+    cluster_executor: str = 'local'        # "lsf" or "local"
+    cluster_queue: Optional[str] = None
+    cluster_account: Optional[str] = None
+    cluster_poll_interval: float = 10.0
+    cluster_log_directory: str = './logs'
+    cluster_default_memory: Optional[str] = None    # e.g. "8 GB"
+    cluster_default_walltime: Optional[str] = None  # e.g. "04:00"
+    cluster_default_cpus: Optional[int] = None
+
     model_config = SettingsConfigDict(
         yaml_file="config.yaml",
         env_file='.env',

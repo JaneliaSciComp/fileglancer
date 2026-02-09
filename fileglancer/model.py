@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional, Dict
+from typing import Any, List, Literal, Optional, Dict
 
 from pydantic import BaseModel, Field, HttpUrl
 
@@ -303,3 +303,100 @@ class NeuroglancerShortLinkResponse(BaseModel):
     links: List[NeuroglancerShortLink] = Field(
         description="A list of stored Neuroglancer short links"
     )
+
+
+# --- App Manifest Models ---
+
+class AppParameter(BaseModel):
+    """A parameter definition for an app entry point"""
+    id: str = Field(description="Unique identifier for the parameter")
+    name: str = Field(description="Display name of the parameter")
+    type: Literal["string", "integer", "number", "boolean", "file", "directory", "enum"] = Field(
+        description="The data type of the parameter"
+    )
+    description: Optional[str] = Field(description="Description of the parameter", default=None)
+    required: bool = Field(description="Whether the parameter is required", default=False)
+    default: Optional[Any] = Field(description="Default value for the parameter", default=None)
+    options: Optional[List[str]] = Field(description="Allowed values for enum type", default=None)
+    min: Optional[float] = Field(description="Minimum value for numeric types", default=None)
+    max: Optional[float] = Field(description="Maximum value for numeric types", default=None)
+    pattern: Optional[str] = Field(description="Regex validation pattern for string types", default=None)
+
+
+class AppResourceDefaults(BaseModel):
+    """Resource defaults for an app entry point"""
+    cpus: Optional[int] = Field(description="Number of CPUs", default=None)
+    memory: Optional[str] = Field(description="Memory allocation (e.g. '16 GB')", default=None)
+    walltime: Optional[str] = Field(description="Wall time limit (e.g. '04:00')", default=None)
+
+
+class AppEntryPoint(BaseModel):
+    """An entry point (command) within an app"""
+    id: str = Field(description="Unique identifier for the entry point")
+    name: str = Field(description="Display name of the entry point")
+    description: Optional[str] = Field(description="Description of the entry point", default=None)
+    command: str = Field(description="The base CLI command to execute")
+    parameters: List[AppParameter] = Field(description="Parameters for this entry point", default=[])
+    resources: Optional[AppResourceDefaults] = Field(description="Default resource requirements", default=None)
+
+
+class AppManifest(BaseModel):
+    """Top-level app manifest (fileglancer-app.json)"""
+    name: str = Field(description="Display name of the app")
+    description: Optional[str] = Field(description="Description of the app", default=None)
+    version: Optional[str] = Field(description="Version of the app", default=None)
+    entryPoints: List[AppEntryPoint] = Field(description="Available entry points for this app")
+
+
+class UserApp(BaseModel):
+    """A user's saved app reference"""
+    url: str = Field(description="URL to the app manifest")
+    name: str = Field(description="App name from manifest")
+    description: Optional[str] = Field(description="App description from manifest", default=None)
+    added_at: datetime = Field(description="When the app was added")
+    manifest: Optional[AppManifest] = Field(description="Cached manifest data", default=None)
+
+
+class ManifestFetchRequest(BaseModel):
+    """Request to fetch an app manifest"""
+    url: str = Field(description="URL to the app manifest or GitHub repo")
+
+
+class AppAddRequest(BaseModel):
+    """Request to add an app"""
+    url: str = Field(description="URL to the app manifest or GitHub repo")
+
+
+class AppRemoveRequest(BaseModel):
+    """Request to remove an app"""
+    url: str = Field(description="URL of the app to remove")
+
+
+class Job(BaseModel):
+    """A job record"""
+    id: int = Field(description="Unique job identifier")
+    app_url: str = Field(description="URL of the app manifest")
+    app_name: str = Field(description="Name of the app")
+    entry_point_id: str = Field(description="Entry point that was executed")
+    entry_point_name: str = Field(description="Display name of the entry point")
+    parameters: Dict = Field(description="Parameters used for the job")
+    status: str = Field(description="Job status (PENDING, RUNNING, DONE, FAILED, KILLED)")
+    exit_code: Optional[int] = Field(description="Exit code of the job", default=None)
+    resources: Optional[Dict] = Field(description="Requested resources", default=None)
+    cluster_job_id: Optional[str] = Field(description="Cluster-assigned job ID", default=None)
+    created_at: datetime = Field(description="When the job was created")
+    started_at: Optional[datetime] = Field(description="When the job started running", default=None)
+    finished_at: Optional[datetime] = Field(description="When the job finished", default=None)
+
+
+class JobSubmitRequest(BaseModel):
+    """Request to submit a new job"""
+    app_url: str = Field(description="URL of the app manifest")
+    entry_point_id: str = Field(description="Entry point to execute")
+    parameters: Dict = Field(description="Parameter values keyed by parameter ID")
+    resources: Optional[AppResourceDefaults] = Field(description="Resource overrides", default=None)
+
+
+class JobResponse(BaseModel):
+    """Response containing a list of jobs"""
+    jobs: List[Job] = Field(description="A list of jobs")

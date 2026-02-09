@@ -14,6 +14,7 @@ try:
 except ImportError:
     import tomli as tomllib
 
+import httpx
 import yaml
 from loguru import logger
 from pydantic import HttpUrl
@@ -28,6 +29,7 @@ from urllib.parse import quote, unquote
 
 from fileglancer import database as db
 from fileglancer import auth
+from fileglancer import apps as apps_module
 from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
@@ -260,10 +262,21 @@ def create_app(settings):
         else:
             logger.debug(f"No notifications file found at {notifications_file}")
 
+        # Start cluster job monitor
+        try:
+            await apps_module.start_job_monitor()
+            logger.info("Cluster job monitor started")
+        except Exception as e:
+            logger.warning(f"Failed to start cluster job monitor: {e}")
+
         logger.info(f"Server ready")
         yield
-        # Cleanup (if needed)
-        pass
+
+        # Cleanup: stop job monitor
+        try:
+            await apps_module.stop_job_monitor()
+        except Exception as e:
+            logger.warning(f"Error stopping cluster job monitor: {e}")
 
     app = FastAPI(lifespan=lifespan)
 
@@ -1445,6 +1458,176 @@ def create_app(settings):
 
             return JSONResponse(status_code=200, content={"message": "Item deleted"})
 
+
+    # --- Apps & Jobs API ---
+
+    @app.post("/api/apps/manifest", response_model=AppManifest,
+              description="Fetch and validate an app manifest from a URL")
+    async def fetch_manifest(body: ManifestFetchRequest,
+                             username: str = Depends(get_current_user)):
+        try:
+            manifest = await apps_module.fetch_app_manifest(body.url)
+            return manifest
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(status_code=502, detail=f"Failed to fetch manifest: HTTP {e.response.status_code}")
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid manifest: {str(e)}")
+
+    @app.get("/api/apps", response_model=list[UserApp],
+             description="Get the user's configured apps with their manifests")
+    async def get_user_apps(username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            pref = db.get_user_preference(session, username, "apps")
+
+        app_list = pref.get("apps", []) if pref else []
+        result = []
+        for app_entry in app_list:
+            user_app = UserApp(
+                url=app_entry["url"],
+                name=app_entry.get("name", "Unknown"),
+                description=app_entry.get("description"),
+                added_at=app_entry.get("added_at", datetime.now(UTC).isoformat()),
+            )
+            # Try to fetch manifest (use cache)
+            try:
+                user_app.manifest = await apps_module.fetch_app_manifest(app_entry["url"])
+                # Update name/description from manifest
+                user_app.name = user_app.manifest.name
+                user_app.description = user_app.manifest.description
+            except Exception as e:
+                logger.warning(f"Failed to fetch manifest for {app_entry['url']}: {e}")
+            result.append(user_app)
+        return result
+
+    @app.post("/api/apps", response_model=UserApp,
+              description="Add an app by URL")
+    async def add_user_app(body: AppAddRequest,
+                           username: str = Depends(get_current_user)):
+        # Fetch manifest to validate
+        try:
+            manifest = await apps_module.fetch_app_manifest(body.url)
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(status_code=502, detail=f"Failed to fetch manifest: HTTP {e.response.status_code}")
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid manifest: {str(e)}")
+
+        now = datetime.now(UTC)
+        new_entry = {
+            "url": body.url,
+            "name": manifest.name,
+            "description": manifest.description,
+            "added_at": now.isoformat(),
+        }
+
+        with db.get_db_session(settings.db_url) as session:
+            pref = db.get_user_preference(session, username, "apps")
+            app_list = pref.get("apps", []) if pref else []
+
+            # Check for duplicates
+            for existing in app_list:
+                if existing["url"] == body.url:
+                    raise HTTPException(status_code=409, detail="App already added")
+
+            app_list.append(new_entry)
+            db.set_user_preference(session, username, "apps", {"apps": app_list})
+
+        return UserApp(
+            url=body.url,
+            name=manifest.name,
+            description=manifest.description,
+            added_at=now,
+            manifest=manifest,
+        )
+
+    @app.delete("/api/apps",
+                description="Remove an app by URL")
+    async def remove_user_app(url: str = Query(..., description="URL of the app to remove"),
+                              username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            pref = db.get_user_preference(session, username, "apps")
+            app_list = pref.get("apps", []) if pref else []
+
+            new_list = [a for a in app_list if a["url"] != url]
+            if len(new_list) == len(app_list):
+                raise HTTPException(status_code=404, detail="App not found")
+
+            db.set_user_preference(session, username, "apps", {"apps": new_list})
+
+        return {"message": "App removed"}
+
+    @app.post("/api/jobs", response_model=Job,
+              description="Submit a new job")
+    async def submit_job(body: JobSubmitRequest,
+                         username: str = Depends(get_current_user)):
+        try:
+            resources_dict = None
+            if body.resources:
+                resources_dict = body.resources.model_dump(exclude_none=True)
+
+            db_job = await apps_module.submit_job(
+                username=username,
+                app_url=body.app_url,
+                entry_point_id=body.entry_point_id,
+                parameters=body.parameters,
+                resources=resources_dict,
+            )
+            return _convert_job(db_job)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            logger.exception(f"Error submitting job: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/jobs", response_model=JobResponse,
+             description="List the user's jobs")
+    async def get_jobs(status: Optional[str] = Query(None, description="Filter by status"),
+                       username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            db_jobs = db.get_jobs_by_username(session, username, status)
+            jobs = [_convert_job(j) for j in db_jobs]
+            return JobResponse(jobs=jobs)
+
+    @app.get("/api/jobs/{job_id}", response_model=Job,
+             description="Get a single job by ID")
+    async def get_job(job_id: int,
+                      username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            db_job = db.get_job(session, job_id, username)
+            if db_job is None:
+                raise HTTPException(status_code=404, detail="Job not found")
+            return _convert_job(db_job)
+
+    @app.delete("/api/jobs/{job_id}",
+                description="Cancel a running job")
+    async def cancel_job(job_id: int,
+                         username: str = Depends(get_current_user)):
+        try:
+            db_job = await apps_module.cancel_job(job_id, username)
+            return _convert_job(db_job)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    def _convert_job(db_job: db.JobDB) -> Job:
+        """Convert a database JobDB to a Pydantic Job model."""
+        return Job(
+            id=db_job.id,
+            app_url=db_job.app_url,
+            app_name=db_job.app_name,
+            entry_point_id=db_job.entry_point_id,
+            entry_point_name=db_job.entry_point_name,
+            parameters=db_job.parameters,
+            status=db_job.status,
+            exit_code=db_job.exit_code,
+            resources=db_job.resources,
+            cluster_job_id=db_job.cluster_job_id,
+            created_at=db_job.created_at,
+            started_at=db_job.started_at,
+            finished_at=db_job.finished_at,
+        )
 
     @app.post("/api/auth/simple-login", include_in_schema=not settings.enable_okta_auth)
     async def simple_login_handler(request: Request, body: dict = Body(...)):

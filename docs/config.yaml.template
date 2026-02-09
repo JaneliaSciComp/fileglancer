@@ -123,3 +123,27 @@ session_cookie_name: fg_session
 # Set to true for production with valid HTTPS certificates
 #
 session_cookie_secure: true
+
+#
+# Cluster configuration for Apps feature
+# Controls how jobs are submitted and executed
+#
+# Executor type: "local" for local execution, "lsf" for LSF cluster
+# cluster_executor: local
+
+# LSF queue name (only used with "lsf" executor)
+# cluster_queue: normal
+
+# LSF account (only used with "lsf" executor)
+# cluster_account: your_account
+
+# Polling interval in seconds for checking job status
+# cluster_poll_interval: 10.0
+
+# Directory for job log files
+# cluster_log_directory: ./logs
+
+# Default resource allocation for jobs (can be overridden per entry point)
+# cluster_default_memory: "8 GB"
+# cluster_default_walltime: "04:00"
+# cluster_default_cpus: 1
