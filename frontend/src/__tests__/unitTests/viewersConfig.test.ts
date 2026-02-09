@@ -3,610 +3,351 @@ import { parseViewersConfig } from '@/config/viewersConfig';
 
 describe('parseViewersConfig', () => {
   describe('Valid configurations', () => {
-    it('should parse valid config with viewers that have manifests', () => {
+    it('should parse config with single manifest_url viewer', () => {
       const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
 viewers:
-  - name: neuroglancer
-  - name: avivator
+  - manifest_url: https://example.com/neuroglancer.yaml
 `;
-      const result = parseViewersConfig(yaml, ['neuroglancer', 'avivator']);
-
-      expect(result.valid_ome_zarr_versions).toEqual([0.4, 0.5]);
-      expect(result.viewers).toHaveLength(2);
-      expect(result.viewers[0].name).toBe('neuroglancer');
-      expect(result.viewers[1].name).toBe('avivator');
-    });
-
-    it('should support custom valid_ome_zarr_versions', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5, 0.6]
-viewers:
-  - name: custom-viewer
-    url: https://example.com/{dataLink}
-    ome_zarr_versions: [0.6]
-`;
-      const result = parseViewersConfig(yaml, []);
-
-      expect(result.valid_ome_zarr_versions).toEqual([0.4, 0.5, 0.6]);
-      expect(result.viewers[0].ome_zarr_versions).toEqual([0.6]);
-    });
-
-    it('should parse config with custom viewer with all required fields', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: custom-viewer
-    url: https://example.com/{dataLink}
-    ome_zarr_versions: [0.4, 0.5]
-`;
-      const result = parseViewersConfig(yaml, []);
+      const result = parseViewersConfig(yaml);
 
       expect(result.viewers).toHaveLength(1);
-      expect(result.viewers[0].name).toBe('custom-viewer');
-      expect(result.viewers[0].url).toBe('https://example.com/{dataLink}');
-      expect(result.viewers[0].ome_zarr_versions).toEqual([0.4, 0.5]);
+      expect(result.viewers[0].manifest_url).toBe(
+        'https://example.com/neuroglancer.yaml'
+      );
+      expect(result.viewers[0].instance_template_url).toBeUndefined();
+      expect(result.viewers[0].label).toBeUndefined();
+      expect(result.viewers[0].logo).toBeUndefined();
     });
 
-    it('should parse config with optional fields', () => {
+    it('should parse config with multiple viewers', () => {
       const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
 viewers:
-  - name: custom-viewer
-    url: https://example.com/{dataLink}
-    ome_zarr_versions: [0.4]
+  - manifest_url: https://example.com/neuroglancer.yaml
+  - manifest_url: https://example.com/avivator.yaml
+  - manifest_url: https://example.com/validator.yaml
+`;
+      const result = parseViewersConfig(yaml);
+
+      expect(result.viewers).toHaveLength(3);
+      expect(result.viewers[0].manifest_url).toBe(
+        'https://example.com/neuroglancer.yaml'
+      );
+      expect(result.viewers[1].manifest_url).toBe(
+        'https://example.com/avivator.yaml'
+      );
+      expect(result.viewers[2].manifest_url).toBe(
+        'https://example.com/validator.yaml'
+      );
+    });
+
+    it('should parse config with all optional fields', () => {
+      const yaml = `
+viewers:
+  - manifest_url: https://example.com/viewer.yaml
+    instance_template_url: https://example.com/viewer?url={dataLink}
     label: Custom Viewer Label
     logo: custom-logo.png
 `;
-      const result = parseViewersConfig(yaml, []);
+      const result = parseViewersConfig(yaml);
 
+      expect(result.viewers).toHaveLength(1);
+      expect(result.viewers[0].manifest_url).toBe(
+        'https://example.com/viewer.yaml'
+      );
+      expect(result.viewers[0].instance_template_url).toBe(
+        'https://example.com/viewer?url={dataLink}'
+      );
       expect(result.viewers[0].label).toBe('Custom Viewer Label');
       expect(result.viewers[0].logo).toBe('custom-logo.png');
     });
 
-    it('should allow viewer with manifest to override url', () => {
+    it('should parse config with manifest_url only (no optional fields)', () => {
       const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
 viewers:
-  - name: neuroglancer
-    url: https://custom-neuroglancer.com/{dataLink}
+  - manifest_url: https://example.com/simple-viewer.yaml
 `;
-      const result = parseViewersConfig(yaml, ['neuroglancer']);
+      const result = parseViewersConfig(yaml);
 
-      expect(result.viewers[0].url).toBe(
-        'https://custom-neuroglancer.com/{dataLink}'
-      );
-    });
-
-    it('should parse mixed config with manifest and non-manifest viewers', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: neuroglancer
-  - name: custom-viewer
-    url: https://example.com/{dataLink}
-    ome_zarr_versions: [0.4]
-  - name: avivator
-`;
-      const result = parseViewersConfig(yaml, ['neuroglancer', 'avivator']);
-
-      expect(result.viewers).toHaveLength(3);
-      expect(result.viewers[0].name).toBe('neuroglancer');
-      expect(result.viewers[1].name).toBe('custom-viewer');
-      expect(result.viewers[2].name).toBe('avivator');
+      expect(result.viewers).toHaveLength(1);
+      expect(result.viewers[0]).toEqual({
+        manifest_url: 'https://example.com/simple-viewer.yaml'
+      });
     });
   });
 
   describe('Invalid YAML syntax', () => {
     it('should throw error for malformed YAML', () => {
-      const invalidYaml = 'viewers:\n  - name: test\n    invalid: [[[';
+      const invalidYaml = 'viewers:\n  - manifest_url: test\n    invalid: [[[';
 
-      expect(() => parseViewersConfig(invalidYaml, [])).toThrow(
+      expect(() => parseViewersConfig(invalidYaml)).toThrow(
         /Failed to parse viewers configuration YAML/
       );
     });
 
-    it('should throw error for invalid YAML structure', () => {
-      const invalidYaml = 'this is not valid yaml [[{]}';
+    it('should throw error for non-object YAML (string)', () => {
+      const invalidYaml = 'just a string';
 
-      // js-yaml parses this as a string, which then fails the object check
-      expect(() => parseViewersConfig(invalidYaml, [])).toThrow(
-        /Configuration must have "valid_ome_zarr_versions" and "viewers" fields/
+      expect(() => parseViewersConfig(invalidYaml)).toThrow(
+        /Configuration must have a "viewers" field/
       );
     });
 
-    it('should throw error for non-object YAML', () => {
-      const invalidYaml = 'just a string';
+    it('should throw error for non-object YAML (number)', () => {
+      const invalidYaml = '123';
 
-      expect(() => parseViewersConfig(invalidYaml, [])).toThrow(
-        /Configuration must have "valid_ome_zarr_versions" and "viewers" fields/
+      expect(() => parseViewersConfig(invalidYaml)).toThrow(
+        /Configuration must have a "viewers" field/
+      );
+    });
+
+    it('should throw error for non-object YAML (array)', () => {
+      const invalidYaml = '[1, 2, 3]';
+
+      expect(() => parseViewersConfig(invalidYaml)).toThrow(
+        /Configuration must have a "viewers" field/
       );
     });
 
     it('should throw error for empty YAML', () => {
       const invalidYaml = '';
 
-      expect(() => parseViewersConfig(invalidYaml, [])).toThrow(
-        /Configuration must have "valid_ome_zarr_versions" and "viewers" fields/
+      expect(() => parseViewersConfig(invalidYaml)).toThrow(
+        /Configuration must have a "viewers" field/
+      );
+    });
+
+    it('should throw error for null YAML', () => {
+      const invalidYaml = 'null';
+
+      expect(() => parseViewersConfig(invalidYaml)).toThrow(
+        /Configuration must have a "viewers" field/
       );
     });
   });
 
   describe('Missing required fields', () => {
-    it('should throw error when valid_ome_zarr_versions is missing', () => {
-      const yaml = `
-viewers:
-  - name: neuroglancer
-`;
-
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /Configuration must have a \"valid_ome_zarr_versions\" field containing an array of numbers/
-      );
-    });
-
-    it('should throw error when valid_ome_zarr_versions is not an array', () => {
-      const yaml = `
-valid_ome_zarr_versions: "not-an-array"
-viewers:
-  - name: neuroglancer
-`;
-
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /Configuration must have a \"valid_ome_zarr_versions\" field containing an array of numbers/
-      );
-    });
-
-    it('should throw error when valid_ome_zarr_versions is empty', () => {
-      const yaml = `
-valid_ome_zarr_versions: []
-viewers:
-  - name: neuroglancer
-`;
-
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /"valid_ome_zarr_versions" must not be empty/
-      );
-    });
-
-    it('should throw error when valid_ome_zarr_versions contains non-numbers', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, "0.5"]
-viewers:
-  - name: neuroglancer
-`;
-
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /"valid_ome_zarr_versions" must contain only numbers/
-      );
-    });
-
     it('should throw error when viewers array is missing', () => {
       const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
 name: some-config
 other_field: value
 `;
 
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /Configuration must have a \"viewers\" field containing an array of viewers/
+      expect(() => parseViewersConfig(yaml)).toThrow(
+        /Configuration must have a "viewers" field containing an array/
       );
     });
 
-    it('should throw error when viewers is not an array', () => {
+    it('should throw error when viewer is missing manifest_url', () => {
       const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers: not-an-array
-`;
-
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /Configuration must have a \"viewers\" field containing an array of viewers/
-      );
-    });
-
-    it('should throw error when viewer is not an object', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
 viewers:
-  - just-a-string
+  - label: Custom Label
+    logo: custom.png
 `;
 
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /Each viewer must have a "name" field \(string\)/
+      expect(() => parseViewersConfig(yaml)).toThrow(
+        /Each viewer must have a "manifest_url" field/
       );
     });
 
-    it('should throw error when viewer lacks name field', () => {
+    it('should throw error when viewers array is empty', () => {
       const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - url: https://example.com
-    ome_zarr_versions: [0.4]
+viewers: []
 `;
 
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /Each viewer must have a "name" field \(string\)/
-      );
-    });
-
-    it('should throw error when viewer name is not a string', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: 123
-    url: https://example.com
-    ome_zarr_versions: [0.4]
-`;
-
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /Each viewer must have a "name" field \(string\)/
-      );
-    });
-
-    it('should throw error when custom viewer (no manifest) lacks url', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: custom-viewer
-    ome_zarr_versions: [0.4]
-`;
-
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /Viewer "custom-viewer" does not have a capability manifest and must specify "url"/
-      );
-    });
-
-    it('should throw error when custom viewer (no manifest) lacks ome_zarr_versions', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: custom-viewer
-    url: https://example.com/{dataLink}
-`;
-
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /Viewer "custom-viewer" does not have a capability manifest and must specify "ome_zarr_versions" \(array of numbers\)/
-      );
-    });
-
-    it('should throw error when custom viewer has empty ome_zarr_versions array', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: custom-viewer
-    url: https://example.com/{dataLink}
-    ome_zarr_versions: []
-`;
-
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /Viewer "custom-viewer" does not have a capability manifest and must specify "ome_zarr_versions" \(array of numbers\)/
+      expect(() => parseViewersConfig(yaml)).toThrow(
+        /"viewers" must contain at least one viewer/
       );
     });
   });
 
   describe('Invalid field types', () => {
-    it('should throw error when url is not a string (for custom viewer)', () => {
+    it('should throw error when manifest_url is not a string', () => {
       const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
 viewers:
-  - name: custom-viewer
-    url: 123
-    ome_zarr_versions: [0.4]
+  - manifest_url: 123
 `;
 
-      // The required field check happens first, so if url is wrong type,
-      // it's caught by the "must specify url" check
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /Viewer "custom-viewer": "url" must be a string/
+      expect(() => parseViewersConfig(yaml)).toThrow(
+        /Each viewer must have a "manifest_url" field/
       );
     });
 
-    it('should throw error when url override is not a string (for manifest viewer)', () => {
+    it('should throw error when manifest_url is not a valid URL', () => {
       const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
 viewers:
-  - name: neuroglancer
-    url: 123
+  - manifest_url: not-a-valid-url
 `;
 
-      expect(() => parseViewersConfig(yaml, ['neuroglancer'])).toThrow(
-        /Viewer "neuroglancer": "url" must be a string/
+      expect(() => parseViewersConfig(yaml)).toThrow(
+        /"manifest_url" must be a valid URL/
       );
     });
 
     it('should throw error when label is not a string', () => {
       const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
 viewers:
-  - name: custom-viewer
-    url: https://example.com
-    ome_zarr_versions: [0.4]
+  - manifest_url: https://example.com/viewer.yaml
     label: 123
 `;
 
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /Viewer "custom-viewer": "label" must be a string/
-      );
+      expect(() => parseViewersConfig(yaml)).toThrow(/"label" must be a string/);
     });
 
     it('should throw error when logo is not a string', () => {
       const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
 viewers:
-  - name: custom-viewer
-    url: https://example.com
-    ome_zarr_versions: [0.4]
+  - manifest_url: https://example.com/viewer.yaml
     logo: 123
 `;
 
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /Viewer "custom-viewer": "logo" must be a string/
+      expect(() => parseViewersConfig(yaml)).toThrow(/"logo" must be a string/);
+    });
+
+    it('should throw error when instance_template_url is not a string', () => {
+      const yaml = `
+viewers:
+  - manifest_url: https://example.com/viewer.yaml
+    instance_template_url: 123
+`;
+
+      expect(() => parseViewersConfig(yaml)).toThrow(
+        /"instance_template_url" must be a string/
       );
     });
 
-    it('should throw error when ome_zarr_versions is not an array (for custom viewer)', () => {
+    it('should throw error when viewer entry is not an object (string in array)', () => {
       const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
 viewers:
-  - name: custom-viewer
-    url: https://example.com
-    ome_zarr_versions: "not-an-array"
+  - just-a-string
 `;
 
-      // The required field check happens first and checks if it's an array
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /Viewer "custom-viewer": "ome_zarr_versions" must be an array/
+      expect(() => parseViewersConfig(yaml)).toThrow(
+        /Each viewer must be an object with a "manifest_url" field/
       );
     });
 
-    it('should throw error when ome_zarr_versions override is not an array (for manifest viewer)', () => {
+    it('should throw error when viewer entry is not an object (number in array)', () => {
       const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
 viewers:
-  - name: neuroglancer
-    ome_zarr_versions: "not-an-array"
+  - 123
 `;
 
-      expect(() => parseViewersConfig(yaml, ['neuroglancer'])).toThrow(
-        /Viewer "neuroglancer": "ome_zarr_versions" must be an array/
-      );
-    });
-  });
-
-  describe('OME-Zarr version validation', () => {
-    it('should accept valid ome_zarr_versions (0.4 and 0.5)', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: custom-viewer
-    url: https://example.com
-    ome_zarr_versions: [0.4, 0.5]
-`;
-
-      const result = parseViewersConfig(yaml, []);
-
-      expect(result.viewers[0].ome_zarr_versions).toEqual([0.4, 0.5]);
-    });
-
-    it('should throw error for invalid ome_zarr_version (0.3)', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: custom-viewer
-    url: https://example.com
-    ome_zarr_versions: [0.3]
-`;
-
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /invalid ome_zarr_version "0.3". Valid versions are: 0.4, 0.5/
+      expect(() => parseViewersConfig(yaml)).toThrow(
+        /Each viewer must be an object with a "manifest_url" field/
       );
     });
 
-    it('should throw error for invalid ome_zarr_version (1.0)', () => {
+    it('should throw error when viewers is not an array', () => {
       const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: custom-viewer
-    url: https://example.com
-    ome_zarr_versions: [1.0]
+viewers: not-an-array
 `;
 
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /invalid ome_zarr_version "1". Valid versions are: 0.4, 0.5/
+      expect(() => parseViewersConfig(yaml)).toThrow(
+        /Configuration must have a "viewers" field containing an array/
       );
-    });
-
-    it('should throw error when mixing valid and invalid versions', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: custom-viewer
-    url: https://example.com
-    ome_zarr_versions: [0.3, 0.4, 0.5]
-`;
-
-      expect(() => parseViewersConfig(yaml, [])).toThrow(
-        /invalid ome_zarr_version "0.3". Valid versions are: 0.4, 0.5/
-      );
-    });
-
-    it('should throw error for invalid version in manifest viewer override', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: neuroglancer
-    ome_zarr_versions: [0.3]
-`;
-
-      expect(() => parseViewersConfig(yaml, ['neuroglancer'])).toThrow(
-        /invalid ome_zarr_version "0.3". Valid versions are: 0.4, 0.5/
-      );
-    });
-
-    it('should accept only 0.4', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: custom-viewer
-    url: https://example.com
-    ome_zarr_versions: [0.4]
-`;
-
-      const result = parseViewersConfig(yaml, []);
-
-      expect(result.viewers[0].ome_zarr_versions).toEqual([0.4]);
-    });
-
-    it('should accept only 0.5', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: custom-viewer
-    url: https://example.com
-    ome_zarr_versions: [0.5]
-`;
-
-      const result = parseViewersConfig(yaml, []);
-
-      expect(result.viewers[0].ome_zarr_versions).toEqual([0.5]);
-    });
-  });
-
-  describe('Case sensitivity and normalization', () => {
-    it('should handle case-insensitive manifest matching', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: Neuroglancer
-  - name: AVIVATOR
-`;
-
-      // Manifest names are lowercase
-      const result = parseViewersConfig(yaml, ['neuroglancer', 'avivator']);
-
-      expect(result.viewers).toHaveLength(2);
-      expect(result.viewers[0].name).toBe('Neuroglancer');
-      expect(result.viewers[1].name).toBe('AVIVATOR');
-    });
-
-    it('should match manifests case-insensitively for mixed case', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: NeuroGlancer
-`;
-
-      // Should recognize this has a manifest (neuroglancer)
-      const result = parseViewersConfig(yaml, ['neuroglancer']);
-
-      expect(result.viewers).toHaveLength(1);
-      expect(result.viewers[0].name).toBe('NeuroGlancer');
-      // Should not require url or ome_zarr_versions since it has a manifest
     });
   });
 
   describe('Edge cases', () => {
-    it('should handle empty viewers array', () => {
+    it('should handle single viewer with only manifest_url', () => {
       const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers: []
-`;
-
-      const result = parseViewersConfig(yaml, []);
-
-      expect(result.viewers).toHaveLength(0);
-    });
-
-    it('should handle viewer with only name (has manifest)', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
 viewers:
-  - name: neuroglancer
+  - manifest_url: https://example.com/viewer.yaml
 `;
 
-      const result = parseViewersConfig(yaml, ['neuroglancer']);
-
-      expect(result.viewers).toHaveLength(1);
-      expect(result.viewers[0]).toEqual({ name: 'neuroglancer' });
-    });
-
-    it('should preserve all valid fields in parsed output', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: custom
-    url: https://example.com
-    label: Custom Label
-    logo: custom.png
-    ome_zarr_versions: [0.4, 0.5]
-`;
-
-      const result = parseViewersConfig(yaml, []);
-
-      expect(result.viewers[0]).toEqual({
-        name: 'custom',
-        url: 'https://example.com',
-        label: 'Custom Label',
-        logo: 'custom.png',
-        ome_zarr_versions: [0.4, 0.5]
-      });
-    });
-
-    it('should handle multiple valid ome_zarr_versions', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: custom
-    url: https://example.com
-    ome_zarr_versions: [0.4, 0.5]
-`;
-
-      const result = parseViewersConfig(yaml, []);
-
-      expect(result.viewers[0].ome_zarr_versions).toEqual([0.4, 0.5]);
-    });
-
-    it('should handle single ome_zarr_version in array', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: custom
-    url: https://example.com
-    ome_zarr_versions: [0.4]
-`;
-
-      const result = parseViewersConfig(yaml, []);
-
-      expect(result.viewers[0].ome_zarr_versions).toEqual([0.4]);
-    });
-  });
-
-  describe('Default parameter behavior', () => {
-    it('should use empty array as default for viewersWithManifests', () => {
-      const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
-viewers:
-  - name: custom
-    url: https://example.com
-    ome_zarr_versions: [0.4]
-`;
-
-      // Not passing second parameter
       const result = parseViewersConfig(yaml);
 
       expect(result.viewers).toHaveLength(1);
-      expect(result.viewers[0].name).toBe('custom');
+      expect(result.viewers[0]).toEqual({
+        manifest_url: 'https://example.com/viewer.yaml'
+      });
     });
 
-    it('should treat viewer as non-manifest when viewersWithManifests is empty', () => {
+    it('should preserve all valid optional fields in output', () => {
       const yaml = `
-valid_ome_zarr_versions: [0.4, 0.5]
 viewers:
-  - name: neuroglancer
+  - manifest_url: https://example.com/viewer.yaml
+    instance_template_url: https://example.com/viewer?url={dataLink}
+    label: Custom Label
+    logo: custom.png
 `;
 
-      // Even though neuroglancer typically has a manifest,
-      // if not in the list, it should require url and versions
-      expect(() => parseViewersConfig(yaml, [])).toThrow(/must specify "url"/);
+      const result = parseViewersConfig(yaml);
+
+      expect(result.viewers[0]).toEqual({
+        manifest_url: 'https://example.com/viewer.yaml',
+        instance_template_url: 'https://example.com/viewer?url={dataLink}',
+        label: 'Custom Label',
+        logo: 'custom.png'
+      });
+    });
+
+    it('should strip/ignore unknown fields', () => {
+      const yaml = `
+viewers:
+  - manifest_url: https://example.com/viewer.yaml
+    unknown_field: some-value
+    another_unknown: 123
+`;
+
+      const result = parseViewersConfig(yaml);
+
+      // Zod should strip unknown fields
+      expect(result.viewers[0]).toEqual({
+        manifest_url: 'https://example.com/viewer.yaml'
+      });
+      expect(result.viewers[0]).not.toHaveProperty('unknown_field');
+      expect(result.viewers[0]).not.toHaveProperty('another_unknown');
+    });
+
+    it('should accept http and https URLs', () => {
+      const yaml = `
+viewers:
+  - manifest_url: http://example.com/viewer.yaml
+  - manifest_url: https://example.com/viewer.yaml
+`;
+
+      const result = parseViewersConfig(yaml);
+
+      expect(result.viewers).toHaveLength(2);
+      expect(result.viewers[0].manifest_url).toBe(
+        'http://example.com/viewer.yaml'
+      );
+      expect(result.viewers[1].manifest_url).toBe(
+        'https://example.com/viewer.yaml'
+      );
+    });
+
+    it('should handle URL with special characters', () => {
+      const yaml = `
+viewers:
+  - manifest_url: https://example.com/viewer-config_v2.yaml?version=1.0&format=yaml
+`;
+
+      const result = parseViewersConfig(yaml);
+
+      expect(result.viewers[0].manifest_url).toBe(
+        'https://example.com/viewer-config_v2.yaml?version=1.0&format=yaml'
+      );
+    });
+
+    it('should handle empty optional strings', () => {
+      const yaml = `
+viewers:
+  - manifest_url: https://example.com/viewer.yaml
+    label: ""
+    logo: ""
+    instance_template_url: ""
+`;
+
+      const result = parseViewersConfig(yaml);
+
+      expect(result.viewers[0]).toEqual({
+        manifest_url: 'https://example.com/viewer.yaml',
+        label: '',
+        logo: '',
+        instance_template_url: ''
+      });
     });
   });
 });
