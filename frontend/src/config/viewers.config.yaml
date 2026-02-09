@@ -1,50 +1,20 @@
 # Fileglancer OME-Zarr Viewers Configuration
 #
-# This file defines which OME-Zarr viewers are available in your Fileglancer deployment.
-# The @bioimagetools/capability-manifest library is used to determine compatibility
-# for viewers that have a capability manifest.
-#
-# Global Configuration:
-# - valid_ome_zarr_versions: Array of OME-Zarr versions supported by the application (e.g., `[0.4, 0.5]`)
-#
-# For viewers with capability manifests, you must provide:
-# - name: must match name value in capability manifest
-# Optionally:
-# - url: to override the template url in the capability manifest
-# - logo: to override the default logo at {name}.png
-# - label: Custom tooltip text (defaults to "View in {Name}")
-#
-# For viewers without capability manifests, you must provide:
-# - name: Viewer identifier
-# - url: URL template (use `{dataLink}` placeholder for dataset URL)
-# - ome_zarr_versions: Array of supported OME-Zarr versions (e.g., `[0.4, 0.5]`)
-# Optionally:
-# - logo: Filename of logo in `frontend/src/assets/` (defaults to `{name}.png` if not specified)
-# - label: Custom tooltip text (defaults to "View in {Name}")
-
-# Valid OME-Zarr versions supported by this application
-valid_ome_zarr_versions: [0.4, 0.5]
+# Each viewer entry requires:
+#   - manifest_url: URL to a capability manifest YAML file
+# Optional overrides:
+#   - instance_template_url: Override the viewer's template_url from the manifest
+#   - logo: Filename of logo in frontend/src/assets/ (defaults to {normalized_name}.png)
+#   - label: Custom tooltip text (defaults to "View in {Name}")
 
 viewers:
-  # OME-Zarr viewers with capability manifests
-  - name: neuroglancer
+  - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/neuroglancer.yaml'
 
-  - name: avivator
-    # Optional: Override the viewer URL from the capability manifest
-    # In this example, override to use Janelia's custom deployment
-    url: 'https://janeliascicomp.github.io/viv/'
+  - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/vizarr.yaml'
+    instance_template_url: 'https://janeliascicomp.github.io/viv/'
 
-  # OME-Zarr viewers without capability manifests
-  # OME-Zarr Validator
-  # Logo will automatically resolve to @/assets/validator.png
-  - name: validator
-    url: 'https://ome.github.io/ome-ngff-validator/?source={dataLink}'
-    ome_zarr_versions: [0.4, 0.5]
+  - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/ome-zarr-validator.yaml'
     label: 'View in OME-Zarr Validator'
 
-  # Vol-E - Allen Cell Explorer 3D viewer
-  # Logo will automatically resolve to @/assets/vole.png
-  - name: vole
-    url: 'https://volumeviewer.allencell.org/viewer?url={dataLink}'
-    ome_zarr_versions: [0.4, 0.5]
+  - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/vol-e.yaml'
     label: 'View in Vol-E'
