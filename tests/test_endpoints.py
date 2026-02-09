@@ -1169,6 +1169,62 @@ def test_get_content_with_symlink_no_matching_fsp(test_client, temp_dir):
         shutil.rmtree(external_dir)
 
 
+def test_get_content_traversal_through_directory_symlink(test_client, temp_dir):
+    """Test that accessing a file through a directory symlink pointing outside the FSP is blocked"""
+    external_dir = tempfile.mkdtemp()
+
+    try:
+        # Create a file in the external directory
+        external_file = os.path.join(external_dir, "secret.txt")
+        with open(external_file, "w") as f:
+            f.write("sensitive data")
+
+        # Create a directory symlink in the FSP pointing to the external directory
+        symlink_path = os.path.join(temp_dir, "link_to_external_dir")
+        os.symlink(external_dir, symlink_path)
+
+        # Try to access a file *through* the directory symlink
+        response = test_client.get(
+            "/api/content/tempdir?subpath=link_to_external_dir/secret.txt"
+        )
+        # Should be blocked — the resolved path escapes the FSP root
+        assert response.status_code == 400
+
+    finally:
+        shutil.rmtree(external_dir)
+
+
+def test_get_content_double_hop_symlink(test_client, temp_dir):
+    """Test that accessing a file through a chain of symlinks pointing outside the FSP is blocked"""
+    external_dir = tempfile.mkdtemp()
+    hop_dir = tempfile.mkdtemp()
+
+    try:
+        # Create a file in the external directory
+        external_file = os.path.join(external_dir, "secret.txt")
+        with open(external_file, "w") as f:
+            f.write("sensitive data")
+
+        # Create first hop: hop_dir/hop2 -> external_dir
+        hop2_path = os.path.join(hop_dir, "hop2")
+        os.symlink(external_dir, hop2_path)
+
+        # Create second hop in the FSP: double_hop -> hop_dir/hop2
+        symlink_path = os.path.join(temp_dir, "double_hop")
+        os.symlink(hop2_path, symlink_path)
+
+        # Try to access a file through the double-hop symlink
+        response = test_client.get(
+            "/api/content/tempdir?subpath=double_hop/secret.txt"
+        )
+        # Should be blocked — the resolved path escapes the FSP root
+        assert response.status_code == 400
+
+    finally:
+        shutil.rmtree(external_dir)
+        shutil.rmtree(hop_dir)
+
+
 def test_head_content_with_symlink(test_client, temp_dir):
     """Test HEAD request to /api/content endpoint with a symlink"""
     # Create a target file within the FSP
