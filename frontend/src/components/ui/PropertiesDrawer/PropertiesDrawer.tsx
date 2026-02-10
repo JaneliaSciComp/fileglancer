@@ -210,7 +210,7 @@ export default function PropertiesDrawer({
                 Permissions
               </Tabs.Trigger>
 
-              {tasksEnabled ? (
+              {tasksEnabled && !fileBrowserState.propertiesTarget.is_symlink ? (
                 <Tabs.Trigger
                   className="!text-foreground h-full"
                   value="convert"
@@ -342,7 +342,7 @@ export default function PropertiesDrawer({
             </Tabs.Panel>
 
             {/*Task panel*/}
-            {tasksEnabled ? (
+            {tasksEnabled && !fileBrowserState.propertiesTarget.is_symlink ? (
               <Tabs.Panel
                 className="flex flex-col gap-4 flex-1 w-full p-2"
                 value="convert"
