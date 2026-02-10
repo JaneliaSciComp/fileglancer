@@ -435,3 +435,48 @@ def test_broken_symlink_detection(test_dir, filestore):
     assert broken_link_info is not None, "Broken symlink should be returned"
     assert broken_link_info.is_symlink is True, "Should be marked as symlink"
     assert broken_link_info.symlink_target_fsp is None, "Target should be None for broken symlink"
+
+
+def test_broken_symlink_within_share(test_dir):
+    """Test that broken symlinks pointing to paths within a file share don't get symlink_target_fsp populated"""
+    # Create a filestore
+    fsp = FileSharePath(zone="test", name="test_share", mount_path=test_dir)
+    filestore = Filestore(fsp)
+
+    # Create a broken symlink that points to a non-existent file within the share
+    broken_link_path = os.path.join(test_dir, "link_to_missing_file")
+    missing_target = os.path.join(test_dir, "subdir", "nonexistent.txt")
+    os.symlink(missing_target, broken_link_path)
+
+    # Mock the database session and find_fsp_from_absolute_path
+    from unittest.mock import Mock
+    from fileglancer import database
+
+    mock_session = Mock()
+    original_find = database.find_fsp_from_absolute_path
+
+    def mock_find(session, path):
+        # This would normally match the file share pattern,
+        # but since the target doesn't exist, we should not get here
+        # because os.path.exists check should return False first
+        normalized_path = os.path.realpath(path)
+        test_dir_real = os.path.realpath(test_dir)
+        if normalized_path.startswith(test_dir_real):
+            return (fsp, os.path.relpath(normalized_path, test_dir_real))
+        return None
+
+    database.find_fsp_from_absolute_path = mock_find
+
+    try:
+        # Get file infos with session (so symlink resolution is attempted)
+        file_infos = list(filestore.yield_file_infos("", session=mock_session))
+
+        # Find the broken symlink
+        broken_link_info = next((f for f in file_infos if f.name == "link_to_missing_file"), None)
+
+        # Verify the symlink is detected but target is not resolved
+        assert broken_link_info is not None, "Broken symlink should be listed"
+        assert broken_link_info.is_symlink is True, "Should be marked as symlink"
+        assert broken_link_info.symlink_target_fsp is None, "symlink_target_fsp should be None for broken symlink even if target path matches share pattern"
+    finally:
+        database.find_fsp_from_absolute_path = original_find

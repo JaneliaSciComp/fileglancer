@@ -96,8 +96,12 @@ class FileInfo(BaseModel):
             target = os.path.join(os.path.dirname(absolute_path), target)
         target = os.path.abspath(target)
 
+        # Check if the symlink target actually exists
+        # If it doesn't exist, return None (broken symlink)
+        if not os.path.exists(target):
+            return None
+
         # Try to find which file share contains this target
-        # If stat failed earlier (broken symlink), we won't find a match
         try:
             from fileglancer.database import find_fsp_from_absolute_path
             match = find_fsp_from_absolute_path(session, target)
