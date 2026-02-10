@@ -440,8 +440,8 @@ export default function NGLinkDialog({
               ? 'Saving...'
               : 'Creating...'
             : isEditMode
-              ? 'Save'
-              : 'Create'}
+              ? 'Save and copy link'
+              : 'Create and copy link'}
         </Button>
         <Button
           className="!rounded-md"
