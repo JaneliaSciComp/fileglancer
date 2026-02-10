@@ -106,9 +106,9 @@ class FileInfo(BaseModel):
                 # Reconstruct the canonical target path from the file share root
                 # and the returned subpath so we only operate within managed roots.
                 if subpath:
-                    validated_target = os.path.realpath(os.path.join(fsp.path, subpath))
+                    validated_target = os.path.realpath(os.path.join(fsp.mount_path, subpath))
                 else:
-                    validated_target = os.path.realpath(fsp.path)
+                    validated_target = os.path.realpath(fsp.mount_path)
 
                 # Check if the symlink target actually exists within the resolved location.
                 # If it doesn't exist, return None (broken symlink)
