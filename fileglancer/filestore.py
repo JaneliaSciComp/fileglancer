@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from typing import Optional, Generator
 from loguru import logger
 
+from .database import find_fsp_from_absolute_path
 from .model import FileSharePath
 from .utils import is_likely_binary
 
@@ -96,16 +97,14 @@ class FileInfo(BaseModel):
             target = os.path.join(os.path.dirname(absolute_path), target)
         target = os.path.abspath(target)
 
-        # Check if the symlink target actually exists
-        # If it doesn't exist, return None (broken symlink)
-        if not os.path.exists(target):
-            return None
-
         # Try to find which file share contains this target
-        try:
-            from fileglancer.database import find_fsp_from_absolute_path
+        try:   
             match = find_fsp_from_absolute_path(session, target)
             if match:
+                # Check if the symlink target actually exists
+                # If it doesn't exist, return None (broken symlink)
+                if not os.path.exists(target):
+                    return None
                 fsp, subpath = match
                 return {"fsp_name": fsp.name, "subpath": subpath}
         except (FileNotFoundError, PermissionError, OSError):
