@@ -3,6 +3,12 @@ import stat
 import pytest
 import tempfile
 import shutil
+
+from contextlib import contextmanager
+from unittest.mock import Mock
+from typing import List, Callable, Optional
+
+from fileglancer import database
 from fileglancer.filestore import Filestore, FileInfo
 from fileglancer.model import FileSharePath
 
@@ -36,6 +42,36 @@ def test_dir():
 def filestore(test_dir):
     file_share_path = FileSharePath(zone="test", name="test", mount_path=test_dir)
     return Filestore(file_share_path)
+
+
+@contextmanager
+def mock_database_for_symlinks(file_share_paths: List[FileSharePath],
+                                find_fsp_func: Optional[Callable] = None):
+    """
+    Context manager to mock database functions for symlink resolution tests.
+
+    Args:
+        file_share_paths: List of FileSharePath objects to return from get_file_share_paths
+        find_fsp_func: Optional custom function for find_fsp_from_absolute_path.
+                      If None, the original function is preserved (not mocked).
+    """
+    original_get_paths = database.get_file_share_paths
+    original_find = database.find_fsp_from_absolute_path
+
+    def mock_get_file_share_paths(session, fsp_name=None):
+        paths = file_share_paths
+        if fsp_name:
+            paths = [p for p in paths if p.name == fsp_name]
+        return paths
+
+    try:
+        database.get_file_share_paths = mock_get_file_share_paths
+        if find_fsp_func is not None:
+            database.find_fsp_from_absolute_path = find_fsp_func
+        yield
+    finally:
+        database.get_file_share_paths = original_get_paths
+        database.find_fsp_from_absolute_path = original_find
 
 
 def test_unmounted_filestore():
@@ -205,23 +241,16 @@ def test_same_share_symlink_resolution_via_listing(filestore, test_dir):
     symlink_path = os.path.join(test_dir, "link_to_subdir_file")
     os.symlink(target_file, symlink_path)
 
-    # Get file info via directory listing with session (mock database session)
-    from unittest.mock import Mock
-    from fileglancer import database
-
     mock_session = Mock()
-    original_find = database.find_fsp_from_absolute_path
+    fsp = FileSharePath(zone="test", name="test", mount_path=test_dir)
 
     def mock_find(session, path):
         # Normalize paths for comparison
         if os.path.realpath(path) == os.path.realpath(target_file):
-            fsp = FileSharePath(zone="test", name="test", mount_path=test_dir)
             return (fsp, "subdir/target_same_share.txt")
         return None
 
-    database.find_fsp_from_absolute_path = mock_find
-
-    try:
+    with mock_database_for_symlinks([fsp], mock_find):
         # Use yield_file_infos to list directory - symlinks are detected this way
         files = list(filestore.yield_file_infos("", session=mock_session))
         symlink_info = next((f for f in files if f.name == "link_to_subdir_file"), None)
@@ -231,8 +260,6 @@ def test_same_share_symlink_resolution_via_listing(filestore, test_dir):
         assert symlink_info.symlink_target_fsp is not None
         assert symlink_info.symlink_target_fsp["fsp_name"] == "test"
         assert symlink_info.symlink_target_fsp["subpath"] == "subdir/target_same_share.txt"
-    finally:
-        database.find_fsp_from_absolute_path = original_find
 
 
 def test_cross_share_symlink_resolution_via_listing(test_dir):
@@ -254,25 +281,18 @@ def test_cross_share_symlink_resolution_via_listing(test_dir):
 
     # Create filestore for share1
     fsp1 = FileSharePath(zone="test", name="share1", mount_path=share1_dir)
+    fsp2 = FileSharePath(zone="test", name="share2", mount_path=share2_dir)
     filestore1 = Filestore(fsp1)
 
-    # Mock database session and find function
-    from unittest.mock import Mock
-    from fileglancer import database
-
     mock_session = Mock()
-    original_find = database.find_fsp_from_absolute_path
 
     def mock_find(session, path):
         # Normalize paths for comparison
         if os.path.realpath(path) == os.path.realpath(target_file):
-            fsp2 = FileSharePath(zone="test", name="share2", mount_path=share2_dir)
             return (fsp2, "target.txt")
         return None
 
-    database.find_fsp_from_absolute_path = mock_find
-
-    try:
+    with mock_database_for_symlinks([fsp1, fsp2], mock_find):
         # Use yield_file_infos to list directory - symlinks are detected this way
         files = list(filestore1.yield_file_infos("", session=mock_session))
         symlink_info = next((f for f in files if f.name == "link_to_share2"), None)
@@ -282,8 +302,6 @@ def test_cross_share_symlink_resolution_via_listing(test_dir):
         assert symlink_info.symlink_target_fsp is not None
         assert symlink_info.symlink_target_fsp["fsp_name"] == "share2"
         assert symlink_info.symlink_target_fsp["subpath"] == "target.txt"
-    finally:
-        database.find_fsp_from_absolute_path = original_find
 
 
 def test_relative_symlink_resolution(test_dir):
@@ -301,24 +319,18 @@ def test_relative_symlink_resolution(test_dir):
 
     # Create filestore for nested_dir so symlink is listed via yield_file_infos
     fsp = FileSharePath(zone="test", name="nested", mount_path=nested_dir)
+    fsp_rel = FileSharePath(zone="test", name="rel_test", mount_path=os.path.join(test_dir, "rel_test"))
     nested_filestore = Filestore(fsp)
 
-    from unittest.mock import Mock
-    from fileglancer import database
-
     mock_session = Mock()
-    original_find = database.find_fsp_from_absolute_path
 
     def mock_find(session, path):
         if os.path.realpath(path) == os.path.realpath(target_file):
             # Return fsp for rel_test directory
-            fsp_rel = FileSharePath(zone="test", name="rel_test", mount_path=os.path.join(test_dir, "rel_test"))
             return (fsp_rel, "target.txt")
         return None
 
-    database.find_fsp_from_absolute_path = mock_find
-
-    try:
+    with mock_database_for_symlinks([fsp, fsp_rel], mock_find):
         # List directory to find the symlink
         files = list(nested_filestore.yield_file_infos("", session=mock_session))
         symlink_info = next((f for f in files if f.name == "link"), None)
@@ -327,8 +339,6 @@ def test_relative_symlink_resolution(test_dir):
         assert symlink_info.is_symlink is True
         assert symlink_info.symlink_target_fsp is not None
         assert symlink_info.symlink_target_fsp["subpath"] == "target.txt"
-    finally:
-        database.find_fsp_from_absolute_path = original_find
 
 
 def test_yield_file_infos_with_symlinks(filestore, test_dir):
@@ -342,25 +352,16 @@ def test_yield_file_infos_with_symlinks(filestore, test_dir):
         os.path.join(test_dir, "link1")
     )
 
-    from unittest.mock import Mock
-    from fileglancer import database
-
     mock_session = Mock()
-    original_find = database.find_fsp_from_absolute_path
-    database.find_fsp_from_absolute_path = lambda s, p: (
-        FileSharePath(zone="test", name="test", mount_path=test_dir),
-        "file1.txt"
-    )
+    fsp = FileSharePath(zone="test", name="test", mount_path=test_dir)
 
-    try:
+    with mock_database_for_symlinks([fsp], lambda s, p: (fsp, "file1.txt")):
         files = list(filestore.yield_file_infos("", session=mock_session))
 
         # Find the symlink in the list
         symlink_info = next((f for f in files if f.name == "link1"), None)
         assert symlink_info is not None
         assert symlink_info.is_symlink is True
-    finally:
-        database.find_fsp_from_absolute_path = original_find
 
 
 def test_broken_symlink_is_listed(filestore, test_dir):
@@ -397,17 +398,10 @@ def test_symlink_to_directory(filestore, test_dir):
     symlink_path = os.path.join(test_dir, "link_to_dir")
     os.symlink(target_dir, symlink_path)
 
-    from unittest.mock import Mock
-    from fileglancer import database
-
     mock_session = Mock()
-    original_find = database.find_fsp_from_absolute_path
-    database.find_fsp_from_absolute_path = lambda s, p: (
-        FileSharePath(zone="test", name="test", mount_path=test_dir),
-        "target_dir"
-    )
+    fsp = FileSharePath(zone="test", name="test", mount_path=test_dir)
 
-    try:
+    with mock_database_for_symlinks([fsp], lambda s, p: (fsp, "target_dir")):
         # Use yield_file_infos to list directory - symlinks to dirs are detected this way
         files = list(filestore.yield_file_infos("", session=mock_session))
         symlink_info = next((f for f in files if f.name == "link_to_dir"), None)
@@ -416,8 +410,6 @@ def test_symlink_to_directory(filestore, test_dir):
         assert symlink_info.is_symlink is True
         assert symlink_info.is_dir is True  # Should also be marked as directory
         assert symlink_info.symlink_target_fsp is not None
-    finally:
-        database.find_fsp_from_absolute_path = original_find
 
 
 def test_broken_symlink_detection(test_dir, filestore):
@@ -448,12 +440,7 @@ def test_broken_symlink_within_share(test_dir):
     missing_target = os.path.join(test_dir, "subdir", "nonexistent.txt")
     os.symlink(missing_target, broken_link_path)
 
-    # Mock the database session and find_fsp_from_absolute_path
-    from unittest.mock import Mock
-    from fileglancer import database
-
     mock_session = Mock()
-    original_find = database.find_fsp_from_absolute_path
 
     def mock_find(session, path):
         # This would normally match the file share pattern,
@@ -465,9 +452,7 @@ def test_broken_symlink_within_share(test_dir):
             return (fsp, os.path.relpath(normalized_path, test_dir_real))
         return None
 
-    database.find_fsp_from_absolute_path = mock_find
-
-    try:
+    with mock_database_for_symlinks([fsp], mock_find):
         # Get file infos with session (so symlink resolution is attempted)
         file_infos = list(filestore.yield_file_infos("", session=mock_session))
 
@@ -478,5 +463,3 @@ def test_broken_symlink_within_share(test_dir):
         assert broken_link_info is not None, "Broken symlink should be listed"
         assert broken_link_info.is_symlink is True, "Should be marked as symlink"
         assert broken_link_info.symlink_target_fsp is None, "symlink_target_fsp should be None for broken symlink even if target path matches share pattern"
-    finally:
-        database.find_fsp_from_absolute_path = original_find
