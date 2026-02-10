@@ -98,14 +98,23 @@ class FileInfo(BaseModel):
         target = os.path.abspath(target)
 
         # Try to find which file share contains this target
-        try:   
+        try:
             match = find_fsp_from_absolute_path(session, target)
             if match:
-                # Check if the symlink target actually exists
-                # If it doesn't exist, return None (broken symlink)
-                if not os.path.exists(target):
-                    return None
                 fsp, subpath = match
+
+                # Reconstruct the canonical target path from the file share root
+                # and the returned subpath so we only operate within managed roots.
+                if subpath:
+                    validated_target = os.path.realpath(os.path.join(fsp.path, subpath))
+                else:
+                    validated_target = os.path.realpath(fsp.path)
+
+                # Check if the symlink target actually exists within the resolved location.
+                # If it doesn't exist, return None (broken symlink)
+                if not os.path.exists(validated_target):
+                    return None
+
                 return {"fsp_name": fsp.name, "subpath": subpath}
         except (FileNotFoundError, PermissionError, OSError):
             # Target doesn't exist or isn't accessible
