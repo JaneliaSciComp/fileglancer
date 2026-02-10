@@ -122,7 +122,9 @@ export default function FileBrowser({
             toast.error(`Error downloading file: ${result.error}`);
           }
         },
-        shouldShow: !propertiesTarget.is_dir
+        shouldShow:
+          !fileBrowserState.selectedFiles[0]?.is_dir &&
+          !fileBrowserState.selectedFiles[0]?.is_symlink
       },
       {
         name: isFavorite ? 'Unset favorite' : 'Set favorite',
@@ -135,9 +137,8 @@ export default function FileBrowser({
           }
         },
         shouldShow:
-          (fileBrowserState.selectedFiles[0]?.is_dir &&
-            !fileBrowserState.selectedFiles[0].is_symlink) ??
-          false
+          fileBrowserState.selectedFiles[0]?.is_dir &&
+          !fileBrowserState.selectedFiles[0].is_symlink
       },
       {
         name: 'Convert images to OME-Zarr',
@@ -146,8 +147,8 @@ export default function FileBrowser({
         },
         shouldShow:
           tasksEnabled &&
-          propertiesTarget.is_dir &&
-          !propertiesTarget.is_symlink
+          fileBrowserState.selectedFiles[0]?.is_dir &&
+          !fileBrowserState.selectedFiles[0]?.is_symlink
       },
       {
         name: 'Rename',
@@ -161,7 +162,7 @@ export default function FileBrowser({
         action: () => {
           setShowPermissionsDialog(true);
         },
-        shouldShow: !propertiesTarget.is_dir
+        shouldShow: true
       },
       {
         name: 'Delete',
