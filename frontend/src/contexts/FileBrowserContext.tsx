@@ -30,6 +30,7 @@ type FileBrowserContextProviderProps = {
 type FileBrowserState = {
   propertiesTarget: FileOrFolder | null;
   selectedFiles: FileOrFolder[];
+  dataLinkPath: string | null;
 };
 
 // Internal state
@@ -275,12 +276,30 @@ export const FileBrowserContextProvider = ({
     fileQuery.data
   ]);
 
+  // Compute the effective path for data link operations.
+  // For symlinks, construct the unresolved path from parent + symlink name
+  // (propertiesTarget.path is the resolved target path, not the symlink location).
+  // For non-symlinks, use propertiesTarget.path directly.
+  const dataLinkPath = useMemo(() => {
+    const parentPath = fileQuery.data?.currentFileOrFolder?.path;
+    if (!propertiesTarget) {
+      return parentPath || null;
+    }
+    if (propertiesTarget.is_symlink && propertiesTarget.name && parentPath) {
+      return parentPath === '.'
+        ? propertiesTarget.name
+        : `${parentPath}/${propertiesTarget.name}`;
+    }
+    return propertiesTarget.path;
+  }, [propertiesTarget, fileQuery.data?.currentFileOrFolder?.path]);
+
   return (
     <FileBrowserContext.Provider
       value={{
         fileBrowserState: {
           propertiesTarget,
-          selectedFiles: internalState.selectedFiles
+          selectedFiles: internalState.selectedFiles,
+          dataLinkPath
         },
 
         // URL params

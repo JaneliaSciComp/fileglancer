@@ -19,7 +19,7 @@ export default function useDataToolLinks(
   pendingToolKey: PendingToolKey,
   setPendingToolKey: Dispatch<SetStateAction<PendingToolKey>>
 ): {
-  handleCreateDataLink: () => Promise<boolean>;
+  handleCreateDataLink: (pathOverride?: string) => Promise<boolean>;
   handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
   handleToolClick: (toolKey: PendingToolKey) => Promise<void>;
   handleDialogConfirm: () => Promise<void>;
@@ -31,7 +31,7 @@ export default function useDataToolLinks(
 export default function useDataToolLinks(
   setShowDataLinkDialog: Dispatch<SetStateAction<boolean>>
 ): {
-  handleCreateDataLink: () => Promise<boolean>;
+  handleCreateDataLink: (pathOverride?: string) => Promise<boolean>;
   handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
   handleToolClick: (toolKey: PendingToolKey) => Promise<void>;
   handleDialogConfirm: () => Promise<void>;
@@ -49,24 +49,27 @@ export default function useDataToolLinks(
   const currentUrlsRef = useRef(openWithToolUrls);
   currentUrlsRef.current = openWithToolUrls;
 
-  const { fileQuery } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const {
     createProxiedPathMutation,
     deleteProxiedPathMutation,
     allProxiedPathsQuery,
-    proxiedPathByFspAndPathQuery
+    currentDirProxiedPathQuery
   } = useProxiedPathContext();
 
   const { areDataLinksAutomatic } = usePreferencesContext();
   const { externalDataUrlQuery } = useExternalBucketContext();
   const { handleCopy, showCopiedTooltip } = useCopyTooltip();
 
-  const handleCreateDataLink = async (): Promise<boolean> => {
+  const handleCreateDataLink = async (
+    pathOverride?: string
+  ): Promise<boolean> => {
+    const path = pathOverride || fileBrowserState.dataLinkPath;
     if (!fileQuery.data?.currentFileSharePath) {
       toast.error('No file share path selected');
       return false;
     }
-    if (!fileQuery.data?.currentFileOrFolder) {
+    if (!path) {
       toast.error('No folder selected');
       return false;
     }
@@ -74,7 +77,7 @@ export default function useDataToolLinks(
     try {
       await createProxiedPathMutation.mutateAsync({
         fsp_name: fileQuery.data.currentFileSharePath.name,
-        path: fileQuery.data.currentFileOrFolder.path
+        path
       });
       toast.success('Data link created successfully');
       await allProxiedPathsQuery.refetch();
@@ -134,7 +137,11 @@ export default function useDataToolLinks(
       return;
     }
 
-    const success = await handleCreateDataLink();
+    // Viewer icon flow: always create data link for the current directory,
+    // not the properties target (which may be a selected subdirectory row)
+    const success = await handleCreateDataLink(
+      fileQuery.data?.currentFileOrFolder?.path
+    );
     if (!success) {
       // If link creation fails, exit immediately without waiting or showing navigation error
       return;
@@ -164,7 +171,7 @@ export default function useDataToolLinks(
   };
 
   const handleToolClick = async (toolKey: PendingToolKey) => {
-    if (!proxiedPathByFspAndPathQuery.data && !externalDataUrlQuery.data) {
+    if (!currentDirProxiedPathQuery.data && !externalDataUrlQuery.data) {
       if (areDataLinksAutomatic) {
         await createLinkAndExecuteAction(toolKey);
       } else {
@@ -172,7 +179,7 @@ export default function useDataToolLinks(
         setShowDataLinkDialog?.(true);
       }
     } else if (
-      (proxiedPathByFspAndPathQuery.data || externalDataUrlQuery.data) &&
+      (currentDirProxiedPathQuery.data || externalDataUrlQuery.data) &&
       openWithToolUrls
     ) {
       await executeToolAction(toolKey, openWithToolUrls);
