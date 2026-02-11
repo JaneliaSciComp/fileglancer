@@ -156,9 +156,23 @@ def _validate_parameter_value(param: AppParameter, value) -> str:
     str_val = str(value)
 
     if param.type in ("file", "directory"):
+        # Normalize backslashes to forward slashes
+        str_val = str_val.replace("\\", "/")
+
         # Validate path characters
         if _SHELL_METACHAR_PATTERN.search(str_val):
             raise ValueError(f"Parameter '{param.id}' contains invalid characters")
+
+        # Require absolute path
+        if not str_val.startswith("/") and not str_val.startswith("~"):
+            raise ValueError(f"Parameter '{param.id}' must be an absolute path (starting with / or ~)")
+
+        # Verify path exists
+        expanded = os.path.expanduser(str_val)
+        if not os.path.exists(expanded):
+            raise ValueError(f"Parameter '{param.id}': path does not exist: {str_val}")
+        if not os.access(expanded, os.R_OK):
+            raise ValueError(f"Parameter '{param.id}': path is not accessible: {str_val}")
 
     if param.type == "string" and param.pattern:
         if not re.fullmatch(param.pattern, str_val):
@@ -228,7 +242,6 @@ async def get_executor():
         _executor = create_executor(
             executor=settings.cluster_executor,
             queue=settings.cluster_queue,
-            log_directory=settings.cluster_log_directory,
         )
     return _executor
 
@@ -406,8 +419,10 @@ async def submit_job(
     # Wrap command with cd into work dir
     full_command = f"cd {work_dir}\n\n{command}"
 
-    # Set work_dir on resource spec for LSF -cwd support
+    # Set work_dir and log paths on resource spec
     resource_spec.work_dir = str(work_dir)
+    resource_spec.stdout_path = str(work_dir / "stdout.log")
+    resource_spec.stderr_path = str(work_dir / "stderr.log")
 
     # Submit to executor
     executor = await get_executor()
@@ -498,22 +513,13 @@ def _resolve_work_dir(db_job: db.JobDB) -> Path:
     return _build_work_dir(db_job.id, db_job.app_name, db_job.entry_point_id)
 
 
-def _get_job_log_paths(db_job: db.JobDB) -> dict[str, Path]:
-    """Get the expected log file paths for a job."""
-    settings = get_settings()
-    log_dir = Path(settings.cluster_log_directory).expanduser()
-    job_name = f"fg-{db_job.app_name}-{db_job.entry_point_id}"
-    safe_name = re.sub(r"[^\w\-.]", "_", job_name)
-
-    return {
-        "stdout": log_dir / f"{job_name}.out",
-        "stderr": log_dir / f"{job_name}.err",
-        "script": log_dir / f"{safe_name}.sh",
-    }
-
-
 async def get_job_file_content(job_id: int, username: str, file_type: str) -> Optional[str]:
     """Read the content of a job file (script, stdout, or stderr).
+
+    All job files live in the job's work directory:
+      - script.sh   — the generated script
+      - stdout.log  — captured standard output
+      - stderr.log  — captured standard error
 
     Returns the file content as a string, or None if the file doesn't exist.
     """
@@ -527,19 +533,16 @@ async def get_job_file_content(job_id: int, username: str, file_type: str) -> Op
 
     work_dir = _resolve_work_dir(db_job)
 
-    if file_type == "script":
-        # Look for our readable script in the work directory
-        script_in_work_dir = work_dir / "script.sh"
-        if script_in_work_dir.is_file():
-            return script_in_work_dir.read_text()
-        return None
+    filenames = {
+        "script": "script.sh",
+        "stdout": "stdout.log",
+        "stderr": "stderr.log",
+    }
 
-    if file_type in ("stdout", "stderr"):
-        # Check log directory for executor-managed log files
-        paths = _get_job_log_paths(db_job)
-        path = paths[file_type]
-        if path.is_file():
-            return path.read_text()
-        return None
+    if file_type not in filenames:
+        raise ValueError(f"Unknown file type: {file_type}")
 
-    raise ValueError(f"Unknown file type: {file_type}")
+    path = work_dir / filenames[file_type]
+    if path.is_file():
+        return path.read_text()
+    return None

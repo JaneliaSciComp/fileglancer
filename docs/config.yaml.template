@@ -140,9 +140,6 @@ session_cookie_secure: true
 # Polling interval in seconds for checking job status
 # cluster_poll_interval: 10.0
 
-# Directory for job log files
-# cluster_log_directory: ~/.fileglancer/logs
-
 # Default resource allocation for jobs (can be overridden per entry point)
 # cluster_default_memory: "8 GB"
 # cluster_default_walltime: "04:00"

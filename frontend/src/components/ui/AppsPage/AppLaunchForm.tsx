@@ -185,6 +185,20 @@ export default function AppLaunchForm({
           }
         }
       }
+      // Validate file/directory paths are absolute
+      if (
+        val !== undefined &&
+        val !== null &&
+        val !== '' &&
+        (param.type === 'file' || param.type === 'directory') &&
+        typeof val === 'string'
+      ) {
+        const normalized = convertBackToForwardSlash(val);
+        if (!normalized.startsWith('/') && !normalized.startsWith('~')) {
+          newErrors[param.id] =
+            `${param.name} must be an absolute path (starting with / or ~)`;
+        }
+      }
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
