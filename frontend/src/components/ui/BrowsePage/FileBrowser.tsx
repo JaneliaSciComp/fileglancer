@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { MouseEvent } from 'react';
 import { Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
@@ -52,7 +53,8 @@ export default function FileBrowser({
     fspName,
     fileQuery,
     fileBrowserState,
-    updateFilesWithContextMenuClick
+    updateFilesWithContextMenuClick,
+    clearSelection
   } = useFileBrowserContext();
   const { folderPreferenceMap, handleContextMenuFavorite } =
     usePreferencesContext();
@@ -82,6 +84,17 @@ export default function FileBrowser({
     detectZarrVersions(fileQuery.data?.files as FileOrFolder[]).length > 0;
 
   const isN5Dir = detectN5(fileQuery.data?.files as FileOrFolder[]);
+
+  // Escape key clears row selection and reverts properties to current directory
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        clearSelection();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [clearSelection]);
 
   // Handle right-click on file - FileBrowser-specific logic
   const handleFileContextMenu = (

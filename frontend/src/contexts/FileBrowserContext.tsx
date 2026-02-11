@@ -81,6 +81,7 @@ type FileBrowserContextType = {
     showFilePropertiesDrawer: boolean
   ) => void;
   updateFilesWithContextMenuClick: (file: FileOrFolder) => void;
+  clearSelection: () => void;
 };
 
 const FileBrowserContext = createContext<FileBrowserContextType | null>(null);
@@ -181,6 +182,14 @@ export const FileBrowserContextProvider = ({
       selectedFiles: newSelectedFiles
     });
   };
+
+  const clearSelection = useCallback(() => {
+    setInternalState({
+      propertiesTargetPath: fileQuery.data?.currentFileOrFolder?.path || null,
+      propertiesTargetName: null,
+      selectedFiles: []
+    });
+  }, [fileQuery.data?.currentFileOrFolder?.path]);
 
   // Update client state when URL changes (navigation to different file/folder)
   // Set propertiesTarget to the current directory/file being viewed
@@ -319,7 +328,8 @@ export const FileBrowserContextProvider = ({
 
         // Actions
         handleLeftClick,
-        updateFilesWithContextMenuClick
+        updateFilesWithContextMenuClick,
+        clearSelection
       }}
     >
       {children}
