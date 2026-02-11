@@ -236,7 +236,7 @@ test.describe('Symlink Navigation and Display', () => {
     ).toBeVisible();
   });
 
-  test('clicking a directory symlink row selects it and shows in properties panel', async ({
+  test('working directory symlink properties panel shows correct content', async ({
     fileglancerPage: page
   }) => {
     // Verify properties panel is visible first
@@ -255,5 +255,104 @@ test.describe('Symlink Navigation and Display', () => {
     await expect(
       propertiesPanel.getByText('symlink_to_subdir', { exact: true })
     ).toBeVisible({ timeout: 10000 });
+
+    // Verify "Linked path:" label (symlink-specific)
+    await expect(propertiesPanel.getByText('Linked path:')).toBeVisible();
+
+    // Verify Overview table shows "Symlink" type
+    await expect(
+      propertiesPanel.locator('table').getByText('Symlink', { exact: true })
+    ).toBeVisible();
+
+    // Verify Convert tab is not shown
+    await expect(
+      propertiesPanel.getByRole('tab', { name: 'Convert' })
+    ).not.toBeVisible();
+
+    // Data link section should be visible (is_dir=true for directory symlink)
+    await expect(propertiesPanel.getByText(/data link/i).first()).toBeVisible({
+      timeout: 10000
+    });
+  });
+
+  test('working file symlink properties panel shows correct content', async ({
+    fileglancerPage: page
+  }) => {
+    const propertiesPanel = page
+      .locator('[role="complementary"]')
+      .filter({ hasText: 'Properties' });
+    await expect(propertiesPanel).toBeVisible();
+
+    // Click the Type column to select
+    const symlinkRow = page
+      .getByRole('row')
+      .filter({ hasText: 'symlink_to_file' });
+    await symlinkRow.getByText('Symlink', { exact: true }).click();
+
+    // Wait for properties panel to populate
+    await expect(
+      propertiesPanel.getByText('symlink_to_file', { exact: true })
+    ).toBeVisible({ timeout: 10000 });
+
+    // Verify "Linked path:" label (symlink-specific)
+    await expect(propertiesPanel.getByText('Linked path:')).toBeVisible();
+
+    // Verify Overview table shows "Symlink" type
+    await expect(
+      propertiesPanel.locator('table').getByText('Symlink', { exact: true })
+    ).toBeVisible();
+
+    // Verify Convert tab is not shown
+    await expect(
+      propertiesPanel.getByRole('tab', { name: 'Convert' })
+    ).not.toBeVisible();
+
+    // Data link section should NOT be visible (is_dir=false for file symlink)
+    await expect(
+      propertiesPanel.getByText('Create data link')
+    ).not.toBeVisible();
+  });
+
+  test('broken symlink properties panel shows correct content', async ({
+    fileglancerPage: page
+  }) => {
+    const propertiesPanel = page
+      .locator('[role="complementary"]')
+      .filter({ hasText: 'Properties' });
+    await expect(propertiesPanel).toBeVisible();
+
+    // Click the Type column to select
+    const brokenRow = page
+      .getByRole('row')
+      .filter({ hasText: 'broken_symlink' });
+    await brokenRow.getByText('Symlink', { exact: true }).click();
+
+    // Wait for properties panel to populate
+    await expect(
+      propertiesPanel.getByText('broken_symlink', { exact: true })
+    ).toBeVisible({ timeout: 10000 });
+
+    // Verify broken link icon (has text-error class)
+    await expect(propertiesPanel.locator('svg.text-error')).toBeVisible();
+
+    // Verify "Linked path:" label
+    await expect(propertiesPanel.getByText('Linked path:')).toBeVisible();
+
+    // Verify Overview table shows "Symlink (broken)" type
+    await expect(
+      propertiesPanel
+        .locator('table')
+        .getByText('Symlink (broken)', { exact: true })
+    ).toBeVisible();
+
+    // Verify Convert tab is not shown
+    await expect(
+      propertiesPanel.getByRole('tab', { name: 'Convert' })
+    ).not.toBeVisible();
+
+    // Data link section should NOT be visible (is_dir=false for broken symlink)
+    await expect(
+      propertiesPanel.getByText('Create data link')
+    ).not.toBeVisible();
   });
 });
