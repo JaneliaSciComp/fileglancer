@@ -8,7 +8,12 @@ import {
   Tabs
 } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
-import { HiOutlineDocument, HiOutlineDuplicate, HiX } from 'react-icons/hi';
+import {
+  HiExternalLink,
+  HiOutlineDocument,
+  HiOutlineDuplicate,
+  HiX
+} from 'react-icons/hi';
 import { HiOutlineFolder } from 'react-icons/hi2';
 import { useLocation } from 'react-router';
 
@@ -276,6 +281,20 @@ export default function PropertiesDrawer({
                           ? 'Deleting the data link will remove data access for collaborators with the link.'
                           : 'Creating a data link allows you to share the data at this path with internal collaborators or use tools to view the data.'}
                     </Typography>
+                    {!externalDataUrlQuery.data &&
+                      !proxiedPathByFspAndPathQuery.data && (
+                        <a
+                          className="flex items-center gap-1 text-primary hover:underline"
+                          href="https://fileglancer-docs.janelia.org/features/data-sharing/"
+                          rel="noopener noreferrer"
+                          target="_blank"
+                        >
+                          <Typography type="small">
+                            Learn more about data links
+                          </Typography>
+                          <HiExternalLink className="icon-xsmall" />
+                        </a>
+                      )}
                   </div>
                   {externalDataUrlQuery.data ? (
                     <>
