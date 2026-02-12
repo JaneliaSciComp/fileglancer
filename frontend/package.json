@@ -30,7 +30,7 @@
         "test": "vitest"
     },
     "dependencies": {
-        "@bioimagetools/capability-manifest": "^0.3.1",
+        "@bioimagetools/capability-manifest": "^0.3.3",
         "@material-tailwind/react": "^3.0.0-beta.24",
         "@tanstack/react-query": "^5.90.2",
         "@tanstack/react-table": "^8.21.3",
