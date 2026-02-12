@@ -172,14 +172,14 @@ viewers:
       );
     });
 
-    it('should throw error when manifest_url is not a valid URL', () => {
+    it('should throw error when manifest_url is not a valid URL or absolute path', () => {
       const yaml = `
 viewers:
   - manifest_url: not-a-valid-url
 `;
 
       expect(() => parseViewersConfig(yaml)).toThrow(
-        /"manifest_url" must be a valid URL/
+        /"manifest_url" must be a valid URL or an absolute path starting with \//
       );
     });
 
@@ -318,6 +318,22 @@ viewers:
       expect(result.viewers[1].manifest_url).toBe(
         'https://example.com/viewer.yaml'
       );
+    });
+
+    it('should accept absolute paths starting with /', () => {
+      const yaml = `
+viewers:
+  - manifest_url: /viewers/neuroglancer.yaml
+  - manifest_url: /viewers/vizarr.yaml
+`;
+
+      const result = parseViewersConfig(yaml);
+
+      expect(result.viewers).toHaveLength(2);
+      expect(result.viewers[0].manifest_url).toBe(
+        '/viewers/neuroglancer.yaml'
+      );
+      expect(result.viewers[1].manifest_url).toBe('/viewers/vizarr.yaml');
     });
 
     it('should handle URL with special characters', () => {

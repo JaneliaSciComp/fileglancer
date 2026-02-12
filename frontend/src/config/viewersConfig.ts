@@ -10,7 +10,10 @@ const ViewerConfigEntrySchema = z.object(
       .string({
         message: 'Each viewer must have a "manifest_url" field (string)'
       })
-      .url({ message: '"manifest_url" must be a valid URL' }),
+      .refine(val => val.startsWith('/') || URL.canParse(val), {
+        message:
+          '"manifest_url" must be a valid URL or an absolute path starting with /'
+      }),
     instance_template_url: z
       .string({ message: '"instance_template_url" must be a string' })
       .optional(),

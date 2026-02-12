@@ -1,20 +1,22 @@
 # Fileglancer OME-Zarr Viewers Configuration
 #
 # Each viewer entry requires:
-#   - manifest_url: URL to a capability manifest YAML file
+#   - manifest_url: URL or absolute path to a capability manifest YAML file
+#     Use absolute paths (e.g. /viewers/neuroglancer.yaml) for manifests bundled
+#     in the public/ directory, or full URLs for externally hosted manifests.
 # Optional overrides:
 #   - instance_template_url: Override the viewer's template_url from the manifest
 #   - logo: Filename of logo in frontend/src/assets/ (defaults to {normalized_name}.png)
 #   - label: Custom tooltip text (defaults to "View in {Name}")
 
 viewers:
-  - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/neuroglancer.yaml'
+  - manifest_url: '/viewers/neuroglancer.yaml'
 
-  - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/vizarr.yaml'
+  - manifest_url: '/viewers/vizarr.yaml'
     instance_template_url: 'https://janeliascicomp.github.io/viv/'
 
-  - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/ome-zarr-validator.yaml'
+  - manifest_url: '/viewers/validator.yaml'
     label: 'View in OME-Zarr Validator'
 
-  - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/vol-e.yaml'
+  - manifest_url: '/viewers/vole.yaml'
     label: 'View in Vol-E'
