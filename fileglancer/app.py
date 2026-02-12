@@ -927,7 +927,9 @@ def create_app(settings):
                     created_at=entry.created_at,
                     updated_at=entry.updated_at,
                     state_url=state_url,
-                    neuroglancer_url=neuroglancer_url
+                    neuroglancer_url=neuroglancer_url,
+                    state=entry.state,
+                    url_base=entry.url_base
                 ))
 
         return NeuroglancerShortLinkResponse(links=links)
