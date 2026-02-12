@@ -38,15 +38,25 @@ type NGLinkResponse = {
 };
 
 /**
- * Payload for creating a Neuroglancer link
+ * Payload for creating a Neuroglancer link from a full URL
  */
-export type CreateNGLinkPayload = {
-  url?: string;
-  state?: Record<string, unknown>;
-  url_base?: string;
-  short_name?: string;
-  title?: string;
+type CreateNGLinkFromUrl = {
+  url: string;
+  short_name: string | undefined;
+  title: string | undefined;
 };
+
+/**
+ * Payload for creating a Neuroglancer link from state and base URL
+ */
+type CreateNGLinkFromState = {
+  state: Record<string, unknown>;
+  url_base: string;
+  short_name: string | undefined;
+  title: string | undefined;
+};
+
+export type CreateNGLinkPayload = CreateNGLinkFromUrl | CreateNGLinkFromState;
 
 /**
  * Payload for updating a Neuroglancer link

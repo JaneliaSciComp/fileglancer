@@ -25,7 +25,7 @@ export type ZarrArray = zarr.Array<any>;
 
 export default function useZarrMetadata() {
   const { fileQuery } = useFileBrowserContext();
-  const { proxiedPathByFspAndPathQuery } = useProxiedPathContext();
+  const { currentDirProxiedPathQuery } = useProxiedPathContext();
   const { externalDataUrlQuery } = useExternalBucketContext();
   const {
     disableNeuroglancerStateGeneration,
@@ -99,7 +99,7 @@ export default function useZarrMetadata() {
     }
 
     const url =
-      externalDataUrlQuery.data || proxiedPathByFspAndPathQuery.data?.url;
+      externalDataUrlQuery.data || currentDirProxiedPathQuery.data?.url;
 
     const openWithToolUrls = {
       copy: url || ''
@@ -229,7 +229,7 @@ export default function useZarrMetadata() {
     return openWithToolUrls;
   }, [
     metadata,
-    proxiedPathByFspAndPathQuery.data?.url,
+    currentDirProxiedPathQuery.data?.url,
     externalDataUrlQuery.data,
     disableNeuroglancerStateGeneration,
     useLegacyMultichannelApproach,

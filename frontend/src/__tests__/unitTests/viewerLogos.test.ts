@@ -23,7 +23,7 @@ describe('getViewerLogo', () => {
     });
 
     it('should return logo path for vole', () => {
-      const voleLogo = getViewerLogo('vole');
+      const voleLogo = getViewerLogo('vol-e');
       expect(voleLogo).toBeTruthy();
       expect(voleLogo).not.toBe(fallback_logo);
     });

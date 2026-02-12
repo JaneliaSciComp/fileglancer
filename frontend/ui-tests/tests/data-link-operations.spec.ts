@@ -148,4 +148,106 @@ test.describe('Data Link Operations', () => {
       ).toBeVisible();
     });
   });
+
+  test('Data link created for subdirectory clicked from parent shows subdirectory name', async ({
+    fileglancerPage: page
+  }) => {
+    const zarrDirName = ZARR_TEST_FILE_INFO.v3_ome.dirname;
+
+    const propertiesPanel = page
+      .locator('[role="complementary"]')
+      .filter({ hasText: 'Properties' });
+
+    // Click the row's Type column to select the subdirectory without navigating in
+    const zarrRow = page.getByRole('row').filter({ hasText: zarrDirName });
+    await zarrRow.getByText('Folder', { exact: true }).click();
+
+    // Wait for properties panel to show the subdirectory name
+    await expect(
+      propertiesPanel.getByText(zarrDirName, { exact: true })
+    ).toBeVisible({ timeout: 10000 });
+
+    // Wait for the data link toggle to appear
+    const dataLinkToggle = propertiesPanel.getByRole('checkbox', {
+      name: /data link/i
+    });
+    await expect(dataLinkToggle).toBeVisible({ timeout: 10000 });
+
+    // Click the toggle to create a data link
+    await dataLinkToggle.click();
+
+    // Confirm in dialog
+    const confirmButton = page.getByRole('button', {
+      name: /confirm|create|yes/i
+    });
+    await expect(confirmButton).toBeVisible({ timeout: 5000 });
+    await confirmButton.click();
+
+    await expect(
+      page.getByText('Data link created successfully')
+    ).toBeVisible();
+
+    // Navigate to the Data links page
+    const linksNavButton = page.getByRole('link', { name: 'Data links' });
+    await linksNavButton.click();
+
+    await expect(page.getByRole('heading', { name: /links/i })).toBeVisible();
+
+    // Verify the data link has the subdirectory name, not the parent directory name
+    const linkRow = page.getByText(zarrDirName, { exact: true });
+    await expect(linkRow).toBeVisible({ timeout: 10000 });
+  });
+
+  test('Viewer icon creates data link for current directory even when subdirectory row is selected', async ({
+    fileglancerPage: page,
+    testDir
+  }) => {
+    const zarrDirName = ZARR_TEST_FILE_INFO.v3_ome.dirname;
+
+    // Navigate into the zarr directory
+    await page.getByRole('link', { name: zarrDirName }).click();
+    await expect(page.getByText('zarr.json')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByAltText(/neuroglancer/i)).toBeVisible();
+
+    // Click on the s0 subdirectory row to select it as the properties target
+    const s0Row = page.getByRole('row').filter({ hasText: 's0' });
+    await s0Row.getByText('Folder', { exact: true }).click();
+
+    // Verify s0 is selected in properties panel
+    const propertiesPanel = page
+      .locator('[role="complementary"]')
+      .filter({ hasText: 'Properties' });
+    await expect(propertiesPanel.getByText('s0', { exact: true })).toBeVisible({
+      timeout: 10000
+    });
+
+    // Click the Neuroglancer viewer icon — this should create a data link
+    // for the zarr directory (currentFileOrFolder), not for s0 (propertiesTarget)
+    const neuroglancerLink = page.getByAltText(/neuroglancer/i);
+    await neuroglancerLink.click();
+
+    // Confirm in dialog
+    const confirmButton = page.getByRole('button', {
+      name: /confirm|create|yes/i
+    });
+    await expect(confirmButton).toBeVisible({ timeout: 5000 });
+    await confirmButton.click();
+
+    await expect(
+      page.getByText('Data link created successfully')
+    ).toBeVisible();
+
+    // Navigate back to check the data link on the links page
+    await page.goto('/browse', { waitUntil: 'domcontentloaded' });
+    const linksNavButton = page.getByRole('link', { name: 'Data links' });
+    await linksNavButton.click();
+
+    await expect(page.getByRole('heading', { name: /links/i })).toBeVisible();
+
+    // The data link should be for the zarr directory, not the s0 subdirectory
+    await expect(page.getByText(zarrDirName, { exact: true })).toBeVisible({
+      timeout: 10000
+    });
+    await expect(page.getByText('s0', { exact: true })).not.toBeVisible();
+  });
 });

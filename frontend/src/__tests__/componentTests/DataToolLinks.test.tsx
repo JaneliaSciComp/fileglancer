@@ -141,7 +141,7 @@ describe('DataToolLinks - Edge Cases', () => {
     mockCapabilityManifest.loadManifestsFromUrls.mockResolvedValue(
       new Map([
         [
-          'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/neuroglancer.yaml',
+          '/viewers/neuroglancer.yaml',
           {
             viewer: {
               name: 'Neuroglancer',
@@ -150,7 +150,7 @@ describe('DataToolLinks - Edge Cases', () => {
           }
         ],
         [
-          'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/vizarr.yaml',
+          '/viewers/vizarr.yaml',
           {
             viewer: {
               name: 'Avivator',
@@ -182,14 +182,14 @@ describe('DataToolLinks - Edge Cases', () => {
 
       // Check for neuroglancer logo (known viewer with logo)
       const neuroglancerLogo = images.find(
-        img => img.getAttribute('alt') === 'Neuroglancer logo'
+        img => img.getAttribute('alt') === 'View in Neuroglancer'
       );
       expect(neuroglancerLogo).toBeTruthy();
       expect(neuroglancerLogo?.getAttribute('src')).toContain('neuroglancer');
 
       // Check for avivator logo (name for viewer in vizarr.yaml)
       const vizarrLogo = images.find(
-        img => img.getAttribute('alt') === 'Avivator logo'
+        img => img.getAttribute('alt') === 'View in Avivator'
       );
       expect(vizarrLogo).toBeTruthy();
       expect(vizarrLogo?.getAttribute('src')).toContain('avivator');
@@ -219,7 +219,7 @@ describe('DataToolLinks - Edge Cases', () => {
 
       // Check for neuroglancer logo
       const neuroglancerLogo = images.find(
-        img => img.getAttribute('alt') === 'Neuroglancer logo'
+        img => img.getAttribute('alt') === 'View in Neuroglancer'
       );
       expect(neuroglancerLogo).toBeTruthy();
 
@@ -250,7 +250,7 @@ describe('DataToolLinks - Expected Behavior', () => {
     mockCapabilityManifest.loadManifestsFromUrls.mockResolvedValue(
       new Map([
         [
-          'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/neuroglancer.yaml',
+          '/viewers/neuroglancer.yaml',
           {
             viewer: {
               name: 'Neuroglancer',
@@ -259,7 +259,7 @@ describe('DataToolLinks - Expected Behavior', () => {
           }
         ],
         [
-          'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/vizarr.yaml',
+          '/viewers/vizarr.yaml',
           {
             viewer: {
               name: 'Avivator',
@@ -341,10 +341,10 @@ describe('DataToolLinks - Expected Behavior', () => {
 
       // Verify specific logos are present
       const neuroglancerLogo = images.find(
-        img => img.getAttribute('alt') === 'Neuroglancer logo'
+        img => img.getAttribute('alt') === 'View in Neuroglancer'
       );
       const vizarrLogo = images.find(
-        img => img.getAttribute('alt') === 'Avivator logo'
+        img => img.getAttribute('alt') === 'View in Avivator'
       );
 
       expect(neuroglancerLogo).toBeTruthy();
@@ -379,10 +379,10 @@ describe('DataToolLinks - Expected Behavior', () => {
       );
 
       // Viewer buttons should have correct aria-labels from their config
-      const neuroglancerButton = screen.getByLabelText('View in Neuroglancer');
+      const neuroglancerButton = screen.getByAltText('View in Neuroglancer');
       expect(neuroglancerButton).toBeInTheDocument();
 
-      const vizarrButton = screen.getByLabelText('View in Avivator');
+      const vizarrButton = screen.getByAltText('View in Avivator');
       expect(vizarrButton).toBeInTheDocument();
     });
   });

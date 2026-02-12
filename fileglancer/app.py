@@ -1124,8 +1124,11 @@ def create_app(settings):
             try:
                 file_info = filestore.get_file_info(subpath)
 
+                is_binary = filestore.check_is_binary(subpath)
+
                 headers = {
                     'Accept-Ranges': 'bytes',
+                    'X-Is-Binary': 'true' if is_binary else 'false',
                 }
 
                 if content_type == 'application/octet-stream' and file_name:
@@ -1271,27 +1274,28 @@ def create_app(settings):
                 raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
 
             try:
-                file_info = filestore.get_file_info(subpath, username)
-                logger.trace(f"File info: {file_info}")
+                with db.get_db_session(settings.db_url) as session:
+                    file_info = filestore.get_file_info(subpath, current_user=username, session=session)
+                    logger.trace(f"File info: {file_info}")
 
-                result = {"info": json.loads(file_info.model_dump_json())}
+                    result = {"info": json.loads(file_info.model_dump_json())}
 
-                if file_info.is_dir:
-                    try:
-                        files = list(filestore.yield_file_infos(subpath, username))
-                        result["files"] = [json.loads(f.model_dump_json()) for f in files]
-                    except PermissionError:
-                        logger.error(f"Permission denied when listing files in directory: {subpath}")
-                        result["files"] = []
-                        result["error"] = "Permission denied when listing directory contents"
-                        return JSONResponse(content=result, status_code=403)
-                    except FileNotFoundError:
-                        logger.error(f"Directory not found during listing: {subpath}")
-                        result["files"] = []
-                        result["error"] = "Directory contents not found"
-                        return JSONResponse(content=result, status_code=404)
+                    if file_info.is_dir:
+                        try:
+                            files = list(filestore.yield_file_infos(subpath, current_user=username, session=session))
+                            result["files"] = [json.loads(f.model_dump_json()) for f in files]
+                        except PermissionError:
+                            logger.error(f"Permission denied when listing files in directory: {subpath}")
+                            result["files"] = []
+                            result["error"] = "Permission denied when listing directory contents"
+                            return JSONResponse(content=result, status_code=403)
+                        except FileNotFoundError:
+                            logger.error(f"Directory not found during listing: {subpath}")
+                            result["files"] = []
+                            result["error"] = "Directory contents not found"
+                            return JSONResponse(content=result, status_code=404)
 
-                return result
+                    return result
 
             except RootCheckError as e:
                 # Path attempts to escape root directory - try to find a valid fsp for this absolute path
