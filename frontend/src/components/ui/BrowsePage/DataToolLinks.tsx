@@ -57,7 +57,7 @@ export default function DataToolLinks({
                 to={url}
               >
                 <img
-                  alt={`${viewer.displayName} logo`}
+                  alt={`${viewer.label}`}
                   className="max-h-8 max-w-8 m-1 rounded-sm"
                   src={viewer.logoPath}
                 />

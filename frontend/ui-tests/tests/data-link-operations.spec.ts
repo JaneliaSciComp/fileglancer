@@ -40,9 +40,7 @@ test.describe('Data Link Operations', () => {
 
     // Wait for zarr metadata to load
     await expect(page.getByText('zarr.json')).toBeVisible({ timeout: 10000 });
-    await expect(
-      page.getByRole('link', { name: 'Neuroglancer logo' })
-    ).toBeVisible();
+    await expect(page.getByAltText(/neuroglancer/i)).toBeVisible();
 
     const dataLinkToggle = page.getByRole('checkbox', { name: /data link/i });
     const confirmButton = page.getByRole('button', {
@@ -53,9 +51,7 @@ test.describe('Data Link Operations', () => {
     });
 
     await test.step('Turn on automatic data links via the data link dialog', async () => {
-      const neuroglancerLink = page.getByRole('link', {
-        name: 'Neuroglancer logo'
-      });
+      const neuroglancerLink = page.getByAltText(/neuroglancer/i);
       await neuroglancerLink.click();
 
       // Confirm the data link creation in the dialog

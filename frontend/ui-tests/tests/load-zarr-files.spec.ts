@@ -32,10 +32,8 @@ test.describe('Zarr File Type Representation', () => {
     // Wait for zarr metadata to load (zarr.json file present indicates loaded)
     await expect(page.getByText('zarr.json')).toBeVisible({ timeout: 10000 });
 
-    await expect(
-      page.getByRole('img', { name: /neuroglancer logo/i })
-    ).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('img', { name: /vol-e logo/i })).toHaveCount(0);
+    await expect(page.getByAltText(/neuroglancer/i)).toBeVisible();
+    await expect(page.getByAltText(/vol-e/i)).toHaveCount(0);
   });
 
   test('Zarr V3 OME-Zarr should show all viewers except avivator', async ({
@@ -51,16 +49,10 @@ test.describe('Zarr File Type Representation', () => {
     // Wait for zarr metadata to load
     await expect(page.getByText('zarr.json')).toBeVisible({ timeout: 10000 });
 
-    await expect(
-      page.getByRole('img', { name: /neuroglancer logo/i })
-    ).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('img', { name: /vol-e logo/i })).toBeVisible();
-    await expect(
-      page.getByRole('img', { name: /validator logo/i })
-    ).toBeVisible();
-    await expect(page.getByRole('img', { name: /avivator logo/i })).toHaveCount(
-      0
-    );
+    await expect(page.getByAltText(/neuroglancer/i)).toBeVisible();
+    await expect(page.getByAltText(/vol-e/i)).toBeVisible();
+    await expect(page.getByAltText(/validator/i)).toBeVisible();
+    await expect(page.getByAltText(/avivator/i)).toHaveCount(0);
   });
 
   test('Zarr V2 Array should show only neuroglancer', async ({
@@ -76,10 +68,8 @@ test.describe('Zarr File Type Representation', () => {
     // Wait for zarr metadata to load
     await expect(page.getByText('.zarray')).toBeVisible({ timeout: 10000 });
 
-    await expect(
-      page.getByRole('img', { name: /neuroglancer logo/i })
-    ).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('img', { name: /vol-e logo/i })).toHaveCount(0);
+    await expect(page.getByAltText(/neuroglancer/i)).toBeVisible();
+    await expect(page.getByAltText(/vol-e/i)).toHaveCount(0);
   });
 
   test('Zarr V2 OME-Zarr should display all viewers including avivator', async ({
@@ -95,16 +85,10 @@ test.describe('Zarr File Type Representation', () => {
     // Wait for zarr metadata to load
     await expect(page.getByText('.zattrs')).toBeVisible({ timeout: 10000 });
 
-    await expect(
-      page.getByRole('img', { name: /neuroglancer logo/i })
-    ).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('img', { name: /vol-e logo/i })).toBeVisible();
-    await expect(
-      page.getByRole('img', { name: /validator logo/i })
-    ).toBeVisible();
-    await expect(
-      page.getByRole('img', { name: /avivator logo/i })
-    ).toBeVisible();
+    await expect(page.getByAltText(/neuroglancer/i)).toBeVisible();
+    await expect(page.getByAltText(/vol-e/i)).toBeVisible();
+    await expect(page.getByAltText(/validator/i)).toBeVisible();
+    await expect(page.getByAltText(/avivator/i)).toBeVisible();
   });
 
   test('Refresh button should update zarr metadata when .zattrs is modified', async ({
