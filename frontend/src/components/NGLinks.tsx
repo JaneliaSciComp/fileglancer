@@ -41,10 +41,9 @@ export default function NGLinks() {
   const handleCreate = async (payload: CreateNGLinkPayload) => {
     try {
       const ngLink = await createNGLinkMutation.mutateAsync(payload);
-      toast.success('Link created');
       const result = await copyToClipboard(ngLink.neuroglancer_url);
       if (result.success) {
-        toast.success('Link copied to clipboard');
+        toast.success('Link created and copied to clipboard');
       } else {
         toast.error(`Failed to copy link: ${result.error}`);
       }
@@ -63,10 +62,9 @@ export default function NGLinks() {
   }) => {
     try {
       const ngLink = await updateNGLinkMutation.mutateAsync(payload);
-      toast.success('Link updated');
       const result = await copyToClipboard(ngLink.neuroglancer_url);
       if (result.success) {
-        toast.success('Link copied to clipboard');
+        toast.success('Link updated and copied to clipboard');
       } else {
         toast.error(`Failed to copy link: ${result.error}`);
       }
