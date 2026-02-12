@@ -35,7 +35,7 @@ test.describe('Zarr File Type Representation', () => {
     await expect(
       page.getByRole('img', { name: /neuroglancer logo/i })
     ).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('img', { name: /vole logo/i })).toHaveCount(0);
+    await expect(page.getByRole('img', { name: /vol-e logo/i })).toHaveCount(0);
   });
 
   test('Zarr V3 OME-Zarr should show all viewers except avivator', async ({
@@ -54,7 +54,7 @@ test.describe('Zarr File Type Representation', () => {
     await expect(
       page.getByRole('img', { name: /neuroglancer logo/i })
     ).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('img', { name: /vole logo/i })).toBeVisible();
+    await expect(page.getByRole('img', { name: /vol-e logo/i })).toBeVisible();
     await expect(
       page.getByRole('img', { name: /validator logo/i })
     ).toBeVisible();
@@ -79,7 +79,7 @@ test.describe('Zarr File Type Representation', () => {
     await expect(
       page.getByRole('img', { name: /neuroglancer logo/i })
     ).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('img', { name: /vole logo/i })).toHaveCount(0);
+    await expect(page.getByRole('img', { name: /vol-e logo/i })).toHaveCount(0);
   });
 
   test('Zarr V2 OME-Zarr should display all viewers including avivator', async ({
@@ -98,7 +98,7 @@ test.describe('Zarr File Type Representation', () => {
     await expect(
       page.getByRole('img', { name: /neuroglancer logo/i })
     ).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('img', { name: /vole logo/i })).toBeVisible();
+    await expect(page.getByRole('img', { name: /vol-e logo/i })).toBeVisible();
     await expect(
       page.getByRole('img', { name: /validator logo/i })
     ).toBeVisible();
