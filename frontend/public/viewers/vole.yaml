@@ -1,8 +1,8 @@
 viewer:
-  name: "vole"
-  version: "1.0.0"
-  repo: "https://github.com/allen-cell-animated/volume-viewer"
-  template_url: "https://volumeviewer.allencell.org/viewer?url={DATA_URL}"
+  name: 'Vol-E'
+  version: '1.0.0'
+  repo: 'https://github.com/allen-cell-animated/volume-viewer'
+  template_url: 'https://volumeviewer.allencell.org/viewer?url={DATA_URL}'
 
 capabilities:
   # Enumeration of OME-Zarr versions that can be loaded

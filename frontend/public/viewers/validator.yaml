@@ -1,8 +1,8 @@
 viewer:
-  name: "validator"
-  version: "1.0.0"
-  repo: "https://github.com/ome/ome-ngff-validator"
-  template_url: "https://ome.github.io/ome-ngff-validator/?source={DATA_URL}"
+  name: 'Validator'
+  version: '1.0.0'
+  repo: 'https://github.com/ome/ome-ngff-validator'
+  template_url: 'https://ome.github.io/ome-ngff-validator/?source={DATA_URL}'
 
 capabilities:
   # Enumeration of OME-Zarr versions that can be loaded
