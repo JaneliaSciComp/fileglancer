@@ -9,7 +9,7 @@ import {
   type SortingState
 } from '@tanstack/react-table';
 import { IconButton, Typography } from '@material-tailwind/react';
-import { TbFile } from 'react-icons/tb';
+import { TbFile, TbLink, TbLinkOff } from 'react-icons/tb';
 import {
   HiOutlineEllipsisHorizontalCircle,
   HiOutlineFolder
@@ -59,8 +59,19 @@ export default function Table({
           const file = row.original;
           const name = getValue() as string;
           let link = '#';
+          let isBrokenSymlink = false;
 
-          if (file.is_dir && fileQuery.data?.currentFileSharePath) {
+          if (file.is_symlink && file.symlink_target_fsp) {
+            // Valid symlink with known target in a valid file share
+            link = makeBrowseLink(
+              file.symlink_target_fsp.fsp_name,
+              file.symlink_target_fsp.subpath
+            ) as string;
+          } else if (file.is_symlink && !file.symlink_target_fsp) {
+            // Broken symlink - no valid target
+            isBrokenSymlink = true;
+          } else if (file.is_dir && fileQuery.data?.currentFileSharePath) {
+            // Regular directory
             link = makeBrowseLink(
               fileQuery.data?.currentFileSharePath.name,
               file.path
@@ -69,13 +80,21 @@ export default function Table({
 
           return (
             <div className="flex items-center gap-3 min-w-0">
-              {file.is_dir ? (
+              {isBrokenSymlink ? (
+                <TbLinkOff className="text-error icon-default flex-shrink-0" />
+              ) : file.is_symlink ? (
+                <TbLink className="text-primary icon-default flex-shrink-0" />
+              ) : file.is_dir ? (
                 <HiOutlineFolder className="text-foreground icon-default flex-shrink-0" />
               ) : (
                 <TbFile className="text-foreground icon-default flex-shrink-0" />
               )}
               <FgTooltip label={name} triggerClasses="max-w-full truncate">
-                {file.is_dir ? (
+                {isBrokenSymlink ? (
+                  <Typography className="truncate text-foreground">
+                    {name}
+                  </Typography>
+                ) : file.is_dir || file.is_symlink ? (
                   <Typography as={FgStyledLink} className="truncate" to={link}>
                     {name}
                   </Typography>
@@ -94,20 +113,25 @@ export default function Table({
       {
         id: 'actions',
         header: 'Actions',
-        cell: ({ row }) => (
-          <div className="flex items-start">
-            <IconButton
-              className="min-w-fit min-h-fit"
-              onClick={e => {
-                e.stopPropagation();
-                handleContextMenuClick(e as any, row.original);
-              }}
-              variant="ghost"
-            >
-              <HiOutlineEllipsisHorizontalCircle className="icon-default text-foreground" />
-            </IconButton>
-          </div>
-        ),
+        cell: ({ row }) => {
+          const file = row.original;
+          const isBrokenSymlink = file.is_symlink && !file.symlink_target_fsp;
+          return (
+            <div className="flex items-start">
+              <IconButton
+                className="min-w-fit min-h-fit"
+                disabled={isBrokenSymlink}
+                onClick={e => {
+                  e.stopPropagation();
+                  handleContextMenuClick(e as any, row.original);
+                }}
+                variant="ghost"
+              >
+                <HiOutlineEllipsisHorizontalCircle className="icon-default text-foreground" />
+              </IconButton>
+            </div>
+          );
+        },
         size: 30,
         enableSorting: false
       }

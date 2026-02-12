@@ -49,7 +49,7 @@ function generateNeuroglancerStateForN5(dataUrl: string): string {
 
 export default function useN5Metadata() {
   const { fileQuery } = useFileBrowserContext();
-  const { proxiedPathByFspAndPathQuery } = useProxiedPathContext();
+  const { currentDirProxiedPathQuery } = useProxiedPathContext();
   const { externalDataUrlQuery } = useExternalBucketContext();
 
   // Fetch N5 metadata
@@ -69,7 +69,7 @@ export default function useN5Metadata() {
     const neuroglancerBaseUrl = 'https://neuroglancer-demo.appspot.com/#!';
 
     const url =
-      externalDataUrlQuery.data || proxiedPathByFspAndPathQuery.data?.url;
+      externalDataUrlQuery.data || currentDirProxiedPathQuery.data?.url;
 
     const toolUrls: N5OpenWithToolUrls = {
       copy: url || '',
@@ -88,7 +88,7 @@ export default function useN5Metadata() {
     return toolUrls;
   }, [
     metadata,
-    proxiedPathByFspAndPathQuery.data?.url,
+    currentDirProxiedPathQuery.data?.url,
     externalDataUrlQuery.data
   ]);
 
