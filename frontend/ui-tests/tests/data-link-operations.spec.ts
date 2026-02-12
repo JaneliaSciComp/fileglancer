@@ -42,7 +42,7 @@ test.describe('Data Link Operations', () => {
     await expect(page.getByText('zarr.json')).toBeVisible({ timeout: 10000 });
     await expect(
       page.getByRole('link', { name: 'Neuroglancer logo' })
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
 
     const dataLinkToggle = page.getByRole('checkbox', { name: /data link/i });
     const confirmButton = page.getByRole('button', {
