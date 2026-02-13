@@ -62,7 +62,6 @@ declare module '@tanstack/react-table' {
       data: CellContextMenuData
     ) => void;
   }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface ColumnMeta<TData, TValue> {
     // Optional function to extract searchable values from a cell
     // Used by globalFilterFn to allow columns to define custom search behavior

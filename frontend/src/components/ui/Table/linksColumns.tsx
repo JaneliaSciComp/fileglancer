@@ -4,7 +4,9 @@ import { Typography } from '@material-tailwind/react';
 import type { ColumnDef } from '@tanstack/react-table';
 
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
-import DataLinkUsageDialog from '@/components/ui/Dialogs/DataLinkUsageDialog';
+import DataLinkUsageDialog, {
+  inferDataType
+} from '@/components/ui/Dialogs/DataLinkUsageDialog';
 import DataLinksActionsMenu from '@/components/ui/Menus/DataLinksActions';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
@@ -187,6 +189,7 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
       {showDataLinkUsageDialog ? (
         <DataLinkUsageDialog
           dataLinkUrl={item.url}
+          dataType={inferDataType(item.path)}
           onClose={() => setShowDataLinkUsageDialog(false)}
           open={showDataLinkUsageDialog}
         />
@@ -263,12 +266,15 @@ export function useLinksColumns(): ColumnDef<ProxiedPath>[] {
         enableSorting: true,
         meta: {
           // Allow searching by URL and all path formats (linux, mac, windows)
-          getSearchableValues: (value: PathCellValue, row: ProxiedPath) => [
-            row.url,
-            value.pathMap.mac_path,
-            value.pathMap.linux_path,
-            value.pathMap.windows_path
-          ]
+          getSearchableValues: (value: unknown, row: ProxiedPath) => {
+            const pathValue = value as PathCellValue;
+            return [
+              row.url,
+              pathValue.pathMap.mac_path,
+              pathValue.pathMap.linux_path,
+              pathValue.pathMap.windows_path
+            ];
+          }
         }
       },
       {
