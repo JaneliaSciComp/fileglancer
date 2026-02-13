@@ -211,7 +211,7 @@ export default function JobDetail() {
                 variant="outline"
               >
                 <HiOutlineRefresh className="icon-small mr-2" />
-                Relaunch with these parameters
+                Relaunch
               </Button>
             </Tabs.Panel>
 
