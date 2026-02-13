@@ -21,6 +21,8 @@ export type NGLink = {
   updated_at: string;
   state_url: string;
   neuroglancer_url: string;
+  state: Record<string, unknown>;
+  url_base: string;
 };
 
 /**

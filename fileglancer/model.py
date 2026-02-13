@@ -297,6 +297,12 @@ class NeuroglancerShortLink(BaseModel):
     neuroglancer_url: str = Field(
         description="Neuroglancer URL that references the stored state"
     )
+    state: Dict = Field(
+        description="The stored Neuroglancer JSON state object"
+    )
+    url_base: str = Field(
+        description="The Neuroglancer base URL"
+    )
 
 
 class NeuroglancerShortLinkResponse(BaseModel):
