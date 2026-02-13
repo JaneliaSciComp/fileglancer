@@ -387,10 +387,8 @@ async def get_executor():
     global _executor
     if _executor is None:
         settings = get_settings()
-        _executor = create_executor(
-            executor=settings.cluster_executor,
-            queue=settings.cluster_queue,
-        )
+        config = settings.cluster.model_dump(exclude_none=True)
+        _executor = create_executor(**config)
     return _executor
 
 
@@ -401,7 +399,7 @@ async def start_job_monitor():
     settings = get_settings()
     executor = await get_executor()
 
-    _monitor = JobMonitor(executor, poll_interval=settings.cluster_poll_interval)
+    _monitor = JobMonitor(executor, poll_interval=settings.cluster.poll_interval)
     await _monitor.start()
 
     # Start reconciliation loop
@@ -436,7 +434,7 @@ async def _reconcile_loop(settings):
         except Exception:
             logger.exception("Error in job reconciliation loop")
 
-        await asyncio.sleep(settings.cluster_poll_interval)
+        await asyncio.sleep(settings.cluster.poll_interval)
 
 
 async def _reconcile_jobs(settings):
@@ -617,10 +615,10 @@ async def submit_job(
 
 def _build_resource_spec(entry_point: AppEntryPoint, overrides: Optional[dict], settings) -> ResourceSpec:
     """Build a ResourceSpec from entry point defaults, user overrides, and global defaults."""
-    cpus = settings.cluster_default_cpus
-    memory = settings.cluster_default_memory
-    walltime = settings.cluster_default_walltime
-    queue = settings.cluster_queue
+    cpus = settings.cluster.cpus
+    memory = settings.cluster.memory
+    walltime = settings.cluster.walltime
+    queue = settings.cluster.queue
 
     # Apply entry point defaults
     if entry_point.resources:
@@ -645,7 +643,6 @@ def _build_resource_spec(entry_point: AppEntryPoint, overrides: Optional[dict], 
         memory=memory,
         walltime=walltime,
         queue=queue,
-        account=settings.cluster_account,
     )
 
 

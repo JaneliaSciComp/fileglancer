@@ -126,21 +126,20 @@ session_cookie_secure: true
 
 #
 # Cluster configuration for Apps feature
-# Controls how jobs are submitted and executed
+# Mirrors py-cluster-api ClusterConfig - all fields are optional
+# See: https://github.com/JaneliaSciComp/py-cluster-api
 #
-# Executor type: "local" for local execution, "lsf" for LSF cluster
-# cluster_executor: local
-
-# LSF queue name (only used with "lsf" executor)
-# cluster_queue: normal
-
-# LSF account (only used with "lsf" executor)
-# cluster_account: your_account
-
-# Polling interval in seconds for checking job status
-# cluster_poll_interval: 10.0
-
-# Default resource allocation for jobs (can be overridden per entry point)
-# cluster_default_memory: "8 GB"
-# cluster_default_walltime: "04:00"
-# cluster_default_cpus: 1
+# cluster:
+#   executor: local            # "local" or "lsf"
+#   memory: "8 GB"             # Default memory allocation
+#   walltime: "04:00"          # Default walltime (HH:MM)
+#   cpus: 1                    # Default CPU count
+#   queue: normal              # LSF queue name
+#   poll_interval: 10.0        # Job status polling interval (seconds)
+#   lsf_units: MB              # Memory units for LSF (KB, MB, GB)
+#   use_stdin: false            # Use stdin for job submission
+#   suppress_job_email: true    # Suppress LSF job email notifications
+#   extra_directives:           # Additional scheduler directives
+#     - "#BSUB -P your_account"
+#   script_prologue:            # Commands to run before each job
+#     - "module load java/11"
