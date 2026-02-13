@@ -446,17 +446,28 @@ async def _reconcile_jobs(settings):
 
         for db_job in active_jobs:
             if not db_job.cluster_job_id:
+                # Job never got a cluster_job_id - submission didn't complete.
+                # Mark FAILED if it's been stuck longer than zombie_timeout.
+                created = db_job.created_at.replace(tzinfo=None) if db_job.created_at.tzinfo else db_job.created_at
+                age_minutes = (datetime.now(UTC).replace(tzinfo=None) - created).total_seconds() / 60
+                if age_minutes > settings.cluster.zombie_timeout_minutes:
+                    db.update_job_status(session, db_job.id, "FAILED", finished_at=datetime.now(UTC))
+                    logger.warning(
+                        f"Job {db_job.id} has no cluster_job_id after "
+                        f"{age_minutes:.0f} minutes, marked FAILED"
+                    )
                 continue
 
             # Check if executor is tracking this job
             tracked = executor.jobs.get(db_job.cluster_job_id)
             if tracked is None:
-                # Job is no longer tracked by executor - might have been lost
-                # Mark as FAILED if it was RUNNING, leave PENDING as is
-                if db_job.status == "RUNNING":
-                    now = datetime.now(UTC)
-                    db.update_job_status(session, db_job.id, "FAILED", finished_at=now)
-                    logger.warning(f"Job {db_job.id} (cluster: {db_job.cluster_job_id}) lost from executor, marked FAILED")
+                # Job is no longer tracked by executor (e.g. after server restart)
+                now = datetime.now(UTC)
+                db.update_job_status(session, db_job.id, "FAILED", finished_at=now)
+                logger.warning(
+                    f"Job {db_job.id} (cluster: {db_job.cluster_job_id}) "
+                    f"lost from executor (was {db_job.status}), marked FAILED"
+                )
                 continue
 
             # Map cluster status to our status strings
