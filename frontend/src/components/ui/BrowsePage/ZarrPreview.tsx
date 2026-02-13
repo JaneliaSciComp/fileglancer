@@ -105,6 +105,7 @@ export default function ZarrPreview({
                   {closeDialog => (
                     <DataLinkUsageDialog
                       dataLinkUrl={openWithToolUrls.copy}
+                      dataType="zarr"
                       onClose={closeDialog}
                       open={true}
                     />
