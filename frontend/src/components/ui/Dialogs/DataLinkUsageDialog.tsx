@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Typography, Tabs } from '@material-tailwind/react';
-import { HiOutlineClipboardCopy } from 'react-icons/hi';
+import { HiExternalLink, HiOutlineClipboardCopy } from 'react-icons/hi';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import {
   materialDark,
@@ -47,17 +47,17 @@ function CodeBlock({
   copyLabel = 'Copy code',
   customStyle = {
     margin: 0,
-    marginTop: 0,
-    marginRight: 0,
-    marginBottom: 0,
-    marginLeft: 0,
     paddingTop: '3em',
-    paddingRight: '1em',
+    paddingRight: '3em',
     paddingBottom: '0',
     paddingLeft: '1em',
     fontSize: '14px',
     lineHeight: '1.5',
-    width: 'max-content'
+    width: '100%',
+    boxSizing: 'border-box' as const,
+    whiteSpace: 'pre-wrap' as const,
+    wordBreak: 'break-word' as const,
+    overflowX: 'hidden' as const
   }
 }: CodeBlockProps) {
   const isDarkMode = useDarkMode();
@@ -68,12 +68,14 @@ function CodeBlock({
   const mergedCodeTagProps = {
     style: {
       ...themeCodeStyles,
-      paddingBottom: '1em'
+      paddingBottom: '1em',
+      whiteSpace: 'pre-wrap' as const,
+      wordBreak: 'break-word' as const
     }
   };
 
   return (
-    <div className="relative">
+    <div className="relative w-full min-w-0">
       <SyntaxHighlighter
         codeTagProps={mergedCodeTagProps}
         customStyle={customStyle}
@@ -126,45 +128,108 @@ type DataLinkUsageDialogProps = {
   readonly onClose: () => void;
 };
 
-function getTabsForDataType(dataType: DataLinkType, dataLinkUrl: string) {
-  if (dataType === 'directory') {
-    return [
-      {
-        id: 'python',
-        label: 'Python',
-        content: (
-          <>
-            <InstructionBlock steps={['Install requests package']} />
+function getNapariZarrTab(dataLinkUrl: string) {
+  return {
+    id: 'napari',
+    label: 'Napari',
+    content: (
+      <ol className="space-y-3 text-foreground">
+        <li className="flex items-start gap-3 text-sm">
+          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-semibold">
+            1
+          </span>
+          <div className="flex flex-col gap-2 pt-0.5 min-w-0 flex-1">
+            <span>Install napari.</span>
             <CodeBlock
-              code={`import requests
-import xml.etree.ElementTree as ET
+              code={`conda create -y -n napari-env -c conda-forge python=3.11
+conda activate napari-env
+conda install -c conda-forge napari pyqt`}
+              copyLabel="Copy code"
+              copyable={true}
+              language="bash"
+            />
+            <a
+              className="flex items-center gap-1 text-primary hover:underline"
+              href="https://napari.org/stable/tutorials/fundamentals/installation.html"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              <span>Full installation instructions</span>
+              <HiExternalLink className="icon-xsmall" />
+            </a>
+          </div>
+        </li>
+        <li className="flex items-start gap-3 text-sm">
+          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-semibold">
+            2
+          </span>
+          <div className="flex flex-col gap-2 pt-0.5 min-w-0 flex-1">
+            <span>
+              Install the napari-ome-zarr plugin. Assuming you are in the conda
+              environment, from the command line:
+            </span>
+            <CodeBlock
+              code="pip install napari-ome-zarr"
+              copyLabel="Copy code"
+              copyable={true}
+              language="bash"
+            />
+          </div>
+        </li>
+        <li className="flex items-start gap-3 text-sm">
+          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-semibold">
+            3
+          </span>
+          <div className="flex flex-col gap-2 pt-0.5 min-w-0 flex-1">
+            <span>
+              Launch napari and open the data link using the napari-ome-zarr
+              plugin. From the command line:
+            </span>
+            <CodeBlock
+              code={`napari --plugin napari-ome-zarr '${dataLinkUrl}'`}
+              copyLabel="Copy code"
+              copyable={true}
+              language="bash"
+            />
+            <span>Or in Python:</span>
+            <CodeBlock
+              code={`import napari
 
-url = '${dataLinkUrl}'
+viewer = napari.Viewer()
+viewer.open('${dataLinkUrl}', plugin='napari-ome-zarr')
 
-# List files using S3-compatible ListObjectsV2 API
-response = requests.get(url, params={'list-type': '2', 'delimiter': '/'})
-response.raise_for_status()
-
-root = ET.fromstring(response.text)
-ns = root.tag.split('}')[0] + '}' if '}' in root.tag else ''
-
-# Print files
-for contents in root.findall(f'{ns}Contents'):
-    key = contents.find(f'{ns}Key').text
-    size = contents.find(f'{ns}Size').text
-    print(f'{key}  ({size} bytes)')
-
-# Print subdirectories
-for prefix in root.findall(f'{ns}CommonPrefixes'):
-    dirname = prefix.find(f'{ns}Prefix').text
-    print(f'{dirname}  (directory)')`}
+napari.run()`}
               copyLabel="Copy code"
               copyable={true}
               language="python"
             />
-          </>
-        )
-      },
+          </div>
+        </li>
+      </ol>
+    )
+  };
+}
+
+function getFijiTab() {
+  return {
+    id: 'fiji',
+    label: 'Fiji',
+    content: (
+      <InstructionBlock
+        steps={[
+          'Launch Fiji',
+          'Navigate to Plugins \u2192 BigDataViewer \u2192 HDF5/N5/Zarr/OME-NGFF Viewer',
+          'Paste data link and click "Detect datasets"',
+          'Select the multiscale image and click "OK"'
+        ]}
+      />
+    )
+  };
+}
+
+function getTabsForDataType(dataType: DataLinkType, dataLinkUrl: string) {
+  if (dataType === 'directory') {
+    return [
       {
         id: 'java',
         label: 'Java',
@@ -224,57 +289,49 @@ public class ListFiles {
             language="java"
           />
         )
-      }
-    ];
-  }
-
-  if (dataType === 'zarr') {
-    return [
-      {
-        id: 'napari',
-        label: 'Napari',
-        content: (
-          <InstructionBlock
-            steps={[
-              'Install napari-ome-zarr plugin',
-              'Launch napari',
-              'Open the data URL'
-            ]}
-          />
-        )
       },
       {
         id: 'python',
         label: 'Python',
         content: (
           <>
-            <InstructionBlock steps={['Install zarr package']} />
+            <InstructionBlock steps={['Install requests package']} />
             <CodeBlock
-              code={`import zarr
-from zarr.storage import FsspecStore
+              code={`import requests
+import xml.etree.ElementTree as ET
 
 url = '${dataLinkUrl}'
 
-# Open the Zarr store over HTTP
-store = FsspecStore.from_url(url)
-root = zarr.open_group(store, mode='r')
+# List files using S3-compatible ListObjectsV2 API
+response = requests.get(url, params={'list-type': '2', 'delimiter': '/'})
+response.raise_for_status()
 
-# Access the highest resolution array
-arr = root['0']
-print(f'Shape: {arr.shape}')
-print(f'Dtype: {arr.dtype}')
-print(f'Chunks: {arr.chunks}')
+root = ET.fromstring(response.text)
+ns = root.tag.split('}')[0] + '}' if '}' in root.tag else ''
 
-# Read and print a slice of voxel data
-data = arr[0, 0, :10, :10, :10]
-print(f'Voxels:\\n{data}')`}
+# Print files
+for contents in root.findall(f'{ns}Contents'):
+    key = contents.find(f'{ns}Key').text
+    size = contents.find(f'{ns}Size').text
+    print(f'{key}  ({size} bytes)')
+
+# Print subdirectories
+for prefix in root.findall(f'{ns}CommonPrefixes'):
+    dirname = prefix.find(f'{ns}Prefix').text
+    print(f'{dirname}  (directory)')`}
               copyLabel="Copy code"
               copyable={true}
               language="python"
             />
           </>
         )
-      },
+      }
+    ];
+  }
+
+  if (dataType === 'zarr') {
+    return [
+      getFijiTab(),
       {
         id: 'java',
         label: 'Java',
@@ -327,18 +384,37 @@ public class ReadZarr {
           />
         )
       },
+      getNapariZarrTab(dataLinkUrl),
       {
-        id: 'fiji',
-        label: 'Fiji',
+        id: 'python',
+        label: 'Python',
         content: (
-          <InstructionBlock
-            steps={[
-              'Launch Fiji',
-              'Navigate to Plugins → BigDataViewer → HDF5/N5/Zarr/OME-NGFF Viewer',
-              'Paste data link and click "Detect datasets"',
-              'Select the multiscale image and click "OK"'
-            ]}
-          />
+          <>
+            <InstructionBlock steps={['Install zarr package']} />
+            <CodeBlock
+              code={`import zarr
+from zarr.storage import FsspecStore
+
+url = '${dataLinkUrl}'
+
+# Open the Zarr store over HTTP
+store = FsspecStore.from_url(url)
+root = zarr.open_group(store, mode='r')
+
+# Access the highest resolution array
+arr = root['0']
+print(f'Shape: {arr.shape}')
+print(f'Dtype: {arr.dtype}')
+print(f'Chunks: {arr.chunks}')
+
+# Read and print a slice of voxel data
+data = arr[0, 0, :10, :10, :10]
+print(f'Voxels:\\n{data}')`}
+              copyLabel="Copy code"
+              copyable={true}
+              language="python"
+            />
+          </>
         )
       }
     ];
@@ -346,50 +422,7 @@ public class ReadZarr {
 
   // dataType === 'n5'
   return [
-    {
-      id: 'napari',
-      label: 'Napari',
-      content: (
-        <InstructionBlock
-          steps={[
-            'Napari does not natively support N5 datasets',
-            'Convert N5 to OME-Zarr, or use Fiji to view N5 data directly'
-          ]}
-        />
-      )
-    },
-    {
-      id: 'python',
-      label: 'Python',
-      content: (
-        <>
-          <InstructionBlock steps={['Install zarr package']} />
-          <CodeBlock
-            code={`import zarr
-from zarr.storage import FsspecStore
-
-url = '${dataLinkUrl}'
-
-# Open the N5 store over HTTP
-store = FsspecStore.from_url(url)
-root = zarr.open_group(store, mode='r')
-
-# Access the highest resolution array
-arr = root['s0']
-print(f'Shape: {arr.shape}')
-print(f'Dtype: {arr.dtype}')
-print(f'Chunks: {arr.chunks}')
-
-# Read and print a slice of voxel data
-data = arr[:10, :10, :10]
-print(f'Voxels:\\n{data}')`}
-            copyLabel="Copy code"
-            copyable={true}
-            language="python"
-          />
-        </>
-      )
-    },
+    getFijiTab(),
     {
       id: 'java',
       label: 'Java',
@@ -443,17 +476,47 @@ public class ReadN5 {
       )
     },
     {
-      id: 'fiji',
-      label: 'Fiji',
+      id: 'napari',
+      label: 'Napari',
       content: (
         <InstructionBlock
           steps={[
-            'Launch Fiji',
-            'Navigate to Plugins → BigDataViewer → HDF5/N5/Zarr/OME-NGFF Viewer',
-            'Paste data link and click "Detect datasets"',
-            'Select the multiscale image and click "OK"'
+            'Napari does not natively support N5 datasets',
+            'Convert N5 to OME-Zarr, or use Fiji to view N5 data directly'
           ]}
         />
+      )
+    },
+    {
+      id: 'python',
+      label: 'Python',
+      content: (
+        <>
+          <InstructionBlock steps={['Install zarr package']} />
+          <CodeBlock
+            code={`import zarr
+from zarr.storage import FsspecStore
+
+url = '${dataLinkUrl}'
+
+# Open the N5 store over HTTP
+store = FsspecStore.from_url(url)
+root = zarr.open_group(store, mode='r')
+
+# Access the highest resolution array
+arr = root['s0']
+print(f'Shape: {arr.shape}')
+print(f'Dtype: {arr.dtype}')
+print(f'Chunks: {arr.chunks}')
+
+# Read and print a slice of voxel data
+data = arr[:10, :10, :10]
+print(f'Voxels:\\n{data}')`}
+            copyLabel="Copy code"
+            copyable={true}
+            language="python"
+          />
+        </>
       )
     }
   ];
@@ -470,12 +533,12 @@ export default function DataLinkUsageDialog({
 
   const TAB_TRIGGER_CLASSES = '!text-foreground h-full';
   const PANEL_CLASSES =
-    'flex-1 flex flex-col gap-4 max-w-full p-4 rounded-b-lg border border-t-0 border-surface bg-surface-light overflow-auto';
+    'flex-1 flex flex-col gap-4 max-w-full p-4 rounded-b-lg border border-t-0 border-surface bg-surface-light overflow-y-auto overflow-x-hidden';
 
   return (
-    <FgDialog onClose={onClose} open={open}>
+    <FgDialog className="max-w-3xl w-full" onClose={onClose} open={open}>
       <div className="flex flex-col gap-4 my-4">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 w-[95%] self-center">
           <Typography className="text-foreground font-semibold text-lg">
             How to use your data link
           </Typography>
@@ -488,7 +551,7 @@ export default function DataLinkUsageDialog({
           </CopyTooltip>
         </div>
         <Tabs
-          className="flex flex-col flex-1 min-h-0 gap-0 max-h-[50vh]"
+          className="flex flex-col flex-1 min-h-0 gap-0 max-h-[50vh] w-[95%] self-center"
           key="data-link-usage-tabs"
           onValueChange={setActiveTab}
           value={activeTab}
