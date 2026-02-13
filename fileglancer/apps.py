@@ -33,6 +33,15 @@ _MANIFEST_CACHE_TTL = 3600  # 1 hour
 _MANIFEST_FILENAMES = ["fileglancer-app.json", "fileglancer-app.yaml", "fileglancer-app.yml"]
 
 _REPO_CACHE_BASE = Path(os.path.expanduser("~/.fileglancer/app-repos"))
+_repo_locks: dict[str, asyncio.Lock] = {}
+
+
+def _get_repo_lock(owner: str, repo: str, branch: str) -> asyncio.Lock:
+    """Get or create an asyncio lock for a specific repo+branch."""
+    key = f"{owner}/{repo}/{branch}"
+    if key not in _repo_locks:
+        _repo_locks[key] = asyncio.Lock()
+    return _repo_locks[key]
 
 
 def _parse_github_url(url: str) -> tuple[str, str, str]:
@@ -75,24 +84,29 @@ async def _run_git(args: list[str], timeout: int = 60):
 
 
 async def _ensure_repo_cache(url: str, pull: bool = False) -> Path:
-    """Clone or update the GitHub repo in per-user cache. Returns repo path."""
-    owner, repo, branch = _parse_github_url(url)
-    repo_dir = _REPO_CACHE_BASE / owner / repo
+    """Clone or update the GitHub repo in per-user cache. Returns repo path.
 
-    if repo_dir.exists():
-        logger.info(f"Repo cache hit: {owner}/{repo}, checking out {branch}")
-        await _run_git(["git", "-C", str(repo_dir), "checkout", branch])
-        if pull:
-            logger.info(f"Pulling latest for {owner}/{repo} ({branch})")
-            await _run_git(["git", "-C", str(repo_dir), "pull", "origin", branch])
-    else:
-        logger.info(f"Cloning {owner}/{repo} ({branch}) into {repo_dir}")
-        repo_dir.parent.mkdir(parents=True, exist_ok=True)
-        clone_url = f"https://github.com/{owner}/{repo}.git"
-        await _run_git(
-            ["git", "clone", "--branch", branch, clone_url, str(repo_dir)],
-            timeout=120,
-        )
+    Cache is keyed by owner/repo/branch to avoid checkout races between branches.
+    An asyncio lock serializes git operations for the same repo+branch.
+    """
+    owner, repo, branch = _parse_github_url(url)
+    repo_dir = _REPO_CACHE_BASE / owner / repo / branch
+    lock = _get_repo_lock(owner, repo, branch)
+
+    async with lock:
+        if repo_dir.exists():
+            logger.info(f"Repo cache hit: {owner}/{repo} ({branch})")
+            if pull:
+                logger.info(f"Pulling latest for {owner}/{repo} ({branch})")
+                await _run_git(["git", "-C", str(repo_dir), "pull", "origin", branch])
+        else:
+            logger.info(f"Cloning {owner}/{repo} ({branch}) into {repo_dir}")
+            repo_dir.parent.mkdir(parents=True, exist_ok=True)
+            clone_url = f"https://github.com/{owner}/{repo}.git"
+            await _run_git(
+                ["git", "clone", "--branch", branch, clone_url, str(repo_dir)],
+                timeout=120,
+            )
 
     return repo_dir
 
@@ -564,7 +578,7 @@ async def submit_job(
     work_dir.mkdir(parents=True, exist_ok=True)
 
     # Clone/update repo cache and symlink into work dir
-    repo_dir = _ensure_repo_cache(app_url, pull=pull_latest)
+    repo_dir = await _ensure_repo_cache(app_url, pull=pull_latest)
     repo_link = work_dir / "repo"
     repo_link.symlink_to(repo_dir)
 
