@@ -22,7 +22,9 @@ import OverviewTable from '@/components/ui/PropertiesDrawer/OverviewTable';
 import TicketDetails from '@/components/ui/PropertiesDrawer/TicketDetails';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
-import DataLinkUsageDialog from '@/components/ui/Dialogs/DataLinkUsageDialog';
+import DataLinkUsageDialog, {
+  inferDataType
+} from '@/components/ui/Dialogs/DataLinkUsageDialog';
 import TextDialogBtn from '@/components/ui/buttons/DialogTextBtn';
 import { getPreferredPathForDisplay } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
@@ -282,19 +284,19 @@ export default function PropertiesDrawer({
                           : 'Creating a data link allows you to share the data at this path with internal collaborators or use tools to view the data.'}
                     </Typography>
                     {!externalDataUrlQuery.data &&
-                      !proxiedPathByFspAndPathQuery.data && (
-                        <a
-                          className="flex items-center gap-1 text-primary hover:underline"
-                          href="https://fileglancer-docs.janelia.org/features/data-sharing/"
-                          rel="noopener noreferrer"
-                          target="_blank"
-                        >
-                          <Typography type="small">
-                            Learn more about data links
-                          </Typography>
-                          <HiExternalLink className="icon-xsmall" />
-                        </a>
-                      )}
+                    !proxiedPathByFspAndPathQuery.data ? (
+                      <a
+                        className="flex items-center gap-1 text-primary hover:underline"
+                        href="https://fileglancer-docs.janelia.org/features/data-sharing/"
+                        rel="noopener noreferrer"
+                        target="_blank"
+                      >
+                        <Typography type="small">
+                          Learn more about data links
+                        </Typography>
+                        <HiExternalLink className="icon-xsmall" />
+                      </a>
+                    ) : null}
                   </div>
                   {externalDataUrlQuery.data ? (
                     <>
@@ -309,6 +311,9 @@ export default function PropertiesDrawer({
                         {closeDialog => (
                           <DataLinkUsageDialog
                             dataLinkUrl={externalDataUrlQuery.data ?? ''}
+                            dataType={inferDataType(
+                              fileBrowserState.propertiesTarget?.path ?? ''
+                            )}
                             onClose={closeDialog}
                             open={true}
                           />
@@ -330,6 +335,9 @@ export default function PropertiesDrawer({
                             dataLinkUrl={
                               proxiedPathByFspAndPathQuery.data?.url ?? ''
                             }
+                            dataType={inferDataType(
+                              fileBrowserState.propertiesTarget?.path ?? ''
+                            )}
                             onClose={closeDialog}
                             open={true}
                           />
