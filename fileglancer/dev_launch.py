@@ -28,7 +28,7 @@ def main():
     # Launch uvicorn with the certificates
     print("Starting uvicorn server with HTTPS...")
     uvicorn_cmd = [
-        'uvicorn', 'fileglancer.app:app',
+        'uvicorn', 'fileglancer.server:app',
         '--host', '0.0.0.0',
         '--port', '443',
         '--reload',
