@@ -1594,6 +1594,7 @@ def create_app(settings):
                 entry_point_id=body.entry_point_id,
                 parameters=body.parameters,
                 resources=resources_dict,
+                pull_latest=body.pull_latest,
             )
             return _convert_job(db_job)
         except ValueError as e:

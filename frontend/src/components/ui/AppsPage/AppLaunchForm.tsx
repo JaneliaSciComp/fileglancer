@@ -18,7 +18,8 @@ interface AppLaunchFormProps {
   readonly entryPoint: AppEntryPoint;
   readonly onSubmit: (
     parameters: Record<string, unknown>,
-    resources?: AppResourceDefaults
+    resources?: AppResourceDefaults,
+    pullLatest?: boolean
   ) => Promise<void>;
   readonly submitting: boolean;
   readonly initialValues?: Record<string, unknown>;
@@ -102,8 +103,11 @@ function ParameterField({
             value={value !== undefined && value !== null ? String(value) : ''}
           />
           <FileSelectorButton
+            initialPath={typeof value === 'string' ? value : undefined}
             label="Browse..."
+            mode={param.type === 'file' ? 'file' : 'directory'}
             onSelect={path => onChange(path)}
+            useServerPath
           />
         </div>
       );
@@ -141,6 +145,7 @@ export default function AppLaunchForm({
 
   const [values, setValues] = useState<Record<string, unknown>>(startingValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [pullLatest, setPullLatest] = useState(false);
   const [showResources, setShowResources] = useState(false);
   const [resources, setResources] = useState<AppResourceDefaults>({
     cpus: entryPoint.resources?.cpus,
@@ -260,7 +265,11 @@ export default function AppLaunchForm({
       showResources &&
       (resources.cpus || resources.memory || resources.walltime);
 
-    await onSubmit(params, hasResourceOverrides ? resources : undefined);
+    await onSubmit(
+      params,
+      hasResourceOverrides ? resources : undefined,
+      pullLatest || undefined
+    );
   };
 
   return (
@@ -310,6 +319,25 @@ export default function AppLaunchForm({
             ) : null}
           </div>
         ))}
+      </div>
+
+      {/* Pull latest toggle */}
+      <div className="mb-6">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            checked={pullLatest}
+            className="h-4 w-4 accent-primary"
+            onChange={e => setPullLatest(e.target.checked)}
+            type="checkbox"
+          />
+          <span className="text-foreground text-sm">
+            Pull latest code before running
+          </span>
+        </label>
+        <Typography className="text-secondary mt-1" type="small">
+          When enabled, runs git pull to fetch the latest code from GitHub
+          before starting the job.
+        </Typography>
       </div>
 
       {/* Resource Overrides (collapsible) */}
@@ -378,6 +406,13 @@ export default function AppLaunchForm({
           </div>
         ) : null}
       </div>
+
+      {/* Validation error summary */}
+      {Object.keys(errors).length > 0 ? (
+        <div className="mb-4 p-3 bg-error/10 rounded text-error text-sm">
+          Please fix the errors above before submitting.
+        </div>
+      ) : null}
 
       {/* Submit */}
       <Button

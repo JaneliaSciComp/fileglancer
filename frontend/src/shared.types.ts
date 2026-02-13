@@ -91,6 +91,7 @@ type AppManifest = {
   name: string;
   description?: string;
   version?: string;
+  requirements?: string[];
   entryPoints: AppEntryPoint[];
 };
 
@@ -123,6 +124,7 @@ type JobSubmitRequest = {
   entry_point_id: string;
   parameters: Record<string, unknown>;
   resources?: AppResourceDefaults;
+  pull_latest?: boolean;
 };
 
 export type {

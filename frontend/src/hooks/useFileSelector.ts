@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
@@ -28,12 +28,27 @@ export type FileSelectorInitialLocation = {
   path: string;
 };
 
-export default function useFileSelector(
-  initialLocation?: FileSelectorInitialLocation
-) {
+export type FileSelectorMode = 'file' | 'directory' | 'any';
+
+type FileSelectorOptions = {
+  initialLocation?: FileSelectorInitialLocation;
+  initialPath?: string;
+  mode?: FileSelectorMode;
+  pathPreferenceOverride?: ['linux_path'];
+};
+
+export default function useFileSelector(options?: FileSelectorOptions) {
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const { pathPreference, isFilteredByGroups } = usePreferencesContext();
   const { profile } = useProfileContext();
+
+  const initialLocation = options?.initialLocation;
+  const mode = options?.mode ?? 'any';
+  const overrideKey = options?.pathPreferenceOverride?.[0];
+  const effectivePathPreference = useMemo(
+    () => (overrideKey ? ([overrideKey] as ['linux_path']) : pathPreference),
+    [overrideKey, pathPreference]
+  );
 
   // Initialize location based on initialLocation prop
   const [state, setState] = useState<FileSelectorState>({
@@ -46,6 +61,69 @@ export default function useFileSelector(
       : { type: 'zones' },
     selectedItem: null
   });
+
+  // Resolve initialPath (raw filesystem path) to FSP + relative path
+  const lastResolvedPath = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const initialPath = options?.initialPath;
+    if (
+      !initialPath ||
+      !zonesAndFspQuery.data ||
+      initialPath === lastResolvedPath.current
+    ) {
+      return;
+    }
+    lastResolvedPath.current = initialPath;
+
+    // Find the FSP whose mount_path is the longest prefix of initialPath
+    let bestFsp: FileSharePath | null = null;
+    let bestMountPath = '';
+    for (const [key, value] of Object.entries(zonesAndFspQuery.data)) {
+      if (!key.startsWith('fsp_')) {
+        continue;
+      }
+      const fsp = value as FileSharePath;
+      const mountPath = fsp.mount_path;
+      if (
+        mountPath &&
+        initialPath.startsWith(mountPath) &&
+        mountPath.length > bestMountPath.length
+      ) {
+        // Ensure it's a proper prefix (matches at a path boundary)
+        const rest = initialPath.slice(mountPath.length);
+        if (rest === '' || rest.startsWith('/')) {
+          bestFsp = fsp;
+          bestMountPath = mountPath;
+        }
+      }
+    }
+
+    if (bestFsp) {
+      let subPath = initialPath.slice(bestMountPath.length);
+      // Remove leading slash from subpath
+      if (subPath.startsWith('/')) {
+        subPath = subPath.slice(1);
+      }
+      // For file mode, navigate to the parent directory
+      if (subPath && mode !== 'directory') {
+        const lastSlash = subPath.lastIndexOf('/');
+        if (lastSlash >= 0) {
+          subPath = subPath.slice(0, lastSlash);
+        } else {
+          subPath = '';
+        }
+      }
+
+      setState({
+        currentLocation: {
+          type: 'filesystem',
+          fspName: bestFsp.name,
+          path: subPath || '.'
+        },
+        selectedItem: null
+      });
+    }
+  }, [options?.initialPath, zonesAndFspQuery.data, mode]);
 
   // Fetch file data only when in filesystem mode
   const fileQuery = useFileQuery(
@@ -167,6 +245,7 @@ export default function useFileSelector(
 
   // Reset to initial state (for when dialog is closed/cancelled)
   const reset = useCallback(() => {
+    lastResolvedPath.current = undefined;
     setState({
       currentLocation: initialLocation
         ? {
@@ -195,7 +274,7 @@ export default function useFileSelector(
         }
 
         fullPath = getPreferredPathForDisplay(
-          pathPreference,
+          effectivePathPreference,
           currentFsp,
           state.currentLocation.path === '.' ? '' : state.currentLocation.path
         );
@@ -208,8 +287,8 @@ export default function useFileSelector(
             : currentFsp.name;
       } else {
         // Case 2: Item provided - select that item
-        // Don't allow selecting files, only directories
-        if (!item.is_dir) {
+        // Only reject files in directory mode
+        if (!item.is_dir && mode === 'directory') {
           return;
         }
 
@@ -223,12 +302,12 @@ export default function useFileSelector(
           const fspKey = makeMapKey('fsp', item.name);
           const fsp = zonesAndFspQuery.data?.[fspKey] as FileSharePath;
           if (fsp) {
-            fullPath = getPreferredPathForDisplay(pathPreference, fsp);
+            fullPath = getPreferredPathForDisplay(effectivePathPreference, fsp);
           }
         } else if (currentFsp) {
           // In filesystem mode, generate path from current FSP + item path
           fullPath = getPreferredPathForDisplay(
-            pathPreference,
+            effectivePathPreference,
             currentFsp,
             item.path
           );
@@ -250,7 +329,13 @@ export default function useFileSelector(
         }));
       }
     },
-    [state.currentLocation, currentFsp, pathPreference, zonesAndFspQuery.data]
+    [
+      state.currentLocation,
+      currentFsp,
+      effectivePathPreference,
+      mode,
+      zonesAndFspQuery.data
+    ]
   );
 
   // Handle double-click navigation

@@ -4,6 +4,8 @@ import asyncio
 import os
 import re
 import shlex
+import shutil
+import subprocess
 import time
 from pathlib import Path
 from datetime import datetime, UTC
@@ -12,6 +14,8 @@ from typing import Optional
 import httpx
 import yaml
 from loguru import logger
+from packaging.specifiers import SpecifierSet
+from packaging.version import Version
 
 from cluster_api import create_executor, ResourceSpec, JobMonitor
 from cluster_api._types import JobStatus
@@ -28,6 +32,52 @@ _MANIFEST_CACHE_TTL = 3600  # 1 hour
 
 _MANIFEST_FILENAMES = ["fileglancer-app.json", "fileglancer-app.yaml", "fileglancer-app.yml"]
 
+_REPO_CACHE_BASE = Path(os.path.expanduser("~/.fileglancer/app-repos"))
+
+
+def _parse_github_url(url: str) -> tuple[str, str, str]:
+    """Parse a GitHub repo URL into (owner, repo, branch).
+
+    Raises ValueError if not a valid GitHub repo URL.
+    """
+    pattern = r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/tree/([^/]+))?/?$"
+    match = re.match(pattern, url)
+    if not match:
+        raise ValueError(
+            f"Invalid app URL: '{url}'. Only GitHub repository URLs are supported "
+            f"(e.g., https://github.com/owner/repo)."
+        )
+    owner, repo, branch = match.groups()
+    return owner, repo, branch or "main"
+
+
+def _run_git(repo_dir: Path, args: list[str]):
+    """Run a git command in the given directory."""
+    subprocess.run(
+        ["git", "-C", str(repo_dir)] + args,
+        check=True, capture_output=True, text=True, timeout=60,
+    )
+
+
+def _ensure_repo_cache(url: str, pull: bool = False) -> Path:
+    """Clone or update the GitHub repo in per-user cache. Returns repo path."""
+    owner, repo, branch = _parse_github_url(url)
+    repo_dir = _REPO_CACHE_BASE / owner / repo
+
+    if repo_dir.exists():
+        _run_git(repo_dir, ["checkout", branch])
+        if pull:
+            _run_git(repo_dir, ["pull", "origin", branch])
+    else:
+        repo_dir.parent.mkdir(parents=True, exist_ok=True)
+        clone_url = f"https://github.com/{owner}/{repo}.git"
+        subprocess.run(
+            ["git", "clone", "--branch", branch, clone_url, str(repo_dir)],
+            check=True, capture_output=True, text=True, timeout=120,
+        )
+
+    return repo_dir
+
 
 def _github_to_raw_urls(url: str) -> list[str]:
     """Convert a GitHub repo URL to raw URLs for the manifest file.
@@ -39,16 +89,11 @@ def _github_to_raw_urls(url: str) -> list[str]:
     - https://github.com/owner/repo/
     - https://github.com/owner/repo/tree/branch
     """
-    pattern = r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/tree/([^/]+))?/?$"
-    match = re.match(pattern, url)
-    if match:
-        owner, repo, branch = match.groups()
-        branch = branch or "main"
-        return [
-            f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{filename}"
-            for filename in _MANIFEST_FILENAMES
-        ]
-    return [url]
+    owner, repo, branch = _parse_github_url(url)
+    return [
+        f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{filename}"
+        for filename in _MANIFEST_FILENAMES
+    ]
 
 
 def _parse_manifest_response(response: httpx.Response) -> dict:
@@ -65,6 +110,9 @@ async def fetch_app_manifest(url: str) -> AppManifest:
     If the URL points to a GitHub repo, it will automatically look for
     fileglancer-app.json, then fileglancer-app.yaml, then fileglancer-app.yml.
     """
+    # Validate GitHub URL (raises ValueError for non-GitHub URLs)
+    _parse_github_url(url)
+
     now = time.time()
 
     # Check cache
@@ -106,6 +154,90 @@ async def fetch_app_manifest(url: str) -> AppManifest:
 def clear_manifest_cache():
     """Clear the manifest cache."""
     _manifest_cache.clear()
+
+
+# --- Requirement Verification ---
+
+_TOOL_REGISTRY = {
+    "pixi": {
+        "version_args": ["pixi", "--version"],
+        "version_pattern": r"pixi (\S+)",
+    },
+    "npm": {
+        "version_args": ["npm", "--version"],
+        "version_pattern": r"^(\S+)$",
+    },
+    "maven": {
+        "version_args": ["mvn", "--version"],
+        "version_pattern": r"Apache Maven (\S+)",
+    },
+}
+
+_REQ_PATTERN = re.compile(r"^([a-zA-Z][a-zA-Z0-9_-]*)\s*((?:>=|<=|!=|==|>|<)\s*\S+)?$")
+
+
+def verify_requirements(requirements: list[str]):
+    """Verify that all required tools are available and meet version constraints.
+
+    Raises ValueError with a message listing all unmet requirements.
+    """
+    if not requirements:
+        return
+
+    errors = []
+
+    for req in requirements:
+        match = _REQ_PATTERN.match(req.strip())
+        if not match:
+            errors.append(f"Invalid requirement format: '{req}'")
+            continue
+
+        tool = match.group(1)
+        version_spec = match.group(2)
+
+        # Check tool exists on PATH
+        if shutil.which(tool) is None:
+            # For maven, the binary is 'mvn' not 'maven'
+            registry_entry = _TOOL_REGISTRY.get(tool)
+            binary = registry_entry["version_args"][0] if registry_entry else tool
+            if binary != tool and shutil.which(binary) is not None:
+                pass  # binary found under alternate name
+            else:
+                errors.append(f"Required tool '{tool}' is not installed or not on PATH")
+                continue
+
+        if version_spec:
+            registry_entry = _TOOL_REGISTRY.get(tool)
+            if not registry_entry:
+                errors.append(f"Cannot check version for '{tool}': no version command configured")
+                continue
+
+            try:
+                result = subprocess.run(
+                    registry_entry["version_args"],
+                    capture_output=True, text=True, timeout=10,
+                )
+                output = result.stdout.strip() or result.stderr.strip()
+                ver_match = re.search(registry_entry["version_pattern"], output)
+                if not ver_match:
+                    errors.append(
+                        f"Could not parse version for '{tool}' from output: {output!r}"
+                    )
+                    continue
+
+                installed = Version(ver_match.group(1))
+                specifier = SpecifierSet(version_spec.strip())
+                if not specifier.contains(installed):
+                    errors.append(
+                        f"'{tool}' version {installed} does not satisfy {version_spec.strip()}"
+                    )
+            except FileNotFoundError:
+                errors.append(f"Required tool '{tool}' is not installed or not on PATH")
+            except subprocess.TimeoutExpired:
+                errors.append(f"Timed out checking version for '{tool}'")
+
+    if errors:
+        raise ValueError("Unmet requirements:\n  - " + "\n  - ".join(errors))
 
 
 # --- Command Building ---
@@ -358,6 +490,7 @@ async def submit_job(
     entry_point_id: str,
     parameters: dict,
     resources: Optional[dict] = None,
+    pull_latest: bool = False,
 ) -> db.JobDB:
     """Submit a new job to the cluster.
 
@@ -378,6 +511,9 @@ async def submit_job(
             break
     if entry_point is None:
         raise ValueError(f"Entry point '{entry_point_id}' not found in manifest")
+
+    # Verify requirements before proceeding
+    verify_requirements(manifest.requirements)
 
     # Build command
     command = build_command(entry_point, parameters)
@@ -408,16 +544,17 @@ async def submit_job(
         )
         job_id = db_job.id
 
-    # Create work directory and write readable script
+    # Create work directory
     work_dir = _build_work_dir(job_id, manifest.name, entry_point.id)
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    script_path = work_dir / "script.sh"
-    script_path.write_text(f"#!/bin/bash\ncd {work_dir}\n\n{command}\n")
-    script_path.chmod(0o755)
+    # Clone/update repo cache and symlink into work dir
+    repo_dir = _ensure_repo_cache(app_url, pull=pull_latest)
+    repo_link = work_dir / "repo"
+    repo_link.symlink_to(repo_dir)
 
-    # Wrap command with cd into work dir
-    full_command = f"cd {work_dir}\n\n{command}"
+    # Wrap command with cd into the repo symlink
+    full_command = f"cd {repo_link}\n\n{command}"
 
     # Set work_dir and log paths on resource spec
     resource_spec.work_dir = str(work_dir)
@@ -517,7 +654,7 @@ async def get_job_file_content(job_id: int, username: str, file_type: str) -> Op
     """Read the content of a job file (script, stdout, or stderr).
 
     All job files live in the job's work directory:
-      - script.sh   — the generated script
+      - *.sh        — the generated script (written by cluster-api)
       - stdout.log  — captured standard output
       - stderr.log  — captured standard error
 
@@ -533,16 +670,19 @@ async def get_job_file_content(job_id: int, username: str, file_type: str) -> Op
 
     work_dir = _resolve_work_dir(db_job)
 
-    filenames = {
-        "script": "script.sh",
-        "stdout": "stdout.log",
-        "stderr": "stderr.log",
-    }
-
-    if file_type not in filenames:
+    if file_type == "script":
+        # Find the script generated by cluster-api (e.g. jobname.1.sh)
+        scripts = sorted(work_dir.glob("*.sh"))
+        if scripts:
+            return scripts[0].read_text()
+        return None
+    elif file_type == "stdout":
+        path = work_dir / "stdout.log"
+    elif file_type == "stderr":
+        path = work_dir / "stderr.log"
+    else:
         raise ValueError(f"Unknown file type: {file_type}")
 
-    path = work_dir / filenames[file_type]
     if path.is_file():
         return path.read_text()
     return None

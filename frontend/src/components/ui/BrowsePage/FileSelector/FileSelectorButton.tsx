@@ -8,20 +8,29 @@ import FileSelectorBreadcrumbs from './FileSelectorBreadcrumbs';
 import FileSelectorTable from './FileSelectorTable';
 import { Spinner } from '@/components/ui/widgets/Loaders';
 import useFileSelector from '@/hooks/useFileSelector';
-import type { FileSelectorInitialLocation } from '@/hooks/useFileSelector';
+import type {
+  FileSelectorInitialLocation,
+  FileSelectorMode
+} from '@/hooks/useFileSelector';
 
 type FileSelectorButtonProps = {
   readonly onSelect: (path: string) => void;
   readonly triggerClasses?: string;
   readonly label?: string;
   readonly initialLocation?: FileSelectorInitialLocation;
+  readonly mode?: FileSelectorMode;
+  readonly useServerPath?: boolean;
+  readonly initialPath?: string;
 };
 
 export default function FileSelectorButton({
   onSelect,
   triggerClasses = '',
   label = 'Browse...',
-  initialLocation
+  initialLocation,
+  mode = 'any',
+  useServerPath,
+  initialPath
 }: FileSelectorButtonProps) {
   const [showDialog, setShowDialog] = useState(false);
 
@@ -34,7 +43,12 @@ export default function FileSelectorButton({
     selectItem,
     handleItemDoubleClick,
     reset
-  } = useFileSelector(initialLocation);
+  } = useFileSelector({
+    initialLocation,
+    initialPath: showDialog ? initialPath : undefined,
+    mode,
+    pathPreferenceOverride: useServerPath ? ['linux_path'] : undefined
+  });
 
   // When dialog opens, select the current folder
   useEffect(() => {
@@ -92,7 +106,11 @@ export default function FileSelectorButton({
             className="mb-4 text-foreground font-bold text-2xl"
             variant="h4"
           >
-            Select File or Folder
+            {mode === 'file'
+              ? 'Select File'
+              : mode === 'directory'
+                ? 'Select Folder'
+                : 'Select File or Folder'}
           </Typography>
 
           {/* Breadcrumbs */}

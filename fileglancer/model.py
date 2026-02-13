@@ -1,7 +1,8 @@
+import re
 from datetime import datetime
 from typing import Any, List, Literal, Optional, Dict
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 
 class FileSharePath(BaseModel):
@@ -340,12 +341,28 @@ class AppEntryPoint(BaseModel):
     resources: Optional[AppResourceDefaults] = Field(description="Default resource requirements", default=None)
 
 
+SUPPORTED_TOOLS = {"pixi", "npm", "maven"}
+
+
 class AppManifest(BaseModel):
     """Top-level app manifest (fileglancer-app.json)"""
     name: str = Field(description="Display name of the app")
     description: Optional[str] = Field(description="Description of the app", default=None)
     version: Optional[str] = Field(description="Version of the app", default=None)
+    requirements: List[str] = Field(
+        description="Required tools, e.g. ['pixi>=0.40', 'npm']",
+        default=[],
+    )
     entryPoints: List[AppEntryPoint] = Field(description="Available entry points for this app")
+
+    @field_validator("requirements")
+    @classmethod
+    def validate_requirements(cls, v):
+        for req in v:
+            tool = re.split(r"[><=!]", req)[0].strip()
+            if tool not in SUPPORTED_TOOLS:
+                raise ValueError(f"Unsupported tool: '{tool}'. Supported: {SUPPORTED_TOOLS}")
+        return v
 
 
 class UserApp(BaseModel):
@@ -395,6 +412,10 @@ class JobSubmitRequest(BaseModel):
     entry_point_id: str = Field(description="Entry point to execute")
     parameters: Dict = Field(description="Parameter values keyed by parameter ID")
     resources: Optional[AppResourceDefaults] = Field(description="Resource overrides", default=None)
+    pull_latest: bool = Field(
+        description="Pull latest code from GitHub before running",
+        default=False,
+    )
 
 
 class PathValidationRequest(BaseModel):
