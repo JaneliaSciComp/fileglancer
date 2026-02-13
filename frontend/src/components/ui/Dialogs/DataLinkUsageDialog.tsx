@@ -45,22 +45,28 @@ function CodeBlock({
   wrapLongLines = true,
   copyable = false,
   copyLabel = 'Copy code',
-  customStyle = {
-    margin: 0,
-    paddingTop: '3em',
-    paddingRight: '3em',
-    paddingBottom: '0',
-    paddingLeft: '1em',
+  customStyle
+}: CodeBlockProps) {
+  const isDarkMode = useDarkMode();
+
+  const defaultStyle = {
+    marginTop: '0px',
+    marginBottom: '0px',
+    padding: '3em 3em 1em 1em',
     fontSize: '14px',
     lineHeight: '1.5',
     width: '100%',
     boxSizing: 'border-box' as const,
     whiteSpace: 'pre-wrap' as const,
     wordBreak: 'break-word' as const,
-    overflowX: 'hidden' as const
-  }
-}: CodeBlockProps) {
-  const isDarkMode = useDarkMode();
+    overflowX: 'hidden' as const,
+    borderRadius: '0.5rem',
+    background: isDarkMode ? '#2f2f2f' : '#fdfdfd'
+  };
+
+  const mergedCustomStyle = customStyle
+    ? { ...defaultStyle, ...customStyle }
+    : defaultStyle;
 
   // Get the theme's code styles and merge with custom codeTagProps
   const theme = isDarkMode ? materialDark : coy;
@@ -68,17 +74,17 @@ function CodeBlock({
   const mergedCodeTagProps = {
     style: {
       ...themeCodeStyles,
-      paddingBottom: '1em',
+      paddingBottom: '1.5em',
       whiteSpace: 'pre-wrap' as const,
       wordBreak: 'break-word' as const
     }
   };
 
   return (
-    <div className="relative w-full min-w-0">
+    <div className="relative w-full min-w-0 rounded-lg border border-surface">
       <SyntaxHighlighter
         codeTagProps={mergedCodeTagProps}
-        customStyle={customStyle}
+        customStyle={mergedCustomStyle}
         language={language}
         showLineNumbers={showLineNumbers}
         style={isDarkMode ? materialDark : coy}
@@ -108,7 +114,7 @@ type InstructionBlockProps = {
 
 function InstructionBlock({ steps }: InstructionBlockProps) {
   return (
-    <ol className="space-y-3 text-foreground">
+    <ol className="space-y-6 text-foreground">
       {steps.map((step, index) => (
         <li className="flex items-start gap-3 text-sm" key={index}>
           <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-semibold">
@@ -133,7 +139,7 @@ function getNapariZarrTab(dataLinkUrl: string) {
     id: 'napari',
     label: 'Napari',
     content: (
-      <ol className="space-y-3 text-foreground">
+      <ol className="space-y-6 text-foreground">
         <li className="flex items-start gap-3 text-sm">
           <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-semibold">
             1
@@ -533,11 +539,15 @@ export default function DataLinkUsageDialog({
 
   const TAB_TRIGGER_CLASSES = '!text-foreground h-full';
   const PANEL_CLASSES =
-    'flex-1 flex flex-col gap-4 max-w-full p-4 rounded-b-lg border border-t-0 border-surface bg-surface-light overflow-y-auto overflow-x-hidden';
+    'flex flex-col gap-4 max-w-full max-h-[65vh] p-4 rounded-b-lg border border-t-0 border-surface bg-surface-light overflow-y-auto overflow-x-hidden';
 
   return (
-    <FgDialog className="max-w-3xl w-full" onClose={onClose} open={open}>
-      <div className="flex flex-col gap-4 my-4">
+    <FgDialog
+      className="max-w-4xl w-11/12 md:w-11/12 lg:w-10/12"
+      onClose={onClose}
+      open={open}
+    >
+      <div className="flex flex-col gap-4 my-4 min-h-0 max-h-[85vh]">
         <div className="flex items-center gap-4 w-[95%] self-center">
           <Typography className="text-foreground font-semibold text-lg">
             How to use your data link
@@ -551,7 +561,7 @@ export default function DataLinkUsageDialog({
           </CopyTooltip>
         </div>
         <Tabs
-          className="flex flex-col flex-1 min-h-0 gap-0 max-h-[50vh] w-[95%] self-center"
+          className="flex flex-col flex-1 min-h-0 gap-0 max-h-[75vh] w-[95%] self-center"
           key="data-link-usage-tabs"
           onValueChange={setActiveTab}
           value={activeTab}
