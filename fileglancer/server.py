@@ -14,7 +14,6 @@ try:
 except ImportError:
     import tomli as tomllib
 
-import httpx
 import yaml
 from loguru import logger
 from pydantic import HttpUrl
@@ -1466,11 +1465,9 @@ def create_app(settings):
     async def fetch_manifest(body: ManifestFetchRequest,
                              username: str = Depends(get_current_user)):
         try:
-            logger.info(f"Fetching manifest for URL: '{body.url}'")
-            manifest = await apps_module.fetch_app_manifest(body.url)
+            logger.info(f"Fetching manifest for URL: '{body.url}' path: '{body.manifest_path}'")
+            manifest = await apps_module.fetch_app_manifest(body.url, body.manifest_path)
             return manifest
-        except httpx.HTTPStatusError as e:
-            raise HTTPException(status_code=502, detail=f"Failed to fetch manifest: HTTP {e.response.status_code}")
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
@@ -1487,13 +1484,16 @@ def create_app(settings):
         for app_entry in app_list:
             user_app = UserApp(
                 url=app_entry["url"],
+                manifest_path=app_entry.get("manifest_path", ""),
                 name=app_entry.get("name", "Unknown"),
                 description=app_entry.get("description"),
                 added_at=app_entry.get("added_at", datetime.now(UTC).isoformat()),
             )
-            # Try to fetch manifest (use cache)
+            # Try to fetch manifest from local clone
             try:
-                user_app.manifest = await apps_module.fetch_app_manifest(app_entry["url"])
+                user_app.manifest = await apps_module.fetch_app_manifest(
+                    app_entry["url"], app_entry.get("manifest_path", "")
+                )
                 # Update name/description from manifest
                 user_app.name = user_app.manifest.name
                 user_app.description = user_app.manifest.description
@@ -1502,57 +1502,77 @@ def create_app(settings):
             result.append(user_app)
         return result
 
-    @app.post("/api/apps", response_model=UserApp,
-              description="Add an app by URL")
+    @app.post("/api/apps", response_model=list[UserApp],
+              description="Add an app by URL (discovers all manifests in the repo)")
     async def add_user_app(body: AppAddRequest,
                            username: str = Depends(get_current_user)):
-        # Fetch manifest to validate
+        # Clone the repo and discover all manifests
         try:
-            manifest = await apps_module.fetch_app_manifest(body.url)
-        except httpx.HTTPStatusError as e:
-            raise HTTPException(status_code=502, detail=f"Failed to fetch manifest: HTTP {e.response.status_code}")
+            repo_dir = await apps_module._ensure_repo_cache(body.url)
+            discovered = apps_module._find_manifests_in_repo(repo_dir)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid manifest: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Failed to clone or scan repo: {str(e)}")
+
+        if not discovered:
+            filenames = ", ".join(apps_module._MANIFEST_FILENAMES)
+            raise HTTPException(
+                status_code=404,
+                detail=f"No manifest files found ({filenames}). "
+                       f"Make sure a manifest exists in the repository.",
+            )
 
         now = datetime.now(UTC)
-        new_entry = {
-            "url": body.url,
-            "name": manifest.name,
-            "description": manifest.description,
-            "added_at": now.isoformat(),
-        }
 
         with db.get_db_session(settings.db_url) as session:
             pref = db.get_user_preference(session, username, "apps")
             app_list = pref.get("apps", []) if pref else []
 
-            # Check for duplicates
-            for existing in app_list:
-                if existing["url"] == body.url:
-                    raise HTTPException(status_code=409, detail="App already added")
+            # Build set of existing (url, manifest_path) for dedup
+            existing_keys = {
+                (a["url"], a.get("manifest_path", "")) for a in app_list
+            }
 
-            app_list.append(new_entry)
+            new_apps: list[UserApp] = []
+            for manifest_path, manifest in discovered:
+                if (body.url, manifest_path) in existing_keys:
+                    continue  # silently skip duplicates
+
+                new_entry = {
+                    "url": body.url,
+                    "manifest_path": manifest_path,
+                    "name": manifest.name,
+                    "description": manifest.description,
+                    "added_at": now.isoformat(),
+                }
+                app_list.append(new_entry)
+                new_apps.append(UserApp(
+                    url=body.url,
+                    manifest_path=manifest_path,
+                    name=manifest.name,
+                    description=manifest.description,
+                    added_at=now,
+                    manifest=manifest,
+                ))
+
             db.set_user_preference(session, username, "apps", {"apps": app_list})
 
-        return UserApp(
-            url=body.url,
-            name=manifest.name,
-            description=manifest.description,
-            added_at=now,
-            manifest=manifest,
-        )
+        return new_apps
 
     @app.delete("/api/apps",
-                description="Remove an app by URL")
+                description="Remove an app by URL and manifest path")
     async def remove_user_app(url: str = Query(..., description="URL of the app to remove"),
+                              manifest_path: str = Query("", description="Manifest path within the repo"),
                               username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
             pref = db.get_user_preference(session, username, "apps")
             app_list = pref.get("apps", []) if pref else []
 
-            new_list = [a for a in app_list if a["url"] != url]
+            new_list = [
+                a for a in app_list
+                if not (a["url"] == url and a.get("manifest_path", "") == manifest_path)
+            ]
             if len(new_list) == len(app_list):
                 raise HTTPException(status_code=404, detail="App not found")
 
@@ -1595,6 +1615,7 @@ def create_app(settings):
                 parameters=body.parameters,
                 resources=resources_dict,
                 pull_latest=body.pull_latest,
+                manifest_path=body.manifest_path,
             )
             return _convert_job(db_job)
         except ValueError as e:
@@ -1663,6 +1684,7 @@ def create_app(settings):
             id=db_job.id,
             app_url=db_job.app_url,
             app_name=db_job.app_name,
+            manifest_path=db_job.manifest_path,
             entry_point_id=db_job.entry_point_id,
             entry_point_name=db_job.entry_point_name,
             parameters=db_job.parameters,

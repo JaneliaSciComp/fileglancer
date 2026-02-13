@@ -1,17 +1,16 @@
 """Apps module for fetching manifests, building commands, and managing cluster jobs."""
 
 import asyncio
+import json
 import os
 import re
 import shlex
 import shutil
 import subprocess
-import time
 from pathlib import Path
 from datetime import datetime, UTC
 from typing import Optional
 
-import httpx
 import yaml
 from loguru import logger
 from packaging.specifiers import SpecifierSet
@@ -23,11 +22,6 @@ from cluster_api._types import JobStatus
 from fileglancer import database as db
 from fileglancer.model import AppManifest, AppEntryPoint, AppParameter
 from fileglancer.settings import get_settings
-
-# --- Manifest Cache ---
-
-_manifest_cache: dict[str, tuple[AppManifest, float]] = {}
-_MANIFEST_CACHE_TTL = 3600  # 1 hour
 
 
 _MANIFEST_FILENAMES = ["fileglancer-app.json", "fileglancer-app.yaml", "fileglancer-app.yml"]
@@ -111,78 +105,71 @@ async def _ensure_repo_cache(url: str, pull: bool = False) -> Path:
     return repo_dir
 
 
-def _github_to_raw_urls(url: str) -> list[str]:
-    """Convert a GitHub repo URL to raw URLs for the manifest file.
+_SKIP_DIRS = {'.git', 'node_modules', '__pycache__', '.pixi', '.venv', 'venv'}
 
-    Returns a list of candidate URLs to try (JSON first, then YAML).
 
-    Handles patterns like:
-    - https://github.com/owner/repo
-    - https://github.com/owner/repo/
-    - https://github.com/owner/repo/tree/branch
+def _read_manifest_file(manifest_dir: Path) -> AppManifest:
+    """Read and validate a manifest file from the given directory.
+
+    Tries each filename in _MANIFEST_FILENAMES order (JSON > YAML > YML).
+    Raises ValueError if no manifest found.
     """
-    owner, repo, branch = _parse_github_url(url)
-    return [
-        f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{filename}"
-        for filename in _MANIFEST_FILENAMES
-    ]
+    for filename in _MANIFEST_FILENAMES:
+        filepath = manifest_dir / filename
+        if filepath.is_file():
+            text = filepath.read_text()
+            if filename.endswith(".json"):
+                data = json.loads(text)
+            else:
+                data = yaml.safe_load(text)
+            return AppManifest(**data)
+
+    filenames = ", ".join(_MANIFEST_FILENAMES)
+    raise ValueError(
+        f"No manifest file found ({filenames}) in {manifest_dir}."
+    )
 
 
-def _parse_manifest_response(response: httpx.Response) -> dict:
-    """Parse a manifest response as JSON or YAML based on content."""
-    url = str(response.url)
-    if url.endswith(".yaml") or url.endswith(".yml"):
-        return yaml.safe_load(response.text)
-    return response.json()
+def _find_manifests_in_repo(repo_dir: Path) -> list[tuple[str, AppManifest]]:
+    """Walk the cloned repo and discover all manifest files.
 
-
-async def fetch_app_manifest(url: str) -> AppManifest:
-    """Fetch and validate an app manifest from a URL.
-
-    If the URL points to a GitHub repo, it will automatically look for
-    fileglancer-app.json, then fileglancer-app.yaml, then fileglancer-app.yml.
+    Returns a list of (relative_dir_path, AppManifest) tuples.
+    Uses "" for root-level manifests.
     """
-    now = time.time()
+    results: list[tuple[str, AppManifest]] = []
 
-    # Check cache
-    if url in _manifest_cache:
-        manifest, cached_at = _manifest_cache[url]
-        if now - cached_at < _MANIFEST_CACHE_TTL:
-            return manifest
+    for dirpath, dirnames, filenames in os.walk(repo_dir, topdown=True):
+        # Prune directories we should skip
+        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
 
-    # Resolve GitHub URL to candidate raw URLs (validates GitHub URL)
-    candidate_urls = _github_to_raw_urls(url)
+        # Check if any manifest filename exists in this directory
+        has_manifest = any(f in filenames for f in _MANIFEST_FILENAMES)
+        if not has_manifest:
+            continue
 
-    data = None
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        for fetch_url in candidate_urls:
-            try:
-                response = await client.get(fetch_url)
-                response.raise_for_status()
-                data = _parse_manifest_response(response)
-                break
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code == 404 and len(candidate_urls) > 1:
-                    continue
-                raise
+        current = Path(dirpath)
+        try:
+            manifest = _read_manifest_file(current)
+        except (ValueError, Exception) as e:
+            logger.warning(f"Skipping invalid manifest in {dirpath}: {e}")
+            continue
 
-    if data is None:
-        filenames = ", ".join(_MANIFEST_FILENAMES)
-        raise ValueError(
-            f"No manifest file found ({filenames}). "
-            f"Make sure the file exists in the repository."
-        )
+        # Compute relative path from repo root
+        rel = current.relative_to(repo_dir)
+        rel_str = str(rel) if str(rel) != "." else ""
+        results.append((rel_str, manifest))
 
-    manifest = AppManifest(**data)
-
-    # Cache the result
-    _manifest_cache[url] = (manifest, now)
-    return manifest
+    return results
 
 
-def clear_manifest_cache():
-    """Clear the manifest cache."""
-    _manifest_cache.clear()
+async def fetch_app_manifest(url: str, manifest_path: str = "") -> AppManifest:
+    """Fetch and validate an app manifest from a cloned repo.
+
+    Clones the repo if needed, then reads the manifest from disk.
+    """
+    repo_dir = await _ensure_repo_cache(url)
+    target_dir = repo_dir / manifest_path if manifest_path else repo_dir
+    return _read_manifest_file(target_dir)
 
 
 # --- Requirement Verification ---
@@ -520,6 +507,7 @@ async def submit_job(
     parameters: dict,
     resources: Optional[dict] = None,
     pull_latest: bool = False,
+    manifest_path: str = "",
 ) -> db.JobDB:
     """Submit a new job to the cluster.
 
@@ -530,7 +518,7 @@ async def submit_job(
     settings = get_settings()
 
     # Fetch and validate manifest
-    manifest = await fetch_app_manifest(app_url)
+    manifest = await fetch_app_manifest(app_url, manifest_path)
 
     # Find entry point
     entry_point = None
@@ -570,6 +558,7 @@ async def submit_job(
             entry_point_name=entry_point.name,
             parameters=parameters,
             resources=resources_dict,
+            manifest_path=manifest_path,
         )
         job_id = db_job.id
 
@@ -577,15 +566,27 @@ async def submit_job(
     work_dir = _build_work_dir(job_id, manifest.name, entry_point.id)
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    # Clone/update repo cache and symlink into work dir
-    repo_dir = await _ensure_repo_cache(app_url, pull=pull_latest)
-    repo_link = work_dir / "repo"
-    repo_link.symlink_to(repo_dir)
+    # Determine which repo to symlink and where to cd
+    if manifest.repo_url:
+        # Tool code lives in a separate repo — clone it and cd to its root
+        tool_repo_dir = await _ensure_repo_cache(manifest.repo_url, pull=pull_latest)
+        repo_link = work_dir / "repo"
+        repo_link.symlink_to(tool_repo_dir)
+        cd_target = repo_link
+    else:
+        # Tool code is in the discovery repo — cd into manifest's subdirectory
+        repo_dir = await _ensure_repo_cache(app_url, pull=pull_latest)
+        repo_link = work_dir / "repo"
+        repo_link.symlink_to(repo_dir)
+        if manifest_path:
+            cd_target = repo_link / manifest_path
+        else:
+            cd_target = repo_link
 
     # Wrap command with cd into the repo symlink
     # Unset PIXI_PROJECT_MANIFEST so pixi uses the repo's own manifest
     # instead of inheriting fileglancer's from the dev server environment
-    full_command = f"unset PIXI_PROJECT_MANIFEST\ncd {repo_link}\n\n{command}"
+    full_command = f"unset PIXI_PROJECT_MANIFEST\ncd {cd_target}\n\n{command}"
 
     # Set work_dir and log paths on resource spec
     resource_spec.work_dir = str(work_dir)

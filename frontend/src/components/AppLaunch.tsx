@@ -12,6 +12,7 @@ import type { AppEntryPoint, AppResourceDefaults } from '@/shared.types';
 
 type LaunchState = {
   appUrl?: string;
+  manifestPath?: string;
   entryPointId?: string;
   parameters?: Record<string, unknown>;
 } | null;
@@ -32,10 +33,11 @@ export default function AppLaunch() {
     : encodedUrl
       ? decodeURIComponent(encodedUrl)
       : '';
+  const manifestPath = launchState?.manifestPath ?? '';
 
   useEffect(() => {
     if (appUrl) {
-      manifestMutation.mutate(appUrl);
+      manifestMutation.mutate({ url: appUrl, manifest_path: manifestPath });
     }
     // Only fetch on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -74,6 +76,7 @@ export default function AppLaunch() {
     try {
       await submitJobMutation.mutateAsync({
         app_url: appUrl,
+        manifest_path: manifestPath,
         entry_point_id: selectedEntryPoint.id,
         parameters,
         resources,

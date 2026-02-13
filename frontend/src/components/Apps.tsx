@@ -34,8 +34,9 @@ export default function Apps() {
 
   const handleAddApp = async (url: string) => {
     try {
-      await addAppMutation.mutateAsync(url);
-      toast.success('App added');
+      const apps = await addAppMutation.mutateAsync(url);
+      const count = apps.length;
+      toast.success(`${count} app${count !== 1 ? 's' : ''} added`);
       setShowAddDialog(false);
     } catch (error) {
       const message =
@@ -44,9 +45,15 @@ export default function Apps() {
     }
   };
 
-  const handleRemoveApp = async (url: string) => {
+  const handleRemoveApp = async ({
+    url,
+    manifest_path
+  }: {
+    url: string;
+    manifest_path: string;
+  }) => {
     try {
-      await removeAppMutation.mutateAsync(url);
+      await removeAppMutation.mutateAsync({ url, manifest_path });
       toast.success('App removed');
     } catch (error) {
       const message =
@@ -63,6 +70,7 @@ export default function Apps() {
     navigate('/apps/launch/relaunch', {
       state: {
         appUrl: job.app_url,
+        manifestPath: job.manifest_path,
         entryPointId: job.entry_point_id,
         parameters: job.parameters
       }
@@ -133,7 +141,7 @@ export default function Apps() {
           {appsQuery.data.map(app => (
             <AppCard
               app={app}
-              key={app.url}
+              key={`${app.url}::${app.manifest_path}`}
               onRemove={handleRemoveApp}
               removing={removeAppMutation.isPending}
             />

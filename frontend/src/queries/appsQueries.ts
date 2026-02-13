@@ -43,12 +43,19 @@ export function useAppsQuery(): UseQueryResult<UserApp[], Error> {
 export function useManifestPreviewMutation(): UseMutationResult<
   AppManifest,
   Error,
-  string
+  { url: string; manifest_path: string }
 > {
   return useMutation({
-    mutationFn: async (url: string) => {
+    mutationFn: async ({
+      url,
+      manifest_path
+    }: {
+      url: string;
+      manifest_path: string;
+    }) => {
       const response = await sendFetchRequest('/api/apps/manifest', 'POST', {
-        url
+        url,
+        manifest_path
       });
       const data = await getResponseJsonOrError(response);
       if (!response.ok) {
@@ -59,7 +66,11 @@ export function useManifestPreviewMutation(): UseMutationResult<
   });
 }
 
-export function useAddAppMutation(): UseMutationResult<UserApp, Error, string> {
+export function useAddAppMutation(): UseMutationResult<
+  UserApp[],
+  Error,
+  string
+> {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (url: string) => {
@@ -68,7 +79,7 @@ export function useAddAppMutation(): UseMutationResult<UserApp, Error, string> {
       if (!response.ok) {
         throwResponseNotOkError(response, data);
       }
-      return data as UserApp;
+      return data as UserApp[];
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appsQueryKeys.all });
@@ -92,14 +103,21 @@ export async function validatePaths(
 export function useRemoveAppMutation(): UseMutationResult<
   unknown,
   Error,
-  string
+  { url: string; manifest_path: string }
 > {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (url: string) => {
+    mutationFn: async ({
+      url,
+      manifest_path
+    }: {
+      url: string;
+      manifest_path: string;
+    }) => {
       const encodedUrl = encodeURIComponent(url);
+      const encodedPath = encodeURIComponent(manifest_path);
       const response = await sendFetchRequest(
-        `/api/apps?url=${encodedUrl}`,
+        `/api/apps?url=${encodedUrl}&manifest_path=${encodedPath}`,
         'DELETE'
       );
       const data = await getResponseJsonOrError(response);

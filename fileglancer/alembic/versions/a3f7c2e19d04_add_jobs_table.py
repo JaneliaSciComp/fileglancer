@@ -24,6 +24,7 @@ def upgrade() -> None:
         sa.Column('cluster_job_id', sa.String(), nullable=True),
         sa.Column('app_url', sa.String(), nullable=False),
         sa.Column('app_name', sa.String(), nullable=False),
+        sa.Column('manifest_path', sa.String(), nullable=False, server_default=''),
         sa.Column('entry_point_id', sa.String(), nullable=False),
         sa.Column('entry_point_name', sa.String(), nullable=False),
         sa.Column('parameters', sa.JSON(), nullable=False),

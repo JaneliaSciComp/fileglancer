@@ -145,6 +145,7 @@ class JobDB(Base):
     cluster_job_id = Column(String, nullable=True, index=True)
     app_url = Column(String, nullable=False)
     app_name = Column(String, nullable=False)
+    manifest_path = Column(String, nullable=False, server_default="")
     entry_point_id = Column(String, nullable=False)
     entry_point_name = Column(String, nullable=False)
     parameters = Column(JSON, nullable=False)
@@ -822,13 +823,14 @@ def delete_expired_sessions(session: Session):
 
 def create_job(session: Session, username: str, app_url: str, app_name: str,
                entry_point_id: str, entry_point_name: str, parameters: Dict,
-               resources: Optional[Dict] = None) -> JobDB:
+               resources: Optional[Dict] = None, manifest_path: str = "") -> JobDB:
     """Create a new job record"""
     now = datetime.now(UTC)
     job = JobDB(
         username=username,
         app_url=app_url,
         app_name=app_name,
+        manifest_path=manifest_path,
         entry_point_id=entry_point_id,
         entry_point_name=entry_point_name,
         parameters=parameters,

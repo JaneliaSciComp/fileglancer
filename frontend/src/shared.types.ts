@@ -91,12 +91,14 @@ type AppManifest = {
   name: string;
   description?: string;
   version?: string;
+  repo_url?: string;
   requirements?: string[];
   entryPoints: AppEntryPoint[];
 };
 
 type UserApp = {
   url: string;
+  manifest_path: string;
   name: string;
   description?: string;
   added_at: string;
@@ -107,6 +109,7 @@ type Job = {
   id: number;
   app_url: string;
   app_name: string;
+  manifest_path: string;
   entry_point_id: string;
   entry_point_name: string;
   parameters: Record<string, unknown>;
@@ -121,6 +124,7 @@ type Job = {
 
 type JobSubmitRequest = {
   app_url: string;
+  manifest_path?: string;
   entry_point_id: string;
   parameters: Record<string, unknown>;
   resources?: AppResourceDefaults;

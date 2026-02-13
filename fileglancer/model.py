@@ -349,6 +349,10 @@ class AppManifest(BaseModel):
     name: str = Field(description="Display name of the app")
     description: Optional[str] = Field(description="Description of the app", default=None)
     version: Optional[str] = Field(description="Version of the app", default=None)
+    repo_url: Optional[str] = Field(
+        description="GitHub repo URL where the tool code lives. If absent, uses the repo containing this manifest.",
+        default=None,
+    )
     requirements: List[str] = Field(
         description="Required tools, e.g. ['pixi>=0.40', 'npm']",
         default=[],
@@ -368,6 +372,7 @@ class AppManifest(BaseModel):
 class UserApp(BaseModel):
     """A user's saved app reference"""
     url: str = Field(description="URL to the app manifest")
+    manifest_path: str = Field(description="Relative directory path to the manifest within the repo", default="")
     name: str = Field(description="App name from manifest")
     description: Optional[str] = Field(description="App description from manifest", default=None)
     added_at: datetime = Field(description="When the app was added")
@@ -377,6 +382,7 @@ class UserApp(BaseModel):
 class ManifestFetchRequest(BaseModel):
     """Request to fetch an app manifest"""
     url: str = Field(description="URL to the app manifest or GitHub repo")
+    manifest_path: str = Field(description="Relative directory path to the manifest within the repo", default="")
 
 
 class AppAddRequest(BaseModel):
@@ -394,6 +400,7 @@ class Job(BaseModel):
     id: int = Field(description="Unique job identifier")
     app_url: str = Field(description="URL of the app manifest")
     app_name: str = Field(description="Name of the app")
+    manifest_path: str = Field(description="Relative manifest path within the app repo", default="")
     entry_point_id: str = Field(description="Entry point that was executed")
     entry_point_name: str = Field(description="Display name of the entry point")
     parameters: Dict = Field(description="Parameters used for the job")
@@ -409,6 +416,7 @@ class Job(BaseModel):
 class JobSubmitRequest(BaseModel):
     """Request to submit a new job"""
     app_url: str = Field(description="URL of the app manifest")
+    manifest_path: str = Field(description="Relative manifest path within the app repo", default="")
     entry_point_id: str = Field(description="Entry point to execute")
     parameters: Dict = Field(description="Parameter values keyed by parameter ID")
     resources: Optional[AppResourceDefaults] = Field(description="Resource overrides", default=None)

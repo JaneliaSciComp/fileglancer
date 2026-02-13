@@ -106,6 +106,7 @@ export default function JobDetail() {
     navigate('/apps/launch/relaunch', {
       state: {
         appUrl: job.app_url,
+        manifestPath: job.manifest_path,
         entryPointId: job.entry_point_id,
         parameters: job.parameters
       }

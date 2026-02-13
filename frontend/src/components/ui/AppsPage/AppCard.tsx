@@ -8,7 +8,7 @@ import type { UserApp } from '@/shared.types';
 
 interface AppCardProps {
   readonly app: UserApp;
-  readonly onRemove: (url: string) => void;
+  readonly onRemove: (params: { url: string; manifest_path: string }) => void;
   readonly removing: boolean;
 }
 
@@ -17,7 +17,7 @@ export default function AppCard({ app, onRemove, removing }: AppCardProps) {
 
   const handleLaunch = () => {
     navigate('/apps/launch/app', {
-      state: { appUrl: app.url }
+      state: { appUrl: app.url, manifestPath: app.manifest_path }
     });
   };
 
@@ -44,7 +44,12 @@ export default function AppCard({ app, onRemove, removing }: AppCardProps) {
           <IconButton
             className="text-secondary hover:text-error flex-shrink-0"
             disabled={removing}
-            onClick={() => onRemove(app.url)}
+            onClick={() =>
+              onRemove({
+                url: app.url,
+                manifest_path: app.manifest_path
+              })
+            }
             size="sm"
             variant="ghost"
           >
