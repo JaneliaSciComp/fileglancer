@@ -70,8 +70,9 @@ export function createAppsJobsColumns(
     {
       accessorKey: 'entry_point_name',
       header: 'Entry Point',
-      cell: ({ getValue, table }) => {
+      cell: ({ getValue, row, table }) => {
         const value = getValue() as string;
+        const jobId = row.original.id;
         const onContextMenu = table.options.meta?.onCellContextMenu;
         return (
           <div
@@ -81,7 +82,13 @@ export function createAppsJobsColumns(
               onContextMenu?.(e, { value });
             }}
           >
-            <span className="truncate">{value}</span>
+            <button
+              className="truncate text-primary hover:underline cursor-pointer text-left"
+              onClick={() => callbacks.onViewDetail(jobId)}
+              type="button"
+            >
+              {value}
+            </button>
           </div>
         );
       },
