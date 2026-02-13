@@ -268,7 +268,7 @@ export default function AppLaunchForm({
     await onSubmit(
       params,
       hasResourceOverrides ? resources : undefined,
-      pullLatest || undefined
+      pullLatest
     );
   };
 

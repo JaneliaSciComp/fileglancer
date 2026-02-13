@@ -51,29 +51,47 @@ def _parse_github_url(url: str) -> tuple[str, str, str]:
     return owner, repo, branch or "main"
 
 
-def _run_git(repo_dir: Path, args: list[str]):
-    """Run a git command in the given directory."""
-    subprocess.run(
-        ["git", "-C", str(repo_dir)] + args,
-        check=True, capture_output=True, text=True, timeout=60,
-    )
+async def _run_git(args: list[str], timeout: int = 60):
+    """Run a git command asynchronously.
+
+    Raises ValueError with a readable message on failure.
+    """
+    try:
+        proc = await asyncio.wait_for(
+            asyncio.create_subprocess_exec(
+                *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            ),
+            timeout=timeout,
+        )
+        stdout, stderr = await proc.communicate()
+    except asyncio.TimeoutError:
+        raise ValueError(f"Git command timed out after {timeout}s: {' '.join(args)}")
+
+    if proc.returncode != 0:
+        err = stderr.decode().strip() if stderr else "unknown error"
+        raise ValueError(f"Git command failed: {err}")
 
 
-def _ensure_repo_cache(url: str, pull: bool = False) -> Path:
+async def _ensure_repo_cache(url: str, pull: bool = False) -> Path:
     """Clone or update the GitHub repo in per-user cache. Returns repo path."""
     owner, repo, branch = _parse_github_url(url)
     repo_dir = _REPO_CACHE_BASE / owner / repo
 
     if repo_dir.exists():
-        _run_git(repo_dir, ["checkout", branch])
+        logger.info(f"Repo cache hit: {owner}/{repo}, checking out {branch}")
+        await _run_git(["git", "-C", str(repo_dir), "checkout", branch])
         if pull:
-            _run_git(repo_dir, ["pull", "origin", branch])
+            logger.info(f"Pulling latest for {owner}/{repo} ({branch})")
+            await _run_git(["git", "-C", str(repo_dir), "pull", "origin", branch])
     else:
+        logger.info(f"Cloning {owner}/{repo} ({branch}) into {repo_dir}")
         repo_dir.parent.mkdir(parents=True, exist_ok=True)
         clone_url = f"https://github.com/{owner}/{repo}.git"
-        subprocess.run(
+        await _run_git(
             ["git", "clone", "--branch", branch, clone_url, str(repo_dir)],
-            check=True, capture_output=True, text=True, timeout=120,
+            timeout=120,
         )
 
     return repo_dir
@@ -110,9 +128,6 @@ async def fetch_app_manifest(url: str) -> AppManifest:
     If the URL points to a GitHub repo, it will automatically look for
     fileglancer-app.json, then fileglancer-app.yaml, then fileglancer-app.yml.
     """
-    # Validate GitHub URL (raises ValueError for non-GitHub URLs)
-    _parse_github_url(url)
-
     now = time.time()
 
     # Check cache
@@ -121,7 +136,7 @@ async def fetch_app_manifest(url: str) -> AppManifest:
         if now - cached_at < _MANIFEST_CACHE_TTL:
             return manifest
 
-    # Resolve GitHub URLs to candidate raw URLs
+    # Resolve GitHub URL to candidate raw URLs (validates GitHub URL)
     candidate_urls = _github_to_raw_urls(url)
 
     data = None
