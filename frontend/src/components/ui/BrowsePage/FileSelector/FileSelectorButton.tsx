@@ -13,6 +13,16 @@ import type {
   FileSelectorMode
 } from '@/hooks/useFileSelector';
 
+// Remember the last confirmed selection's parent folder across all instances
+let lastSelectedParentPath: string | null = null;
+
+function getParentPath(fullPath: string): string {
+  // Strip trailing slash, then take everything up to the last slash
+  const trimmed = fullPath.endsWith('/') ? fullPath.slice(0, -1) : fullPath;
+  const lastSlash = trimmed.lastIndexOf('/');
+  return lastSlash > 0 ? trimmed.slice(0, lastSlash) : trimmed;
+}
+
 type FileSelectorButtonProps = {
   readonly onSelect: (path: string) => void;
   readonly triggerClasses?: string;
@@ -34,6 +44,10 @@ export default function FileSelectorButton({
 }: FileSelectorButtonProps) {
   const [showDialog, setShowDialog] = useState(false);
 
+  // Use initialPath if provided, otherwise fall back to last confirmed selection's parent
+  const effectiveInitialPath =
+    initialPath || lastSelectedParentPath || undefined;
+
   const {
     state,
     displayItems,
@@ -45,7 +59,7 @@ export default function FileSelectorButton({
     reset
   } = useFileSelector({
     initialLocation,
-    initialPath: showDialog ? initialPath : undefined,
+    initialPath: showDialog ? effectiveInitialPath : undefined,
     mode,
     pathPreferenceOverride: useServerPath ? ['linux_path'] : undefined
   });
@@ -64,6 +78,7 @@ export default function FileSelectorButton({
 
   const handleSelect = () => {
     if (state.selectedItem) {
+      lastSelectedParentPath = getParentPath(state.selectedItem.fullPath);
       onSelect(state.selectedItem.fullPath);
       onClose();
     }
