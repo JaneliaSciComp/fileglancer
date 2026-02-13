@@ -583,7 +583,9 @@ async def submit_job(
     repo_link.symlink_to(repo_dir)
 
     # Wrap command with cd into the repo symlink
-    full_command = f"cd {repo_link}\n\n{command}"
+    # Unset PIXI_PROJECT_MANIFEST so pixi uses the repo's own manifest
+    # instead of inheriting fileglancer's from the dev server environment
+    full_command = f"unset PIXI_PROJECT_MANIFEST\ncd {repo_link}\n\n{command}"
 
     # Set work_dir and log paths on resource spec
     resource_spec.work_dir = str(work_dir)
