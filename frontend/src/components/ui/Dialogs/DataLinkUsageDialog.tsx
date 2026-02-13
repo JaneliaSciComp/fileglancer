@@ -11,6 +11,18 @@ import FgDialog from './FgDialog';
 import useDarkMode from '@/hooks/useDarkMode';
 import CopyTooltip from '@/components/ui/widgets/CopyTooltip';
 
+export type DataLinkType = 'directory' | 'zarr' | 'n5';
+
+export function inferDataType(path: string): DataLinkType {
+  if (/\.zarr(\/|$)/.test(path)) {
+    return 'zarr';
+  }
+  if (/\.n5(\/|$)/.test(path)) {
+    return 'n5';
+  }
+  return 'directory';
+}
+
 type CodeBlockProps = {
   readonly code: string;
   readonly language?: string;
@@ -109,27 +121,239 @@ function InstructionBlock({ steps }: InstructionBlockProps) {
 
 type DataLinkUsageDialogProps = {
   readonly dataLinkUrl: string;
+  readonly dataType: DataLinkType;
   readonly open: boolean;
   readonly onClose: () => void;
 };
 
-export default function DataLinkUsageDialog({
-  dataLinkUrl,
-  open,
-  onClose
-}: DataLinkUsageDialogProps) {
-  const [activeTab, setActiveTab] = useState<string>('napari');
+function getTabsForDataType(dataType: DataLinkType, dataLinkUrl: string) {
+  if (dataType === 'directory') {
+    return [
+      {
+        id: 'python',
+        label: 'Python',
+        content: (
+          <>
+            <InstructionBlock steps={['Install requests package']} />
+            <CodeBlock
+              code={`import requests
+import xml.etree.ElementTree as ET
 
-  const tabs = [
+url = '${dataLinkUrl}'
+
+# List files using S3-compatible ListObjectsV2 API
+response = requests.get(url, params={'list-type': '2', 'delimiter': '/'})
+response.raise_for_status()
+
+root = ET.fromstring(response.text)
+ns = root.tag.split('}')[0] + '}' if '}' in root.tag else ''
+
+# Print files
+for contents in root.findall(f'{ns}Contents'):
+    key = contents.find(f'{ns}Key').text
+    size = contents.find(f'{ns}Size').text
+    print(f'{key}  ({size} bytes)')
+
+# Print subdirectories
+for prefix in root.findall(f'{ns}CommonPrefixes'):
+    dirname = prefix.find(f'{ns}Prefix').text
+    print(f'{dirname}  (directory)')`}
+              copyLabel="Copy code"
+              copyable={true}
+              language="python"
+            />
+          </>
+        )
+      },
+      {
+        id: 'java',
+        label: 'Java',
+        content: (
+          <CodeBlock
+            code={`import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import javax.xml.parsers.DocumentBuilderFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
+import org.w3c.dom.Element;
+import java.io.ByteArrayInputStream;
+
+public class ListFiles {
+    private static final String URL = '${dataLinkUrl}';
+
+    public static void main(String[] args) throws Exception {
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(URL + "?list-type=2&delimiter=/"))
+            .GET()
+            .build();
+
+        HttpResponse<String> response = client.send(request,
+            HttpResponse.BodyHandlers.ofString());
+
+        Document doc = DocumentBuilderFactory.newInstance()
+            .newDocumentBuilder()
+            .parse(new ByteArrayInputStream(
+                response.body().getBytes()));
+
+        // Print files
+        NodeList contents = doc.getElementsByTagName("Contents");
+        for (int i = 0; i < contents.getLength(); i++) {
+            Element el = (Element) contents.item(i);
+            String key = el.getElementsByTagName("Key")
+                .item(0).getTextContent();
+            String size = el.getElementsByTagName("Size")
+                .item(0).getTextContent();
+            System.out.println(key + "  (" + size + " bytes)");
+        }
+
+        // Print subdirectories
+        NodeList prefixes = doc.getElementsByTagName("CommonPrefixes");
+        for (int i = 0; i < prefixes.getLength(); i++) {
+            Element el = (Element) prefixes.item(i);
+            String prefix = el.getElementsByTagName("Prefix")
+                .item(0).getTextContent();
+            System.out.println(prefix + "  (directory)");
+        }
+    }
+}`}
+            copyLabel="Copy code"
+            copyable={true}
+            language="java"
+          />
+        )
+      }
+    ];
+  }
+
+  if (dataType === 'zarr') {
+    return [
+      {
+        id: 'napari',
+        label: 'Napari',
+        content: (
+          <InstructionBlock
+            steps={[
+              'Install napari-ome-zarr plugin',
+              'Launch napari',
+              'Open the data URL'
+            ]}
+          />
+        )
+      },
+      {
+        id: 'python',
+        label: 'Python',
+        content: (
+          <>
+            <InstructionBlock steps={['Install zarr package']} />
+            <CodeBlock
+              code={`import zarr
+from zarr.storage import FsspecStore
+
+url = '${dataLinkUrl}'
+
+# Open the Zarr store over HTTP
+store = FsspecStore.from_url(url)
+root = zarr.open_group(store, mode='r')
+
+# Access the highest resolution array
+arr = root['0']
+print(f'Shape: {arr.shape}')
+print(f'Dtype: {arr.dtype}')
+print(f'Chunks: {arr.chunks}')
+
+# Read and print a slice of voxel data
+data = arr[0, 0, :10, :10, :10]
+print(f'Voxels:\\n{data}')`}
+              copyLabel="Copy code"
+              copyable={true}
+              language="python"
+            />
+          </>
+        )
+      },
+      {
+        id: 'java',
+        label: 'Java',
+        content: (
+          <CodeBlock
+            code={`import org.janelia.saalfeldlab.n5.DataBlock;
+import org.janelia.saalfeldlab.n5.DatasetAttributes;
+import org.janelia.saalfeldlab.n5.N5Reader;
+import org.janelia.saalfeldlab.n5.N5URI;
+import org.janelia.saalfeldlab.n5.universe.N5Factory;
+import org.janelia.saalfeldlab.n5.universe.StorageFormat;
+
+import java.util.Arrays;
+
+public class ReadZarr {
+    private static final String URL = '${dataLinkUrl}';
+
+    public static void main(String[] args) throws Exception {
+        N5URI n5URI = new N5URI(URL);
+        N5Factory n5Factory = new N5Factory().cacheAttributes(true);
+        N5Reader reader = n5Factory.openReader(StorageFormat.ZARR, n5URI.getURI());
+
+        String dataset = "0";
+        DatasetAttributes attrs = reader.getDatasetAttributes(dataset);
+        System.out.println("Shape: " + Arrays.toString(attrs.getDimensions()));
+        System.out.println("Dtype: " + attrs.getDataType());
+        System.out.println("Block size: " + Arrays.toString(attrs.getBlockSize()));
+
+        // Read a block and print voxel values
+        long[] blockPosition = new long[attrs.getBlockSize().length];
+        DataBlock<?> block = reader.readBlock(
+            dataset, attrs, blockPosition);
+        if (block != null) {
+            Object data = block.getData();
+            if (data instanceof short[]) {
+                System.out.println("Voxels: " + Arrays.toString((short[]) data));
+            } else if (data instanceof float[]) {
+                System.out.println("Voxels: " + Arrays.toString((float[]) data));
+            } else if (data instanceof byte[]) {
+                System.out.println("Voxels: " + Arrays.toString((byte[]) data));
+            }
+        }
+
+        reader.close();
+    }
+}`}
+            copyLabel="Copy code"
+            copyable={true}
+            language="java"
+          />
+        )
+      },
+      {
+        id: 'fiji',
+        label: 'Fiji',
+        content: (
+          <InstructionBlock
+            steps={[
+              'Launch Fiji',
+              'Navigate to Plugins → BigDataViewer → HDF5/N5/Zarr/OME-NGFF Viewer',
+              'Paste data link and click "Detect datasets"',
+              'Select the multiscale image and click "OK"'
+            ]}
+          />
+        )
+      }
+    ];
+  }
+
+  // dataType === 'n5'
+  return [
     {
       id: 'napari',
       label: 'Napari',
       content: (
         <InstructionBlock
           steps={[
-            'Install napari-ome-zarr plugin',
-            'Launch napari',
-            'Open the data URL'
+            'Napari does not natively support N5 datasets',
+            'Convert N5 to OME-Zarr, or use Fiji to view N5 data directly'
           ]}
         />
       )
@@ -143,44 +367,22 @@ export default function DataLinkUsageDialog({
           <CodeBlock
             code={`import zarr
 from zarr.storage import FsspecStore
-from ome_zarr_models.v04.image import Image
 
 url = '${dataLinkUrl}'
 
-# Open the zarr store using fsspec for HTTP access
+# Open the N5 store over HTTP
 store = FsspecStore.from_url(url)
 root = zarr.open_group(store, mode='r')
 
-# Read OME-ZARR metadata using ome-zarr-models
-ome_image = Image.from_zarr(root)
-ome_image_metadata = ome_image.attributes
-multiscales = ome_image_metadata.multiscales
-print(f'Version: {multiscales[0].version}')
-print(f'Name: {multiscales[0].name}')
-print(f'Axes: {[(ax.name, ax.type, ax.unit) for ax in multiscales[0].axes]}')
-print(f'Datasets: {[ds.path for ds in multiscales[0].datasets]}')
-
-# Print coordinate transforms for each scale level
-for ds in multiscales[0].datasets:
-    if ds.coordinateTransformations:
-        for ct in ds.coordinateTransformations:
-            if hasattr(ct, 'scale'):
-                print(f'{ds.path} scale: {ct.scale}')
-            if hasattr(ct, 'translation'):
-                print(f'{ds.path} translation: {ct.translation}')
-
 # Access the highest resolution array
-if '0' in root:
-    arr = root['0']
-    print(f'\\nHighest resolution array shape: {arr.shape}')
-    print(f'Array dtype: {arr.dtype}')
-    print(f'Array chunks: {arr.chunks}')
+arr = root['s0']
+print(f'Shape: {arr.shape}')
+print(f'Dtype: {arr.dtype}')
+print(f'Chunks: {arr.chunks}')
 
-# Read a small slice of data
-if '0' in root:
-    data = arr[0,0,500:600,1000:1100,1000:1100]
-    print(f'\\nLoaded slice shape: {data.shape}')
-    print(f'Data min: {data.min()}, max: {data.max()}')`}
+# Read and print a slice of voxel data
+data = arr[:10, :10, :10]
+print(f'Voxels:\\n{data}')`}
             copyLabel="Copy code"
             copyable={true}
             language="python"
@@ -193,274 +395,50 @@ if '0' in root:
       label: 'Java',
       content: (
         <CodeBlock
-          code={`package org.janelia.omezarr.example;
-
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import org.janelia.saalfeldlab.n5.DataBlock;
+          code={`import org.janelia.saalfeldlab.n5.DataBlock;
 import org.janelia.saalfeldlab.n5.DatasetAttributes;
 import org.janelia.saalfeldlab.n5.N5Reader;
 import org.janelia.saalfeldlab.n5.N5URI;
-import org.janelia.saalfeldlab.n5.imglib2.N5Utils;
 import org.janelia.saalfeldlab.n5.universe.N5Factory;
 import org.janelia.saalfeldlab.n5.universe.StorageFormat;
 
-import net.imglib2.RandomAccessibleInterval;
-import net.imglib2.type.NativeType;
-import net.imglib2.type.numeric.RealType;
-import net.imglib2.view.Views;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.URL;
-import java.nio.file.Paths;
 import java.util.Arrays;
-import java.util.Map;
-import java.util.stream.Collectors;
 
-/**
- * Simple example to read OME-ZARR from an HTTP URL using N5-Zarr.
- */
-public class ReadOmeZarr {
+public class ReadN5 {
     private static final String URL = '${dataLinkUrl}';
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-    public static void main(String[] args) {
-        // Use URL from args if provided, otherwise use default
-        String url = args.length > 0 ? args[0] : URL;
-        String groupName = args.length > 1 ? args[1] : "r0";
-        String arraySubpath = args.length > 2 ? args[2] : "0";
-        runExampleUsingN5API(url, groupName, arraySubpath);
-    }
+    public static void main(String[] args) throws Exception {
+        N5URI n5URI = new N5URI(URL);
+        N5Factory n5Factory = new N5Factory().cacheAttributes(true);
+        N5Reader reader = n5Factory.openReader(StorageFormat.N5, n5URI.getURI());
 
+        String dataset = "s0";
+        DatasetAttributes attrs = reader.getDatasetAttributes(dataset);
+        System.out.println("Shape: " + Arrays.toString(attrs.getDimensions()));
+        System.out.println("Dtype: " + attrs.getDataType());
+        System.out.println("Block size: " + Arrays.toString(attrs.getBlockSize()));
 
-    private static void runExampleUsingN5API(String url, String groupName, String arraySubpath) {
-        try {
-            N5URI n5URI = new N5URI(url).resolve(groupName);
-            // Open the zarr store using N5ZarrReader for HTTP access
-            N5Factory n5Factory = new N5Factory().cacheAttributes(true);
-            N5Reader reader = n5Factory.openReader(StorageFormat.ZARR, n5URI.getURI());
-            // new N5Factory().openReader(n5URI.getContainerPath());
-
-            // Read OME-ZARR metadata from .zattrs
-            JsonObject zattrs = readZattrs(n5URI);
-            if (zattrs != null && zattrs.has("multiscales")) {
-                JsonArray multiscales = zattrs.getAsJsonArray("multiscales");
-                JsonObject firstMultiscale = multiscales.get(0).getAsJsonObject();
-
-                // Print version
-                if (firstMultiscale.has("version")) {
-                    System.out.println("  Version: " + firstMultiscale.get("version").getAsString());
-                }
-
-                // Print name
-                if (firstMultiscale.has("name")) {
-                    System.out.println("  Name: " + firstMultiscale.get("name").getAsString());
-                }
-
-                // Print axes
-                if (firstMultiscale.has("axes")) {
-                    JsonArray axes = firstMultiscale.getAsJsonArray("axes");
-                    System.out.print("  Axes: [");
-                    for (int i = 0; i < axes.size(); i++) {
-                        JsonObject axis = axes.get(i).getAsJsonObject();
-                        String name = axis.get("name").getAsString();
-                        String type = axis.has("type") ? axis.get("type").getAsString() : "null";
-                        String unit = axis.has("unit") ? axis.get("unit").getAsString() : "null";
-                        System.out.print("(" + name + ", " + type + ", " + unit + ")");
-                        if (i < axes.size() - 1) System.out.print(", ");
-                    }
-                    System.out.println("]");
-                }
-
-                // Print datasets
-                if (firstMultiscale.has("datasets")) {
-                    JsonArray datasets = firstMultiscale.getAsJsonArray("datasets");
-                    System.out.print("  Datasets: [");
-                    for (int i = 0; i < datasets.size(); i++) {
-                        JsonObject ds = datasets.get(i).getAsJsonObject();
-                        System.out.print(ds.get("path").getAsString());
-                        if (i < datasets.size() - 1) System.out.print(", ");
-                    }
-                    System.out.println("]");
-
-                    // Print coordinate transforms for each scale level
-                    for (int i = 0; i < datasets.size(); i++) {
-                        JsonObject ds = datasets.get(i).getAsJsonObject();
-                        String path = ds.get("path").getAsString();
-                        if (ds.has("coordinateTransformations")) {
-                            JsonArray transforms = ds.getAsJsonArray("coordinateTransformations");
-                            for (JsonElement t : transforms) {
-                                JsonObject transform = t.getAsJsonObject();
-                                if (transform.has("scale")) {
-                                    JsonArray scale = transform.getAsJsonArray("scale");
-                                    System.out.println("  " + path + " scale: " + scale);
-                                }
-                                if (transform.has("translation")) {
-                                    JsonArray translation = transform.getAsJsonArray("translation");
-                                    System.out.println("  " + path + " translation: " + translation);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Access the highest resolution array (dataset "0")
-            if (reader.exists(arraySubpath)) {
-                DatasetAttributes attrs = reader.getDatasetAttributes(arraySubpath);
-                long[] dimensions = attrs.getDimensions();
-                int[] blockSize = attrs.getBlockSize();
-
-                System.out.println("\\nHighest resolution array shape: " + Arrays.toString(dimensions));
-                System.out.println("Array dtype: " + attrs.getDataType());
-                System.out.println("Array chunks: " + Arrays.toString(blockSize));
-
-                // N5 reads whole chunks, so we read a block at a position that covers similar data
-                // Note that in java the order of the axes is: XYZCT
-                long[] blockGridPosition = new long[]{
-                    1000 / blockSize[0], 1000 / blockSize[1], 500 / blockSize[2], 0, 0
-                };
-                double[] minMax = readBlockMinMax(reader, "0", blockGridPosition);
-                if (minMax != null) {
-                    System.out.println("\\nBlock at grid position " + Arrays.toString(blockGridPosition) + ":");
-                    System.out.println("Data min: " + minMax[0] + ", max: " + minMax[1]);
-                }
-
-                // Use imglib2 to read an arbitrary interval (similar to Python slice [0,0,500:600,1000:1100,1000:1100])
-                // In Java XYZCT order: x=[1000,1100), y=[1000,1100), z=[500,600), c=0, t=0
-                long[] intervalMin = new long[]{1000, 1000, 500, 0, 0};
-                long[] intervalMax = new long[]{1099, 1099, 599, 0, 0};
-                double[] intervalMinMax = readIntervalMinMax(reader, "0", intervalMin, intervalMax);
-                if (intervalMinMax != null) {
-                    System.out.println("\\nInterval [" + Arrays.toString(intervalMin) + " - " + Arrays.toString(intervalMax) + "]:");
-                    System.out.println("Data min: " + intervalMinMax[0] + ", max: " + intervalMinMax[1]);
-                }
-            }
-
-            reader.close();
-
-        } catch (Exception e) {
-            System.err.println("Error reading OME-ZARR: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Read the .zattrs file from the Zarr root to get OME-ZARR metadata.
-     */
-    private static JsonObject readZattrs(N5URI baseUrl) {
-        try {
-            N5URI zattrsUri = baseUrl.resolve(".zattrs");
-            URL url = zattrsUri.getURI().toURL();
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()))) {
-                String content = reader.lines().collect(Collectors.joining("\\n"));
-                return GSON.fromJson(content, JsonObject.class);
-            }
-        } catch (Exception e) {
-            System.err.println("Could not read .zattrs: " + e.getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * Read a data block and compute its min and max values.
-     */
-    private static double[] readBlockMinMax(N5Reader reader, String dataset, long[] gridPosition) {
-        try {
-            DataBlock<?> block = reader.readBlock(dataset, reader.getDatasetAttributes(dataset), gridPosition);
-            if (block == null) {
-                System.err.println("Block not found at position " + Arrays.toString(gridPosition));
-                return null;
-            }
-
+        // Read a block and print voxel values
+        long[] blockPosition = new long[attrs.getBlockSize().length];
+        DataBlock<?> block = reader.readBlock(
+            dataset, attrs, blockPosition);
+        if (block != null) {
             Object data = block.getData();
-            double min = Double.MAX_VALUE;
-            double max = Double.MIN_VALUE;
-
             if (data instanceof short[]) {
-                short[] arr = (short[]) data;
-                for (short v : arr) {
-                    int unsigned = v & 0xFFFF;
-                    if (unsigned < min) min = unsigned;
-                    if (unsigned > max) max = unsigned;
-                }
-            } else if (data instanceof int[]) {
-                int[] arr = (int[]) data;
-                for (int v : arr) {
-                    if (v < min) min = v;
-                    if (v > max) max = v;
-                }
+                System.out.println("Voxels: " + Arrays.toString((short[]) data));
             } else if (data instanceof float[]) {
-                float[] arr = (float[]) data;
-                for (float v : arr) {
-                    if (v < min) min = v;
-                    if (v > max) max = v;
-                }
-            } else if (data instanceof double[]) {
-                double[] arr = (double[]) data;
-                for (double v : arr) {
-                    if (v < min) min = v;
-                    if (v > max) max = v;
-                }
+                System.out.println("Voxels: " + Arrays.toString((float[]) data));
             } else if (data instanceof byte[]) {
-                byte[] arr = (byte[]) data;
-                for (byte v : arr) {
-                    int unsigned = v & 0xFF;
-                    if (unsigned < min) min = unsigned;
-                    if (unsigned > max) max = unsigned;
-                }
-            } else if (data instanceof long[]) {
-                long[] arr = (long[]) data;
-                for (long v : arr) {
-                    if (v < min) min = v;
-                    if (v > max) max = v;
-                }
-            } else {
-                System.err.println("Unsupported data type: " + data.getClass().getSimpleName());
-                return null;
+                System.out.println("Voxels: " + Arrays.toString((byte[]) data));
             }
-
-            return new double[]{min, max};
-        } catch (Exception e) {
-            System.err.println("Error reading block: " + e.getMessage());
-            return null;
         }
+
+        reader.close();
     }
-
-    /**
-     * Read an arbitrary interval using imglib2 and compute min/max values.
-     */
-    private static <T extends NativeType<T> & RealType<T>> double[] readIntervalMinMax(
-            N5Reader reader, String dataset, long[] intervalMin, long[] intervalMax) {
-        try {
-            RandomAccessibleInterval<T> img = N5Utils.open(reader, dataset);
-            RandomAccessibleInterval<T> interval = Views.interval(img, intervalMin, intervalMax);
-
-            double min = Double.MAX_VALUE;
-            double max = -Double.MAX_VALUE;
-
-            for (T pixel : Views.flatIterable(interval)) {
-                double val = pixel.getRealDouble();
-                if (val < min) min = val;
-                if (val > max) max = val;
-            }
-
-            return new double[]{min, max};
-        } catch (Exception e) {
-            System.err.println("Error reading interval: " + e.getMessage());
-            return null;
-        }
-    }
-}
-  `}
+}`}
           copyLabel="Copy code"
           copyable={true}
-          language="python"
+          language="java"
         />
       )
     },
@@ -477,22 +455,18 @@ public class ReadOmeZarr {
           ]}
         />
       )
-    },
-    {
-      id: 'vvdViewer',
-      label: 'VVDViewer',
-      content: (
-        <InstructionBlock
-          steps={[
-            'Install VVDViewer',
-            'Launch VVDViewer',
-            'Navigate to File → Open URL',
-            'Paste data link and click "OK"'
-          ]}
-        />
-      )
     }
   ];
+}
+
+export default function DataLinkUsageDialog({
+  dataLinkUrl,
+  dataType,
+  open,
+  onClose
+}: DataLinkUsageDialogProps) {
+  const tabs = getTabsForDataType(dataType, dataLinkUrl);
+  const [activeTab, setActiveTab] = useState<string>(tabs[0]?.id ?? '');
 
   const TAB_TRIGGER_CLASSES = '!text-foreground h-full';
   const PANEL_CLASSES =
