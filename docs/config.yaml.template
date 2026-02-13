@@ -139,7 +139,10 @@ session_cookie_secure: true
 #   lsf_units: MB              # Memory units for LSF (KB, MB, GB)
 #   use_stdin: false            # Use stdin for job submission
 #   suppress_job_email: true    # Suppress LSF job email notifications
-#   extra_directives:           # Additional scheduler directives
-#     - "#BSUB -P your_account"
+#   extra_directives:           # Additional scheduler directives (prefix auto-added)
+#     - "-P your_account"
+#   extra_args:                 # Extra CLI args appended to submit command
+#     - "-P"
+#     - "your_project"
 #   script_prologue:            # Commands to run before each job
 #     - "module load java/11"

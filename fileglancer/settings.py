@@ -24,6 +24,7 @@ class ClusterSettings(BaseModel):
     script_prologue: List[str] = []
     script_epilogue: List[str] = []
     extra_directives: List[str] = []
+    extra_args: List[str] = []
     directives_skip: List[str] = []
     lsf_units: str = "MB"
     use_stdin: bool = False
