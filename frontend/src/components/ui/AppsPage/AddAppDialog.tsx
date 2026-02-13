@@ -3,8 +3,6 @@ import { useState } from 'react';
 import { Button, Typography } from '@material-tailwind/react';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
-import { useManifestPreviewMutation } from '@/queries/appsQueries';
-import type { AppManifest } from '@/shared.types';
 
 const GITHUB_URL_PATTERN = /^https?:\/\/github\.com\/[^/]+\/[^/]+\/?$/;
 
@@ -36,8 +34,6 @@ export default function AddAppDialog({
   const [repoUrl, setRepoUrl] = useState('');
   const [branch, setBranch] = useState('');
   const [urlError, setUrlError] = useState('');
-  const [preview, setPreview] = useState<AppManifest | null>(null);
-  const manifestMutation = useManifestPreviewMutation();
 
   const validateUrl = (url: string): boolean => {
     if (!url.trim()) {
@@ -52,36 +48,25 @@ export default function AddAppDialog({
     return true;
   };
 
-  const handleFetchPreview = async () => {
+  const handleAdd = async () => {
     if (!validateUrl(repoUrl)) {
       return;
     }
-    const appUrl = buildAppUrl(repoUrl, branch);
-    try {
-      const manifest = await manifestMutation.mutateAsync(appUrl);
-      setPreview(manifest);
-    } catch {
-      setPreview(null);
-    }
-  };
-
-  const handleAdd = async () => {
     const appUrl = buildAppUrl(repoUrl, branch);
     await onAdd(appUrl);
     setRepoUrl('');
     setBranch('');
     setUrlError('');
-    setPreview(null);
   };
 
   const handleClose = () => {
     setRepoUrl('');
     setBranch('');
     setUrlError('');
-    setPreview(null);
-    manifestMutation.reset();
     onClose();
   };
+
+  const urlIsValid = repoUrl.trim() !== '' && isValidGitHubUrl(repoUrl);
 
   return (
     <FgDialog className="max-w-lg" onClose={handleClose} open={open}>
@@ -98,34 +83,22 @@ export default function AddAppDialog({
         <label className="block text-foreground text-sm font-medium mb-1">
           GitHub Repository URL
         </label>
-        <div className="flex gap-2">
-          <input
-            autoFocus
-            className="flex-1 p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary"
-            onChange={e => {
-              setRepoUrl(e.target.value);
-              setUrlError('');
-              setPreview(null);
-              manifestMutation.reset();
-            }}
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
-                handleFetchPreview();
-              }
-            }}
-            placeholder="https://github.com/org/repo"
-            type="text"
-            value={repoUrl}
-          />
-          <Button
-            className="!rounded-md"
-            disabled={!repoUrl.trim() || manifestMutation.isPending}
-            onClick={handleFetchPreview}
-            variant="outline"
-          >
-            {manifestMutation.isPending ? 'Checking...' : 'Preview'}
-          </Button>
-        </div>
+        <input
+          autoFocus
+          className="w-full p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary"
+          onChange={e => {
+            setRepoUrl(e.target.value);
+            setUrlError('');
+          }}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              handleAdd();
+            }
+          }}
+          placeholder="https://github.com/org/repo"
+          type="text"
+          value={repoUrl}
+        />
         {urlError ? (
           <Typography className="text-error mt-1" type="small">
             {urlError}
@@ -142,12 +115,10 @@ export default function AddAppDialog({
           className="w-full p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary"
           onChange={e => {
             setBranch(e.target.value);
-            setPreview(null);
-            manifestMutation.reset();
           }}
           onKeyDown={e => {
             if (e.key === 'Enter') {
-              handleFetchPreview();
+              handleAdd();
             }
           }}
           placeholder="main"
@@ -156,39 +127,10 @@ export default function AddAppDialog({
         />
       </div>
 
-      {manifestMutation.isError ? (
-        <div className="mb-4 p-3 bg-error/10 rounded text-error text-sm">
-          Failed to fetch manifest:{' '}
-          {manifestMutation.error?.message || 'Unknown error'}
-        </div>
-      ) : null}
-
-      {preview ? (
-        <div className="mb-4 p-3 bg-surface/30 rounded border border-primary-light">
-          <Typography className="text-foreground font-semibold" type="small">
-            {preview.name}
-          </Typography>
-          {preview.description ? (
-            <Typography className="text-secondary mt-1" type="small">
-              {preview.description}
-            </Typography>
-          ) : null}
-          {preview.version ? (
-            <Typography className="text-secondary mt-1" type="small">
-              Version: {preview.version}
-            </Typography>
-          ) : null}
-          <Typography className="text-secondary mt-1" type="small">
-            {preview.entryPoints.length} entry point
-            {preview.entryPoints.length !== 1 ? 's' : ''}
-          </Typography>
-        </div>
-      ) : null}
-
       <div className="flex gap-3">
         <Button
           className="!rounded-md"
-          disabled={!preview || adding}
+          disabled={!urlIsValid || adding}
           onClick={handleAdd}
         >
           {adding ? 'Adding...' : 'Add App'}
