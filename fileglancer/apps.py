@@ -399,6 +399,14 @@ async def start_job_monitor():
     settings = get_settings()
     executor = await get_executor()
 
+    # Reconnect to any previously submitted jobs (e.g. after server restart)
+    try:
+        reconnected = await executor.reconnect()
+        if reconnected:
+            logger.info(f"Reconnected to {len(reconnected)} existing cluster jobs")
+    except NotImplementedError:
+        logger.debug("Job reconnection not supported by this executor")
+
     _monitor = JobMonitor(executor, poll_interval=settings.cluster.poll_interval)
     await _monitor.start()
 
