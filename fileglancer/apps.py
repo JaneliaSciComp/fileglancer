@@ -24,7 +24,7 @@ from fileglancer.model import AppManifest, AppEntryPoint, AppParameter
 from fileglancer.settings import get_settings
 
 
-_MANIFEST_FILENAMES = ["fileglancer-app.json", "fileglancer-app.yaml", "fileglancer-app.yml"]
+_MANIFEST_FILENAMES = ["runnables.json", "runnables.yaml", "runnables.yml"]
 
 _REPO_CACHE_BASE = Path(os.path.expanduser("~/.fileglancer/app-repos"))
 _repo_locks: dict[str, asyncio.Lock] = {}
@@ -566,7 +566,7 @@ async def submit_job(
 
     # Find entry point
     entry_point = None
-    for ep in manifest.entryPoints:
+    for ep in manifest.runnables:
         if ep.id == entry_point_id:
             entry_point = ep
             break

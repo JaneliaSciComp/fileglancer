@@ -93,7 +93,7 @@ type AppManifest = {
   version?: string;
   repo_url?: string;
   requirements?: string[];
-  entryPoints: AppEntryPoint[];
+  runnables: AppEntryPoint[];
 };
 
 type UserApp = {

@@ -51,7 +51,7 @@ export default function AppLaunch() {
       return;
     }
     if (launchState?.entryPointId) {
-      const ep = manifest.entryPoints.find(
+      const ep = manifest.runnables.find(
         e => e.id === launchState.entryPointId
       );
       if (ep) {
@@ -59,8 +59,8 @@ export default function AppLaunch() {
         return;
       }
     }
-    if (manifest.entryPoints.length === 1) {
-      setSelectedEntryPoint(manifest.entryPoints[0]);
+    if (manifest.runnables.length === 1) {
+      setSelectedEntryPoint(manifest.runnables[0]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manifest]);
@@ -113,7 +113,7 @@ export default function AppLaunch() {
         </div>
       ) : manifest && selectedEntryPoint ? (
         <>
-          {manifest.entryPoints.length > 1 ? (
+          {manifest.runnables.length > 1 ? (
             <Button
               className="!rounded-md mb-4"
               onClick={() => setSelectedEntryPoint(null)}
@@ -145,7 +145,7 @@ export default function AppLaunch() {
             Select an entry point:
           </Typography>
           <div className="space-y-2">
-            {manifest.entryPoints.map(ep => (
+            {manifest.runnables.map(ep => (
               <div
                 className="flex items-center justify-between gap-4 p-3 border border-primary-light rounded-lg bg-background hover:bg-surface/30 transition-colors"
                 key={ep.id}

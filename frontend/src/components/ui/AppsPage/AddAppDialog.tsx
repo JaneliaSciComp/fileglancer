@@ -76,7 +76,7 @@ export default function AddAppDialog({
 
       <Typography className="mb-2 text-foreground text-sm">
         Enter a GitHub repository URL containing a{' '}
-        <code>fileglancer-app.json</code> manifest.
+        <code>runnables.yaml</code> manifest.
       </Typography>
 
       <div className="mb-3">

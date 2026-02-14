@@ -345,7 +345,7 @@ SUPPORTED_TOOLS = {"pixi", "npm", "maven"}
 
 
 class AppManifest(BaseModel):
-    """Top-level app manifest (fileglancer-app.json)"""
+    """Top-level app manifest (runnables.yaml)"""
     name: str = Field(description="Display name of the app")
     description: Optional[str] = Field(description="Description of the app", default=None)
     version: Optional[str] = Field(description="Version of the app", default=None)
@@ -357,7 +357,7 @@ class AppManifest(BaseModel):
         description="Required tools, e.g. ['pixi>=0.40', 'npm']",
         default=[],
     )
-    entryPoints: List[AppEntryPoint] = Field(description="Available entry points for this app")
+    runnables: List[AppEntryPoint] = Field(description="Available entry points for this app")
 
     @field_validator("requirements")
     @classmethod
