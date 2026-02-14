@@ -27,7 +27,6 @@ class ClusterSettings(BaseModel):
     extra_args: List[str] = []
     directives_skip: List[str] = []
     lsf_units: str = "MB"
-    use_stdin: bool = False
     job_name_prefix: Optional[str] = None
     zombie_timeout_minutes: float = 30.0
     completed_retention_minutes: float = 10.0

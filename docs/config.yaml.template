@@ -137,7 +137,6 @@ session_cookie_secure: true
 #   queue: normal              # LSF queue name
 #   poll_interval: 10.0        # Job status polling interval (seconds)
 #   lsf_units: MB              # Memory units for LSF (KB, MB, GB)
-#   use_stdin: false            # Use stdin for job submission
 #   suppress_job_email: true    # Suppress LSF job email notifications
 #   extra_directives:           # Additional scheduler directives (prefix auto-added)
 #     - "-P your_account"
