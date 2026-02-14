@@ -28,18 +28,6 @@ function AppInfoTable({ app }: { readonly app: UserApp }) {
   return (
     <table className="w-full text-sm mb-6">
       <tbody>
-        {app.description ? (
-          <tr>
-            <td className={labelClass}>Description</td>
-            <td className={valueClass}>{app.description}</td>
-          </tr>
-        ) : null}
-        {app.manifest?.version ? (
-          <tr>
-            <td className={labelClass}>Version</td>
-            <td className={valueClass}>{app.manifest.version}</td>
-          </tr>
-        ) : null}
         <tr>
           <td className={labelClass}>URL</td>
           <td className="py-1.5">
@@ -54,6 +42,18 @@ function AppInfoTable({ app }: { readonly app: UserApp }) {
             </a>
           </td>
         </tr>
+        {app.manifest?.version ? (
+          <tr>
+            <td className={labelClass}>Version</td>
+            <td className={valueClass}>{app.manifest.version}</td>
+          </tr>
+        ) : null}
+        {app.description ? (
+          <tr>
+            <td className={labelClass}>Description</td>
+            <td className={valueClass}>{app.description}</td>
+          </tr>
+        ) : null}
         {app.manifest?.runnables && app.manifest.runnables.length > 0 ? (
           <tr>
             <td className={labelClass}>Entry Points</td>
