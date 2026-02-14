@@ -403,9 +403,11 @@ async def start_job_monitor():
     try:
         reconnected = await executor.reconnect()
         if reconnected:
+            for record in reconnected:
+                record.on_exit(_on_job_exit)
             logger.info(f"Reconnected to {len(reconnected)} existing cluster jobs")
-    except NotImplementedError:
-        logger.debug("Job reconnection not supported by this executor")
+    except Exception as e:
+        logger.debug(f"Job reconnection skipped: {e}")
 
     _monitor = JobMonitor(executor, poll_interval=settings.cluster.poll_interval)
     await _monitor.start()
@@ -469,16 +471,16 @@ async def _reconcile_jobs(settings):
             # Check if executor is tracking this job
             tracked = executor.jobs.get(db_job.cluster_job_id)
             if tracked is None:
-                # Job is no longer tracked by executor (e.g. after server restart)
-                now = datetime.now(UTC)
-                db.update_job_status(session, db_job.id, "FAILED", finished_at=now)
-                logger.warning(
-                    f"Job {db_job.id} (cluster: {db_job.cluster_job_id}) "
-                    f"lost from executor (was {db_job.status}), marked FAILED"
-                )
+                # Job was purged from executor tracking. Terminal status
+                # updates are handled by the on_exit callback, so this
+                # means either the callback already fired or the job was
+                # lost (e.g. server restart without reconnection).
+                # Skip it here — the zombie timeout above will catch
+                # truly stuck jobs that never got a cluster_job_id.
                 continue
 
-            # Map cluster status to our status strings
+            # Sync non-terminal status changes (e.g. PENDING -> RUNNING).
+            # Terminal transitions are handled by the on_exit callback.
             new_status = _map_status(tracked.status)
             if new_status != db_job.status:
                 db.update_job_status(
@@ -501,6 +503,31 @@ def _map_status(status: JobStatus) -> str:
         JobStatus.UNKNOWN: "FAILED",
     }
     return mapping.get(status, "FAILED")
+
+
+def _on_job_exit(record):
+    """Callback fired by JobMonitor when a job reaches terminal state.
+
+    This runs inside the monitor's poll loop, before completed jobs are
+    purged, so we are guaranteed to capture the final status.
+    """
+    settings = get_settings()
+    new_status = _map_status(record.status)
+
+    with db.get_db_session(settings.db_url) as session:
+        db_job = db.get_job_by_cluster_id(session, record.job_id)
+        if db_job is None:
+            logger.warning(f"No DB job found for cluster job {record.job_id}")
+            return
+        if db_job.status == new_status:
+            return
+        db.update_job_status(
+            session, db_job.id, new_status,
+            exit_code=record.exit_code,
+            started_at=record.start_time,
+            finished_at=record.finish_time,
+        )
+        logger.info(f"Job {db_job.id} completed: {db_job.status} -> {new_status}")
 
 
 # --- Job Submission ---
@@ -618,6 +645,9 @@ async def submit_job(
         name=job_name,
         resources=resource_spec,
     )
+
+    # Register callback to update DB when job reaches terminal state
+    cluster_job.on_exit(_on_job_exit)
 
     # Update DB with cluster job ID and return fresh object
     with db.get_db_session(settings.db_url) as session:

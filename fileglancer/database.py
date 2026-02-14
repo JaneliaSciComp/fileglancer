@@ -863,6 +863,11 @@ def get_active_jobs(session: Session) -> List[JobDB]:
     ).all()
 
 
+def get_job_by_cluster_id(session: Session, cluster_job_id: str) -> Optional[JobDB]:
+    """Get a single job by its cluster job ID"""
+    return session.query(JobDB).filter_by(cluster_job_id=cluster_job_id).first()
+
+
 def update_job_status(session: Session, job_id: int, status: str,
                       exit_code: Optional[int] = None,
                       cluster_job_id: Optional[str] = None,
