@@ -1641,7 +1641,7 @@ def create_app(settings):
             db_job = db.get_job(session, job_id, username)
             if db_job is None:
                 raise HTTPException(status_code=404, detail="Job not found")
-            return _convert_job(db_job)
+            return _convert_job(db_job, include_files=True)
 
     @app.post("/api/jobs/{job_id}/cancel",
               description="Cancel a running job")
@@ -1678,8 +1678,11 @@ def create_app(settings):
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
 
-    def _convert_job(db_job: db.JobDB) -> Job:
+    def _convert_job(db_job: db.JobDB, include_files: bool = False) -> Job:
         """Convert a database JobDB to a Pydantic Job model."""
+        files = None
+        if include_files:
+            files = apps_module.get_job_file_paths(db_job)
         return Job(
             id=db_job.id,
             app_url=db_job.app_url,
@@ -1695,6 +1698,7 @@ def create_app(settings):
             created_at=db_job.created_at,
             started_at=db_job.started_at,
             finished_at=db_job.finished_at,
+            files=files,
         )
 
     @app.post("/api/auth/simple-login", include_in_schema=not settings.enable_okta_auth)

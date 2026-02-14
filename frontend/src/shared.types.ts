@@ -105,6 +105,11 @@ type UserApp = {
   manifest?: AppManifest;
 };
 
+type JobFileInfo = {
+  path: string;
+  exists: boolean;
+};
+
 type Job = {
   id: number;
   app_url: string;
@@ -120,6 +125,7 @@ type Job = {
   created_at: string;
   started_at?: string;
   finished_at?: string;
+  files?: Record<string, JobFileInfo>;
 };
 
 type JobSubmitRequest = {
@@ -141,6 +147,7 @@ export type {
   FileSharePath,
   Failure,
   Job,
+  JobFileInfo,
   JobSubmitRequest,
   Profile,
   Result,

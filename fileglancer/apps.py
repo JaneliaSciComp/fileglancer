@@ -728,6 +728,48 @@ def _resolve_work_dir(db_job: db.JobDB) -> Path:
     return _build_work_dir(db_job.id, db_job.app_name, db_job.entry_point_id)
 
 
+def _resolve_browse_path(abs_path: str) -> tuple[str | None, str | None]:
+    """Resolve an absolute path to an FSP name and subpath for browse links."""
+    settings = get_settings()
+    with db.get_db_session(settings.db_url) as session:
+        result = db.find_fsp_from_absolute_path(session, abs_path)
+    if result:
+        return result[0].name, result[1]
+    return None, None
+
+
+def _make_file_info(file_path: str, exists: bool) -> dict:
+    """Create a file info dict with browse link resolution."""
+    fsp_name, subpath = _resolve_browse_path(file_path) if exists else (None, None)
+    return {
+        "path": file_path,
+        "exists": exists,
+        "fsp_name": fsp_name,
+        "subpath": subpath,
+    }
+
+
+def get_job_file_paths(db_job: db.JobDB) -> dict[str, dict]:
+    """Return file path info for a job's files (script, stdout, stderr).
+
+    Returns a dict keyed by file type with path and existence info.
+    """
+    work_dir = _resolve_work_dir(db_job)
+
+    # Find script file
+    scripts = sorted(work_dir.glob("*.sh")) if work_dir.exists() else []
+    script_path = str(scripts[0]) if scripts else str(work_dir / "script.sh")
+
+    stdout_path = work_dir / "stdout.log"
+    stderr_path = work_dir / "stderr.log"
+
+    return {
+        "script": _make_file_info(script_path, len(scripts) > 0),
+        "stdout": _make_file_info(str(stdout_path), stdout_path.is_file()),
+        "stderr": _make_file_info(str(stderr_path), stderr_path.is_file()),
+    }
+
+
 async def get_job_file_content(job_id: int, username: str, file_type: str) -> Optional[str]:
     """Read the content of a job file (script, stdout, or stderr).
 

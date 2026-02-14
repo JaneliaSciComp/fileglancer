@@ -395,6 +395,14 @@ class AppRemoveRequest(BaseModel):
     url: str = Field(description="URL of the app to remove")
 
 
+class JobFileInfo(BaseModel):
+    """Information about a job file"""
+    path: str = Field(description="Absolute path to the file")
+    exists: bool = Field(description="Whether the file exists on disk")
+    fsp_name: Optional[str] = Field(description="File share path name for browse link", default=None)
+    subpath: Optional[str] = Field(description="Subpath within the FSP for browse link", default=None)
+
+
 class Job(BaseModel):
     """A job record"""
     id: int = Field(description="Unique job identifier")
@@ -411,6 +419,7 @@ class Job(BaseModel):
     created_at: datetime = Field(description="When the job was created")
     started_at: Optional[datetime] = Field(description="When the job started running", default=None)
     finished_at: Optional[datetime] = Field(description="When the job finished", default=None)
+    files: Optional[Dict[str, JobFileInfo]] = Field(description="Job file paths and existence", default=None)
 
 
 class JobSubmitRequest(BaseModel):

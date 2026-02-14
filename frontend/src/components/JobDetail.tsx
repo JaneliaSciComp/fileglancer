@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 
 import { Button, Tabs, Typography } from '@material-tailwind/react';
 import {
@@ -13,8 +13,15 @@ import {
   coy
 } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
+import type { JobFileInfo, FileSharePath } from '@/shared.types';
 import JobStatusBadge from '@/components/ui/AppsPage/JobStatusBadge';
 import { formatDateString } from '@/utils';
+import {
+  getPreferredPathForDisplay,
+  makeBrowseLink
+} from '@/utils/pathHandling';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
+import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { useJobQuery, useJobFileQuery } from '@/queries/jobsQueries';
 
 function FilePreview({
@@ -76,11 +83,57 @@ function FilePreview({
   );
 }
 
+function FilePathLink({
+  fileInfo,
+  pathPreference,
+  zonesAndFspMap
+}: {
+  readonly fileInfo: JobFileInfo | undefined;
+  readonly pathPreference: ['linux_path' | 'windows_path' | 'mac_path'];
+  readonly zonesAndFspMap: Record<string, unknown>;
+}) {
+  if (!fileInfo?.fsp_name || !fileInfo.subpath) {
+    return null;
+  }
+
+  // Find the FSP in the zones map to get platform-specific paths
+  let fsp: FileSharePath | null = null;
+  for (const value of Object.values(zonesAndFspMap)) {
+    if (
+      value &&
+      typeof value === 'object' &&
+      'name' in value &&
+      (value as FileSharePath).name === fileInfo.fsp_name
+    ) {
+      fsp = value as FileSharePath;
+      break;
+    }
+  }
+
+  const displayPath = fsp
+    ? getPreferredPathForDisplay(pathPreference, fsp, fileInfo.subpath)
+    : fileInfo.path;
+
+  const browseUrl = makeBrowseLink(fileInfo.fsp_name, fileInfo.subpath);
+
+  return (
+    <Link
+      className="text-primary-light text-sm font-mono hover:underline"
+      to={browseUrl}
+    >
+      {displayPath}
+    </Link>
+  );
+}
+
 export default function JobDetail() {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeTab, setActiveTab] = useState('parameters');
+
+  const { pathPreference } = usePreferencesContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
 
   const id = jobId ? parseInt(jobId) : 0;
   const jobQuery = useJobQuery(id);
@@ -230,6 +283,13 @@ export default function JobDetail() {
             </Tabs.Panel>
 
             <Tabs.Panel className="pt-4" value="script">
+              <div className="flex items-center justify-between mb-2">
+                <FilePathLink
+                  fileInfo={job.files?.script}
+                  pathPreference={pathPreference}
+                  zonesAndFspMap={zonesAndFspQuery.data || {}}
+                />
+              </div>
               <FilePreview
                 content={
                   scriptQuery.isPending ? undefined : (scriptQuery.data ?? null)
@@ -240,8 +300,13 @@ export default function JobDetail() {
             </Tabs.Panel>
 
             <Tabs.Panel className="pt-4" value="stdout">
-              {stdoutQuery.data != null ? (
-                <div className="flex justify-end mb-2">
+              <div className="flex items-center justify-between mb-2">
+                <FilePathLink
+                  fileInfo={job.files?.stdout}
+                  pathPreference={pathPreference}
+                  zonesAndFspMap={zonesAndFspQuery.data || {}}
+                />
+                {stdoutQuery.data !== undefined && stdoutQuery.data !== null ? (
                   <Button
                     className="!rounded-md"
                     onClick={() =>
@@ -253,8 +318,8 @@ export default function JobDetail() {
                     <HiOutlineDownload className="icon-small mr-2" />
                     Download
                   </Button>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
               <FilePreview
                 content={
                   stdoutQuery.isPending ? undefined : (stdoutQuery.data ?? null)
@@ -265,8 +330,13 @@ export default function JobDetail() {
             </Tabs.Panel>
 
             <Tabs.Panel className="pt-4" value="stderr">
-              {stderrQuery.data != null ? (
-                <div className="flex justify-end mb-2">
+              <div className="flex items-center justify-between mb-2">
+                <FilePathLink
+                  fileInfo={job.files?.stderr}
+                  pathPreference={pathPreference}
+                  zonesAndFspMap={zonesAndFspQuery.data || {}}
+                />
+                {stderrQuery.data !== undefined && stderrQuery.data !== null ? (
                   <Button
                     className="!rounded-md"
                     onClick={() =>
@@ -278,8 +348,8 @@ export default function JobDetail() {
                     <HiOutlineDownload className="icon-small mr-2" />
                     Download
                   </Button>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
               <FilePreview
                 content={
                   stderrQuery.isPending ? undefined : (stderrQuery.data ?? null)
