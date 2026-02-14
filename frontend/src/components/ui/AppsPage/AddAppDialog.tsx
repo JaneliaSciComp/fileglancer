@@ -75,8 +75,8 @@ export default function AddAppDialog({
       </Typography>
 
       <Typography className="mb-2 text-foreground text-sm">
-        Enter a GitHub repository URL containing a{' '}
-        <code>runnables.yaml</code> manifest.
+        Enter a GitHub repository URL containing a <code>runnables.yaml</code>{' '}
+        manifest.
       </Typography>
 
       <div className="mb-3">

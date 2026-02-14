@@ -269,35 +269,35 @@ def _validate_parameter_value(param: AppParameter, value) -> str:
     """
     if param.type == "boolean":
         if not isinstance(value, bool):
-            raise ValueError(f"Parameter '{param.id}' must be a boolean")
+            raise ValueError(f"Parameter '{param.name}' must be a boolean")
         return str(value)
 
     if param.type == "integer":
         try:
             int_val = int(value)
         except (TypeError, ValueError):
-            raise ValueError(f"Parameter '{param.id}' must be an integer")
+            raise ValueError(f"Parameter '{param.name}' must be an integer")
         if param.min is not None and int_val < param.min:
-            raise ValueError(f"Parameter '{param.id}' must be >= {param.min}")
+            raise ValueError(f"Parameter '{param.name}' must be >= {param.min}")
         if param.max is not None and int_val > param.max:
-            raise ValueError(f"Parameter '{param.id}' must be <= {param.max}")
+            raise ValueError(f"Parameter '{param.name}' must be <= {param.max}")
         return str(int_val)
 
     if param.type == "number":
         try:
             num_val = float(value)
         except (TypeError, ValueError):
-            raise ValueError(f"Parameter '{param.id}' must be a number")
+            raise ValueError(f"Parameter '{param.name}' must be a number")
         if param.min is not None and num_val < param.min:
-            raise ValueError(f"Parameter '{param.id}' must be >= {param.min}")
+            raise ValueError(f"Parameter '{param.name}' must be >= {param.min}")
         if param.max is not None and num_val > param.max:
-            raise ValueError(f"Parameter '{param.id}' must be <= {param.max}")
+            raise ValueError(f"Parameter '{param.name}' must be <= {param.max}")
         return str(num_val)
 
     if param.type == "enum":
         str_val = str(value)
         if param.options and str_val not in param.options:
-            raise ValueError(f"Parameter '{param.id}' must be one of {param.options}")
+            raise ValueError(f"Parameter '{param.name}' must be one of {param.options}")
         return str_val
 
     # string, file, directory
@@ -309,22 +309,22 @@ def _validate_parameter_value(param: AppParameter, value) -> str:
 
         # Validate path characters
         if _SHELL_METACHAR_PATTERN.search(str_val):
-            raise ValueError(f"Parameter '{param.id}' contains invalid characters")
+            raise ValueError(f"Parameter '{param.name}' contains invalid characters")
 
         # Require absolute path
         if not str_val.startswith("/") and not str_val.startswith("~"):
-            raise ValueError(f"Parameter '{param.id}' must be an absolute path (starting with / or ~)")
+            raise ValueError(f"Parameter '{param.name}' must be an absolute path (starting with / or ~)")
 
         # Verify path exists
         expanded = os.path.expanduser(str_val)
         if not os.path.exists(expanded):
-            raise ValueError(f"Parameter '{param.id}': path does not exist: {str_val}")
+            raise ValueError(f"Parameter '{param.name}': path does not exist: {str_val}")
         if not os.access(expanded, os.R_OK):
-            raise ValueError(f"Parameter '{param.id}': path is not accessible: {str_val}")
+            raise ValueError(f"Parameter '{param.name}': path is not accessible: {str_val}")
 
     if param.type == "string" and param.pattern:
         if not re.fullmatch(param.pattern, str_val):
-            raise ValueError(f"Parameter '{param.id}' does not match required pattern")
+            raise ValueError(f"Parameter '{param.name}' does not match required pattern")
 
     return str_val
 
@@ -333,44 +333,58 @@ def build_command(entry_point: AppEntryPoint, parameters: dict) -> str:
     """Build a shell command from an entry point and parameter values.
 
     All parameter values are validated and shell-escaped.
+    Positional parameters (no flag) are emitted first in declaration order,
+    then flagged parameters in declaration order.
     Raises ValueError for invalid parameters.
     """
-    # Build a lookup of parameter definitions
-    param_defs = {p.id: p for p in entry_point.parameters}
+    # Build a lookup of parameter definitions by key
+    param_defs = {p.key: p for p in entry_point.parameters}
 
     # Validate required parameters
     for param in entry_point.parameters:
-        if param.required and param.id not in parameters:
+        if param.required and param.key not in parameters:
             if param.default is None:
-                raise ValueError(f"Required parameter '{param.id}' is missing")
+                raise ValueError(f"Required parameter '{param.name}' is missing")
+
+    # Check for unknown parameters
+    for param_key in parameters:
+        if param_key not in param_defs:
+            raise ValueError(f"Unknown parameter '{param_key}'")
+
+    # Compute effective values: user-provided merged with defaults
+    effective: dict[str, tuple[AppParameter, any]] = {}
+    for param in entry_point.parameters:
+        if param.key in parameters:
+            effective[param.key] = (param, parameters[param.key])
+        elif param.default is not None:
+            effective[param.key] = (param, param.default)
 
     # Start with the base command
     parts = [entry_point.command]
 
-    # Append parameters as CLI flags
-    for param_id, value in parameters.items():
-        if param_id not in param_defs:
-            raise ValueError(f"Unknown parameter '{param_id}'")
-
-        param = param_defs[param_id]
-        validated = _validate_parameter_value(param, value)
-
-        if param.type == "boolean":
-            if value is True:
-                parts.append(f"--{param_id}")
-            # If False, omit the flag
-        else:
-            parts.append(f"--{param_id} {shlex.quote(validated)}")
-
-    # Apply defaults for missing optional parameters
+    # Pass 1: Positional args in declaration order
     for param in entry_point.parameters:
-        if param.id not in parameters and param.default is not None:
-            validated = _validate_parameter_value(param, param.default)
-            if param.type == "boolean":
-                if param.default is True:
-                    parts.append(f"--{param.id}")
-            else:
-                parts.append(f"--{param.id} {shlex.quote(validated)}")
+        if param.flag is not None:
+            continue
+        if param.key not in effective:
+            continue
+        p, value = effective[param.key]
+        validated = _validate_parameter_value(p, value)
+        parts.append(shlex.quote(validated))
+
+    # Pass 2: Flagged args in declaration order
+    for param in entry_point.parameters:
+        if param.flag is None:
+            continue
+        if param.key not in effective:
+            continue
+        p, value = effective[param.key]
+        validated = _validate_parameter_value(p, value)
+        if p.type == "boolean":
+            if value is True:
+                parts.append(p.flag)
+        else:
+            parts.append(f"{p.flag} {shlex.quote(validated)}")
 
     return (" \\\n  ").join(parts)
 

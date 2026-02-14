@@ -53,7 +53,8 @@ type FetchRequestOptions = {
 // --- App / Job types ---
 
 type AppParameter = {
-  id: string;
+  flag?: string;
+  key: string;
   name: string;
   type:
     | 'string'

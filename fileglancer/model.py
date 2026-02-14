@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 from typing import Any, List, Literal, Optional, Dict
 
-from pydantic import BaseModel, Field, HttpUrl, field_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 
 
 class FileSharePath(BaseModel):
@@ -310,7 +310,14 @@ class NeuroglancerShortLinkResponse(BaseModel):
 
 class AppParameter(BaseModel):
     """A parameter definition for an app entry point"""
-    id: str = Field(description="Unique identifier for the parameter")
+    flag: Optional[str] = Field(
+        description="CLI flag syntax (e.g. '--outdir', '-n'). Omit for positional arguments.",
+        default=None,
+    )
+    key: str = Field(
+        description="Internal key for this parameter, auto-generated from flag or positional index",
+        default="",
+    )
     name: str = Field(description="Display name of the parameter")
     type: Literal["string", "integer", "number", "boolean", "file", "directory", "enum"] = Field(
         description="The data type of the parameter"
@@ -322,6 +329,17 @@ class AppParameter(BaseModel):
     min: Optional[float] = Field(description="Minimum value for numeric types", default=None)
     max: Optional[float] = Field(description="Maximum value for numeric types", default=None)
     pattern: Optional[str] = Field(description="Regex validation pattern for string types", default=None)
+
+    @field_validator("flag")
+    @classmethod
+    def validate_flag(cls, v):
+        if v is not None:
+            if not v.startswith("-"):
+                raise ValueError(f"Flag must start with '-', got '{v}'")
+            stripped = v.lstrip("-")
+            if not stripped:
+                raise ValueError("Flag must have content after dashes")
+        return v
 
 
 class AppResourceDefaults(BaseModel):
@@ -339,6 +357,24 @@ class AppEntryPoint(BaseModel):
     command: str = Field(description="The base CLI command to execute")
     parameters: List[AppParameter] = Field(description="Parameters for this entry point", default=[])
     resources: Optional[AppResourceDefaults] = Field(description="Default resource requirements", default=None)
+
+    @model_validator(mode='after')
+    def generate_parameter_keys(self):
+        positional_index = 0
+        keys_seen: dict[str, str] = {}
+        for param in self.parameters:
+            if param.flag is not None:
+                param.key = param.flag.lstrip("-")
+            else:
+                param.key = f"_arg{positional_index}"
+                positional_index += 1
+            if param.key in keys_seen:
+                raise ValueError(
+                    f"Duplicate parameter key '{param.key}' "
+                    f"(from '{param.name}' and '{keys_seen[param.key]}')"
+                )
+            keys_seen[param.key] = param.name
+        return self
 
 
 SUPPORTED_TOOLS = {"pixi", "npm", "maven"}
@@ -427,7 +463,7 @@ class JobSubmitRequest(BaseModel):
     app_url: str = Field(description="URL of the app manifest")
     manifest_path: str = Field(description="Relative manifest path within the app repo", default="")
     entry_point_id: str = Field(description="Entry point to execute")
-    parameters: Dict = Field(description="Parameter values keyed by parameter ID")
+    parameters: Dict = Field(description="Parameter values keyed by parameter key")
     resources: Optional[AppResourceDefaults] = Field(description="Resource overrides", default=None)
     pull_latest: bool = Field(
         description="Pull latest code from GitHub before running",
@@ -437,12 +473,12 @@ class JobSubmitRequest(BaseModel):
 
 class PathValidationRequest(BaseModel):
     """Request to validate file/directory paths"""
-    paths: Dict[str, str] = Field(description="Map of parameter ID to path value")
+    paths: Dict[str, str] = Field(description="Map of parameter key to path value")
 
 
 class PathValidationResponse(BaseModel):
     """Response with path validation results"""
-    errors: Dict[str, str] = Field(description="Map of parameter ID to error message (empty if all valid)")
+    errors: Dict[str, str] = Field(description="Map of parameter key to error message (empty if all valid)")
 
 
 class JobResponse(BaseModel):

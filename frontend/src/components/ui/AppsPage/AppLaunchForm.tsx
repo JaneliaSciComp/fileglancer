@@ -136,7 +136,7 @@ export default function AppLaunchForm({
   const defaultValues: Record<string, unknown> = {};
   for (const param of entryPoint.parameters) {
     if (param.default !== undefined) {
-      defaultValues[param.id] = param.default;
+      defaultValues[param.key] = param.default;
     }
   }
   const startingValues = externalValues
@@ -168,9 +168,9 @@ export default function AppLaunchForm({
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
     for (const param of entryPoint.parameters) {
-      const val = values[param.id];
+      const val = values[param.key];
       if (param.required && (val === undefined || val === null || val === '')) {
-        newErrors[param.id] = `${param.name} is required`;
+        newErrors[param.key] = `${param.name} is required`;
       }
       if (
         val !== undefined &&
@@ -180,13 +180,14 @@ export default function AppLaunchForm({
       ) {
         const numVal = Number(val);
         if (isNaN(numVal)) {
-          newErrors[param.id] = `${param.name} must be a valid number`;
+          newErrors[param.key] = `${param.name} must be a valid number`;
         } else {
           if (param.min !== undefined && numVal < param.min) {
-            newErrors[param.id] = `${param.name} must be at least ${param.min}`;
+            newErrors[param.key] =
+              `${param.name} must be at least ${param.min}`;
           }
           if (param.max !== undefined && numVal > param.max) {
-            newErrors[param.id] = `${param.name} must be at most ${param.max}`;
+            newErrors[param.key] = `${param.name} must be at most ${param.max}`;
           }
         }
       }
@@ -200,7 +201,7 @@ export default function AppLaunchForm({
       ) {
         const normalized = convertBackToForwardSlash(val);
         if (!normalized.startsWith('/') && !normalized.startsWith('~')) {
-          newErrors[param.id] =
+          newErrors[param.key] =
             `${param.name} must be an absolute path (starting with / or ~)`;
         }
       }
@@ -217,7 +218,7 @@ export default function AppLaunchForm({
     }
 
     // Build a lookup of parameter definitions
-    const paramDefs = new Map(entryPoint.parameters.map(p => [p.id, p]));
+    const paramDefs = new Map(entryPoint.parameters.map(p => [p.key, p]));
 
     // Filter out undefined/empty values and normalize paths to Linux format
     const params: Record<string, unknown> = {};
@@ -290,11 +291,11 @@ export default function AppLaunchForm({
       {/* Parameters */}
       <div className="space-y-4 mb-6">
         {entryPoint.parameters.map(param => (
-          <div key={param.id}>
+          <div key={param.key}>
             {param.type !== 'boolean' ? (
               <label
                 className="block text-foreground text-sm font-medium mb-1"
-                htmlFor={`param-${param.id}`}
+                htmlFor={`param-${param.key}`}
               >
                 {param.name}
                 {param.required ? (
@@ -308,13 +309,13 @@ export default function AppLaunchForm({
               </Typography>
             ) : null}
             <ParameterField
-              onChange={val => handleChange(param.id, val)}
+              onChange={val => handleChange(param.key, val)}
               param={param}
-              value={values[param.id]}
+              value={values[param.key]}
             />
-            {errors[param.id] ? (
+            {errors[param.key] ? (
               <Typography className="text-error mt-1" type="small">
-                {errors[param.id]}
+                {errors[param.key]}
               </Typography>
             ) : null}
           </div>

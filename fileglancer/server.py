@@ -1585,18 +1585,18 @@ def create_app(settings):
     async def validate_paths(body: PathValidationRequest,
                              username: str = Depends(get_current_user)):
         errors = {}
-        for param_id, path_value in body.paths.items():
+        for param_key, path_value in body.paths.items():
             # Normalize backslashes to forward slashes
             normalized = path_value.replace("\\", "/")
             # Require absolute path
             if not normalized.startswith("/") and not normalized.startswith("~"):
-                errors[param_id] = f"Must be an absolute path (starting with / or ~)"
+                errors[param_key] = f"Must be an absolute path (starting with / or ~)"
                 continue
             expanded = os.path.expanduser(normalized)
             if not os.path.exists(expanded):
-                errors[param_id] = f"Path does not exist: {normalized}"
+                errors[param_key] = f"Path does not exist: {normalized}"
             elif not os.access(expanded, os.R_OK):
-                errors[param_id] = f"Path is not accessible: {normalized}"
+                errors[param_key] = f"Path is not accessible: {normalized}"
         return PathValidationResponse(errors=errors)
 
     @app.post("/api/jobs", response_model=Job,
