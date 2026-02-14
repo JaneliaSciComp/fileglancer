@@ -2,7 +2,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 
 import { Button, Tabs, Typography } from '@material-tailwind/react';
-import { HiOutlineArrowLeft, HiOutlineRefresh } from 'react-icons/hi';
+import {
+  HiOutlineArrowLeft,
+  HiOutlineDownload,
+  HiOutlineRefresh
+} from 'react-icons/hi';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import {
   materialDark,
@@ -98,6 +102,16 @@ export default function JobDetail() {
   }, []);
 
   const job = jobQuery.data;
+
+  const handleDownload = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const handleRelaunch = () => {
     if (!job) {
@@ -226,6 +240,21 @@ export default function JobDetail() {
             </Tabs.Panel>
 
             <Tabs.Panel className="pt-4" value="stdout">
+              {stdoutQuery.data != null ? (
+                <div className="flex justify-end mb-2">
+                  <Button
+                    className="!rounded-md"
+                    onClick={() =>
+                      handleDownload(stdoutQuery.data!, `job-${id}-stdout.log`)
+                    }
+                    size="sm"
+                    variant="outline"
+                  >
+                    <HiOutlineDownload className="icon-small mr-2" />
+                    Download
+                  </Button>
+                </div>
+              ) : null}
               <FilePreview
                 content={
                   stdoutQuery.isPending ? undefined : (stdoutQuery.data ?? null)
@@ -236,6 +265,21 @@ export default function JobDetail() {
             </Tabs.Panel>
 
             <Tabs.Panel className="pt-4" value="stderr">
+              {stderrQuery.data != null ? (
+                <div className="flex justify-end mb-2">
+                  <Button
+                    className="!rounded-md"
+                    onClick={() =>
+                      handleDownload(stderrQuery.data!, `job-${id}-stderr.log`)
+                    }
+                    size="sm"
+                    variant="outline"
+                  >
+                    <HiOutlineDownload className="icon-small mr-2" />
+                    Download
+                  </Button>
+                </div>
+              ) : null}
               <FilePreview
                 content={
                   stderrQuery.isPending ? undefined : (stderrQuery.data ?? null)
