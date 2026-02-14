@@ -53,7 +53,7 @@ function FilePreview({
   const themeCodeStyles = theme['code[class*="language-"]'] || {};
 
   return (
-    <div className="border border-primary-light rounded overflow-auto max-h-[70vh]">
+    <div className="border border-primary-light rounded">
       <SyntaxHighlighter
         codeTagProps={{
           style: {
@@ -200,7 +200,7 @@ export default function JobDetail() {
           Failed to load job: {jobQuery.error?.message || 'Unknown error'}
         </div>
       ) : job ? (
-        <div className="max-w-4xl">
+        <div>
           {/* Job Info Header */}
           <div className="mb-6">
             <Typography className="text-foreground font-bold mb-1" type="h5">
