@@ -13,6 +13,7 @@ import type { Job } from '@/shared.types';
 import {
   useAppsQuery,
   useAddAppMutation,
+  useUpdateAppMutation,
   useRemoveAppMutation
 } from '@/queries/appsQueries';
 import {
@@ -28,21 +29,16 @@ export default function Apps() {
   const appsQuery = useAppsQuery();
   const jobsQuery = useJobsQuery();
   const addAppMutation = useAddAppMutation();
+  const updateAppMutation = useUpdateAppMutation();
   const removeAppMutation = useRemoveAppMutation();
   const cancelJobMutation = useCancelJobMutation();
   const deleteJobMutation = useDeleteJobMutation();
 
   const handleAddApp = async (url: string) => {
-    try {
-      const apps = await addAppMutation.mutateAsync(url);
-      const count = apps.length;
-      toast.success(`${count} app${count !== 1 ? 's' : ''} added`);
-      setShowAddDialog(false);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Failed to add app';
-      toast.error(message);
-    }
+    const apps = await addAppMutation.mutateAsync(url);
+    const count = apps.length;
+    toast.success(`${count} app${count !== 1 ? 's' : ''} added`);
+    setShowAddDialog(false);
   };
 
   const handleRemoveApp = async ({
@@ -58,6 +54,23 @@ export default function Apps() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to remove app';
+      toast.error(message);
+    }
+  };
+
+  const handleUpdateApp = async ({
+    url,
+    manifest_path
+  }: {
+    url: string;
+    manifest_path: string;
+  }) => {
+    try {
+      await updateAppMutation.mutateAsync({ url, manifest_path });
+      toast.success('App updated');
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to update app';
       toast.error(message);
     }
   };
@@ -143,7 +156,9 @@ export default function Apps() {
               app={app}
               key={`${app.url}::${app.manifest_path}`}
               onRemove={handleRemoveApp}
+              onUpdate={handleUpdateApp}
               removing={removeAppMutation.isPending}
+              updating={updateAppMutation.isPending}
             />
           ))}
         </div>

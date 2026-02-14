@@ -1508,7 +1508,7 @@ def create_app(settings):
                            username: str = Depends(get_current_user)):
         # Clone the repo and discover all manifests
         try:
-            repo_dir = await apps_module._ensure_repo_cache(body.url)
+            repo_dir = await apps_module._ensure_repo_cache(body.url, pull=True)
             discovered = apps_module._find_manifests_in_repo(repo_dir)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
@@ -1556,6 +1556,12 @@ def create_app(settings):
                     manifest=manifest,
                 ))
 
+            if not new_apps:
+                raise HTTPException(
+                    status_code=409,
+                    detail="All apps in this repository have already been added.",
+                )
+
             db.set_user_preference(session, username, "apps", {"apps": app_list})
 
         return new_apps
@@ -1579,6 +1585,31 @@ def create_app(settings):
             db.set_user_preference(session, username, "apps", {"apps": new_list})
 
         return {"message": "App removed"}
+
+    @app.post("/api/apps/update", response_model=AppManifest,
+              description="Pull latest code and re-read the manifest for an app")
+    async def update_user_app(body: ManifestFetchRequest,
+                              username: str = Depends(get_current_user)):
+        try:
+            await apps_module._ensure_repo_cache(body.url, pull=True)
+            manifest = await apps_module.fetch_app_manifest(body.url, body.manifest_path)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to update app: {str(e)}")
+
+        # Update stored name/description from refreshed manifest
+        with db.get_db_session(settings.db_url) as session:
+            pref = db.get_user_preference(session, username, "apps")
+            app_list = pref.get("apps", []) if pref else []
+            for entry in app_list:
+                if entry["url"] == body.url and entry.get("manifest_path", "") == body.manifest_path:
+                    entry["name"] = manifest.name
+                    entry["description"] = manifest.description
+                    break
+            db.set_user_preference(session, username, "apps", {"apps": app_list})
+
+        return manifest
 
     @app.post("/api/apps/validate-paths", response_model=PathValidationResponse,
               description="Validate file/directory paths for app parameters")

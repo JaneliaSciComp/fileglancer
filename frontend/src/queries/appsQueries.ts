@@ -100,6 +100,36 @@ export async function validatePaths(
   return (data as { errors: Record<string, string> }).errors;
 }
 
+export function useUpdateAppMutation(): UseMutationResult<
+  AppManifest,
+  Error,
+  { url: string; manifest_path: string }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      url,
+      manifest_path
+    }: {
+      url: string;
+      manifest_path: string;
+    }) => {
+      const response = await sendFetchRequest('/api/apps/update', 'POST', {
+        url,
+        manifest_path
+      });
+      const data = await getResponseJsonOrError(response);
+      if (!response.ok) {
+        throwResponseNotOkError(response, data);
+      }
+      return data as AppManifest;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: appsQueryKeys.all });
+    }
+  });
+}
+
 export function useRemoveAppMutation(): UseMutationResult<
   unknown,
   Error,

@@ -1,19 +1,34 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { Button, IconButton, Typography } from '@material-tailwind/react';
-import { HiOutlinePlay, HiOutlineTrash } from 'react-icons/hi';
+import {
+  HiOutlineInformationCircle,
+  HiOutlinePlay,
+  HiOutlineTrash
+} from 'react-icons/hi';
 
+import AppInfoDialog from '@/components/ui/AppsPage/AppInfoDialog';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import type { UserApp } from '@/shared.types';
 
 interface AppCardProps {
   readonly app: UserApp;
   readonly onRemove: (params: { url: string; manifest_path: string }) => void;
+  readonly onUpdate: (params: { url: string; manifest_path: string }) => void;
   readonly removing: boolean;
+  readonly updating: boolean;
 }
 
-export default function AppCard({ app, onRemove, removing }: AppCardProps) {
+export default function AppCard({
+  app,
+  onRemove,
+  onUpdate,
+  removing,
+  updating
+}: AppCardProps) {
   const navigate = useNavigate();
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const handleLaunch = () => {
     navigate('/apps/launch/app', {
@@ -40,28 +55,59 @@ export default function AppCard({ app, onRemove, removing }: AppCardProps) {
             </Typography>
           ) : null}
         </div>
-        <FgTooltip label="Remove app">
-          <IconButton
-            className="text-secondary hover:text-error flex-shrink-0"
-            disabled={removing}
-            onClick={() =>
-              onRemove({
-                url: app.url,
-                manifest_path: app.manifest_path
-              })
-            }
-            size="sm"
-            variant="ghost"
-          >
-            <HiOutlineTrash className="icon-default" />
-          </IconButton>
-        </FgTooltip>
+        <div className="flex flex-shrink-0">
+          <FgTooltip label="App info">
+            <IconButton
+              className="text-secondary hover:text-primary"
+              onClick={() => setInfoOpen(true)}
+              size="sm"
+              variant="ghost"
+            >
+              <HiOutlineInformationCircle className="icon-default" />
+            </IconButton>
+          </FgTooltip>
+          <FgTooltip label="Remove app">
+            <IconButton
+              className="text-secondary hover:text-error"
+              disabled={removing}
+              onClick={() =>
+                onRemove({
+                  url: app.url,
+                  manifest_path: app.manifest_path
+                })
+              }
+              size="sm"
+              variant="ghost"
+            >
+              <HiOutlineTrash className="icon-default" />
+            </IconButton>
+          </FgTooltip>
+        </div>
       </div>
 
       <Button className="!rounded-md" onClick={handleLaunch} size="sm">
         <HiOutlinePlay className="icon-small mr-1" />
         Launch
       </Button>
+
+      <AppInfoDialog
+        app={app}
+        onClose={() => setInfoOpen(false)}
+        onLaunch={() => {
+          setInfoOpen(false);
+          handleLaunch();
+        }}
+        onRemove={() => {
+          setInfoOpen(false);
+          onRemove({ url: app.url, manifest_path: app.manifest_path });
+        }}
+        onUpdate={() =>
+          onUpdate({ url: app.url, manifest_path: app.manifest_path })
+        }
+        open={infoOpen}
+        removing={removing}
+        updating={updating}
+      />
     </div>
   );
 }

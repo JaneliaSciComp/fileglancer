@@ -53,10 +53,14 @@ export default function AddAppDialog({
       return;
     }
     const appUrl = buildAppUrl(repoUrl, branch);
-    await onAdd(appUrl);
-    setRepoUrl('');
-    setBranch('');
-    setUrlError('');
+    try {
+      await onAdd(appUrl);
+      setRepoUrl('');
+      setBranch('');
+      setUrlError('');
+    } catch (error) {
+      setUrlError(error instanceof Error ? error.message : 'Failed to add app');
+    }
   };
 
   const handleClose = () => {
