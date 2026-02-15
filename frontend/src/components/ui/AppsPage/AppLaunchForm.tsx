@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 
 import { Accordion, Button, Tabs, Typography } from '@material-tailwind/react';
 import { HiChevronDown, HiOutlinePlay } from 'react-icons/hi';
@@ -394,10 +395,8 @@ export default function AppLaunchForm({
           <div className="max-w-2xl space-y-4">
             {hasSections ? (
               <Accordion
-                onValueChange={v =>
-                  setOpenSections(
-                    Array.isArray(v) ? (v as string[]) : [v as string]
-                  )
+                onValueChange={
+                  setOpenSections as Dispatch<SetStateAction<string | string[]>>
                 }
                 type="multiple"
                 value={openSections}
@@ -410,9 +409,9 @@ export default function AppLaunchForm({
                     >
                       <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
                         <div className="text-left">
-                          <span className="text-foreground font-medium text-sm">
+                          <div className="text-foreground font-medium text-sm">
                             {item.section}
-                          </span>
+                          </div>
                           {item.description ? (
                             <Typography className="text-secondary" type="small">
                               {item.description}
@@ -427,7 +426,7 @@ export default function AppLaunchForm({
                           }`}
                         />
                       </Accordion.Trigger>
-                      <Accordion.Content className="pt-4 pb-2">
+                      <Accordion.Content className="pt-4 pb-2 pl-4">
                         <SectionContent
                           errors={errors}
                           onParamChange={handleChange}
