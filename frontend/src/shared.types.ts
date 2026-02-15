@@ -107,6 +107,9 @@ type AppEntryPoint = {
   command: string;
   parameters: AppParameterItem[];
   resources?: AppResourceDefaults;
+  env?: Record<string, string>;
+  pre_run?: string;
+  post_run?: string;
 };
 
 type AppManifest = {
@@ -157,6 +160,9 @@ type JobSubmitRequest = {
   parameters: Record<string, unknown>;
   resources?: AppResourceDefaults;
   pull_latest?: boolean;
+  env?: Record<string, string>;
+  pre_run?: string;
+  post_run?: string;
 };
 
 export type {

@@ -90,6 +90,9 @@ Each runnable defines a single command that users can launch. If the manifest ha
 | `command` | string | yes | Base shell command to execute (see [Command Building](#command-building)) |
 | `parameters` | list of objects | no | Parameter definitions (see [Parameters](#parameters)) |
 | `resources` | object | no | Default cluster resource requests (see [Resources](#resources)) |
+| `env` | object | no | Default environment variables to export (see [Environment Variables](#environment-variables)) |
+| `pre_run` | string | no | Shell script to run before the main command (see [Pre/Post-Run Scripts](#prepost-run-scripts)) |
+| `post_run` | string | no | Shell script to run after the main command (see [Pre/Post-Run Scripts](#prepost-run-scripts)) |
 
 ### Parameters
 
@@ -185,6 +188,61 @@ Default resource requests for the cluster scheduler. Users can override these in
 | `walltime` | string | Wall clock time limit, e.g. `"04:00"` (hours:minutes) |
 
 If omitted, the server's global defaults are used. User overrides take highest priority, followed by the runnable's defaults, then the server defaults.
+
+### Environment Variables
+
+The `env` field defines default environment variables that are exported before the main command runs. Each entry is a key-value pair where the key is the variable name and the value is the default string value.
+
+```yaml
+runnables:
+  - id: convert
+    name: Convert to OME-Zarr
+    command: nextflow run main.nf
+    env:
+      JAVA_HOME: /opt/java
+      NXF_SINGULARITY_CACHEDIR: /scratch/singularity
+```
+
+Users can override or extend these in the Fileglancer UI before submitting a job. Variable names must match `[A-Za-z_][A-Za-z0-9_]*` and values are shell-quoted with `shlex.quote()` for safety.
+
+### Pre/Post-Run Scripts
+
+The `pre_run` and `post_run` fields allow you to specify shell commands that run before and after the main command, respectively. These are useful for loading modules, setting up the environment, or performing cleanup.
+
+```yaml
+runnables:
+  - id: convert
+    name: Convert to OME-Zarr
+    command: nextflow run main.nf
+    pre_run: |
+      module load java/21
+    post_run: |
+      echo "Conversion complete"
+```
+
+Users can override these in the UI. If a user provides their own pre/post-run script, it replaces the manifest default entirely.
+
+The generated job script has the following structure:
+
+```bash
+unset PIXI_PROJECT_MANIFEST
+cd /path/to/repo
+
+# Environment variables
+export JAVA_HOME='/opt/java'
+export NXF_SINGULARITY_CACHEDIR='/scratch/singularity'
+
+# Pre-run script
+module load java/21
+
+# Main command
+nextflow run main.nf \
+  --input '/data/input' \
+  --outdir '/data/output'
+
+# Post-run script
+echo "Conversion complete"
+```
 
 ## Command Building
 

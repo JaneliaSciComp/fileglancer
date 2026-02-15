@@ -261,6 +261,9 @@ def verify_requirements(requirements: list[str]):
 # Characters that are dangerous in shell commands
 _SHELL_METACHAR_PATTERN = re.compile(r'[;&|`$(){}!<>\n\r]')
 
+# Valid environment variable name
+_ENV_VAR_NAME_PATTERN = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
+
 
 def _validate_parameter_value(param: AppParameter, value) -> str:
     """Validate a single parameter value against its schema and return the string representation.
@@ -567,6 +570,9 @@ async def submit_job(
     resources: Optional[dict] = None,
     pull_latest: bool = False,
     manifest_path: str = "",
+    env: Optional[dict] = None,
+    pre_run: Optional[str] = None,
+    post_run: Optional[str] = None,
 ) -> db.JobDB:
     """Submit a new job to the cluster.
 
@@ -642,10 +648,36 @@ async def submit_job(
         else:
             cd_target = repo_link
 
+    # Merge env/pre_run/post_run: manifest defaults overridden by user values
+    merged_env = dict(entry_point.env or {})
+    if env:
+        merged_env.update(env)
+
+    effective_pre_run = pre_run if pre_run is not None else (entry_point.pre_run or None)
+    effective_post_run = post_run if post_run is not None else (entry_point.post_run or None)
+
+    # Build environment variable export lines
+    env_lines = ""
+    if merged_env:
+        parts = []
+        for var_name, var_value in merged_env.items():
+            if not _ENV_VAR_NAME_PATTERN.match(var_name):
+                raise ValueError(f"Invalid environment variable name: '{var_name}'")
+            parts.append(f"export {var_name}={shlex.quote(var_value)}")
+        env_lines = "\n".join(parts) + "\n"
+
     # Wrap command with cd into the repo symlink
     # Unset PIXI_PROJECT_MANIFEST so pixi uses the repo's own manifest
     # instead of inheriting fileglancer's from the dev server environment
-    full_command = f"unset PIXI_PROJECT_MANIFEST\ncd {cd_target}\n\n{command}"
+    script_parts = [f"unset PIXI_PROJECT_MANIFEST\ncd {cd_target}"]
+    if env_lines:
+        script_parts.append(env_lines.rstrip())
+    if effective_pre_run:
+        script_parts.append(effective_pre_run.rstrip())
+    script_parts.append(command)
+    if effective_post_run:
+        script_parts.append(effective_post_run.rstrip())
+    full_command = "\n\n".join(script_parts)
 
     # Set work_dir and log paths on resource spec
     resource_spec.work_dir = str(work_dir)

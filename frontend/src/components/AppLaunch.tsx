@@ -85,7 +85,10 @@ export default function AppLaunch() {
   const handleSubmit = async (
     parameters: Record<string, unknown>,
     resources?: AppResourceDefaults,
-    pullLatest?: boolean
+    pullLatest?: boolean,
+    env?: Record<string, string>,
+    preRun?: string,
+    postRun?: string
   ) => {
     if (!selectedEntryPoint) {
       return;
@@ -97,7 +100,10 @@ export default function AppLaunch() {
         entry_point_id: selectedEntryPoint.id,
         parameters,
         resources,
-        pull_latest: pullLatest
+        pull_latest: pullLatest,
+        env,
+        pre_run: preRun,
+        post_run: postRun
       });
       toast.success('Job submitted');
       navigate('/apps/jobs');

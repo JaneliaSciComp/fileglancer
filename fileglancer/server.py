@@ -1647,6 +1647,9 @@ def create_app(settings):
                 resources=resources_dict,
                 pull_latest=body.pull_latest,
                 manifest_path=body.manifest_path,
+                env=body.env,
+                pre_run=body.pre_run,
+                post_run=body.post_run,
             )
             return _convert_job(db_job)
         except ValueError as e:

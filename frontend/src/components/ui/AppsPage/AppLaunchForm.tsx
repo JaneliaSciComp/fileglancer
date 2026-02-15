@@ -2,7 +2,12 @@ import { useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
 import { Accordion, Button, Tabs, Typography } from '@material-tailwind/react';
-import { HiChevronDown, HiOutlinePlay } from 'react-icons/hi';
+import {
+  HiChevronDown,
+  HiOutlinePlus,
+  HiOutlinePlay,
+  HiOutlineTrash
+} from 'react-icons/hi';
 
 import FileSelectorButton from '@/components/ui/BrowsePage/FileSelector/FileSelectorButton';
 import { validatePaths } from '@/queries/appsQueries';
@@ -22,11 +27,16 @@ interface AppLaunchFormProps {
   readonly onSubmit: (
     parameters: Record<string, unknown>,
     resources?: AppResourceDefaults,
-    pullLatest?: boolean
+    pullLatest?: boolean,
+    env?: Record<string, string>,
+    preRun?: string,
+    postRun?: string
   ) => Promise<void>;
   readonly submitting: boolean;
   readonly initialValues?: Record<string, unknown>;
 }
+
+type EnvVar = { key: string; value: string };
 
 function ParameterField({
   param,
@@ -191,6 +201,266 @@ function SectionContent({
   );
 }
 
+function EnvVarRows({
+  envVars,
+  setEnvVars
+}: {
+  readonly envVars: EnvVar[];
+  readonly setEnvVars: Dispatch<SetStateAction<EnvVar[]>>;
+}) {
+  return (
+    <div>
+      <label className="block text-foreground text-sm font-medium mb-2">
+        Environment Variables
+      </label>
+      {envVars.map((envVar, idx) => (
+        <div className="flex gap-2 mb-2 items-center" key={idx}>
+          <input
+            className="flex-1 p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary font-mono text-sm"
+            onChange={e =>
+              setEnvVars(prev =>
+                prev.map((v, i) =>
+                  i === idx ? { ...v, key: e.target.value } : v
+                )
+              )
+            }
+            placeholder="NAME"
+            type="text"
+            value={envVar.key}
+          />
+          <span className="text-secondary">=</span>
+          <input
+            className="flex-[2] p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary font-mono text-sm"
+            onChange={e =>
+              setEnvVars(prev =>
+                prev.map((v, i) =>
+                  i === idx ? { ...v, value: e.target.value } : v
+                )
+              )
+            }
+            placeholder="value"
+            type="text"
+            value={envVar.value}
+          />
+          <button
+            className="p-1 text-secondary hover:text-error transition-colors"
+            onClick={() => setEnvVars(prev => prev.filter((_, i) => i !== idx))}
+            title="Remove variable"
+            type="button"
+          >
+            <HiOutlineTrash className="h-4 w-4" />
+          </button>
+        </div>
+      ))}
+      <button
+        className="flex items-center gap-1 text-sm text-primary hover:text-primary-dark transition-colors"
+        onClick={() => setEnvVars(prev => [...prev, { key: '', value: '' }])}
+        type="button"
+      >
+        <HiOutlinePlus className="h-4 w-4" />
+        Add variable
+      </button>
+    </div>
+  );
+}
+
+function EnvironmentSectionContent({
+  envVars,
+  setEnvVars,
+  preRun,
+  setPreRun,
+  postRun,
+  setPostRun
+}: {
+  readonly envVars: EnvVar[];
+  readonly setEnvVars: Dispatch<SetStateAction<EnvVar[]>>;
+  readonly preRun: string;
+  readonly setPreRun: Dispatch<SetStateAction<string>>;
+  readonly postRun: string;
+  readonly setPostRun: Dispatch<SetStateAction<string>>;
+}) {
+  const textareaClass =
+    'w-full p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary font-mono text-sm';
+
+  return (
+    <div className="space-y-4">
+      <EnvVarRows envVars={envVars} setEnvVars={setEnvVars} />
+
+      <div>
+        <label className="block text-foreground text-sm font-medium mb-1">
+          Pre-run Script
+        </label>
+        <Typography className="text-secondary mb-1" type="small">
+          Shell commands to run before the main command (e.g. module loads)
+        </Typography>
+        <textarea
+          className={textareaClass}
+          onChange={e => setPreRun(e.target.value)}
+          placeholder="module load java/21"
+          rows={3}
+          value={preRun}
+        />
+      </div>
+
+      <div>
+        <label className="block text-foreground text-sm font-medium mb-1">
+          Post-run Script
+        </label>
+        <Typography className="text-secondary mb-1" type="small">
+          Shell commands to run after the main command completes
+        </Typography>
+        <textarea
+          className={textareaClass}
+          onChange={e => setPostRun(e.target.value)}
+          placeholder='echo "Done"'
+          rows={3}
+          value={postRun}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ResourcesSectionContent({
+  resources,
+  setResources
+}: {
+  readonly resources: AppResourceDefaults;
+  readonly setResources: Dispatch<SetStateAction<AppResourceDefaults>>;
+}) {
+  const inputClass =
+    'p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary';
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="block text-foreground text-sm font-medium mb-1">
+          CPUs
+        </label>
+        <input
+          className={inputClass}
+          min={1}
+          onChange={e =>
+            setResources(prev => ({
+              ...prev,
+              cpus: e.target.value ? parseInt(e.target.value) : undefined
+            }))
+          }
+          placeholder="Number of CPUs"
+          type="number"
+          value={resources.cpus ?? ''}
+        />
+      </div>
+      <div>
+        <label className="block text-foreground text-sm font-medium mb-1">
+          Memory
+        </label>
+        <input
+          className={inputClass}
+          onChange={e =>
+            setResources(prev => ({
+              ...prev,
+              memory: e.target.value || undefined
+            }))
+          }
+          placeholder="e.g. 16 GB"
+          type="text"
+          value={resources.memory ?? ''}
+        />
+      </div>
+      <div>
+        <label className="block text-foreground text-sm font-medium mb-1">
+          Wall Time
+        </label>
+        <input
+          className={inputClass}
+          onChange={e =>
+            setResources(prev => ({
+              ...prev,
+              walltime: e.target.value || undefined
+            }))
+          }
+          placeholder="e.g. 04:00"
+          type="text"
+          value={resources.walltime ?? ''}
+        />
+      </div>
+    </div>
+  );
+}
+
+function EnvironmentTabContent({
+  envVars,
+  setEnvVars,
+  preRun,
+  setPreRun,
+  postRun,
+  setPostRun,
+  resources,
+  setResources,
+  openEnvSections,
+  setOpenEnvSections
+}: {
+  readonly envVars: EnvVar[];
+  readonly setEnvVars: Dispatch<SetStateAction<EnvVar[]>>;
+  readonly preRun: string;
+  readonly setPreRun: Dispatch<SetStateAction<string>>;
+  readonly postRun: string;
+  readonly setPostRun: Dispatch<SetStateAction<string>>;
+  readonly resources: AppResourceDefaults;
+  readonly setResources: Dispatch<SetStateAction<AppResourceDefaults>>;
+  readonly openEnvSections: string[];
+  readonly setOpenEnvSections: Dispatch<SetStateAction<string[]>>;
+}) {
+  return (
+    <Accordion
+      onValueChange={
+        setOpenEnvSections as Dispatch<SetStateAction<string | string[]>>
+      }
+      type="multiple"
+      value={openEnvSections}
+    >
+      <Accordion.Item value="environment">
+        <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
+          <div className="text-foreground font-medium text-sm">Environment</div>
+          <HiChevronDown
+            className={`h-4 w-4 text-secondary transition-transform ${
+              openEnvSections.includes('environment') ? 'rotate-180' : ''
+            }`}
+          />
+        </Accordion.Trigger>
+        <Accordion.Content className="pt-4 pb-2 pl-4">
+          <EnvironmentSectionContent
+            envVars={envVars}
+            postRun={postRun}
+            preRun={preRun}
+            setEnvVars={setEnvVars}
+            setPostRun={setPostRun}
+            setPreRun={setPreRun}
+          />
+        </Accordion.Content>
+      </Accordion.Item>
+
+      <Accordion.Item value="resources">
+        <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
+          <div className="text-foreground font-medium text-sm">Resources</div>
+          <HiChevronDown
+            className={`h-4 w-4 text-secondary transition-transform ${
+              openEnvSections.includes('resources') ? 'rotate-180' : ''
+            }`}
+          />
+        </Accordion.Trigger>
+        <Accordion.Content className="pt-4 pb-2 pl-4">
+          <ResourcesSectionContent
+            resources={resources}
+            setResources={setResources}
+          />
+        </Accordion.Content>
+      </Accordion.Item>
+    </Accordion>
+  );
+}
+
 export default function AppLaunchForm({
   manifest,
   entryPoint,
@@ -227,6 +497,23 @@ export default function AppLaunchForm({
     memory: entryPoint.resources?.memory,
     walltime: entryPoint.resources?.walltime
   });
+
+  // Environment tab state
+  const [envVars, setEnvVars] = useState<EnvVar[]>(() => {
+    if (entryPoint.env) {
+      return Object.entries(entryPoint.env).map(([key, value]) => ({
+        key,
+        value
+      }));
+    }
+    return [];
+  });
+  const [preRun, setPreRun] = useState(entryPoint.pre_run ?? '');
+  const [postRun, setPostRun] = useState(entryPoint.post_run ?? '');
+  const [openEnvSections, setOpenEnvSections] = useState<string[]>([
+    'environment',
+    'resources'
+  ]);
 
   const handleChange = (paramId: string, value: unknown) => {
     setValues(prev => ({ ...prev, [paramId]: value }));
@@ -355,10 +642,22 @@ export default function AppLaunchForm({
     const hasResourceOverrides =
       resources.cpus || resources.memory || resources.walltime;
 
+    // Convert envVars array to Record, filtering empty keys
+    const envRecord: Record<string, string> = {};
+    for (const { key, value } of envVars) {
+      if (key.trim()) {
+        envRecord[key.trim()] = value;
+      }
+    }
+    const hasEnv = Object.keys(envRecord).length > 0;
+
     await onSubmit(
       params,
       hasResourceOverrides ? resources : undefined,
-      pullLatest
+      pullLatest,
+      hasEnv ? envRecord : undefined,
+      preRun.trim() || undefined,
+      postRun.trim() || undefined
     );
   };
 
@@ -482,61 +781,18 @@ export default function AppLaunchForm({
             </Typography>
           </div>
 
-          {/* Resource Overrides */}
-          <div className="space-y-3">
-            <div>
-              <label className="block text-foreground text-sm font-medium mb-1">
-                CPUs
-              </label>
-              <input
-                className="p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary"
-                min={1}
-                onChange={e =>
-                  setResources(prev => ({
-                    ...prev,
-                    cpus: e.target.value ? parseInt(e.target.value) : undefined
-                  }))
-                }
-                placeholder="Number of CPUs"
-                type="number"
-                value={resources.cpus ?? ''}
-              />
-            </div>
-            <div>
-              <label className="block text-foreground text-sm font-medium mb-1">
-                Memory
-              </label>
-              <input
-                className="p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary"
-                onChange={e =>
-                  setResources(prev => ({
-                    ...prev,
-                    memory: e.target.value || undefined
-                  }))
-                }
-                placeholder="e.g. 16 GB"
-                type="text"
-                value={resources.memory ?? ''}
-              />
-            </div>
-            <div>
-              <label className="block text-foreground text-sm font-medium mb-1">
-                Wall Time
-              </label>
-              <input
-                className="p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary"
-                onChange={e =>
-                  setResources(prev => ({
-                    ...prev,
-                    walltime: e.target.value || undefined
-                  }))
-                }
-                placeholder="e.g. 04:00"
-                type="text"
-                value={resources.walltime ?? ''}
-              />
-            </div>
-          </div>
+          <EnvironmentTabContent
+            envVars={envVars}
+            openEnvSections={openEnvSections}
+            postRun={postRun}
+            preRun={preRun}
+            resources={resources}
+            setEnvVars={setEnvVars}
+            setOpenEnvSections={setOpenEnvSections}
+            setPostRun={setPostRun}
+            setPreRun={setPreRun}
+            setResources={setResources}
+          />
         </Tabs.Panel>
       </Tabs>
 

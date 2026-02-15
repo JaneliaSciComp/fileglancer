@@ -380,6 +380,9 @@ class AppEntryPoint(BaseModel):
     command: str = Field(description="The base CLI command to execute")
     parameters: List[AppParameterItem] = Field(description="Parameters for this entry point", default=[])
     resources: Optional[AppResourceDefaults] = Field(description="Default resource requirements", default=None)
+    env: Optional[Dict[str, str]] = Field(description="Default environment variables", default=None)
+    pre_run: Optional[str] = Field(description="Script to run before the main command", default=None)
+    post_run: Optional[str] = Field(description="Script to run after the main command", default=None)
 
     def flat_parameters(self) -> List[AppParameter]:
         """Return a flat list of all parameters, traversing sections."""
@@ -502,6 +505,9 @@ class JobSubmitRequest(BaseModel):
         description="Pull latest code from GitHub before running",
         default=False,
     )
+    env: Optional[Dict[str, str]] = Field(description="Environment variables to export", default=None)
+    pre_run: Optional[str] = Field(description="Script to run before the main command", default=None)
+    post_run: Optional[str] = Field(description="Script to run after the main command", default=None)
 
 
 class PathValidationRequest(BaseModel):
