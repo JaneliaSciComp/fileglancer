@@ -131,6 +131,10 @@ session_cookie_secure: true
 #
 # cluster:
 #   executor: local            # "local" or "lsf"
+#   job_name_prefix: fg        # Prefix for cluster job names. REQUIRED for job
+#                              # reconnection after server restarts. Without this,
+#                              # active jobs will not be re-tracked and will
+#                              # eventually be marked FAILED by the zombie timeout.
 #   memory: "8 GB"             # Default memory allocation
 #   walltime: "04:00"          # Default walltime (HH:MM)
 #   cpus: 1                    # Default CPU count
