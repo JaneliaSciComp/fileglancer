@@ -26,7 +26,7 @@ from fileglancer.settings import get_settings
 
 _MANIFEST_FILENAMES = ["runnables.json", "runnables.yaml", "runnables.yml"]
 
-_REPO_CACHE_BASE = Path(os.path.expanduser("~/.fileglancer/app-repos"))
+_REPO_CACHE_BASE = Path(os.path.expanduser("~/.fileglancer/apps"))
 _repo_locks: dict[str, asyncio.Lock] = {}
 
 
