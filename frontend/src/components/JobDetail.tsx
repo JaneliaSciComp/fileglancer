@@ -193,9 +193,30 @@ export default function JobDetail() {
       </Button>
 
       {jobQuery.isPending ? (
-        <Typography className="text-secondary" type="small">
-          Loading job details...
-        </Typography>
+        <div className="animate-pulse">
+          {/* Title skeleton */}
+          <div className="mb-6">
+            <div className="w-72 h-6 bg-surface rounded mb-3" />
+            <div className="flex items-center gap-4 mt-2">
+              <div className="w-20 h-5 bg-surface rounded-full" />
+              <div className="w-36 h-4 bg-surface rounded" />
+              <div className="w-36 h-4 bg-surface rounded" />
+            </div>
+          </div>
+          {/* Tab bar skeleton */}
+          <div className="flex gap-4 py-2 mb-4 border-b border-surface">
+            <div className="w-24 h-4 bg-surface rounded" />
+            <div className="w-16 h-4 bg-surface rounded" />
+            <div className="w-24 h-4 bg-surface rounded" />
+            <div className="w-20 h-4 bg-surface rounded" />
+          </div>
+          {/* Content area skeleton */}
+          <div className="mt-4 space-y-2">
+            <div className="w-full h-4 bg-surface rounded" />
+            <div className="w-3/4 h-4 bg-surface rounded" />
+            <div className="w-1/2 h-4 bg-surface rounded" />
+          </div>
+        </div>
       ) : jobQuery.isError ? (
         <div className="p-3 bg-error/10 rounded text-error text-sm">
           Failed to load job: {jobQuery.error?.message || 'Unknown error'}
