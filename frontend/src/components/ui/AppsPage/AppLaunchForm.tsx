@@ -278,12 +278,12 @@ export default function AppLaunchForm({
       <Typography className="text-foreground font-bold mb-1" type="h5">
         {entryPoint.name}
       </Typography>
-      <Typography className="text-secondary mb-1" type="small">
+      <Typography className="text-secondary block mb-4" type="small">
         {manifest.name}
         {manifest.version ? ` v${manifest.version}` : ''}
       </Typography>
       {entryPoint.description ? (
-        <Typography className="text-secondary mb-6" type="small">
+        <Typography className="text-secondary block mb-6" type="small">
           {entryPoint.description}
         </Typography>
       ) : null}
