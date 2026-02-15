@@ -220,9 +220,12 @@ function EnvVarRows({
 }) {
   return (
     <div>
-      <label className="block text-foreground text-sm font-medium mb-2">
+      <label className="block text-foreground text-sm font-medium mb-1">
         Environment Variables
       </label>
+      <Typography className="text-secondary mb-2" type="small">
+        Variables exported in the job script before the command runs
+      </Typography>
       {envVars.map((envVar, idx) => (
         <div className="flex gap-2 mb-2 items-center" key={idx}>
           <input
@@ -347,6 +350,9 @@ function ResourcesSectionContent({
         <label className="block text-foreground text-sm font-medium mb-1">
           CPUs
         </label>
+        <Typography className="text-secondary mb-1" type="small">
+          Number of CPU cores to allocate for the job
+        </Typography>
         <input
           className={inputClass}
           min={1}
@@ -356,7 +362,7 @@ function ResourcesSectionContent({
               cpus: e.target.value ? parseInt(e.target.value) : undefined
             }))
           }
-          placeholder="Number of CPUs"
+          placeholder="e.g. 4"
           type="number"
           value={resources.cpus ?? ''}
         />
@@ -365,6 +371,9 @@ function ResourcesSectionContent({
         <label className="block text-foreground text-sm font-medium mb-1">
           Memory
         </label>
+        <Typography className="text-secondary mb-1" type="small">
+          Amount of RAM to allocate (e.g. &quot;16 GB&quot;, &quot;512 MB&quot;)
+        </Typography>
         <input
           className={inputClass}
           onChange={e =>
@@ -380,8 +389,11 @@ function ResourcesSectionContent({
       </div>
       <div>
         <label className="block text-foreground text-sm font-medium mb-1">
-          Wall Time
+          Time Limit
         </label>
+        <Typography className="text-secondary mb-1" type="small">
+          Maximum run time before the job is killed (HH:MM format)
+        </Typography>
         <input
           className={inputClass}
           onChange={e =>
