@@ -342,10 +342,10 @@ function ResourcesSectionContent({
   readonly setResources: Dispatch<SetStateAction<AppResourceDefaults>>;
 }) {
   const inputClass =
-    'p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary';
+    'w-full p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary';
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div>
         <label className="block text-foreground text-sm font-medium mb-1">
           CPUs
