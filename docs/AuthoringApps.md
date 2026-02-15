@@ -21,13 +21,7 @@ runnables:
 
 ## Manifest Discovery
 
-When a user adds a GitHub repository, Fileglancer clones it and walks the directory tree looking for manifest files. The following filenames are recognized (checked in this order):
-
-1. `runnables.json`
-2. `runnables.yaml`
-3. `runnables.yml`
-
-Only the first match per directory is used. If a directory contains both `runnables.json` and `runnables.yaml`, the JSON file takes precedence.
+When a user adds a GitHub repository, Fileglancer clones it and walks the directory tree looking for `runnables.yaml` files.
 
 ### Multi-App Repositories
 

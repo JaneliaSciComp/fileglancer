@@ -1,7 +1,6 @@
 """Apps module for fetching manifests, building commands, and managing cluster jobs."""
 
 import asyncio
-import json
 import os
 import re
 import shlex
@@ -24,7 +23,7 @@ from fileglancer.model import AppManifest, AppEntryPoint, AppParameter
 from fileglancer.settings import get_settings
 
 
-_MANIFEST_FILENAMES = ["runnables.json", "runnables.yaml", "runnables.yml"]
+_MANIFEST_FILENAME = "runnables.yaml"
 
 _REPO_CACHE_BASE = Path(os.path.expanduser("~/.fileglancer/apps"))
 _repo_locks: dict[str, asyncio.Lock] = {}
@@ -109,25 +108,17 @@ _SKIP_DIRS = {'.git', 'node_modules', '__pycache__', '.pixi', '.venv', 'venv'}
 
 
 def _read_manifest_file(manifest_dir: Path) -> AppManifest:
-    """Read and validate a manifest file from the given directory.
+    """Read and validate a runnables.yaml file from the given directory.
 
-    Tries each filename in _MANIFEST_FILENAMES order (JSON > YAML > YML).
-    Raises ValueError if no manifest found.
+    Raises ValueError if the file is not found.
     """
-    for filename in _MANIFEST_FILENAMES:
-        filepath = manifest_dir / filename
-        if filepath.is_file():
-            text = filepath.read_text()
-            if filename.endswith(".json"):
-                data = json.loads(text)
-            else:
-                data = yaml.safe_load(text)
-            return AppManifest(**data)
-
-    filenames = ", ".join(_MANIFEST_FILENAMES)
-    raise ValueError(
-        f"No manifest file found ({filenames}) in {manifest_dir}."
-    )
+    filepath = manifest_dir / _MANIFEST_FILENAME
+    if not filepath.is_file():
+        raise ValueError(
+            f"No {_MANIFEST_FILENAME} found in {manifest_dir}."
+        )
+    data = yaml.safe_load(filepath.read_text())
+    return AppManifest(**data)
 
 
 def _find_manifests_in_repo(repo_dir: Path) -> list[tuple[str, AppManifest]]:
@@ -142,9 +133,7 @@ def _find_manifests_in_repo(repo_dir: Path) -> list[tuple[str, AppManifest]]:
         # Prune directories we should skip
         dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
 
-        # Check if any manifest filename exists in this directory
-        has_manifest = any(f in filenames for f in _MANIFEST_FILENAMES)
-        if not has_manifest:
+        if _MANIFEST_FILENAME not in filenames:
             continue
 
         current = Path(dirpath)
