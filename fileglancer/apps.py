@@ -89,7 +89,7 @@ async def _ensure_repo_cache(url: str, pull: bool = False) -> Path:
 
     async with lock:
         if repo_dir.exists():
-            logger.info(f"Repo cache hit: {owner}/{repo} ({branch})")
+            logger.debug(f"Repo cache hit: {owner}/{repo} ({branch})")
             if pull:
                 logger.info(f"Pulling latest for {owner}/{repo} ({branch})")
                 await _run_git(["git", "-C", str(repo_dir), "pull", "origin", branch])
