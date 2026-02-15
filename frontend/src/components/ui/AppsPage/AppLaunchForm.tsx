@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { Button, Typography } from '@material-tailwind/react';
+import { Button, Tabs, Typography } from '@material-tailwind/react';
 import { HiOutlinePlay } from 'react-icons/hi';
 
 import FileSelectorButton from '@/components/ui/BrowsePage/FileSelector/FileSelectorButton';
@@ -145,8 +145,8 @@ export default function AppLaunchForm({
 
   const [values, setValues] = useState<Record<string, unknown>>(startingValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [activeTab, setActiveTab] = useState('parameters');
   const [pullLatest, setPullLatest] = useState(false);
-  const [showResources, setShowResources] = useState(false);
   const [resources, setResources] = useState<AppResourceDefaults>({
     cpus: entryPoint.resources?.cpus,
     memory: entryPoint.resources?.memory,
@@ -261,10 +261,9 @@ export default function AppLaunchForm({
       setValidating(false);
     }
 
-    // Only pass resources if user modified them
+    // Only pass resources if user provided values
     const hasResourceOverrides =
-      showResources &&
-      (resources.cpus || resources.memory || resources.walltime);
+      resources.cpus || resources.memory || resources.walltime;
 
     await onSubmit(
       params,
@@ -274,7 +273,7 @@ export default function AppLaunchForm({
   };
 
   return (
-    <div className="max-w-2xl">
+    <div>
       <Typography className="text-foreground font-bold mb-1" type="h5">
         {entryPoint.name}
       </Typography>
@@ -283,75 +282,86 @@ export default function AppLaunchForm({
         {manifest.version ? ` v${manifest.version}` : ''}
       </Typography>
       {entryPoint.description ? (
-        <Typography className="text-secondary block mb-6" type="small">
+        <Typography className="text-secondary block mb-4" type="small">
           {entryPoint.description}
         </Typography>
       ) : null}
 
-      {/* Parameters */}
-      <div className="space-y-4 mb-6">
-        {entryPoint.parameters.map(param => (
-          <div key={param.key}>
-            {param.type !== 'boolean' ? (
-              <label
-                className="block text-foreground text-sm font-medium mb-1"
-                htmlFor={`param-${param.key}`}
-              >
-                {param.name}
-                {param.required ? (
-                  <span className="text-error ml-1">*</span>
+      {/* Tabs */}
+      <Tabs onValueChange={setActiveTab} value={activeTab}>
+        <Tabs.List className="justify-start items-stretch shrink-0 min-w-fit w-full py-2 bg-surface dark:bg-surface-light">
+          <Tabs.Trigger
+            className="!text-foreground h-full"
+            value="parameters"
+          >
+            Parameters
+          </Tabs.Trigger>
+          <Tabs.Trigger
+            className="!text-foreground h-full"
+            value="environment"
+          >
+            Environment
+          </Tabs.Trigger>
+          <Tabs.TriggerIndicator className="h-full" />
+        </Tabs.List>
+
+        <Tabs.Panel className="pt-4" value="parameters">
+          <div className="max-w-2xl space-y-4">
+            {entryPoint.parameters.map(param => (
+              <div key={param.key}>
+                {param.type !== 'boolean' ? (
+                  <label
+                    className="block text-foreground text-sm font-medium mb-1"
+                    htmlFor={`param-${param.key}`}
+                  >
+                    {param.name}
+                    {param.required ? (
+                      <span className="text-error ml-1">*</span>
+                    ) : null}
+                  </label>
                 ) : null}
-              </label>
-            ) : null}
-            {param.description && param.type !== 'boolean' ? (
-              <Typography className="text-secondary mb-1" type="small">
-                {param.description}
-              </Typography>
-            ) : null}
-            <ParameterField
-              onChange={val => handleChange(param.key, val)}
-              param={param}
-              value={values[param.key]}
-            />
-            {errors[param.key] ? (
-              <Typography className="text-error mt-1" type="small">
-                {errors[param.key]}
-              </Typography>
-            ) : null}
+                {param.description && param.type !== 'boolean' ? (
+                  <Typography className="text-secondary mb-1" type="small">
+                    {param.description}
+                  </Typography>
+                ) : null}
+                <ParameterField
+                  onChange={val => handleChange(param.key, val)}
+                  param={param}
+                  value={values[param.key]}
+                />
+                {errors[param.key] ? (
+                  <Typography className="text-error mt-1" type="small">
+                    {errors[param.key]}
+                  </Typography>
+                ) : null}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </Tabs.Panel>
 
-      {/* Pull latest toggle */}
-      <div className="mb-6">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            checked={pullLatest}
-            className="h-4 w-4 accent-primary"
-            onChange={e => setPullLatest(e.target.checked)}
-            type="checkbox"
-          />
-          <span className="text-foreground text-sm">
-            Pull latest code before running
-          </span>
-        </label>
-        <Typography className="text-secondary mt-1" type="small">
-          When enabled, runs git pull to fetch the latest code from GitHub
-          before starting the job.
-        </Typography>
-      </div>
+        <Tabs.Panel className="pt-4 max-w-2xl" value="environment">
+          {/* Pull latest toggle */}
+          <div className="mb-6">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                checked={pullLatest}
+                className="h-4 w-4 accent-primary"
+                onChange={e => setPullLatest(e.target.checked)}
+                type="checkbox"
+              />
+              <span className="text-foreground text-sm">
+                Pull latest code before running
+              </span>
+            </label>
+            <Typography className="text-secondary mt-1" type="small">
+              When enabled, runs git pull to fetch the latest code from GitHub
+              before starting the job.
+            </Typography>
+          </div>
 
-      {/* Resource Overrides (collapsible) */}
-      <div className="mb-6">
-        <button
-          className="text-sm text-primary hover:underline"
-          onClick={() => setShowResources(!showResources)}
-          type="button"
-        >
-          {showResources ? 'Hide' : 'Show'} resource options
-        </button>
-        {showResources ? (
-          <div className="mt-3 p-4 bg-surface/30 rounded border border-primary-light space-y-3">
+          {/* Resource Overrides */}
+          <div className="space-y-3">
             <div>
               <label className="block text-foreground text-sm font-medium mb-1">
                 CPUs
@@ -405,19 +415,19 @@ export default function AppLaunchForm({
               />
             </div>
           </div>
-        ) : null}
-      </div>
+        </Tabs.Panel>
+      </Tabs>
 
       {/* Validation error summary */}
       {Object.keys(errors).length > 0 ? (
-        <div className="mb-4 p-3 bg-error/10 rounded text-error text-sm">
+        <div className="mt-6 mb-4 p-3 bg-error/10 rounded text-error text-sm">
           Please fix the errors above before submitting.
         </div>
       ) : null}
 
       {/* Submit */}
       <Button
-        className="!rounded-md"
+        className="!rounded-md mt-6"
         disabled={submitting || validating}
         onClick={handleSubmit}
       >

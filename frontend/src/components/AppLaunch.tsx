@@ -151,14 +151,19 @@ export default function AppLaunch() {
       ) : null}
 
       {manifestMutation.isPending ? (
-        <div className="max-w-2xl animate-pulse">
+        <div className="animate-pulse">
           {/* Title + subtitle */}
-          <div className="mb-6">
+          <div className="mb-4">
             <div className="w-48 h-6 bg-surface rounded mb-2" />
             <div className="w-32 h-4 bg-surface rounded" />
           </div>
+          {/* Tab bar skeleton */}
+          <div className="flex gap-4 py-2 mb-4 w-full bg-surface/50 rounded px-2">
+            <div className="w-28 h-4 bg-surface rounded" />
+            <div className="w-24 h-4 bg-surface rounded" />
+          </div>
           {/* Parameter fields */}
-          <div className="space-y-4 mb-6">
+          <div className="max-w-2xl space-y-4 mb-6">
             {[1, 2, 3].map(i => (
               <div key={i}>
                 <div className="w-24 h-4 bg-surface rounded mb-2" />
@@ -166,13 +171,6 @@ export default function AppLaunch() {
               </div>
             ))}
           </div>
-          {/* Checkbox toggle */}
-          <div className="flex items-center gap-2 mb-6">
-            <div className="w-4 h-4 bg-surface rounded" />
-            <div className="w-48 h-4 bg-surface rounded" />
-          </div>
-          {/* Resource options link */}
-          <div className="w-36 h-4 bg-surface rounded mb-6" />
           {/* Submit button */}
           <div className="w-32 h-10 bg-surface rounded" />
         </div>
