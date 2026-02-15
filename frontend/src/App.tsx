@@ -9,6 +9,7 @@ import { BrowsePageLayout } from './layouts/BrowseLayout';
 import { OtherPagesLayout } from './layouts/OtherPagesLayout';
 import Login from '@/components/Login';
 import Apps from '@/components/Apps';
+import AppJobs from '@/components/AppJobs';
 import AppLaunch from '@/components/AppLaunch';
 import JobDetail from '@/components/JobDetail';
 import Browse from '@/components/Browse';
@@ -126,10 +127,34 @@ const AppComponent = () => {
             <Route
               element={
                 <RequireAuth>
+                  <AppJobs />
+                </RequireAuth>
+              }
+              path="apps/jobs"
+            />
+            <Route
+              element={
+                <RequireAuth>
                   <AppLaunch />
                 </RequireAuth>
               }
-              path="apps/launch/:encodedUrl"
+              path="apps/launch/:owner/:repo/:branch/:entryPointId"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <AppLaunch />
+                </RequireAuth>
+              }
+              path="apps/launch/:owner/:repo/:branch"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <AppLaunch />
+                </RequireAuth>
+              }
+              path="apps/relaunch/:owner/:repo/:branch/:entryPointId"
             />
             <Route
               element={

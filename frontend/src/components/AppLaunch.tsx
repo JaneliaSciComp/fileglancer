@@ -1,39 +1,58 @@
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router';
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams
+} from 'react-router';
 
 import { Button, Typography } from '@material-tailwind/react';
-import { HiOutlineArrowLeft, HiOutlinePlay } from 'react-icons/hi';
+import {
+  HiOutlineArrowLeft,
+  HiOutlineDownload,
+  HiOutlinePlay
+} from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
 import AppLaunchForm from '@/components/ui/AppsPage/AppLaunchForm';
-import { useManifestPreviewMutation } from '@/queries/appsQueries';
+import { buildGithubUrl } from '@/utils';
+import {
+  useAppsQuery,
+  useAddAppMutation,
+  useManifestPreviewMutation
+} from '@/queries/appsQueries';
 import { useSubmitJobMutation } from '@/queries/jobsQueries';
 import type { AppEntryPoint, AppResourceDefaults } from '@/shared.types';
 
-type LaunchState = {
-  appUrl?: string;
-  manifestPath?: string;
-  entryPointId?: string;
-  parameters?: Record<string, unknown>;
-} | null;
-
 export default function AppLaunch() {
-  const { encodedUrl } = useParams<{ encodedUrl: string }>();
+  const { owner, repo, branch, entryPointId } = useParams<{
+    owner: string;
+    repo: string;
+    branch: string;
+    entryPointId?: string;
+  }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
   const manifestMutation = useManifestPreviewMutation();
   const submitJobMutation = useSubmitJobMutation();
+  const appsQuery = useAppsQuery();
+  const addAppMutation = useAddAppMutation();
   const [selectedEntryPoint, setSelectedEntryPoint] =
     useState<AppEntryPoint | null>(null);
 
-  const launchState = (location.state as LaunchState) || null;
-  // Prefer app URL from state (relaunch), fall back to path param (normal launch)
-  const appUrl = launchState?.appUrl
-    ? launchState.appUrl
-    : encodedUrl
-      ? decodeURIComponent(encodedUrl)
-      : '';
-  const manifestPath = launchState?.manifestPath ?? '';
+  const manifestPath = searchParams.get('path') || '';
+  const appUrl = buildGithubUrl(owner!, repo!, branch!);
+  const isRelaunch = location.pathname.startsWith('/apps/relaunch/');
+  const relaunchParameters = isRelaunch
+    ? (location.state as { parameters?: Record<string, unknown> } | null)
+        ?.parameters
+    : undefined;
+
+  // Check if app is in user's library
+  const isInstalled = appsQuery.data?.some(
+    a => a.url === appUrl && a.manifest_path === manifestPath
+  );
 
   useEffect(() => {
     if (appUrl) {
@@ -45,15 +64,13 @@ export default function AppLaunch() {
 
   const manifest = manifestMutation.data;
 
-  // Auto-select entry point from relaunch state, or if there's only one
+  // Auto-select entry point from URL param, or if there's only one
   useEffect(() => {
     if (!manifest) {
       return;
     }
-    if (launchState?.entryPointId) {
-      const ep = manifest.runnables.find(
-        e => e.id === launchState.entryPointId
-      );
+    if (entryPointId) {
+      const ep = manifest.runnables.find(e => e.id === entryPointId);
       if (ep) {
         setSelectedEntryPoint(ep);
         return;
@@ -83,10 +100,22 @@ export default function AppLaunch() {
         pull_latest: pullLatest
       });
       toast.success('Job submitted');
-      navigate('/apps');
+      navigate('/apps/jobs');
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to submit job';
+      toast.error(message);
+    }
+  };
+
+  const handleInstall = async () => {
+    try {
+      const apps = await addAppMutation.mutateAsync(appUrl);
+      const count = apps.length;
+      toast.success(`${count} app${count !== 1 ? 's' : ''} added`);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to install app';
       toast.error(message);
     }
   };
@@ -101,6 +130,25 @@ export default function AppLaunch() {
         <HiOutlineArrowLeft className="icon-small mr-2" />
         Back to Apps
       </Button>
+
+      {/* Not-installed banner */}
+      {!appsQuery.isPending && !isInstalled ? (
+        <div className="mb-4 p-3 flex items-center gap-3 border border-primary-light rounded-lg bg-surface/30">
+          <Typography className="text-secondary flex-1" type="small">
+            This app is not in your library. Install it for quick access from
+            the Apps page.
+          </Typography>
+          <Button
+            className="!rounded-md flex-shrink-0"
+            disabled={addAppMutation.isPending}
+            onClick={handleInstall}
+            size="sm"
+          >
+            <HiOutlineDownload className="icon-small mr-1" />
+            {addAppMutation.isPending ? 'Installing...' : 'Install App'}
+          </Button>
+        </div>
+      ) : null}
 
       {manifestMutation.isPending ? (
         <Typography className="text-secondary" type="small">
@@ -125,7 +173,7 @@ export default function AppLaunch() {
           ) : null}
           <AppLaunchForm
             entryPoint={selectedEntryPoint}
-            initialValues={launchState?.parameters}
+            initialValues={relaunchParameters}
             manifest={manifest}
             onSubmit={handleSubmit}
             submitting={submitJobMutation.isPending}

@@ -19,7 +19,8 @@ import {
 import {
   HiOutlineFolder,
   HiOutlineBriefcase,
-  HiOutlineCommandLine
+  HiOutlineCommandLine,
+  HiOutlineQueueList
 } from 'react-icons/hi2';
 import { TbBrandGithub } from 'react-icons/tb';
 
@@ -48,6 +49,11 @@ const LINKS = [
     icon: HiOutlineCommandLine,
     title: 'Apps',
     href: '/apps'
+  },
+  {
+    icon: HiOutlineQueueList,
+    title: 'Jobs',
+    href: '/apps/jobs'
   },
   {
     icon: HiOutlineBriefcase,

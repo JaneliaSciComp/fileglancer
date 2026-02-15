@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { Button, IconButton, Typography } from '@material-tailwind/react';
+import { buildLaunchPathFromApp } from '@/utils';
 import {
   HiOutlineInformationCircle,
   HiOutlinePlay,
@@ -31,9 +32,7 @@ export default function AppCard({
   const [infoOpen, setInfoOpen] = useState(false);
 
   const handleLaunch = () => {
-    navigate('/apps/launch/app', {
-      state: { appUrl: app.url, manifestPath: app.manifest_path }
-    });
+    navigate(buildLaunchPathFromApp(app.url, app.manifest_path));
   };
 
   return (

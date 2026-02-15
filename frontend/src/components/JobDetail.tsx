@@ -15,7 +15,7 @@ import {
 
 import type { JobFileInfo, FileSharePath } from '@/shared.types';
 import JobStatusBadge from '@/components/ui/AppsPage/JobStatusBadge';
-import { formatDateString } from '@/utils';
+import { formatDateString, buildRelaunchPath, parseGithubUrl } from '@/utils';
 import {
   getPreferredPathForDisplay,
   makeBrowseLink
@@ -170,25 +170,26 @@ export default function JobDetail() {
     if (!job) {
       return;
     }
-    navigate('/apps/launch/relaunch', {
-      state: {
-        appUrl: job.app_url,
-        manifestPath: job.manifest_path,
-        entryPointId: job.entry_point_id,
-        parameters: job.parameters
-      }
-    });
+    const { owner, repo, branch } = parseGithubUrl(job.app_url);
+    const path = buildRelaunchPath(
+      owner,
+      repo,
+      branch,
+      job.entry_point_id,
+      job.manifest_path || undefined
+    );
+    navigate(path, { state: { parameters: job.parameters } });
   };
 
   return (
     <div>
       <Button
         className="!rounded-md mb-6"
-        onClick={() => navigate('/apps')}
+        onClick={() => navigate('/apps/jobs')}
         variant="outline"
       >
         <HiOutlineArrowLeft className="icon-small mr-2" />
-        Back to Apps
+        Back to Jobs
       </Button>
 
       {jobQuery.isPending ? (
