@@ -15,7 +15,15 @@ export default function OverviewTable({
               Type
             </td>
             <td className="p-3">
-              {file ? (file.is_dir ? 'Folder' : 'File') : null}
+              {file
+                ? file.is_symlink
+                  ? file.symlink_target_fsp
+                    ? 'Symlink'
+                    : 'Symlink (broken)'
+                  : file.is_dir
+                    ? 'Folder'
+                    : 'File'
+                : null}
             </td>
           </tr>
           <tr className="border-b border-surface">
@@ -31,7 +39,11 @@ export default function OverviewTable({
               Size
             </td>
             <td className="p-3">
-              {file ? (file.is_dir ? '—' : formatFileSize(file.size)) : null}
+              {file
+                ? file.is_dir && !file.is_symlink
+                  ? '—'
+                  : formatFileSize(file.size)
+                : null}
             </td>
           </tr>
         </tbody>

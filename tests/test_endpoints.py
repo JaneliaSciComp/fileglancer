@@ -1169,6 +1169,62 @@ def test_get_content_with_symlink_no_matching_fsp(test_client, temp_dir):
         shutil.rmtree(external_dir)
 
 
+def test_get_content_traversal_through_directory_symlink(test_client, temp_dir):
+    """Test that accessing a file through a directory symlink pointing outside the FSP is blocked"""
+    external_dir = tempfile.mkdtemp()
+
+    try:
+        # Create a file in the external directory
+        external_file = os.path.join(external_dir, "secret.txt")
+        with open(external_file, "w") as f:
+            f.write("sensitive data")
+
+        # Create a directory symlink in the FSP pointing to the external directory
+        symlink_path = os.path.join(temp_dir, "link_to_external_dir")
+        os.symlink(external_dir, symlink_path)
+
+        # Try to access a file *through* the directory symlink
+        response = test_client.get(
+            "/api/content/tempdir?subpath=link_to_external_dir/secret.txt"
+        )
+        # Should be blocked — the resolved path escapes the FSP root
+        assert response.status_code == 400
+
+    finally:
+        shutil.rmtree(external_dir)
+
+
+def test_get_content_double_hop_symlink(test_client, temp_dir):
+    """Test that accessing a file through a chain of symlinks pointing outside the FSP is blocked"""
+    external_dir = tempfile.mkdtemp()
+    hop_dir = tempfile.mkdtemp()
+
+    try:
+        # Create a file in the external directory
+        external_file = os.path.join(external_dir, "secret.txt")
+        with open(external_file, "w") as f:
+            f.write("sensitive data")
+
+        # Create first hop: hop_dir/hop2 -> external_dir
+        hop2_path = os.path.join(hop_dir, "hop2")
+        os.symlink(external_dir, hop2_path)
+
+        # Create second hop in the FSP: double_hop -> hop_dir/hop2
+        symlink_path = os.path.join(temp_dir, "double_hop")
+        os.symlink(hop2_path, symlink_path)
+
+        # Try to access a file through the double-hop symlink
+        response = test_client.get(
+            "/api/content/tempdir?subpath=double_hop/secret.txt"
+        )
+        # Should be blocked — the resolved path escapes the FSP root
+        assert response.status_code == 400
+
+    finally:
+        shutil.rmtree(external_dir)
+        shutil.rmtree(hop_dir)
+
+
 def test_head_content_with_symlink(test_client, temp_dir):
     """Test HEAD request to /api/content endpoint with a symlink"""
     # Create a target file within the FSP
@@ -1188,3 +1244,33 @@ def test_head_content_with_symlink(test_client, temp_dir):
     assert response.headers["Accept-Ranges"] == "bytes"
     assert "Content-Length" in response.headers
     assert int(response.headers["Content-Length"]) == len(target_content)
+
+
+def test_broken_symlink_in_file_listing(test_client, temp_dir):
+    """Test that broken symlinks appear in /api/files response with correct properties"""
+    # Create a broken symlink pointing to a nonexistent path
+    broken_link_path = os.path.join(temp_dir, "broken_link")
+    os.symlink("/nonexistent/path", broken_link_path)
+
+    # Create a regular file for comparison
+    regular_file = os.path.join(temp_dir, "regular.txt")
+    with open(regular_file, "w") as f:
+        f.write("content")
+
+    # Request file listing
+    response = test_client.get("/api/files/tempdir")
+    assert response.status_code == 200
+
+    data = response.json()
+    files = data["files"]
+
+    # Find broken symlink in response
+    broken_link_file = next((f for f in files if f["name"] == "broken_link"), None)
+    assert broken_link_file is not None, "Broken symlink should be in response"
+    assert broken_link_file["is_symlink"] is True, "Should be marked as symlink"
+    assert broken_link_file["symlink_target_fsp"] is None, "Target should be None for broken symlink"
+
+    # Regular file should also be present
+    regular = next((f for f in files if f["name"] == "regular.txt"), None)
+    assert regular is not None, "Regular file should be in response"
+    assert regular["is_symlink"] is False, "Regular file should not be marked as symlink"

@@ -25,6 +25,7 @@ import { useTicketContext } from '@/contexts/TicketsContext';
 import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
 import { useExternalBucketContext } from '@/contexts/ExternalBucketContext';
 import useDataToolLinks from '@/hooks/useDataToolLinks';
+import { TbLink, TbLinkOff } from 'react-icons/tb';
 
 type PropertiesDrawerProps = {
   readonly togglePropertiesDrawer: () => void;
@@ -38,17 +39,23 @@ type PropertiesDrawerProps = {
 
 function CopyPathButton({
   path,
-  isDataLink
+  isDataLink,
+  isSymlink
 }: {
   readonly path: string;
   readonly isDataLink?: boolean;
+  readonly isSymlink?: boolean;
 }) {
   return (
     <div className="group flex justify-between items-center min-w-0 max-w-full">
       <FgTooltip label={path} triggerClasses="block truncate">
         <Typography className="text-foreground text-sm truncate">
           <span className="!font-bold">
-            {isDataLink ? 'Data Link: ' : 'Path: '}
+            {isDataLink
+              ? 'Data Link: '
+              : isSymlink
+                ? 'Linked path: '
+                : 'Path: '}
           </span>
           {path}
         </Typography>
@@ -60,11 +67,11 @@ function CopyPathButton({
           const result = await copyToClipboard(path);
           if (result.success) {
             toast.success(
-              `${isDataLink ? 'Data link' : 'Path'} copied to clipboard!`
+              `${isDataLink ? 'Data link' : isSymlink ? 'Linked path' : 'Path'} copied to clipboard!`
             );
           } else {
             toast.error(
-              `Failed to copy ${isDataLink ? 'data link' : 'path'}. Error: ${result.error}`
+              `Failed to copy ${isDataLink ? 'data link' : isSymlink ? 'linked path' : 'path'}. Error: ${result.error}`
             );
           }
         }}
@@ -137,21 +144,44 @@ export default function PropertiesDrawer({
           </IconButton>
         </div>
 
-        {fileBrowserState.propertiesTarget ? (
+        {fileQuery.data?.currentFileOrFolder &&
+        fileBrowserState.propertiesTarget ? (
           <div className="shrink-0 flex items-center gap-2 mt-3 mb-4 max-h-min">
-            {fileBrowserState.propertiesTarget.is_dir ? (
-              <HiOutlineFolder className="icon-default" />
+            {fileBrowserState.propertiesTarget.is_symlink ? (
+              <>
+                {fileBrowserState.propertiesTarget.symlink_target_fsp ? (
+                  <TbLink className="icon-default" />
+                ) : (
+                  <TbLinkOff className="icon-default text-error" />
+                )}
+                <div className="flex flex-col min-w-0 gap-1">
+                  <FgTooltip
+                    label={fileBrowserState.propertiesTarget.name}
+                    triggerClasses="truncate"
+                  >
+                    <Typography className="font-semibold truncate">
+                      {fileBrowserState.propertiesTarget.name}
+                    </Typography>
+                  </FgTooltip>
+                </div>
+              </>
             ) : (
-              <HiOutlineDocument className="icon-default" />
+              <>
+                {fileBrowserState.propertiesTarget.is_dir ? (
+                  <HiOutlineFolder className="icon-default" />
+                ) : (
+                  <HiOutlineDocument className="icon-default" />
+                )}
+                <FgTooltip
+                  label={fileBrowserState.propertiesTarget.name}
+                  triggerClasses={tooltipTriggerClasses}
+                >
+                  <Typography className="font-semibold truncate max-w-min">
+                    {fileBrowserState.propertiesTarget?.name}
+                  </Typography>
+                </FgTooltip>
+              </>
             )}
-            <FgTooltip
-              label={fileBrowserState.propertiesTarget.name}
-              triggerClasses={tooltipTriggerClasses}
-            >
-              <Typography className="font-semibold truncate max-w-min">
-                {fileBrowserState.propertiesTarget?.name}
-              </Typography>
-            </FgTooltip>
           </div>
         ) : (
           <Typography className="mt-3 mb-4">
@@ -180,7 +210,7 @@ export default function PropertiesDrawer({
                 Permissions
               </Tabs.Trigger>
 
-              {tasksEnabled ? (
+              {tasksEnabled && !fileBrowserState.propertiesTarget.is_symlink ? (
                 <Tabs.Trigger
                   className="!text-foreground h-full"
                   value="convert"
@@ -196,7 +226,10 @@ export default function PropertiesDrawer({
               className="flex-1 flex flex-col gap-4 max-w-full p-2"
               value="overview"
             >
-              <CopyPathButton path={fullPath} />
+              <CopyPathButton
+                isSymlink={fileBrowserState.propertiesTarget.is_symlink}
+                path={fullPath}
+              />
               <OverviewTable file={fileBrowserState.propertiesTarget} />
               {fileBrowserState.propertiesTarget.is_dir &&
               (proxiedPathByFspAndPathQuery.isPending ||
@@ -309,7 +342,7 @@ export default function PropertiesDrawer({
             </Tabs.Panel>
 
             {/*Task panel*/}
-            {tasksEnabled ? (
+            {tasksEnabled && !fileBrowserState.propertiesTarget.is_symlink ? (
               <Tabs.Panel
                 className="flex flex-col gap-4 flex-1 w-full p-2"
                 value="convert"

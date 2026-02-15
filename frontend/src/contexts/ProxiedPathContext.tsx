@@ -25,6 +25,9 @@ type ProxiedPathContextType = {
   proxiedPathByFspAndPathQuery: ReturnType<
     typeof useProxiedPathByFspAndPathQuery
   >;
+  currentDirProxiedPathQuery: ReturnType<
+    typeof useProxiedPathByFspAndPathQuery
+  >;
   createProxiedPathMutation: ReturnType<typeof useCreateProxiedPathMutation>;
   deleteProxiedPathMutation: ReturnType<typeof useDeleteProxiedPathMutation>;
 };
@@ -46,21 +49,34 @@ export const ProxiedPathProvider = ({
 }: {
   readonly children: ReactNode;
 }) => {
-  const { fileQuery } = useFileBrowserContext();
+  const { fileQuery, fileBrowserState } = useFileBrowserContext();
+
+  const isReady = !fileQuery.isPending && !fileQuery.isError;
 
   // Initialize all queries and mutations
   const allProxiedPathsQuery = useAllProxiedPathsQuery();
+
+  // Query for the properties target (used by the data link toggle in PropertiesDrawer)
   const proxiedPathByFspAndPathQuery = useProxiedPathByFspAndPathQuery(
     fileQuery.data?.currentFileSharePath?.name,
-    fileQuery.data?.currentFileOrFolder?.path,
-    !fileQuery.isPending && !fileQuery.isError
+    fileBrowserState.dataLinkPath ?? undefined,
+    isReady
   );
+
+  // Query for the current browsed directory (used by viewer icon URLs)
+  const currentDirProxiedPathQuery = useProxiedPathByFspAndPathQuery(
+    fileQuery.data?.currentFileSharePath?.name,
+    fileQuery.data?.currentFileOrFolder?.path,
+    isReady
+  );
+
   const createProxiedPathMutation = useCreateProxiedPathMutation();
   const deleteProxiedPathMutation = useDeleteProxiedPathMutation();
 
   const value: ProxiedPathContextType = {
     allProxiedPathsQuery,
     proxiedPathByFspAndPathQuery,
+    currentDirProxiedPathQuery,
     createProxiedPathMutation,
     deleteProxiedPathMutation
   };
