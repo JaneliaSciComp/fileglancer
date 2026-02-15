@@ -108,6 +108,44 @@ Parameters define the inputs that users fill in through the Fileglancer UI. Each
 | `max` | number | no | Maximum value (only for `integer` and `number` types) |
 | `pattern` | string | no | Regex validation pattern (only for `string` type, uses full match) |
 
+### Parameter Sections
+
+Parameters can be grouped into collapsible sections in the UI. A section is an item in the `parameters` list that has a `section` key instead of `name`/`type`. Sections contain their own nested `parameters` list (one level deep only). Top-level parameters and sections can be interleaved freely.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `section` | string | yes | Section title displayed in the UI |
+| `description` | string | no | Help text shown next to the section title |
+| `collapsed` | boolean | no | Whether the section starts collapsed. Default: `false` |
+| `parameters` | list of objects | no | Parameter definitions within this section (same schema as top-level parameters) |
+
+```yaml
+parameters:
+  # Top-level parameter (always visible)
+  - flag: --input
+    name: Input Path
+    type: file
+    required: true
+
+  # Collapsible section
+  - section: Advanced Options
+    description: Optional tuning parameters
+    collapsed: true
+    parameters:
+      - flag: --chunk_size
+        name: Chunk Size
+        type: string
+        default: "128,128,128"
+      - flag: --verbose
+        name: Verbose
+        type: boolean
+        default: false
+```
+
+When a section has `collapsed: true`, it renders as a closed accordion in the UI. Users can click to expand it and see the parameters inside. Sections without `collapsed` (or with `collapsed: false`) start expanded.
+
+On form validation, any section containing a parameter with an error is automatically expanded so the user can see and fix the problem.
+
 ### Flag Forms
 
 Parameters support three flag styles:

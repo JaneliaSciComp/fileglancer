@@ -15,7 +15,7 @@ export default function Jobs() {
       <Typography className="mb-6 text-foreground">
         Jobs are runs of command-line tools on the compute cluster that are
         launched from the{' '}
-        <Link to="/fg/apps" className="text-primary underline">
+        <Link className="text-primary underline" to="/fg/apps">
           Apps page
         </Link>
         .

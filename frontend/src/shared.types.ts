@@ -73,6 +73,27 @@ type AppParameter = {
   pattern?: string;
 };
 
+type AppParameterSection = {
+  section: string;
+  description?: string;
+  collapsed?: boolean;
+  parameters: AppParameter[];
+};
+
+type AppParameterItem = AppParameter | AppParameterSection;
+
+function isParameterSection(
+  item: AppParameterItem
+): item is AppParameterSection {
+  return 'section' in item;
+}
+
+function flattenParameters(items: AppParameterItem[]): AppParameter[] {
+  return items.flatMap(item =>
+    isParameterSection(item) ? item.parameters : [item]
+  );
+}
+
 type AppResourceDefaults = {
   cpus?: number;
   memory?: string;
@@ -84,7 +105,7 @@ type AppEntryPoint = {
   name: string;
   description?: string;
   command: string;
-  parameters: AppParameter[];
+  parameters: AppParameterItem[];
   resources?: AppResourceDefaults;
 };
 
@@ -142,6 +163,8 @@ export type {
   AppEntryPoint,
   AppManifest,
   AppParameter,
+  AppParameterItem,
+  AppParameterSection,
   AppResourceDefaults,
   FetchRequestOptions,
   FileOrFolder,
@@ -157,3 +180,5 @@ export type {
   Zone,
   ZonesAndFileSharePathsMap
 };
+
+export { flattenParameters, isParameterSection };

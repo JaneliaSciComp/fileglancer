@@ -1,8 +1,8 @@
 import re
 from datetime import datetime
-from typing import Any, List, Literal, Optional, Dict
+from typing import Annotated, Any, List, Literal, Optional, Dict, Union
 
-from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
+from pydantic import BaseModel, Discriminator, Field, HttpUrl, Tag, field_validator, model_validator
 
 
 class FileSharePath(BaseModel):
@@ -342,6 +342,29 @@ class AppParameter(BaseModel):
         return v
 
 
+class AppParameterSection(BaseModel):
+    """A collapsible section that groups parameters in the UI"""
+    section: str = Field(description="Section title")
+    description: Optional[str] = Field(default=None)
+    collapsed: bool = Field(default=False)
+    parameters: List[AppParameter] = Field(default=[])
+
+
+def _param_item_discriminator(v):
+    if isinstance(v, dict):
+        return 'section' if 'section' in v else 'parameter'
+    return 'section' if isinstance(v, AppParameterSection) else 'parameter'
+
+
+AppParameterItem = Annotated[
+    Union[
+        Annotated[AppParameter, Tag('parameter')],
+        Annotated[AppParameterSection, Tag('section')],
+    ],
+    Discriminator(_param_item_discriminator),
+]
+
+
 class AppResourceDefaults(BaseModel):
     """Resource defaults for an app entry point"""
     cpus: Optional[int] = Field(description="Number of CPUs", default=None)
@@ -355,14 +378,24 @@ class AppEntryPoint(BaseModel):
     name: str = Field(description="Display name of the entry point")
     description: Optional[str] = Field(description="Description of the entry point", default=None)
     command: str = Field(description="The base CLI command to execute")
-    parameters: List[AppParameter] = Field(description="Parameters for this entry point", default=[])
+    parameters: List[AppParameterItem] = Field(description="Parameters for this entry point", default=[])
     resources: Optional[AppResourceDefaults] = Field(description="Default resource requirements", default=None)
+
+    def flat_parameters(self) -> List[AppParameter]:
+        """Return a flat list of all parameters, traversing sections."""
+        result = []
+        for item in self.parameters:
+            if isinstance(item, AppParameterSection):
+                result.extend(item.parameters)
+            else:
+                result.append(item)
+        return result
 
     @model_validator(mode='after')
     def generate_parameter_keys(self):
         positional_index = 0
         keys_seen: dict[str, str] = {}
-        for param in self.parameters:
+        for param in self.flat_parameters():
             if param.flag is not None:
                 param.key = param.flag.lstrip("-")
             else:

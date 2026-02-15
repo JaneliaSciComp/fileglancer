@@ -338,10 +338,11 @@ def build_command(entry_point: AppEntryPoint, parameters: dict) -> str:
     Raises ValueError for invalid parameters.
     """
     # Build a lookup of parameter definitions by key
-    param_defs = {p.key: p for p in entry_point.parameters}
+    flat_params = entry_point.flat_parameters()
+    param_defs = {p.key: p for p in flat_params}
 
     # Validate required parameters
-    for param in entry_point.parameters:
+    for param in flat_params:
         if param.required and param.key not in parameters:
             if param.default is None:
                 raise ValueError(f"Required parameter '{param.name}' is missing")
@@ -353,7 +354,7 @@ def build_command(entry_point: AppEntryPoint, parameters: dict) -> str:
 
     # Compute effective values: user-provided merged with defaults
     effective: dict[str, tuple[AppParameter, any]] = {}
-    for param in entry_point.parameters:
+    for param in flat_params:
         if param.key in parameters:
             effective[param.key] = (param, parameters[param.key])
         elif param.default is not None:
@@ -363,7 +364,7 @@ def build_command(entry_point: AppEntryPoint, parameters: dict) -> str:
     parts = [entry_point.command]
 
     # Pass 1: Positional args in declaration order
-    for param in entry_point.parameters:
+    for param in flat_params:
         if param.flag is not None:
             continue
         if param.key not in effective:
@@ -373,7 +374,7 @@ def build_command(entry_point: AppEntryPoint, parameters: dict) -> str:
         parts.append(shlex.quote(validated))
 
     # Pass 2: Flagged args in declaration order
-    for param in entry_point.parameters:
+    for param in flat_params:
         if param.flag is None:
             continue
         if param.key not in effective:

@@ -68,7 +68,8 @@ export default function Apps() {
         Apps
       </Typography>
       <Typography className="mb-4 text-foreground" type="small">
-        Run command-line tools on the compute cluster. Add apps by URL to get started.
+        Run command-line tools on the compute cluster. Add apps by URL to get
+        started.
       </Typography>
 
       <div className="mb-6">

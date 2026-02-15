@@ -1,15 +1,17 @@
 import { useState } from 'react';
 
-import { Button, Tabs, Typography } from '@material-tailwind/react';
-import { HiOutlinePlay } from 'react-icons/hi';
+import { Accordion, Button, Tabs, Typography } from '@material-tailwind/react';
+import { HiChevronDown, HiOutlinePlay } from 'react-icons/hi';
 
 import FileSelectorButton from '@/components/ui/BrowsePage/FileSelector/FileSelectorButton';
 import { validatePaths } from '@/queries/appsQueries';
 import { convertBackToForwardSlash } from '@/utils/pathHandling';
+import { flattenParameters, isParameterSection } from '@/shared.types';
 import type {
   AppEntryPoint,
   AppManifest,
   AppParameter,
+  AppParameterSection,
   AppResourceDefaults
 } from '@/shared.types';
 
@@ -125,6 +127,69 @@ function ParameterField({
   }
 }
 
+function ParameterFieldRow({
+  param,
+  value,
+  error,
+  onChange
+}: {
+  readonly param: AppParameter;
+  readonly value: unknown;
+  readonly error?: string;
+  readonly onChange: (value: unknown) => void;
+}) {
+  return (
+    <div>
+      {param.type !== 'boolean' ? (
+        <label
+          className="block text-foreground text-sm font-medium mb-1"
+          htmlFor={`param-${param.key}`}
+        >
+          {param.name}
+          {param.required ? <span className="text-error ml-1">*</span> : null}
+        </label>
+      ) : null}
+      {param.description && param.type !== 'boolean' ? (
+        <Typography className="text-secondary mb-1" type="small">
+          {param.description}
+        </Typography>
+      ) : null}
+      <ParameterField onChange={onChange} param={param} value={value} />
+      {error ? (
+        <Typography className="text-error mt-1" type="small">
+          {error}
+        </Typography>
+      ) : null}
+    </div>
+  );
+}
+
+function SectionContent({
+  section,
+  values,
+  errors,
+  onParamChange
+}: {
+  readonly section: AppParameterSection;
+  readonly values: Record<string, unknown>;
+  readonly errors: Record<string, string>;
+  readonly onParamChange: (paramId: string, value: unknown) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      {section.parameters.map(param => (
+        <ParameterFieldRow
+          error={errors[param.key]}
+          key={param.key}
+          onChange={val => onParamChange(param.key, val)}
+          param={param}
+          value={values[param.key]}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function AppLaunchForm({
   manifest,
   entryPoint,
@@ -132,9 +197,11 @@ export default function AppLaunchForm({
   submitting,
   initialValues: externalValues
 }: AppLaunchFormProps) {
+  const allParams = flattenParameters(entryPoint.parameters);
+
   // Initialize parameter values: external values override defaults
   const defaultValues: Record<string, unknown> = {};
-  for (const param of entryPoint.parameters) {
+  for (const param of allParams) {
     if (param.default !== undefined) {
       defaultValues[param.key] = param.default;
     }
@@ -143,10 +210,17 @@ export default function AppLaunchForm({
     ? { ...defaultValues, ...externalValues }
     : defaultValues;
 
+  // Compute which sections start open (those without collapsed: true)
+  const initialOpenSections = entryPoint.parameters
+    .filter(item => isParameterSection(item) && !item.collapsed)
+    .map(item => (item as AppParameterSection).section);
+
   const [values, setValues] = useState<Record<string, unknown>>(startingValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState('parameters');
   const [pullLatest, setPullLatest] = useState(false);
+  const [openSections, setOpenSections] =
+    useState<string[]>(initialOpenSections);
   const [resources, setResources] = useState<AppResourceDefaults>({
     cpus: entryPoint.resources?.cpus,
     memory: entryPoint.resources?.memory,
@@ -167,7 +241,7 @@ export default function AppLaunchForm({
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
-    for (const param of entryPoint.parameters) {
+    for (const param of allParams) {
       const val = values[param.key];
       if (param.required && (val === undefined || val === null || val === '')) {
         newErrors[param.key] = `${param.name} is required`;
@@ -207,6 +281,21 @@ export default function AppLaunchForm({
       }
     }
     setErrors(newErrors);
+
+    // Auto-expand sections that contain errors
+    if (Object.keys(newErrors).length > 0) {
+      const sectionsToOpen = new Set(openSections);
+      for (const item of entryPoint.parameters) {
+        if (
+          isParameterSection(item) &&
+          item.parameters.some(p => newErrors[p.key])
+        ) {
+          sectionsToOpen.add(item.section);
+        }
+      }
+      setOpenSections([...sectionsToOpen]);
+    }
+
     return Object.keys(newErrors).length === 0;
   };
 
@@ -218,7 +307,7 @@ export default function AppLaunchForm({
     }
 
     // Build a lookup of parameter definitions
-    const paramDefs = new Map(entryPoint.parameters.map(p => [p.key, p]));
+    const paramDefs = new Map(allParams.map(p => [p.key, p]));
 
     // Filter out undefined/empty values and normalize paths to Linux format
     const params: Record<string, unknown> = {};
@@ -272,6 +361,8 @@ export default function AppLaunchForm({
     );
   };
 
+  const hasSections = entryPoint.parameters.some(isParameterSection);
+
   return (
     <div>
       <Typography className="text-foreground font-bold mb-1" type="h5">
@@ -290,16 +381,10 @@ export default function AppLaunchForm({
       {/* Tabs */}
       <Tabs onValueChange={setActiveTab} value={activeTab}>
         <Tabs.List className="justify-start items-stretch shrink-0 min-w-fit w-full py-2 bg-surface dark:bg-surface-light">
-          <Tabs.Trigger
-            className="!text-foreground h-full"
-            value="parameters"
-          >
+          <Tabs.Trigger className="!text-foreground h-full" value="parameters">
             Parameters
           </Tabs.Trigger>
-          <Tabs.Trigger
-            className="!text-foreground h-full"
-            value="environment"
-          >
+          <Tabs.Trigger className="!text-foreground h-full" value="environment">
             Environment
           </Tabs.Trigger>
           <Tabs.TriggerIndicator className="h-full" />
@@ -307,36 +392,74 @@ export default function AppLaunchForm({
 
         <Tabs.Panel className="pt-4" value="parameters">
           <div className="max-w-2xl space-y-4">
-            {entryPoint.parameters.map(param => (
-              <div key={param.key}>
-                {param.type !== 'boolean' ? (
-                  <label
-                    className="block text-foreground text-sm font-medium mb-1"
-                    htmlFor={`param-${param.key}`}
-                  >
-                    {param.name}
-                    {param.required ? (
-                      <span className="text-error ml-1">*</span>
-                    ) : null}
-                  </label>
-                ) : null}
-                {param.description && param.type !== 'boolean' ? (
-                  <Typography className="text-secondary mb-1" type="small">
-                    {param.description}
-                  </Typography>
-                ) : null}
-                <ParameterField
-                  onChange={val => handleChange(param.key, val)}
-                  param={param}
-                  value={values[param.key]}
-                />
-                {errors[param.key] ? (
-                  <Typography className="text-error mt-1" type="small">
-                    {errors[param.key]}
-                  </Typography>
-                ) : null}
-              </div>
-            ))}
+            {hasSections ? (
+              <Accordion
+                onValueChange={v =>
+                  setOpenSections(
+                    Array.isArray(v) ? (v as string[]) : [v as string]
+                  )
+                }
+                type="multiple"
+                value={openSections}
+              >
+                {entryPoint.parameters.map(item =>
+                  isParameterSection(item) ? (
+                    <Accordion.Item
+                      key={`section-${item.section}`}
+                      value={item.section}
+                    >
+                      <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
+                        <div className="text-left">
+                          <span className="text-foreground font-medium text-sm">
+                            {item.section}
+                          </span>
+                          {item.description ? (
+                            <Typography className="text-secondary" type="small">
+                              {item.description}
+                            </Typography>
+                          ) : null}
+                        </div>
+                        <HiChevronDown
+                          className={`h-4 w-4 text-secondary transition-transform ${
+                            openSections.includes(item.section)
+                              ? 'rotate-180'
+                              : ''
+                          }`}
+                        />
+                      </Accordion.Trigger>
+                      <Accordion.Content className="pt-4 pb-2">
+                        <SectionContent
+                          errors={errors}
+                          onParamChange={handleChange}
+                          section={item}
+                          values={values}
+                        />
+                      </Accordion.Content>
+                    </Accordion.Item>
+                  ) : (
+                    <ParameterFieldRow
+                      error={errors[item.key]}
+                      key={item.key}
+                      onChange={val => handleChange(item.key, val)}
+                      param={item}
+                      value={values[item.key]}
+                    />
+                  )
+                )}
+              </Accordion>
+            ) : (
+              entryPoint.parameters.map(item =>
+                isParameterSection(item) ? null : (
+                  <ParameterFieldRow
+                    error={errors[item.key]}
+                    key={item.key}
+                    onChange={val => handleChange(item.key, val)}
+                    param={item}
+                    value={values[item.key]}
+                  />
+                )
+              )
+            )}
           </div>
         </Tabs.Panel>
 
