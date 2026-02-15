@@ -151,9 +151,31 @@ export default function AppLaunch() {
       ) : null}
 
       {manifestMutation.isPending ? (
-        <Typography className="text-secondary" type="small">
-          Loading app manifest...
-        </Typography>
+        <div className="max-w-2xl animate-pulse">
+          {/* Title + subtitle */}
+          <div className="mb-6">
+            <div className="w-48 h-6 bg-surface rounded mb-2" />
+            <div className="w-32 h-4 bg-surface rounded" />
+          </div>
+          {/* Parameter fields */}
+          <div className="space-y-4 mb-6">
+            {[1, 2, 3].map(i => (
+              <div key={i}>
+                <div className="w-24 h-4 bg-surface rounded mb-2" />
+                <div className="w-full h-10 bg-surface rounded" />
+              </div>
+            ))}
+          </div>
+          {/* Checkbox toggle */}
+          <div className="flex items-center gap-2 mb-6">
+            <div className="w-4 h-4 bg-surface rounded" />
+            <div className="w-48 h-4 bg-surface rounded" />
+          </div>
+          {/* Resource options link */}
+          <div className="w-36 h-4 bg-surface rounded mb-6" />
+          {/* Submit button */}
+          <div className="w-32 h-10 bg-surface rounded" />
+        </div>
       ) : manifestMutation.isError ? (
         <div className="p-3 bg-error/10 rounded text-error text-sm">
           Failed to load app manifest:{' '}
