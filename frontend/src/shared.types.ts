@@ -149,6 +149,7 @@ type Job = {
   env?: Record<string, string>;
   pre_run?: string;
   post_run?: string;
+  pull_latest: boolean;
   cluster_job_id?: string;
   created_at: string;
   started_at?: string;

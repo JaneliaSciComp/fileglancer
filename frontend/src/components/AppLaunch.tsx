@@ -47,15 +47,21 @@ export default function AppLaunch() {
   const relaunchState = isRelaunch
     ? (location.state as {
         parameters?: Record<string, unknown>;
+        resources?: Record<string, unknown>;
         env?: Record<string, string>;
         pre_run?: string;
         post_run?: string;
+        pull_latest?: boolean;
       } | null)
     : null;
   const relaunchParameters = relaunchState?.parameters;
+  const relaunchResources = relaunchState?.resources as
+    | AppResourceDefaults
+    | undefined;
   const relaunchEnv = relaunchState?.env;
   const relaunchPreRun = relaunchState?.pre_run;
   const relaunchPostRun = relaunchState?.post_run;
+  const relaunchPullLatest = relaunchState?.pull_latest;
 
   // Check if app is in user's library
   const isInstalled = appsQuery.data?.some(
@@ -210,6 +216,8 @@ export default function AppLaunch() {
             initialEnv={relaunchEnv}
             initialPostRun={relaunchPostRun}
             initialPreRun={relaunchPreRun}
+            initialPullLatest={relaunchPullLatest}
+            initialResources={relaunchResources}
             initialValues={relaunchParameters}
             manifest={manifest}
             onSubmit={handleSubmit}

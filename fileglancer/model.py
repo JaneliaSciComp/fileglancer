@@ -490,6 +490,7 @@ class Job(BaseModel):
     env: Optional[Dict[str, str]] = Field(description="Environment variables used for the job", default=None)
     pre_run: Optional[str] = Field(description="Script run before the main command", default=None)
     post_run: Optional[str] = Field(description="Script run after the main command", default=None)
+    pull_latest: bool = Field(description="Whether pull latest was enabled", default=False)
     cluster_job_id: Optional[str] = Field(description="Cluster-assigned job ID", default=None)
     created_at: datetime = Field(description="When the job was created")
     started_at: Optional[datetime] = Field(description="When the job started running", default=None)

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, UTC
 import os
 from functools import lru_cache
 
-from sqlalchemy import create_engine, Column, String, Integer, DateTime, JSON, UniqueConstraint
+from sqlalchemy import create_engine, Column, String, Integer, Boolean, DateTime, JSON, UniqueConstraint
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.pool import StaticPool
@@ -155,6 +155,7 @@ class JobDB(Base):
     env = Column(JSON, nullable=True)
     pre_run = Column(String, nullable=True)
     post_run = Column(String, nullable=True)
+    pull_latest = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
@@ -828,7 +829,7 @@ def create_job(session: Session, username: str, app_url: str, app_name: str,
                entry_point_id: str, entry_point_name: str, parameters: Dict,
                resources: Optional[Dict] = None, manifest_path: str = "",
                env: Optional[Dict] = None, pre_run: Optional[str] = None,
-               post_run: Optional[str] = None) -> JobDB:
+               post_run: Optional[str] = None, pull_latest: bool = False) -> JobDB:
     """Create a new job record"""
     now = datetime.now(UTC)
     job = JobDB(
@@ -843,6 +844,7 @@ def create_job(session: Session, username: str, app_url: str, app_name: str,
         env=env,
         pre_run=pre_run,
         post_run=post_run,
+        pull_latest=pull_latest,
         status="PENDING",
         created_at=now
     )

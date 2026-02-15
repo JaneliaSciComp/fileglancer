@@ -34,9 +34,11 @@ interface AppLaunchFormProps {
   ) => Promise<void>;
   readonly submitting: boolean;
   readonly initialValues?: Record<string, unknown>;
+  readonly initialResources?: AppResourceDefaults;
   readonly initialEnv?: Record<string, string>;
   readonly initialPreRun?: string;
   readonly initialPostRun?: string;
+  readonly initialPullLatest?: boolean;
 }
 
 type EnvVar = { key: string; value: string };
@@ -470,9 +472,11 @@ export default function AppLaunchForm({
   onSubmit,
   submitting,
   initialValues: externalValues,
+  initialResources,
   initialEnv,
   initialPreRun,
-  initialPostRun
+  initialPostRun,
+  initialPullLatest
 }: AppLaunchFormProps) {
   const allParams = flattenParameters(entryPoint.parameters);
 
@@ -495,14 +499,16 @@ export default function AppLaunchForm({
   const [values, setValues] = useState<Record<string, unknown>>(startingValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState('parameters');
-  const [pullLatest, setPullLatest] = useState(false);
+  const [pullLatest, setPullLatest] = useState(initialPullLatest ?? false);
   const [openSections, setOpenSections] =
     useState<string[]>(initialOpenSections);
-  const [resources, setResources] = useState<AppResourceDefaults>({
-    cpus: entryPoint.resources?.cpus,
-    memory: entryPoint.resources?.memory,
-    walltime: entryPoint.resources?.walltime
-  });
+  const [resources, setResources] = useState<AppResourceDefaults>(
+    initialResources ?? {
+      cpus: entryPoint.resources?.cpus,
+      memory: entryPoint.resources?.memory,
+      walltime: entryPoint.resources?.walltime
+    }
+  );
 
   // Environment tab state — relaunch values override entry point defaults
   const [envVars, setEnvVars] = useState<EnvVar[]>(() => {

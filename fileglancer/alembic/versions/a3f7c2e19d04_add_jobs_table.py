@@ -34,6 +34,7 @@ def upgrade() -> None:
         sa.Column('env', sa.JSON(), nullable=True),
         sa.Column('pre_run', sa.String(), nullable=True),
         sa.Column('post_run', sa.String(), nullable=True),
+        sa.Column('pull_latest', sa.Boolean(), nullable=False, server_default='0'),
         sa.Column('created_at', sa.DateTime(), nullable=False),
         sa.Column('started_at', sa.DateTime(), nullable=True),
         sa.Column('finished_at', sa.DateTime(), nullable=True),

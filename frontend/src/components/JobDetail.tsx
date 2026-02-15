@@ -181,9 +181,11 @@ export default function JobDetail() {
     navigate(path, {
       state: {
         parameters: job.parameters,
+        resources: job.resources,
         env: job.env,
         pre_run: job.pre_run,
-        post_run: job.post_run
+        post_run: job.post_run,
+        pull_latest: job.pull_latest
       }
     });
   };

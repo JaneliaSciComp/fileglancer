@@ -1731,6 +1731,7 @@ def create_app(settings):
             env=db_job.env,
             pre_run=db_job.pre_run,
             post_run=db_job.post_run,
+            pull_latest=db_job.pull_latest,
             cluster_job_id=db_job.cluster_job_id,
             created_at=db_job.created_at,
             started_at=db_job.started_at,

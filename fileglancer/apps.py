@@ -634,6 +634,7 @@ async def submit_job(
             env=merged_env or None,
             pre_run=effective_pre_run,
             post_run=effective_post_run,
+            pull_latest=pull_latest,
         )
         job_id = db_job.id
 
