@@ -603,6 +603,13 @@ async def submit_job(
     # Build resource spec
     resource_spec = _build_resource_spec(entry_point, resources, settings)
 
+    # Merge env/pre_run/post_run: manifest defaults overridden by user values
+    merged_env = dict(entry_point.env or {})
+    if env:
+        merged_env.update(env)
+    effective_pre_run = pre_run if pre_run is not None else (entry_point.pre_run or None)
+    effective_post_run = post_run if post_run is not None else (entry_point.post_run or None)
+
     # Create DB record first to get job ID for the work directory
     resources_dict = None
     if resource_spec:
@@ -624,6 +631,9 @@ async def submit_job(
             parameters=parameters,
             resources=resources_dict,
             manifest_path=manifest_path,
+            env=merged_env or None,
+            pre_run=effective_pre_run,
+            post_run=effective_post_run,
         )
         job_id = db_job.id
 
@@ -647,14 +657,6 @@ async def submit_job(
             cd_target = repo_link / manifest_path
         else:
             cd_target = repo_link
-
-    # Merge env/pre_run/post_run: manifest defaults overridden by user values
-    merged_env = dict(entry_point.env or {})
-    if env:
-        merged_env.update(env)
-
-    effective_pre_run = pre_run if pre_run is not None else (entry_point.pre_run or None)
-    effective_post_run = post_run if post_run is not None else (entry_point.post_run or None)
 
     # Build environment variable export lines
     env_lines = ""

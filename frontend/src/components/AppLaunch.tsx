@@ -44,10 +44,18 @@ export default function AppLaunch() {
   const manifestPath = searchParams.get('path') || '';
   const appUrl = buildGithubUrl(owner!, repo!, branch!);
   const isRelaunch = location.pathname.startsWith('/apps/relaunch/');
-  const relaunchParameters = isRelaunch
-    ? (location.state as { parameters?: Record<string, unknown> } | null)
-        ?.parameters
-    : undefined;
+  const relaunchState = isRelaunch
+    ? (location.state as {
+        parameters?: Record<string, unknown>;
+        env?: Record<string, string>;
+        pre_run?: string;
+        post_run?: string;
+      } | null)
+    : null;
+  const relaunchParameters = relaunchState?.parameters;
+  const relaunchEnv = relaunchState?.env;
+  const relaunchPreRun = relaunchState?.pre_run;
+  const relaunchPostRun = relaunchState?.post_run;
 
   // Check if app is in user's library
   const isInstalled = appsQuery.data?.some(
@@ -199,6 +207,9 @@ export default function AppLaunch() {
           ) : null}
           <AppLaunchForm
             entryPoint={selectedEntryPoint}
+            initialEnv={relaunchEnv}
+            initialPostRun={relaunchPostRun}
+            initialPreRun={relaunchPreRun}
             initialValues={relaunchParameters}
             manifest={manifest}
             onSubmit={handleSubmit}

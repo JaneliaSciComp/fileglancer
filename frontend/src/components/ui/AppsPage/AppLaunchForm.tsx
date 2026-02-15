@@ -34,6 +34,9 @@ interface AppLaunchFormProps {
   ) => Promise<void>;
   readonly submitting: boolean;
   readonly initialValues?: Record<string, unknown>;
+  readonly initialEnv?: Record<string, string>;
+  readonly initialPreRun?: string;
+  readonly initialPostRun?: string;
 }
 
 type EnvVar = { key: string; value: string };
@@ -466,7 +469,10 @@ export default function AppLaunchForm({
   entryPoint,
   onSubmit,
   submitting,
-  initialValues: externalValues
+  initialValues: externalValues,
+  initialEnv,
+  initialPreRun,
+  initialPostRun
 }: AppLaunchFormProps) {
   const allParams = flattenParameters(entryPoint.parameters);
 
@@ -498,18 +504,20 @@ export default function AppLaunchForm({
     walltime: entryPoint.resources?.walltime
   });
 
-  // Environment tab state
+  // Environment tab state — relaunch values override entry point defaults
   const [envVars, setEnvVars] = useState<EnvVar[]>(() => {
-    if (entryPoint.env) {
-      return Object.entries(entryPoint.env).map(([key, value]) => ({
-        key,
-        value
-      }));
+    const source = initialEnv ?? entryPoint.env;
+    if (source) {
+      return Object.entries(source).map(([key, value]) => ({ key, value }));
     }
     return [];
   });
-  const [preRun, setPreRun] = useState(entryPoint.pre_run ?? '');
-  const [postRun, setPostRun] = useState(entryPoint.post_run ?? '');
+  const [preRun, setPreRun] = useState(
+    initialPreRun ?? entryPoint.pre_run ?? ''
+  );
+  const [postRun, setPostRun] = useState(
+    initialPostRun ?? entryPoint.post_run ?? ''
+  );
   const [openEnvSections, setOpenEnvSections] = useState<string[]>([
     'environment',
     'resources'

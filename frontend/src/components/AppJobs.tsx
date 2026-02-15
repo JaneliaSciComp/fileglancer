@@ -33,7 +33,14 @@ export default function AppJobs() {
       job.entry_point_id,
       job.manifest_path || undefined
     );
-    navigate(path, { state: { parameters: job.parameters } });
+    navigate(path, {
+      state: {
+        parameters: job.parameters,
+        env: job.env,
+        pre_run: job.pre_run,
+        post_run: job.post_run
+      }
+    });
   };
 
   const handleCancelJob = async (jobId: number) => {

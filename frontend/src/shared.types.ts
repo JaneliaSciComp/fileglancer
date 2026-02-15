@@ -146,6 +146,9 @@ type Job = {
   status: 'PENDING' | 'RUNNING' | 'DONE' | 'FAILED' | 'KILLED';
   exit_code?: number;
   resources?: Record<string, unknown>;
+  env?: Record<string, string>;
+  pre_run?: string;
+  post_run?: string;
   cluster_job_id?: string;
   created_at: string;
   started_at?: string;
