@@ -171,6 +171,11 @@ function ParameterFieldRow({
         </Typography>
       ) : null}
       <ParameterField onChange={onChange} param={param} value={value} />
+      {param.description && param.type === 'boolean' ? (
+        <Typography className="text-secondary mt-1" type="small">
+          {param.description}
+        </Typography>
+      ) : null}
       {error ? (
         <Typography className="text-error mt-1" type="small">
           {error}
