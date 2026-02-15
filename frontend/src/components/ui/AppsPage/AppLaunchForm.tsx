@@ -367,7 +367,7 @@ export default function AppLaunchForm({
                 CPUs
               </label>
               <input
-                className="w-full p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary"
+                className="p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary"
                 min={1}
                 onChange={e =>
                   setResources(prev => ({
@@ -385,7 +385,7 @@ export default function AppLaunchForm({
                 Memory
               </label>
               <input
-                className="w-full p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary"
+                className="p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary"
                 onChange={e =>
                   setResources(prev => ({
                     ...prev,
@@ -402,7 +402,7 @@ export default function AppLaunchForm({
                 Wall Time
               </label>
               <input
-                className="w-full p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary"
+                className="p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary"
                 onChange={e =>
                   setResources(prev => ({
                     ...prev,
