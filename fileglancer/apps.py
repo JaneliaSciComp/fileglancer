@@ -50,7 +50,16 @@ def _parse_github_url(url: str) -> tuple[str, str, str]:
             f"(e.g., https://github.com/owner/repo)."
         )
     owner, repo, branch = match.groups()
-    return owner, repo, branch or "main"
+    branch = branch or "main"
+
+    # Validate segments to prevent path traversal
+    for name, value in [("owner", owner), ("repo", repo), ("branch", branch)]:
+        if ".." in value or "\x00" in value:
+            raise ValueError(
+                f"Invalid app URL: {name} '{value}' contains invalid characters"
+            )
+
+    return owner, repo, branch
 
 
 async def _run_git(args: list[str], timeout: int = 60):

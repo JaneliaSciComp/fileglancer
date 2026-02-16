@@ -1626,7 +1626,7 @@ def create_app(settings):
             if not normalized.startswith("/") and not normalized.startswith("~"):
                 errors[param_key] = f"Must be an absolute path (starting with / or ~)"
                 continue
-            expanded = os.path.expanduser(normalized)
+            expanded = os.path.normpath(os.path.expanduser(normalized))
             if not os.path.exists(expanded):
                 errors[param_key] = f"Path does not exist: {normalized}"
             elif not os.access(expanded, os.R_OK):
