@@ -43,7 +43,8 @@ dependencies = [
     "cryptography >=41.0.0",
     "sqlalchemy >=2.0.44",
     "uvicorn >=0.38.0",
-    "x2s3 >=1.1.0"
+    "x2s3 >=1.1.0",
+    "py-cluster-api >=0.2.3"
 ]
 
 [project.scripts]
@@ -137,12 +138,14 @@ node-prettier-write = "cd frontend && npx prettier --list-different --write '**/
 node-check = "cd frontend && npx tsc --noEmit -p tsconfig.app.json"
 node-install-ui-tests = "npm --prefix frontend/ui-tests install"
 test-ui = { cmd = "npm --prefix frontend/ui-tests run test ", depends-on = ["node-install-ui-tests"] }
-test-launch = "pixi run uvicorn fileglancer.app:app --no-access-log --port 7879"
+test-launch = "pixi run uvicorn fileglancer.server:app --no-access-log --port 7879"
 dev-install = { depends-on = ["node-build", "pip-install"] }
 dev-watch = { cmd = "cd frontend && NODE_ENV=development npm run watch" }
-dev-launch = "pixi run uvicorn fileglancer.app:app --no-access-log --port 7878 --reload"
-dev-launch-remote = "pixi run uvicorn fileglancer.app:app --host 0.0.0.0 --port 7878 --reload --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
-prod-launch-remote = "pixi run uvicorn fileglancer.app:app --workers 10 --host 0.0.0.0 --port 7878 --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
+dev-vite = { cmd = "cd frontend && npx vite" }
+dev-vite-remote = { cmd = "cd frontend && SSL_KEYFILE=/opt/certs/cert.key SSL_CERTFILE=/opt/certs/cert.crt npx vite" }
+dev-launch = "pixi run uvicorn fileglancer.server:app --no-access-log --port 7878 --reload"
+dev-launch-remote = "pixi run uvicorn fileglancer.server:app --host 0.0.0.0 --port 7878 --reload --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
+prod-launch-remote = "pixi run uvicorn fileglancer.server:app --workers 10 --host 0.0.0.0 --port 7878 --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
 dev-launch-secure = "python fileglancer/dev_launch.py"
 migrate = "alembic upgrade head"
 migrate-create = "alembic revision --autogenerate"

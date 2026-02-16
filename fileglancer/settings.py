@@ -2,13 +2,36 @@ from typing import List, Optional
 from functools import cache
 import sys
 
-from pydantic import HttpUrl, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, HttpUrl, ValidationError, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
     SettingsConfigDict,
     YamlConfigSettingsSource
 )
+
+
+class ClusterSettings(BaseModel):
+    """Cluster configuration matching py-cluster-api's ClusterConfig."""
+    executor: str = 'local'
+    cpus: Optional[int] = None
+    gpus: Optional[int] = None
+    memory: Optional[str] = None
+    walltime: Optional[str] = None
+    queue: Optional[str] = None
+    poll_interval: float = 10.0
+    shebang: str = "#!/bin/bash"
+    script_prologue: List[str] = []
+    script_epilogue: List[str] = []
+    extra_directives: List[str] = []
+    extra_args: List[str] = []
+    directives_skip: List[str] = []
+    lsf_units: str = "MB"
+    job_name_prefix: Optional[str] = None
+    zombie_timeout_minutes: float = 30.0
+    completed_retention_minutes: float = 10.0
+    command_timeout: float = 100.0
+    suppress_job_email: bool = True
 
 
 class Settings(BaseSettings):
@@ -66,6 +89,9 @@ class Settings(BaseSettings):
 
     # CLI mode - enables auto-login endpoint for standalone CLI usage
     cli_mode: bool = False
+
+    # Cluster / Apps settings (mirrors py-cluster-api ClusterConfig)
+    cluster: ClusterSettings = ClusterSettings()
 
     model_config = SettingsConfigDict(
         yaml_file="config.yaml",

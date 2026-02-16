@@ -3,7 +3,7 @@ import yaml
 import pytest
 from fastapi.testclient import TestClient
 from fileglancer.settings import Settings
-from fileglancer.app import create_app, get_current_user
+from fileglancer.server import create_app, get_current_user
 from fileglancer.database import create_engine, sessionmaker, Base, FileSharePathDB
 
 TEST_USERNAME = "testuser"

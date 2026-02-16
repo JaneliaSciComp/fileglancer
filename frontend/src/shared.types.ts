@@ -55,14 +55,145 @@ type FetchRequestOptions = {
   signal?: AbortSignal;
 };
 
+// --- App / Job types ---
+
+type AppParameter = {
+  flag?: string;
+  key: string;
+  name: string;
+  type:
+    | 'string'
+    | 'integer'
+    | 'number'
+    | 'boolean'
+    | 'file'
+    | 'directory'
+    | 'enum';
+  description?: string;
+  required?: boolean;
+  default?: unknown;
+  options?: string[];
+  min?: number;
+  max?: number;
+  pattern?: string;
+};
+
+type AppParameterSection = {
+  section: string;
+  description?: string;
+  collapsed?: boolean;
+  parameters: AppParameter[];
+};
+
+type AppParameterItem = AppParameter | AppParameterSection;
+
+function isParameterSection(
+  item: AppParameterItem
+): item is AppParameterSection {
+  return 'section' in item;
+}
+
+function flattenParameters(items: AppParameterItem[]): AppParameter[] {
+  return items.flatMap(item =>
+    isParameterSection(item) ? item.parameters : [item]
+  );
+}
+
+type AppResourceDefaults = {
+  cpus?: number;
+  memory?: string;
+  walltime?: string;
+};
+
+type AppEntryPoint = {
+  id: string;
+  name: string;
+  description?: string;
+  command: string;
+  parameters: AppParameterItem[];
+  resources?: AppResourceDefaults;
+  env?: Record<string, string>;
+  pre_run?: string;
+  post_run?: string;
+};
+
+type AppManifest = {
+  name: string;
+  description?: string;
+  version?: string;
+  repo_url?: string;
+  requirements?: string[];
+  runnables: AppEntryPoint[];
+};
+
+type UserApp = {
+  url: string;
+  manifest_path: string;
+  name: string;
+  description?: string;
+  added_at: string;
+  manifest?: AppManifest;
+};
+
+type JobFileInfo = {
+  path: string;
+  exists: boolean;
+};
+
+type Job = {
+  id: number;
+  app_url: string;
+  app_name: string;
+  manifest_path: string;
+  entry_point_id: string;
+  entry_point_name: string;
+  parameters: Record<string, unknown>;
+  status: 'PENDING' | 'RUNNING' | 'DONE' | 'FAILED' | 'KILLED';
+  exit_code?: number;
+  resources?: Record<string, unknown>;
+  env?: Record<string, string>;
+  pre_run?: string;
+  post_run?: string;
+  pull_latest: boolean;
+  cluster_job_id?: string;
+  created_at: string;
+  started_at?: string;
+  finished_at?: string;
+  files?: Record<string, JobFileInfo>;
+};
+
+type JobSubmitRequest = {
+  app_url: string;
+  manifest_path?: string;
+  entry_point_id: string;
+  parameters: Record<string, unknown>;
+  resources?: AppResourceDefaults;
+  pull_latest?: boolean;
+  env?: Record<string, string>;
+  pre_run?: string;
+  post_run?: string;
+};
+
 export type {
+  AppEntryPoint,
+  AppManifest,
+  AppParameter,
+  AppParameterItem,
+  AppParameterSection,
+  AppResourceDefaults,
   FetchRequestOptions,
   FileOrFolder,
   FileSharePath,
   Failure,
+  Job,
+  JobFileInfo,
+  JobSubmitRequest,
   Profile,
   Result,
   Success,
+  UserApp,
   Zone,
   ZonesAndFileSharePathsMap
 };
+
+export { flattenParameters, isParameterSection };

@@ -123,3 +123,29 @@ session_cookie_name: fg_session
 # Set to true for production with valid HTTPS certificates
 #
 session_cookie_secure: true
+
+#
+# Cluster configuration for Apps feature
+# Mirrors py-cluster-api ClusterConfig - all fields are optional
+# See: https://github.com/JaneliaSciComp/py-cluster-api
+#
+# cluster:
+#   executor: local            # "local" or "lsf"
+#   job_name_prefix: fg        # Prefix for cluster job names. REQUIRED for job
+#                              # reconnection after server restarts. Without this,
+#                              # active jobs will not be re-tracked and will
+#                              # eventually be marked FAILED by the zombie timeout.
+#   memory: "8 GB"             # Default memory allocation
+#   walltime: "04:00"          # Default walltime (HH:MM)
+#   cpus: 1                    # Default CPU count
+#   queue: normal              # LSF queue name
+#   poll_interval: 10.0        # Job status polling interval (seconds)
+#   lsf_units: MB              # Memory units for LSF (KB, MB, GB)
+#   suppress_job_email: true    # Suppress LSF job email notifications
+#   extra_directives:           # Additional scheduler directives (prefix auto-added)
+#     - "-P your_account"
+#   extra_args:                 # Extra CLI args appended to submit command
+#     - "-P"
+#     - "your_project"
+#   script_prologue:            # Commands to run before each job
+#     - "module load java/11"

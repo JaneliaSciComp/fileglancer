@@ -157,6 +157,22 @@ https://fileglancer-dev.int.janelia.org/
 
 **Important:** Remember to remove or comment out this entry from `/etc/hosts` when you're done testing, especially if the domain is used in production.
 
+### Cluster Configuration (Apps Feature)
+
+The Apps feature requires a `cluster` section in `config.yaml` to submit jobs. See `config.yaml.template` for all available options.
+
+#### Job Reconnection
+
+If the Fileglancer server restarts while jobs are running on the cluster, it automatically attempts to reconnect to those jobs on startup. This requires `job_name_prefix` to be set in the cluster configuration — the prefix is used to identify jobs belonging to this Fileglancer instance when querying the cluster scheduler (e.g. `bjobs` for LSF).
+
+```yaml
+cluster:
+  executor: lsf
+  job_name_prefix: fg   # required for reconnection
+```
+
+Without `job_name_prefix`, reconnection is silently skipped and active jobs will not be re-tracked. They will eventually be marked FAILED after the `zombie_timeout_minutes` period (default: 30 minutes).
+
 ### Troubleshooting
 
 If you run into any build issues, the first thing to try is to clear the build directories and start from scratch:
