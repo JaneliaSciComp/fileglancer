@@ -92,7 +92,8 @@ async def _ensure_repo_cache(url: str, pull: bool = False) -> Path:
     An asyncio lock serializes git operations for the same repo+branch.
     """
     owner, repo, branch = _parse_github_url(url)
-    repo_dir = _REPO_CACHE_BASE / owner / repo / branch
+    repo_dir = (_REPO_CACHE_BASE / owner / repo / branch).resolve()
+    repo_dir.relative_to(_REPO_CACHE_BASE.resolve())
     lock = _get_repo_lock(owner, repo, branch)
 
     async with lock:
