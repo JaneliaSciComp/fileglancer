@@ -548,16 +548,19 @@ export default function DataLinkUsageDialog({
       open={open}
     >
       <div className="flex flex-col gap-4 my-4 min-h-0 max-h-[85vh]">
-        <div className="flex items-center gap-4 w-[95%] self-center">
-          <Typography className="text-foreground font-semibold text-lg">
-            How to use your data link
-          </Typography>
+        <Typography className="text-foreground font-semibold text-lg w-[95%] self-center">
+          How to use your data link
+        </Typography>
+        <div className="flex items-center gap-2 w-[95%] self-center border border-surface rounded-lg px-3 py-2 bg-surface-light overflow-hidden">
+          <span className="text-foreground text-sm font-mono truncate flex-1 min-w-0">
+            {dataLinkUrl}
+          </span>
           <CopyTooltip
             primaryLabel="Copy data link"
             textToCopy={dataLinkUrl}
             tooltipTriggerClasses={TOOLTIP_TRIGGER_CLASSES}
           >
-            <HiOutlineClipboardCopy className="icon-default" />
+            <HiOutlineClipboardCopy className="icon-default text-foreground shrink-0" />
           </CopyTooltip>
         </div>
         <Tabs
