@@ -35,6 +35,7 @@ from fileglancer.utils import format_timestamp, guess_content_type, parse_range_
 from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext, UserContextConfigurationError
 from fileglancer.filestore import Filestore, RootCheckError
 from fileglancer.log import AccessLogMiddleware
+from fileglancer import sshkeys
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response
 from x2s3.client_file import FileProxyClient
@@ -217,7 +218,8 @@ def create_app(settings):
             # Expand ~ to user's home directory before constructing the mount path
             expanded_mount_path = os.path.expanduser(fsp.mount_path)
             mount_path = f"{expanded_mount_path}/{proxied_path.path}"
-            return FileProxyClient(proxy_kwargs={'target_name': sharing_name}, path=mount_path), _get_user_context(proxied_path.username)
+            # Use 256KB buffer for better performance on network filesystems
+            return FileProxyClient(proxy_kwargs={'target_name': sharing_name}, path=mount_path, buffer_size=256*1024), _get_user_context(proxied_path.username)
 
 
     @asynccontextmanager
@@ -926,7 +928,9 @@ def create_app(settings):
                     created_at=entry.created_at,
                     updated_at=entry.updated_at,
                     state_url=state_url,
-                    neuroglancer_url=neuroglancer_url
+                    neuroglancer_url=neuroglancer_url,
+                    state=entry.state,
+                    url_base=entry.url_base
                 ))
 
         return NeuroglancerShortLinkResponse(links=links)
@@ -1060,6 +1064,46 @@ def create_app(settings):
                 "groups": user_groups,
             }
 
+    # SSH Key Management endpoints
+    @app.get("/api/ssh-keys", response_model=sshkeys.SSHKeyListResponse,
+             description="List Fileglancer-managed SSH keys")
+    async def list_ssh_keys(username: str = Depends(get_current_user)):
+        """List SSH keys with 'fileglancer' in the comment from authorized_keys"""
+        with _get_user_context(username):
+            try:
+                ssh_dir = sshkeys.get_ssh_directory()
+                keys = sshkeys.list_ssh_keys(ssh_dir)
+                return sshkeys.SSHKeyListResponse(keys=keys)
+            except Exception as e:
+                logger.error(f"Error listing SSH keys for {username}: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/ssh-keys/generate-temp",
+              description="Generate a temporary SSH key and return private key for one-time copy")
+    async def generate_temp_ssh_key(
+        request: sshkeys.GenerateKeyRequest = Body(default=sshkeys.GenerateKeyRequest()),
+        username: str = Depends(get_current_user)
+    ):
+        """Generate a temporary SSH key, add to authorized_keys, return private key.
+
+        The private key is streamed securely and the temporary files are deleted
+        after the response is sent. Key info is included in response headers:
+        - X-SSH-Key-Filename
+        - X-SSH-Key-Type
+        - X-SSH-Key-Fingerprint
+        - X-SSH-Key-Comment
+        """
+        with _get_user_context(username):
+            try:
+                ssh_dir = sshkeys.get_ssh_directory()
+                return sshkeys.generate_temp_key_and_authorize(ssh_dir, request.passphrase)
+
+            except RuntimeError as e:
+                raise HTTPException(status_code=500, detail=str(e))
+            except Exception as e:
+                logger.error(f"Error generating temp SSH key for {username}: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
     # File content endpoint
     @app.head("/api/content/{path_name:path}")
     async def head_file_content(path_name: str,
@@ -1083,8 +1127,11 @@ def create_app(settings):
             try:
                 file_info = filestore.get_file_info(subpath)
 
+                is_binary = filestore.check_is_binary(subpath)
+
                 headers = {
                     'Accept-Ranges': 'bytes',
+                    'X-Is-Binary': 'true' if is_binary else 'false',
                 }
 
                 if content_type == 'application/octet-stream' and file_name:
@@ -1230,27 +1277,28 @@ def create_app(settings):
                 raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
 
             try:
-                file_info = filestore.get_file_info(subpath, username)
-                logger.trace(f"File info: {file_info}")
+                with db.get_db_session(settings.db_url) as session:
+                    file_info = filestore.get_file_info(subpath, current_user=username, session=session)
+                    logger.trace(f"File info: {file_info}")
 
-                result = {"info": json.loads(file_info.model_dump_json())}
+                    result = {"info": json.loads(file_info.model_dump_json())}
 
-                if file_info.is_dir:
-                    try:
-                        files = list(filestore.yield_file_infos(subpath, username))
-                        result["files"] = [json.loads(f.model_dump_json()) for f in files]
-                    except PermissionError:
-                        logger.error(f"Permission denied when listing files in directory: {subpath}")
-                        result["files"] = []
-                        result["error"] = "Permission denied when listing directory contents"
-                        return JSONResponse(content=result, status_code=403)
-                    except FileNotFoundError:
-                        logger.error(f"Directory not found during listing: {subpath}")
-                        result["files"] = []
-                        result["error"] = "Directory contents not found"
-                        return JSONResponse(content=result, status_code=404)
+                    if file_info.is_dir:
+                        try:
+                            files = list(filestore.yield_file_infos(subpath, current_user=username, session=session))
+                            result["files"] = [json.loads(f.model_dump_json()) for f in files]
+                        except PermissionError:
+                            logger.error(f"Permission denied when listing files in directory: {subpath}")
+                            result["files"] = []
+                            result["error"] = "Permission denied when listing directory contents"
+                            return JSONResponse(content=result, status_code=403)
+                        except FileNotFoundError:
+                            logger.error(f"Directory not found during listing: {subpath}")
+                            result["files"] = []
+                            result["error"] = "Directory contents not found"
+                            return JSONResponse(content=result, status_code=404)
 
-                return result
+                    return result
 
             except RootCheckError as e:
                 # Path attempts to escape root directory - try to find a valid fsp for this absolute path

@@ -15,6 +15,7 @@ import Preferences from '@/components/Preferences';
 import Links from '@/components/Links';
 import NGLinks from '@/components/NGLinks';
 import Notifications from '@/components/Notifications';
+import SSHKeys from '@/components/SSHKeys';
 import ErrorFallback from '@/components/ErrorFallback';
 import { NGLinkProvider } from '@/contexts/NGLinkContext';
 
@@ -84,6 +85,7 @@ function RootRedirect() {
 
 const AppComponent = () => {
   const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
+  const sshKeysEnabled = import.meta.env.VITE_ENABLE_SSH_KEYS === 'true';
 
   return (
     <BrowserRouter>
@@ -137,6 +139,16 @@ const AppComponent = () => {
               }
               path="notifications"
             />
+            {sshKeysEnabled ? (
+              <Route
+                element={
+                  <RequireAuth>
+                    <SSHKeys />
+                  </RequireAuth>
+                }
+                path="ssh-keys"
+              />
+            ) : null}
           </Route>
           <Route
             element={

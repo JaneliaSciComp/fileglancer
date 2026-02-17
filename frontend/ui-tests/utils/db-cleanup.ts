@@ -1,4 +1,5 @@
-import { execSync } from 'child_process';
+import Database from 'better-sqlite3';
+import type { Database as DatabaseType } from 'better-sqlite3';
 import { join } from 'path';
 import { existsSync } from 'fs';
 
@@ -14,21 +15,40 @@ export function cleanDatabase(testTempDir: string): void {
     return;
   }
 
+  let db: DatabaseType | null = null;
+
   try {
+    db = new Database(dbPath, { fileMustExist: true });
     const tables = ['proxied_paths', 'tickets', 'user_preferences'];
 
     for (const table of tables) {
       try {
-        execSync(`sqlite3 "${dbPath}" "DELETE FROM ${table};"`, {
-          encoding: 'utf8',
-          stdio: 'pipe'
-        });
+        db.prepare(`DELETE FROM ${table}`).run();
         console.log(`[DB Cleanup] Cleared table: ${table}`);
       } catch (error) {
-        console.log(`[DB Cleanup] Skipped ${table} (table may not exist)`);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+
+        // Check if it's a "table doesn't exist" error (expected for new databases)
+        if (errorMessage.includes('no such table')) {
+          console.log(`[DB Cleanup] Skipped ${table} (table does not exist)`);
+        } else {
+          // Unexpected error - this indicates a real problem
+          console.error(
+            `[DB Cleanup] Failed to clear ${table}: ${errorMessage}`
+          );
+          throw new Error(
+            `Database cleanup failed for table ${table}: ${errorMessage}`
+          );
+        }
       }
     }
   } catch (error) {
-    console.warn(`[DB Cleanup] Failed to clean database: ${error}`);
+    console.error(`[DB Cleanup] Fatal error during database cleanup: ${error}`);
+    throw error; // Fail tests immediately if cleanup fails
+  } finally {
+    if (db) {
+      db.close();
+    }
   }
 }

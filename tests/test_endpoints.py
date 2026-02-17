@@ -527,6 +527,89 @@ def test_head_file_content(test_client, temp_dir):
     assert int(response.headers["Content-Length"]) == len(test_content)
 
 
+def test_head_file_content_text_file_is_not_binary(test_client, temp_dir):
+    """Test HEAD request returns X-Is-Binary: false for text files"""
+    # Create a text file
+    test_file = os.path.join(temp_dir, "text_file.txt")
+    test_content = "This is a text file with regular content.\n" * 100
+    with open(test_file, "w") as f:
+        f.write(test_content)
+
+    response = test_client.head("/api/content/tempdir?subpath=text_file.txt")
+    assert response.status_code == 200
+    assert "X-Is-Binary" in response.headers
+    assert response.headers["X-Is-Binary"] == "false"
+
+
+def test_head_file_content_json_file_is_not_binary(test_client, temp_dir):
+    """Test HEAD request returns X-Is-Binary: false for JSON files"""
+    # Create a JSON file
+    test_file = os.path.join(temp_dir, "data.json")
+    test_content = '{"key": "value", "number": 123, "array": [1, 2, 3]}'
+    with open(test_file, "w") as f:
+        f.write(test_content)
+
+    response = test_client.head("/api/content/tempdir?subpath=data.json")
+    assert response.status_code == 200
+    assert "X-Is-Binary" in response.headers
+    assert response.headers["X-Is-Binary"] == "false"
+
+
+def test_head_file_content_binary_file_is_binary(test_client, temp_dir):
+    """Test HEAD request returns X-Is-Binary: true for binary files"""
+    # Create a binary file with null bytes and control characters
+    test_file = os.path.join(temp_dir, "binary_file.bin")
+    binary_content = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x10'
+    with open(test_file, "wb") as f:
+        f.write(binary_content)
+
+    response = test_client.head("/api/content/tempdir?subpath=binary_file.bin")
+    assert response.status_code == 200
+    assert "X-Is-Binary" in response.headers
+    assert response.headers["X-Is-Binary"] == "true"
+
+
+def test_head_file_content_large_text_file_is_not_binary(test_client, temp_dir):
+    """Test HEAD request checks only first 4KB for large text files"""
+    # Create a large text file (10KB)
+    test_file = os.path.join(temp_dir, "large_text.txt")
+    # Repeat text to create a 10KB file
+    test_content = "This is line number {}\n".format(1) * 500
+    with open(test_file, "w") as f:
+        f.write(test_content)
+
+    response = test_client.head("/api/content/tempdir?subpath=large_text.txt")
+    assert response.status_code == 200
+    assert "X-Is-Binary" in response.headers
+    assert response.headers["X-Is-Binary"] == "false"
+
+
+def test_head_file_content_directory_no_binary_check(test_client, temp_dir):
+    """Test HEAD request for directory doesn't include X-Is-Binary header"""
+    # Create a subdirectory
+    test_dir = os.path.join(temp_dir, "test_subdir")
+    os.makedirs(test_dir, exist_ok=True)
+
+    response = test_client.head("/api/content/tempdir?subpath=test_subdir")
+    assert response.status_code == 200
+    # For directories, is_binary should be false (default)
+    assert "X-Is-Binary" in response.headers
+    assert response.headers["X-Is-Binary"] == "false"
+
+
+def test_head_file_content_empty_file_is_not_binary(test_client, temp_dir):
+    """Test HEAD request returns X-Is-Binary: false for empty files"""
+    # Create an empty file
+    test_file = os.path.join(temp_dir, "empty_file.txt")
+    with open(test_file, "w") as f:
+        pass  # Empty file
+
+    response = test_client.head("/api/content/tempdir?subpath=empty_file.txt")
+    assert response.status_code == 200
+    assert "X-Is-Binary" in response.headers
+    assert response.headers["X-Is-Binary"] == "false"
+
+
 def test_get_file_content(test_client, temp_dir):
     """Test GET request for file content"""
     # Create a test file
@@ -1086,6 +1169,62 @@ def test_get_content_with_symlink_no_matching_fsp(test_client, temp_dir):
         shutil.rmtree(external_dir)
 
 
+def test_get_content_traversal_through_directory_symlink(test_client, temp_dir):
+    """Test that accessing a file through a directory symlink pointing outside the FSP is blocked"""
+    external_dir = tempfile.mkdtemp()
+
+    try:
+        # Create a file in the external directory
+        external_file = os.path.join(external_dir, "secret.txt")
+        with open(external_file, "w") as f:
+            f.write("sensitive data")
+
+        # Create a directory symlink in the FSP pointing to the external directory
+        symlink_path = os.path.join(temp_dir, "link_to_external_dir")
+        os.symlink(external_dir, symlink_path)
+
+        # Try to access a file *through* the directory symlink
+        response = test_client.get(
+            "/api/content/tempdir?subpath=link_to_external_dir/secret.txt"
+        )
+        # Should be blocked — the resolved path escapes the FSP root
+        assert response.status_code == 400
+
+    finally:
+        shutil.rmtree(external_dir)
+
+
+def test_get_content_double_hop_symlink(test_client, temp_dir):
+    """Test that accessing a file through a chain of symlinks pointing outside the FSP is blocked"""
+    external_dir = tempfile.mkdtemp()
+    hop_dir = tempfile.mkdtemp()
+
+    try:
+        # Create a file in the external directory
+        external_file = os.path.join(external_dir, "secret.txt")
+        with open(external_file, "w") as f:
+            f.write("sensitive data")
+
+        # Create first hop: hop_dir/hop2 -> external_dir
+        hop2_path = os.path.join(hop_dir, "hop2")
+        os.symlink(external_dir, hop2_path)
+
+        # Create second hop in the FSP: double_hop -> hop_dir/hop2
+        symlink_path = os.path.join(temp_dir, "double_hop")
+        os.symlink(hop2_path, symlink_path)
+
+        # Try to access a file through the double-hop symlink
+        response = test_client.get(
+            "/api/content/tempdir?subpath=double_hop/secret.txt"
+        )
+        # Should be blocked — the resolved path escapes the FSP root
+        assert response.status_code == 400
+
+    finally:
+        shutil.rmtree(external_dir)
+        shutil.rmtree(hop_dir)
+
+
 def test_head_content_with_symlink(test_client, temp_dir):
     """Test HEAD request to /api/content endpoint with a symlink"""
     # Create a target file within the FSP
@@ -1105,3 +1244,33 @@ def test_head_content_with_symlink(test_client, temp_dir):
     assert response.headers["Accept-Ranges"] == "bytes"
     assert "Content-Length" in response.headers
     assert int(response.headers["Content-Length"]) == len(target_content)
+
+
+def test_broken_symlink_in_file_listing(test_client, temp_dir):
+    """Test that broken symlinks appear in /api/files response with correct properties"""
+    # Create a broken symlink pointing to a nonexistent path
+    broken_link_path = os.path.join(temp_dir, "broken_link")
+    os.symlink("/nonexistent/path", broken_link_path)
+
+    # Create a regular file for comparison
+    regular_file = os.path.join(temp_dir, "regular.txt")
+    with open(regular_file, "w") as f:
+        f.write("content")
+
+    # Request file listing
+    response = test_client.get("/api/files/tempdir")
+    assert response.status_code == 200
+
+    data = response.json()
+    files = data["files"]
+
+    # Find broken symlink in response
+    broken_link_file = next((f for f in files if f["name"] == "broken_link"), None)
+    assert broken_link_file is not None, "Broken symlink should be in response"
+    assert broken_link_file["is_symlink"] is True, "Should be marked as symlink"
+    assert broken_link_file["symlink_target_fsp"] is None, "Target should be None for broken symlink"
+
+    # Regular file should also be present
+    regular = next((f for f in files if f["name"] == "regular.txt"), None)
+    assert regular is not None, "Regular file should be in response"
+    assert regular["is_symlink"] is False, "Regular file should not be marked as symlink"

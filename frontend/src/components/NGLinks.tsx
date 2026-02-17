@@ -9,7 +9,8 @@ import NGLinkDialog from '@/components/ui/Dialogs/NGLinkDialog';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import DeleteBtn from '@/components/ui/buttons/DeleteBtn';
 import { useNGLinkContext } from '@/contexts/NGLinkContext';
-import type { NGLink } from '@/queries/ngLinkQueries';
+import type { CreateNGLinkPayload, NGLink } from '@/queries/ngLinkQueries';
+import { copyToClipboard } from '@/utils/copyText';
 
 export default function NGLinks() {
   const {
@@ -37,14 +38,15 @@ export default function NGLinks() {
     setEditItem(undefined);
   };
 
-  const handleCreate = async (payload: {
-    url: string;
-    short_name?: string;
-    title?: string;
-  }) => {
+  const handleCreate = async (payload: CreateNGLinkPayload) => {
     try {
-      await createNGLinkMutation.mutateAsync(payload);
-      toast.success('Link created');
+      const ngLink = await createNGLinkMutation.mutateAsync(payload);
+      const result = await copyToClipboard(ngLink.neuroglancer_url);
+      if (result.success) {
+        toast.success('Link created and copied to clipboard');
+      } else {
+        toast.error(`Failed to copy link: ${result.error}`);
+      }
       handleClose();
     } catch (error) {
       const message =
@@ -59,8 +61,13 @@ export default function NGLinks() {
     title?: string;
   }) => {
     try {
-      await updateNGLinkMutation.mutateAsync(payload);
-      toast.success('Link updated');
+      const ngLink = await updateNGLinkMutation.mutateAsync(payload);
+      const result = await copyToClipboard(ngLink.neuroglancer_url);
+      if (result.success) {
+        toast.success('Link updated and copied to clipboard');
+      } else {
+        toast.error(`Failed to copy link: ${result.error}`);
+      }
       handleClose();
     } catch (error) {
       const message =

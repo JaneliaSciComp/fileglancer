@@ -62,6 +62,7 @@ declare module '@tanstack/react-table' {
       data: CellContextMenuData
     ) => void;
   }
+
   interface ColumnMeta<TData, TValue> {
     // Optional function to extract searchable values from a cell
     // Used by globalFilterFn to allow columns to define custom search behavior

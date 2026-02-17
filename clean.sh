@@ -19,6 +19,5 @@ clean_dir() {
 rm -f fileglancer/_version.py || true
 clean_dir ".pixi/envs" || true
 clean_dir ".pixi/solve-group-envs" || true
-clean_dir "fileglancer/labextension" || true
 clean_dir "frontend/node_modules" || true
 echo "Cleaned up dev environment."

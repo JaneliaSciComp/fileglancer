@@ -9,6 +9,11 @@ type FileOrFolder = {
   last_modified: number;
   hasRead?: boolean;
   hasWrite?: boolean;
+  is_symlink?: boolean;
+  symlink_target_fsp?: {
+    fsp_name: string;
+    subpath: string;
+  } | null;
 };
 
 type FileSharePath = {
