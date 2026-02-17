@@ -147,6 +147,7 @@ export default function DataToolLinks({
 
         <div className="flex flex-col items-center w-16">
           <FgTooltip
+            as="button"
             label={showCopiedTooltip ? 'Copied!' : 'Copy data URL'}
             onClick={async () => {
               await onToolClick('copy');
