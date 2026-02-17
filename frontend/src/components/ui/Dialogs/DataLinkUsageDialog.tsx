@@ -49,9 +49,11 @@ function CodeBlock({
 }: CodeBlockProps) {
   const isDarkMode = useDarkMode();
 
+  // Note: margin and marginBottom need to be defined separately because the coy theme in react-syntax-highlighter defines both.
+  // If we only set margin, the coy theme's marginBottom value will override ours and cause extra space at the bottom of the code block.
   const defaultStyle = {
-    marginTop: '0px',
-    marginBottom: '0px',
+    margin: '0 0',
+    marginBottom: '0',
     padding: '3em 3em 1em 1em',
     fontSize: '14px',
     lineHeight: '1.5',
@@ -81,13 +83,13 @@ function CodeBlock({
   };
 
   return (
-    <div className="relative w-full min-w-0 rounded-lg border border-surface">
+    <div className="relative w-full min-w-0 rounded-lg border border-surface dark:border-foreground/30">
       <SyntaxHighlighter
         codeTagProps={mergedCodeTagProps}
         customStyle={mergedCustomStyle}
         language={language}
         showLineNumbers={showLineNumbers}
-        style={isDarkMode ? materialDark : coy}
+        style={theme}
         wrapLines={wrapLines}
         wrapLongLines={wrapLongLines}
       >
@@ -225,8 +227,8 @@ function getFijiTab() {
         steps={[
           'Launch Fiji',
           'Navigate to Plugins \u2192 BigDataViewer \u2192 HDF5/N5/Zarr/OME-NGFF Viewer',
-          'Paste data link and click "Detect datasets"',
-          'Select the multiscale image and click "OK"'
+          'Paste your data link into the text input area located at the top of the "Main" tab of the resulting dialog. Then click "Detect datasets"',
+          'In the text area under where you pasted the data link, you should now see the image file name, followed by "multiscale". Click on this entry, then click "OK"'
         ]}
       />
     )
@@ -373,11 +375,14 @@ public class ReadZarr {
         if (block != null) {
             Object data = block.getData();
             if (data instanceof short[]) {
-                System.out.println("Voxels: " + Arrays.toString((short[]) data));
+                short[] arr = (short[]) data;
+                System.out.println("First 10 voxels: " + Arrays.toString(Arrays.copyOf(arr, Math.min(10, arr.length))));
             } else if (data instanceof float[]) {
-                System.out.println("Voxels: " + Arrays.toString((float[]) data));
+                float[] arr = (float[]) data;
+                System.out.println("First 10 voxels: " + Arrays.toString(Arrays.copyOf(arr, Math.min(10, arr.length))));
             } else if (data instanceof byte[]) {
-                System.out.println("Voxels: " + Arrays.toString((byte[]) data));
+                byte[] arr = (byte[]) data;
+                System.out.println("First 10 voxels: " + Arrays.toString(Arrays.copyOf(arr, Math.min(10, arr.length))));
             }
         }
 
@@ -464,11 +469,14 @@ public class ReadN5 {
         if (block != null) {
             Object data = block.getData();
             if (data instanceof short[]) {
-                System.out.println("Voxels: " + Arrays.toString((short[]) data));
+                short[] arr = (short[]) data;
+                System.out.println("First 10 voxels: " + Arrays.toString(Arrays.copyOf(arr, Math.min(10, arr.length))));
             } else if (data instanceof float[]) {
-                System.out.println("Voxels: " + Arrays.toString((float[]) data));
+                float[] arr = (float[]) data;
+                System.out.println("First 10 voxels: " + Arrays.toString(Arrays.copyOf(arr, Math.min(10, arr.length))));
             } else if (data instanceof byte[]) {
-                System.out.println("Voxels: " + Arrays.toString((byte[]) data));
+                byte[] arr = (byte[]) data;
+                System.out.println("First 10 voxels: " + Arrays.toString(Arrays.copyOf(arr, Math.min(10, arr.length))));
             }
         }
 
@@ -539,11 +547,11 @@ export default function DataLinkUsageDialog({
 
   const TAB_TRIGGER_CLASSES = '!text-foreground h-full';
   const PANEL_CLASSES =
-    'flex flex-col gap-4 max-w-full max-h-[65vh] p-4 rounded-b-lg border border-t-0 border-surface bg-surface-light overflow-y-auto overflow-x-hidden';
+    'flex flex-col gap-4 max-w-full max-h-[65vh] p-4 rounded-b-lg border border-t-0 border-surface dark:border-foreground/30 bg-surface-light dark:bg-surface overflow-y-auto overflow-x-hidden';
 
   return (
     <FgDialog
-      className="max-w-4xl w-11/12 md:w-11/12 lg:w-10/12"
+      className="max-w-4xl w-11/12 md:w-11/12 lg:w-10/12 dark:bg-surface"
       onClose={onClose}
       open={open}
     >
@@ -569,7 +577,7 @@ export default function DataLinkUsageDialog({
           onValueChange={setActiveTab}
           value={activeTab}
         >
-          <Tabs.List className="justify-start items-stretch shrink-0 min-w-fit w-full rounded-b-none bg-surface dark:bg-surface-light">
+          <Tabs.List className="justify-start items-stretch shrink-0 min-w-fit w-full py-2 rounded-b-none bg-surface dark:bg-surface-light">
             {tabs.map(tab => (
               <Tabs.Trigger
                 className={TAB_TRIGGER_CLASSES}
