@@ -55,6 +55,9 @@ export default function N5Preview({
 
           {openWithToolUrls ? (
             <DataToolLinks
+              compact={mainPanelWidth <= 1000}
+              dataLinkUrl={openWithToolUrls.copy || undefined}
+              dataType="n5"
               onToolClick={handleToolClick}
               showCopiedTooltip={showCopiedTooltip}
               title="Open with:"

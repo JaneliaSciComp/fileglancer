@@ -92,6 +92,9 @@ export default function ZarrPreview({
 
           {openWithToolUrls ? (
             <DataToolLinks
+              compact={mainPanelWidth <= 1000}
+              dataLinkUrl={openWithToolUrls.copy || undefined}
+              dataType="zarr"
               onToolClick={handleToolClick}
               showCopiedTooltip={showCopiedTooltip}
               title="Open with:"

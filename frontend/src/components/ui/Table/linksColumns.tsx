@@ -4,6 +4,9 @@ import { Typography } from '@material-tailwind/react';
 import type { ColumnDef } from '@tanstack/react-table';
 
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
+import DataLinkUsageDialog, {
+  inferDataType
+} from '@/components/ui/Dialogs/DataLinkUsageDialog';
 import DataLinksActionsMenu from '@/components/ui/Menus/DataLinksActions';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
@@ -37,6 +40,7 @@ type ProxiedPathRowActionProps = {
   handleCopyPath: (path: string) => Promise<void>;
   handleCopyUrl: (item: ProxiedPath) => Promise<void>;
   handleUnshare: () => void;
+  handleViewDataLinkUsage: () => void;
   item: ProxiedPath;
   displayPath: string;
   pathFsp: FileSharePath | undefined;
@@ -94,6 +98,8 @@ function PathCell({
 
 function ActionsCell({ item }: { readonly item: ProxiedPath }) {
   const [showDataLinkDialog, setShowDataLinkDialog] = useState<boolean>(false);
+  const [showDataLinkUsageDialog, setShowDataLinkUsageDialog] =
+    useState<boolean>(false);
   const { handleDeleteDataLink } = useDataToolLinks(setShowDataLinkDialog);
   const { pathPreference } = usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
@@ -114,6 +120,10 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
     item.path
   );
 
+  const handleViewDataLinkUsage = () => {
+    setShowDataLinkUsageDialog(true);
+  };
+
   const menuItems: MenuItem<ProxiedPathRowActionProps>[] = [
     {
       name: 'Copy path',
@@ -128,6 +138,11 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
       }
     },
     {
+      name: 'Example code snippets',
+      action: (props: ProxiedPathRowActionProps) =>
+        props.handleViewDataLinkUsage()
+    },
+    {
       name: 'Unshare',
       action: (props: ProxiedPathRowActionProps) => props.handleUnshare(),
       color: 'text-red-600'
@@ -138,6 +153,7 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
     handleCopyPath,
     handleCopyUrl,
     handleUnshare,
+    handleViewDataLinkUsage,
     item,
     displayPath,
     pathFsp
@@ -167,6 +183,15 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
           proxiedPath={item}
           setShowDataLinkDialog={setShowDataLinkDialog}
           showDataLinkDialog={showDataLinkDialog}
+        />
+      ) : null}
+      {/* Code snippets dialog */}
+      {showDataLinkUsageDialog ? (
+        <DataLinkUsageDialog
+          dataLinkUrl={item.url}
+          dataType={inferDataType(item.path)}
+          onClose={() => setShowDataLinkUsageDialog(false)}
+          open={showDataLinkUsageDialog}
         />
       ) : null}
     </div>
@@ -241,12 +266,15 @@ export function useLinksColumns(): ColumnDef<ProxiedPath>[] {
         enableSorting: true,
         meta: {
           // Allow searching by URL and all path formats (linux, mac, windows)
-          getSearchableValues: (value: PathCellValue, row: ProxiedPath) => [
-            row.url,
-            value.pathMap.mac_path,
-            value.pathMap.linux_path,
-            value.pathMap.windows_path
-          ]
+          getSearchableValues: (value: unknown, row: ProxiedPath) => {
+            const pathValue = value as PathCellValue;
+            return [
+              row.url,
+              pathValue.pathMap.mac_path,
+              pathValue.pathMap.linux_path,
+              pathValue.pathMap.windows_path
+            ];
+          }
         }
       },
       {

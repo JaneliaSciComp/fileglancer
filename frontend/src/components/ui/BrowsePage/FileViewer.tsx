@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Switch, Typography } from '@material-tailwind/react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import {
@@ -13,6 +13,7 @@ import {
   useFileContentQuery,
   useFileMetadataQuery
 } from '@/queries/fileContentQueries';
+import useDarkMode from '@/hooks/useDarkMode';
 
 type FileViewerProps = {
   readonly file: FileOrFolder;
@@ -79,8 +80,7 @@ const getLanguageFromExtension = (filename: string): string => {
 
 export default function FileViewer({ file }: FileViewerProps) {
   const { fspName } = useFileBrowserContext();
-
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+  const isDarkMode = useDarkMode();
   const [formatJson, setFormatJson] = useState<boolean>(true);
 
   // First, fetch metadata to check if file is binary
@@ -96,22 +96,6 @@ export default function FileViewer({ file }: FileViewerProps) {
 
   const language = getLanguageFromExtension(file.name);
   const isJsonFile = language === 'json';
-
-  // Detect dark mode from document
-  useEffect(() => {
-    const checkDarkMode = () => {
-      setIsDarkMode(document.documentElement.classList.contains('dark'));
-    };
-
-    checkDarkMode();
-    const observer = new MutationObserver(checkDarkMode);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class']
-    });
-
-    return () => observer.disconnect();
-  }, []);
 
   const renderViewer = () => {
     if (metadataQuery.isLoading) {
@@ -184,7 +168,10 @@ export default function FileViewer({ file }: FileViewerProps) {
         codeTagProps={mergedCodeTagProps}
         customStyle={{
           margin: 0,
-          padding: '1rem',
+          paddingTop: '1em',
+          paddingRight: '1em',
+          paddingBottom: '0',
+          paddingLeft: '1em',
           fontSize: '14px',
           lineHeight: '1.5',
           overflow: 'visible',
