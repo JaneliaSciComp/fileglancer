@@ -5,8 +5,6 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import zarrLogo from '@/assets/zarr.jpg';
 import ZarrMetadataTable from '@/components/ui/BrowsePage/ZarrMetadataTable';
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
-import DataLinkUsageDialog from '@/components/ui/Dialogs/DataLinkUsageDialog';
-import TextDialogBtn from '@/components/ui/buttons/DialogTextBtn';
 import DataToolLinks from './DataToolLinks';
 import type {
   OpenWithToolUrls,
@@ -93,26 +91,15 @@ export default function ZarrPreview({
           </div>
 
           {openWithToolUrls ? (
-            <>
-              <DataToolLinks
-                onToolClick={handleToolClick}
-                showCopiedTooltip={showCopiedTooltip}
-                title="Open with:"
-                urls={openWithToolUrls as OpenWithToolUrls}
-              />
-              {openWithToolUrls.copy ? (
-                <TextDialogBtn label="More ways to open" variant="solid">
-                  {closeDialog => (
-                    <DataLinkUsageDialog
-                      dataLinkUrl={openWithToolUrls.copy}
-                      dataType="zarr"
-                      onClose={closeDialog}
-                      open={true}
-                    />
-                  )}
-                </TextDialogBtn>
-              ) : null}
-            </>
+            <DataToolLinks
+              compact={mainPanelWidth <= 1000}
+              dataLinkUrl={openWithToolUrls.copy || undefined}
+              dataType="zarr"
+              onToolClick={handleToolClick}
+              showCopiedTooltip={showCopiedTooltip}
+              title="Open with:"
+              urls={openWithToolUrls as OpenWithToolUrls}
+            />
           ) : null}
 
           {showDataLinkDialog ? (

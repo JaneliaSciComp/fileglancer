@@ -3,8 +3,6 @@ import type { UseQueryResult } from '@tanstack/react-query';
 
 import N5MetadataTable from '@/components/ui/BrowsePage/N5MetadataTable';
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
-import DataLinkUsageDialog from '@/components/ui/Dialogs/DataLinkUsageDialog';
-import TextDialogBtn from '@/components/ui/buttons/DialogTextBtn';
 import DataToolLinks from './DataToolLinks';
 import type { N5Metadata, N5OpenWithToolUrls } from '@/queries/n5Queries';
 import useDataToolLinks from '@/hooks/useDataToolLinks';
@@ -56,26 +54,15 @@ export default function N5Preview({
           <N5Logo />
 
           {openWithToolUrls ? (
-            <>
-              <DataToolLinks
-                onToolClick={handleToolClick}
-                showCopiedTooltip={showCopiedTooltip}
-                title="Open with:"
-                urls={openWithToolUrls as OpenWithToolUrls}
-              />
-              {openWithToolUrls.copy ? (
-                <TextDialogBtn label="More ways to open" variant="solid">
-                  {closeDialog => (
-                    <DataLinkUsageDialog
-                      dataLinkUrl={openWithToolUrls.copy}
-                      dataType="n5"
-                      onClose={closeDialog}
-                      open={true}
-                    />
-                  )}
-                </TextDialogBtn>
-              ) : null}
-            </>
+            <DataToolLinks
+              compact={mainPanelWidth <= 1000}
+              dataLinkUrl={openWithToolUrls.copy || undefined}
+              dataType="n5"
+              onToolClick={handleToolClick}
+              showCopiedTooltip={showCopiedTooltip}
+              title="Open with:"
+              urls={openWithToolUrls as OpenWithToolUrls}
+            />
           ) : null}
 
           {showDataLinkDialog ? (
