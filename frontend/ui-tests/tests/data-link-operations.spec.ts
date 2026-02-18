@@ -40,9 +40,7 @@ test.describe('Data Link Operations', () => {
 
     // Wait for zarr metadata to load
     await expect(page.getByText('zarr.json')).toBeVisible({ timeout: 10000 });
-    await expect(
-      page.getByRole('link', { name: 'Neuroglancer logo' })
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByAltText(/neuroglancer/i)).toBeVisible();
 
     const dataLinkToggle = page.getByRole('checkbox', { name: /data link/i });
     const confirmButton = page.getByRole('button', {
@@ -53,9 +51,7 @@ test.describe('Data Link Operations', () => {
     });
 
     await test.step('Turn on automatic data links via the data link dialog', async () => {
-      const neuroglancerLink = page.getByRole('link', {
-        name: 'Neuroglancer logo'
-      });
+      const neuroglancerLink = page.getByAltText(/neuroglancer/i);
       await neuroglancerLink.click();
 
       // Confirm the data link creation in the dialog
@@ -211,9 +207,7 @@ test.describe('Data Link Operations', () => {
     // Navigate into the zarr directory
     await page.getByRole('link', { name: zarrDirName }).click();
     await expect(page.getByText('zarr.json')).toBeVisible({ timeout: 10000 });
-    await expect(
-      page.getByRole('link', { name: 'Neuroglancer logo' })
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByAltText(/neuroglancer/i)).toBeVisible();
 
     // Click on the s0 subdirectory row to select it as the properties target
     const s0Row = page.getByRole('row').filter({ hasText: 's0' });
@@ -229,9 +223,7 @@ test.describe('Data Link Operations', () => {
 
     // Click the Neuroglancer viewer icon — this should create a data link
     // for the zarr directory (currentFileOrFolder), not for s0 (propertiesTarget)
-    const neuroglancerLink = page.getByRole('link', {
-      name: 'Neuroglancer logo'
-    });
+    const neuroglancerLink = page.getByAltText(/neuroglancer/i);
     await neuroglancerLink.click();
 
     // Confirm in dialog

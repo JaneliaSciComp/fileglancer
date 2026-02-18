@@ -32,7 +32,8 @@
   },
   "mounts": [
     "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind",
-    "source=fileglancer-pixi,target=${containerWorkspaceFolder}/.pixi,type=volume"
+    "source=fileglancer-pixi,target=${containerWorkspaceFolder}/.pixi,type=volume",
+    "source=/groups/scicompsoft/home/truhlara/gh-repos/capability-manifest,target=/workspaces/capability-manifest,type=bind"
   ],
   "remoteEnv": {
     "NODE_OPTIONS": "--max-old-space-size=4096",
