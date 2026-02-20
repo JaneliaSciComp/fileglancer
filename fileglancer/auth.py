@@ -3,6 +3,7 @@ Authentication module for OKTA OAuth/OIDC integration
 """
 import os
 import hashlib
+import secrets
 from datetime import datetime, timedelta, UTC
 from typing import Optional
 
@@ -109,9 +110,25 @@ def get_current_user(request: Request, settings: Settings) -> str:
     """
     Get the current authenticated user
 
-    Always validates session from cookie (for both OKTA and simple auth)
-    Raises HTTPException(401) if authentication fails
+    Checks API key header first (only when enable_test_api_key is True),
+    then falls back to session cookie validation.
+    Raises HTTPException(401) if authentication fails.
     """
+    # API key path — only active when explicitly enabled in settings.
+    # Never set enable_test_api_key=True on production deployments.
+    if settings.enable_test_api_key and settings.test_api_key:
+        api_key = request.headers.get("X-API-Key")
+        if api_key and secrets.compare_digest(api_key, settings.test_api_key):
+            username = request.headers.get("X-API-Username", "").strip()
+            if not username:
+                raise HTTPException(
+                    status_code=401,
+                    detail="X-API-Username header is required when using API key authentication"
+                )
+            logger.debug(f"API key authentication for user {username}")
+            return username
+
+    # Normal cookie path — used for both OKTA and simple auth
     user_session = get_session_from_cookie(request, settings)
 
     if not user_session:

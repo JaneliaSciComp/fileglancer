@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     # CLI mode - enables auto-login endpoint for standalone CLI usage
     cli_mode: bool = False
 
+    # Test API key for automated integration testing.
+    # NEVER enable on production. Must be explicitly set to True to take effect.
+    enable_test_api_key: bool = False
+    test_api_key: Optional[str] = None
+
     model_config = SettingsConfigDict(
         yaml_file="config.yaml",
         env_file='.env',
