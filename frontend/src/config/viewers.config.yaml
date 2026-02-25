@@ -10,13 +10,13 @@
 #   - label: Custom tooltip text (defaults to "View in {Name}")
 
 viewers:
-  - manifest_url: '/viewers/neuroglancer.yaml'
+  - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/7e460032d34b04ee7367000413d26ae0b989739b/frontend/public/viewers/neuroglancer.yaml'
 
-  - manifest_url: '/viewers/vizarr.yaml'
+  - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/7e460032d34b04ee7367000413d26ae0b989739b/frontend/public/viewers/vizarr.yaml'
     instance_template_url: 'https://janeliascicomp.github.io/viv/'
 
-  - manifest_url: '/viewers/validator.yaml'
+  - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/7e460032d34b04ee7367000413d26ae0b989739b/frontend/public/viewers/validator.yaml'
     label: 'View in OME-Zarr Validator'
 
-  - manifest_url: '/viewers/vole.yaml'
+  - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/7e460032d34b04ee7367000413d26ae0b989739b/frontend/public/viewers/vole.yaml'
     label: 'View in Vol-E'
