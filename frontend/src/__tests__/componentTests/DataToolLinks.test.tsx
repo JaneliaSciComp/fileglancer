@@ -136,29 +136,36 @@ describe('DataToolLinks - Edge Cases', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Mock loadManifestsFromUrls to return Map with manifests
-    // URLs must match those in viewers.config.yaml
-    mockCapabilityManifest.loadManifestsFromUrls.mockResolvedValue(
-      new Map([
-        [
-          '/viewers/neuroglancer.yaml',
-          {
-            viewer: {
-              name: 'Neuroglancer',
-              template_url: 'https://neuroglancer.com/#!{DATA_URL}'
+    // Mock loadManifestsFromUrls to return manifests keyed by the URLs it receives.
+    // This decouples the test from the exact manifest_url values in viewers.config.yaml.
+    const manifestsByName: Record<string, object> = {
+      neuroglancer: {
+        viewer: {
+          name: 'Neuroglancer',
+          template_url: 'https://neuroglancer.com/#!{DATA_URL}'
+        }
+      },
+      vizarr: {
+        viewer: {
+          name: 'Avivator',
+          template_url: 'https://vizarr.com/?url={DATA_URL}'
+        }
+      }
+    };
+
+    mockCapabilityManifest.loadManifestsFromUrls.mockImplementation(
+      async (urls: string[]) => {
+        const map = new Map();
+        for (const url of urls) {
+          for (const [name, manifest] of Object.entries(manifestsByName)) {
+            if (url.includes(name)) {
+              map.set(url, manifest);
+              break;
             }
           }
-        ],
-        [
-          '/viewers/vizarr.yaml',
-          {
-            viewer: {
-              name: 'Avivator',
-              template_url: 'https://vizarr.com/?url={DATA_URL}'
-            }
-          }
-        ]
-      ])
+        }
+        return map;
+      }
     );
 
     // Mock isCompatible to return true for all viewers
@@ -245,29 +252,36 @@ describe('DataToolLinks - Expected Behavior', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Mock loadManifestsFromUrls to return Map with manifests
-    // URLs must match those in viewers.config.yaml
-    mockCapabilityManifest.loadManifestsFromUrls.mockResolvedValue(
-      new Map([
-        [
-          '/viewers/neuroglancer.yaml',
-          {
-            viewer: {
-              name: 'Neuroglancer',
-              template_url: 'https://neuroglancer.com/#!{DATA_URL}'
+    // Mock loadManifestsFromUrls to return manifests keyed by the URLs it receives.
+    // This decouples the test from the exact manifest_url values in viewers.config.yaml.
+    const manifestsByName: Record<string, object> = {
+      neuroglancer: {
+        viewer: {
+          name: 'Neuroglancer',
+          template_url: 'https://neuroglancer.com/#!{DATA_URL}'
+        }
+      },
+      vizarr: {
+        viewer: {
+          name: 'Avivator',
+          template_url: 'https://vizarr.com/?url={DATA_URL}'
+        }
+      }
+    };
+
+    mockCapabilityManifest.loadManifestsFromUrls.mockImplementation(
+      async (urls: string[]) => {
+        const map = new Map();
+        for (const url of urls) {
+          for (const [name, manifest] of Object.entries(manifestsByName)) {
+            if (url.includes(name)) {
+              map.set(url, manifest);
+              break;
             }
           }
-        ],
-        [
-          '/viewers/vizarr.yaml',
-          {
-            viewer: {
-              name: 'Avivator',
-              template_url: 'https://vizarr.com/?url={DATA_URL}'
-            }
-          }
-        ]
-      ])
+        }
+        return map;
+      }
     );
 
     // Mock isCompatible to return true for all viewers
