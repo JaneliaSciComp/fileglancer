@@ -1639,17 +1639,9 @@ def create_app(settings):
                              username: str = Depends(get_current_user)):
         errors = {}
         for param_key, path_value in body.paths.items():
-            # Normalize backslashes to forward slashes
-            normalized = path_value.replace("\\", "/")
-            # Require absolute path
-            if not normalized.startswith("/") and not normalized.startswith("~"):
-                errors[param_key] = f"Must be an absolute path (starting with / or ~)"
-                continue
-            expanded = os.path.normpath(os.path.expanduser(normalized))
-            if not os.path.exists(expanded):
-                errors[param_key] = f"Path does not exist: {normalized}"
-            elif not os.access(expanded, os.R_OK):
-                errors[param_key] = f"Path is not accessible: {normalized}"
+            error = apps_module.validate_path(path_value)
+            if error:
+                errors[param_key] = error
         return PathValidationResponse(errors=errors)
 
     @app.get("/api/cluster-defaults",

@@ -281,10 +281,35 @@ def verify_requirements(requirements: list[str]):
         raise ValueError("Unmet requirements:\n  - " + "\n  - ".join(errors))
 
 
-# --- Command Building ---
+# --- Path Validation ---
 
 # Characters that are dangerous in shell commands
 _SHELL_METACHAR_PATTERN = re.compile(r'[;&|`$(){}!<>\n\r]')
+
+
+def validate_path(path_value: str) -> str | None:
+    """Validate a file or directory path for use in app parameters.
+
+    Returns an error message string if invalid, or None if valid.
+    """
+    normalized = path_value.replace("\\", "/")
+
+    if _SHELL_METACHAR_PATTERN.search(normalized):
+        return "Path contains invalid characters"
+
+    if not normalized.startswith("/") and not normalized.startswith("~"):
+        return "Must be an absolute path (starting with / or ~)"
+
+    expanded = os.path.expanduser(normalized)
+    if not os.path.exists(expanded):
+        return f"Path does not exist: {normalized}"
+    if not os.access(expanded, os.R_OK):
+        return f"Path is not accessible: {normalized}"
+
+    return None
+
+
+# --- Command Building ---
 
 # Valid environment variable name
 _ENV_VAR_NAME_PATTERN = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
@@ -332,23 +357,10 @@ def _validate_parameter_value(param: AppParameter, value) -> str:
     str_val = str(value)
 
     if param.type in ("file", "directory"):
-        # Normalize backslashes to forward slashes
         str_val = str_val.replace("\\", "/")
-
-        # Validate path characters
-        if _SHELL_METACHAR_PATTERN.search(str_val):
-            raise ValueError(f"Parameter '{param.name}' contains invalid characters")
-
-        # Require absolute path
-        if not str_val.startswith("/") and not str_val.startswith("~"):
-            raise ValueError(f"Parameter '{param.name}' must be an absolute path (starting with / or ~)")
-
-        # Verify path exists
-        expanded = os.path.expanduser(str_val)
-        if not os.path.exists(expanded):
-            raise ValueError(f"Parameter '{param.name}': path does not exist: {str_val}")
-        if not os.access(expanded, os.R_OK):
-            raise ValueError(f"Parameter '{param.name}': path is not accessible: {str_val}")
+        error = validate_path(str_val)
+        if error:
+            raise ValueError(f"Parameter '{param.name}': {error}")
 
     if param.type == "string" and param.pattern:
         if not re.fullmatch(param.pattern, str_val):
