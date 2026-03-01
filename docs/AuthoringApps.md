@@ -359,11 +359,11 @@ When a job is submitted, Fileglancer constructs the full shell command from the 
 
 1. Start with the base `command` string
 2. Merge user-provided values with defaults for any parameters the user didn't set
-3. **Pass 1 — Positional arguments**: Emit values for parameters without a `flag`, in declaration order, as bare shell-quoted values
-4. **Pass 2 — Flagged arguments**: Emit values for parameters with a `flag`, in declaration order:
+3. **Pass 1 — Flagged arguments**: Emit values for parameters with a `flag`, in declaration order:
    - Boolean `true` → append the flag (e.g. `--verbose`)
    - Boolean `false` → omit entirely
    - All other types → append `{flag} {shell_quoted_value}`
+4. **Pass 2 — Positional arguments**: Emit values for parameters without a `flag`, in declaration order, as bare shell-quoted values
 5. Join all parts with line-continuation (`\`) for readability
 
 For example, given this runnable:

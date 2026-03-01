@@ -151,7 +151,7 @@ def _find_manifests_in_repo(repo_dir: Path) -> list[tuple[str, AppManifest]]:
         current = Path(dirpath)
         try:
             manifest = _read_manifest_file(current)
-        except (ValueError, Exception) as e:
+        except Exception as e:
             logger.warning(f"Skipping invalid manifest in {dirpath}: {e}")
             continue
 
@@ -361,8 +361,8 @@ def build_command(entry_point: AppEntryPoint, parameters: dict) -> str:
     """Build a shell command from an entry point and parameter values.
 
     All parameter values are validated and shell-escaped.
-    Positional parameters (no flag) are emitted first in declaration order,
-    then flagged parameters in declaration order.
+    Flagged parameters are emitted first in declaration order,
+    then positional parameters (no flag) in declaration order.
     Raises ValueError for invalid parameters.
     """
     # Build a lookup of parameter definitions by key
