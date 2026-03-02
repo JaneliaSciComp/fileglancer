@@ -33,8 +33,19 @@ View the app in the browser at localhost:7878.
 
 Copy the configuration file and edit as desired.
 
-```
+```bash
 cp docs/config.yaml.template config.yaml
+```
+
+Optionally, to run Playwright tests against a development deployment with OKTA authentication enabled, add the below to the configuration file.
+**Note:** Do NOT add this configuration to a production deployment.
+
+```yaml
+#
+# Bypass OKTA multifactor authentication for integration tests against a development deployment
+#
+enable_test_api_key: true
+test_api_key: "<your-generated-key>"
 ```
 
 ### File Share Paths
@@ -43,16 +54,16 @@ By default, Fileglancer provides access to each user's home directory without re
 
 ```yaml
 file_share_mounts:
-  - "~/"    # User's home directory (default)
+  - "~/" # User's home directory (default)
 ```
 
 You can add additional file share paths by editing your `config.yaml`:
 
 ```yaml
 file_share_mounts:
-  - "~/"                              # User's home directory
-  - "/groups/scicomp/data"            # Shared data directory
-  - "/opt/data"                       # Another shared directory
+  - "~/" # User's home directory
+  - "/groups/scicomp/data" # Shared data directory
+  - "/opt/data" # Another shared directory
 ```
 
 **How Home Directories Work:**

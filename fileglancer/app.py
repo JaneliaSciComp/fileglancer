@@ -1495,6 +1495,44 @@ def create_app(settings):
 
         return response
 
+
+    @app.post("/api/auth/test-login", include_in_schema=False)
+    async def test_login(request: Request):
+        """Create a session for automated testing. Requires enable_test_api_key=true in settings."""
+        if not settings.enable_test_api_key or not settings.test_api_key:
+            raise HTTPException(status_code=404, detail="Not found")
+
+        import secrets as _secrets
+        api_key = request.headers.get("X-API-Key", "")
+        if not api_key or not _secrets.compare_digest(api_key, settings.test_api_key):
+            raise HTTPException(status_code=401, detail="Invalid API key")
+
+        username = request.headers.get("X-API-Username", "").strip()
+        if not username:
+            raise HTTPException(status_code=400, detail="X-API-Username header is required")
+
+        expires_at = datetime.now(UTC) + timedelta(hours=settings.session_expiry_hours)
+
+        with db.get_db_session(settings.db_url) as session:
+            user_session = db.create_session(
+                session=session,
+                username=username,
+                email=None,
+                expires_at=expires_at,
+                session_secret_key=settings.session_secret_key,
+                okta_access_token=None,
+                okta_id_token=None
+            )
+            session_id = user_session.session_id
+
+        response = JSONResponse(content={"success": True, "username": username})
+        auth.create_session_cookie(response, session_id, settings)
+
+        logger.info(f"User {username} logged in via test API key")
+
+        return response
+
+
     # Return 404 error at /attributes.json
     # Required for Neuroglancer to be able to render N5 volumes
     @app.get("/attributes.json", include_in_schema=False)
