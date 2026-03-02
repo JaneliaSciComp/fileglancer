@@ -48,7 +48,7 @@ viewers:
   - manifest_url: "https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/neuroglancer.yaml"
 
   - manifest_url: "https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/vizarr.yaml"
-    instance_template_url: "https://janeliascicomp.github.io/viv/"
+    instance_template_url: "https://janeliascicomp.github.io/viv/?image_url={DATA_URL}"
 
   - manifest_url: "https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/validator.yaml"
     label: "View in OME-Zarr Validator"
