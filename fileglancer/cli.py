@@ -178,7 +178,7 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
 
     # Build uvicorn config
     config_kwargs = {
-        'app': 'fileglancer.app:app',
+        'app': 'fileglancer.server:app',
         'host': host,
         'port': port,
         'access_log': False,
