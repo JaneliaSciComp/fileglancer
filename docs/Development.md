@@ -72,11 +72,13 @@ Fileglancer supports dynamic configuration of OME-Zarr viewers through `viewers.
 
 **Quick Setup:**
 
-1. Edit the configuration file at `frontend/src/config/viewers.config.yaml` to enable/disable viewers or customize URLs
+1. Copy the template into the frontend directory: `cp frontend/viewers.config.yaml.template frontend/viewers.config.yaml`
 
-2. Rebuild the application: `pixi run node-build` or use watch mode in development: `pixi run dev-watch`
+2. Edit `frontend/viewers.config.yaml` to enable/disable viewers or customize URLs
 
-**Note:** The configuration file is bundled at build time, so changes require rebuilding the application. The default configuration includes Neuroglancer, Avivator, OME-Zarr Validator, and Vol-E viewers.
+3. Rebuild the application: `pixi run node-build` or use watch mode in development: `pixi run dev-watch`
+
+**Note:** The configuration file is bundled at build time, so changes require rebuilding the application. `frontend/viewers.config.yaml` is gitignored so your customizations will not conflict with upstream updates. The default configuration includes Neuroglancer, Avivator, OME-Zarr Validator, and Vol-E viewers.
 
 For detailed configuration options, examples, and documentation on adding custom viewers, see [ViewersConfiguration.md](ViewersConfiguration.md).
 
