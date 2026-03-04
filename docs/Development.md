@@ -43,16 +43,16 @@ By default, Fileglancer provides access to each user's home directory without re
 
 ```yaml
 file_share_mounts:
-  - "~/" # User's home directory (default)
+  - "~/"                    # User's home directory (default)
 ```
 
 You can add additional file share paths by editing your `config.yaml`:
 
 ```yaml
 file_share_mounts:
-  - "~/" # User's home directory
-  - "/groups/scicomp/data" # Shared data directory
-  - "/opt/data" # Another shared directory
+  - "~/"                    # User's home directory
+  - "/groups/scicomp/data"  # Shared data directory
+  - "/opt/data"             # Another shared directory
 ```
 
 **How Home Directories Work:**
