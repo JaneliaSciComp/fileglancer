@@ -1,5 +1,5 @@
 viewer:
-  name: 'Validator'
+  name: 'OME-Zarr Validator'
   version: '1.0.0'
   repo: 'https://github.com/ome/ome-ngff-validator'
   template_url: 'https://ome.github.io/ome-ngff-validator/?source={DATA_URL}'
