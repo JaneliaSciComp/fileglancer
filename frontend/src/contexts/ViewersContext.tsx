@@ -59,23 +59,18 @@ async function loadViewersConfig(): Promise<ViewerConfigEntry[]> {
       'Using custom viewers configuration from src/config/viewers.config.yaml'
     );
   } catch (error) {
-    log.info(
-      'No custom viewers.config.yaml found, using default configuration'
+    throw new Error(
+      `Failed to load viewers configuration: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
-    return [
-      {
-        manifest_url:
-          'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/neuroglancer.yaml'
-      }
-    ];
   }
 
   try {
     const config = parseViewersConfig(configYaml);
     return config.viewers;
   } catch (error) {
-    log.error('Error parsing viewers configuration:', error);
-    throw error;
+    throw new Error(
+      `Failed to parse viewers configuration: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
 }
 
@@ -113,7 +108,6 @@ export function ViewersProvider({
           manifestsMap = await loadManifestsFromUrls(manifestUrls);
           log.info(`Loaded ${manifestsMap.size} viewer capability manifests`);
         } catch (manifestError) {
-          log.error('Failed to load capability manifests:', manifestError);
           throw new Error(
             `Failed to load viewer manifests: ${manifestError instanceof Error ? manifestError.message : 'Unknown error'}`
           );
