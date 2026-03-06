@@ -26,10 +26,8 @@ vi.mock('@bioimagetools/capability-manifest', () => mockCapabilityManifest);
 
 const mockOpenWithToolUrls: OpenWithToolUrls = {
   copy: 'http://localhost:3000/test/copy/url',
-  validator: 'http://localhost:3000/test/validator/url',
   neuroglancer: 'http://localhost:3000/test/neuroglancer/url',
-  vole: 'http://localhost:3000/test/vole/url',
-  vizarr: 'http://localhost:3000/test/vizarr/url'
+  avivator: 'http://localhost:3000/test/avivator/url'
 };
 
 // Helper component to wrap DataToolLinks with ViewersProvider
@@ -220,21 +218,16 @@ describe('DataToolLinks - Edge Cases', () => {
         { timeout: 3000 }
       );
 
-      // Should have neuroglancer logo and copy icon
+      // Should have neuroglancer logo
       const images = screen.getAllByRole('img');
-      expect(images.length).toBeGreaterThanOrEqual(2);
-
-      // Check for neuroglancer logo
       const neuroglancerLogo = images.find(
         img => img.getAttribute('alt') === 'View in Neuroglancer'
       );
       expect(neuroglancerLogo).toBeTruthy();
 
-      // Check for copy icon
-      const copyIcon = images.find(
-        img => img.getAttribute('alt') === 'Copy URL icon'
-      );
-      expect(copyIcon).toBeTruthy();
+      // Copy button is an SVG icon, find by aria-label
+      const copyButton = screen.getByLabelText('Copy data URL');
+      expect(copyButton).toBeInTheDocument();
     });
   });
 
@@ -299,15 +292,13 @@ describe('DataToolLinks - Expected Behavior', () => {
         { timeout: 3000 }
       );
 
-      // Should render copy icon at minimum
+      // Should render viewer logos
       const images = screen.getAllByRole('img');
-      const copyIcon = images.find(
-        img => img.getAttribute('alt') === 'Copy URL icon'
-      );
-      expect(copyIcon).toBeTruthy();
+      expect(images.length).toBeGreaterThanOrEqual(1);
 
-      // Should also have viewer logos
-      expect(images.length).toBeGreaterThan(1);
+      // Copy button is an SVG icon, find by aria-label
+      const copyButton = screen.getByLabelText('Copy data URL');
+      expect(copyButton).toBeInTheDocument();
     });
 
     it('should call onToolClick when copy icon is clicked', async () => {
@@ -321,17 +312,11 @@ describe('DataToolLinks - Expected Behavior', () => {
         { timeout: 3000 }
       );
 
-      // Click the copy icon (always present)
-      const images = screen.getAllByRole('img');
-      const copyIcon = images.find(
-        img => img.getAttribute('alt') === 'Copy URL icon'
-      );
-      expect(copyIcon).toBeTruthy();
+      // Click the copy button (SVG icon, not img — find by aria-label)
+      const copyButton = screen.getByLabelText('Copy data URL');
+      expect(copyButton).toBeInTheDocument();
 
-      const copyButton = copyIcon!.closest('button');
-      expect(copyButton).toBeTruthy();
-
-      copyButton!.click();
+      copyButton.click();
 
       await waitFor(() => {
         expect(onToolClick).toHaveBeenCalledWith('copy');
@@ -348,18 +333,20 @@ describe('DataToolLinks - Expected Behavior', () => {
         { timeout: 3000 }
       );
 
+      // Verify viewer logos are present (img elements)
       const images = screen.getAllByRole('img');
+      expect(images.length).toBeGreaterThanOrEqual(2);
 
-      // Should have neuroglancer, vizarr, and copy icons at minimum
-      expect(images.length).toBeGreaterThanOrEqual(3);
-
-      // Verify specific logos are present
       const neuroglancerLogo = images.find(
         img => img.getAttribute('alt') === 'View in Neuroglancer'
       );
       const vizarrLogo = images.find(
         img => img.getAttribute('alt') === 'View in Avivator'
       );
+
+      // Copy icon is an SVG, not an img — verify separately
+      const copyButton = screen.getByLabelText('Copy data URL');
+      expect(copyButton).toBeInTheDocument();
 
       expect(neuroglancerLogo).toBeTruthy();
       expect(vizarrLogo).toBeTruthy();
