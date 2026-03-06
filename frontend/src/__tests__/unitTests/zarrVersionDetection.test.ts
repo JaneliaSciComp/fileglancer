@@ -20,7 +20,10 @@ const createFile = (name: string): FileOrFolder => ({
 
 describe('areZarrMetadataFilesPresent', () => {
   it('should return true when zarr.json exists', () => {
-    const files = [createFile('zarr.json'), createFile('arrays/data/chunk_key_1')];
+    const files = [
+      createFile('zarr.json'),
+      createFile('arrays/data/chunk_key_1')
+    ];
     expect(areZarrMetadataFilesPresent(files)).toBe(true);
   });
 

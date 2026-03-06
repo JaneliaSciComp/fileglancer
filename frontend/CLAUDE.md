@@ -13,17 +13,16 @@ Use separate import lines for values and types from the same package (e.g. `impo
 Never manually construct URLs with template strings. Use utility functions (`src/utils/index.ts`, `src/utils/pathHandling.ts`):
 
 1. **`buildUrl`** (`src/utils/index.ts`) - General-purpose URL builder with two overloads:
-
    - **Overload 1**: `buildUrl(baseUrl, singlePathSegment | null, queryParams | null)` — single path segment encoded with `encodeURIComponent`, plus optional query params via `URLSearchParams`
      ```typescript
-     buildUrl('/api/files/', 'myFSP', { subpath: 'folder/file.txt' })
+     buildUrl('/api/files/', 'myFSP', { subpath: 'folder/file.txt' });
      // → '/api/files/myFSP?subpath=folder%2Ffile.txt'
-     buildUrl('/api/endpoint', null, { key: 'value' })
+     buildUrl('/api/endpoint', null, { key: 'value' });
      // → '/api/endpoint?key=value'
      ```
    - **Overload 2**: `buildUrl(baseUrl, multiSegmentPathString)` — multi-segment path encoded with `escapePathForUrl` (preserves `/`)
      ```typescript
-     buildUrl('https://s3.example.com/bucket', 'folder/file 100%.zarr')
+     buildUrl('https://s3.example.com/bucket', 'folder/file 100%.zarr');
      // → 'https://s3.example.com/bucket/folder/file%20100%25.zarr'
      ```
    - **Use for**: All internal API calls and any external URL that needs path or query encoding
@@ -54,10 +53,12 @@ Never manually construct URLs with template strings. Use utility functions (`src
 ### API Integration with TanStack Query
 
 **URL construction:** Use `buildUrl` from `@/utils` for all API URLs:
+
 - `buildUrl('/api/files/', fspName, { subpath: path })` — path segment + query params
 - `buildUrl('/api/resource/', id, null)` — path segment only
 
 **Query utilities** (`src/queries/queryUtils.ts`):
+
 - `sendRequestAndThrowForNotOk(url, method, body?)` — sends request, throws on non-2xx; use for most mutations
 - `getResponseJsonOrError(response)` + `throwResponseNotOkError(response, body)` — use together when you need custom status-code handling (e.g. treat 404 as empty result, not an error)
 
