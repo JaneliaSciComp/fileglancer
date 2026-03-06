@@ -136,18 +136,15 @@ async function fetchZarrMetadata({
           3
         );
         const metadata = await getOmeZarrMetadata(imageUrl);
-        // Check for labels
+        // Check for labels (optional - may not exist)
         try {
           const labelsAttrs = (await fetchFileAsJson(
             fspName,
             currentFileOrFolder.path + '/labels/zarr.json'
           )) as ZarrV3Attrs;
           metadata.labels = labelsAttrs?.attributes?.ome?.labels;
-          if (metadata.labels) {
-            log.info('OME-Zarr Labels found: ', metadata.labels);
-          }
-        } catch (error) {
-          log.trace('Could not fetch labels attrs: ', error);
+        } catch {
+          // Labels directory doesn't exist - that's fine
         }
         return {
           metadata,
@@ -156,7 +153,6 @@ async function fetchZarrMetadata({
           isOmeZarr: true
         };
       } else {
-        log.info('Zarrv3 group has no multiscales', attrs.attributes);
         return {
           metadata: null,
           omeZarrUrl: null,
@@ -165,7 +161,6 @@ async function fetchZarrMetadata({
         };
       }
     } else {
-      log.warn('Unknown Zarrv3 node type', attrs.node_type);
       return {
         metadata: null,
         omeZarrUrl: null,
@@ -213,18 +208,15 @@ async function fetchZarrMetadata({
             2
           );
           const metadata = await getOmeZarrMetadata(imageUrl);
-          // Check for labels
+          // Check for labels (optional - may not exist)
           try {
             const labelsAttrs = (await fetchFileAsJson(
               fspName,
               currentFileOrFolder.path + '/labels/.zattrs'
             )) as ZarrV2Attrs;
             metadata.labels = labelsAttrs?.labels;
-            if (metadata.labels) {
-              log.info('OME-Zarr Labels found: ', metadata.labels);
-            }
-          } catch (error) {
-            log.trace('Could not fetch labels attrs: ', error);
+          } catch {
+            // Labels directory doesn't exist - that's fine
           }
           return {
             metadata,

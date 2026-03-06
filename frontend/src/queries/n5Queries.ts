@@ -60,6 +60,24 @@ type N5MetadataQueryParams = {
   files: FileOrFolder[] | undefined;
 };
 
+export type N5DetectionSignals = {
+  hasAttributesJson: boolean; // attributes.json file (not dir) present
+  hasS0Folder: boolean; // s0/ directory present
+};
+
+export function getN5DetectionSignals(
+  files: FileOrFolder[]
+): N5DetectionSignals {
+  if (!files || files.length === 0) {
+    return { hasAttributesJson: false, hasS0Folder: false };
+  }
+  const hasAttributesJson = files.some(
+    f => f.name === 'attributes.json' && !f.is_dir
+  );
+  const hasS0Folder = files.some(f => f.name === 's0' && f.is_dir);
+  return { hasAttributesJson, hasS0Folder };
+}
+
 /**
  * Detects if the current directory is an N5 dataset.
  * N5 is detected when:
@@ -67,15 +85,7 @@ type N5MetadataQueryParams = {
  * 2. A child directory named "s0" exists
  */
 export function detectN5(files: FileOrFolder[]): boolean {
-  if (!files || files.length === 0) {
-    return false;
-  }
-
-  const hasAttributesJson = files.some(
-    f => f.name === 'attributes.json' && !f.is_dir
-  );
-  const hasS0Folder = files.some(f => f.name === 's0' && f.is_dir);
-
+  const { hasAttributesJson, hasS0Folder } = getN5DetectionSignals(files);
   return hasAttributesJson && hasS0Folder;
 }
 
@@ -88,7 +98,6 @@ async function fetchN5Metadata({
   files
 }: N5MetadataQueryParams): Promise<N5Metadata | null> {
   if (!fspName || !currentFileOrFolder || !files) {
-    log.warn('Missing required parameters for N5 metadata fetch');
     return null;
   }
 
@@ -103,33 +112,28 @@ async function fetchN5Metadata({
     return null;
   }
 
-  try {
-    // Fetch root attributes.json
-    log.info('Fetching N5 root attributes from', attributesFile.path);
-    const rootAttrs = (await fetchFileAsJson(
-      fspName,
-      attributesFile.path
-    )) as N5RootAttributes;
+  // Fetch root attributes.json
+  log.info('Fetching N5 root attributes from', attributesFile.path);
+  const rootAttrs = (await fetchFileAsJson(
+    fspName,
+    attributesFile.path
+  )) as N5RootAttributes;
 
-    // Construct path to s0/attributes.json
-    const s0AttributesPath = currentFileOrFolder.path + '/s0/attributes.json';
+  // Construct path to s0/attributes.json
+  const s0AttributesPath = currentFileOrFolder.path + '/s0/attributes.json';
 
-    // Fetch s0/attributes.json
-    log.info('Fetching N5 s0 attributes from', s0AttributesPath);
-    const s0Attrs = (await fetchFileAsJson(
-      fspName,
-      s0AttributesPath
-    )) as N5S0Attributes;
+  // Fetch s0/attributes.json
+  log.info('Fetching N5 s0 attributes from', s0AttributesPath);
+  const s0Attrs = (await fetchFileAsJson(
+    fspName,
+    s0AttributesPath
+  )) as N5S0Attributes;
 
-    return {
-      rootAttrs,
-      s0Attrs,
-      dataUrl
-    };
-  } catch (error) {
-    log.error('Error fetching N5 metadata:', error);
-    throw error;
-  }
+  return {
+    rootAttrs,
+    s0Attrs,
+    dataUrl
+  };
 }
 
 /**
