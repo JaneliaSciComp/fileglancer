@@ -1,0 +1,4 @@
+# Test fixture: mock viewers.config.yaml used to verify the override mechanism.
+# This file simulates a custom frontend/viewers.config.yaml provided by the user.
+viewers:
+  - manifest_url: 'https://example.com/mock-viewer.yaml'
