@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import N5MetadataTable from './N5MetadataTable';
+import N5MetadataTable from '../../components/ui/BrowsePage/N5MetadataTable';
 import type { N5Metadata } from '@/queries/n5Queries';
 
 const mockS0Attrs = {
