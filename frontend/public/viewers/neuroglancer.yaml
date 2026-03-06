@@ -1,0 +1,41 @@
+viewer:
+  name: "Neuroglancer"
+  version: "2.41.2"
+  repo: "https://github.com/google/neuroglancer"
+  template_url: https://neuroglancer-demo.appspot.com/#!{"layers":[{"name":"image","source":"{DATA_URL}","type":"image"}]}
+
+capabilities:
+  # Enumeration of OME-Zarr versions that can be loaded
+  ome_zarr_versions: [0.4, 0.5]
+
+  compression_codecs: ["blosc", "zstd", "zlib", "lz4", "gzip"]
+
+  # Which additional RFCs are supported?
+  rfcs_supported: []
+
+  # Are axis names and units respected?
+  axes: true
+
+  # Are scaling factors respected on multiscales?
+  scale: true
+
+  # Are translation factors respected on multiscales (including subpixel offsets for lower scale levels)?
+  translation: true
+
+  # Does the tool support multiple channels?
+  channels: true
+
+  # Does the tool support multiple timepoints?
+  timepoints: true
+
+  # Are labels loaded when available?
+  labels: false
+
+  # Are HCS plates loaded when available?
+  hcs_plates: false
+
+  # Does the viewer handle multiple images in a bioformats2raw layout?
+  bioformats2raw_layout: false
+
+  # Is the OMERO metadata used to e.g. color the channels?
+  omero_metadata: false

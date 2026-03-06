@@ -19,7 +19,7 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
 import { useHandleDownload } from '@/hooks/useHandleDownload';
-import { detectZarrVersions } from '@/queries/zarrQueries';
+import { areZarrMetadataFilesPresent } from '@/queries/zarrQueries';
 import { detectN5 } from '@/queries/n5Queries';
 import { makeMapKey } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
@@ -74,14 +74,15 @@ export default function FileBrowser({
     thumbnailQuery,
     openWithToolUrls,
     layerType,
-    availableVersions
+    availableZarrVersions
   } = useZarrMetadata();
 
   const { n5MetadataQuery, openWithToolUrls: n5OpenWithToolUrls } =
     useN5Metadata();
 
-  const isZarrDir =
-    detectZarrVersions(fileQuery.data?.files as FileOrFolder[]).length > 0;
+  const isZarrDir = areZarrMetadataFilesPresent(
+    fileQuery.data?.files as FileOrFolder[]
+  );
 
   const isN5Dir = detectN5(fileQuery.data?.files as FileOrFolder[]);
 
@@ -205,7 +206,7 @@ export default function FileBrowser({
         </div>
       ) : zarrMetadataQuery.data?.metadata ? (
         <ZarrPreview
-          availableVersions={availableVersions}
+          availableZarrVersions={availableZarrVersions}
           fspName={fileQuery.data?.currentFileSharePath?.name ?? ''}
           layerType={layerType}
           mainPanelWidth={mainPanelWidth}

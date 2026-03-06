@@ -26,7 +26,8 @@ vi.mock('@/hooks/useZarrMetadata', async () => {
 
 // Test component that uses the actual useZarrMetadata hook
 function ZarrMetadataTableTestWrapper() {
-  const { availableVersions, layerType, zarrMetadataQuery } = useZarrMetadata();
+  const { availableZarrVersions, layerType, zarrMetadataQuery } =
+    useZarrMetadata();
 
   // Don't render until we have metadata
   if (!zarrMetadataQuery.data?.metadata) {
@@ -35,7 +36,7 @@ function ZarrMetadataTableTestWrapper() {
 
   return (
     <ZarrMetadataTable
-      availableVersions={availableVersions}
+      availableZarrVersions={availableZarrVersions}
       layerType={layerType}
       metadata={zarrMetadataQuery.data.metadata}
     />
@@ -43,14 +44,15 @@ function ZarrMetadataTableTestWrapper() {
 }
 
 describe('ZarrMetadataTable', () => {
-  it('should display "v2, v3" when both versions are available', async () => {
+  it('should display "3, 2" when both zarr versions are available', async () => {
     render(<ZarrMetadataTableTestWrapper />, {
       initialEntries: ['/browse/test_fsp/my_folder/ome_zarr_both_versions']
     });
 
     // Wait for the metadata table to render with version info
+    // zarr.json (v3) is checked first, then .zattrs (v2), so order is 3, 2
     await waitFor(() => {
-      expect(screen.getByText('v2, v3')).toBeInTheDocument();
+      expect(screen.getByText('3, 2')).toBeInTheDocument();
     });
   });
 
