@@ -109,7 +109,9 @@ export function getEffectiveZarrStorageVersion(
 }
 
 /**
- * Fetches Zarr metadata by checking for zarr.json, .zarray, or .zattrs files
+ * Fetches Zarr metadata by checking for zarr.json, .zattrs, and .zarray files.
+ * Always checks all metadata sources to build complete version arrays.
+ * Start with zarr.json for Zarr v3 metadata, then .zattrs for Zarr v2 metadata, then .zarray as fallback.
  */
 async function fetchZarrMetadata({
   fspName,
@@ -121,7 +123,8 @@ async function fetchZarrMetadata({
     return {
       metadata: null,
       omeZarrUrl: null,
-      availableVersions: [],
+      availableZarrVersions: [],
+      availableOmeZarrVersions: [],
       isOmeZarr: false
     };
   }
@@ -132,21 +135,44 @@ async function fetchZarrMetadata({
   const getFile = (fileName: string) =>
     files.find((file: FileOrFolder) => file.name === fileName);
 
-  const availableVersions = detectZarrVersions(files);
+  const availableZarrVersions: number[] = [];
+  const availableOmeZarrVersions: string[] = [];
 
-  // Default to Zarr v3 when available
-  if (availableVersions.includes('v3')) {
-    const zarrJsonFile = getFile('zarr.json') as FileOrFolder;
+  // Track whether we found primary metadata from zarr.json
+  let primaryMetadata: ZarrMetadataResult | null = null;
+
+  // Step 1: Try zarr.json
+  const zarrJsonFile = getFile('zarr.json');
+  if (zarrJsonFile) {
     const attrs = (await fetchFileAsJson(
       fspName,
       zarrJsonFile.path
     )) as ZarrV3Attrs;
 
+    // Read zarr_format field for Zarr storage version
+    const zarrStorageVersion = attrs.zarr_format;
+    if (zarrStorageVersion === undefined || zarrStorageVersion === null) {
+      log.warn('zarr.json missing zarr_format field, defaulting to 3');
+      availableZarrVersions.push(3);
+    } else {
+      availableZarrVersions.push(zarrStorageVersion);
+    }
+
+    const effectiveVersion: 2 | 3 =
+      zarrStorageVersion === 2 || zarrStorageVersion === 3
+        ? zarrStorageVersion
+        : 3;
+
     if (attrs.node_type === 'array') {
-      log.info('Getting Zarr array for', imageUrl, 'with Zarr version', 3);
-      const arr = await getZarrArray(imageUrl, 3);
+      log.info(
+        'Getting Zarr array for',
+        imageUrl,
+        'with Zarr version',
+        effectiveVersion
+      );
+      const arr = await getZarrArray(imageUrl, effectiveVersion);
       const shapes = [arr.shape];
-      return {
+      primaryMetadata = {
         metadata: {
           arr,
           shapes,
@@ -154,19 +180,25 @@ async function fetchZarrMetadata({
           scales: undefined,
           omero: undefined,
           labels: undefined,
-          zarrVersion: 3
+          zarrVersion: effectiveVersion
         },
         omeZarrUrl: null,
-        availableVersions,
+        availableZarrVersions,
+        availableOmeZarrVersions,
         isOmeZarr: false
       };
     } else if (attrs.node_type === 'group') {
       if (attrs.attributes?.ome?.multiscales) {
+        const ngffVersion = getOmeNgffVersion(attrs);
+        if (!availableOmeZarrVersions.includes(ngffVersion)) {
+          availableOmeZarrVersions.push(ngffVersion);
+        }
+
         log.info(
           'Getting OME-Zarr metadata for',
           imageUrl,
           'with Zarr version',
-          3
+          effectiveVersion
         );
         const metadata = await getOmeZarrMetadata(imageUrl);
         // Check for labels
@@ -182,119 +214,116 @@ async function fetchZarrMetadata({
         } catch (error) {
           log.trace('Could not fetch labels attrs: ', error);
         }
-        return {
+        primaryMetadata = {
           metadata,
           omeZarrUrl: imageUrl,
-          availableVersions,
+          availableZarrVersions,
+          availableOmeZarrVersions,
           isOmeZarr: true
         };
       } else {
         log.info('Zarrv3 group has no multiscales', attrs.attributes);
-        return {
-          metadata: null,
-          omeZarrUrl: null,
-          availableVersions,
-          isOmeZarr: false
-        };
+        // Don't return yet - continue to check .zattrs
       }
     } else {
       log.warn('Unknown Zarrv3 node type', attrs.node_type);
-      return {
-        metadata: null,
-        omeZarrUrl: null,
-        availableVersions,
-        isOmeZarr: false
-      };
     }
-    // v3 not available, now check for v2
-  } else {
-    // v2 present
-    if (availableVersions.includes('v2')) {
-      const zarrayFile = getFile('.zarray');
-      const zattrsFile = getFile('.zattrs');
+  }
 
-      // Check for .zarray (Zarr v2 array)
-      if (zarrayFile) {
-        log.info('Getting Zarr array for', imageUrl, 'with Zarr version', 2);
-        const arr = await getZarrArray(imageUrl, 2);
-        const shapes = [arr.shape];
-        return {
-          metadata: {
-            arr,
-            shapes,
-            multiscale: undefined,
-            scales: undefined,
-            omero: undefined,
-            labels: undefined,
-            zarrVersion: 2
-          },
-          omeZarrUrl: null,
-          availableVersions,
-          isOmeZarr: false
-        };
-        // Check for .zattrs (Zarr v2 OME-Zarr)
-      } else if (zattrsFile) {
-        const attrs = (await fetchFileAsJson(
-          fspName,
-          zattrsFile.path
-        )) as ZarrV2Attrs;
-        if (attrs.multiscales) {
-          log.info(
-            'Getting OME-Zarr metadata for',
-            imageUrl,
-            'with Zarr version',
-            2
-          );
-          const metadata = await getOmeZarrMetadata(imageUrl);
-          // Check for labels
-          try {
-            const labelsAttrs = (await fetchFileAsJson(
-              fspName,
-              currentFileOrFolder.path + '/labels/.zattrs'
-            )) as ZarrV2Attrs;
-            metadata.labels = labelsAttrs?.labels;
-            if (metadata.labels) {
-              log.info('OME-Zarr Labels found: ', metadata.labels);
-            }
-          } catch (error) {
-            log.trace('Could not fetch labels attrs: ', error);
+  // Step 2: Always also check .zattrs
+  const zattrsFile = getFile('.zattrs');
+  if (zattrsFile) {
+    if (!availableZarrVersions.includes(2)) {
+      availableZarrVersions.push(2);
+    }
+
+    const attrs = (await fetchFileAsJson(
+      fspName,
+      zattrsFile.path
+    )) as ZarrV2Attrs;
+
+    if (attrs.multiscales) {
+      const ngffVersion = getOmeNgffVersion(attrs);
+      if (!availableOmeZarrVersions.includes(ngffVersion)) {
+        availableOmeZarrVersions.push(ngffVersion);
+      }
+
+      // If we don't already have primary metadata from zarr.json, use .zattrs
+      if (!primaryMetadata) {
+        log.info(
+          'Getting OME-Zarr metadata for',
+          imageUrl,
+          'with Zarr version',
+          2
+        );
+        const metadata = await getOmeZarrMetadata(imageUrl);
+        // Check for labels
+        try {
+          const labelsAttrs = (await fetchFileAsJson(
+            fspName,
+            currentFileOrFolder.path + '/labels/.zattrs'
+          )) as ZarrV2Attrs;
+          metadata.labels = labelsAttrs?.labels;
+          if (metadata.labels) {
+            log.info('OME-Zarr Labels found: ', metadata.labels);
           }
-          return {
-            metadata,
-            omeZarrUrl: imageUrl,
-            availableVersions,
-            isOmeZarr: true
-          };
-        } else {
-          log.debug('Zarrv2 .zattrs has no multiscales', attrs);
-          return {
-            metadata: null,
-            omeZarrUrl: null,
-            availableVersions,
-            isOmeZarr: false
-          };
+        } catch (error) {
+          log.trace('Could not fetch labels attrs: ', error);
         }
-        // No Zarr metadata found
-      } else {
-        log.debug('No Zarr metadata files found for', imageUrl);
-        return {
-          metadata: null,
-          omeZarrUrl: null,
-          availableVersions,
-          isOmeZarr: false
+        primaryMetadata = {
+          metadata,
+          omeZarrUrl: imageUrl,
+          availableZarrVersions,
+          availableOmeZarrVersions,
+          isOmeZarr: true
         };
       }
-      // No Zarr metadata found
     } else {
-      log.debug('No supported Zarr versions detected for', imageUrl);
+      log.debug('Zarrv2 .zattrs has no multiscales', attrs);
+    }
+  }
+
+  // Step 3: If neither zarr.json nor .zattrs had data, check .zarray
+  if (!primaryMetadata) {
+    const zarrayFile = getFile('.zarray');
+    if (zarrayFile) {
+      if (!availableZarrVersions.includes(2)) {
+        availableZarrVersions.push(2);
+      }
+      log.info('Getting Zarr array for', imageUrl, 'with Zarr version', 2);
+      const arr = await getZarrArray(imageUrl, 2);
+      const shapes = [arr.shape];
       return {
-        metadata: null,
+        metadata: {
+          arr,
+          shapes,
+          multiscale: undefined,
+          scales: undefined,
+          omero: undefined,
+          labels: undefined,
+          zarrVersion: 2
+        },
         omeZarrUrl: null,
-        availableVersions: [],
+        availableZarrVersions,
+        availableOmeZarrVersions,
         isOmeZarr: false
       };
     }
   }
+
+  // Return primary metadata if found, otherwise return empty result
+  if (primaryMetadata) {
+    return primaryMetadata;
+  }
+
+  log.debug('No Zarr metadata found for', imageUrl);
+  return {
+    metadata: null,
+    omeZarrUrl: null,
+    availableZarrVersions,
+    availableOmeZarrVersions,
+    isOmeZarr: false
+  };
 }
 
 /**
@@ -318,7 +347,7 @@ export function useZarrMetadataQuery(
       !!currentFileOrFolder &&
       !!files &&
       files.length > 0 &&
-      detectZarrVersions(files).length > 0,
+      areZarrMetadataFilesPresent(files),
     staleTime: 5 * 60 * 1000, // 5 minutes - Zarr metadata doesn't change often
     retry: false // Don't retry if no Zarr files found
   });
