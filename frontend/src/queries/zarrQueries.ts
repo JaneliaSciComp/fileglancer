@@ -1,4 +1,5 @@
-import { useQuery, UseQueryResult } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import type { UseQueryResult } from '@tanstack/react-query';
 import { default as log } from '@/logger';
 import {
   getOmeZarrMetadata,
@@ -29,15 +30,18 @@ type ZarrMetadataQueryParams = {
 export type ZarrMetadataResult = {
   metadata: ZarrMetadata;
   omeZarrUrl: string | null;
-  availableVersions: ('v2' | 'v3')[];
+  availableZarrVersions: number[];
+  availableOmeZarrVersions: string[];
   isOmeZarr: boolean;
 };
 
 // Zarr v3 zarr.json structure
 type ZarrV3Attrs = {
+  zarr_format?: number;
   node_type: 'array' | 'group';
   attributes?: {
     ome?: {
+      version?: string;
       multiscales?: unknown;
       labels?: string[];
     };
@@ -51,28 +55,57 @@ type ZarrV2Attrs = {
 };
 
 /**
- * Detects which Zarr versions are supported by checking for version-specific marker files.
- * @returns Array of supported versions: ['v2'], ['v3'], or ['v2', 'v3']
+ * Extracts the OME-NGFF spec version from parsed metadata.
+ * Logic follows the OME-NGFF Validator.
  */
-export function detectZarrVersions(files: FileOrFolder[]): ('v2' | 'v3')[] {
+export function getOmeNgffVersion(ngffData: Record<string, any>): string {
+  let version: string | undefined;
+
+  if (ngffData.attributes?.ome) {
+    version = ngffData.attributes.ome.version;
+    if (!version) {
+      log.warn('No version found in attributes.ome, defaulting to 0.4');
+    }
+    // Used if 'attributes' is at the root
+  } else if (ngffData.ome?.version) {
+    version = ngffData.ome.version;
+  } else if (ngffData.version) {
+    version = ngffData.version;
+  } else {
+    // 0.4 and earlier: check multiscales, plate, or well
+    version =
+      ngffData.multiscales?.[0]?.version ??
+      ngffData.plate?.version ??
+      ngffData.well?.version;
+  }
+
+  // for 0.4 and earlier, version wasn't MUST and we defaulted
+  // to using v0.4 for validation. To preserve that behaviour
+  // return "0.4" if no version found.
+  version = version || '0.4';
+  // remove any -dev2 etc.
+  return version.split('-')[0];
+}
+
+export function areZarrMetadataFilesPresent(files: FileOrFolder[]): boolean {
   if (!files || files.length === 0) {
-    return [];
+    return false;
   }
-
   const hasFile = (name: string) => files.some(f => f.name === name);
-  const versions: ('v2' | 'v3')[] = [];
+  return hasFile('zarr.json') || hasFile('.zattrs') || hasFile('.zarray');
+}
 
-  // Check for Zarr v2 indicators
-  if (hasFile('.zarray') || hasFile('.zattrs')) {
-    versions.push('v2');
+/**
+ * Returns the preferred Zarr storage version from available versions.
+ * Prefers v3 if available, otherwise v2.
+ */
+export function getEffectiveZarrStorageVersion(
+  availableZarrVersions: number[]
+): 2 | 3 {
+  if (availableZarrVersions.includes(3)) {
+    return 3;
   }
-
-  // Check for Zarr v3 indicator
-  if (hasFile('zarr.json')) {
-    versions.push('v3');
-  }
-
-  return versions;
+  return 2;
 }
 
 /**
