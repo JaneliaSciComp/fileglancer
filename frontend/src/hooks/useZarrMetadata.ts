@@ -7,7 +7,8 @@ import { useExternalBucketContext } from '@/contexts/ExternalBucketContext';
 import { useViewersContext } from '@/contexts/ViewersContext';
 import {
   useZarrMetadataQuery,
-  useOmeZarrThumbnailQuery
+  useOmeZarrThumbnailQuery,
+  getEffectiveZarrStorageVersion
 } from '@/queries/zarrQueries';
 import type { OpenWithToolUrls, ZarrMetadata } from '@/queries/zarrQueries';
 import {
@@ -45,8 +46,9 @@ export default function useZarrMetadata() {
     files: fileQuery.data?.files
   });
 
-  const effectiveZarrVersion =
-    zarrMetadataQuery.data?.availableVersions.includes('v3') ? 3 : 2;
+  const effectiveZarrVersion = getEffectiveZarrStorageVersion(
+    zarrMetadataQuery.data?.availableZarrVersions ?? []
+  );
 
   const metadata = zarrMetadataQuery.data?.metadata || null;
   const omeZarrUrl = zarrMetadataQuery.data?.omeZarrUrl || null;
@@ -112,7 +114,9 @@ export default function useZarrMetadata() {
     if (metadata?.multiscale) {
       // Convert our metadata to OmeZarrMetadata format for capability checking
       const omeZarrMetadata = {
-        version: effectiveZarrVersion === 3 ? '0.5' : '0.4',
+        version: zarrMetadataQuery.data?.availableOmeZarrVersions.sort(
+          (a, b) => parseFloat(b) - parseFloat(a)
+        )[0],
         axes: metadata.multiscale?.axes,
         multiscales: metadata.multiscale ? [metadata.multiscale] : undefined,
         omero: metadata.omero,
@@ -235,6 +239,7 @@ export default function useZarrMetadata() {
     useLegacyMultichannelApproach,
     layerType,
     effectiveZarrVersion,
+    zarrMetadataQuery.data?.availableOmeZarrVersions,
     validViewers,
     viewersInitialized,
     getCompatibleViewers
@@ -245,6 +250,6 @@ export default function useZarrMetadata() {
     thumbnailQuery,
     openWithToolUrls,
     layerType,
-    availableVersions: zarrMetadataQuery.data?.availableVersions || []
+    availableZarrVersions: zarrMetadataQuery.data?.availableZarrVersions || []
   };
 }
