@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import { Button, Typography } from '@material-tailwind/react';
 
@@ -34,6 +34,8 @@ export default function NGLinkDialog({
   editItem
 }: NGLinkDialogProps) {
   const isEditMode = !!editItem;
+  const urlInputRef = useRef<HTMLInputElement>(null);
+  const shouldAutoSelectUrl = useRef(false);
 
   const [inputMode, setInputMode] = useState<'url' | 'state'>('url');
   const [neuroglancerUrl, setNeuroglancerUrl] = useState('');
@@ -54,13 +56,16 @@ export default function NGLinkDialog({
   useEffect(() => {
     if (editItem) {
       setInputMode('url');
-      setNeuroglancerUrl('');
+      setNeuroglancerUrl(
+        constructNeuroglancerUrl(editItem.state, editItem.url_base)
+      );
       setShortName(editItem.short_name || '');
       setTitle(editItem.title || '');
-      setStateJson('');
-      setBaseUrl(DEFAULT_BASE_URL);
+      setStateJson(JSON.stringify(editItem.state, null, 2));
+      setBaseUrl(editItem.url_base);
       setUrlValidationError(null);
       setStateValidationError(null);
+      shouldAutoSelectUrl.current = true;
     } else {
       setInputMode('url');
       setNeuroglancerUrl('');
@@ -72,6 +77,14 @@ export default function NGLinkDialog({
       setStateValidationError(null);
     }
   }, [editItem]);
+
+  // Auto-select the URL text once after it's populated in edit mode
+  useEffect(() => {
+    if (shouldAutoSelectUrl.current && urlInputRef.current) {
+      urlInputRef.current.select();
+      shouldAutoSelectUrl.current = false;
+    }
+  }, [neuroglancerUrl]);
 
   const validateUrlInput = (value: string): string | null => {
     if (!value.trim()) {
@@ -109,9 +122,11 @@ export default function NGLinkDialog({
 
   const handleModeChange = (mode: 'url' | 'state') => {
     setInputMode(mode);
-    setNeuroglancerUrl('');
-    setStateJson('');
-    setBaseUrl(DEFAULT_BASE_URL);
+    if (!isEditMode) {
+      setNeuroglancerUrl('');
+      setStateJson('');
+      setBaseUrl(DEFAULT_BASE_URL);
+    }
     setUrlValidationError(null);
     setStateValidationError(null);
     setError(null);
@@ -305,6 +320,7 @@ export default function NGLinkDialog({
               id="neuroglancer-url"
               onChange={handleUrlChange}
               placeholder="https://neuroglancer-demo.appspot.com/#!{...}"
+              ref={urlInputRef}
               type="text"
               value={neuroglancerUrl}
             />

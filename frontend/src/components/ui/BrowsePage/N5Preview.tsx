@@ -9,9 +9,11 @@ import useDataToolLinks from '@/hooks/useDataToolLinks';
 import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
 
 type N5PreviewProps = {
+  readonly fspName: string;
   readonly mainPanelWidth: number;
   readonly openWithToolUrls: N5OpenWithToolUrls | null;
   readonly n5MetadataQuery: UseQueryResult<N5Metadata | null, Error>;
+  readonly path: string;
 };
 
 /**
@@ -28,9 +30,11 @@ function N5Logo() {
 }
 
 export default function N5Preview({
+  fspName,
   mainPanelWidth,
   openWithToolUrls,
-  n5MetadataQuery
+  n5MetadataQuery,
+  path
 }: N5PreviewProps) {
   const [showDataLinkDialog, setShowDataLinkDialog] = useState<boolean>(false);
   const [pendingToolKey, setPendingToolKey] = useState<PendingToolKey>(null);
@@ -55,7 +59,11 @@ export default function N5Preview({
 
           {openWithToolUrls ? (
             <DataToolLinks
+              compact={mainPanelWidth <= 1000}
+              dataLinkUrl={openWithToolUrls.copy || undefined}
+              fspName={fspName}
               onToolClick={handleToolClick}
+              path={path}
               showCopiedTooltip={showCopiedTooltip}
               title="Open with:"
               urls={openWithToolUrls as OpenWithToolUrls}

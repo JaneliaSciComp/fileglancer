@@ -206,9 +206,11 @@ export default function FileBrowser({
       ) : zarrMetadataQuery.data?.metadata ? (
         <ZarrPreview
           availableVersions={availableVersions}
+          fspName={fileQuery.data?.currentFileSharePath?.name ?? ''}
           layerType={layerType}
           mainPanelWidth={mainPanelWidth}
           openWithToolUrls={openWithToolUrls}
+          path={fileQuery.data?.currentFileOrFolder?.path ?? ''}
           thumbnailQuery={thumbnailQuery}
           zarrMetadataQuery={zarrMetadataQuery}
         />
@@ -229,9 +231,11 @@ export default function FileBrowser({
         </div>
       ) : n5MetadataQuery.data ? (
         <N5Preview
+          fspName={fileQuery.data?.currentFileSharePath?.name ?? ''}
           mainPanelWidth={mainPanelWidth}
           n5MetadataQuery={n5MetadataQuery}
           openWithToolUrls={n5OpenWithToolUrls}
+          path={fileQuery.data?.currentFileOrFolder?.path ?? ''}
         />
       ) : null}
 

@@ -6,6 +6,7 @@ that are stored in the user's authorized_keys file.
 
 import gc
 import os
+import pwd
 import shutil
 import subprocess
 import tempfile
@@ -127,7 +128,7 @@ def get_ssh_directory() -> str:
     Returns:
         The absolute path to ~/.ssh
     """
-    return os.path.expanduser("~/.ssh")
+    return os.path.join(pwd.getpwuid(os.geteuid()).pw_dir, ".ssh")
 
 
 def ensure_ssh_directory_exists(ssh_dir: str) -> None:

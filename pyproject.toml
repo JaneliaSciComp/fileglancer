@@ -12,38 +12,34 @@ authors = [
     { name = "Konrad Rokicki", email = "rokickik@janelia.hhmi.org" }
 ]
 license = { file = "LICENSE" }
-requires-python = ">=3.14.0,<4"
+requires-python = ">=3.12.0"
 classifiers = [
     "License :: OSI Approved :: BSD License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
 ]
 dynamic = ["version", "description", "urls", "keywords"]
 dependencies = [
-    "aiosqlite >=0.21.0",
     "alembic >=1.17.0",
     "atlassian-python-api >=4.0.7",
     "authlib >=1.6.5",
     "cachetools >=6.2.1",
     "click >=8.0",
     "fastapi >=0.119.1",
-    "httpx >=0.28",
+    "httpx >=0.28.1,<0.29",
     "itsdangerous >=2.2.0",
     "loguru >=0.7.3",
-    "lxml >=5.3.1",
     "pandas >=2.3.3",
-    "psycopg2-binary >=2.9.10,<3",
+    "psycopg2 >=2.9.10,<3",
     "pydantic >=2.10.6",
     "pydantic-settings >=2.11.0",
     "python-jose >=3.5.0,<4",
     "cryptography >=41.0.0",
     "sqlalchemy >=2.0.44",
     "uvicorn >=0.38.0",
-    "x2s3 >=1.1.0"
+    "x2s3 >=1.1.1"
 ]
 
 [project.scripts]
@@ -52,7 +48,6 @@ fileglancer = "fileglancer.cli:cli"
 [project.optional-dependencies]
 test = [
     "coverage",
-    "httpx >=0.28",
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
@@ -153,22 +148,20 @@ container-claude = "npx @devcontainers/cli exec --workspace-folder . bash -lc 'p
 claude = "claude"
 
 [tool.pixi.dependencies]
-python = ">=3.14.0,<4"
+python = ">=3.12.0"
 pip = ">=25.0.1,<26"
 nodejs = ">=22.12.0,<23"
-aiosqlite = ">=0.21.0,<0.22"
 alembic = ">=1.17.0,<2"
 atlassian-python-api = ">=4.0.7,<5"
 authlib = ">=1.6.5,<2"
 cachetools = ">=6.2.1,<7"
 click = ">=8.0"
 fastapi = ">=0.119.1,<0.120"
-httpx = ">=0.28"
+httpx = ">=0.28.1,<0.29"
 itsdangerous = ">=2.2.0,<3"
 loguru = ">=0.7.3,<0.8"
-lxml = ">=5.3.1"
 pandas = ">=2.3.3,<3"
-psycopg2-binary = ">=2.9.10,<3"
+psycopg2 = ">=2.9.10,<3"
 pydantic = ">=2.10.6,<3"
 pydantic-settings = ">=2.11.0,<3"
 python-jose = ">=3.5.0,<4"

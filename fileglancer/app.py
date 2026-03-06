@@ -218,7 +218,8 @@ def create_app(settings):
             # Expand ~ to user's home directory before constructing the mount path
             expanded_mount_path = os.path.expanduser(fsp.mount_path)
             mount_path = f"{expanded_mount_path}/{proxied_path.path}"
-            return FileProxyClient(proxy_kwargs={'target_name': sharing_name}, path=mount_path), _get_user_context(proxied_path.username)
+            # Use 256KB buffer for better performance on network filesystems
+            return FileProxyClient(proxy_kwargs={'target_name': sharing_name}, path=mount_path, buffer_size=256*1024), _get_user_context(proxied_path.username)
 
 
     @asynccontextmanager
@@ -927,7 +928,9 @@ def create_app(settings):
                     created_at=entry.created_at,
                     updated_at=entry.updated_at,
                     state_url=state_url,
-                    neuroglancer_url=neuroglancer_url
+                    neuroglancer_url=neuroglancer_url,
+                    state=entry.state,
+                    url_base=entry.url_base
                 ))
 
         return NeuroglancerShortLinkResponse(links=links)

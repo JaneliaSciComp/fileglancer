@@ -32,11 +32,15 @@ export const ExternalBucketProvider = ({
 }: {
   readonly children: ReactNode;
 }) => {
-  const { fspName, filePath } = useFileBrowserContext();
+  const { fspName, fileBrowserState } = useFileBrowserContext();
 
   // Use TanStack Query to fetch external bucket and transform to data URL
-  // Second parameter is conditions required to enable the query
-  const externalDataUrlQuery = useExternalDataUrlQuery(fspName, filePath);
+  // Uses dataLinkPath (tracks propertiesTarget) so the URL updates when
+  // the user selects a subdirectory in the file browser
+  const externalDataUrlQuery = useExternalDataUrlQuery(
+    fspName,
+    fileBrowserState.dataLinkPath ?? undefined
+  );
 
   return (
     <ExternalBucketContext.Provider

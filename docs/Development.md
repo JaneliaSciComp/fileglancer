@@ -9,10 +9,16 @@ git clone git@github.com:JaneliaSciComp/fileglancer.git
 cd fileglancer
 ```
 
-If this is your first time installing the extension in dev mode, install package in development mode.
+Install the package in development mode.
 
 ```bash
 pixi run dev-install
+```
+
+Copy the configuration file and edit as desired (more details in [Configuration](#configuration) below).
+
+```bash
+cp docs/config.yaml.template config.yaml
 ```
 
 Now you can launch the server. It will automatically rebuild when there are file changes to the backend.
@@ -31,11 +37,7 @@ View the app in the browser at localhost:7878.
 
 ## Configuration
 
-Copy the configuration file and edit as desired.
-
-```
-cp docs/config.yaml.template config.yaml
-```
+The `config.yaml` file at the project root provides the server configuration.
 
 ### File Share Paths
 

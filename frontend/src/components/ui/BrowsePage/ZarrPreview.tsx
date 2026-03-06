@@ -15,9 +15,11 @@ import useDataToolLinks from '@/hooks/useDataToolLinks';
 import { Metadata } from '@/omezarr-helper';
 
 type ZarrPreviewProps = {
+  readonly fspName: string;
   readonly layerType: 'auto' | 'image' | 'segmentation' | null;
   readonly mainPanelWidth: number;
   readonly openWithToolUrls: OpenWithToolUrls | null;
+  readonly path: string;
   readonly availableVersions: ('v2' | 'v3')[];
   readonly thumbnailQuery: UseQueryResult<string, Error>;
   readonly zarrMetadataQuery: UseQueryResult<{
@@ -28,9 +30,11 @@ type ZarrPreviewProps = {
 
 export default function ZarrPreview({
   availableVersions,
+  fspName,
   layerType,
   mainPanelWidth,
   openWithToolUrls,
+  path,
   thumbnailQuery,
   zarrMetadataQuery
 }: ZarrPreviewProps) {
@@ -92,7 +96,11 @@ export default function ZarrPreview({
 
           {openWithToolUrls ? (
             <DataToolLinks
+              compact={mainPanelWidth <= 1000}
+              dataLinkUrl={openWithToolUrls.copy || undefined}
+              fspName={fspName}
               onToolClick={handleToolClick}
+              path={path}
               showCopiedTooltip={showCopiedTooltip}
               title="Open with:"
               urls={openWithToolUrls as OpenWithToolUrls}

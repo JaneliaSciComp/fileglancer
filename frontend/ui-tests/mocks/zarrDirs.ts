@@ -161,6 +161,29 @@ export const ZARR_V2_OME_ZARRAY_METADATA = {
   zarr_format: 2
 };
 
+// Type 5: N5 dataset
+// Detected by attributes.json file + s0/ subdirectory (per detectN5 in n5Queries.ts)
+export const N5_ROOT_METADATA = {
+  n5: '4.0.0',
+  downsamplingFactors: [
+    [1, 1, 1],
+    [2, 2, 1]
+  ],
+  resolution: [157, 157, 628],
+  units: ['nm', 'nm', 'nm'],
+  multiScale: true
+};
+
+export const N5_S0_METADATA = {
+  dataType: 'uint16',
+  compression: {
+    type: 'zstd',
+    level: 3
+  },
+  blockSize: [128, 128, 128],
+  dimensions: [1000, 1000, 500]
+};
+
 export const ZARR_TEST_FILE_INFO = {
   v3_non_ome: {
     dirname: 'zarr_v3_non_ome.zarr',
@@ -185,6 +208,12 @@ export const ZARR_TEST_FILE_INFO = {
     hasOmeMetadata: true,
     zarrVersion: 2,
     expectedViewers: ['validator', 'neuroglancer', 'vole', 'avivator']
+  },
+  n5: {
+    dirname: 'test_n5'
+  },
+  plain_dir: {
+    dirname: 'plain_dir'
   }
 } as const;
 
@@ -249,6 +278,26 @@ export function createZarrDirsSync(baseDir: string): void {
     JSON.stringify(ZARR_V2_OME_ZARRAY_METADATA, null, 2),
     { mode: 0o644 }
   );
+
+  // Type 5: N5 dataset (attributes.json + s0/ subdirectory)
+  const n5Dir = path.join(baseDir, ZARR_TEST_FILE_INFO.n5.dirname);
+  fsSync.mkdirSync(n5Dir, { recursive: true, mode: 0o755 });
+  fsSync.writeFileSync(
+    path.join(n5Dir, 'attributes.json'),
+    JSON.stringify(N5_ROOT_METADATA, null, 2),
+    { mode: 0o644 }
+  );
+  const n5S0Dir = path.join(n5Dir, 's0');
+  fsSync.mkdirSync(n5S0Dir, { recursive: true, mode: 0o755 });
+  fsSync.writeFileSync(
+    path.join(n5S0Dir, 'attributes.json'),
+    JSON.stringify(N5_S0_METADATA, null, 2),
+    { mode: 0o644 }
+  );
+
+  // Plain directory (no special metadata)
+  const plainDir = path.join(baseDir, ZARR_TEST_FILE_INFO.plain_dir.dirname);
+  fsSync.mkdirSync(plainDir, { recursive: true, mode: 0o755 });
 }
 
 // Asynchronous version for use in tests
@@ -309,5 +358,26 @@ export async function createZarrDirs(baseDir: string): Promise<void> {
     JSON.stringify(ZARR_V2_OME_ZARRAY_METADATA, null, 2),
     { mode: 0o644 }
   );
+
+  // Type 5: N5 dataset (attributes.json + s0/ subdirectory)
+  const n5Dir = path.join(baseDir, ZARR_TEST_FILE_INFO.n5.dirname);
+  await fs.mkdir(n5Dir, { recursive: true, mode: 0o755 });
+  await fs.writeFile(
+    path.join(n5Dir, 'attributes.json'),
+    JSON.stringify(N5_ROOT_METADATA, null, 2),
+    { mode: 0o644 }
+  );
+  const n5S0Dir = path.join(n5Dir, 's0');
+  await fs.mkdir(n5S0Dir, { recursive: true, mode: 0o755 });
+  await fs.writeFile(
+    path.join(n5S0Dir, 'attributes.json'),
+    JSON.stringify(N5_S0_METADATA, null, 2),
+    { mode: 0o644 }
+  );
+
+  // Plain directory (no special metadata)
+  const plainDir = path.join(baseDir, ZARR_TEST_FILE_INFO.plain_dir.dirname);
+  await fs.mkdir(plainDir, { recursive: true, mode: 0o755 });
+
   console.log('Created Zarr test directories in', baseDir);
 }

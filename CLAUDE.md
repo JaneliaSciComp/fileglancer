@@ -229,9 +229,9 @@ cd frontend/ui-tests && pixi run npx playwright install
 ## Technology Stack
 
 ### Backend
-- Python 3.14+
+- Python 3.12+
 - FastAPI
-- SQLAlchemy (async with aiosqlite/psycopg2)
+- SQLAlchemy (synchronous)
 - Alembic (migrations)
 - Pydantic (validation)
 - Uvicorn (ASGI server)
