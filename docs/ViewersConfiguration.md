@@ -204,8 +204,9 @@ viewers:
 The `@bioimagetools/capability-manifest` library handles all compatibility checking. When a user views an OME-Zarr dataset:
 
 1. The application reads the dataset's metadata (OME-Zarr version, axes, codecs, etc.)
-2. For each registered viewer, the library's `isCompatible()` function compares the dataset metadata against the manifest's declared capabilities
+2. For each registered viewer, the library's `validateViewer()` function compares the dataset metadata against the manifest's declared capabilities
 3. Only viewers whose capabilities match the dataset are shown to the user
+4. Incompatibility reasons (e.g., "Viewer does not support OME-Zarr v3") are logged to the browser console for debugging
 
 This replaces the previous system where `valid_ome_zarr_versions` was a global config setting and custom viewers used simple version matching. Now all compatibility logic is driven by the detailed capabilities declared in each viewer's manifest.
 
