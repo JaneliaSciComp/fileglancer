@@ -69,7 +69,14 @@ describe('DataToolLinks - Error Scenarios', () => {
     mockCapabilityManifest.loadManifestsFromUrls.mockResolvedValue(new Map());
     mockCapabilityManifest.validateViewer.mockReturnValue({
       compatible: false,
-      errors: [{ capability: 'test', message: 'Not compatible', required: null, found: null }],
+      errors: [
+        {
+          capability: 'test',
+          message: 'Not compatible',
+          required: null,
+          found: null
+        }
+      ],
       warnings: []
     });
   });
