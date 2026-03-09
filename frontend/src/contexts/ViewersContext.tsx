@@ -8,7 +8,7 @@ import {
 } from 'react';
 import {
   loadManifestsFromUrls,
-  isCompatible,
+  validateViewer,
   type ViewerManifest,
   type OmeZarrMetadata
 } from '@bioimagetools/capability-manifest';
@@ -194,9 +194,20 @@ export function ViewersProvider({
         return [];
       }
 
-      return validViewers.filter(viewer =>
-        isCompatible(viewer.manifest, metadata)
-      );
+      return validViewers.filter(viewer => {
+        const result = validateViewer(viewer.manifest, metadata);
+        if (!result.compatible) {
+          log.info(
+            `Viewer "${viewer.displayName}" is not compatible with this dataset: ${result.errors.map(e => e.message).join('; ')}`
+          );
+        }
+        if (result.warnings.length > 0) {
+          log.info(
+            `Viewer "${viewer.displayName}" warnings: ${result.warnings.map(w => w.message).join('; ')}`
+          );
+        }
+        return result.compatible;
+      });
     },
     [validViewers, isInitialized]
   );

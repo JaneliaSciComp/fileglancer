@@ -19,7 +19,7 @@ vi.mock('@/logger', () => ({
 // Mock capability manifest to avoid network requests in tests
 const mockCapabilityManifest = vi.hoisted(() => ({
   loadManifestsFromUrls: vi.fn(),
-  isCompatible: vi.fn()
+  validateViewer: vi.fn()
 }));
 
 vi.mock('@bioimagetools/capability-manifest', () => mockCapabilityManifest);
@@ -67,7 +67,11 @@ describe('DataToolLinks - Error Scenarios', () => {
 
     // Default mock: return empty Map (no manifests loaded)
     mockCapabilityManifest.loadManifestsFromUrls.mockResolvedValue(new Map());
-    mockCapabilityManifest.isCompatible.mockReturnValue(false);
+    mockCapabilityManifest.validateViewer.mockReturnValue({
+      compatible: false,
+      errors: [{ capability: 'test', message: 'Not compatible', required: null, found: null }],
+      warnings: []
+    });
   });
 
   describe('Invalid YAML syntax', () => {
@@ -166,8 +170,12 @@ describe('DataToolLinks - Edge Cases', () => {
       }
     );
 
-    // Mock isCompatible to return true for all viewers
-    mockCapabilityManifest.isCompatible.mockReturnValue(true);
+    // Mock validateViewer to return compatible for all viewers
+    mockCapabilityManifest.validateViewer.mockReturnValue({
+      compatible: true,
+      errors: [],
+      warnings: []
+    });
   });
 
   describe('Logo rendering in components', () => {
@@ -277,8 +285,12 @@ describe('DataToolLinks - Expected Behavior', () => {
       }
     );
 
-    // Mock isCompatible to return true for all viewers
-    mockCapabilityManifest.isCompatible.mockReturnValue(true);
+    // Mock validateViewer to return compatible for all viewers
+    mockCapabilityManifest.validateViewer.mockReturnValue({
+      compatible: true,
+      errors: [],
+      warnings: []
+    });
   });
 
   describe('Component behavior with valid viewers', () => {
