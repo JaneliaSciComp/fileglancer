@@ -268,6 +268,15 @@ def create_app(settings):
 
     app = FastAPI(lifespan=lifespan)
 
+    try:
+        from omero_figure.fileglancer import app as figure_app
+        app.include_router(figure_app.router, prefix="/omero-figure", tags=["figure"])
+        static_dir = figure_app.get_static_dir()
+        # NB: vite must build the figure app with "base: '/omero-figure/'" for this to work correctly
+        app.mount("/omero-figure/", StaticFiles(directory=static_dir, html=True), name="omero_figure")
+    except Exception:
+        logger.info("Could not import figure app. Figure-related endpoints will not be available.")
+
     # Add custom access log middleware
     # This logs HTTP access information with authenticated username
     app.add_middleware(AccessLogMiddleware, settings=settings)
