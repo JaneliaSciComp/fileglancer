@@ -22,6 +22,8 @@ const navigateToZarrDir = async (
 };
 
 test.describe('Data Link Operations', () => {
+  // These tests involve multiple full-page navigations with API calls
+  test.setTimeout(60_000);
   test.beforeEach(
     'Wait for Zarr directories to load',
     async ({ fileglancerPage: page }) => {
