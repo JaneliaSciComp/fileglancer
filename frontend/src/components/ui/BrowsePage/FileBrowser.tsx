@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
 import type { MouseEvent } from 'react';
 import { Typography } from '@material-tailwind/react';
+import { useHotkey } from '@tanstack/react-hotkeys';
 import toast from 'react-hot-toast';
 
 import Crumbs from './Crumbs';
@@ -103,15 +103,9 @@ export default function FileBrowser({
     !zarrMetadataQuery.data.metadata;
 
   // Escape key clears row selection and reverts properties to current directory
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        clearSelection();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [clearSelection]);
+  useHotkey('Escape', () => {
+    clearSelection();
+  });
 
   // Handle right-click on file - FileBrowser-specific logic
   const handleFileContextMenu = (

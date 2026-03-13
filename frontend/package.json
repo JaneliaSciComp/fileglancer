@@ -31,6 +31,7 @@
     },
     "dependencies": {
         "@material-tailwind/react": "^3.0.0-beta.24",
+        "@tanstack/react-hotkeys": "^0.4.1",
         "@tanstack/react-query": "^5.90.2",
         "@tanstack/react-table": "^8.21.3",
         "@types/react-syntax-highlighter": "^15.5.13",

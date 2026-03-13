@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
+import { useNavigate } from 'react-router';
 import {
   flexRender,
   getCoreRowModel,
@@ -8,6 +9,7 @@ import {
   type ColumnDef,
   type SortingState
 } from '@tanstack/react-table';
+import { useHotkey } from '@tanstack/react-hotkeys';
 import { IconButton, Typography } from '@material-tailwind/react';
 import { TbFile, TbLink, TbLinkOff } from 'react-icons/tb';
 import { HiOutlineEllipsisHorizontalCircle, HiFolder } from 'react-icons/hi2';
@@ -23,6 +25,25 @@ import {
   lastModifiedColumn,
   sizeColumn
 } from '@/components/ui/BrowsePage/fileTableColumns';
+
+function getFileLink(
+  file: FileOrFolder,
+  currentFspName: string | undefined
+): string | null {
+  if (file.is_symlink && file.symlink_target_fsp) {
+    return makeBrowseLink(
+      file.symlink_target_fsp.fsp_name,
+      file.symlink_target_fsp.subpath
+    );
+  }
+  if (file.is_symlink && !file.symlink_target_fsp) {
+    return null;
+  }
+  if (currentFspName) {
+    return makeBrowseLink(currentFspName, file.path);
+  }
+  return null;
+}
 
 type TableProps = {
   readonly data: FileOrFolder[];
@@ -40,6 +61,7 @@ export default function Table({
 }: TableProps) {
   const { fileQuery, fileBrowserState, handleLeftClick } =
     useFileBrowserContext();
+  const navigate = useNavigate();
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const selectedFileNames = useMemo(
@@ -55,25 +77,11 @@ export default function Table({
         cell: ({ getValue, row }) => {
           const file = row.original;
           const name = getValue() as string;
-          let link = '#';
-          let isBrokenSymlink = false;
-
-          if (file.is_symlink && file.symlink_target_fsp) {
-            // Valid symlink with known target in a valid file share
-            link = makeBrowseLink(
-              file.symlink_target_fsp.fsp_name,
-              file.symlink_target_fsp.subpath
-            ) as string;
-          } else if (file.is_symlink && !file.symlink_target_fsp) {
-            // Broken symlink - no valid target
-            isBrokenSymlink = true;
-          } else if (fileQuery.data?.currentFileSharePath) {
-            // Regular directory or file
-            link = makeBrowseLink(
-              fileQuery.data?.currentFileSharePath.name,
-              file.path
-            ) as string;
-          }
+          const link = getFileLink(
+            file,
+            fileQuery.data?.currentFileSharePath?.name
+          );
+          const isBrokenSymlink = file.is_symlink && !file.symlink_target_fsp;
 
           return (
             <div className="flex items-center gap-3 min-w-0">
@@ -96,7 +104,7 @@ export default function Table({
                     as={FgStyledLink}
                     className="truncate"
                     onClick={(e: MouseEvent) => e.stopPropagation()}
-                    to={link}
+                    to={link ?? '#'}
                   >
                     {name}
                   </Typography>
@@ -157,6 +165,69 @@ export default function Table({
     enableColumnFilters: false
   });
 
+  const rows = table.getRowModel().rows;
+  const rowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
+
+  const navigateRows = useCallback(
+    (direction: 'up' | 'down') => {
+      if (rows.length === 0) {
+        return;
+      }
+
+      const selectedName =
+        fileBrowserState.selectedFiles.length > 0
+          ? fileBrowserState.selectedFiles[0].name
+          : null;
+
+      const currentIndex = selectedName
+        ? rows.findIndex(row => row.original.name === selectedName)
+        : -1;
+
+      let nextIndex: number;
+      if (direction === 'down') {
+        nextIndex = currentIndex < rows.length - 1 ? currentIndex + 1 : 0;
+      } else {
+        nextIndex = currentIndex > 0 ? currentIndex - 1 : rows.length - 1;
+      }
+
+      handleLeftClick(rows[nextIndex].original, showPropertiesDrawer);
+      rowRefs.current.get(nextIndex)?.scrollIntoView({ block: 'nearest' });
+    },
+    [
+      rows,
+      fileBrowserState.selectedFiles,
+      handleLeftClick,
+      showPropertiesDrawer
+    ]
+  );
+
+  useHotkey('ArrowDown', e => {
+    e.preventDefault();
+    navigateRows('down');
+  });
+
+  useHotkey('ArrowUp', e => {
+    e.preventDefault();
+    navigateRows('up');
+  });
+
+  useHotkey('Enter', e => {
+    if (fileBrowserState.selectedFiles.length === 0) {
+      return;
+    }
+
+    const link = getFileLink(
+      fileBrowserState.selectedFiles[0],
+      fileQuery.data?.currentFileSharePath?.name
+    );
+    if (!link) {
+      return;
+    }
+
+    e.preventDefault();
+    navigate(link);
+  });
+
   return (
     <div className="min-w-full bg-background select-none">
       <table className="w-full">
@@ -200,7 +271,7 @@ export default function Table({
           ))}
         </thead>
         <tbody>
-          {table.getRowModel().rows.map((row, index) => {
+          {rows.map((row, index) => {
             const isSelected = selectedFileNames.has(row.original.name);
             return (
               <tr
@@ -210,6 +281,13 @@ export default function Table({
                   handleLeftClick(row.original, showPropertiesDrawer)
                 }
                 onContextMenu={e => handleContextMenuClick(e, row.original)}
+                ref={el => {
+                  if (el) {
+                    rowRefs.current.set(index, el);
+                  } else {
+                    rowRefs.current.delete(index);
+                  }
+                }}
               >
                 {row.getVisibleCells().map(cell => (
                   <td
