@@ -14,7 +14,7 @@ const navigateToScratchFsp = async (page: Page) => {
     .filter({ hasNotText: 'zarr' })
     .nth(0);
 
-  await expect(scratchFsp).toBeVisible({ timeout: 10000 });
+  await expect(scratchFsp).toBeVisible();
 
   // Wait for file directory to load
   await scratchFsp.click();

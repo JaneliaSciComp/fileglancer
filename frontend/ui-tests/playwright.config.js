@@ -36,6 +36,9 @@ export default defineConfig({
   },
   timeout: process.env.CI ? 180_000 : 20_000,
   navigationTimeout: process.env.CI ? 90_000 : 10_000,
+  expect: {
+    timeout: 20_000
+  },
   workers: 1,
   webServer: {
     command: 'pixi run test-launch',
