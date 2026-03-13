@@ -20,7 +20,7 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
 import { useHandleDownload } from '@/hooks/useHandleDownload';
-import { detectZarrVersions } from '@/queries/zarrQueries';
+import { areZarrMetadataFilesPresent } from '@/queries/zarrQueries';
 import { detectN5, getN5DetectionSignals } from '@/queries/n5Queries';
 import { makeMapKey } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
@@ -75,7 +75,7 @@ export default function FileBrowser({
     thumbnailQuery,
     openWithToolUrls,
     layerType,
-    availableVersions
+    availableZarrVersions
   } = useZarrMetadata();
 
   const { n5MetadataQuery, openWithToolUrls: n5OpenWithToolUrls } =
@@ -84,15 +84,13 @@ export default function FileBrowser({
   const files = (fileQuery.data?.files ?? []) as FileOrFolder[];
   const currentName = fileQuery.data?.currentFileOrFolder?.name ?? '';
 
-  const isZarrDir = detectZarrVersions(files).length > 0;
+  const isZarrDir = areZarrMetadataFilesPresent(files);
   const isN5Dir = detectN5(files);
 
   const hasZarrExt = currentName.endsWith('.zarr');
   const hasN5Ext = currentName.endsWith('.n5');
 
   const { hasAttributesJson, hasS0Folder } = getN5DetectionSignals(files);
-
-  const isN5Ext = hasN5Ext;
 
   // 1st case Zarr hint req'd: query fired, no error, but no metadata returned (indicating a Zarr without expected metadata structure)
   const isZarrNullMetadata =
@@ -223,7 +221,7 @@ export default function FileBrowser({
         />
       ) : zarrMetadataQuery.data?.metadata ? (
         <ZarrPreview
-          availableVersions={availableVersions}
+          availableZarrVersions={availableZarrVersions}
           fspName={fileQuery.data?.currentFileSharePath?.name ?? ''}
           layerType={layerType}
           mainPanelWidth={mainPanelWidth}
@@ -235,7 +233,7 @@ export default function FileBrowser({
       ) : isZarrNullMetadata ? (
         <MetadataHint
           variant={
-            availableVersions.includes('v3')
+            availableZarrVersions.includes(3)
               ? { case: 'zarr-v3-no-multiscales' }
               : { case: 'zarr-v2-no-multiscales' }
           }
@@ -270,11 +268,11 @@ export default function FileBrowser({
       {!isZarrDir && !isN5Dir && !fileQuery.isPending && !!fileQuery.data ? (
         hasZarrExt ? (
           <MetadataHint variant={{ case: 'zarr-extension-no-markers' }} />
-        ) : isN5Ext && !hasAttributesJson && hasS0Folder ? (
+        ) : hasN5Ext && !hasAttributesJson && hasS0Folder ? (
           <MetadataHint variant={{ case: 'n5-has-s0-no-attrs' }} />
-        ) : isN5Ext && hasAttributesJson && !hasS0Folder ? (
+        ) : hasN5Ext && hasAttributesJson && !hasS0Folder ? (
           <MetadataHint variant={{ case: 'n5-has-attrs-no-s0' }} />
-        ) : isN5Ext && !hasAttributesJson && !hasS0Folder ? (
+        ) : hasN5Ext && !hasAttributesJson && !hasS0Folder ? (
           <MetadataHint variant={{ case: 'n5-no-markers' }} />
         ) : null
       ) : null}

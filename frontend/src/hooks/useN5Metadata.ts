@@ -73,10 +73,7 @@ export default function useN5Metadata() {
 
     const toolUrls: N5OpenWithToolUrls = {
       copy: url || '',
-      neuroglancer: '',
-      validator: null,
-      vole: null,
-      avivator: null
+      neuroglancer: ''
     };
 
     if (url) {

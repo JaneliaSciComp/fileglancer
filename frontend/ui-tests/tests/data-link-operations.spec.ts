@@ -10,6 +10,8 @@ const navigateToZarrDir = async (
   await page.goto('/browse', {
     waitUntil: 'domcontentloaded'
   });
+  // Make sure the full page content has loaded before interacting with the file browser
+  await expect(page.getByText('Recently viewed')).toBeVisible();
   await navigateToScratchFsp(page);
   const testDirName = testDir.split('/').pop() || testDir;
   const fullTestPath = testDirName.startsWith('test-')
@@ -18,10 +20,12 @@ const navigateToZarrDir = async (
   await navigateToTestDir(page, fullTestPath);
   await page.getByRole('link', { name: zarrDirName }).click();
   // Wait for zarr metadata to load
-  await page.waitForSelector('text=zarr.json', { timeout: 10000 });
+  await page.waitForSelector('text=zarr.json');
 };
 
 test.describe('Data Link Operations', () => {
+  // These tests involve multiple full-page navigations with API calls
+  test.setTimeout(60_000);
   test.beforeEach(
     'Wait for Zarr directories to load',
     async ({ fileglancerPage: page }) => {
@@ -40,9 +44,7 @@ test.describe('Data Link Operations', () => {
 
     // Wait for zarr metadata to load
     await expect(page.getByText('zarr.json')).toBeVisible({ timeout: 10000 });
-    await expect(
-      page.getByRole('link', { name: 'Neuroglancer logo' })
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByAltText(/neuroglancer/i)).toBeVisible();
 
     const dataLinkToggle = page.getByRole('checkbox', { name: /data link/i });
     const confirmButton = page.getByRole('button', {
@@ -53,9 +55,7 @@ test.describe('Data Link Operations', () => {
     });
 
     await test.step('Turn on automatic data links via the data link dialog', async () => {
-      const neuroglancerLink = page.getByRole('link', {
-        name: 'Neuroglancer logo'
-      });
+      const neuroglancerLink = page.getByAltText(/neuroglancer/i);
       await neuroglancerLink.click();
 
       // Confirm the data link creation in the dialog
@@ -93,25 +93,25 @@ test.describe('Data Link Operations', () => {
 
     await test.step('Delete data link via properties panel', async () => {
       await dataLinkToggle.click();
-      await expect(confirmDeleteButton).toBeVisible({ timeout: 5000 });
+      await expect(confirmDeleteButton).toBeVisible();
       await confirmDeleteButton.click();
       await expect(
         page.getByText('Successfully deleted data link')
       ).toBeVisible();
-      await expect(dataLinkToggle).not.toBeChecked({ timeout: 10000 });
+      await expect(dataLinkToggle).not.toBeChecked();
     });
 
     await test.step('Recreate data link via properties panel', async () => {
       await expect(
         page.getByText('Successfully deleted data link')
-      ).not.toBeVisible({ timeout: 10000 });
+      ).not.toBeVisible();
       await dataLinkToggle.click();
 
       // Navigate back to the zarr directory to check data link status; the above click takes you to Neuroglancer
       await navigateToZarrDir(page, testDir, zarrDirName);
-      await page.waitForLoadState('domcontentloaded', { timeout: 10000 });
+      await page.waitForLoadState('domcontentloaded');
 
-      await expect(dataLinkToggle).toBeChecked({ timeout: 10000 });
+      await expect(dataLinkToggle).toBeChecked();
     });
 
     await test.step('Delete the link via action menu on links page', async () => {
@@ -129,21 +129,21 @@ test.describe('Data Link Operations', () => {
       const deleteLinkOption = page.getByRole('menuitem', { name: /unshare/i });
       await deleteLinkOption.click();
       // Confirm deletion
-      await expect(confirmDeleteButton).toBeVisible({ timeout: 10000 });
+      await expect(confirmDeleteButton).toBeVisible();
       await confirmDeleteButton.click();
 
       // Verify the link is removed from the table
-      await expect(linkRow).not.toBeVisible({ timeout: 10000 });
+      await expect(linkRow).not.toBeVisible();
     });
 
     await test.step('Copy link works when automatic links is on and no data link exists yet', async () => {
       await navigateToZarrDir(page, testDir, zarrDirName);
-      await page.waitForLoadState('domcontentloaded', { timeout: 10000 });
+      await page.waitForLoadState('domcontentloaded');
 
-      await expect(page.getByText('zarr.json')).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText('zarr.json')).toBeVisible();
 
       const copyLinkIcon = page.getByRole('button', { name: 'Copy data URL' });
-      await expect(copyLinkIcon).toBeVisible({ timeout: 10000 });
+      await expect(copyLinkIcon).toBeVisible();
 
       await copyLinkIcon.click();
       await expect(page.getByText('Copied!')).toBeVisible();
@@ -210,10 +210,8 @@ test.describe('Data Link Operations', () => {
 
     // Navigate into the zarr directory
     await page.getByRole('link', { name: zarrDirName }).click();
-    await expect(page.getByText('zarr.json')).toBeVisible({ timeout: 10000 });
-    await expect(
-      page.getByRole('link', { name: 'Neuroglancer logo' })
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('zarr.json')).toBeVisible();
+    await expect(page.getByAltText(/neuroglancer/i)).toBeVisible();
 
     // Click on the s0 subdirectory row to select it as the properties target
     const s0Row = page.getByRole('row').filter({ hasText: 's0' });
@@ -223,22 +221,20 @@ test.describe('Data Link Operations', () => {
     const propertiesPanel = page
       .locator('[role="complementary"]')
       .filter({ hasText: 'Properties' });
-    await expect(propertiesPanel.getByText('s0', { exact: true })).toBeVisible({
-      timeout: 10000
-    });
+    await expect(
+      propertiesPanel.getByText('s0', { exact: true })
+    ).toBeVisible();
 
     // Click the Neuroglancer viewer icon — this should create a data link
     // for the zarr directory (currentFileOrFolder), not for s0 (propertiesTarget)
-    const neuroglancerLink = page.getByRole('link', {
-      name: 'Neuroglancer logo'
-    });
+    const neuroglancerLink = page.getByAltText(/neuroglancer/i);
     await neuroglancerLink.click();
 
     // Confirm in dialog
     const confirmButton = page.getByRole('button', {
       name: /confirm|create|yes/i
     });
-    await expect(confirmButton).toBeVisible({ timeout: 5000 });
+    await expect(confirmButton).toBeVisible();
     await confirmButton.click();
 
     await expect(
@@ -253,9 +249,7 @@ test.describe('Data Link Operations', () => {
     await expect(page.getByRole('heading', { name: /links/i })).toBeVisible();
 
     // The data link should be for the zarr directory, not the s0 subdirectory
-    await expect(page.getByText(zarrDirName, { exact: true })).toBeVisible({
-      timeout: 10000
-    });
+    await expect(page.getByText(zarrDirName, { exact: true })).toBeVisible();
     await expect(page.getByText('s0', { exact: true })).not.toBeVisible();
   });
 });
