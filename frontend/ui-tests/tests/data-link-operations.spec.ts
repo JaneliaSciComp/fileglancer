@@ -10,6 +10,8 @@ const navigateToZarrDir = async (
   await page.goto('/browse', {
     waitUntil: 'domcontentloaded'
   });
+  // Make sure the full page content has loaded before interacting with the file browser
+  await expect(page.getByText('Recently viewed')).toBeVisible();
   await navigateToScratchFsp(page);
   const testDirName = testDir.split('/').pop() || testDir;
   const fullTestPath = testDirName.startsWith('test-')

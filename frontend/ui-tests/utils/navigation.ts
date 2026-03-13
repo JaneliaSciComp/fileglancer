@@ -5,6 +5,8 @@ const navigateToScratchFsp = async (page: Page) => {
   const localZone = page
     .getByLabel('List of file share paths')
     .getByRole('button', { name: 'Local' });
+  // Wait for the Local zone to be visible before clicking
+  await expect(localZone).toBeVisible();
   // Click specifically on the text to avoid clicking the favorite button
   await localZone.getByText('Local').click();
 
