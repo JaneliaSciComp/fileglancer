@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import DataLinkOptions from '@/components/ui/PreferencesPage/DataLinkOptions';
 import DisplayOptions from '@/components/ui/PreferencesPage/DisplayOptions';
+import JobOptions from '@/components/ui/PreferencesPage/JobOptions';
 import NeuroglancerOptions from '@/components/ui/PreferencesPage/NeuroglancerOptions';
 
 export default function Preferences() {
@@ -122,6 +123,7 @@ export default function Preferences() {
           <DisplayOptions />
           <DataLinkOptions />
           <NeuroglancerOptions />
+          <JobOptions />
         </Card.Body>
       </Card>
     </>

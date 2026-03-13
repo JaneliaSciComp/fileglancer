@@ -108,7 +108,7 @@ describe('N5MetadataTable', () => {
     expect(screen.queryByText('1')).not.toBeInTheDocument();
   });
 
-  it('should default to micrometers ("um") if no units specified', () => {
+  it('should show empty unit with warning when no units specified', () => {
     const metadata: N5Metadata = {
       rootAttrs: {
         n5: '2.0.0',
@@ -120,7 +120,13 @@ describe('N5MetadataTable', () => {
 
     render(<N5MetadataTable metadata={metadata} />);
 
-    expect(screen.getAllByText('um')).toHaveLength(3);
+    expect(screen.queryByText('um')).not.toBeInTheDocument();
+    // Warning tooltips should be present (one per axis)
+    expect(
+      screen.getAllByLabelText(
+        "No 'units' or 'pixelResolution.unit' found in attributes.json. Viewers may assume a default unit when none is specified."
+      )
+    ).toHaveLength(3);
   });
 
   it('should use scales when downsamplingFactors is missing', () => {

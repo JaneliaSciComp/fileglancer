@@ -4,6 +4,7 @@ import { Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
 import Crumbs from './Crumbs';
+import MetadataHint from './MetadataHint';
 import ZarrPreview from './ZarrPreview';
 import N5Preview from './N5Preview';
 import Table from './FileTable';
@@ -20,7 +21,7 @@ import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
 import { useHandleDownload } from '@/hooks/useHandleDownload';
 import { areZarrMetadataFilesPresent } from '@/queries/zarrQueries';
-import { detectN5 } from '@/queries/n5Queries';
+import { detectN5, getN5DetectionSignals } from '@/queries/n5Queries';
 import { makeMapKey } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
 
@@ -80,11 +81,24 @@ export default function FileBrowser({
   const { n5MetadataQuery, openWithToolUrls: n5OpenWithToolUrls } =
     useN5Metadata();
 
-  const isZarrDir = areZarrMetadataFilesPresent(
-    fileQuery.data?.files as FileOrFolder[]
-  );
+  const files = (fileQuery.data?.files ?? []) as FileOrFolder[];
+  const currentName = fileQuery.data?.currentFileOrFolder?.name ?? '';
 
-  const isN5Dir = detectN5(fileQuery.data?.files as FileOrFolder[]);
+  const isZarrDir = areZarrMetadataFilesPresent(files);
+  const isN5Dir = detectN5(files);
+
+  const hasZarrExt = currentName.endsWith('.zarr');
+  const hasN5Ext = currentName.endsWith('.n5');
+
+  const { hasAttributesJson, hasS0Folder } = getN5DetectionSignals(files);
+
+  // 1st case Zarr hint req'd: query fired, no error, but no metadata returned (indicating a Zarr without expected metadata structure)
+  const isZarrNullMetadata =
+    isZarrDir &&
+    !zarrMetadataQuery.isPending &&
+    !zarrMetadataQuery.isError &&
+    !!zarrMetadataQuery.data &&
+    !zarrMetadataQuery.data.metadata;
 
   // Escape key clears row selection and reverts properties to current directory
   useEffect(() => {
@@ -199,11 +213,12 @@ export default function FileBrowser({
           </Typography>
         </div>
       ) : zarrMetadataQuery.isError ? (
-        <div className="flex shadow-sm rounded-md w-full min-h-96 bg-primary-light/30">
-          <Typography className="place-self-center text-center w-full text-warning">
-            Error loading Zarr metadata
-          </Typography>
-        </div>
+        <MetadataHint
+          variant={{
+            case: 'zarr-query-error',
+            errorMessage: zarrMetadataQuery.error?.message
+          }}
+        />
       ) : zarrMetadataQuery.data?.metadata ? (
         <ZarrPreview
           availableZarrVersions={availableZarrVersions}
@@ -215,6 +230,14 @@ export default function FileBrowser({
           thumbnailQuery={thumbnailQuery}
           zarrMetadataQuery={zarrMetadataQuery}
         />
+      ) : isZarrNullMetadata ? (
+        <MetadataHint
+          variant={
+            availableZarrVersions.includes(3)
+              ? { case: 'zarr-v3-no-multiscales' }
+              : { case: 'zarr-v2-no-multiscales' }
+          }
+        />
       ) : null}
 
       {/* N5 Preview */}
@@ -225,11 +248,12 @@ export default function FileBrowser({
           </Typography>
         </div>
       ) : n5MetadataQuery.isError ? (
-        <div className="flex shadow-sm rounded-md w-full min-h-96 bg-primary-light/30">
-          <Typography className="place-self-center text-center w-full text-warning">
-            Error loading N5 metadata
-          </Typography>
-        </div>
+        <MetadataHint
+          variant={{
+            case: 'n5-query-error',
+            errorMessage: n5MetadataQuery.error?.message
+          }}
+        />
       ) : n5MetadataQuery.data ? (
         <N5Preview
           fspName={fileQuery.data?.currentFileSharePath?.name ?? ''}
@@ -238,6 +262,19 @@ export default function FileBrowser({
           openWithToolUrls={n5OpenWithToolUrls}
           path={fileQuery.data?.currentFileOrFolder?.path ?? ''}
         />
+      ) : null}
+
+      {/* 2nd case N5/Zarr hints req'd: no detection fired, but directory has Zarr/N5 extension signals */}
+      {!isZarrDir && !isN5Dir && !fileQuery.isPending && !!fileQuery.data ? (
+        hasZarrExt ? (
+          <MetadataHint variant={{ case: 'zarr-extension-no-markers' }} />
+        ) : hasN5Ext && !hasAttributesJson && hasS0Folder ? (
+          <MetadataHint variant={{ case: 'n5-has-s0-no-attrs' }} />
+        ) : hasN5Ext && hasAttributesJson && !hasS0Folder ? (
+          <MetadataHint variant={{ case: 'n5-has-attrs-no-s0' }} />
+        ) : hasN5Ext && !hasAttributesJson && !hasS0Folder ? (
+          <MetadataHint variant={{ case: 'n5-no-markers' }} />
+        ) : null
       ) : null}
 
       {/* Loading state */}

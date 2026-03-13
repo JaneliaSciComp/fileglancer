@@ -1,5 +1,8 @@
-import type { N5Metadata } from '@/queries/n5Queries';
+import { HiExclamationTriangle } from 'react-icons/hi2';
+
+import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import { translateUnitToNeuroglancer } from '@/omezarr-helper';
+import type { N5Metadata } from '@/queries/n5Queries';
 
 type N5MetadataTableProps = {
   readonly metadata: N5Metadata;
@@ -43,16 +46,9 @@ function getAxisData(metadata: N5Metadata) {
     // Priority: resolution -> pixelResolution.dimensions
     const res = resolution?.[index] ?? pixelResolution?.dimensions?.[index];
 
-    // Determine unit for this specific axis
-    // Priority: units[index] -> pixelResolution.unit -> "um"
-    let axisUnit = 'um';
-    if (units && units[index]) {
-      axisUnit = units[index];
-    } else if (pixelResolution?.unit) {
-      axisUnit = pixelResolution.unit;
-    }
-
-    const displayUnit = translateUnitToNeuroglancer(axisUnit);
+    // Priority: units[index] -> pixelResolution.unit -> '' (not specified)
+    const rawUnit = units?.[index] || pixelResolution?.unit || '';
+    const displayUnit = rawUnit ? translateUnitToNeuroglancer(rawUnit) : '';
     const shape = dim;
 
     return {
@@ -64,8 +60,32 @@ function getAxisData(metadata: N5Metadata) {
   });
 }
 
+export function getN5MissingAttributeHints(metadata: N5Metadata): string[] {
+  const hints: string[] = [];
+  const { resolution, pixelResolution, units, downsamplingFactors, scales } =
+    metadata.rootAttrs;
+
+  if (!resolution && !pixelResolution?.dimensions) {
+    hints.push('n5-no-resolution');
+  }
+
+  if ((!units || units.length === 0) && !pixelResolution?.unit) {
+    hints.push('n5-no-units');
+  }
+
+  if (!downsamplingFactors && !scales) {
+    hints.push('n5-no-downsampling');
+  }
+
+  return hints;
+}
+
 export default function N5MetadataTable({ metadata }: N5MetadataTableProps) {
   const { rootAttrs, s0Attrs } = metadata;
+  const hints = getN5MissingAttributeHints(metadata);
+  const hasNoResolution = hints.includes('n5-no-resolution');
+  const hasNoUnits = hints.includes('n5-no-units');
+  const hasNoDownsampling = hints.includes('n5-no-downsampling');
   const axisData = getAxisData(metadata);
 
   return (
@@ -96,15 +116,23 @@ export default function N5MetadataTable({ metadata }: N5MetadataTableProps) {
             <td className="px-3 py-2 font-semibold">Block Size</td>
             <td className="px-3 py-2">{formatBlockSize(s0Attrs.blockSize)}</td>
           </tr>
-          {rootAttrs.downsamplingFactors || rootAttrs.scales ? (
-            <tr className="h-11 border-b border-surface-dark">
-              <td className="px-3 py-2 font-semibold">Multiscale Levels</td>
+          <tr className="h-11 border-b border-surface-dark">
+            <td className="px-3 py-2 font-semibold">Multiscale Levels</td>
+            {hasNoDownsampling ? (
+              <td className="px-3 py-3 flex items-center gap-1 text-warning">
+                Not specified
+                <FgTooltip
+                  icon={HiExclamationTriangle}
+                  label="No 'downsamplingFactors' or 'scales' found in attributes.json. Neuroglancer can also read 'downsamplingFactors' from individual sN/attributes.json files."
+                />
+              </td>
+            ) : (
               <td className="px-3 py-2">
                 {rootAttrs.downsamplingFactors?.length ??
                   rootAttrs.scales?.length}
               </td>
-            </tr>
-          ) : null}
+            )}
+          </tr>
           <tr className="h-11 border-b border-surface-dark">
             <td className="px-3 py-2 font-semibold">Compression</td>
             <td className="px-3 py-2">
@@ -130,8 +158,32 @@ export default function N5MetadataTable({ metadata }: N5MetadataTableProps) {
               <tr className="h-11 border-b border-surface-dark" key={axis.name}>
                 <td className="px-3 py-2 text-center">{axis.name}</td>
                 <td className="px-3 py-2 text-right">{axis.shape}</td>
-                <td className="px-3 py-2 text-right">{axis.resolution}</td>
-                <td className="px-3 py-2 text-left">{axis.unit}</td>
+
+                {hasNoResolution && axis.resolution === 'Unknown' ? (
+                  <td className="px-3 py-3 text-right">
+                    <span className="flex items-center justify-end gap-1 text-warning">
+                      {axis.resolution}
+                      <FgTooltip
+                        icon={HiExclamationTriangle}
+                        label="No 'resolution' or 'pixelResolution.dimensions' found in attributes.json. Neuroglancer uses these to define the physical scale of each dimension."
+                      />
+                    </span>
+                  </td>
+                ) : (
+                  <td className="px-3 py-2 text-right">{axis.resolution}</td>
+                )}
+
+                <td className="px-3 py-2 text-left">
+                  <span className="flex items-center gap-1">
+                    {axis.unit}
+                    {hasNoUnits ? (
+                      <FgTooltip
+                        icon={HiExclamationTriangle}
+                        label="No 'units' or 'pixelResolution.unit' found in attributes.json. Viewers may assume a default unit when none is specified."
+                      />
+                    ) : null}
+                  </span>
+                </td>
               </tr>
             ))}
           </tbody>

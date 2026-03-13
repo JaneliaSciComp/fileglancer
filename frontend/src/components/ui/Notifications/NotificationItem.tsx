@@ -101,7 +101,7 @@ export interface NotificationItemProps {
     id: number;
     type: string;
     title: string;
-    message: string;
+    message: string | React.ReactNode;
     created_at?: string;
   };
   readonly onDismiss?: (id: number) => void;

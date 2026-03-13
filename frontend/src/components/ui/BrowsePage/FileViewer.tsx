@@ -5,6 +5,7 @@ import {
   materialDark,
   coy
 } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { Formatter } from 'fracturedjsonjs';
 
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { formatFileSize, formatUnixTimestamp } from '@/utils';
@@ -146,7 +147,9 @@ export default function FileViewer({ file }: FileViewerProps) {
     if (isJsonFile && formatJson && content) {
       try {
         const parsed = JSON.parse(content);
-        displayContent = JSON.stringify(parsed, null, 2);
+        const formatter = new Formatter();
+        formatter.Options.IndentSpaces = 2;
+        displayContent = formatter.Serialize(parsed);
       } catch {
         // If JSON parsing fails, show original content
         displayContent = content;

@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from pydantic import HttpUrl
 
 from fileglancer.settings import Settings
-from fileglancer.app import create_app
+from fileglancer.server import create_app
 from fileglancer.database import *
 from fileglancer.model import TicketComment
 
@@ -93,7 +93,7 @@ def test_app(temp_dir):
 def test_client(test_app):
     """Create test client with authentication bypass"""
     # Override the get_current_user dependency to return a test user
-    from fileglancer.app import get_current_user
+    from fileglancer.server import get_current_user
 
     def override_get_current_user():
         return TEST_USERNAME
@@ -682,8 +682,8 @@ def test_get_file_content_not_found(test_client):
 
 # Ticket endpoint tests with mocked JIRA integration
 
-@patch('fileglancer.app.create_jira_ticket')
-@patch('fileglancer.app.get_jira_ticket_details')
+@patch('fileglancer.server.create_jira_ticket')
+@patch('fileglancer.server.get_jira_ticket_details')
 def test_create_ticket(mock_get_details, mock_create, test_client, temp_dir):
     """Test creating a new ticket"""
     # Mock JIRA responses
@@ -732,8 +732,8 @@ def test_create_ticket(mock_get_details, mock_create, test_client, temp_dir):
     mock_get_details.assert_called_once_with('TEST-123')
 
 
-@patch('fileglancer.app.create_jira_ticket')
-@patch('fileglancer.app.get_jira_ticket_details')
+@patch('fileglancer.server.create_jira_ticket')
+@patch('fileglancer.server.get_jira_ticket_details')
 def test_create_ticket_jira_failure(mock_get_details, mock_create, test_client, temp_dir):
     """Test creating a ticket when JIRA returns invalid response"""
     # Mock JIRA to return invalid response
@@ -757,8 +757,8 @@ def test_create_ticket_jira_failure(mock_get_details, mock_create, test_client, 
     assert "error" in data
 
 
-@patch('fileglancer.app.create_jira_ticket')
-@patch('fileglancer.app.get_jira_ticket_details')
+@patch('fileglancer.server.create_jira_ticket')
+@patch('fileglancer.server.get_jira_ticket_details')
 def test_get_tickets(mock_get_details, mock_create, test_client, temp_dir):
     """Test retrieving tickets for a user"""
     # First create a ticket
@@ -816,8 +816,8 @@ def test_get_tickets(mock_get_details, mock_create, test_client, temp_dir):
     assert len(ticket["comments"]) == 1
 
 
-@patch('fileglancer.app.create_jira_ticket')
-@patch('fileglancer.app.get_jira_ticket_details')
+@patch('fileglancer.server.create_jira_ticket')
+@patch('fileglancer.server.get_jira_ticket_details')
 def test_get_tickets_with_filters(mock_get_details, mock_create, test_client, temp_dir):
     """Test retrieving tickets with fsp_name and path filters"""
     # Create a ticket
@@ -856,7 +856,7 @@ def test_get_tickets_with_filters(mock_get_details, mock_create, test_client, te
     assert data["tickets"][0]["path"] == "filtered_path"
 
 
-@patch('fileglancer.app.get_jira_ticket_details')
+@patch('fileglancer.server.get_jira_ticket_details')
 def test_get_tickets_jira_unavailable(mock_get_details, test_client):
     """Test retrieving tickets when JIRA details are unavailable"""
     # Mock JIRA to raise an exception
@@ -868,7 +868,7 @@ def test_get_tickets_jira_unavailable(mock_get_details, test_client):
     assert response.status_code == 404
 
 
-@patch('fileglancer.app.delete_jira_ticket')
+@patch('fileglancer.server.delete_jira_ticket')
 def test_delete_ticket(mock_delete, test_client):
     """Test deleting a ticket"""
     # Mock successful deletion
@@ -883,7 +883,7 @@ def test_delete_ticket(mock_delete, test_client):
     mock_delete.assert_called_once_with("TEST-999")
 
 
-@patch('fileglancer.app.delete_jira_ticket')
+@patch('fileglancer.server.delete_jira_ticket')
 def test_delete_ticket_not_found(mock_delete, test_client):
     """Test deleting a non-existent ticket"""
     # Mock JIRA to raise "Issue Does Not Exist" exception

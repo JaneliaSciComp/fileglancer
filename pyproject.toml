@@ -39,7 +39,8 @@ dependencies = [
     "cryptography >=41.0.0",
     "sqlalchemy >=2.0.44",
     "uvicorn >=0.38.0",
-    "x2s3 >=1.1.1"
+    "x2s3 >=1.1.1",
+    "py-cluster-api >=0.3.0"
 ]
 
 [project.scripts]
@@ -93,9 +94,9 @@ channels = ["conda-forge"]
 platforms = ["osx-arm64", "osx-64", "linux-64", "linux-aarch64"]
 
 [tool.pixi.feature.test.tasks]
-test-pip-install = "pip install -e ."
-test-backend = { cmd = "pytest --cov=fileglancer --cov-report=html --cov-report=term", depends-on = ["test-pip-install"] }
-test-frontend = "cd frontend && npm test"
+test-pip-install = { cmd = "pip install -e .", default-environment = "test" }
+test-backend = { cmd = "pytest --cov=fileglancer --cov-report=html --cov-report=term", depends-on = ["test-pip-install"], default-environment = "test" }
+test-frontend = { cmd = "cd frontend && npm test", default-environment = "test" }
 
 [tool.pixi.feature.test.dependencies]
 coverage = ">=7.10.6,<8"
@@ -115,10 +116,14 @@ pypi-upload = "twine upload dist/*"
 twine = ">=6.2.0,<7"
 hatch = ">=1.14.1,<2"
 
+[tool.pixi.feature.py312.dependencies]
+python = "3.12.*"
+
 [tool.pixi.environments]
 default = { solve-group = "default" }
 test = { features = ["test"], solve-group = "default" }
 release = { features = ["release"], solve-group = "default" }
+test-py312 = ["test", "py312"]
 
 [tool.pixi.tasks]
 pip-install = { cmd = "pixi reinstall fileglancer" }
@@ -132,20 +137,28 @@ node-prettier-write = "cd frontend && npx prettier --list-different --write '**/
 node-check = "cd frontend && npx tsc --noEmit -p tsconfig.app.json"
 node-install-ui-tests = "npm --prefix frontend/ui-tests install"
 test-ui = { cmd = "npm --prefix frontend/ui-tests run test ", depends-on = ["node-install-ui-tests"] }
-test-launch = "pixi run uvicorn fileglancer.app:app --no-access-log --port 7879"
+test-launch = "pixi run uvicorn fileglancer.server:app --no-access-log --port 7879"
 dev-install = { depends-on = ["node-build", "pip-install"] }
 dev-watch = { cmd = "cd frontend && NODE_ENV=development npm run watch" }
-dev-launch = "pixi run uvicorn fileglancer.app:app --no-access-log --port 7878 --reload"
-dev-launch-remote = "pixi run uvicorn fileglancer.app:app --host 0.0.0.0 --port 7878 --reload --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
-prod-launch-remote = "pixi run uvicorn fileglancer.app:app --workers 10 --host 0.0.0.0 --port 7878 --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
+dev-vite = { cmd = "cd frontend && npx vite" }
+dev-vite-remote = { cmd = "cd frontend && SSL_KEYFILE=/opt/certs/cert.key SSL_CERTFILE=/opt/certs/cert.crt npx vite" }
+dev-launch = "pixi run uvicorn fileglancer.server:app --no-access-log --port 7878 --reload"
+dev-launch-remote = "pixi run uvicorn fileglancer.server:app --host 0.0.0.0 --port 7878 --reload --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
+prod-launch-remote = "pixi run uvicorn fileglancer.server:app --workers 10 --host 0.0.0.0 --port 7878 --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
 dev-launch-secure = "python fileglancer/dev_launch.py"
-migrate = "alembic upgrade head"
-migrate-create = "alembic revision --autogenerate"
+migrate = "alembic -c fileglancer/alembic.ini upgrade head"
+migrate-create = "alembic -c fileglancer/alembic.ini revision --autogenerate"
 stamp-db = "python -m fileglancer.stamp_db"
 container-rebuild = "npx @devcontainers/cli up --workspace-folder . --remove-existing-container"
 container-shell = "npx @devcontainers/cli exec --workspace-folder . bash"
 container-claude = "npx @devcontainers/cli exec --workspace-folder . bash -lc 'pixi run claude --dangerously-skip-permissions'"
 claude = "claude"
+
+[tool.pixi.tasks.test-py312]
+depends-on = [
+    { task = "test-pip-install", environment = "test-py312" },
+    { task = "test-backend", environment = "test-py312" }
+]
 
 [tool.pixi.dependencies]
 python = ">=3.12.0"

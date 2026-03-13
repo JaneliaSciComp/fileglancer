@@ -1,5 +1,13 @@
 # Making a new release of Fileglancer
 
+## Run Python 3.12 compatibility tests
+
+Since the PyPI package supports Python 3.12 (`requires-python = ">=3.12.0"`), verify that the backend tests pass under Python 3.12 before releasing:
+
+```bash
+pixi run test-py312
+```
+
 ## Bump the version number
 
 To view the current version:

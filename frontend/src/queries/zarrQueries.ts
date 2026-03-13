@@ -201,18 +201,15 @@ async function fetchZarrMetadata({
           effectiveVersion
         );
         const metadata = await getOmeZarrMetadata(imageUrl);
-        // Check for labels
+        // Check for labels (optional - may not exist)
         try {
           const labelsAttrs = (await fetchFileAsJson(
             fspName,
             currentFileOrFolder.path + '/labels/zarr.json'
           )) as ZarrV3Attrs;
           metadata.labels = labelsAttrs?.attributes?.ome?.labels;
-          if (metadata.labels) {
-            log.info('OME-Zarr Labels found: ', metadata.labels);
-          }
-        } catch (error) {
-          log.trace('Could not fetch labels attrs: ', error);
+        } catch {
+          // Labels directory doesn't exist - that's fine
         }
         primaryMetadata = {
           metadata,

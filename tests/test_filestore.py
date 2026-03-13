@@ -463,3 +463,30 @@ def test_broken_symlink_within_share(test_dir):
         assert broken_link_info is not None, "Broken symlink should be listed"
         assert broken_link_info.is_symlink is True, "Should be marked as symlink"
         assert broken_link_info.symlink_target_fsp is None, "symlink_target_fsp should be None for broken symlink even if target path matches share pattern"
+
+
+# Filestore.validate_path() tests
+
+def test_validate_path_valid_file(filestore):
+    """Valid existing file returns None."""
+    assert filestore.validate_path("test.txt") is None
+
+
+def test_validate_path_valid_dir(filestore):
+    """Valid existing directory returns None."""
+    assert filestore.validate_path("subdir") is None
+
+
+def test_validate_path_root(filestore):
+    """Root (None) returns None."""
+    assert filestore.validate_path(None) is None
+
+
+def test_validate_path_nonexistent(filestore):
+    """Nonexistent path returns error."""
+    assert filestore.validate_path("no_such_file.txt") == "Path does not exist"
+
+
+def test_validate_path_escape(filestore):
+    """Path escape attempt returns confinement error."""
+    assert filestore.validate_path("../outside.txt") == "Path is not within an allowed file share"

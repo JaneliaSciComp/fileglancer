@@ -349,6 +349,15 @@ export type {
   RetryState
 } from './retryWithBackoff';
 
+// Re-export app URL utilities
+export {
+  parseGithubUrl,
+  buildGithubUrl,
+  buildLaunchPath,
+  buildLaunchPathFromApp,
+  buildRelaunchPath
+} from './appUrls';
+
 // Re-export Neuroglancer URL utilities
 export {
   parseNeuroglancerUrl,

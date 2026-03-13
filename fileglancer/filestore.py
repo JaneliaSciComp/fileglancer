@@ -367,6 +367,21 @@ class Filestore:
         return self.root_path
 
 
+    def validate_path(self, path: Optional[str] = None) -> Optional[str]:
+        """Validate that a path exists and is readable within this filestore.
+
+        Returns an error message string if invalid, or None if valid.
+        """
+        try:
+            full_path = self._check_path_in_root(path)
+        except RootCheckError:
+            return "Path is not within an allowed file share"
+        if not os.path.exists(full_path):
+            return "Path does not exist"
+        if not os.access(full_path, os.R_OK):
+            return "Path is not accessible"
+        return None
+
     def get_absolute_path(self, relative_path: Optional[str] = None) -> str:
         """
         Get the absolute path of the Filestore.

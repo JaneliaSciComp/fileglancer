@@ -8,6 +8,10 @@ import { MainLayout } from './layouts/MainLayout';
 import { BrowsePageLayout } from './layouts/BrowseLayout';
 import { OtherPagesLayout } from './layouts/OtherPagesLayout';
 import Login from '@/components/Login';
+import Apps from '@/components/Apps';
+import AppJobs from '@/components/AppJobs';
+import AppLaunch from '@/components/AppLaunch';
+import JobDetail from '@/components/JobDetail';
 import Browse from '@/components/Browse';
 import Help from '@/components/Help';
 import Jobs from '@/components/Jobs';
@@ -111,6 +115,54 @@ const AppComponent = () => {
                 </RequireAuth>
               }
               path="nglinks"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <Apps />
+                </RequireAuth>
+              }
+              path="apps"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <AppJobs />
+                </RequireAuth>
+              }
+              path="apps/jobs"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <AppLaunch />
+                </RequireAuth>
+              }
+              path="apps/launch/:owner/:repo/:branch/:entryPointId"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <AppLaunch />
+                </RequireAuth>
+              }
+              path="apps/launch/:owner/:repo/:branch"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <AppLaunch />
+                </RequireAuth>
+              }
+              path="apps/relaunch/:owner/:repo/:branch/:entryPointId"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <JobDetail />
+                </RequireAuth>
+              }
+              path="apps/jobs/:jobId"
             />
             {tasksEnabled ? (
               <Route
