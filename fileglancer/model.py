@@ -154,6 +154,13 @@ class ProxiedPath(BaseModel):
         default=None
     )
 
+class UpdateProxiedPathPayload(BaseModel):
+    """Payload for updating a proxied path"""
+    sharing_name: Optional[str] = None
+    fsp_name: Optional[str] = None
+    path: Optional[str] = None
+
+
 class ProxiedPathResponse(BaseModel):
     paths: List[ProxiedPath] = Field(
         description="A list of proxied paths"

@@ -850,9 +850,13 @@ def create_app(settings):
               description="Create a new proxied path")
     async def create_proxied_path(fsp_name: str = Query(..., description="The name of the file share path that this proxied path is associated with"),
                                   path: str = Query(..., description="The path relative to the file share path mount point"),
+                                  sharing_name: Optional[str] = Query(default=None, description="Display name for the data link"),
                                   username: str = Depends(get_current_user)):
 
-        sharing_name = os.path.basename(path)
+        if sharing_name:
+            sharing_name = sharing_name.strip()
+        if not sharing_name:
+            sharing_name = os.path.basename(path)
         logger.info(f"Creating proxied path for {username} with sharing name {sharing_name} and fsp_name {fsp_name} and path {path}")
         with db.get_db_session(settings.db_url) as session:
             with _get_user_context(username): # Necessary to validate the user can access the proxied path
@@ -892,14 +896,17 @@ def create_app(settings):
 
     @app.put("/api/proxied-path/{sharing_key}", description="Update a proxied path by sharing key")
     async def update_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path"),
-                                  fsp_name: Optional[str] = Query(default=None, description="The name of the file share path that this proxied path is associated with"),
-                                  path: Optional[str] = Query(default=None, description="The path relative to the file share path mount point"),
-                                  sharing_name: Optional[str] = Query(default=None, description="The sharing path of the proxied path"),
+                                  payload: UpdateProxiedPathPayload = Body(...),
                                   username: str = Depends(get_current_user)):
+        # Strip sharing_name and reject whitespace-only values
+        if payload.sharing_name is not None:
+            payload.sharing_name = payload.sharing_name.strip()
+            if not payload.sharing_name:
+                raise HTTPException(status_code=400, detail="sharing_name cannot be empty")
         with db.get_db_session(settings.db_url) as session:
             with _get_user_context(username): # Necessary to validate the user can access the proxied path
                 try:
-                    updated = db.update_proxied_path(session, username, sharing_key, new_path=path, new_sharing_name=sharing_name, new_fsp_name=fsp_name)
+                    updated = db.update_proxied_path(session, username, sharing_key, new_path=payload.path, new_sharing_name=payload.sharing_name, new_fsp_name=payload.fsp_name)
                     return _convert_proxied_path(updated, settings.external_proxy_url)
                 except ValueError as e:
                     logger.error(f"Error updating proxied path: {e}")
