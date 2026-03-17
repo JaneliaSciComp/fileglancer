@@ -1,7 +1,7 @@
 /* eslint-disable react/destructuring-assignment */
 // Props are used for TypeScript type narrowing purposes and cannot be destructured at the beginning
 
-import { useState, SetStateAction } from 'react';
+import { useState, useEffect, useRef, SetStateAction } from 'react';
 import type { ReactNode, Dispatch } from 'react';
 import { Button, Typography } from '@material-tailwind/react';
 
@@ -25,7 +25,8 @@ interface CommonDataLinkDialogProps {
 interface CreateLinkFromToolsProps extends CommonDataLinkDialogProps {
   tools: true;
   action: 'create';
-  onConfirm: () => Promise<void>;
+  path: string;
+  onConfirm: (sharingName?: string) => Promise<void>;
   onCancel: () => void;
   setPendingToolKey: Dispatch<SetStateAction<PendingToolKey>>;
 }
@@ -33,7 +34,7 @@ interface CreateLinkFromToolsProps extends CommonDataLinkDialogProps {
 interface CreateLinkNotFromToolsProps extends CommonDataLinkDialogProps {
   tools: false;
   action: 'create';
-  onConfirm: () => Promise<void>;
+  onConfirm: (sharingName?: string) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -50,16 +51,18 @@ type DataLinkDialogProps =
   | DeleteLinkDialogProps;
 
 function CreateLinkBtn({
-  onConfirm
+  onConfirm,
+  sharingName
 }: {
-  readonly onConfirm: () => Promise<void>;
+  readonly onConfirm: (sharingName?: string) => Promise<void>;
+  readonly sharingName?: string;
 }) {
   return (
     <Button
       className="!rounded-md flex items-center gap-2"
       color="error"
       onClick={async () => {
-        await onConfirm();
+        await onConfirm(sharingName);
       }}
       variant="outline"
     >
@@ -104,10 +107,11 @@ function BtnContainer({ children }: { readonly children: ReactNode }) {
 }
 
 export default function DataLinkDialog(props: DataLinkDialogProps) {
-  const { fspName, filePath } = useFileBrowserContext();
+  const { fspName, fileBrowserState } = useFileBrowserContext();
   const { pathPreference, areDataLinksAutomatic } = usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const [localAreDataLinksAutomatic] = useState(areDataLinksAutomatic);
+  const [sharingNameError, setSharingNameError] = useState('');
 
   function getDisplayPath(): string {
     const fspKey =
@@ -122,13 +126,31 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
         ? (zonesAndFspQuery.data[fspKey] as FileSharePath)
         : null;
     const targetPath =
-      props.action === 'delete' ? props.proxiedPath.path : filePath;
+      props.action === 'delete'
+        ? props.proxiedPath.path
+        : props.tools
+          ? props.path
+          : (fileBrowserState.dataLinkPath ?? undefined);
 
     return pathFsp && targetPath
       ? getPreferredPathForDisplay(pathPreference, pathFsp, targetPath)
       : '';
   }
   const displayPath = getDisplayPath();
+  const pathBasename = displayPath
+    ? (displayPath.split('/').filter(Boolean).pop() ?? '')
+    : '';
+  const [sharingName, setSharingName] = useState(pathBasename);
+  const hasInitialized = useRef(!!pathBasename);
+
+  // Sync sharingName with pathBasename when displayPath resolves asynchronously
+  // Only runs once to set the initial value, does not override user edits
+  useEffect(() => {
+    if (pathBasename && !hasInitialized.current) {
+      hasInitialized.current = true;
+      setSharingName(pathBasename);
+    }
+  }, [pathBasename]);
 
   return (
     <FgDialog
@@ -155,12 +177,41 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
             </Typography>
             <div className="flex flex-col gap-2">
               <Typography className="font-semibold text-foreground">
+                Nickname:
+              </Typography>
+              <input
+                className="border border-surface rounded-md px-3 py-2 text-foreground bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                onChange={e => {
+                  setSharingName(e.target.value);
+                  setSharingNameError('');
+                }}
+                onFocus={e => e.target.select()}
+                type="text"
+                value={sharingName}
+              />
+              {sharingNameError ? (
+                <Typography className="text-error text-sm">
+                  {sharingNameError}
+                </Typography>
+              ) : null}
+            </div>
+            <div className="flex flex-col gap-2">
+              <Typography className="font-semibold text-foreground">
                 Don't ask me this again:
               </Typography>
               <AutomaticLinksToggle checkboxesOnly />
             </div>
             <BtnContainer>
-              <CreateLinkBtn onConfirm={props.onConfirm} />
+              <CreateLinkBtn
+                onConfirm={name => {
+                  if (!name || name.trim() === '') {
+                    setSharingNameError('Nickname cannot be empty');
+                    return Promise.resolve();
+                  }
+                  return props.onConfirm(name);
+                }}
+                sharingName={sharingName}
+              />
               <CancelBtn onCancel={props.onCancel} />
             </BtnContainer>
           </>

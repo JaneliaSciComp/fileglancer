@@ -19,10 +19,13 @@ export default function useDataToolLinks(
   pendingToolKey: PendingToolKey,
   setPendingToolKey: Dispatch<SetStateAction<PendingToolKey>>
 ): {
-  handleCreateDataLink: (pathOverride?: string) => Promise<boolean>;
+  handleCreateDataLink: (
+    pathOverride?: string,
+    sharingName?: string
+  ) => Promise<boolean>;
   handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
   handleToolClick: (toolKey: PendingToolKey) => Promise<void>;
-  handleDialogConfirm: () => Promise<void>;
+  handleDialogConfirm: (sharingName?: string) => Promise<void>;
   handleDialogCancel: () => void;
   showCopiedTooltip: boolean;
 };
@@ -31,10 +34,13 @@ export default function useDataToolLinks(
 export default function useDataToolLinks(
   setShowDataLinkDialog: Dispatch<SetStateAction<boolean>>
 ): {
-  handleCreateDataLink: (pathOverride?: string) => Promise<boolean>;
+  handleCreateDataLink: (
+    pathOverride?: string,
+    sharingName?: string
+  ) => Promise<boolean>;
   handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
   handleToolClick: (toolKey: PendingToolKey) => Promise<void>;
-  handleDialogConfirm: () => Promise<void>;
+  handleDialogConfirm: (sharingName?: string) => Promise<void>;
   handleDialogCancel: () => void;
   showCopiedTooltip: boolean;
 };
@@ -62,7 +68,8 @@ export default function useDataToolLinks(
   const { handleCopy, showCopiedTooltip } = useCopyTooltip();
 
   const handleCreateDataLink = async (
-    pathOverride?: string
+    pathOverride?: string,
+    sharingName?: string
   ): Promise<boolean> => {
     const path = pathOverride || fileBrowserState.dataLinkPath;
     if (!fileQuery.data?.currentFileSharePath) {
@@ -75,10 +82,15 @@ export default function useDataToolLinks(
     }
 
     try {
-      await createProxiedPathMutation.mutateAsync({
-        fsp_name: fileQuery.data.currentFileSharePath.name,
-        path
-      });
+      const payload: { fsp_name: string; path: string; sharing_name?: string } =
+        {
+          fsp_name: fileQuery.data.currentFileSharePath.name,
+          path
+        };
+      if (sharingName) {
+        payload.sharing_name = sharingName;
+      }
+      await createProxiedPathMutation.mutateAsync(payload);
       toast.success('Data link created successfully');
       await allProxiedPathsQuery.refetch();
       return true;
@@ -130,7 +142,8 @@ export default function useDataToolLinks(
   };
 
   const createLinkAndExecuteAction = async (
-    clickedToolKey?: PendingToolKey
+    clickedToolKey?: PendingToolKey,
+    sharingName?: string
   ) => {
     const toolKey = clickedToolKey || pendingToolKey;
     if (!toolKey) {
@@ -140,7 +153,8 @@ export default function useDataToolLinks(
     // Viewer icon flow: always create data link for the current directory,
     // not the properties target (which may be a selected subdirectory row)
     const success = await handleCreateDataLink(
-      fileQuery.data?.currentFileOrFolder?.path
+      fileQuery.data?.currentFileOrFolder?.path,
+      sharingName
     );
     if (!success) {
       // If link creation fails, exit immediately without waiting or showing navigation error
@@ -188,11 +202,11 @@ export default function useDataToolLinks(
 
   // First case is for link creation through a data tool button click
   // Second case is for link creation through the PropertiesDrawer dialog
-  const handleDialogConfirm = async () => {
+  const handleDialogConfirm = async (sharingName?: string) => {
     if (pendingToolKey) {
-      await createLinkAndExecuteAction();
+      await createLinkAndExecuteAction(undefined, sharingName);
     } else {
-      await handleCreateDataLink();
+      await handleCreateDataLink(undefined, sharingName);
     }
     setShowDataLinkDialog?.(false);
   };

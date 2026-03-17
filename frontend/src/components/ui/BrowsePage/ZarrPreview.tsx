@@ -112,6 +112,7 @@ export default function ZarrPreview({
               action="create"
               onCancel={handleDialogCancel}
               onConfirm={handleDialogConfirm}
+              path={path}
               setPendingToolKey={setPendingToolKey}
               setShowDataLinkDialog={setShowDataLinkDialog}
               showDataLinkDialog={showDataLinkDialog}

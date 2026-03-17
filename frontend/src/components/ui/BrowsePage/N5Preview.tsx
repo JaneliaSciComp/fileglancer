@@ -75,6 +75,7 @@ export default function N5Preview({
               action="create"
               onCancel={handleDialogCancel}
               onConfirm={handleDialogConfirm}
+              path={path}
               setPendingToolKey={setPendingToolKey}
               setShowDataLinkDialog={setShowDataLinkDialog}
               showDataLinkDialog={showDataLinkDialog}

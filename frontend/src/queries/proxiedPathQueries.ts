@@ -27,6 +27,7 @@ type ProxiedPathApiResponse = {
 type CreateProxiedPathPayload = {
   fsp_name: string;
   path: string;
+  sharing_name?: string;
 };
 
 /**
@@ -34,6 +35,14 @@ type CreateProxiedPathPayload = {
  */
 type DeleteProxiedPathPayload = {
   sharing_key: string;
+};
+
+/**
+ * Payload for updating a proxied path
+ */
+type UpdateProxiedPathPayload = {
+  sharing_key: string;
+  sharing_name: string;
 };
 
 // Query key factory for proxied paths
@@ -178,10 +187,14 @@ export function useCreateProxiedPathMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: async (payload: CreateProxiedPathPayload) => {
-      const url = buildUrl('/api/proxied-path', null, {
+      const queryParams: Record<string, string> = {
         fsp_name: payload.fsp_name,
         path: payload.path
-      });
+      };
+      if (payload.sharing_name) {
+        queryParams.sharing_name = payload.sharing_name;
+      }
+      const url = buildUrl('/api/proxied-path', null, queryParams);
       const proxiedPath = await sendRequestAndThrowForNotOk(url, 'POST');
       return proxiedPath as ProxiedPath;
     },
@@ -279,6 +292,36 @@ export function useDeleteProxiedPathMutation(): UseMutationResult<
           context.previousPaths
         );
       }
+    }
+  });
+}
+
+/**
+ * Mutation hook for updating a proxied path
+ *
+ * @example
+ * const mutation = useUpdateProxiedPathMutation();
+ * mutation.mutate({ sharing_key: 'abc123', sharing_name: 'My Custom Name' });
+ */
+export function useUpdateProxiedPathMutation(): UseMutationResult<
+  ProxiedPath,
+  Error,
+  UpdateProxiedPathPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: UpdateProxiedPathPayload) => {
+      const url = buildUrl('/api/proxied-path/', payload.sharing_key, null);
+      const proxiedPath = await sendRequestAndThrowForNotOk(url, 'PUT', {
+        sharing_name: payload.sharing_name
+      });
+      return proxiedPath as ProxiedPath;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: proxiedPathQueryKeys.all
+      });
     }
   });
 }
