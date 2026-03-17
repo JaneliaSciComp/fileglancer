@@ -628,6 +628,10 @@ def update_proxied_path(session: Session,
     if username != proxied_path.username:
         raise ValueError(f"Proxied path with sharing key {sharing_key} not found for user {username}")
 
+    # Merge into current session in case the object came from the cache
+    # (detached objects from a previous session won't persist changes on commit)
+    proxied_path = session.merge(proxied_path)
+
     if new_sharing_name:
         proxied_path.sharing_name = new_sharing_name
 
