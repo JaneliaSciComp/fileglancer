@@ -95,7 +95,7 @@ def _convert_external_bucket(db_bucket: db.ExternalBucketDB) -> ExternalBucket:
 def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optional[HttpUrl]) -> ProxiedPath:
     """Convert a database ProxiedPathDB model to a Pydantic ProxiedPath model"""
     if external_proxy_url:
-        url = f"{external_proxy_url}/{db_path.sharing_key}/{quote(db_path.sharing_name)}"
+        url = f"{external_proxy_url}/{db_path.sharing_key}/{quote(os.path.basename(db_path.path))}"
     else:
         logger.warning(f"No external proxy URL was provided, proxy links will not be available.")
         url = None
@@ -199,29 +199,30 @@ def create_app(settings):
             return CurrentUserContext()
 
 
-    def _get_file_proxy_client(sharing_key: str, sharing_name: str) -> Tuple[FileProxyClient, UserContext] | Tuple[Response, None]:
+    def _get_file_proxy_client(sharing_key: str, path_basename: str) -> Tuple[FileProxyClient, UserContext] | Tuple[Response, None]:
         with db.get_db_session(settings.db_url) as session:
 
             proxied_path = db.get_proxied_path_by_sharing_key(session, sharing_key)
             if not proxied_path:
-                return get_nosuchbucket_response(sharing_name), None
+                return get_nosuchbucket_response(path_basename), None
 
             # Vol-E viewer sends URLs with literal % characters (not URL-encoded)
-            # FastAPI automatically decodes path parameters - % chars are treated as escapes, creating a garbled sharing_name if they're present
+            # FastAPI automatically decodes path parameters - % chars are treated as escapes, creating a garbled path_basename if they're present
             # We therefore need to handle two cases:
-            #   1. Properly encoded requests (sharing_name matches DB value of proxied_path.sharing_name)
-            #   2. Vol-E's unencoded requests (unquote(proxied_path.sharing_name) matches the garbled request value)
-            if proxied_path.sharing_name != sharing_name and unquote(proxied_path.sharing_name) != sharing_name:
-                return get_error_response(404, "NoSuchKey", f"Sharing name mismatch for sharing key {sharing_key}", sharing_name), None
+            #   1. Properly encoded requests (path_basename matches os.path.basename of proxied_path.path)
+            #   2. Vol-E's unencoded requests (unquote of the expected basename matches the garbled request value)
+            expected_basename = os.path.basename(proxied_path.path)
+            if expected_basename != path_basename and unquote(expected_basename) != path_basename:
+                return get_error_response(404, "NoSuchKey", f"Path name mismatch for sharing key {sharing_key}", path_basename), None
 
             fsp = db.get_file_share_path(session, proxied_path.fsp_name)
             if not fsp:
-                return get_error_response(400, "InvalidArgument", f"File share path {proxied_path.fsp_name} not found", sharing_name), None
+                return get_error_response(400, "InvalidArgument", f"File share path {proxied_path.fsp_name} not found", path_basename), None
             # Expand ~ to user's home directory before constructing the mount path
             expanded_mount_path = os.path.expanduser(fsp.mount_path)
             mount_path = f"{expanded_mount_path}/{proxied_path.path}"
             # Use 256KB buffer for better performance on network filesystems
-            return FileProxyClient(proxy_kwargs={'target_name': sharing_name}, path=mount_path, buffer_size=256*1024), _get_user_context(proxied_path.username)
+            return FileProxyClient(proxy_kwargs={'target_name': os.path.basename(proxied_path.path)}, path=mount_path, buffer_size=256*1024), _get_user_context(proxied_path.username)
 
 
     @asynccontextmanager
@@ -970,11 +971,11 @@ def create_app(settings):
         return NeuroglancerShortLinkResponse(links=links)
 
 
-    @app.get("/files/{sharing_key}/{sharing_name}")
-    @app.get("/files/{sharing_key}/{sharing_name}/{path:path}")
+    @app.get("/files/{sharing_key}/{path_basename}")
+    @app.get("/files/{sharing_key}/{path_basename}/{path:path}")
     async def target_dispatcher(request: Request,
                                 sharing_key: str,
-                                sharing_name: str,
+                                path_basename: str,
                                 path: str | None = '',
                                 list_type: Optional[int] = Query(None, alias="list-type"),
                                 continuation_token: Optional[str] = Query(None, alias="continuation-token"),
@@ -988,7 +989,7 @@ def create_app(settings):
         if 'acl' in request.query_params:
             return get_read_access_acl()
 
-        client, ctx = _get_file_proxy_client(sharing_key, sharing_name)
+        client, ctx = _get_file_proxy_client(sharing_key, path_basename)
         if isinstance(client, Response):
             return client
 
@@ -1015,10 +1016,10 @@ def create_app(settings):
                 return handle
 
 
-    @app.head("/files/{sharing_key}/{sharing_name}/{path:path}")
-    async def head_object(sharing_key: str, sharing_name: str, path: str):
+    @app.head("/files/{sharing_key}/{path_basename}/{path:path}")
+    async def head_object(sharing_key: str, path_basename: str, path: str):
         try:
-            client, ctx = _get_file_proxy_client(sharing_key, sharing_name)
+            client, ctx = _get_file_proxy_client(sharing_key, path_basename)
             if isinstance(client, Response):
                 return client
             with ctx:
