@@ -293,10 +293,115 @@ def test_update_proxied_path(test_client):
     # Update the proxied path
     new_path = "new_test_proxied_path"
 
-    response = test_client.put(f"/api/proxied-path/{sharing_key}?fsp_name=tempdir&path={new_path}")
+    response = test_client.put(f"/api/proxied-path/{sharing_key}", json={"fsp_name": "tempdir", "path": new_path})
     assert response.status_code == 200
     updated_data = response.json()
     assert updated_data["path"] == new_path
+
+
+def test_create_proxied_path_with_sharing_name(test_client, temp_dir):
+    """Test creating a proxied path with a custom sharing_name"""
+    path = "test_proxied_path"
+
+    response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path={path}&sharing_name=My%20Custom%20Name")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["sharing_name"] == "My Custom Name"
+    assert data["path"] == path
+
+
+def test_create_proxied_path_sharing_name_defaults_to_basename(test_client, temp_dir):
+    """Test that sharing_name defaults to os.path.basename(path) when not provided"""
+    path = "test_proxied_path"
+
+    response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path={path}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["sharing_name"] == "test_proxied_path"
+
+
+def test_url_uses_path_basename_not_sharing_name(test_client, temp_dir):
+    """Test that the URL uses os.path.basename(path) instead of sharing_name"""
+    path = "test_proxied_path"
+
+    # Create with a custom sharing_name
+    response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path={path}&sharing_name=Custom%20Display%20Name")
+    assert response.status_code == 200
+    data = response.json()
+    sharing_key = data["sharing_key"]
+
+    # The URL should contain the path basename, not the sharing_name
+    assert data["url"] is not None
+    assert f"/{sharing_key}/test_proxied_path" in data["url"]
+    assert "Custom%20Display%20Name" not in data["url"]
+    assert "Custom Display Name" not in data["url"]
+
+
+def test_url_stable_after_sharing_name_update(test_client, temp_dir):
+    """Test that updating sharing_name does not change the URL"""
+    path = "test_proxied_path"
+
+    # Create a proxied path
+    response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path={path}")
+    assert response.status_code == 200
+    data = response.json()
+    sharing_key = data["sharing_key"]
+    original_url = data["url"]
+
+    # Update only the sharing_name
+    response = test_client.put(f"/api/proxied-path/{sharing_key}", json={"sharing_name": "Renamed Display Name"})
+    assert response.status_code == 200
+    updated_data = response.json()
+
+    # The sharing_name should be updated
+    assert updated_data["sharing_name"] == "Renamed Display Name"
+    # The URL should remain unchanged (still uses path basename)
+    assert updated_data["url"] == original_url
+
+
+def test_update_proxied_path_sharing_name(test_client):
+    """Test updating only the sharing_name via PUT with JSON body"""
+    path = "test_proxied_path"
+    response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path={path}")
+    assert response.status_code == 200
+    data = response.json()
+    sharing_key = data["sharing_key"]
+
+    # Update only the sharing_name
+    response = test_client.put(f"/api/proxied-path/{sharing_key}", json={"sharing_name": "New Name"})
+    assert response.status_code == 200
+    updated_data = response.json()
+    assert updated_data["sharing_name"] == "New Name"
+    # Path should remain unchanged
+    assert updated_data["path"] == path
+
+
+def test_update_proxied_path_persists_across_requests(test_client):
+    """Test that updating sharing_name is persisted and returned by subsequent GET requests.
+    Regression test for detached SQLAlchemy cached objects not persisting changes.
+    """
+    path = "test_proxied_path"
+    response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path={path}")
+    assert response.status_code == 200
+    sharing_key = response.json()["sharing_key"]
+
+    # Update the sharing_name
+    response = test_client.put(f"/api/proxied-path/{sharing_key}", json={"sharing_name": "Updated Nickname"})
+    assert response.status_code == 200
+    assert response.json()["sharing_name"] == "Updated Nickname"
+
+    # Verify the update is returned by GET (list)
+    response = test_client.get("/api/proxied-path")
+    assert response.status_code == 200
+    paths = response.json()["paths"]
+    matched = [p for p in paths if p["sharing_key"] == sharing_key]
+    assert len(matched) == 1
+    assert matched[0]["sharing_name"] == "Updated Nickname"
+
+    # Verify the update is returned by GET (single)
+    response = test_client.get(f"/api/proxied-path/{sharing_key}")
+    assert response.status_code == 200
+    assert response.json()["sharing_name"] == "Updated Nickname"
 
 
 def test_delete_proxied_path(test_client):
