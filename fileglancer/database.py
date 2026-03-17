@@ -653,13 +653,14 @@ def update_proxied_path(session: Session,
     return proxied_path
 
 
-def delete_proxied_path(session: Session, username: str, sharing_key: str):
-    """Delete a proxied path"""
-    session.query(ProxiedPathDB).filter_by(username=username, sharing_key=sharing_key).delete()
+def delete_proxied_path(session: Session, username: str, sharing_key: str) -> int:
+    """Delete a proxied path. Returns the number of rows deleted."""
+    deleted = session.query(ProxiedPathDB).filter_by(username=username, sharing_key=sharing_key).delete()
     session.commit()
 
     # Remove from cache
     _invalidate_sharing_key_cache(sharing_key)
+    return deleted
 
 
 def _generate_unique_neuroglancer_key(session: Session) -> str:
