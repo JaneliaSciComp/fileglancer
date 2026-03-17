@@ -6,7 +6,8 @@ import {
   useAllProxiedPathsQuery,
   useProxiedPathByFspAndPathQuery,
   useCreateProxiedPathMutation,
-  useDeleteProxiedPathMutation
+  useDeleteProxiedPathMutation,
+  useUpdateProxiedPathMutation
 } from '@/queries/proxiedPathQueries';
 
 export type ProxiedPath = {
@@ -30,6 +31,7 @@ type ProxiedPathContextType = {
   >;
   createProxiedPathMutation: ReturnType<typeof useCreateProxiedPathMutation>;
   deleteProxiedPathMutation: ReturnType<typeof useDeleteProxiedPathMutation>;
+  updateProxiedPathMutation: ReturnType<typeof useUpdateProxiedPathMutation>;
 };
 
 const ProxiedPathContext = createContext<ProxiedPathContextType | null>(null);
@@ -72,13 +74,15 @@ export const ProxiedPathProvider = ({
 
   const createProxiedPathMutation = useCreateProxiedPathMutation();
   const deleteProxiedPathMutation = useDeleteProxiedPathMutation();
+  const updateProxiedPathMutation = useUpdateProxiedPathMutation();
 
   const value: ProxiedPathContextType = {
     allProxiedPathsQuery,
     proxiedPathByFspAndPathQuery,
     currentDirProxiedPathQuery,
     createProxiedPathMutation,
-    deleteProxiedPathMutation
+    deleteProxiedPathMutation,
+    updateProxiedPathMutation
   };
 
   return (

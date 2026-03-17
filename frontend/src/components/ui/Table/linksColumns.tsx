@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
-import type { MouseEvent } from 'react';
+import { useState, useRef, useMemo } from 'react';
+import type { MouseEvent, ChangeEvent, KeyboardEvent } from 'react';
 import { Typography } from '@material-tailwind/react';
+import toast from 'react-hot-toast';
 import type { ColumnDef } from '@tanstack/react-table';
 
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
@@ -88,6 +89,88 @@ function PathCell({
           to={browseLink}
         >
           {displayPath}
+        </Typography>
+      </FgTooltip>
+    </div>
+  );
+}
+
+function NicknameCell({
+  item,
+  onContextMenu
+}: {
+  readonly item: ProxiedPath;
+  readonly onContextMenu?: (
+    e: MouseEvent<HTMLElement>,
+    data: { value: string }
+  ) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(item.sharing_name);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { updateProxiedPathMutation } = useProxiedPathContext();
+
+  const startEditing = () => {
+    setValue(item.sharing_name);
+    setEditing(true);
+    // Select text after the input renders
+    setTimeout(() => inputRef.current?.select(), 0);
+  };
+
+  const save = async () => {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === item.sharing_name) {
+      setEditing(false);
+      return;
+    }
+    try {
+      await updateProxiedPathMutation.mutateAsync({
+        sharing_key: item.sharing_key,
+        sharing_name: trimmed
+      });
+      toast.success('Nickname updated.');
+    } catch {
+      toast.error('Failed to update nickname.');
+    }
+    setEditing(false);
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      save();
+    } else if (e.key === 'Escape') {
+      setEditing(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <input
+        className="w-full p-1 text-foreground border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background"
+        onBlur={save}
+        onChange={(e: ChangeEvent<HTMLInputElement>) =>
+          setValue(e.target.value)
+        }
+        onKeyDown={handleKeyDown}
+        ref={inputRef}
+        type="text"
+        value={value}
+      />
+    );
+  }
+
+  return (
+    <div
+      className="flex items-center truncate w-full h-full cursor-text"
+      onContextMenu={e => {
+        e.preventDefault();
+        onContextMenu?.(e, { value: item.sharing_name });
+      }}
+      onDoubleClick={startEditing}
+    >
+      <FgTooltip label={item.sharing_name} triggerClasses={TRIGGER_CLASSES}>
+        <Typography className="text-foreground truncate select-all">
+          {item.sharing_name}
         </Typography>
       </FgTooltip>
     </div>
@@ -205,28 +288,11 @@ export function useLinksColumns(): ColumnDef<ProxiedPath>[] {
     () => [
       {
         accessorKey: 'sharing_name',
-        header: 'Name',
-        cell: ({ cell, row, table }) => {
-          const item = row.original;
+        header: 'Nickname',
+        cell: ({ row, table }) => {
           const onContextMenu = table.options.meta?.onCellContextMenu;
           return (
-            <div
-              className="flex items-center truncate w-full h-full"
-              key={cell.id}
-              onContextMenu={e => {
-                e.preventDefault();
-                onContextMenu?.(e, { value: item.sharing_name });
-              }}
-            >
-              <FgTooltip
-                label={item.sharing_name}
-                triggerClasses={TRIGGER_CLASSES}
-              >
-                <Typography className="text-foreground truncate select-all">
-                  {item.sharing_name}
-                </Typography>
-              </FgTooltip>
-            </div>
+            <NicknameCell item={row.original} onContextMenu={onContextMenu} />
           );
         },
         enableSorting: true
@@ -284,7 +350,7 @@ export function useLinksColumns(): ColumnDef<ProxiedPath>[] {
           const onContextMenu = table.options.meta?.onCellContextMenu;
           return (
             <div
-              className="flex items-center truncate w-full h-full"
+              className="flex items-center truncate w-full h-full cursor-default"
               key={cell.id}
               onContextMenu={e => {
                 e.preventDefault();
@@ -312,7 +378,7 @@ export function useLinksColumns(): ColumnDef<ProxiedPath>[] {
           const onContextMenu = table.options.meta?.onCellContextMenu;
           return (
             <div
-              className="flex items-center  truncate w-full h-full"
+              className="flex items-center truncate w-full h-full cursor-default"
               key={cell.id}
               onContextMenu={e => {
                 e.preventDefault();
