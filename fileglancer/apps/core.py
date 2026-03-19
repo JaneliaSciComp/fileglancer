@@ -789,12 +789,18 @@ def _build_container_script(
 
 
 def _build_work_dir(job_id: int, app_name: str, entry_point_id: str,
-                    job_name_prefix: Optional[str] = None) -> Path:
-    """Build a working directory path under ~/.fileglancer/jobs/."""
+                    job_name_prefix: Optional[str] = None,
+                    username: Optional[str] = None) -> Path:
+    """Build a working directory path under ~/.fileglancer/jobs/.
+
+    When username is provided, expands ~username to the user's home directory
+    instead of the server process's home (which is typically root).
+    """
     safe_app = _sanitize_for_path(app_name)
     safe_ep = _sanitize_for_path(entry_point_id)
     prefix = f"{_sanitize_for_path(job_name_prefix)}-" if job_name_prefix else ""
-    return Path(os.path.expanduser(f"~/.fileglancer/jobs/{prefix}{job_id}-{safe_app}-{safe_ep}"))
+    home = os.path.expanduser(f"~{username}") if username else os.path.expanduser("~")
+    return Path(f"{home}/.fileglancer/jobs/{prefix}{job_id}-{safe_app}-{safe_ep}")
 
 
 async def submit_job(
@@ -893,7 +899,8 @@ async def submit_job(
 
         # Compute and persist work_dir now that we have the job ID
         work_dir = _build_work_dir(job_id, manifest.name, entry_point.id,
-                                   job_name_prefix=settings.cluster.job_name_prefix)
+                                   job_name_prefix=settings.cluster.job_name_prefix,
+                                   username=username)
         db_job.work_dir = str(work_dir)
         session.commit()
 
