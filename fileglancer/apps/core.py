@@ -993,6 +993,8 @@ async def submit_job(
     with user_context if user_context is not None else nullcontext():
         work_dir.mkdir(parents=True, exist_ok=True)
         repo_link = work_dir / "repo"
+        if repo_link.is_symlink() or repo_link.exists():
+            repo_link.unlink()
         repo_link.symlink_to(cached_repo_dir)
         cluster_job = await executor.submit(
             command=full_command,
