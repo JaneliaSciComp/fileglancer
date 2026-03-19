@@ -6,6 +6,7 @@ import re
 import shlex
 import shutil
 import subprocess
+from contextlib import nullcontext
 from pathlib import Path
 from datetime import datetime, UTC
 from typing import Optional
@@ -810,6 +811,7 @@ async def submit_job(
     post_run: Optional[str] = None,
     container: Optional[str] = None,
     container_args: Optional[str] = None,
+    user_context=None,
 ) -> db.JobDB:
     """Submit a new job to the cluster.
 
@@ -895,21 +897,14 @@ async def submit_job(
         db_job.work_dir = str(work_dir)
         session.commit()
 
-    # Create work directory on disk
-    work_dir.mkdir(parents=True, exist_ok=True)
-
-    # Determine which repo to symlink and where to cd
+    # Pre-fetch repo into the shared server-owned cache. This must run as the
+    # server/root user because the cache lives under the server's home directory
+    # (~/.fileglancer/apps), which the authenticated user cannot write to.
     if manifest.repo_url:
-        # Tool code lives in a separate repo — clone it and cd to its root
-        tool_repo_dir = await _ensure_repo_cache(manifest.repo_url, pull=pull_latest)
-        repo_link = work_dir / "repo"
-        repo_link.symlink_to(tool_repo_dir)
+        cached_repo_dir = await _ensure_repo_cache(manifest.repo_url, pull=pull_latest)
         cd_suffix = "repo"
     else:
-        # Tool code is in the discovery repo — cd into manifest's subdirectory
-        repo_dir = await _ensure_repo_cache(app_url, pull=pull_latest)
-        repo_link = work_dir / "repo"
-        repo_link.symlink_to(repo_dir)
+        cached_repo_dir = await _ensure_repo_cache(app_url, pull=pull_latest)
         cd_suffix = f"repo/{manifest_path}" if manifest_path else "repo"
 
     # Build environment variable export lines
@@ -984,14 +979,19 @@ async def submit_job(
     resource_spec.stdout_path = str(work_dir / "stdout.log")
     resource_spec.stderr_path = str(work_dir / "stderr.log")
 
-    # Submit to executor
+    # Create work directory, symlink the cached repo, and submit to the cluster —
+    # all as the authenticated user so the job runs with correct ownership.
     executor = await get_executor()
     job_name = f"{manifest.name}-{entry_point.id}"
-    cluster_job = await executor.submit(
-        command=full_command,
-        name=job_name,
-        resources=resource_spec,
-    )
+    with user_context if user_context is not None else nullcontext():
+        work_dir.mkdir(parents=True, exist_ok=True)
+        repo_link = work_dir / "repo"
+        repo_link.symlink_to(cached_repo_dir)
+        cluster_job = await executor.submit(
+            command=full_command,
+            name=job_name,
+            resources=resource_spec,
+        )
 
     # Register callback to update DB when job reaches terminal state
     cluster_job.on_exit(_on_job_exit)

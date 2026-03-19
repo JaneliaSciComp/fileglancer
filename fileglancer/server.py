@@ -1687,22 +1687,22 @@ def create_app(settings):
             if body.resources:
                 resources_dict = body.resources.model_dump(exclude_none=True)
 
-            with _get_user_context(username):
-                db_job = await apps_module.submit_job(
-                    username=username,
-                    app_url=body.app_url,
-                    entry_point_id=body.entry_point_id,
-                    parameters=body.parameters,
-                    resources=resources_dict,
-                    extra_args=body.extra_args,
-                    pull_latest=body.pull_latest,
-                    manifest_path=body.manifest_path,
-                    env=body.env,
-                    pre_run=body.pre_run,
-                    post_run=body.post_run,
-                    container=body.container,
-                    container_args=body.container_args,
-                )
+            db_job = await apps_module.submit_job(
+                username=username,
+                app_url=body.app_url,
+                entry_point_id=body.entry_point_id,
+                parameters=body.parameters,
+                resources=resources_dict,
+                extra_args=body.extra_args,
+                pull_latest=body.pull_latest,
+                manifest_path=body.manifest_path,
+                env=body.env,
+                pre_run=body.pre_run,
+                post_run=body.post_run,
+                container=body.container,
+                container_args=body.container_args,
+                user_context=_get_user_context(username),
+            )
             return _convert_job(db_job)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
