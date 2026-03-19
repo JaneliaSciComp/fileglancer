@@ -586,6 +586,15 @@ async def get_executor():
         # to avoid double-application (config + per-job merge in py-cluster-api)
         config.pop("extra_args", None)
         _executor = create_executor(**config)
+        # Resolve scheduler commands to absolute paths so that subprocess
+        # spawning works even when euid has been switched (uvloop/libuv
+        # may fail PATH resolution in that context).
+        for attr in ("submit_command", "cancel_command", "status_command"):
+            cmd = getattr(_executor, attr, None)
+            if cmd and not os.path.isabs(cmd):
+                full_path = shutil.which(cmd)
+                if full_path:
+                    setattr(_executor, attr, full_path)
     return _executor
 
 
