@@ -14,6 +14,7 @@ from pydantic_settings import (
 class ClusterSettings(BaseModel):
     """Cluster configuration matching py-cluster-api's ClusterConfig."""
     executor: str = 'local'
+    extra_paths: List[str] = []
     cpus: Optional[int] = None
     gpus: Optional[int] = None
     memory: Optional[str] = None

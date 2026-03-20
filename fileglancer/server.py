@@ -266,6 +266,14 @@ def create_app(settings):
         logger.debug(f"  external_proxy_url: {settings.external_proxy_url}")
         logger.debug(f"  atlassian_url: {settings.atlassian_url}")
 
+        # Prepend cluster extra_paths to PATH so scheduler commands
+        # (bsub, bjobs, bkill) are findable without relying on the
+        # system service's default PATH.
+        if settings.cluster.extra_paths:
+            extra = os.pathsep.join(settings.cluster.extra_paths)
+            os.environ["PATH"] = extra + os.pathsep + os.environ.get("PATH", "")
+            logger.debug(f"  cluster.extra_paths prepended to PATH: {extra}")
+
         # Initialize database (run migrations once at startup)
         db.initialize_database(settings.db_url)
 

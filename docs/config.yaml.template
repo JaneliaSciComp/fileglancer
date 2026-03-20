@@ -138,6 +138,10 @@ session_cookie_secure: true
 #
 cluster:
   executor: local            # "local" or "lsf"
+#   extra_paths:               # Directories prepended to the server's PATH at
+#     - /opt/lsf/bin           # startup so scheduler commands (bsub, bjobs,
+#                              # bkill) are findable. Useful when running as a
+#                              # systemd service with a minimal default PATH.
 #   job_name_prefix: fg        # Prefix for cluster job names. REQUIRED for job
 #                              # reconnection after server restarts. Without this,
 #                              # active jobs will not be re-tracked and will
