@@ -274,6 +274,14 @@ def create_app(settings):
             os.environ["PATH"] = extra + os.pathsep + os.environ.get("PATH", "")
             logger.debug(f"  cluster.extra_paths prepended to PATH: {extra}")
 
+        # Set extra environment variables needed by scheduler commands
+        # (e.g., LSF_ENVDIR for bsub to find lsf.conf). Pixi strips
+        # inherited env vars, so they must be set inside the process.
+        if settings.cluster.extra_env:
+            for key, value in settings.cluster.extra_env.items():
+                os.environ[key] = value
+                logger.debug(f"  cluster.extra_env set: {key}={value}")
+
         # Initialize database (run migrations once at startup)
         db.initialize_database(settings.db_url)
 

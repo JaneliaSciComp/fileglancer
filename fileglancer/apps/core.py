@@ -586,6 +586,7 @@ async def get_executor():
         # to avoid double-application (config + per-job merge in py-cluster-api)
         config.pop("extra_args", None)
         config.pop("extra_paths", None)
+        config.pop("extra_env", None)
         _executor = create_executor(**config)
     return _executor
 

@@ -142,6 +142,8 @@ cluster:
 #     - /opt/lsf/bin           # startup so scheduler commands (bsub, bjobs,
 #                              # bkill) are findable. Useful when running as a
 #                              # systemd service with a minimal default PATH.
+#   extra_env:                 # Extra environment variables set at startup.
+#     LSF_ENVDIR: /misc/lsf/conf  # Required for LSF to find lsf.conf.
 #   job_name_prefix: fg        # Prefix for cluster job names. REQUIRED for job
 #                              # reconnection after server restarts. Without this,
 #                              # active jobs will not be re-tracked and will

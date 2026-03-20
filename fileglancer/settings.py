@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 from functools import cache
 import sys
 
@@ -15,6 +15,7 @@ class ClusterSettings(BaseModel):
     """Cluster configuration matching py-cluster-api's ClusterConfig."""
     executor: str = 'local'
     extra_paths: List[str] = []
+    extra_env: Dict[str, str] = {}
     cpus: Optional[int] = None
     gpus: Optional[int] = None
     memory: Optional[str] = None
