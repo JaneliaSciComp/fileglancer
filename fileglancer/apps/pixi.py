@@ -170,6 +170,7 @@ def _task_to_entry_point(name: str, task: dict) -> AppEntryPoint | None:
         description=description,
         command=command,
         parameters=parameters,
+        pre_run='export PATH="$HOME/.pixi/bin:$PATH"',
     )
 
 
