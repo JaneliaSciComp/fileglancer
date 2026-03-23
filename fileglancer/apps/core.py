@@ -596,17 +596,25 @@ def _run_as_user(username: str, request: dict) -> dict:
     Raises ValueError on worker failure.
     """
     pw = pwd.getpwnam(username)
-    groups = [g.gr_gid for g in grp.getgrall() if username in g.gr_mem]
-    if pw.pw_gid not in groups:
-        groups.append(pw.pw_gid)
+
+    # Only switch identity if running as root; otherwise we're already
+    # the target user (e.g. development mode).
+    identity_kwargs: dict = {}
+    if os.geteuid() == 0:
+        groups = [g.gr_gid for g in grp.getgrall() if username in g.gr_mem]
+        if pw.pw_gid not in groups:
+            groups.append(pw.pw_gid)
+        identity_kwargs = {
+            "user": pw.pw_uid,
+            "group": pw.pw_gid,
+            "extra_groups": groups,
+        }
 
     result = subprocess.run(
         [sys.executable, "-m", "fileglancer.apps.worker"],
         input=json.dumps(request).encode(),
         capture_output=True,
-        user=pw.pw_uid,
-        group=pw.pw_gid,
-        extra_groups=groups,
+        **identity_kwargs,
     )
 
     if result.stdout:
