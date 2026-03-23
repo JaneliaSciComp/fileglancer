@@ -271,7 +271,7 @@ def create_app(settings):
         # in a bash subshell and captures the resulting environment,
         # applying any new/changed vars to this process. Pixi strips
         # inherited env vars, so they must be set inside the process.
-        # Runs before extra_paths/extra_env so those can override.
+        #
         if settings.env_source_script:
             import subprocess as _sp
             script = settings.env_source_script
@@ -297,20 +297,6 @@ def create_app(settings):
                     )
             except Exception as e:
                 logger.warning(f"env_source_script error: {e}")
-
-        # Prepend extra_paths to PATH so commands (e.g. bsub, bjobs,
-        # bkill) are findable without relying on the system service's
-        # default PATH.
-        if settings.extra_paths:
-            extra = os.pathsep.join(settings.extra_paths)
-            os.environ["PATH"] = extra + os.pathsep + os.environ.get("PATH", "")
-            logger.debug(f"extra_paths prepended to PATH: {extra}")
-
-        # Set extra environment variables at startup.
-        if settings.extra_env:
-            for key, value in settings.extra_env.items():
-                os.environ[key] = value
-                logger.debug(f"extra_env set: {key}={value}")
 
         # Initialize database (run migrations once at startup)
         db.initialize_database(settings.db_url)
