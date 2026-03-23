@@ -266,6 +266,38 @@ def create_app(settings):
         logger.debug(f"  external_proxy_url: {settings.external_proxy_url}")
         logger.debug(f"  atlassian_url: {settings.atlassian_url}")
 
+        # Source a shell script to import environment variables
+        # (e.g., /misc/lsf/conf/profile.lsf). This runs the script
+        # in a bash subshell and captures the resulting environment,
+        # applying any new/changed vars to this process. Pixi strips
+        # inherited env vars, so they must be set inside the process.
+        # Runs before extra_paths/extra_env so those can override.
+        if settings.env_source_script:
+            import subprocess as _sp
+            script = settings.env_source_script
+            try:
+                result = _sp.run(
+                    ["bash", "-c", f". {script} && env -0"],
+                    capture_output=True, text=True, timeout=10,
+                )
+                if result.returncode == 0:
+                    sourced_env = dict(
+                        line.split("=", 1)
+                        for line in result.stdout.split("\0")
+                        if "=" in line
+                    )
+                    for key, value in sourced_env.items():
+                        if os.environ.get(key) != value:
+                            os.environ[key] = value
+                            logger.debug(f"  env_source_script set: {key}={value}")
+                else:
+                    logger.warning(
+                        f"env_source_script failed (rc={result.returncode}): "
+                        f"{result.stderr.strip()}"
+                    )
+            except Exception as e:
+                logger.warning(f"env_source_script error: {e}")
+
         # Prepend extra_paths to PATH so commands (e.g. bsub, bjobs,
         # bkill) are findable without relying on the system service's
         # default PATH.

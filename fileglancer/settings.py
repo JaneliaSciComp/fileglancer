@@ -94,6 +94,11 @@ class Settings(BaseSettings):
 
     # CLI mode - enables auto-login endpoint for standalone CLI usage
     cli_mode: bool = False
+
+    # Shell script sourced at startup to import environment variables.
+    # Useful for setting up scheduler env (e.g., /misc/lsf/conf/profile.lsf).
+    env_source_script: Optional[str] = None
+
     # Directories prepended to the server's PATH at startup.
     extra_paths: List[str] = []
 
