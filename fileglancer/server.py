@@ -1771,7 +1771,8 @@ def create_app(settings):
                        username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
             db_jobs = db.get_jobs_by_username(session, username, status)
-            jobs = [_convert_job(j) for j in db_jobs]
+            with _get_user_context(username):
+                jobs = [_convert_job(j) for j in db_jobs]
             return JobResponse(jobs=jobs)
 
     @app.get("/api/jobs/{job_id}", response_model=Job,
@@ -1782,7 +1783,8 @@ def create_app(settings):
             db_job = db.get_job(session, job_id, username)
             if db_job is None:
                 raise HTTPException(status_code=404, detail="Job not found")
-            return _convert_job(db_job, include_files=True)
+            with _get_user_context(username):
+                return _convert_job(db_job, include_files=True)
 
     @app.post("/api/jobs/{job_id}/cancel",
               description="Cancel a running job")
@@ -1790,7 +1792,8 @@ def create_app(settings):
                          username: str = Depends(get_current_user)):
         try:
             db_job = await apps_module.cancel_job(job_id, username)
-            return _convert_job(db_job)
+            with _get_user_context(username):
+                return _convert_job(db_job)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
@@ -1812,7 +1815,8 @@ def create_app(settings):
         if file_type not in ("script", "stdout", "stderr"):
             raise HTTPException(status_code=400, detail="file_type must be script, stdout, or stderr")
         try:
-            content = await apps_module.get_job_file_content(job_id, username, file_type)
+            with _get_user_context(username):
+                content = await apps_module.get_job_file_content(job_id, username, file_type)
             if content is None:
                 raise HTTPException(status_code=404, detail=f"File not found: {file_type}")
             return PlainTextResponse(content)
