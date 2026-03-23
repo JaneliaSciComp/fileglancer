@@ -14,8 +14,6 @@ from pydantic_settings import (
 class ClusterSettings(BaseModel):
     """Cluster configuration matching py-cluster-api's ClusterConfig."""
     executor: str = 'local'
-    extra_paths: List[str] = []
-    extra_env: Dict[str, str] = {}
     cpus: Optional[int] = None
     gpus: Optional[int] = None
     memory: Optional[str] = None
@@ -96,6 +94,12 @@ class Settings(BaseSettings):
 
     # CLI mode - enables auto-login endpoint for standalone CLI usage
     cli_mode: bool = False
+    # Directories prepended to the server's PATH at startup.
+    extra_paths: List[str] = []
+
+    # Extra environment variables set at startup.
+    extra_env: Dict[str, str] = {}
+
     # Cluster / Apps settings (mirrors py-cluster-api ClusterConfig)
     cluster: ClusterSettings = ClusterSettings()
 

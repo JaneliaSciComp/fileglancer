@@ -125,6 +125,16 @@ session_cookie_name: fg_session
 session_cookie_secure: true
 
 #
+# Environment setup — sourced at startup before any scheduler commands.
+# Useful when running as a systemd service where login scripts don't run.
+#
+# env_source_script: /misc/lsf/conf/profile.lsf  # Source a shell script to set env vars
+# extra_paths:               # Directories prepended to the server's PATH
+#   - /opt/lsf/bin
+# extra_env:                 # Extra environment variables set at startup
+#   LSF_ENVDIR: /misc/lsf/conf
+
+#
 # Settings for the Apps feature
 #
 # apps:
@@ -138,12 +148,6 @@ session_cookie_secure: true
 #
 cluster:
   executor: local            # "local" or "lsf"
-#   extra_paths:               # Directories prepended to the server's PATH at
-#     - /opt/lsf/bin           # startup so scheduler commands (bsub, bjobs,
-#                              # bkill) are findable. Useful when running as a
-#                              # systemd service with a minimal default PATH.
-#   extra_env:                 # Extra environment variables set at startup.
-#     LSF_ENVDIR: /misc/lsf/conf  # Required for LSF to find lsf.conf.
 #   job_name_prefix: fg        # Prefix for cluster job names. REQUIRED for job
 #                              # reconnection after server restarts. Without this,
 #                              # active jobs will not be re-tracked and will

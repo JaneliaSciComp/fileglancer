@@ -266,21 +266,19 @@ def create_app(settings):
         logger.debug(f"  external_proxy_url: {settings.external_proxy_url}")
         logger.debug(f"  atlassian_url: {settings.atlassian_url}")
 
-        # Prepend cluster extra_paths to PATH so scheduler commands
-        # (bsub, bjobs, bkill) are findable without relying on the
-        # system service's default PATH.
-        if settings.cluster.extra_paths:
-            extra = os.pathsep.join(settings.cluster.extra_paths)
+        # Prepend extra_paths to PATH so commands (e.g. bsub, bjobs,
+        # bkill) are findable without relying on the system service's
+        # default PATH.
+        if settings.extra_paths:
+            extra = os.pathsep.join(settings.extra_paths)
             os.environ["PATH"] = extra + os.pathsep + os.environ.get("PATH", "")
-            logger.debug(f"  cluster.extra_paths prepended to PATH: {extra}")
+            logger.debug(f"extra_paths prepended to PATH: {extra}")
 
-        # Set extra environment variables needed by scheduler commands
-        # (e.g., LSF_ENVDIR for bsub to find lsf.conf). Pixi strips
-        # inherited env vars, so they must be set inside the process.
-        if settings.cluster.extra_env:
-            for key, value in settings.cluster.extra_env.items():
+        # Set extra environment variables at startup.
+        if settings.extra_env:
+            for key, value in settings.extra_env.items():
                 os.environ[key] = value
-                logger.debug(f"  cluster.extra_env set: {key}={value}")
+                logger.debug(f"extra_env set: {key}={value}")
 
         # Initialize database (run migrations once at startup)
         db.initialize_database(settings.db_url)
