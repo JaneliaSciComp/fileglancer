@@ -1,11 +1,15 @@
 """Apps module for fetching manifests, building commands, and managing cluster jobs."""
 
 import asyncio
+import grp
+import json
 import os
+import pwd
 import re
 import shlex
 import shutil
 import subprocess
+import sys
 from contextlib import nullcontext
 from pathlib import Path
 from datetime import datetime, UTC
@@ -580,6 +584,48 @@ def build_command(entry_point: AppEntryPoint, parameters: dict, session=None) ->
     return (" \\\n  ").join(parts)
 
 
+def _run_as_user(username: str, request: dict) -> dict:
+    """Run a worker action as the given user in a subprocess.
+
+    Spawns a child process with the target user's identity using
+    Python 3.9+ ``user``/``group``/``extra_groups`` subprocess kwargs.
+    The child runs fileglancer.apps.worker, which creates a fresh
+    py-cluster-api executor and performs the requested action.
+
+    Returns the parsed JSON response from the worker.
+    Raises ValueError on worker failure.
+    """
+    pw = pwd.getpwnam(username)
+    groups = [g.gr_gid for g in grp.getgrall() if username in g.gr_mem]
+    if pw.pw_gid not in groups:
+        groups.append(pw.pw_gid)
+
+    result = subprocess.run(
+        [sys.executable, "-m", "fileglancer.apps.worker"],
+        input=json.dumps(request).encode(),
+        capture_output=True,
+        user=pw.pw_uid,
+        group=pw.pw_gid,
+        extra_groups=groups,
+    )
+
+    if result.stdout:
+        try:
+            response = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            raise ValueError(
+                f"Worker produced invalid JSON: {result.stdout.decode()[:500]}"
+            )
+    else:
+        response = {}
+
+    if result.returncode != 0:
+        error = response.get("error", result.stderr.decode()[:500])
+        raise ValueError(f"Worker failed: {error}")
+
+    return response
+
+
 # --- Executor Management ---
 
 _executor = None
@@ -838,8 +884,9 @@ async def submit_job(
     """
     settings = get_settings()
 
-    # Fetch and validate manifest
-    manifest = await fetch_app_manifest(app_url, manifest_path, username=username)
+    # Fetch and validate manifest (clones repo into user's cache)
+    with user_context if user_context is not None else nullcontext():
+        manifest = await fetch_app_manifest(app_url, manifest_path, username=username)
 
     # Find entry point
     entry_point = None
@@ -916,14 +963,15 @@ async def submit_job(
         session.commit()
 
     # Clone/pull repo into the user's cache (~username/.fileglancer/apps).
-    if manifest.repo_url:
-        cached_repo_dir = await _ensure_repo_cache(manifest.repo_url, pull=pull_latest,
-                                                   username=username)
-        cd_suffix = "repo"
-    else:
-        cached_repo_dir = await _ensure_repo_cache(app_url, pull=pull_latest,
-                                                   username=username)
-        cd_suffix = f"repo/{manifest_path}" if manifest_path else "repo"
+    with user_context if user_context is not None else nullcontext():
+        if manifest.repo_url:
+            cached_repo_dir = await _ensure_repo_cache(manifest.repo_url, pull=pull_latest,
+                                                       username=username)
+            cd_suffix = "repo"
+        else:
+            cached_repo_dir = await _ensure_repo_cache(app_url, pull=pull_latest,
+                                                       username=username)
+            cd_suffix = f"repo/{manifest_path}" if manifest_path else "repo"
 
     # Build environment variable export lines
     env_lines = ""
@@ -997,30 +1045,48 @@ async def submit_job(
     resource_spec.stdout_path = str(work_dir / "stdout.log")
     resource_spec.stderr_path = str(work_dir / "stderr.log")
 
-    # Create work directory, symlink the cached repo, and submit to the cluster —
-    # all as the authenticated user so the job runs with correct ownership.
-    executor = await get_executor()
+    # Submit to the cluster as the target user.  The worker subprocess
+    # creates the work directory, symlinks the repo, and calls
+    # executor.submit() — all with the user's identity.
     job_name = f"{manifest.name}-{entry_point.id}"
-    with user_context if user_context is not None else nullcontext():
-        work_dir.mkdir(parents=True, exist_ok=True)
-        repo_link = work_dir / "repo"
-        if repo_link.is_symlink() or repo_link.exists():
-            repo_link.unlink()
-        repo_link.symlink_to(cached_repo_dir)
-        cluster_job = await executor.submit(
-            command=full_command,
-            name=job_name,
-            resources=resource_spec,
-        )
+    cluster_config = settings.cluster.model_dump(exclude_none=True)
+    worker_result = _run_as_user(username, {
+        "action": "submit",
+        "cluster_config": cluster_config,
+        "command": full_command,
+        "job_name": job_name,
+        "resources": {
+            "cpus": resource_spec.cpus,
+            "gpus": resource_spec.gpus,
+            "memory": resource_spec.memory,
+            "walltime": resource_spec.walltime,
+            "queue": resource_spec.queue,
+            "work_dir": resource_spec.work_dir,
+            "stdout_path": resource_spec.stdout_path,
+            "stderr_path": resource_spec.stderr_path,
+            "extra_directives": resource_spec.extra_directives,
+            "extra_args": resource_spec.extra_args,
+        },
+        "work_dir": str(work_dir),
+        "cached_repo_dir": cached_repo_dir,
+    })
 
-    # Register callback to update DB when job reaches terminal state
-    cluster_job.on_exit(_on_job_exit)
+    cluster_job_id = worker_result["job_id"]
+
+    # Reconnect so the parent's monitor picks up the new job
+    executor = await get_executor()
+    try:
+        reconnected = await executor.reconnect()
+        for record in reconnected:
+            record.on_exit(_on_job_exit)
+    except Exception as e:
+        logger.debug(f"Post-submit reconnect: {e}")
 
     # Update DB with cluster job ID and return fresh object
     with db.get_db_session(settings.db_url) as session:
         db.update_job_status(
             session, job_id, "PENDING",
-            cluster_job_id=cluster_job.job_id,
+            cluster_job_id=cluster_job_id,
         )
         db_job = db.get_job(session, job_id, username)
         session.expunge(db_job)
@@ -1082,10 +1148,14 @@ async def cancel_job(job_id: int, username: str) -> db.JobDB:
         if db_job.status not in ("PENDING", "RUNNING"):
             raise ValueError(f"Job {job_id} is not cancellable (status: {db_job.status})")
 
-        # Cancel on cluster
+        # Cancel on cluster as the target user
         if db_job.cluster_job_id:
-            executor = await get_executor()
-            await executor.cancel(db_job.cluster_job_id)
+            cluster_config = settings.cluster.model_dump(exclude_none=True)
+            _run_as_user(username, {
+                "action": "cancel",
+                "cluster_config": cluster_config,
+                "job_id": db_job.cluster_job_id,
+            })
 
         # Update DB
         now = datetime.now(UTC)
