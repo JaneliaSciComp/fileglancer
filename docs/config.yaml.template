@@ -129,10 +129,6 @@ session_cookie_secure: true
 # Useful when running as a systemd service where login scripts don't run.
 #
 # env_source_script: /misc/lsf/conf/profile.lsf  # Source a shell script to set env vars
-# extra_paths:               # Directories prepended to the server's PATH
-#   - /opt/lsf/bin
-# extra_env:                 # Extra environment variables set at startup
-#   LSF_ENVDIR: /misc/lsf/conf
 
 #
 # Settings for the Apps feature

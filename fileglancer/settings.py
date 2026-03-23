@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import List, Optional
 from functools import cache
 import sys
 
@@ -98,12 +98,6 @@ class Settings(BaseSettings):
     # Shell script sourced at startup to import environment variables.
     # Useful for setting up scheduler env (e.g., /misc/lsf/conf/profile.lsf).
     env_source_script: Optional[str] = None
-
-    # Directories prepended to the server's PATH at startup.
-    extra_paths: List[str] = []
-
-    # Extra environment variables set at startup.
-    extra_env: Dict[str, str] = {}
 
     # Cluster / Apps settings (mirrors py-cluster-api ClusterConfig)
     cluster: ClusterSettings = ClusterSettings()
