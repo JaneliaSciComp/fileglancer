@@ -1068,7 +1068,7 @@ async def submit_job(
             "extra_args": resource_spec.extra_args,
         },
         "work_dir": str(work_dir),
-        "cached_repo_dir": cached_repo_dir,
+        "cached_repo_dir": str(cached_repo_dir),
     })
 
     cluster_job_id = worker_result["job_id"]
