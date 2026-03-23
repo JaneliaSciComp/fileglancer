@@ -863,12 +863,6 @@ async def submit_job(
         overrides["extra_args"] = extra_args
     resource_spec = _build_resource_spec(entry_point, overrides or None, settings)
 
-    # When running as root, tell LSF to execute the job as the actual user.
-    if user_context is not None:
-        if resource_spec.extra_args is None:
-            resource_spec.extra_args = []
-        resource_spec.extra_args.append(f"-U {username}")
-
     # Merge env/pre_run/post_run: manifest defaults overridden by user values
     merged_env = dict(entry_point.env or {})
     if env:
