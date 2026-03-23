@@ -27,7 +27,13 @@ from fileglancer.settings import get_settings
 
 _MANIFEST_FILENAME = "runnables.yaml"
 
-_REPO_CACHE_BASE = Path(os.path.expanduser("~/.fileglancer/apps"))
+def _repo_cache_base(username: str | None = None) -> Path:
+    """Return the repo cache base directory, optionally for a specific user."""
+    if username:
+        home = os.path.expanduser(f"~{username}")
+    else:
+        home = os.path.expanduser("~")
+    return Path(home) / ".fileglancer" / "apps"
 _repo_locks: dict[str, asyncio.Lock] = {}
 
 
@@ -121,18 +127,21 @@ async def _resolve_default_branch(clone_url: str) -> str:
     return "main"
 
 
-async def _ensure_repo_cache(url: str, pull: bool = False) -> Path:
+async def _ensure_repo_cache(url: str, pull: bool = False,
+                             username: str | None = None) -> Path:
     """Clone or update the GitHub repo in per-user cache. Returns repo path.
 
     Cache is keyed by owner/repo/branch to avoid checkout races between branches.
     An asyncio lock serializes git operations for the same repo+branch.
+    When username is provided, the cache is placed under ~username/.fileglancer/apps.
     """
     owner, repo, branch = _parse_github_url(url)
     clone_url = f"https://github.com/{owner}/{repo}.git"
     if not branch:
         branch = await _resolve_default_branch(clone_url)
-    repo_dir = (_REPO_CACHE_BASE / owner / repo / branch).resolve()
-    repo_dir.relative_to(_REPO_CACHE_BASE.resolve())
+    cache_base = _repo_cache_base(username)
+    repo_dir = (cache_base / owner / repo / branch).resolve()
+    repo_dir.relative_to(cache_base.resolve())
     lock = _get_repo_lock(owner, repo, branch)
 
     async with lock:
@@ -227,22 +236,24 @@ def _find_manifests_in_repo(repo_dir: Path) -> list[tuple[str, AppManifest]]:
 MANIFEST_FILENAME = _MANIFEST_FILENAME
 
 
-async def discover_app_manifests(url: str) -> list[tuple[str, AppManifest]]:
+async def discover_app_manifests(url: str,
+                                 username: str | None = None) -> list[tuple[str, AppManifest]]:
     """Clone/pull a GitHub repo and discover all manifest files.
 
     Returns a list of (relative_dir_path, AppManifest) tuples.
     Raises ValueError if the URL is invalid or the clone fails.
     """
-    repo_dir = await _ensure_repo_cache(url, pull=True)
+    repo_dir = await _ensure_repo_cache(url, pull=True, username=username)
     return _find_manifests_in_repo(repo_dir)
 
 
-async def fetch_app_manifest(url: str, manifest_path: str = "") -> AppManifest:
+async def fetch_app_manifest(url: str, manifest_path: str = "",
+                             username: str | None = None) -> AppManifest:
     """Fetch and validate an app manifest from a cloned repo.
 
     Clones the repo if needed, then reads the manifest from disk.
     """
-    repo_dir = await _ensure_repo_cache(url)
+    repo_dir = await _ensure_repo_cache(url, username=username)
     target_dir = repo_dir / manifest_path if manifest_path else repo_dir
     return _read_manifest_file(target_dir)
 
@@ -828,7 +839,7 @@ async def submit_job(
     settings = get_settings()
 
     # Fetch and validate manifest
-    manifest = await fetch_app_manifest(app_url, manifest_path)
+    manifest = await fetch_app_manifest(app_url, manifest_path, username=username)
 
     # Find entry point
     entry_point = None
@@ -851,6 +862,12 @@ async def submit_job(
     if extra_args is not None:
         overrides["extra_args"] = extra_args
     resource_spec = _build_resource_spec(entry_point, overrides or None, settings)
+
+    # When running as root, tell LSF to execute the job as the actual user.
+    if user_context is not None:
+        if resource_spec.extra_args is None:
+            resource_spec.extra_args = []
+        resource_spec.extra_args.append(f"-U {username}")
 
     # Merge env/pre_run/post_run: manifest defaults overridden by user values
     merged_env = dict(entry_point.env or {})
@@ -904,14 +921,14 @@ async def submit_job(
         db_job.work_dir = str(work_dir)
         session.commit()
 
-    # Pre-fetch repo into the shared server-owned cache. This must run as the
-    # server/root user because the cache lives under the server's home directory
-    # (~/.fileglancer/apps), which the authenticated user cannot write to.
+    # Clone/pull repo into the user's cache (~username/.fileglancer/apps).
     if manifest.repo_url:
-        cached_repo_dir = await _ensure_repo_cache(manifest.repo_url, pull=pull_latest)
+        cached_repo_dir = await _ensure_repo_cache(manifest.repo_url, pull=pull_latest,
+                                                   username=username)
         cd_suffix = "repo"
     else:
-        cached_repo_dir = await _ensure_repo_cache(app_url, pull=pull_latest)
+        cached_repo_dir = await _ensure_repo_cache(app_url, pull=pull_latest,
+                                                   username=username)
         cd_suffix = f"repo/{manifest_path}" if manifest_path else "repo"
 
     # Build environment variable export lines

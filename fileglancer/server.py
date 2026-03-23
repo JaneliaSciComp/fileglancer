@@ -1538,7 +1538,9 @@ def create_app(settings):
                              username: str = Depends(get_current_user)):
         try:
             logger.info(f"Fetching manifest for URL: '{body.url}' path: '{body.manifest_path}'")
-            manifest = await apps_module.fetch_app_manifest(body.url, body.manifest_path)
+            with _get_user_context(username):
+                manifest = await apps_module.fetch_app_manifest(body.url, body.manifest_path,
+                                                                    username=username)
             return manifest
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
@@ -1564,9 +1566,11 @@ def create_app(settings):
             )
             # Try to fetch manifest from local clone
             try:
-                user_app.manifest = await apps_module.fetch_app_manifest(
-                    app_entry["url"], app_entry.get("manifest_path", "")
-                )
+                with _get_user_context(username):
+                    user_app.manifest = await apps_module.fetch_app_manifest(
+                        app_entry["url"], app_entry.get("manifest_path", ""),
+                        username=username,
+                    )
                 # Update name/description from manifest
                 user_app.name = user_app.manifest.name
                 user_app.description = user_app.manifest.description
@@ -1582,7 +1586,9 @@ def create_app(settings):
                            username: str = Depends(get_current_user)):
         # Clone the repo and discover all manifests
         try:
-            discovered = await apps_module.discover_app_manifests(body.url)
+            with _get_user_context(username):
+                discovered = await apps_module.discover_app_manifests(body.url,
+                                                                       username=username)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
@@ -1666,12 +1672,15 @@ def create_app(settings):
     async def update_user_app(body: ManifestFetchRequest,
                               username: str = Depends(get_current_user)):
         try:
-            await apps_module._ensure_repo_cache(body.url, pull=True)
+            with _get_user_context(username):
+                await apps_module._ensure_repo_cache(body.url, pull=True, username=username)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to pull latest code: {str(e)}")
 
         try:
-            manifest = await apps_module.fetch_app_manifest(body.url, body.manifest_path)
+            with _get_user_context(username):
+                manifest = await apps_module.fetch_app_manifest(body.url, body.manifest_path,
+                                                                username=username)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
