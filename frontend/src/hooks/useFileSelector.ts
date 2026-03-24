@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import type { ChangeEvent } from 'react';
 
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
@@ -61,6 +62,22 @@ export default function useFileSelector(options?: FileSelectorOptions) {
       : { type: 'zones' },
     selectedItem: null
   });
+
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  const handleSearchChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      setSearchQuery(event.target.value);
+    },
+    []
+  );
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery('');
+  }, []);
+
+  const userHasGroups = (profile?.groups?.length ?? 0) > 0;
 
   // Resolve initialPath (raw filesystem path) to FSP + relative path
   const lastResolvedPath = useRef<string | undefined>(undefined);
@@ -185,6 +202,13 @@ export default function useFileSelector(options?: FileSelectorOptions) {
         }
       });
 
+      // Filter zones by search query
+      if (normalizedQuery) {
+        return items.filter(item =>
+          item.name.toLowerCase().includes(normalizedQuery)
+        );
+      }
+
       return items;
     } else if (state.currentLocation.type === 'zone') {
       // Show FSPs in the selected zone
@@ -209,8 +233,15 @@ export default function useFileSelector(options?: FileSelectorOptions) {
         isFilteredByGroups
       );
 
+      // Filter FSPs by search query
+      const searchFilteredFsps = normalizedQuery
+        ? accessibleFsps.filter(fsp =>
+            fsp.name.toLowerCase().includes(normalizedQuery)
+          )
+        : accessibleFsps;
+
       // Convert to FileOrFolder items to display in file selector table
-      const items: FileOrFolder[] = accessibleFsps.map(fsp => ({
+      const items: FileOrFolder[] = searchFilteredFsps.map(fsp => ({
         name: fsp.name,
         path: fsp.name,
         is_dir: true,
@@ -224,7 +255,13 @@ export default function useFileSelector(options?: FileSelectorOptions) {
       return items;
     } else {
       // In filesystem mode, return files from query
-      return fileQuery.data?.files || [];
+      const files = fileQuery.data?.files || [];
+      if (normalizedQuery) {
+        return files.filter(item =>
+          item.name.toLowerCase().includes(normalizedQuery)
+        );
+      }
+      return files;
     }
   }, [
     state.currentLocation,
@@ -232,20 +269,23 @@ export default function useFileSelector(options?: FileSelectorOptions) {
     zonesAndFspQuery.isPending,
     fileQuery.data,
     isFilteredByGroups,
-    profile
+    profile,
+    normalizedQuery
   ]);
 
   // Navigation methods
-  const navigateToLocation = (location: FileSelectorLocation) => {
+  const navigateToLocation = useCallback((location: FileSelectorLocation) => {
+    setSearchQuery('');
     setState({
       currentLocation: location,
       selectedItem: null
     });
-  };
+  }, []);
 
   // Reset to initial state (for when dialog is closed/cancelled)
   const reset = useCallback(() => {
     lastResolvedPath.current = undefined;
+    setSearchQuery('');
     setState({
       currentLocation: initialLocation
         ? {
@@ -342,39 +382,26 @@ export default function useFileSelector(options?: FileSelectorOptions) {
   const handleItemDoubleClick = useCallback(
     (item: FileOrFolder) => {
       if (!item.is_dir) {
-        // Can't navigate into files
         return;
       }
 
       if (state.currentLocation.type === 'zones') {
-        // Navigate to zone
-        setState({
-          currentLocation: { type: 'zone', zoneId: item.name },
-          selectedItem: null
-        });
+        navigateToLocation({ type: 'zone', zoneId: item.name });
       } else if (state.currentLocation.type === 'zone') {
-        // Navigate to FSP
-        setState({
-          currentLocation: {
-            type: 'filesystem',
-            fspName: item.name,
-            path: '.'
-          },
-          selectedItem: null
+        navigateToLocation({
+          type: 'filesystem',
+          fspName: item.name,
+          path: '.'
         });
       } else if (state.currentLocation.type === 'filesystem') {
-        // Navigate to folder
-        setState({
-          currentLocation: {
-            type: 'filesystem',
-            fspName: state.currentLocation.fspName,
-            path: item.path
-          },
-          selectedItem: null
+        navigateToLocation({
+          type: 'filesystem',
+          fspName: state.currentLocation.fspName,
+          path: item.path
         });
       }
     },
-    [state.currentLocation]
+    [state.currentLocation, navigateToLocation]
   );
 
   return {
@@ -385,6 +412,11 @@ export default function useFileSelector(options?: FileSelectorOptions) {
     navigateToLocation,
     selectItem,
     handleItemDoubleClick,
-    reset
+    reset,
+    searchQuery,
+    handleSearchChange,
+    clearSearch,
+    isFilteredByGroups,
+    userHasGroups
   };
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { MouseEvent } from 'react';
-import { Button, Typography } from '@material-tailwind/react';
-import { HiOutlineFolder } from 'react-icons/hi2';
+import { Button, Input, Typography } from '@material-tailwind/react';
+import { HiOutlineFolder, HiOutlineFunnel, HiXMark } from 'react-icons/hi2';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import FileSelectorBreadcrumbs from './FileSelectorBreadcrumbs';
@@ -56,7 +56,12 @@ export default function FileSelectorButton({
     navigateToLocation,
     selectItem,
     handleItemDoubleClick,
-    reset
+    reset,
+    searchQuery,
+    handleSearchChange,
+    clearSearch,
+    isFilteredByGroups,
+    userHasGroups
   } = useFileSelector({
     initialLocation,
     initialPath: showDialog ? effectiveInitialPath : undefined,
@@ -135,6 +140,31 @@ export default function FileSelectorButton({
             zonesData={zonesQuery.data}
           />
 
+          {/* Search input */}
+          <div className="my-2 relative">
+            <Input
+              className="bg-background text-foreground [&::-webkit-search-cancel-button]:appearance-none"
+              onChange={handleSearchChange}
+              placeholder="Type to filter"
+              type="search"
+              value={searchQuery}
+            >
+              <Input.Icon>
+                <HiOutlineFunnel className="h-full w-full" />
+              </Input.Icon>
+            </Input>
+            {searchQuery ? (
+              <button
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-primary hover:text-primary/80 transition-colors"
+                onClick={clearSearch}
+                type="button"
+              >
+                <HiXMark className="h-5 w-5 font-bold" />
+              </button>
+            ) : null}
+          </div>
+
           {/* Table with loading/error states */}
           <div className="my-4 h-96">
             {zonesQuery.isPending ? (
@@ -176,6 +206,17 @@ export default function FileSelectorButton({
               />
             )}
           </div>
+
+          {/* Group filter status */}
+          {state.currentLocation.type === 'zones' && userHasGroups ? (
+            <div className="text-center pb-4">
+              <Typography className="text-xs text-foreground/60">
+                {isFilteredByGroups
+                  ? 'Viewing zones for your groups only'
+                  : 'Viewing all zones'}
+              </Typography>
+            </div>
+          ) : null}
 
           {/* Selected path display */}
 
