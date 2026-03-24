@@ -10,7 +10,7 @@ import {
   HiOutlineTrash
 } from 'react-icons/hi';
 
-import FileSelectorButton from '@/components/ui/BrowsePage/FileSelector/FileSelectorButton';
+import FileSelectorButton from '@/components/ui/FileSelector/FileSelectorButton';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { validatePaths } from '@/queries/appsQueries';
 import { useClusterDefaultsQuery } from '@/queries/jobsQueries';

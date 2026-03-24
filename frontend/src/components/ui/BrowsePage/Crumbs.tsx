@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { HiChevronRight, HiOutlineDuplicate } from 'react-icons/hi';
 import { HiOutlineSquares2X2 } from 'react-icons/hi2';
 
-import BreadcrumbSegment from './BreadcrumbSegment';
+import BreadcrumbSegment from '@/components/ui/widgets/BreadcrumbSegment';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';

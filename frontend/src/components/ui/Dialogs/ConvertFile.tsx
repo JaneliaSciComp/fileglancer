@@ -10,7 +10,7 @@ import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { useTicketContext } from '@/contexts/TicketsContext';
 import { getPreferredPathForDisplay } from '@/utils/pathHandling';
-import FileSelectorButton from '@/components/ui/BrowsePage/FileSelector/FileSelectorButton';
+import FileSelectorButton from '@/components/ui/FileSelector/FileSelectorButton';
 
 type ItemNamingDialogProps = {
   readonly showConvertFileDialog: boolean;
