@@ -56,7 +56,7 @@ export default function BreadcrumbSegment({
         // Callback-based navigation (for dialogs)
         <BreadcrumbLink as="button" onClick={onClick}>
           <Typography
-            className="font-medium text-primary-light hover:underline focus:underline"
+            className="font-medium text-primary-light"
             variant="small"
           >
             {label}
