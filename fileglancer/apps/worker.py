@@ -83,9 +83,73 @@ async def _cancel(request: dict) -> dict:
     return {"status": "ok"}
 
 
+async def _poll(request: dict) -> dict:
+    """Poll job statuses via py-cluster-api (bjobs -u all).
+
+    The executor needs to know which jobs to track, so we seed it with
+    the cluster_job_ids from the DB before polling. After poll(), we
+    return the updated statuses and metadata for each tracked job.
+    """
+    from cluster_api._types import JobRecord, JobStatus
+
+    config = request["cluster_config"]
+    config.pop("extra_args", None)
+
+    executor = create_executor(**config)
+
+    # Seed the executor with stub JobRecords so poll() knows what to track.
+    # poll() queries bjobs and updates these records in-place.
+    for cid in request["cluster_job_ids"]:
+        executor._jobs[cid] = JobRecord(
+            job_id=cid,
+            name="",
+            command="",
+            status=JobStatus.PENDING,
+        )
+
+    await executor.poll()
+
+    # Return the updated state for each job
+    jobs = {}
+    for cid, record in executor.jobs.items():
+        jobs[cid] = {
+            "status": record.status.value,
+            "exit_code": record.exit_code,
+            "exec_host": record.exec_host,
+            "start_time": record.start_time.isoformat() if record.start_time else None,
+            "finish_time": record.finish_time.isoformat() if record.finish_time else None,
+        }
+
+    return {"jobs": jobs}
+
+
+async def _reconnect(request: dict) -> dict:
+    """Reconnect to existing jobs via py-cluster-api (bjobs -u all)."""
+    config = request["cluster_config"]
+    config.pop("extra_args", None)
+
+    executor = create_executor(**config)
+    reconnected = await executor.reconnect()
+
+    jobs = {}
+    for record in reconnected:
+        jobs[record.job_id] = {
+            "status": record.status.value,
+            "name": record.name,
+            "exit_code": record.exit_code,
+            "exec_host": record.exec_host,
+            "start_time": record.start_time.isoformat() if record.start_time else None,
+            "finish_time": record.finish_time.isoformat() if record.finish_time else None,
+        }
+
+    return {"jobs": jobs}
+
+
 _ACTIONS = {
     "submit": _submit,
     "cancel": _cancel,
+    "poll": _poll,
+    "reconnect": _reconnect,
 }
 
 

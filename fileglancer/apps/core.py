@@ -20,8 +20,7 @@ from loguru import logger
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
-from cluster_api import create_executor, ResourceSpec, JobMonitor
-from cluster_api._types import JobStatus
+from cluster_api import ResourceSpec
 
 from fileglancer import database as db
 from fileglancer.apps.adapters import try_adapt
@@ -634,92 +633,119 @@ def _run_as_user(username: str, request: dict) -> dict:
     return response
 
 
-# --- Executor Management ---
+# --- Job Monitoring ---
+#
+# The server process runs as root, which cannot execute LSF commands
+# (bjobs, bsub, bkill) due to HPC root-squash policy.  All LSF
+# operations go through worker subprocesses running as a real user.
+#
+# The poll loop picks any user with active jobs and spawns a worker
+# that runs ``bjobs -u all`` to get statuses for ALL users' jobs.
 
-_executor = None
-_monitor = None
-_monitor_task = None
-
-
-async def get_executor():
-    """Get or create the cluster executor singleton."""
-    global _executor
-    if _executor is None:
-        settings = get_settings()
-        config = settings.cluster.model_dump(exclude_none=True)
-        # extra_args are handled via ResourceSpec in _build_resource_spec
-        # to avoid double-application (config + per-job merge in py-cluster-api)
-        config.pop("extra_args", None)
-        _executor = create_executor(**config)
-    return _executor
+_poll_task = None
 
 
 async def start_job_monitor():
-    """Start the background job monitoring loop."""
-    global _monitor, _monitor_task
+    """Start the background job poll loop."""
+    global _poll_task
 
     settings = get_settings()
-    executor = await get_executor()
 
     # Reconnect to any previously submitted jobs (e.g. after server restart)
-    try:
-        reconnected = await executor.reconnect()
-        if reconnected:
-            for record in reconnected:
-                record.on_exit(_on_job_exit)
-            logger.info(f"Reconnected to {len(reconnected)} existing cluster jobs")
-    except Exception as e:
-        logger.debug(f"Job reconnection skipped: {e}")
+    _reconnect_as_any_user(settings)
 
-    _monitor = JobMonitor(executor, poll_interval=settings.cluster.poll_interval)
-    await _monitor.start()
-
-    # Start reconciliation loop
-    _monitor_task = asyncio.create_task(_reconcile_loop(settings))
+    _poll_task = asyncio.create_task(_poll_loop(settings))
     logger.info("Job monitor started")
 
 
 async def stop_job_monitor():
-    """Stop the background job monitoring loop."""
-    global _monitor, _monitor_task
+    """Stop the background job poll loop."""
+    global _poll_task
 
-    if _monitor_task:
-        _monitor_task.cancel()
+    if _poll_task:
+        _poll_task.cancel()
         try:
-            await _monitor_task
+            await _poll_task
         except asyncio.CancelledError:
             pass
-        _monitor_task = None
-
-    if _monitor:
-        await _monitor.stop()
-        _monitor = None
+        _poll_task = None
 
     logger.info("Job monitor stopped")
 
 
-async def _reconcile_loop(settings):
-    """Periodically reconcile DB job statuses with cluster state."""
+def _get_any_active_username(settings) -> str | None:
+    """Return any username that has active (PENDING/RUNNING) jobs, or None."""
+    with db.get_db_session(settings.db_url) as session:
+        active_jobs = db.get_active_jobs(session)
+        for job in active_jobs:
+            if job.username:
+                return job.username
+    return None
+
+
+def _reconnect_as_any_user(settings):
+    """Reconnect to existing cluster jobs via a worker subprocess.
+
+    Picks any user with active jobs to run bjobs as.  If no active jobs
+    exist, reconnection is skipped (nothing to reconnect to).
+    """
+    username = _get_any_active_username(settings)
+    if not username:
+        logger.debug("No active jobs, skipping reconnect")
+        return
+
+    cluster_config = settings.cluster.model_dump(exclude_none=True)
+    try:
+        result = _run_as_user(username, {
+            "action": "reconnect",
+            "cluster_config": cluster_config,
+        })
+    except ValueError as e:
+        logger.debug(f"Job reconnection skipped: {e}")
+        return
+
+    jobs = result.get("jobs", {})
+    if jobs:
+        logger.info(f"Reconnected to {len(jobs)} existing cluster jobs")
+
+    # Update DB for any reconnected jobs that we're tracking
+    with db.get_db_session(settings.db_url) as session:
+        for cluster_job_id, info in jobs.items():
+            db_job = db.get_job_by_cluster_id(session, cluster_job_id)
+            if db_job is None:
+                continue
+            new_status = info["status"].upper()
+            if new_status != db_job.status:
+                is_terminal = new_status in ("DONE", "FAILED", "KILLED")
+                finished_at = _parse_iso_dt(info.get("finish_time")) if is_terminal else None
+                db.update_job_status(
+                    session, db_job.id, new_status,
+                    exit_code=info.get("exit_code"),
+                    started_at=_parse_iso_dt(info.get("start_time")),
+                    finished_at=finished_at,
+                )
+
+
+async def _poll_loop(settings):
+    """Periodically poll cluster job statuses via a worker subprocess."""
     while True:
         try:
-            await _reconcile_jobs(settings)
+            _poll_jobs(settings)
         except Exception:
-            logger.exception("Error in job reconciliation loop")
+            logger.exception("Error in job poll loop")
 
         await asyncio.sleep(settings.cluster.poll_interval)
 
 
-async def _reconcile_jobs(settings):
-    """Reconcile DB job statuses with the executor's tracked jobs."""
-    executor = await get_executor()
-
+def _poll_jobs(settings):
+    """Run one poll cycle: query bjobs via worker, update DB."""
     with db.get_db_session(settings.db_url) as session:
         active_jobs = db.get_active_jobs(session)
 
+        # Handle zombie jobs (no cluster_job_id after timeout)
+        jobs_to_poll = []
         for db_job in active_jobs:
             if not db_job.cluster_job_id:
-                # Job never got a cluster_job_id - submission didn't complete.
-                # Mark FAILED if it's been stuck longer than zombie_timeout.
                 created = db_job.created_at.replace(tzinfo=None) if db_job.created_at.tzinfo else db_job.created_at
                 age_minutes = (datetime.now(UTC).replace(tzinfo=None) - created).total_seconds() / 60
                 if age_minutes > settings.cluster.zombie_timeout_minutes:
@@ -729,75 +755,55 @@ async def _reconcile_jobs(settings):
                         f"{age_minutes:.0f} minutes, marked FAILED"
                     )
                 continue
+            jobs_to_poll.append(db_job)
 
-            # Check if executor is tracking this job
-            tracked = executor.jobs.get(db_job.cluster_job_id)
-            if tracked is None:
-                # Job was purged from executor tracking. Terminal status
-                # updates are handled by the on_exit callback, so this
-                # means either the callback already fired or the job was
-                # lost (e.g. server restart without reconnection).
-                # Skip it here — the zombie timeout above will catch
-                # truly stuck jobs that never got a cluster_job_id.
+        if not jobs_to_poll:
+            return
+
+        # Pick any user to run bjobs as (bjobs -u all sees all users' jobs)
+        poll_username = jobs_to_poll[0].username
+        cluster_job_ids = [j.cluster_job_id for j in jobs_to_poll]
+
+        cluster_config = settings.cluster.model_dump(exclude_none=True)
+        try:
+            result = _run_as_user(poll_username, {
+                "action": "poll",
+                "cluster_config": cluster_config,
+                "cluster_job_ids": cluster_job_ids,
+            })
+        except ValueError as e:
+            logger.warning(f"Poll failed: {e}")
+            return
+
+        polled_jobs = result.get("jobs", {})
+
+        # Update DB with polled statuses
+        for db_job in jobs_to_poll:
+            info = polled_jobs.get(db_job.cluster_job_id)
+            if info is None:
                 continue
-
-            # Sync non-terminal status changes (e.g. PENDING -> RUNNING).
-            # Terminal transitions are handled by the on_exit callback.
-            new_status = _map_status(tracked.status)
-            if new_status != db_job.status:
-                # Only store finished_at for terminal states. LSF may report
-                # a FINISH_TIME for running jobs (projected walltime end),
-                # which we must not store as an actual finish time.
-                is_terminal = new_status in ("DONE", "FAILED", "KILLED")
-                db.update_job_status(
-                    session, db_job.id, new_status,
-                    exit_code=tracked.exit_code if is_terminal else None,
-                    started_at=tracked.start_time,
-                    finished_at=tracked.finish_time if is_terminal else None,
-                )
-                logger.info(f"Job {db_job.id} status updated: {db_job.status} -> {new_status}")
+            new_status = info["status"].upper()
+            if new_status == db_job.status:
+                continue
+            is_terminal = new_status in ("DONE", "FAILED", "KILLED")
+            finished_at = _parse_iso_dt(info.get("finish_time")) if is_terminal else None
+            db.update_job_status(
+                session, db_job.id, new_status,
+                exit_code=info.get("exit_code") if is_terminal else None,
+                started_at=_parse_iso_dt(info.get("start_time")),
+                finished_at=finished_at,
+            )
+            logger.info(f"Job {db_job.id} status updated: {db_job.status} -> {new_status}")
 
 
-def _map_status(status: JobStatus) -> str:
-    """Map py-cluster-api JobStatus to our string status."""
-    mapping = {
-        JobStatus.PENDING: "PENDING",
-        JobStatus.RUNNING: "RUNNING",
-        JobStatus.DONE: "DONE",
-        JobStatus.FAILED: "FAILED",
-        JobStatus.KILLED: "KILLED",
-        JobStatus.UNKNOWN: "FAILED",
-    }
-    return mapping.get(status, "FAILED")
-
-
-def _on_job_exit(record):
-    """Callback fired by JobMonitor when a job reaches terminal state.
-
-    This runs inside the monitor's poll loop, before completed jobs are
-    purged, so we are guaranteed to capture the final status.
-    """
-    settings = get_settings()
-    new_status = _map_status(record.status)
-
-    with db.get_db_session(settings.db_url) as session:
-        db_job = db.get_job_by_cluster_id(session, record.job_id)
-        if db_job is None:
-            logger.warning(f"No DB job found for cluster job {record.job_id}")
-            return
-        if db_job.status == new_status:
-            return
-        # Don't overwrite a terminal status (e.g. KILLED by user) with
-        # another terminal status from the executor callback.
-        if db_job.status in ("DONE", "FAILED", "KILLED"):
-            return
-        db.update_job_status(
-            session, db_job.id, new_status,
-            exit_code=record.exit_code,
-            started_at=record.start_time,
-            finished_at=record.finish_time,
-        )
-        logger.info(f"Job {db_job.id} completed: {db_job.status} -> {new_status}")
+def _parse_iso_dt(s: str | None) -> datetime | None:
+    """Parse an ISO 8601 datetime string, or return None."""
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s)
+    except (ValueError, TypeError):
+        return None
 
 
 # --- Job Submission ---
@@ -1081,16 +1087,7 @@ async def submit_job(
 
     cluster_job_id = worker_result["job_id"]
 
-    # Reconnect so the parent's monitor picks up the new job
-    executor = await get_executor()
-    try:
-        reconnected = await executor.reconnect()
-        for record in reconnected:
-            record.on_exit(_on_job_exit)
-    except Exception as e:
-        logger.debug(f"Post-submit reconnect: {e}")
-
-    # Update DB with cluster job ID and return fresh object
+    # Update DB with cluster job ID — the poll loop will track status from here
     with db.get_db_session(settings.db_url) as session:
         db.update_job_status(
             session, job_id, "PENDING",
