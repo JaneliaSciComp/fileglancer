@@ -1700,11 +1700,12 @@ def create_app(settings):
     async def validate_paths(body: PathValidationRequest,
                              username: str = Depends(get_current_user)):
         errors = {}
-        with db.get_db_session(settings.db_url) as session:
-            for param_key, path_value in body.paths.items():
-                error = apps_module.validate_path_in_filestore(path_value, session)
-                if error:
-                    errors[param_key] = error
+        with _get_user_context(username):
+            with db.get_db_session(settings.db_url) as session:
+                for param_key, path_value in body.paths.items():
+                    error = apps_module.validate_path_in_filestore(path_value, session)
+                    if error:
+                        errors[param_key] = error
         return PathValidationResponse(errors=errors)
 
     @app.get("/api/cluster-defaults",
@@ -1738,7 +1739,8 @@ def create_app(settings):
                 container=body.container,
                 container_args=body.container_args,
             )
-            return _convert_job(db_job)
+            with _get_user_context(username):
+                return _convert_job(db_job)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
