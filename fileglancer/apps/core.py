@@ -808,14 +808,20 @@ def _poll_jobs(settings):
 
         # Pick any user to run bjobs as (bjobs -u all sees all users' jobs)
         poll_username = jobs_to_poll[0].username
-        cluster_job_ids = [j.cluster_job_id for j in jobs_to_poll]
+        # Pass current known statuses so stubs are seeded correctly.
+        # Without this, stubs default to PENDING and jobs whose status
+        # bjobs doesn't return would revert to PENDING in the DB.
+        job_statuses = {
+            j.cluster_job_id: j.status for j in jobs_to_poll
+        }
 
         cluster_config = settings.cluster.model_dump(exclude_none=True)
         try:
             result = _run_as_user(poll_username, {
                 "action": "poll",
                 "cluster_config": cluster_config,
-                "cluster_job_ids": cluster_job_ids,
+                "cluster_job_ids": list(job_statuses.keys()),
+                "job_statuses": job_statuses,
             })
         except ValueError as e:
             logger.warning(f"Poll failed: {e}")

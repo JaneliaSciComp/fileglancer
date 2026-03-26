@@ -101,12 +101,20 @@ async def _poll(request: dict) -> dict:
 
     # Seed the executor with stub JobRecords so poll() knows what to track.
     # poll() queries bjobs and updates these records in-place.
+    # Use each job's current DB status so that jobs not found in bjobs
+    # output keep their real status instead of reverting to PENDING.
+    known_statuses = request.get("job_statuses", {})
     for cid in request["cluster_job_ids"]:
+        db_status = known_statuses.get(cid, "PENDING").lower()
+        try:
+            seed_status = JobStatus(db_status)
+        except ValueError:
+            seed_status = JobStatus.PENDING
         executor._jobs[cid] = JobRecord(
             job_id=cid,
             name="",
             command="",
-            status=JobStatus.PENDING,
+            status=seed_status,
         )
 
     await executor.poll()
