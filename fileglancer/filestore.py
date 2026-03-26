@@ -490,6 +490,65 @@ class Filestore:
             return True
 
 
+    def yield_file_infos_paginated(self, path: Optional[str] = None, current_user: str = None,
+                                    session = None, limit: int = 200,
+                                    cursor: Optional[str] = None) -> tuple[list[FileInfo], bool, Optional[str], int]:
+        """
+        Return a page of FileInfo objects for children of the given path.
+
+        Uses os.scandir() for efficient directory listing. DirEntry.is_dir() is
+        free (cached from readdir on Linux) so sorting dirs-first costs no extra
+        syscalls. Only entries in the returned page are stat'd.
+
+        Args:
+            path: Relative path to the directory to list.
+            current_user: Username for permission checking.
+            session: Database session for symlink resolution.
+            limit: Maximum number of entries to return.
+            cursor: Name of the last entry from the previous page. Entries after
+                this name (in sort order) are returned.
+
+        Returns:
+            Tuple of (file_infos, has_more, next_cursor, total_count).
+        """
+        full_path = self._check_path_in_root(path)
+
+        # Collect and sort all entries — scandir's is_dir() is free on Linux
+        entries = list(os.scandir(full_path))
+        entries.sort(key=lambda e: (not e.is_dir(follow_symlinks=False), e.name))
+        total_count = len(entries)
+
+        # Apply cursor: skip past the cursor entry
+        if cursor:
+            cursor_index = None
+            for i, e in enumerate(entries):
+                if e.name == cursor:
+                    cursor_index = i
+                    break
+            if cursor_index is not None:
+                entries = entries[cursor_index + 1:]
+            else:
+                # Cursor not found (entry deleted?) — start from beginning
+                pass
+
+        # Apply limit
+        has_more = len(entries) > limit
+        page_entries = entries[:limit]
+
+        # Stat only the page entries
+        file_infos = []
+        for entry in page_entries:
+            try:
+                file_infos.append(
+                    self._get_file_info_from_path(entry.path, current_user, session)
+                )
+            except PermissionError as e:
+                logger.error(f"Permission denied accessing entry: {entry.path}: {e}")
+                continue
+
+        next_cursor = page_entries[-1].name if has_more and page_entries else None
+        return file_infos, has_more, next_cursor, total_count
+
     def yield_file_infos(self, path: Optional[str] = None, current_user: str = None, session = None) -> Generator[FileInfo, None, None]:
         """
         Yield a FileInfo object for each child of the given path.

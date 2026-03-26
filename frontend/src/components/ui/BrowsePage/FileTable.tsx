@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { useNavigate } from 'react-router';
 import {
@@ -9,6 +9,7 @@ import {
   type ColumnDef,
   type SortingState
 } from '@tanstack/react-table';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useHotkey } from '@tanstack/react-hotkeys';
 import { IconButton, Typography } from '@material-tailwind/react';
 import { TbFile, TbLink, TbLinkOff } from 'react-icons/tb';
@@ -25,6 +26,10 @@ import {
   lastModifiedColumn,
   sizeColumn
 } from '@/components/ui/BrowsePage/fileTableColumns';
+
+const ROW_HEIGHT = 44;
+const OVERSCAN = 10;
+const LOAD_MORE_THRESHOLD = 20;
 
 function getFileLink(
   file: FileOrFolder,
@@ -59,10 +64,17 @@ export default function Table({
   showPropertiesDrawer,
   handleContextMenuClick
 }: TableProps) {
-  const { fileQuery, fileBrowserState, handleLeftClick } =
-    useFileBrowserContext();
+  const {
+    fileQuery,
+    fileBrowserState,
+    handleLeftClick,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage
+  } = useFileBrowserContext();
   const navigate = useNavigate();
   const [sorting, setSorting] = useState<SortingState>([]);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const selectedFileNames = useMemo(
     () => new Set(fileBrowserState.selectedFiles.map(file => file.name)),
@@ -162,13 +174,45 @@ export default function Table({
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    columnResizeMode: 'onChange', // Note - if users experience lag with resizing, might need to memoize table body https://tanstack.com/table/latest/docs/framework/react/examples/column-resizing-performant
+    columnResizeMode: 'onChange',
     enableColumnResizing: true,
     enableColumnFilters: false
   });
 
   const rows = table.getRowModel().rows;
-  const rowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
+
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: OVERSCAN
+  });
+
+  // Trigger loading more data when scrolling near the bottom
+  const virtualItems = virtualizer.getVirtualItems();
+  const lastVirtualItem = virtualItems[virtualItems.length - 1];
+  const lastVirtualIndex = lastVirtualItem?.index ?? 0;
+
+  useEffect(() => {
+    if (virtualItems.length === 0) {
+      return;
+    }
+
+    if (
+      lastVirtualIndex >= rows.length - LOAD_MORE_THRESHOLD &&
+      hasNextPage &&
+      !isFetchingNextPage
+    ) {
+      fetchNextPage();
+    }
+  }, [
+    lastVirtualIndex,
+    virtualItems.length,
+    rows.length,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage
+  ]);
 
   const navigateRows = useCallback(
     (direction: 'up' | 'down') => {
@@ -193,13 +237,14 @@ export default function Table({
       }
 
       handleLeftClick(rows[nextIndex].original, showPropertiesDrawer);
-      rowRefs.current.get(nextIndex)?.scrollIntoView({ block: 'nearest' });
+      virtualizer.scrollToIndex(nextIndex, { align: 'auto' });
     },
     [
       rows,
       fileBrowserState.selectedFiles,
       handleLeftClick,
-      showPropertiesDrawer
+      showPropertiesDrawer,
+      virtualizer
     ]
   );
 
@@ -231,17 +276,21 @@ export default function Table({
   });
 
   return (
-    <div className="min-w-full bg-background select-none">
-      <table className="w-full table-fixed">
-        <thead>
-          {table.getHeaderGroups().map(headerGroup => (
-            <tr className="border-b border-surface" key={headerGroup.id}>
-              {headerGroup.headers.map(header => (
-                <th
-                  className="text-left p-3 font-bold text-sm relative"
+    <div
+      className="min-w-full bg-background select-none overflow-auto flex-1"
+      ref={scrollContainerRef}
+    >
+      <div className="sticky top-0 z-10 bg-background border-b border-surface">
+        {table.getHeaderGroups().map(headerGroup => (
+          <div className="flex w-full" key={headerGroup.id}>
+            {headerGroup.headers.map(header => {
+              const isFlexColumn = header.column.id === 'name';
+              return (
+                <div
+                  className={`text-left p-3 font-bold text-sm relative ${isFlexColumn ? 'flex-1 min-w-0' : 'flex-none'}`}
                   key={header.id}
                   style={{
-                    width: header.getSize(),
+                    width: isFlexColumn ? undefined : header.getSize(),
                     minWidth: header.column.columnDef.minSize
                   }}
                 >
@@ -270,47 +319,63 @@ export default function Table({
                       <div className="absolute left-1/2 top-0 h-full w-[1px] bg-surface group-hover:bg-primary group-hover:w-[2px] group-focus:bg-primary group-focus:w-[2px] -translate-x-1/2" />
                     </div>
                   ) : null}
-                </th>
-              ))}
-            </tr>
-          ))}
-        </thead>
-        <tbody>
-          {rows.map((row, index) => {
-            const isSelected = selectedFileNames.has(row.original.name);
-            return (
-              <tr
-                className={`cursor-pointer hover:bg-surface dark:hover:bg-surface-light ${isSelected ? 'bg-primary-light/30 outline outline-1 outline-primary' : index % 2 === 0 ? 'bg-surface-light dark:bg-surface/50' : ''}`}
-                key={row.id}
-                onClick={() =>
-                  handleLeftClick(row.original, showPropertiesDrawer)
-                }
-                onContextMenu={e => handleContextMenuClick(e, row.original)}
-                ref={el => {
-                  if (el) {
-                    rowRefs.current.set(index, el);
-                  } else {
-                    rowRefs.current.delete(index);
-                  }
-                }}
-              >
-                {row.getVisibleCells().map(cell => (
-                  <td
-                    className="p-3 text-grey-700 overflow-hidden"
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          position: 'relative'
+        }}
+      >
+        {virtualItems.map(virtualRow => {
+          const row = rows[virtualRow.index];
+          const isSelected = selectedFileNames.has(row.original.name);
+          return (
+            <div
+              className={`flex cursor-pointer hover:bg-surface dark:hover:bg-surface-light ${isSelected ? 'bg-primary-light/30 outline outline-1 outline-primary' : virtualRow.index % 2 === 0 ? 'bg-surface-light dark:bg-surface/50' : ''}`}
+              data-index={virtualRow.index}
+              key={row.id}
+              onClick={() =>
+                handleLeftClick(row.original, showPropertiesDrawer)
+              }
+              onContextMenu={e => handleContextMenuClick(e, row.original)}
+              ref={virtualizer.measureElement}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualRow.start}px)`
+              }}
+            >
+              {row.getVisibleCells().map(cell => {
+                const isFlexColumn = cell.column.id === 'name';
+                return (
+                  <div
+                    className={`p-3 text-grey-700 overflow-hidden ${isFlexColumn ? 'flex-1 min-w-0' : 'flex-none'}`}
                     key={cell.id}
                     style={{
-                      width: cell.column.getSize(),
+                      width: isFlexColumn ? undefined : cell.column.getSize(),
                       minWidth: cell.column.columnDef.minSize
                     }}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+      {isFetchingNextPage ? (
+        <div className="flex items-center justify-center py-3 text-sm text-foreground/60">
+          Loading more files...
+        </div>
+      ) : null}
     </div>
   );
 }
