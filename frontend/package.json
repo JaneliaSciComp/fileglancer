@@ -1,7 +1,7 @@
 {
     "name": "fileglancer",
     "type": "module",
-    "version": "2.7.0-a13",
+    "version": "2.7.0-a14",
     "description": "Browse, share, and publish files on the Janelia file system",
     "keywords": [
         "ngff",
