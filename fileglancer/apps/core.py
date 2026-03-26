@@ -1,6 +1,7 @@
 """Apps module for fetching manifests, building commands, and managing cluster jobs."""
 
 import asyncio
+import fcntl
 import grp
 import json
 import os
@@ -10,6 +11,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from datetime import datetime, UTC
 from typing import Optional
@@ -706,19 +708,32 @@ async def _run_as_user_async(username: str, request: dict) -> dict:
 # that runs ``bjobs -u all`` to get statuses for ALL users' jobs.
 
 _poll_task = None
+_POLL_LOCK_PATH = os.path.join(tempfile.gettempdir(), "fileglancer_poll.lock")
 
 
 async def start_job_monitor():
-    """Start the background job poll loop."""
+    """Start the background job poll loop.
+
+    Every uvicorn worker starts a poll loop, but each iteration acquires
+    a file lock before polling.  Only the worker that wins the lock
+    actually runs ``bjobs``; the rest sleep and try again next cycle.
+    This means if the active worker dies, another picks up automatically.
+    """
     global _poll_task
 
     settings = get_settings()
 
-    # Reconnect to any previously submitted jobs (e.g. after server restart)
-    _reconnect_as_any_user(settings)
+    # Only one worker should reconnect at startup — use the same lock.
+    try:
+        with open(_POLL_LOCK_PATH, "w") as f:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            _reconnect_as_any_user(settings)
+            fcntl.flock(f, fcntl.LOCK_UN)
+        logger.info("Job monitor started (reconnected existing jobs)")
+    except OSError:
+        logger.info("Job monitor started (reconnect handled by another worker)")
 
     _poll_task = asyncio.create_task(_poll_loop(settings))
-    logger.info("Job monitor started")
 
 
 async def stop_job_monitor():
@@ -790,10 +805,24 @@ def _reconnect_as_any_user(settings):
 
 
 async def _poll_loop(settings):
-    """Periodically poll cluster job statuses via a worker subprocess."""
+    """Periodically poll cluster job statuses via a worker subprocess.
+
+    All uvicorn workers run this loop, but only the one that acquires
+    the file lock actually polls.  The lock is held only for the
+    duration of a single poll cycle, so if a worker dies another
+    takes over on the next interval.
+    """
     while True:
         try:
-            _poll_jobs(settings)
+            with open(_POLL_LOCK_PATH, "w") as f:
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                try:
+                    _poll_jobs(settings)
+                finally:
+                    fcntl.flock(f, fcntl.LOCK_UN)
+        except OSError:
+            # Another worker is polling this cycle — skip
+            pass
         except Exception:
             logger.exception("Error in job poll loop")
 
