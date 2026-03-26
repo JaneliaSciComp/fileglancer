@@ -9,6 +9,7 @@ import type {
   InfiniteData
 } from '@tanstack/react-query';
 
+import { default as log } from '@/logger';
 import { sendFetchRequest, buildUrl, makeMapKey } from '@/utils';
 import { normalizePosixStylePath } from '@/utils/pathHandling';
 import type { FileOrFolder, FileSharePath } from '@/shared.types';
@@ -136,12 +137,20 @@ export default function useFileQuery(
     });
 
     const lastPage = data.pages[data.pages.length - 1];
+    const totalCount = lastPage?.total_count ?? null;
+
+    if (totalCount !== null) {
+      log.info(
+        `Loaded ${allFiles.length} of ${totalCount} items (${data.pages.length} pages)`
+      );
+    }
+
     return {
       currentFileSharePath,
       currentFileOrFolder,
       files: allFiles,
       hasMore: lastPage?.has_more ?? false,
-      totalCount: lastPage?.total_count ?? null
+      totalCount
     };
   };
 

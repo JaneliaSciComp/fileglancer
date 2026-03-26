@@ -302,14 +302,6 @@ export default function FileBrowser({
         </div>
       ) : displayFiles.length > 0 ? (
         <div className="flex flex-col flex-1 min-h-0" data-tour="file-browser">
-          {fileQuery.data?.totalCount !== null &&
-          fileQuery.data?.totalCount !== undefined ? (
-            <div className="flex items-center px-3 py-1 text-xs text-foreground/60">
-              {displayFiles.length < fileQuery.data.totalCount
-                ? `Showing ${displayFiles.length} of ${fileQuery.data.totalCount} items`
-                : `${fileQuery.data.totalCount} items`}
-            </div>
-          ) : null}
           <Table
             data={displayFiles}
             handleContextMenuClick={handleFileContextMenu}
