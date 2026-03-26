@@ -1064,26 +1064,33 @@ async def submit_job(
     # executor.submit() — all with the user's identity.
     job_name = f"{manifest.name}-{entry_point.id}"
     cluster_config = settings.cluster.model_dump(exclude_none=True)
-    worker_result = _run_as_user(username, {
-        "action": "submit",
-        "cluster_config": cluster_config,
-        "command": full_command,
-        "job_name": job_name,
-        "resources": {
-            "cpus": resource_spec.cpus,
-            "gpus": resource_spec.gpus,
-            "memory": resource_spec.memory,
-            "walltime": resource_spec.walltime,
-            "queue": resource_spec.queue,
-            "work_dir": resource_spec.work_dir,
-            "stdout_path": resource_spec.stdout_path,
-            "stderr_path": resource_spec.stderr_path,
-            "extra_directives": resource_spec.extra_directives,
-            "extra_args": resource_spec.extra_args,
-        },
-        "work_dir": str(work_dir),
-        "cached_repo_dir": str(cached_repo_dir),
-    })
+    try:
+        worker_result = _run_as_user(username, {
+            "action": "submit",
+            "cluster_config": cluster_config,
+            "command": full_command,
+            "job_name": job_name,
+            "resources": {
+                "cpus": resource_spec.cpus,
+                "gpus": resource_spec.gpus,
+                "memory": resource_spec.memory,
+                "walltime": resource_spec.walltime,
+                "queue": resource_spec.queue,
+                "work_dir": resource_spec.work_dir,
+                "stdout_path": resource_spec.stdout_path,
+                "stderr_path": resource_spec.stderr_path,
+                "extra_directives": resource_spec.extra_directives,
+                "extra_args": resource_spec.extra_args,
+            },
+            "work_dir": str(work_dir),
+            "cached_repo_dir": str(cached_repo_dir),
+        })
+    except Exception:
+        # Cluster submission failed — remove the PENDING DB record so
+        # the job does not appear in the user's jobs list.
+        with db.get_db_session(settings.db_url) as session:
+            db.delete_job(session, job_id, username)
+        raise
 
     cluster_job_id = worker_result["job_id"]
 
