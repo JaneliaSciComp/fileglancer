@@ -808,25 +808,30 @@ async def _poll_loop(settings):
     """Periodically poll cluster job statuses via a worker subprocess.
 
     All uvicorn workers run this loop, but only the one that acquires
-    the file lock actually polls.  The lock is held only for the
-    duration of a single poll cycle, so if a worker dies another
-    takes over on the next interval.
+    the file lock actually polls.  The lock is held through both the
+    poll and the sleep, so staggered workers can't double-poll within
+    the same interval.  If the lock-holding worker dies, the OS
+    releases the lock and another worker takes over next cycle.
     """
     while True:
+        lock_fd = None
         try:
-            with open(_POLL_LOCK_PATH, "w") as f:
-                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                try:
-                    _poll_jobs(settings)
-                finally:
-                    fcntl.flock(f, fcntl.LOCK_UN)
+            lock_fd = open(_POLL_LOCK_PATH, "w")
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            try:
+                _poll_jobs(settings)
+            except Exception:
+                logger.exception("Error in job poll loop")
+            # Hold lock through the sleep so no other worker polls
+            # until this interval is over
+            await asyncio.sleep(settings.cluster.poll_interval)
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            lock_fd.close()
         except OSError:
-            # Another worker is polling this cycle — skip
-            pass
-        except Exception:
-            logger.exception("Error in job poll loop")
-
-        await asyncio.sleep(settings.cluster.poll_interval)
+            # Another worker is polling this cycle — skip and retry
+            if lock_fd:
+                lock_fd.close()
+            await asyncio.sleep(settings.cluster.poll_interval)
 
 
 def _poll_jobs(settings):
@@ -881,7 +886,8 @@ def _poll_jobs(settings):
             if info is None:
                 continue
             new_status = info["status"].upper()
-            if new_status == db_job.status:
+            old_status = db_job.status
+            if new_status == old_status:
                 continue
             is_terminal = new_status in ("DONE", "FAILED", "KILLED")
             finished_at = _parse_iso_dt(info.get("finish_time")) if is_terminal else None
@@ -891,7 +897,7 @@ def _poll_jobs(settings):
                 started_at=_parse_iso_dt(info.get("start_time")),
                 finished_at=finished_at,
             )
-            logger.info(f"Job {db_job.id} status updated: {db_job.status} -> {new_status}")
+            logger.info(f"Job {db_job.id} status updated: {old_status} -> {new_status}")
 
 
 def _parse_iso_dt(s: str | None) -> datetime | None:
