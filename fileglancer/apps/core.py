@@ -148,6 +148,10 @@ async def _ensure_repo_cache(url: str, pull: bool = False,
         branch = await _resolve_default_branch(clone_url)
 
     if username:
+        logger.debug(
+            f"Delegating ensure_repo to worker for user={username} "
+            f"repo={owner}/{repo} ({branch}) pull={pull}"
+        )
         lock = _get_repo_lock(owner, repo, branch)
         async with lock:
             result = await _run_as_user_async(username, {
@@ -158,6 +162,7 @@ async def _ensure_repo_cache(url: str, pull: bool = False,
             return Path(result["repo_dir"])
 
     # Running as the current user (worker subprocess or dev mode)
+    logger.debug(f"ensure_repo running in-process as euid={os.geteuid()}")
     cache_base = _repo_cache_base()
     repo_dir = (cache_base / owner / repo / branch).resolve()
     repo_dir.relative_to(cache_base.resolve())
@@ -266,6 +271,7 @@ async def discover_app_manifests(url: str,
     running as the target user.
     """
     if username:
+        logger.debug(f"Delegating discover_manifests to worker for user={username} url={url}")
         result = await _run_as_user_async(username, {
             "action": "discover_manifests",
             "url": url,
@@ -289,6 +295,7 @@ async def fetch_app_manifest(url: str, manifest_path: str = "",
     running as the target user.
     """
     if username:
+        logger.debug(f"Delegating read_manifest to worker for user={username} url={url}")
         result = await _run_as_user_async(username, {
             "action": "read_manifest",
             "url": url,
@@ -635,6 +642,7 @@ def _run_as_user(username: str, request: dict) -> dict:
     Raises ValueError on worker failure.
     """
     pw = pwd.getpwnam(username)
+    action = request.get("action", "unknown")
 
     # Only switch identity if running as root; otherwise we're already
     # the target user (e.g. development mode).
@@ -648,6 +656,15 @@ def _run_as_user(username: str, request: dict) -> dict:
             "group": pw.pw_gid,
             "extra_groups": groups,
         }
+        logger.debug(
+            f"Spawning worker action={action} as user={username} "
+            f"uid={pw.pw_uid} gid={pw.pw_gid} HOME={pw.pw_dir}"
+        )
+    else:
+        logger.debug(
+            f"Spawning worker action={action} as current user "
+            f"(euid={os.geteuid()}, not root — no identity switch)"
+        )
 
     result = subprocess.run(
         [sys.executable, "-m", "fileglancer.apps.worker"],

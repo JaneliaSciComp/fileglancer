@@ -209,8 +209,22 @@ _ACTIONS = {
 
 
 def main():
+    import pwd as _pwd
+
     request = json.loads(sys.stdin.buffer.read())
     action = request.get("action")
+
+    uid = os.getuid()
+    euid = os.geteuid()
+    try:
+        uname = _pwd.getpwuid(uid).pw_name
+    except KeyError:
+        uname = str(uid)
+    print(
+        f"[worker] action={action} uid={uid}({uname}) euid={euid} "
+        f"HOME={os.environ.get('HOME', '<unset>')}",
+        file=sys.stderr,
+    )
 
     handler = _ACTIONS.get(action)
     if handler is None:
