@@ -1,9 +1,10 @@
-"""Subprocess worker for running cluster operations as a target user.
+"""Subprocess worker for running operations as a target user.
 
 This module is invoked as a subprocess by fileglancer to run py-cluster-api
-operations (submit, cancel) with the identity of the authenticated user.
-The parent process uses Python 3.9+ ``user``/``group``/``extra_groups``
-subprocess kwargs to set the child's identity before any code runs.
+operations (submit, cancel, poll) and git/manifest operations (clone, pull,
+read) with the identity of the authenticated user.  The parent process uses
+Python 3.9+ ``user``/``group``/``extra_groups`` subprocess kwargs to set the
+child's identity before any code runs.
 
 Protocol:
     - Input:  JSON on stdin
@@ -15,6 +16,7 @@ Usage (called by fileglancer, not directly):
         [sys.executable, "-m", "fileglancer.apps.worker"],
         input=json.dumps(request).encode(),
         capture_output=True,
+        env={**os.environ, "HOME": pw.pw_dir},
         user=uid, group=gid, extra_groups=groups,
     )
 """
@@ -145,11 +147,56 @@ async def _reconnect(request: dict) -> dict:
     return {"jobs": jobs}
 
 
+async def _ensure_repo(request: dict) -> dict:
+    """Clone or update a GitHub repo in the current user's cache."""
+    from fileglancer.apps.core import _ensure_repo_cache
+
+    repo_dir = await _ensure_repo_cache(
+        url=request["url"],
+        pull=request.get("pull", False),
+    )
+    return {"repo_dir": str(repo_dir)}
+
+
+async def _discover_manifests(request: dict) -> dict:
+    """Clone/pull repo and discover all manifests."""
+    from fileglancer.apps.core import _ensure_repo_cache, _find_manifests_in_repo
+
+    repo_dir = await _ensure_repo_cache(
+        url=request["url"],
+        pull=True,
+    )
+    results = _find_manifests_in_repo(repo_dir)
+    return {
+        "manifests": [
+            {"path": path, "manifest": manifest.model_dump(mode="json")}
+            for path, manifest in results
+        ]
+    }
+
+
+async def _read_manifest(request: dict) -> dict:
+    """Fetch and read a single manifest from a cached repo."""
+    from fileglancer.apps.core import _ensure_repo_cache, _read_manifest_file
+
+    repo_dir = await _ensure_repo_cache(
+        url=request["url"],
+        pull=request.get("pull", False),
+    )
+    manifest_path = request.get("manifest_path", "")
+    target_dir = repo_dir / manifest_path if manifest_path else repo_dir
+    manifest = _read_manifest_file(target_dir)
+    return {"manifest": manifest.model_dump(mode="json")}
+
+
 _ACTIONS = {
     "submit": _submit,
     "cancel": _cancel,
     "poll": _poll,
     "reconnect": _reconnect,
+    "ensure_repo": _ensure_repo,
+    "discover_manifests": _discover_manifests,
+    "read_manifest": _read_manifest,
 }
 
 

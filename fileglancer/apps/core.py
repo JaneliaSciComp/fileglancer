@@ -10,7 +10,6 @@ import shlex
 import shutil
 import subprocess
 import sys
-from contextlib import nullcontext
 from pathlib import Path
 from datetime import datetime, UTC
 from typing import Optional
@@ -136,13 +135,30 @@ async def _ensure_repo_cache(url: str, pull: bool = False,
 
     Cache is keyed by owner/repo/branch to avoid checkout races between branches.
     An asyncio lock serializes git operations for the same repo+branch.
-    When username is provided, the cache is placed under ~username/.fileglancer/apps.
+
+    When username is provided, the work is delegated to a worker subprocess
+    that runs with the target user's real UID/GID, avoiding the process-wide
+    euid race condition that EffectiveUserContext has with concurrent async
+    requests.  When username is None, git commands run in-process (used by
+    the worker subprocess itself, or in single-user dev mode).
     """
     owner, repo, branch = _parse_github_url(url)
     clone_url = f"https://github.com/{owner}/{repo}.git"
     if not branch:
         branch = await _resolve_default_branch(clone_url)
-    cache_base = _repo_cache_base(username)
+
+    if username:
+        lock = _get_repo_lock(owner, repo, branch)
+        async with lock:
+            result = await _run_as_user_async(username, {
+                "action": "ensure_repo",
+                "url": url,
+                "pull": pull,
+            })
+            return Path(result["repo_dir"])
+
+    # Running as the current user (worker subprocess or dev mode)
+    cache_base = _repo_cache_base()
     repo_dir = (cache_base / owner / repo / branch).resolve()
     repo_dir.relative_to(cache_base.resolve())
     lock = _get_repo_lock(owner, repo, branch)
@@ -245,8 +261,21 @@ async def discover_app_manifests(url: str,
 
     Returns a list of (relative_dir_path, AppManifest) tuples.
     Raises ValueError if the URL is invalid or the clone fails.
+
+    When username is provided, the work is delegated to a worker subprocess
+    running as the target user.
     """
-    repo_dir = await _ensure_repo_cache(url, pull=True, username=username)
+    if username:
+        result = await _run_as_user_async(username, {
+            "action": "discover_manifests",
+            "url": url,
+        })
+        return [
+            (item["path"], AppManifest(**item["manifest"]))
+            for item in result["manifests"]
+        ]
+
+    repo_dir = await _ensure_repo_cache(url, pull=True)
     return _find_manifests_in_repo(repo_dir)
 
 
@@ -255,8 +284,19 @@ async def fetch_app_manifest(url: str, manifest_path: str = "",
     """Fetch and validate an app manifest from a cloned repo.
 
     Clones the repo if needed, then reads the manifest from disk.
+
+    When username is provided, the work is delegated to a worker subprocess
+    running as the target user.
     """
-    repo_dir = await _ensure_repo_cache(url, username=username)
+    if username:
+        result = await _run_as_user_async(username, {
+            "action": "read_manifest",
+            "url": url,
+            "manifest_path": manifest_path,
+        })
+        return AppManifest(**result["manifest"])
+
+    repo_dir = await _ensure_repo_cache(url)
     target_dir = repo_dir / manifest_path if manifest_path else repo_dir
     return _read_manifest_file(target_dir)
 
@@ -613,6 +653,7 @@ def _run_as_user(username: str, request: dict) -> dict:
         [sys.executable, "-m", "fileglancer.apps.worker"],
         input=json.dumps(request).encode(),
         capture_output=True,
+        env={**os.environ, "HOME": pw.pw_dir},
         **identity_kwargs,
     )
 
@@ -631,6 +672,11 @@ def _run_as_user(username: str, request: dict) -> dict:
         raise ValueError(f"Worker failed: {error}")
 
     return response
+
+
+async def _run_as_user_async(username: str, request: dict) -> dict:
+    """Async wrapper for _run_as_user that doesn't block the event loop."""
+    return await asyncio.to_thread(_run_as_user, username, request)
 
 
 # --- Job Monitoring ---
@@ -888,7 +934,6 @@ async def submit_job(
     post_run: Optional[str] = None,
     container: Optional[str] = None,
     container_args: Optional[str] = None,
-    user_context=None,
 ) -> db.JobDB:
     """Submit a new job to the cluster.
 
@@ -899,8 +944,7 @@ async def submit_job(
     settings = get_settings()
 
     # Fetch and validate manifest (clones repo into user's cache)
-    with user_context if user_context is not None else nullcontext():
-        manifest = await fetch_app_manifest(app_url, manifest_path, username=username)
+    manifest = await fetch_app_manifest(app_url, manifest_path, username=username)
 
     # Find entry point
     entry_point = None
@@ -977,15 +1021,14 @@ async def submit_job(
         session.commit()
 
     # Clone/pull repo into the user's cache (~username/.fileglancer/apps).
-    with user_context if user_context is not None else nullcontext():
-        if manifest.repo_url:
-            cached_repo_dir = await _ensure_repo_cache(manifest.repo_url, pull=pull_latest,
-                                                       username=username)
-            cd_suffix = "repo"
-        else:
-            cached_repo_dir = await _ensure_repo_cache(app_url, pull=pull_latest,
-                                                       username=username)
-            cd_suffix = f"repo/{manifest_path}" if manifest_path else "repo"
+    if manifest.repo_url:
+        cached_repo_dir = await _ensure_repo_cache(manifest.repo_url, pull=pull_latest,
+                                                   username=username)
+        cd_suffix = "repo"
+    else:
+        cached_repo_dir = await _ensure_repo_cache(app_url, pull=pull_latest,
+                                                   username=username)
+        cd_suffix = f"repo/{manifest_path}" if manifest_path else "repo"
 
     # Build environment variable export lines
     env_lines = ""
