@@ -75,6 +75,7 @@ export default function Table({
   const navigate = useNavigate();
   const [sorting, setSorting] = useState<SortingState>([]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const sortingEnabled = !hasNextPage;
 
   const selectedFileNames = useMemo(
     () => new Set(fileBrowserState.selectedFiles.map(file => file.name)),
@@ -165,6 +166,13 @@ export default function Table({
     [fileQuery.data?.currentFileSharePath, handleContextMenuClick]
   );
 
+  // Clear sort when sorting becomes disabled (more pages still loading)
+  useEffect(() => {
+    if (!sortingEnabled && sorting.length > 0) {
+      setSorting([]);
+    }
+  }, [sortingEnabled, sorting.length]);
+
   const table = useReactTable({
     data,
     columns,
@@ -176,7 +184,8 @@ export default function Table({
     getSortedRowModel: getSortedRowModel(),
     columnResizeMode: 'onChange',
     enableColumnResizing: true,
-    enableColumnFilters: false
+    enableColumnFilters: false,
+    enableSorting: sortingEnabled
   });
 
   const rows = table.getRowModel().rows;
@@ -298,16 +307,20 @@ export default function Table({
                     <div
                       className={
                         header.column.getCanSort()
-                          ? 'cursor-pointer select-none flex items-center gap-2'
+                          ? `select-none flex items-center gap-2 ${sortingEnabled ? 'cursor-pointer' : 'cursor-default opacity-50'}`
                           : 'flex items-center gap-2'
                       }
-                      onClick={header.column.getToggleSortingHandler()}
+                      onClick={
+                        sortingEnabled
+                          ? header.column.getToggleSortingHandler()
+                          : undefined
+                      }
                     >
                       {flexRender(
                         header.column.columnDef.header,
                         header.getContext()
                       )}
-                      <SortIcons header={header} />
+                      {sortingEnabled ? <SortIcons header={header} /> : null}
                     </div>
                   )}
                   {header.column.getCanResize() ? (
