@@ -12,6 +12,7 @@ from fileglancer.apps import (
     verify_requirements,
     _container_sif_name,
     _build_container_script,
+    build_command,
 )
 
 
@@ -467,3 +468,42 @@ class TestValidatePathInFilestore:
         error = validate_path_in_filestore("/data;bad", mock_session)
         assert error is not None
         assert "invalid characters" in error
+
+
+class TestBuildCommandTildeExpansion:
+    """build_command expands ~ in file/directory params so shlex quoting works."""
+
+    @pytest.fixture()
+    def entry_point(self):
+        return AppEntryPoint(
+            id="test",
+            name="test",
+            command="test_cmd",
+            parameters=[
+                {
+                    "key": "output_dir",
+                    "name": "Output Directory",
+                    "type": "directory",
+                    "flag": "--output_dir",
+                }
+            ],
+        )
+
+    def test_tilde_expanded_in_directory_param(self, entry_point):
+        import os
+        cmd = build_command(entry_point, {"output_dir": "~/data/output"})
+        home = os.path.expanduser("~")
+        expected = f"{home}/data/output"
+        assert expected in cmd
+        assert "~" not in cmd
+
+    def test_bare_tilde_expanded(self, entry_point):
+        import os
+        cmd = build_command(entry_point, {"output_dir": "~"})
+        home = os.path.expanduser("~")
+        assert home in cmd
+        assert "~" not in cmd
+
+    def test_absolute_path_unchanged(self, entry_point):
+        cmd = build_command(entry_point, {"output_dir": "/data/output"})
+        assert "/data/output" in cmd
