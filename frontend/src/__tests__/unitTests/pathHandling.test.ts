@@ -290,10 +290,7 @@ describe('resolvePathToFsp', () => {
   });
 
   test('matches a Windows-style path with backslashes', () => {
-    const result = resolvePathToFsp(
-      '\\\\win\\a\\sub\\folder',
-      zonesAndFspData
-    );
+    const result = resolvePathToFsp('\\\\win\\a\\sub\\folder', zonesAndFspData);
     expect(result).not.toBeNull();
     expect(result!.fsp.name).toBe('fsp_a');
     expect(result!.subpath).toBe('sub/folder');
