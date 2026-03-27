@@ -3,6 +3,7 @@
 import asyncio
 import fcntl
 import multiprocessing
+import time
 from datetime import datetime, UTC
 from types import SimpleNamespace
 from unittest.mock import patch, MagicMock, call
@@ -148,6 +149,9 @@ def _try_poll_with_lock(counter, sync_barrier):
             try:
                 with counter.get_lock():
                     counter.value += 1
+                # Hold lock long enough for the other process to attempt
+                # acquisition and fail with LOCK_NB
+                time.sleep(0.5)
             finally:
                 fcntl.flock(f, fcntl.LOCK_UN)
     except OSError:
