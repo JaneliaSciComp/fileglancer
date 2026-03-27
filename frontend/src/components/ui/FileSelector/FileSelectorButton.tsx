@@ -17,14 +17,14 @@ import type {
 let lastSelectedParentPath: string | null = null;
 
 function getParentPath(fullPath: string): string {
-  // Strip trailing slash, then take everything up to the last slash
-  const trimmed = fullPath.endsWith('/') ? fullPath.slice(0, -1) : fullPath;
-  const lastSlash = trimmed.lastIndexOf('/');
-  return lastSlash > 0 ? trimmed.slice(0, lastSlash) : trimmed;
+  // Strip trailing slash, then take everything up to the last separator
+  const trimmed = fullPath.replace(/[\\/]+$/, '');
+  const lastSep = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
+  return lastSep > 0 ? trimmed.slice(0, lastSep) : trimmed;
 }
 
 type FileSelectorButtonProps = {
-  readonly onSelect: (path: string) => void;
+  readonly onSelect: (path: string, displayPath: string) => void;
   readonly triggerClasses?: string;
   readonly label?: string;
   readonly initialLocation?: FileSelectorInitialLocation;
@@ -83,8 +83,8 @@ export default function FileSelectorButton({
 
   const handleSelect = () => {
     if (state.selectedItem) {
-      lastSelectedParentPath = getParentPath(state.selectedItem.fullPath);
-      onSelect(state.selectedItem.fullPath);
+      lastSelectedParentPath = getParentPath(state.selectedItem.displayPath);
+      onSelect(state.selectedItem.fullPath, state.selectedItem.displayPath);
       onClose();
     }
   };
@@ -226,7 +226,7 @@ export default function FileSelectorButton({
             </Typography>
             {state.selectedItem ? (
               <Typography className="text-sm text-foreground font-mono truncate">
-                {state.selectedItem.fullPath}
+                {state.selectedItem.displayPath}
               </Typography>
             ) : (
               <div className="h-5" />

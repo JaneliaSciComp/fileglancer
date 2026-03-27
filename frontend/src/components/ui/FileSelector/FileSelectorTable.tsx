@@ -34,6 +34,7 @@ type FileSelectorTableProps = {
     name: string;
     isDir: boolean;
     fullPath: string;
+    displayPath: string;
   } | null;
   readonly zonesData: Record<string, FileSharePath | Zone> | undefined;
   readonly onItemClick: (item: FileOrFolder) => void;

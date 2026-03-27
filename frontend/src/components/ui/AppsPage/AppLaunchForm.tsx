@@ -61,6 +61,13 @@ function ParameterField({
   readonly value: unknown;
   readonly onChange: (value: unknown) => void;
 }) {
+  // For file/directory fields, track a display-formatted path separately from
+  // the server-formatted value used for submission. When the user selects a
+  // path via the file selector, the display path uses their OS preference
+  // (e.g. Windows backslashes) while the stored value stays in server format.
+  // Manual edits clear the override so the input shows exactly what was typed.
+  const [fileDisplayPath, setFileDisplayPath] = useState<string | null>(null);
+
   const baseInputClass =
     'w-full p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary';
 
@@ -126,10 +133,16 @@ function ParameterField({
         <div className="flex gap-2">
           <input
             className={`flex-1 ${baseInputClass}`}
-            onChange={e => onChange(e.target.value)}
+            onChange={e => {
+              setFileDisplayPath(null);
+              onChange(e.target.value);
+            }}
             placeholder={`Select a ${param.type}...`}
             type="text"
-            value={value !== undefined && value !== null ? String(value) : ''}
+            value={
+              fileDisplayPath ??
+              (value !== undefined && value !== null ? String(value) : '')
+            }
           />
           <FileSelectorButton
             initialPath={
@@ -142,7 +155,10 @@ function ParameterField({
             }
             label="Browse..."
             mode={param.type === 'file' ? 'file' : 'directory'}
-            onSelect={path => onChange(path)}
+            onSelect={(serverPath, displayPath) => {
+              onChange(serverPath);
+              setFileDisplayPath(displayPath);
+            }}
             useServerPath
           />
         </div>

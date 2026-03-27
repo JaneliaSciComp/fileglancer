@@ -23,7 +23,8 @@ type FileSelectorState = {
   selectedItem: {
     name: string;
     isDir: boolean;
-    fullPath: string; // Full filesystem path in preferred format
+    fullPath: string; // Path in effective format (may be overridden for server use)
+    displayPath: string; // Path in user's preferred format for display
   } | null;
 };
 
@@ -281,6 +282,7 @@ export default function useFileSelector(options?: FileSelectorOptions) {
   const selectItem = useCallback(
     (item?: FileOrFolder) => {
       let fullPath = '';
+      let displayPath = '';
       let name = '';
       let isDir = true;
 
@@ -291,10 +293,17 @@ export default function useFileSelector(options?: FileSelectorOptions) {
           return;
         }
 
+        const subPath =
+          state.currentLocation.path === '.' ? '' : state.currentLocation.path;
         fullPath = getPreferredPathForDisplay(
           effectivePathPreference,
           currentFsp,
-          state.currentLocation.path === '.' ? '' : state.currentLocation.path
+          subPath
+        );
+        displayPath = getPreferredPathForDisplay(
+          pathPreference,
+          currentFsp,
+          subPath
         );
 
         // Get the folder name from the path
@@ -321,11 +330,17 @@ export default function useFileSelector(options?: FileSelectorOptions) {
           const fsp = zonesAndFspQuery.data?.[fspKey] as FileSharePath;
           if (fsp) {
             fullPath = getPreferredPathForDisplay(effectivePathPreference, fsp);
+            displayPath = getPreferredPathForDisplay(pathPreference, fsp);
           }
         } else if (currentFsp) {
           // In filesystem mode, generate path from current FSP + item path
           fullPath = getPreferredPathForDisplay(
             effectivePathPreference,
+            currentFsp,
+            item.path
+          );
+          displayPath = getPreferredPathForDisplay(
+            pathPreference,
             currentFsp,
             item.path
           );
@@ -342,7 +357,8 @@ export default function useFileSelector(options?: FileSelectorOptions) {
           selectedItem: {
             name,
             isDir,
-            fullPath
+            fullPath,
+            displayPath
           }
         }));
       }
@@ -351,6 +367,7 @@ export default function useFileSelector(options?: FileSelectorOptions) {
       state.currentLocation,
       currentFsp,
       effectivePathPreference,
+      pathPreference,
       mode,
       zonesAndFspQuery.data
     ]
