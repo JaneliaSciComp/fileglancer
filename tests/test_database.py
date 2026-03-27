@@ -504,3 +504,113 @@ class TestFindBestFspMatch:
         )
         assert result is None
 
+
+# --- resolve_any_path_format tests ---
+
+class TestResolveAnyPathFormat:
+    """resolve_any_path_format converts Mac/Windows/Linux paths to mount_path."""
+
+    def test_mac_smb_path(self):
+        fsp = FileSharePath(
+            zone="test", name="test",
+            mount_path="/mnt/share",
+            mac_path="smb://server/share",
+        )
+        mock_session = MagicMock()
+        with patch("fileglancer.database.get_file_share_paths", return_value=[fsp]):
+            result = resolve_any_path_format(mock_session, "smb://server/share/sub/dir")
+        assert result == "/mnt/share/sub/dir"
+
+    def test_windows_unc_path(self):
+        fsp = FileSharePath(
+            zone="test", name="test",
+            mount_path="/mnt/share",
+            windows_path="\\\\server\\share",
+        )
+        mock_session = MagicMock()
+        with patch("fileglancer.database.get_file_share_paths", return_value=[fsp]):
+            result = resolve_any_path_format(mock_session, "\\\\server\\share\\sub\\dir")
+        assert result == "/mnt/share/sub/dir"
+
+    def test_linux_path(self):
+        fsp = FileSharePath(
+            zone="test", name="test",
+            mount_path="/mnt/share",
+            linux_path="/linux/share",
+        )
+        mock_session = MagicMock()
+        with patch("fileglancer.database.get_file_share_paths", return_value=[fsp]):
+            result = resolve_any_path_format(mock_session, "/linux/share/file.txt")
+        assert result == "/mnt/share/file.txt"
+
+    def test_mount_path_exact(self):
+        fsp = FileSharePath(
+            zone="test", name="test",
+            mount_path="/mnt/share",
+        )
+        mock_session = MagicMock()
+        with patch("fileglancer.database.get_file_share_paths", return_value=[fsp]):
+            result = resolve_any_path_format(mock_session, "/mnt/share")
+        assert result == "/mnt/share"
+
+    def test_no_match_returns_none(self):
+        mock_session = MagicMock()
+        with patch("fileglancer.database.get_file_share_paths", return_value=[]):
+            result = resolve_any_path_format(mock_session, "smb://unknown/share")
+        assert result is None
+
+    def test_longest_match_wins(self):
+        fsp_short = FileSharePath(
+            zone="test", name="parent",
+            mount_path="/mnt/parent",
+            mac_path="smb://server/parent",
+        )
+        fsp_long = FileSharePath(
+            zone="test", name="child",
+            mount_path="/mnt/parent/child",
+            mac_path="smb://server/parent/child",
+        )
+        mock_session = MagicMock()
+        with patch("fileglancer.database.get_file_share_paths", return_value=[fsp_short, fsp_long]):
+            result = resolve_any_path_format(mock_session, "smb://server/parent/child/file.txt")
+        assert result == "/mnt/parent/child/file.txt"
+
+    def test_boundary_safety(self):
+        """Should not match /linux/abc against /linux/a."""
+        fsp = FileSharePath(
+            zone="test", name="test",
+            mount_path="/mnt/a",
+            linux_path="/linux/a",
+        )
+        mock_session = MagicMock()
+        with patch("fileglancer.database.get_file_share_paths", return_value=[fsp]):
+            result = resolve_any_path_format(mock_session, "/linux/abc/file.txt")
+        assert result is None
+
+    def test_mount_path_already_resolved_returns_mount_path(self):
+        """A path already in mount_path format should still resolve correctly."""
+        fsp = FileSharePath(
+            zone="test", name="test",
+            mount_path="/mnt/share",
+            mac_path="smb://server/share",
+        )
+        mock_session = MagicMock()
+        with patch("fileglancer.database.get_file_share_paths", return_value=[fsp]):
+            result = resolve_any_path_format(mock_session, "/mnt/share/data/output")
+        assert result == "/mnt/share/data/output"
+
+    def test_windows_path_with_dollar_sign(self):
+        """Windows paths with $ (e.g. admin shares) should resolve correctly."""
+        fsp = FileSharePath(
+            zone="test", name="test",
+            mount_path="/mnt/scicompsoft",
+            windows_path="\\\\prfs.hhmi.org\\scicompsoft$",
+        )
+        mock_session = MagicMock()
+        with patch("fileglancer.database.get_file_share_paths", return_value=[fsp]):
+            result = resolve_any_path_format(
+                mock_session,
+                "\\\\prfs.hhmi.org\\scicompsoft$\\truhlara\\scratch"
+            )
+        assert result == "/mnt/scicompsoft/truhlara/scratch"
+

@@ -12,9 +12,13 @@ import {
 import FileSelectorButton from '@/components/ui/FileSelector/FileSelectorButton';
 import FgSwitch from '@/components/ui/widgets/FgSwitch';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
+import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { validatePaths } from '@/queries/appsQueries';
 import { useClusterDefaultsQuery } from '@/queries/jobsQueries';
-import { convertBackToForwardSlash } from '@/utils/pathHandling';
+import {
+  convertBackToForwardSlash,
+  resolvePathToFsp
+} from '@/utils/pathHandling';
 import { flattenParameters, isParameterSection } from '@/shared.types';
 import type {
   AppEntryPoint,
@@ -688,6 +692,7 @@ export default function AppLaunchForm({
   initialContainerArgs
 }: AppLaunchFormProps) {
   const { defaultExtraArgs } = usePreferencesContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const clusterDefaultsQuery = useClusterDefaultsQuery();
   const allParams = flattenParameters([
     ...entryPoint.parameters,
@@ -776,6 +781,24 @@ export default function AppLaunchForm({
     'submitOptions'
   ]);
 
+  /**
+   * Resolve a path in any OS format (Mac smb://, Windows UNC, Linux) to
+   * the server's mount_path + subpath. Returns the original value if FSP
+   * data isn't loaded or no match is found.
+   */
+  const resolveToServerPath = (val: string): string => {
+    const fspData = zonesAndFspQuery.data;
+    if (!fspData) {
+      return val;
+    }
+    const result = resolvePathToFsp(val, fspData);
+    if (!result) {
+      return val;
+    }
+    const { fsp, subpath } = result;
+    return subpath ? `${fsp.mount_path}/${subpath}` : fsp.mount_path;
+  };
+
   const handleChange = (paramId: string, value: unknown) => {
     setValues(prev => ({ ...prev, [paramId]: value }));
     // Clear error on change
@@ -830,7 +853,9 @@ export default function AppLaunchForm({
         (param.type === 'file' || param.type === 'directory') &&
         typeof val === 'string'
       ) {
-        const normalized = convertBackToForwardSlash(val);
+        // Resolve Mac/Windows/alternate-Linux paths to server mount_path
+        const resolved = resolveToServerPath(val);
+        const normalized = convertBackToForwardSlash(resolved);
         if (
           !normalized.startsWith('s3://') &&
           !normalized.startsWith('gs://') &&
@@ -897,7 +922,9 @@ export default function AppLaunchForm({
           (paramDef.type === 'file' || paramDef.type === 'directory') &&
           typeof val === 'string'
         ) {
-          const normalized = convertBackToForwardSlash(val);
+          // Resolve Mac/Windows/alternate-Linux paths to server mount_path
+          const resolved = resolveToServerPath(val);
+          const normalized = convertBackToForwardSlash(resolved);
           params[key] = normalized;
           // Skip server-side path validation for URI schemes (e.g. s3://)
           if (

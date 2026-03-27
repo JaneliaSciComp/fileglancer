@@ -469,6 +469,51 @@ class TestValidatePathInFilestore:
         assert error is not None
         assert "invalid characters" in error
 
+    def test_mac_smb_path_resolved_to_mount_path(self, tmp_path):
+        """Mac smb:// path matching an FSP's mac_path resolves to mount_path."""
+        test_dir = tmp_path / "scratch"
+        test_dir.mkdir()
+
+        from fileglancer.model import FileSharePath
+        fsp = FileSharePath(
+            zone="test", name="test",
+            mount_path=str(tmp_path),
+            mac_path="smb://server/share",
+        )
+
+        mock_session = MagicMock()
+        with patch("fileglancer.database.get_file_share_paths", return_value=[fsp]), \
+             patch("fileglancer.database.find_fsp_from_absolute_path",
+                   return_value=(fsp, "scratch")):
+            error = validate_path_in_filestore("smb://server/share/scratch", mock_session)
+        assert error is None
+
+    def test_windows_unc_path_resolved_to_mount_path(self, tmp_path):
+        """Windows UNC path matching an FSP's windows_path resolves to mount_path."""
+        test_dir = tmp_path / "data"
+        test_dir.mkdir()
+
+        from fileglancer.model import FileSharePath
+        fsp = FileSharePath(
+            zone="test", name="test",
+            mount_path=str(tmp_path),
+            windows_path="\\\\server\\share",
+        )
+
+        mock_session = MagicMock()
+        with patch("fileglancer.database.get_file_share_paths", return_value=[fsp]), \
+             patch("fileglancer.database.find_fsp_from_absolute_path",
+                   return_value=(fsp, "data")):
+            error = validate_path_in_filestore("\\\\server\\share\\data", mock_session)
+        assert error is None
+
+    def test_unresolvable_smb_path_rejected(self):
+        """smb:// path that matches no FSP is rejected."""
+        mock_session = MagicMock()
+        with patch("fileglancer.database.get_file_share_paths", return_value=[]):
+            error = validate_path_in_filestore("smb://unknown/share/foo", mock_session)
+        assert error is not None
+
 
 class TestBuildCommandTildeExpansion:
     """build_command expands ~ in file/directory params so shlex quoting works."""
@@ -507,3 +552,67 @@ class TestBuildCommandTildeExpansion:
     def test_absolute_path_unchanged(self, entry_point):
         cmd = build_command(entry_point, {"output_dir": "/data/output"})
         assert "/data/output" in cmd
+
+
+class TestBuildCommandPathResolution:
+    """build_command resolves Mac/Windows paths to mount_path when a session is provided."""
+
+    @pytest.fixture()
+    def entry_point(self):
+        return AppEntryPoint(
+            id="test",
+            name="test",
+            command="test_cmd",
+            parameters=[
+                {
+                    "key": "output_dir",
+                    "name": "Output Directory",
+                    "type": "directory",
+                    "flag": "--output_dir",
+                }
+            ],
+        )
+
+    def test_mac_smb_path_resolved_in_command(self, entry_point, tmp_path):
+        """Mac smb:// path is resolved to mount_path in the built command."""
+        (tmp_path / "output").mkdir()
+
+        from fileglancer.model import FileSharePath
+        fsp = FileSharePath(
+            zone="test", name="test",
+            mount_path=str(tmp_path),
+            mac_path="smb://server/share",
+        )
+        mock_session = MagicMock()
+        with patch("fileglancer.database.get_file_share_paths", return_value=[fsp]), \
+             patch("fileglancer.database.find_fsp_from_absolute_path",
+                   return_value=(fsp, "output")):
+            cmd = build_command(
+                entry_point,
+                {"output_dir": "smb://server/share/output"},
+                session=mock_session,
+            )
+        assert str(tmp_path) + "/output" in cmd
+        assert "smb://" not in cmd
+
+    def test_windows_unc_path_resolved_in_command(self, entry_point, tmp_path):
+        """Windows UNC path is resolved to mount_path in the built command."""
+        (tmp_path / "data").mkdir()
+
+        from fileglancer.model import FileSharePath
+        fsp = FileSharePath(
+            zone="test", name="test",
+            mount_path=str(tmp_path),
+            windows_path="\\\\server\\share",
+        )
+        mock_session = MagicMock()
+        with patch("fileglancer.database.get_file_share_paths", return_value=[fsp]), \
+             patch("fileglancer.database.find_fsp_from_absolute_path",
+                   return_value=(fsp, "data")):
+            cmd = build_command(
+                entry_point,
+                {"output_dir": "\\\\server\\share\\data"},
+                session=mock_session,
+            )
+        assert str(tmp_path) + "/data" in cmd
+        assert "\\\\" not in cmd

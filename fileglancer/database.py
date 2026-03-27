@@ -575,6 +575,37 @@ def _find_best_fsp_match(
     return (best_fsp, subpath)
 
 
+def resolve_any_path_format(session: Session, path_value: str) -> Optional[str]:
+    """
+    Resolve a path in any OS format (Mac smb://, Windows UNC, Linux) to the
+    server's mount_path equivalent.
+
+    Normalises backslashes to forward slashes, then checks the input against
+    every FSP's mount_path, linux_path, mac_path, and windows_path. Returns
+    the mount_path-based equivalent (mount_path + subpath) if a match is found,
+    or None if no FSP matches.
+    """
+    normalized = path_value.replace("\\", "/")
+    paths = get_file_share_paths(session)
+
+    def _all_path_formats(fsp: FileSharePath):
+        return [
+            fsp.mount_path,
+            fsp.linux_path,
+            fsp.mac_path,
+            fsp.windows_path.replace("\\", "/") if fsp.windows_path else None,
+        ]
+
+    result = _find_best_fsp_match(paths, normalized, _all_path_formats)
+    if result is None:
+        return None
+
+    fsp, subpath = result
+    if subpath:
+        return fsp.mount_path + "/" + subpath
+    return fsp.mount_path
+
+
 def find_fsp_from_absolute_path(session: Session, absolute_path: str) -> Optional[tuple[FileSharePath, str]]:
     """
     Find the file share path that exactly matches the given absolute path.
