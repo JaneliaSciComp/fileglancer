@@ -2,12 +2,15 @@ import tempfile
 import os
 import shutil
 from datetime import datetime
+from unittest.mock import patch, MagicMock
 
 import pytest
 import pandas as pd
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from fileglancer.database import *
+from fileglancer.database import _find_best_fsp_match
+from fileglancer.model import FileSharePath
 from fileglancer.utils import slugify_path
 
 def create_file_share_path_dicts(df):
@@ -418,4 +421,86 @@ def test_find_fsp_from_absolute_path_with_symlink_resolution(db_session, temp_di
         assert result[1] == "target"
     finally:
         shutil.rmtree(symlink_container)
+
+
+# --- _find_best_fsp_match tests ---
+
+class TestFindBestFspMatch:
+    """Unit tests for the shared _find_best_fsp_match helper."""
+
+    @pytest.fixture()
+    def fsps(self):
+        return [
+            FileSharePath(
+                zone="z", name="short",
+                mount_path="/mnt/short",
+                linux_path="/linux/short",
+                mac_path="smb://server/short",
+            ),
+            FileSharePath(
+                zone="z", name="long",
+                mount_path="/mnt/long",
+                linux_path="/linux/short/nested",
+                mac_path="smb://server/short/nested",
+            ),
+        ]
+
+    def test_longest_match_wins(self, fsps):
+        result = _find_best_fsp_match(
+            fsps, "smb://server/short/nested/file.txt",
+            lambda fsp: [fsp.mac_path],
+        )
+        assert result is not None
+        assert result[0].name == "long"
+        assert result[1] == "file.txt"
+
+    def test_boundary_safety(self, fsps):
+        """A prefix that doesn't end on a separator boundary must not match."""
+        result = _find_best_fsp_match(
+            fsps, "/linux/shortcut/file.txt",
+            lambda fsp: [fsp.linux_path],
+        )
+        assert result is None
+
+    def test_exact_match_returns_empty_subpath(self, fsps):
+        result = _find_best_fsp_match(
+            fsps, "/linux/short",
+            lambda fsp: [fsp.linux_path],
+        )
+        assert result is not None
+        assert result[0].name == "short"
+        assert result[1] == ""
+
+    def test_none_candidates_are_skipped(self):
+        fsp = FileSharePath(zone="z", name="test", mount_path="/mnt/test")
+        result = _find_best_fsp_match(
+            [fsp], "/mnt/test/file",
+            lambda f: [None, f.mount_path, None],
+        )
+        assert result is not None
+        assert result[1] == "file"
+
+    def test_custom_separator(self):
+        """os.sep separator is respected for boundary checks."""
+        fsp = FileSharePath(zone="z", name="test", mount_path="/mnt/test")
+        # With "/" separator, this should match
+        result_slash = _find_best_fsp_match(
+            [fsp], "/mnt/test/sub",
+            lambda f: [f.mount_path],
+            separator="/",
+        )
+        assert result_slash is not None
+        assert result_slash[1] == "sub"
+
+    def test_no_fsps_returns_none(self):
+        result = _find_best_fsp_match([], "/any/path", lambda f: [f.mount_path])
+        assert result is None
+
+    def test_no_matching_candidate_returns_none(self):
+        fsp = FileSharePath(zone="z", name="test", mount_path="/mnt/test")
+        result = _find_best_fsp_match(
+            [fsp], "/completely/different",
+            lambda f: [f.mount_path],
+        )
+        assert result is None
 
