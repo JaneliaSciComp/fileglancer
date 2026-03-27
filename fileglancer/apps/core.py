@@ -712,15 +712,12 @@ _POLL_LOCK_PATH = os.path.join(tempfile.gettempdir(), "fileglancer_poll.lock")
 
 
 async def start_job_monitor():
-    """Start the background job poll loop.
+    """Reconnect any in-flight jobs and start polling if needed.
 
-    Every uvicorn worker starts a poll loop, but each iteration acquires
-    a file lock before polling.  Only the worker that wins the lock
-    actually runs ``bjobs``; the rest sleep and try again next cycle.
-    This means if the active worker dies, another picks up automatically.
+    Only one uvicorn worker performs the reconnect (via file lock).
+    The poll loop is only started if there are active jobs in the DB;
+    otherwise it waits until a job is submitted (see ensure_poll_loop).
     """
-    global _poll_task
-
     settings = get_settings()
 
     # Only one worker should reconnect at startup — use the same lock.
@@ -733,7 +730,29 @@ async def start_job_monitor():
     except OSError:
         logger.info("Job monitor started (reconnect handled by another worker)")
 
+    # Only start the poll loop if there are already active jobs
+    if _get_any_active_username(settings) is not None:
+        ensure_poll_loop()
+        logger.info("Poll loop started (active jobs found at startup)")
+    else:
+        logger.info("Poll loop deferred (no active jobs)")
+
+
+def ensure_poll_loop():
+    """Start the poll loop if it is not already running.
+
+    Called by submit_job after a new job is created, and by
+    start_job_monitor if active jobs exist at startup.
+    Safe to call multiple times — only one loop runs at a time.
+    """
+    global _poll_task
+
+    if _poll_task is not None and not _poll_task.done():
+        return  # already running
+
+    settings = get_settings()
     _poll_task = asyncio.create_task(_poll_loop(settings))
+    logger.info("Poll loop started")
 
 
 async def stop_job_monitor():
@@ -812,21 +831,32 @@ async def _poll_loop(settings):
     poll and the sleep, so staggered workers can't double-poll within
     the same interval.  If the lock-holding worker dies, the OS
     releases the lock and another worker takes over next cycle.
+
+    The loop exits automatically when there are no active jobs,
+    and is restarted on the next job submission via ensure_poll_loop().
     """
+    global _poll_task
+
     while True:
         lock_fd = None
         try:
             lock_fd = open(_POLL_LOCK_PATH, "w")
             fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             try:
-                _poll_jobs(settings)
+                has_jobs = _poll_jobs(settings)
             except Exception:
                 logger.exception("Error in job poll loop")
+                has_jobs = True  # keep polling on error
             # Hold lock through the sleep so no other worker polls
             # until this interval is over
             await asyncio.sleep(settings.cluster.poll_interval)
             fcntl.flock(lock_fd, fcntl.LOCK_UN)
             lock_fd.close()
+
+            if not has_jobs:
+                logger.info("No active jobs — poll loop stopping")
+                _poll_task = None
+                return
         except OSError:
             # Another worker is polling this cycle — skip and retry
             if lock_fd:
@@ -835,9 +865,16 @@ async def _poll_loop(settings):
 
 
 def _poll_jobs(settings):
-    """Run one poll cycle: query bjobs via worker, update DB."""
+    """Run one poll cycle: query bjobs via worker, update DB.
+
+    Returns True if there are active jobs to continue polling,
+    False if the loop can stop.
+    """
     with db.get_db_session(settings.db_url) as session:
         active_jobs = db.get_active_jobs(session)
+
+        if not active_jobs:
+            return False
 
         # Handle zombie jobs (no cluster_job_id after timeout)
         jobs_to_poll = []
@@ -855,7 +892,7 @@ def _poll_jobs(settings):
             jobs_to_poll.append(db_job)
 
         if not jobs_to_poll:
-            return
+            return True  # zombie jobs still pending, keep polling
 
         # Pick any user to run bjobs as (bjobs -u all sees all users' jobs)
         poll_username = jobs_to_poll[0].username
@@ -876,7 +913,7 @@ def _poll_jobs(settings):
             })
         except ValueError as e:
             logger.warning(f"Poll failed: {e}")
-            return
+            return True  # keep polling on error
 
         polled_jobs = result.get("jobs", {})
 
@@ -898,6 +935,8 @@ def _poll_jobs(settings):
                 finished_at=finished_at,
             )
             logger.info(f"Job {db_job.id} status updated: {old_status} -> {new_status}")
+
+        return True
 
 
 def _parse_iso_dt(s: str | None) -> datetime | None:
@@ -1204,6 +1243,7 @@ async def submit_job(
         db_job = db.get_job(session, job_id, username)
         session.expunge(db_job)
 
+    ensure_poll_loop()
     logger.info(f"Job {db_job.id} submitted for user {username} in {work_dir}")
     return db_job
 
