@@ -202,6 +202,61 @@ function makeBrowseLink(
   return `/browse/${escapedFspName}`;
 }
 
+/**
+ * Resolves a raw filesystem path (in any format: Linux, Mac, or Windows) to the
+ * best-matching FSP and remaining subpath. Used by both the navigation input and
+ * the file selector to accept pasted paths in any OS format.
+ *
+ * Returns null if no FSP matches the given path.
+ */
+function resolvePathToFsp(
+  rawPath: string,
+  zonesAndFspData: Record<string, unknown>
+): { fsp: FileSharePath; subpath: string } | null {
+  const normalizedInput = convertBackToForwardSlash(rawPath.trim());
+
+  let bestFsp: FileSharePath | null = null;
+  let bestMountPath = '';
+
+  for (const [key, value] of Object.entries(zonesAndFspData)) {
+    if (!key.startsWith('fsp_')) {
+      continue;
+    }
+    const fsp = value as FileSharePath;
+
+    const candidatePaths = [
+      fsp.mount_path,
+      fsp.linux_path,
+      fsp.mac_path,
+      fsp.windows_path ? convertBackToForwardSlash(fsp.windows_path) : null
+    ];
+
+    for (const candidatePath of candidatePaths) {
+      if (
+        candidatePath &&
+        normalizedInput.startsWith(candidatePath) &&
+        candidatePath.length > bestMountPath.length
+      ) {
+        const rest = normalizedInput.slice(candidatePath.length);
+        if (rest === '' || rest.startsWith('/')) {
+          bestFsp = fsp;
+          bestMountPath = candidatePath;
+        }
+      }
+    }
+  }
+
+  if (!bestFsp) {
+    return null;
+  }
+
+  let subpath = normalizedInput.slice(bestMountPath.length);
+  if (subpath.startsWith('/')) {
+    subpath = subpath.slice(1);
+  }
+  return { fsp: bestFsp, subpath };
+}
+
 export {
   convertBackToForwardSlash,
   escapePathForUrl,
@@ -213,5 +268,6 @@ export {
   makePathSegmentArray,
   normalizePosixStylePath,
   removeLastSegmentFromPath,
-  removeTrailingSlashes
+  removeTrailingSlashes,
+  resolvePathToFsp
 };

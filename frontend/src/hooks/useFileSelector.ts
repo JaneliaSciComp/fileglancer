@@ -5,7 +5,10 @@ import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useProfileContext } from '@/contexts/ProfileContext';
 import useFileQuery from '@/queries/fileQueries';
-import { getPreferredPathForDisplay } from '@/utils/pathHandling';
+import {
+  getPreferredPathForDisplay,
+  resolvePathToFsp
+} from '@/utils/pathHandling';
 import { makeMapKey } from '@/utils';
 import { filterFspsByGroupMembership } from '@/utils/groupFiltering';
 import type { FileOrFolder, FileSharePath, Zone } from '@/shared.types';
@@ -92,35 +95,10 @@ export default function useFileSelector(options?: FileSelectorOptions) {
     }
     lastResolvedPath.current = initialPath;
 
-    // Find the FSP whose mount_path is the longest prefix of initialPath
-    let bestFsp: FileSharePath | null = null;
-    let bestMountPath = '';
-    for (const [key, value] of Object.entries(zonesAndFspQuery.data)) {
-      if (!key.startsWith('fsp_')) {
-        continue;
-      }
-      const fsp = value as FileSharePath;
-      const mountPath = fsp.mount_path;
-      if (
-        mountPath &&
-        initialPath.startsWith(mountPath) &&
-        mountPath.length > bestMountPath.length
-      ) {
-        // Ensure it's a proper prefix (matches at a path boundary)
-        const rest = initialPath.slice(mountPath.length);
-        if (rest === '' || rest.startsWith('/')) {
-          bestFsp = fsp;
-          bestMountPath = mountPath;
-        }
-      }
-    }
+    const resolved = resolvePathToFsp(initialPath, zonesAndFspQuery.data);
 
-    if (bestFsp) {
-      let subPath = initialPath.slice(bestMountPath.length);
-      // Remove leading slash from subpath
-      if (subPath.startsWith('/')) {
-        subPath = subPath.slice(1);
-      }
+    if (resolved) {
+      let subPath = resolved.subpath;
       // For file mode, navigate to the parent directory
       if (subPath && mode !== 'directory') {
         const lastSlash = subPath.lastIndexOf('/');
@@ -134,7 +112,7 @@ export default function useFileSelector(options?: FileSelectorOptions) {
       setState({
         currentLocation: {
           type: 'filesystem',
-          fspName: bestFsp.name,
+          fspName: resolved.fsp.name,
           path: subPath || '.'
         },
         selectedItem: null
