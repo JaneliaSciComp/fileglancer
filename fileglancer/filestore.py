@@ -334,6 +334,42 @@ class Filestore:
         )
 
 
+    def _file_info_from_direntry(self, entry: os.DirEntry, current_user: str = None, session = None) -> FileInfo:
+        """Build a FileInfo from a DirEntry, using entry.stat() instead of os.lstat/os.stat.
+
+        DirEntry.stat(follow_symlinks=False) uses fstatat() with the directory fd
+        still open, which is significantly faster than os.lstat() on a full path.
+
+        This method is only called from yield_file_infos_paginated where the
+        parent directory was already validated by _check_path_in_root, so entries
+        from os.scandir() are guaranteed to be within root.
+        """
+        root_real = os.path.realpath(self.root_path)
+        full_path = entry.path
+
+        lstat_result = entry.stat(follow_symlinks=False)
+        is_symlink = stat.S_ISLNK(lstat_result.st_mode)
+        if is_symlink:
+            try:
+                stat_result = entry.stat(follow_symlinks=True)
+            except (FileNotFoundError, PermissionError, OSError) as e:
+                logger.warning(f"Broken symlink detected: {full_path}: {e}")
+                stat_result = lstat_result
+        else:
+            stat_result = lstat_result
+
+        full_real = os.path.realpath(full_path)
+        if full_real == root_real:
+            rel_path = '.'
+        else:
+            rel_path = os.path.relpath(full_real, root_real)
+
+        return FileInfo.from_stat(
+            rel_path, full_path, lstat_result, stat_result,
+            current_user=current_user, session=session,
+            root_path=self.root_path,
+        )
+
     def get_root_path(self) -> str:
         """
         Get the root path of the Filestore.
@@ -509,12 +545,12 @@ class Filestore:
         has_more = len(entries) > limit
         page_entries = entries[:limit]
 
-        # Stat only the page entries
+        # Build FileInfo using DirEntry.stat() (faster than os.lstat on full path)
         file_infos = []
         for entry in page_entries:
             try:
                 file_infos.append(
-                    self._get_file_info_from_path(entry.path, current_user, session)
+                    self._file_info_from_direntry(entry, current_user, session)
                 )
             except PermissionError as e:
                 logger.error(f"Permission denied accessing entry: {entry.path}: {e}")
