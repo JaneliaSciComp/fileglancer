@@ -20,6 +20,10 @@ from .utils import is_likely_binary
 # Default buffer size for streaming file contents
 DEFAULT_BUFFER_SIZE = 8192
 
+# Valid sort fields and directions for paginated listing
+VALID_SORT_FIELDS = {"name", "type", "size", "last_modified"}
+VALID_SORT_DIRS = {"asc", "desc"}
+
 
 class RootCheckError(ValueError):
     """
@@ -153,21 +157,18 @@ class FileInfo(BaseModel):
         try:
             owner = pwd.getpwuid(stat_result.st_uid).pw_name
         except KeyError:
-            # If the user ID is not found, use the user ID as the owner
             owner = str(stat_result.st_uid)
 
         try:
             group = grp.getgrgid(stat_result.st_gid).gr_name
         except KeyError:
-            # If the group ID is not found, use the group ID as the group
             group = str(stat_result.st_gid)
 
         # Calculate read/write permissions for current user
         hasRead = None
         hasWrite = None
         if current_user is not None:
-            hasRead = cls._has_read_permission(stat_result, current_user, owner, group)
-            hasWrite = cls._has_write_permission(stat_result, current_user, owner, group)
+            hasRead, hasWrite = cls._check_permissions(stat_result, current_user, owner, group)
 
         # Resolve symlink target to file share path if applicable
         symlink_target_fsp = cls._get_symlink_target_fsp(absolute_path, is_symlink, session, root_path)
@@ -189,60 +190,33 @@ class FileInfo(BaseModel):
         )
 
     @staticmethod
-    def _has_read_permission(stat_result: os.stat_result, current_user: str, owner: str, group: str) -> bool:
-        """Check if current user has read permission"""
+    def _check_permissions(stat_result: os.stat_result, current_user: str,
+                           owner: str, group: str) -> tuple[bool, bool]:
+        """Check if current user has read and write permission.
+
+        Returns (hasRead, hasWrite) in a single pass with one getgrall() call.
+        """
         mode = stat_result.st_mode
 
-        # Check owner permissions
         if current_user == owner:
-            return bool(mode & stat.S_IRUSR)
+            return bool(mode & stat.S_IRUSR), bool(mode & stat.S_IWUSR)
 
-        # Check group permissions
+        # Compute group membership once
         try:
-            user_groups = [g.gr_name for g in grp.getgrall() if current_user in g.gr_mem]
-            # Also add user's primary group
+            user_groups = {g.gr_name for g in grp.getgrall() if current_user in g.gr_mem}
             try:
                 primary_gid = pwd.getpwnam(current_user).pw_gid
                 primary_group = grp.getgrgid(primary_gid).gr_name
-                user_groups.append(primary_group)
+                user_groups.add(primary_group)
             except (KeyError, OSError):
                 pass
 
             if group in user_groups:
-                return bool(mode & stat.S_IRGRP)
+                return bool(mode & stat.S_IRGRP), bool(mode & stat.S_IWGRP)
         except (KeyError, OSError):
             pass
 
-        # Check other permissions
-        return bool(mode & stat.S_IROTH)
-
-    @staticmethod
-    def _has_write_permission(stat_result: os.stat_result, current_user: str, owner: str, group: str) -> bool:
-        """Check if current user has write permission"""
-        mode = stat_result.st_mode
-
-        # Check owner permissions
-        if current_user == owner:
-            return bool(mode & stat.S_IWUSR)
-
-        # Check group permissions
-        try:
-            user_groups = [g.gr_name for g in grp.getgrall() if current_user in g.gr_mem]
-            # Also add user's primary group
-            try:
-                primary_gid = pwd.getpwnam(current_user).pw_gid
-                primary_group = grp.getgrgid(primary_gid).gr_name
-                user_groups.append(primary_group)
-            except (KeyError, OSError):
-                pass
-
-            if group in user_groups:
-                return bool(mode & stat.S_IWGRP)
-        except (KeyError, OSError):
-            pass
-
-        # Check other permissions
-        return bool(mode & stat.S_IWOTH)
+        return bool(mode & stat.S_IROTH), bool(mode & stat.S_IWOTH)
 
 
 class Filestore:
