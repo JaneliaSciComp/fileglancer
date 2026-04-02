@@ -577,17 +577,16 @@ class Filestore:
         """
         full_path = self._check_path_in_root(path)
 
-        entries = os.listdir(full_path)
+        entries = list(os.scandir(full_path))
         # Sort entries in alphabetical order, with directories listed first
-        entries.sort(key=lambda e: (not os.path.isdir(
-                                        os.path.join(full_path, e)), e))
+        # DirEntry.is_dir() is free on Linux (cached from readdir)
+        entries.sort(key=lambda e: (not e.is_dir(follow_symlinks=False), e.name))
         for entry in entries:
-            entry_path = os.path.join(full_path, entry)
             try:
-                yield self._get_file_info_from_path(entry_path, current_user, session)
+                yield self._file_info_from_direntry(entry, current_user, session)
             except PermissionError as e:
                 # Skip files we don't have permission to access
-                logger.error(f"Permission denied accessing entry: {entry_path}: {e}")
+                logger.error(f"Permission denied accessing entry: {entry.path}: {e}")
                 continue
 
 
