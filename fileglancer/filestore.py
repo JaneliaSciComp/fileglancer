@@ -130,7 +130,8 @@ class FileInfo(BaseModel):
     def from_stat(cls, path: str, absolute_path: str,
                   lstat_result: os.stat_result, stat_result: os.stat_result,
                   current_user: str = None, session = None,
-                  root_path: Optional[str] = None):
+                  root_path: Optional[str] = None,
+                  user_groups: Optional[set[str]] = None):
         """
         Create FileInfo from pre-computed stat results.
 
@@ -142,6 +143,7 @@ class FileInfo(BaseModel):
             current_user: Username for permission checking (optional).
             session: Database session for symlink resolution (optional).
             root_path: Filestore root for defense-in-depth validation in symlink reading (optional).
+            user_groups: Pre-computed user group set to avoid per-file getgrall() (optional).
         """
         if path is None or path == "":
             raise ValueError("Path cannot be None or empty")
@@ -168,7 +170,7 @@ class FileInfo(BaseModel):
         hasRead = None
         hasWrite = None
         if current_user is not None:
-            hasRead, hasWrite = cls._check_permissions(stat_result, current_user, owner, group)
+            hasRead, hasWrite = cls._check_permissions(stat_result, current_user, owner, group, user_groups)
 
         # Resolve symlink target to file share path if applicable
         symlink_target_fsp = cls._get_symlink_target_fsp(absolute_path, is_symlink, session, root_path)
@@ -190,31 +192,43 @@ class FileInfo(BaseModel):
         )
 
     @staticmethod
+    def _get_user_groups(username: str) -> set[str]:
+        """Compute all groups a user belongs to. Call once per listing, not per file."""
+        groups: set[str] = set()
+        try:
+            for g in grp.getgrall():
+                if username in g.gr_mem:
+                    groups.add(g.gr_name)
+        except (KeyError, OSError):
+            pass
+        try:
+            primary_gid = pwd.getpwnam(username).pw_gid
+            primary_group = grp.getgrgid(primary_gid).gr_name
+            groups.add(primary_group)
+        except (KeyError, OSError):
+            pass
+        return groups
+
+    @staticmethod
     def _check_permissions(stat_result: os.stat_result, current_user: str,
-                           owner: str, group: str) -> tuple[bool, bool]:
+                           owner: str, group: str,
+                           user_groups: Optional[set[str]] = None) -> tuple[bool, bool]:
         """Check if current user has read and write permission.
 
-        Returns (hasRead, hasWrite) in a single pass with one getgrall() call.
+        Args:
+            user_groups: Pre-computed set of group names the user belongs to.
+                When provided, avoids the expensive grp.getgrall() call.
         """
         mode = stat_result.st_mode
 
         if current_user == owner:
             return bool(mode & stat.S_IRUSR), bool(mode & stat.S_IWUSR)
 
-        # Compute group membership once
-        try:
-            user_groups = {g.gr_name for g in grp.getgrall() if current_user in g.gr_mem}
-            try:
-                primary_gid = pwd.getpwnam(current_user).pw_gid
-                primary_group = grp.getgrgid(primary_gid).gr_name
-                user_groups.add(primary_group)
-            except (KeyError, OSError):
-                pass
+        if user_groups is None:
+            user_groups = FileInfo._get_user_groups(current_user)
 
-            if group in user_groups:
-                return bool(mode & stat.S_IRGRP), bool(mode & stat.S_IWGRP)
-        except (KeyError, OSError):
-            pass
+        if group in user_groups:
+            return bool(mode & stat.S_IRGRP), bool(mode & stat.S_IWGRP)
 
         return bool(mode & stat.S_IROTH), bool(mode & stat.S_IWOTH)
 
@@ -262,7 +276,8 @@ class Filestore:
         return full_path
 
 
-    def _get_file_info_from_path(self, full_path: str, current_user: str = None, session = None) -> FileInfo:
+    def _get_file_info_from_path(self, full_path: str, current_user: str = None, session = None,
+                                    user_groups: Optional[set[str]] = None) -> FileInfo:
         """
         Get the FileInfo for a file or directory at the given path.
 
@@ -331,10 +346,12 @@ class Filestore:
             rel_path, full_path, lstat_result, stat_result,
             current_user=current_user, session=session,
             root_path=self.root_path,
+            user_groups=user_groups,
         )
 
 
-    def _file_info_from_direntry(self, entry: os.DirEntry, current_user: str = None, session = None) -> FileInfo:
+    def _file_info_from_direntry(self, entry: os.DirEntry, current_user: str = None, session = None,
+                                    user_groups: Optional[set[str]] = None) -> FileInfo:
         """Build a FileInfo from a DirEntry, using entry.stat() instead of os.lstat/os.stat.
 
         DirEntry.stat(follow_symlinks=False) uses fstatat() with the directory fd
@@ -368,6 +385,7 @@ class Filestore:
             rel_path, full_path, lstat_result, stat_result,
             current_user=current_user, session=session,
             root_path=self.root_path,
+            user_groups=user_groups,
         )
 
     def get_root_path(self) -> str:
@@ -523,6 +541,9 @@ class Filestore:
         """
         full_path = self._check_path_in_root(path)
 
+        # Compute user groups once for the entire listing
+        user_groups = FileInfo._get_user_groups(current_user) if current_user else None
+
         # Collect and sort all entries — scandir's is_dir() is free on Linux
         entries = list(os.scandir(full_path))
         entries.sort(key=lambda e: (not e.is_dir(follow_symlinks=False), e.name))
@@ -550,7 +571,7 @@ class Filestore:
         for entry in page_entries:
             try:
                 file_infos.append(
-                    self._file_info_from_direntry(entry, current_user, session)
+                    self._file_info_from_direntry(entry, current_user, session, user_groups)
                 )
             except PermissionError as e:
                 logger.error(f"Permission denied accessing entry: {entry.path}: {e}")
@@ -577,13 +598,16 @@ class Filestore:
         """
         full_path = self._check_path_in_root(path)
 
+        # Compute user groups once for the entire listing
+        user_groups = FileInfo._get_user_groups(current_user) if current_user else None
+
         entries = list(os.scandir(full_path))
         # Sort entries in alphabetical order, with directories listed first
         # DirEntry.is_dir() is free on Linux (cached from readdir)
         entries.sort(key=lambda e: (not e.is_dir(follow_symlinks=False), e.name))
         for entry in entries:
             try:
-                yield self._file_info_from_direntry(entry, current_user, session)
+                yield self._file_info_from_direntry(entry, current_user, session, user_groups)
             except PermissionError as e:
                 # Skip files we don't have permission to access
                 logger.error(f"Permission denied accessing entry: {entry.path}: {e}")
