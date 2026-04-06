@@ -216,16 +216,18 @@ export default function FileBrowser({
           }}
         />
       ) : zarrMetadataQuery.data?.metadata ? (
-        <ZarrPreview
-          availableVersions={availableVersions}
-          fspName={fileQuery.data?.currentFileSharePath?.name ?? ''}
-          layerType={layerType}
-          mainPanelWidth={mainPanelWidth}
-          openWithToolUrls={openWithToolUrls}
-          path={fileQuery.data?.currentFileOrFolder?.path ?? ''}
-          thumbnailQuery={thumbnailQuery}
-          zarrMetadataQuery={zarrMetadataQuery}
-        />
+        <div className="mb-3">
+          <ZarrPreview
+            availableVersions={availableVersions}
+            fspName={fileQuery.data?.currentFileSharePath?.name ?? ''}
+            layerType={layerType}
+            mainPanelWidth={mainPanelWidth}
+            openWithToolUrls={openWithToolUrls}
+            path={fileQuery.data?.currentFileOrFolder?.path ?? ''}
+            thumbnailQuery={thumbnailQuery}
+            zarrMetadataQuery={zarrMetadataQuery}
+          />
+        </div>
       ) : isZarrNullMetadata ? (
         <MetadataHint
           variant={
@@ -251,13 +253,15 @@ export default function FileBrowser({
           }}
         />
       ) : n5MetadataQuery.data ? (
-        <N5Preview
-          fspName={fileQuery.data?.currentFileSharePath?.name ?? ''}
-          mainPanelWidth={mainPanelWidth}
-          n5MetadataQuery={n5MetadataQuery}
-          openWithToolUrls={n5OpenWithToolUrls}
-          path={fileQuery.data?.currentFileOrFolder?.path ?? ''}
-        />
+        <div className="mb-3">
+          <N5Preview
+            fspName={fileQuery.data?.currentFileSharePath?.name ?? ''}
+            mainPanelWidth={mainPanelWidth}
+            n5MetadataQuery={n5MetadataQuery}
+            openWithToolUrls={n5OpenWithToolUrls}
+            path={fileQuery.data?.currentFileOrFolder?.path ?? ''}
+          />
+        </div>
       ) : null}
 
       {/* 2nd case N5/Zarr hints req'd: no detection fired, but directory has Zarr/N5 extension signals */}
