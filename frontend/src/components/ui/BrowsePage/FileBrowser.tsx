@@ -301,7 +301,7 @@ export default function FileBrowser({
           </div>
         </div>
       ) : displayFiles.length > 0 ? (
-        <div className="flex flex-col flex-1 min-h-0" data-tour="file-browser">
+        <div data-tour="file-browser">
           <Table
             data={displayFiles}
             handleContextMenuClick={handleFileContextMenu}

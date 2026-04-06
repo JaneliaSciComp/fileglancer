@@ -74,7 +74,26 @@ export default function Table({
   } = useFileBrowserContext();
   const navigate = useNavigate();
   const [sorting, setSorting] = useState<SortingState>([]);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  // Use the nearest scrollable ancestor as the virtualizer's scroll element
+  // so the entire page (zarr preview + header + rows) scrolls together.
+  const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = tableRef.current;
+    if (!el) {
+      return;
+    }
+    let parent = el.parentElement;
+    while (parent) {
+      const { overflowY } = getComputedStyle(parent);
+      if (overflowY === 'auto' || overflowY === 'scroll') {
+        setScrollElement(parent);
+        return;
+      }
+      parent = parent.parentElement;
+    }
+  }, []);
   const sortingEnabled = !hasNextPage;
 
   const selectedFileNames = useMemo(
@@ -192,9 +211,10 @@ export default function Table({
 
   const virtualizer = useVirtualizer({
     count: rows.length,
-    getScrollElement: () => scrollContainerRef.current,
+    getScrollElement: () => scrollElement,
     estimateSize: () => ROW_HEIGHT,
-    overscan: OVERSCAN
+    overscan: OVERSCAN,
+    scrollMargin: tableRef.current?.offsetTop ?? 0
   });
 
   // Trigger loading more data when scrolling near the bottom
@@ -285,8 +305,8 @@ export default function Table({
   });
 
   return (
-    <div className="min-w-full bg-background select-none flex flex-col flex-1 min-h-0">
-      <div className="bg-background border-b border-surface flex-shrink-0">
+    <div className="min-w-full bg-background select-none" ref={tableRef}>
+      <div className="bg-background border-b border-surface">
         {table.getHeaderGroups().map(headerGroup => (
           <div className="flex w-full" key={headerGroup.id}>
             {headerGroup.headers.map(header => {
@@ -335,64 +355,59 @@ export default function Table({
           </div>
         ))}
       </div>
-      <div className="overflow-auto flex-1" ref={scrollContainerRef}>
-        <div
-          style={{
-            height: `${virtualizer.getTotalSize()}px`,
-            position: 'relative'
-          }}
-        >
-          {virtualItems.map(virtualRow => {
-            const row = rows[virtualRow.index];
-            const isSelected = selectedFileNames.has(row.original.name);
-            return (
-              <div
-                className={`flex cursor-pointer hover:bg-surface dark:hover:bg-surface-light ${isSelected ? 'bg-primary-light/20 outline outline-1 outline-primary' : virtualRow.index % 2 === 0 ? 'bg-surface-light dark:bg-surface/50' : ''}`}
-                data-index={virtualRow.index}
-                key={row.id}
-                onClick={() =>
-                  handleLeftClick(row.original, showPropertiesDrawer)
-                }
-                onContextMenu={e => handleContextMenuClick(e, row.original)}
-                ref={virtualizer.measureElement}
-                role="row"
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  transform: `translateY(${virtualRow.start}px)`
-                }}
-              >
-                {row.getVisibleCells().map(cell => {
-                  const isFlexColumn = cell.column.id === 'name';
-                  return (
-                    <div
-                      className={`p-3 text-foreground overflow-hidden ${isFlexColumn ? 'flex-1 min-w-0' : 'flex-none'}`}
-                      key={cell.id}
-                      role="cell"
-                      style={{
-                        width: isFlexColumn ? undefined : cell.column.getSize(),
-                        minWidth: cell.column.columnDef.minSize
-                      }}
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-        {isFetchingNextPage ? (
-          <div className="flex items-center justify-center py-3 text-sm text-foreground/60">
-            Loading more files...
-          </div>
-        ) : null}
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          position: 'relative'
+        }}
+      >
+        {virtualItems.map(virtualRow => {
+          const row = rows[virtualRow.index];
+          const isSelected = selectedFileNames.has(row.original.name);
+          return (
+            <div
+              className={`flex cursor-pointer hover:bg-surface dark:hover:bg-surface-light ${isSelected ? 'bg-primary-light/20 outline outline-1 outline-primary' : virtualRow.index % 2 === 0 ? 'bg-surface-light dark:bg-surface/50' : ''}`}
+              data-index={virtualRow.index}
+              key={row.id}
+              onClick={() =>
+                handleLeftClick(row.original, showPropertiesDrawer)
+              }
+              onContextMenu={e => handleContextMenuClick(e, row.original)}
+              ref={virtualizer.measureElement}
+              role="row"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualRow.start - virtualizer.options.scrollMargin}px)`
+              }}
+            >
+              {row.getVisibleCells().map(cell => {
+                const isFlexColumn = cell.column.id === 'name';
+                return (
+                  <div
+                    className={`p-3 text-foreground overflow-hidden ${isFlexColumn ? 'flex-1 min-w-0' : 'flex-none'}`}
+                    key={cell.id}
+                    role="cell"
+                    style={{
+                      width: isFlexColumn ? undefined : cell.column.getSize(),
+                      minWidth: cell.column.columnDef.minSize
+                    }}
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
+      {isFetchingNextPage ? (
+        <div className="flex items-center justify-center py-3 text-sm text-foreground/60">
+          Loading more files...
+        </div>
+      ) : null}
     </div>
   );
 }
