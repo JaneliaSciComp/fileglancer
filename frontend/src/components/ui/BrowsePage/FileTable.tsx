@@ -75,24 +75,38 @@ export default function Table({
   const navigate = useNavigate();
   const [sorting, setSorting] = useState<SortingState>([]);
   const tableRef = useRef<HTMLDivElement>(null);
+  const [tableWidth, setTableWidth] = useState(0);
 
-  // Use the nearest scrollable ancestor as the virtualizer's scroll element
-  // so the entire page (zarr preview + header + rows) scrolls together.
+  // Use the nearest scrollable ancestor (the main panel) as the virtualizer's
+  // scroll element so the entire page (zarr preview + table) scrolls together.
   const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null);
   useEffect(() => {
     const el = tableRef.current;
     if (!el) {
       return;
     }
+
+    // Track table width so the Name column can fill remaining space
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setTableWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(el);
+    setTableWidth(el.offsetWidth);
+
+    // Find scrollable ancestor
     let parent = el.parentElement;
     while (parent) {
       const { overflowY } = getComputedStyle(parent);
       if (overflowY === 'auto' || overflowY === 'scroll') {
         setScrollElement(parent);
-        return;
+        break;
       }
       parent = parent.parentElement;
     }
+
+    return () => observer.disconnect();
   }, []);
   const sortingEnabled = !hasNextPage;
 
@@ -101,11 +115,16 @@ export default function Table({
     [fileBrowserState.selectedFiles]
   );
 
+  // Fixed column widths — Name gets whatever space remains
+  const FIXED_COLUMNS_WIDTH = 80 + 175 + 100 + 70; // Type + Last Modified + Size + Actions
+  const nameColumnSize = Math.max(200, tableWidth - FIXED_COLUMNS_WIDTH);
+
   const columns = useMemo<ColumnDef<FileOrFolder>[]>(
     () => [
       {
         accessorKey: 'name',
         header: 'Name',
+        size: nameColumnSize,
         cell: ({ getValue, row }) => {
           const file = row.original;
           const name = getValue() as string;
@@ -149,8 +168,7 @@ export default function Table({
             </div>
           );
         },
-        size: 250,
-        minSize: 100
+        minSize: 200
       },
       typeColumn,
       lastModifiedColumn,
@@ -182,7 +200,11 @@ export default function Table({
         enableSorting: false
       }
     ],
-    [fileQuery.data?.currentFileSharePath, handleContextMenuClick]
+    [
+      fileQuery.data?.currentFileSharePath,
+      handleContextMenuClick,
+      nameColumnSize
+    ]
   );
 
   // Clear sort when sorting becomes disabled (more pages still loading)
@@ -309,49 +331,46 @@ export default function Table({
       <div className="bg-background border-b border-surface">
         {table.getHeaderGroups().map(headerGroup => (
           <div className="flex w-full" key={headerGroup.id}>
-            {headerGroup.headers.map(header => {
-              const isFlexColumn = header.column.id === 'name';
-              return (
-                <div
-                  className={`text-left p-3 font-bold text-sm relative ${isFlexColumn ? 'flex-1 min-w-0' : 'flex-none'}`}
-                  key={header.id}
-                  style={{
-                    width: isFlexColumn ? undefined : header.getSize(),
-                    minWidth: header.column.columnDef.minSize
-                  }}
-                >
-                  {header.isPlaceholder ? null : (
-                    <div
-                      className={
-                        header.column.getCanSort()
-                          ? `select-none flex items-center gap-2 ${sortingEnabled ? 'cursor-pointer' : 'cursor-default opacity-50'}`
-                          : 'flex items-center gap-2'
-                      }
-                      onClick={
-                        sortingEnabled
-                          ? header.column.getToggleSortingHandler()
-                          : undefined
-                      }
-                    >
-                      {flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                      {sortingEnabled ? <SortIcons header={header} /> : null}
-                    </div>
-                  )}
-                  {header.column.getCanResize() ? (
-                    <div
-                      className="cursor-col-resize absolute z-10 -right-1 top-0 h-full w-3 bg-transparent group"
-                      onMouseDown={header.getResizeHandler()}
-                      onTouchStart={header.getResizeHandler()}
-                    >
-                      <div className="absolute left-1/2 top-0 h-full w-[1px] bg-surface group-hover:bg-primary group-hover:w-[2px] group-focus:bg-primary group-focus:w-[2px] -translate-x-1/2" />
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
+            {headerGroup.headers.map(header => (
+              <div
+                className="text-left p-3 font-bold text-sm relative flex-none"
+                key={header.id}
+                style={{
+                  width: header.getSize(),
+                  minWidth: header.column.columnDef.minSize
+                }}
+              >
+                {header.isPlaceholder ? null : (
+                  <div
+                    className={
+                      header.column.getCanSort()
+                        ? `select-none flex items-center gap-2 ${sortingEnabled ? 'cursor-pointer' : 'cursor-default opacity-50'}`
+                        : 'flex items-center gap-2'
+                    }
+                    onClick={
+                      sortingEnabled
+                        ? header.column.getToggleSortingHandler()
+                        : undefined
+                    }
+                  >
+                    {flexRender(
+                      header.column.columnDef.header,
+                      header.getContext()
+                    )}
+                    {sortingEnabled ? <SortIcons header={header} /> : null}
+                  </div>
+                )}
+                {header.column.getCanResize() ? (
+                  <div
+                    className="cursor-col-resize absolute z-10 -right-1 top-0 h-full w-3 bg-transparent group"
+                    onMouseDown={header.getResizeHandler()}
+                    onTouchStart={header.getResizeHandler()}
+                  >
+                    <div className="absolute left-1/2 top-0 h-full w-[1px] bg-surface group-hover:bg-primary group-hover:w-[2px] group-focus:bg-primary group-focus:w-[2px] -translate-x-1/2" />
+                  </div>
+                ) : null}
+              </div>
+            ))}
           </div>
         ))}
       </div>
@@ -383,22 +402,19 @@ export default function Table({
                 transform: `translateY(${virtualRow.start - virtualizer.options.scrollMargin}px)`
               }}
             >
-              {row.getVisibleCells().map(cell => {
-                const isFlexColumn = cell.column.id === 'name';
-                return (
-                  <div
-                    className={`p-3 text-foreground overflow-hidden ${isFlexColumn ? 'flex-1 min-w-0' : 'flex-none'}`}
-                    key={cell.id}
-                    role="cell"
-                    style={{
-                      width: isFlexColumn ? undefined : cell.column.getSize(),
-                      minWidth: cell.column.columnDef.minSize
-                    }}
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </div>
-                );
-              })}
+              {row.getVisibleCells().map(cell => (
+                <div
+                  className="p-3 text-foreground overflow-hidden flex-none"
+                  key={cell.id}
+                  role="cell"
+                  style={{
+                    width: cell.column.getSize(),
+                    minWidth: cell.column.columnDef.minSize
+                  }}
+                >
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </div>
+              ))}
             </div>
           );
         })}

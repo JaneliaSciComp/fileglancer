@@ -41,8 +41,8 @@ export const lastModifiedColumn: ColumnDef<FileOrFolder> = {
       {getValue() ? formatUnixTimestamp(getValue() as number) : '—'}
     </Typography>
   ),
-  size: 135,
-  minSize: 135
+  size: 175,
+  minSize: 175
 };
 
 /**
@@ -61,6 +61,6 @@ export const sizeColumn: ColumnDef<FileOrFolder> = {
     const b = rowB.original.is_dir ? -1 : rowB.original.size;
     return a - b;
   },
-  size: 75,
-  minSize: 75
+  size: 100,
+  minSize: 100
 };
