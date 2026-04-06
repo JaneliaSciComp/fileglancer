@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from fileglancer.model import SUPPORTED_TOOLS, AppEntryPoint, JobSubmitRequest
 from fileglancer.apps import (
     _TOOL_REGISTRY,
+    merge_requirements,
     verify_requirements,
     _container_sif_name,
     _build_container_script,
@@ -129,6 +130,63 @@ class TestVerifyRequirementsMiniforge:
         )
         with pytest.raises(ValueError, match="does not satisfy"):
             verify_requirements(["miniforge>=24.0"])
+
+
+# --- merge_requirements tests ---
+
+class TestMergeRequirements:
+    def test_empty_both(self):
+        assert merge_requirements([], []) == []
+
+    def test_manifest_only(self):
+        assert merge_requirements(["pixi>=0.40"], []) == ["pixi>=0.40"]
+
+    def test_entry_point_only(self):
+        assert merge_requirements([], ["apptainer"]) == ["apptainer"]
+
+    def test_disjoint_requirements_merged(self):
+        result = merge_requirements(["pixi>=0.40"], ["apptainer"])
+        assert "pixi>=0.40" in result
+        assert "apptainer" in result
+
+    def test_entry_point_overrides_manifest_version(self):
+        result = merge_requirements(["pixi>=0.40"], ["pixi>=0.50"])
+        assert result == ["pixi>=0.50"]
+
+    def test_entry_point_overrides_manifest_adds_version(self):
+        result = merge_requirements(["pixi"], ["pixi>=0.50"])
+        assert result == ["pixi>=0.50"]
+
+    def test_multiple_manifest_partial_override(self):
+        result = merge_requirements(["pixi>=0.40", "npm"], ["pixi>=0.50"])
+        assert "pixi>=0.50" in result
+        assert "npm" in result
+        assert len(result) == 2
+
+    def test_no_duplicates(self):
+        result = merge_requirements(["pixi>=0.40", "npm"], ["npm", "apptainer"])
+        tools = [r.split(">")[0].split("<")[0].split("=")[0].split("!")[0] for r in result]
+        assert len(tools) == len(set(tools))
+
+
+class TestEntryPointRequirementsValidation:
+    def test_valid_requirements(self):
+        ep = AppEntryPoint(
+            id="t", name="T", command="echo",
+            requirements=["apptainer", "pixi>=0.40"],
+        )
+        assert ep.requirements == ["apptainer", "pixi>=0.40"]
+
+    def test_empty_requirements_default(self):
+        ep = AppEntryPoint(id="t", name="T", command="echo")
+        assert ep.requirements == []
+
+    def test_rejects_unsupported_tool(self):
+        with pytest.raises(ValidationError, match="Unsupported tool"):
+            AppEntryPoint(
+                id="t", name="T", command="echo",
+                requirements=["docker"],
+            )
 
 
 # --- Script generation tests ---

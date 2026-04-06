@@ -193,7 +193,7 @@ export default function FileBrowser({
         action: () => {
           setShowDeleteDialog(true);
         },
-        color: 'text-red-600',
+        color: 'text-error',
         shouldShow: true
       }
     ];

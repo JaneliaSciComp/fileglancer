@@ -413,6 +413,19 @@ class AppEntryPoint(BaseModel):
         description="Default extra arguments for container exec (e.g. '--nv')",
         default=None,
     )
+    requirements: List[str] = Field(
+        description="Required tools for this entry point, e.g. ['apptainer']. Merged with manifest-level requirements.",
+        default=[],
+    )
+
+    @field_validator("requirements")
+    @classmethod
+    def validate_entry_point_requirements(cls, v):
+        for req in v:
+            tool = re.split(r"[><=!]", req)[0].strip()
+            if tool not in SUPPORTED_TOOLS:
+                raise ValueError(f"Unsupported tool: '{tool}'. Supported: {SUPPORTED_TOOLS}")
+        return v
 
     @field_validator("conda_env")
     @classmethod

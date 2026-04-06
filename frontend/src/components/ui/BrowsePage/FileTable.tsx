@@ -349,7 +349,7 @@ export default function Table({
           const isSelected = selectedFileNames.has(row.original.name);
           return (
             <div
-              className={`flex cursor-pointer hover:bg-surface dark:hover:bg-surface-light ${isSelected ? 'bg-primary-light/30 outline outline-1 outline-primary' : virtualRow.index % 2 === 0 ? 'bg-surface-light dark:bg-surface/50' : ''}`}
+              className={`flex cursor-pointer hover:bg-surface dark:hover:bg-surface-light ${isSelected ? 'bg-primary-light/20 outline outline-1 outline-primary' : virtualRow.index % 2 === 0 ? 'bg-surface-light dark:bg-surface/50' : ''}`}
               data-index={virtualRow.index}
               key={row.id}
               onClick={() =>
@@ -370,7 +370,7 @@ export default function Table({
                 const isFlexColumn = cell.column.id === 'name';
                 return (
                   <div
-                    className={`p-3 text-grey-700 overflow-hidden ${isFlexColumn ? 'flex-1 min-w-0' : 'flex-none'}`}
+                    className={`p-3 text-foreground overflow-hidden ${isFlexColumn ? 'flex-1 min-w-0' : 'flex-none'}`}
                     key={cell.id}
                     role="cell"
                     style={{

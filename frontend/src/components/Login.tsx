@@ -57,7 +57,7 @@ export default function Login() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Link
-          className="flex items-start p-6 border rounded-lg hover:bg-accent hover:border-accent-foreground transition-colors group"
+          className="flex items-start p-6 border rounded-lg dark:border-surface-light hover:bg-accent hover:border-accent-foreground transition-colors group"
           to="/help"
         >
           <HiQuestionMarkCircle className="w-8 h-8 mr-4 text-primary flex-shrink-0" />

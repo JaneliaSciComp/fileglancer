@@ -36,7 +36,7 @@ export default function AppCard({
   };
 
   return (
-    <Card className="p-4 flex flex-col gap-3 text-left w-full">
+    <Card className="p-4 flex flex-col gap-3 text-left w-full dark:border-surface-light">
       <div className="flex items-center justify-between">
         <Typography
           className="text-foreground font-semibold truncate"

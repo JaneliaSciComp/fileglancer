@@ -100,49 +100,49 @@ const config = {
         }
       },
       darkColors: {
-        background: '#030712',
-        foreground: '#9CA3AF',
+        background: '#111827', // was #030712 (gray-950) — softened to gray-900 to reduce eye strain
+        foreground: '#D1D5DB', // was #9CA3AF (gray-400) — brightened to gray-300 for comfortable reading
         surface: {
-          default: '#1F2937', // gray-800
-          dark: '#111827', // gray-900
-          light: '#374151', // gray-700
-          foreground: '#E5E7EB' // gray-200
+          default: '#1F2937', // gray-800 (unchanged — now has breathing room from bg)
+          dark: '#171f2e', // slightly darker than surface, clearly distinct from bg
+          light: '#374151', // gray-700 (unchanged)
+          foreground: '#F3F4F6' // was #E5E7EB — now gray-100, crisper headings
         },
         primary: {
-          default: '#36a9b0',
-          dark: '#058d96',
-          light: '#66c7d0',
-          foreground: '#E5E7EB'
+          default: '#45bcc4', // balanced teal — visible for text/outlines, not washed out for buttons
+          dark: '#36a9b0', // deeper variant — good for text on dark surfaces
+          light: '#5cc8cf', // lighter variant for hover/decorative use
+          foreground: '#F3F4F6'
         },
         secondary: {
-          default: '#8B5CF6',
-          dark: '#6D28D9',
-          light: '#C4B5FD',
-          foreground: '#E5E7EB'
+          default: '#A78BFA', // was #8B5CF6 — violet-400, better contrast on surfaces
+          dark: '#8B5CF6', // was #6D28D9 — bumped to pass AA on background
+          light: '#DDD6FE', // was #C4B5FD — lighter for decorative use
+          foreground: '#F3F4F6'
         },
         success: {
-          default: '#22c55e', // main success color (green-500)
-          dark: '#052e16', // darker variant (green-950)
-          light: '#6ee7b7', // lighter variant (emerald-300)
-          foreground: '#E5E7EB' // text color for use on default/dark backgrounds
+          default: '#4ade80', // was #22c55e — green-400 (brighter)
+          dark: '#0a3d1e', // was #052e16 — slightly lighter for better contrast
+          light: '#86efac', // was #6ee7b7
+          foreground: '#F3F4F6'
         },
         info: {
-          default: '#3b82f6', // main info color (blue-500)
-          dark: '#172554', // darker variant (blue-950) - visually darker
-          light: '#93c5fd', // lighter variant (blue-300) - visually lighter
-          foreground: '#E5E7EB' // text color for use on default/dark backgrounds
+          default: '#60a5fa', // was #3b82f6 — blue-400 (brighter)
+          dark: '#1e3a5f', // was #172554 — lighter bg for better contrast with text
+          light: '#93c5fd',
+          foreground: '#F3F4F6'
         },
         warning: {
-          default: '#f59e0b', // main warning color (amber-500)
-          dark: '#451a03', // darker variant (amber-950) - visually darker
-          light: '#fcd34d', // lighter variant (amber-300) - visually lighter
-          foreground: '#E5E7EB' // text color for use on default/dark backgrounds
+          default: '#fbbf24', // was #f59e0b — amber-400
+          dark: '#5c2d0e', // was #451a03 — slightly lighter
+          light: '#fcd34d',
+          foreground: '#F3F4F6'
         },
         error: {
-          default: '#ef4444', // main error color (red-500)
-          dark: '#450a0a', // darker variant (red-950) - visually darker
-          light: '#fca5a5', // lighter variant (red-300) - visually lighter
-          foreground: '#E5E7EB' // text color for use on default/dark backgrounds
+          default: '#f87171', // was #ef4444 — red-400 (brighter)
+          dark: '#5c1414', // was #450a0a — lighter for better contrast
+          light: '#fca5a5',
+          foreground: '#F3F4F6'
         }
       }
     })

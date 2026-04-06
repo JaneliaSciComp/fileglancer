@@ -139,7 +139,8 @@ async def _ensure_repo_cache(url: str, pull: bool = False) -> Path:
             logger.debug(f"Repo cache hit: {owner}/{repo} ({branch})")
             if pull:
                 logger.info(f"Pulling latest for {owner}/{repo} ({branch})")
-                await _run_git(["git", "-C", str(repo_dir), "pull", "origin", branch])
+                await _run_git(["git", "-C", str(repo_dir), "fetch", "origin", branch])
+                await _run_git(["git", "-C", str(repo_dir), "reset", "--hard", f"origin/{branch}"])
         else:
             logger.info(f"Cloning {owner}/{repo} ({branch}) into {repo_dir}")
             repo_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -295,6 +296,36 @@ def _augmented_path(extra_paths: list[str]) -> str:
     if not extra_paths:
         return os.environ.get("PATH", "")
     return os.environ.get("PATH", "") + os.pathsep + os.pathsep.join(extra_paths)
+
+
+def merge_requirements(
+    manifest_requirements: list[str], entry_point_requirements: list[str]
+) -> list[str]:
+    """Merge manifest-level and entry-point-level requirements.
+
+    Entry-point requirements for the same tool override the manifest-level
+    version spec (e.g. entry point 'pixi>=0.50' overrides manifest 'pixi>=0.40').
+    Requirements are deduped by tool name, with entry-point taking precedence.
+    """
+    if not entry_point_requirements:
+        return manifest_requirements
+    if not manifest_requirements:
+        return entry_point_requirements
+
+    # Parse tool names from entry-point requirements
+    ep_tools = set()
+    for req in entry_point_requirements:
+        tool = _REQ_PATTERN.match(req.strip())
+        if tool:
+            ep_tools.add(tool.group(1))
+
+    # Keep manifest requirements that aren't overridden by entry-point
+    merged = [
+        req for req in manifest_requirements
+        if _REQ_PATTERN.match(req.strip()) and _REQ_PATTERN.match(req.strip()).group(1) not in ep_tools
+    ]
+    merged.extend(entry_point_requirements)
+    return merged
 
 
 def verify_requirements(requirements: list[str]):
@@ -831,8 +862,11 @@ async def submit_job(
     if entry_point is None:
         raise ValueError(f"Entry point '{entry_point_id}' not found in manifest")
 
-    # Verify requirements before proceeding
-    verify_requirements(manifest.requirements)
+    # Verify requirements: merge manifest-level with entry-point-level
+    effective_requirements = merge_requirements(
+        manifest.requirements, entry_point.requirements
+    )
+    verify_requirements(effective_requirements)
 
     # Build command (with DB session for path validation against file shares)
     with db.get_db_session(settings.db_url) as session:

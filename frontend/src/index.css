@@ -43,3 +43,16 @@
 .dark .sidebar-scroll::-webkit-scrollbar-thumb {
   background: var(--tw-prose-invert-scrollbar-thumb-dark, #334155);
 }
+
+/* Dark mode: solid primary buttons use a darker teal (#058d96) for better
+   white text contrast, with default primary (#45bcc4) on hover.
+   Border matches background to avoid a lighter outline. */
+.dark .bg-primary {
+  background-color: rgb(5 141 150 / var(--tw-bg-opacity, 1));
+}
+.dark .bg-primary.border-primary {
+  border-color: rgb(5 141 150 / var(--tw-border-opacity, 1));
+}
+.dark .hover\:bg-primary-light:hover {
+  background-color: rgb(var(--color-primary) / var(--tw-bg-opacity, 1));
+}
