@@ -116,7 +116,7 @@ export default function Table({
   );
 
   // Fixed column widths — Name gets whatever space remains
-  const FIXED_COLUMNS_WIDTH = 80 + 175 + 100 + 70; // Type + Last Modified + Size + Actions
+  const FIXED_COLUMNS_WIDTH = 80 + 200 + 100 + 70; // Type + Last Modified + Size + Actions
   const nameColumnSize = Math.max(200, tableWidth - FIXED_COLUMNS_WIDTH);
 
   const columns = useMemo<ColumnDef<FileOrFolder>[]>(

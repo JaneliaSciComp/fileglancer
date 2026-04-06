@@ -41,8 +41,8 @@ export const lastModifiedColumn: ColumnDef<FileOrFolder> = {
       {getValue() ? formatUnixTimestamp(getValue() as number) : '—'}
     </Typography>
   ),
-  size: 175,
-  minSize: 175
+  size: 200,
+  minSize: 200
 };
 
 /**
