@@ -285,11 +285,8 @@ export default function Table({
   });
 
   return (
-    <div
-      className="min-w-full bg-background select-none overflow-auto flex-1"
-      ref={scrollContainerRef}
-    >
-      <div className="sticky top-0 z-10 bg-background border-b border-surface">
+    <div className="min-w-full bg-background select-none flex flex-col flex-1 min-h-0">
+      <div className="bg-background border-b border-surface flex-shrink-0">
         {table.getHeaderGroups().map(headerGroup => (
           <div className="flex w-full" key={headerGroup.id}>
             {headerGroup.headers.map(header => {
@@ -338,59 +335,64 @@ export default function Table({
           </div>
         ))}
       </div>
-      <div
-        style={{
-          height: `${virtualizer.getTotalSize()}px`,
-          position: 'relative'
-        }}
-      >
-        {virtualItems.map(virtualRow => {
-          const row = rows[virtualRow.index];
-          const isSelected = selectedFileNames.has(row.original.name);
-          return (
-            <div
-              className={`flex cursor-pointer hover:bg-surface dark:hover:bg-surface-light ${isSelected ? 'bg-primary-light/20 outline outline-1 outline-primary' : virtualRow.index % 2 === 0 ? 'bg-surface-light dark:bg-surface/50' : ''}`}
-              data-index={virtualRow.index}
-              key={row.id}
-              onClick={() =>
-                handleLeftClick(row.original, showPropertiesDrawer)
-              }
-              onContextMenu={e => handleContextMenuClick(e, row.original)}
-              ref={virtualizer.measureElement}
-              role="row"
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                transform: `translateY(${virtualRow.start}px)`
-              }}
-            >
-              {row.getVisibleCells().map(cell => {
-                const isFlexColumn = cell.column.id === 'name';
-                return (
-                  <div
-                    className={`p-3 text-foreground overflow-hidden ${isFlexColumn ? 'flex-1 min-w-0' : 'flex-none'}`}
-                    key={cell.id}
-                    role="cell"
-                    style={{
-                      width: isFlexColumn ? undefined : cell.column.getSize(),
-                      minWidth: cell.column.columnDef.minSize
-                    }}
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
-      {isFetchingNextPage ? (
-        <div className="flex items-center justify-center py-3 text-sm text-foreground/60">
-          Loading more files...
+      <div className="overflow-auto flex-1" ref={scrollContainerRef}>
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            position: 'relative'
+          }}
+        >
+          {virtualItems.map(virtualRow => {
+            const row = rows[virtualRow.index];
+            const isSelected = selectedFileNames.has(row.original.name);
+            return (
+              <div
+                className={`flex cursor-pointer hover:bg-surface dark:hover:bg-surface-light ${isSelected ? 'bg-primary-light/20 outline outline-1 outline-primary' : virtualRow.index % 2 === 0 ? 'bg-surface-light dark:bg-surface/50' : ''}`}
+                data-index={virtualRow.index}
+                key={row.id}
+                onClick={() =>
+                  handleLeftClick(row.original, showPropertiesDrawer)
+                }
+                onContextMenu={e => handleContextMenuClick(e, row.original)}
+                ref={virtualizer.measureElement}
+                role="row"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${virtualRow.start}px)`
+                }}
+              >
+                {row.getVisibleCells().map(cell => {
+                  const isFlexColumn = cell.column.id === 'name';
+                  return (
+                    <div
+                      className={`p-3 text-foreground overflow-hidden ${isFlexColumn ? 'flex-1 min-w-0' : 'flex-none'}`}
+                      key={cell.id}
+                      role="cell"
+                      style={{
+                        width: isFlexColumn ? undefined : cell.column.getSize(),
+                        minWidth: cell.column.columnDef.minSize
+                      }}
+                    >
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
-      ) : null}
+        {isFetchingNextPage ? (
+          <div className="flex items-center justify-center py-3 text-sm text-foreground/60">
+            Loading more files...
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
