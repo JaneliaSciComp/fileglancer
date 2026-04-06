@@ -357,6 +357,7 @@ export default function Table({
               }
               onContextMenu={e => handleContextMenuClick(e, row.original)}
               ref={virtualizer.measureElement}
+              role="row"
               style={{
                 position: 'absolute',
                 top: 0,
@@ -371,6 +372,7 @@ export default function Table({
                   <div
                     className={`p-3 text-grey-700 overflow-hidden ${isFlexColumn ? 'flex-1 min-w-0' : 'flex-none'}`}
                     key={cell.id}
+                    role="cell"
                     style={{
                       width: isFlexColumn ? undefined : cell.column.getSize(),
                       minWidth: cell.column.columnDef.minSize
