@@ -116,7 +116,7 @@ export default function useFileQuery(
       };
     }
 
-    // Flatten all pages' files
+    // Flatten all pages' files (order preserved from backend sort)
     const allFiles: FileOrFolder[] = [];
     for (const page of data.pages) {
       const rawFiles = 'files' in page ? page.files : [];
@@ -127,14 +127,6 @@ export default function useFileQuery(
         } as FileOrFolder);
       }
     }
-
-    // Sort: directories first, then alphabetically
-    allFiles.sort((a: FileOrFolder, b: FileOrFolder) => {
-      if (a.is_dir === b.is_dir) {
-        return a.name.localeCompare(b.name);
-      }
-      return a.is_dir ? -1 : 1;
-    });
 
     const lastPage = data.pages[data.pages.length - 1];
     const totalCount = lastPage?.total_count ?? null;

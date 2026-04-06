@@ -15,14 +15,9 @@ from loguru import logger
 
 from .database import find_fsp_from_absolute_path
 from .model import FileSharePath
-from .utils import is_likely_binary
 
 # Default buffer size for streaming file contents
 DEFAULT_BUFFER_SIZE = 8192
-
-# Valid sort fields and directions for paginated listing
-VALID_SORT_FIELDS = {"name", "type", "size", "last_modified"}
-VALID_SORT_DIRS = {"asc", "desc"}
 
 
 class RootCheckError(ValueError):
@@ -446,40 +441,6 @@ class Filestore:
         else:
             full_path = os.path.join(self.root_path, path)
         return self._get_file_info_from_path(full_path, current_user, session)
-
-
-    def check_is_binary(self, path: Optional[str] = None, sample_size: int = 4096) -> bool:
-        """
-        Check if a file is likely binary by reading a sample of its contents.
-
-        Args:
-            path (str): The relative path to the file to check.
-                May be None, in which case the root is checked (always returns False for directories).
-            sample_size (int): Number of bytes to read for binary detection. Defaults to 4096.
-
-        Returns:
-            bool: True if the file appears to be binary, False otherwise.
-                Returns False for directories.
-
-        Raises:
-            ValueError: If path attempts to escape root directory
-            FileNotFoundError: If the file does not exist
-            PermissionError: If the file cannot be read
-        """
-        full_path = self._check_path_in_root(path)
-
-        # Directories are not binary
-        if os.path.isdir(full_path):
-            return False
-
-        try:
-            with open(full_path, 'rb') as f:
-                sample = f.read(sample_size)
-                return is_likely_binary(sample)
-        except Exception as e:
-            # If we can't read the file, assume it's binary to be safe
-            logger.warning(f"Could not read file sample for binary detection: {e}")
-            return True
 
 
     def check_is_binary(self, path: Optional[str] = None, sample_size: int = 4096) -> bool:
