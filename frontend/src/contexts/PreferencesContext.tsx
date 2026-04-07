@@ -48,6 +48,7 @@ type PreferencesContextType = {
   layout: string;
   hideDotFiles: boolean;
   areDataLinksAutomatic: boolean;
+  transparentDataLinks: boolean;
   disableNeuroglancerStateGeneration: boolean;
   disableHeuristicalLayerTypeDetection: boolean;
   useLegacyMultichannelApproach: boolean;
@@ -77,6 +78,7 @@ type PreferencesContextType = {
   setLayoutWithPropertiesOpen: () => Promise<Result<void>>;
   toggleHideDotFiles: () => Promise<Result<void>>;
   toggleAutomaticDataLinks: () => Promise<Result<void>>;
+  toggleTransparentDataLinks: () => Promise<Result<void>>;
   toggleDisableNeuroglancerStateGeneration: () => Promise<Result<void>>;
   toggleDisableHeuristicalLayerTypeDetection: () => Promise<Result<void>>;
   toggleUseLegacyMultichannelApproach: () => Promise<Result<void>>;
@@ -209,6 +211,13 @@ export const PreferencesProvider = ({
     return togglePreference(
       'areDataLinksAutomatic',
       preferencesQuery.data?.areDataLinksAutomatic ?? true
+    );
+  };
+
+  const toggleTransparentDataLinks = async (): Promise<Result<void>> => {
+    return togglePreference(
+      'transparentDataLinks',
+      preferencesQuery.data?.transparentDataLinks ?? false
     );
   };
 
@@ -524,6 +533,7 @@ export const PreferencesProvider = ({
     hideDotFiles: preferencesQuery.data?.hideDotFiles || false,
     areDataLinksAutomatic:
       preferencesQuery.data?.areDataLinksAutomatic ?? false,
+    transparentDataLinks: preferencesQuery.data?.transparentDataLinks ?? false,
     disableNeuroglancerStateGeneration:
       preferencesQuery.data?.disableNeuroglancerStateGeneration || false,
     disableHeuristicalLayerTypeDetection:
@@ -555,6 +565,7 @@ export const PreferencesProvider = ({
     setLayoutWithPropertiesOpen,
     toggleHideDotFiles,
     toggleAutomaticDataLinks,
+    toggleTransparentDataLinks,
     toggleDisableNeuroglancerStateGeneration,
     toggleDisableHeuristicalLayerTypeDetection,
     toggleUseLegacyMultichannelApproach,
