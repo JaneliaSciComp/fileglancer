@@ -4,6 +4,7 @@
 import { useState, SetStateAction } from 'react';
 import type { ReactNode, Dispatch } from 'react';
 import { Button, Typography } from '@material-tailwind/react';
+import { Link } from 'react-router';
 
 import type { ProxiedPath } from '@/contexts/ProxiedPathContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
@@ -14,7 +15,7 @@ import type { FileSharePath } from '@/shared.types';
 import type { PendingToolKey } from '@/hooks/useZarrMetadata';
 import FgDialog from './FgDialog';
 import TextWithFilePath from './TextWithFilePath';
-import AutomaticLinksToggle from '@/components/ui/PreferencesPage/DataLinkOptions';
+import DataLinkOptions from '@/components/ui/PreferencesPage/DataLinkOptions';
 import DeleteBtn from '@/components/ui/buttons/DeleteBtn';
 
 interface CommonDataLinkDialogProps {
@@ -105,7 +106,13 @@ function BtnContainer({ children }: { readonly children: ReactNode }) {
 
 export default function DataLinkDialog(props: DataLinkDialogProps) {
   const { fspName, filePath } = useFileBrowserContext();
-  const { pathPreference, areDataLinksAutomatic } = usePreferencesContext();
+  const {
+    pathPreference,
+    areDataLinksAutomatic,
+    toggleAutomaticDataLinks,
+    transparentDataLinks,
+    toggleTransparentDataLinks
+  } = usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const [localAreDataLinksAutomatic] = useState(areDataLinksAutomatic);
 
@@ -130,6 +137,11 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
   }
   const displayPath = getDisplayPath();
 
+  // Generate a preview data link URL
+  const folderNameOnly = filePath ? filePath.split('/').pop() || filePath : '';
+  const pathPortion = transparentDataLinks ? filePath || '' : folderNameOnly;
+  const dataLinkPreview = `https://.../<key>/${pathPortion}`;
+
   return (
     <FgDialog
       onClose={() => {
@@ -140,29 +152,38 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
       }}
       open={props.showDataLinkDialog}
     >
-      <div className="flex flex-col gap-4 my-4">
+      <div className="flex flex-col gap-2 my-4">
         {props.action === 'create' && localAreDataLinksAutomatic ? (
           <> </>
         ) : props.action === 'create' && !localAreDataLinksAutomatic ? (
           <>
-            <TextWithFilePath
-              path={displayPath}
-              text="Are you sure you want to create a data link for this path?"
-            />
+            <Typography className="text-foreground font-semibold">
+              Are you sure you want to create a data link?
+            </Typography>
             <Typography className="text-foreground">
               If you share the data link with internal collaborators, they will
               be able to view these data.
             </Typography>
-            <div className="flex flex-col gap-2">
-              <Typography className="font-semibold text-foreground">
-                Don't ask me this again:
-              </Typography>
-              <AutomaticLinksToggle checkboxesOnly />
-            </div>
             <BtnContainer>
               <CreateLinkBtn onConfirm={props.onConfirm} />
               <CancelBtn onCancel={props.onCancel} />
             </BtnContainer>
+            <div className="flex flex-col gap-2 mt-4">
+              <Typography className="font-semibold text-foreground">
+                Data link settings:
+              </Typography>
+              <DataLinkOptions checkboxesOnly />
+              <Typography className="text-foreground text-sm font-mono break-all bg-surface/30 p-2 rounded">
+                {dataLinkPreview}
+              </Typography>
+              <Typography className="text-xs text-foreground">
+                You can always modify settings on the{' '}
+                <Link className="text-primary underline" to="/preferences">
+                  preferences page
+                </Link>{' '}
+                .
+              </Typography>
+            </div>
           </>
         ) : null}
         {props.action === 'delete' ? (
