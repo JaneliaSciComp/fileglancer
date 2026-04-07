@@ -590,7 +590,7 @@ def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
         raise ValueError(f"Path {path} is not accessible relative to {fsp_name}")
 
 
-def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_name: str, path: str) -> ProxiedPathDB:
+def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_name: str, path: str, is_transparent: bool = False) -> ProxiedPathDB:
     """Create a new proxied path"""
     _validate_proxied_path(session, fsp_name, path)
 
@@ -602,6 +602,7 @@ def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_
         sharing_name=sharing_name,
         fsp_name=fsp_name,
         path=path,
+        is_transparent=is_transparent,
         created_at=now,
         updated_at=now
     )

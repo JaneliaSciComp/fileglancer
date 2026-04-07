@@ -95,7 +95,10 @@ def _convert_external_bucket(db_bucket: db.ExternalBucketDB) -> ExternalBucket:
 def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optional[HttpUrl]) -> ProxiedPath:
     """Convert a database ProxiedPathDB model to a Pydantic ProxiedPath model"""
     if external_proxy_url:
-        url = f"{external_proxy_url}/{db_path.sharing_key}/{quote(db_path.sharing_name)}"
+        if db_path.is_transparent:
+            url = f"{external_proxy_url}/{db_path.sharing_key}/{quote(db_path.path, safe='/')}"
+        else:
+            url = f"{external_proxy_url}/{db_path.sharing_key}/{quote(os.path.basename(db_path.path))}"
     else:
         logger.warning(f"No external proxy URL was provided, proxy links will not be available.")
         url = None
@@ -849,14 +852,15 @@ def create_app(settings):
               description="Create a new proxied path")
     async def create_proxied_path(fsp_name: str = Query(..., description="The name of the file share path that this proxied path is associated with"),
                                   path: str = Query(..., description="The path relative to the file share path mount point"),
+                                  is_transparent: bool = Query(False, description="Whether to create a transparent link"),
                                   username: str = Depends(get_current_user)):
 
         sharing_name = os.path.basename(path)
-        logger.info(f"Creating proxied path for {username} with sharing name {sharing_name} and fsp_name {fsp_name} and path {path}")
+        logger.info(f"Creating proxied path for {username} with sharing name {sharing_name} and fsp_name {fsp_name} and path {path} (transparent={is_transparent})")
         with db.get_db_session(settings.db_url) as session:
             with _get_user_context(username): # Necessary to validate the user can access the proxied path
                 try:
-                    new_path = db.create_proxied_path(session, username, sharing_name, fsp_name, path)
+                    new_path = db.create_proxied_path(session, username, sharing_name, fsp_name, path, is_transparent=is_transparent)
                     return _convert_proxied_path(new_path, settings.external_proxy_url)
                 except ValueError as e:
                     logger.error(f"Error creating proxied path: {e}")
