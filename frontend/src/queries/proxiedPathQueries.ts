@@ -27,6 +27,9 @@ type ProxiedPathApiResponse = {
 type CreateProxiedPathPayload = {
   fsp_name: string;
   path: string;
+  is_transparent?: boolean;
+};
+
 };
 
 /**

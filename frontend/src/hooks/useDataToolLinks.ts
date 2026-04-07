@@ -57,7 +57,8 @@ export default function useDataToolLinks(
     currentDirProxiedPathQuery
   } = useProxiedPathContext();
 
-  const { areDataLinksAutomatic } = usePreferencesContext();
+  const { areDataLinksAutomatic, transparentDataLinks } =
+    usePreferencesContext();
   const { externalDataUrlQuery } = useExternalBucketContext();
   const { handleCopy, showCopiedTooltip } = useCopyTooltip();
 
@@ -77,7 +78,8 @@ export default function useDataToolLinks(
     try {
       await createProxiedPathMutation.mutateAsync({
         fsp_name: fileQuery.data.currentFileSharePath.name,
-        path
+        path,
+        is_transparent: transparentDataLinks
       });
       toast.success('Data link created successfully');
       await allProxiedPathsQuery.refetch();
