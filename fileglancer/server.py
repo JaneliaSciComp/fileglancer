@@ -202,29 +202,52 @@ def create_app(settings):
             return CurrentUserContext()
 
 
-    def _get_file_proxy_client(sharing_key: str, sharing_name: str) -> Tuple[FileProxyClient, UserContext] | Tuple[Response, None]:
+    def _get_file_proxy_client(sharing_key: str, captured_path: str) -> Tuple[FileProxyClient | Response, UserContext | None, str]:
+        """Resolve a sharing key and captured path to a FileProxyClient.
+
+        Returns (client, user_context, subpath) on success, or (error_response, None, "") on failure.
+        """
+        def try_strip_prefix(captured: str, prefix: str) -> str | None:
+            if captured == prefix:
+                return ""
+            if captured.startswith(prefix + "/"):
+                return captured[len(prefix) + 1:]
+            return None
+
         with db.get_db_session(settings.db_url) as session:
 
             proxied_path = db.get_proxied_path_by_sharing_key(session, sharing_key)
             if not proxied_path:
-                return get_nosuchbucket_response(sharing_name), None
+                return get_nosuchbucket_response(captured_path), None, ""
 
-            # Vol-E viewer sends URLs with literal % characters (not URL-encoded)
-            # FastAPI automatically decodes path parameters - % chars are treated as escapes, creating a garbled sharing_name if they're present
-            # We therefore need to handle two cases:
-            #   1. Properly encoded requests (sharing_name matches DB value of proxied_path.sharing_name)
-            #   2. Vol-E's unencoded requests (unquote(proxied_path.sharing_name) matches the garbled request value)
-            if proxied_path.sharing_name != sharing_name and unquote(proxied_path.sharing_name) != sharing_name:
-                return get_error_response(404, "NoSuchKey", f"Sharing name mismatch for sharing key {sharing_key}", sharing_name), None
+            # Match captured_path against the expected prefix for this link type.
+            # Transparent links use the full stored path; non-transparent use only the basename.
+            # We restrict matching to the link's type to prevent non-transparent links
+            # from accepting full-path URLs (which would leak directory structure).
+            # The unquote() fallback handles clients like Vol-E viewer that send URLs
+            # with literal % characters instead of proper URL encoding — FastAPI
+            # auto-decodes path params, so we need to match the decoded form too.
+            if proxied_path.is_transparent:
+                subpath = try_strip_prefix(captured_path, proxied_path.path)
+                if subpath is None:
+                    subpath = try_strip_prefix(captured_path, unquote(proxied_path.path))
+            else:
+                path_basename = os.path.basename(proxied_path.path)
+                subpath = try_strip_prefix(captured_path, path_basename)
+                if subpath is None:
+                    subpath = try_strip_prefix(captured_path, unquote(path_basename))
+            if subpath is None:
+                return get_error_response(404, "NoSuchKey", f"Path mismatch for sharing key {sharing_key}", captured_path), None, ""
 
             fsp = db.get_file_share_path(session, proxied_path.fsp_name)
             if not fsp:
-                return get_error_response(400, "InvalidArgument", f"File share path {proxied_path.fsp_name} not found", sharing_name), None
+                return get_error_response(400, "InvalidArgument", f"File share path {proxied_path.fsp_name} not found", captured_path), None, ""
             # Expand ~ to user's home directory before constructing the mount path
             expanded_mount_path = os.path.expanduser(fsp.mount_path)
             mount_path = f"{expanded_mount_path}/{proxied_path.path}"
+            target_name = captured_path.rsplit('/', 1)[-1] if captured_path else os.path.basename(proxied_path.path)
             # Use 256KB buffer for better performance on network filesystems
-            return FileProxyClient(proxy_kwargs={'target_name': sharing_name}, path=mount_path, buffer_size=256*1024), _get_user_context(proxied_path.username)
+            return FileProxyClient(proxy_kwargs={'target_name': target_name}, path=mount_path, buffer_size=256*1024), _get_user_context(proxied_path.username), subpath
 
 
     @asynccontextmanager
@@ -974,12 +997,10 @@ def create_app(settings):
         return NeuroglancerShortLinkResponse(links=links)
 
 
-    @app.get("/files/{sharing_key}/{sharing_name}")
-    @app.get("/files/{sharing_key}/{sharing_name}/{path:path}")
+    @app.get("/files/{sharing_key}/{path:path}")
     async def target_dispatcher(request: Request,
                                 sharing_key: str,
-                                sharing_name: str,
-                                path: str | None = '',
+                                path: str = '',
                                 list_type: Optional[int] = Query(None, alias="list-type"),
                                 continuation_token: Optional[str] = Query(None, alias="continuation-token"),
                                 delimiter: Optional[str] = Query(None, alias="delimiter"),
@@ -992,7 +1013,7 @@ def create_app(settings):
         if 'acl' in request.query_params:
             return get_read_access_acl()
 
-        client, ctx = _get_file_proxy_client(sharing_key, sharing_name)
+        client, ctx, subpath = _get_file_proxy_client(sharing_key, path)
         if isinstance(client, Response):
             return client
 
@@ -1009,7 +1030,7 @@ def create_app(settings):
             # Open file in user context, then immediately exit
             # The file descriptor retains access rights after we switch back to root
             with ctx:
-                handle = await client.open_object(path, range_header)
+                handle = await client.open_object(subpath, range_header)
 
             # Context exited! Now stream without holding the lock
             if isinstance(handle, ObjectHandle):
@@ -1019,14 +1040,14 @@ def create_app(settings):
                 return handle
 
 
-    @app.head("/files/{sharing_key}/{sharing_name}/{path:path}")
-    async def head_object(sharing_key: str, sharing_name: str, path: str):
+    @app.head("/files/{sharing_key}/{path:path}")
+    async def head_object(sharing_key: str, path: str = ''):
         try:
-            client, ctx = _get_file_proxy_client(sharing_key, sharing_name)
+            client, ctx, subpath = _get_file_proxy_client(sharing_key, path)
             if isinstance(client, Response):
                 return client
             with ctx:
-                return await client.head_object(path)
+                return await client.head_object(subpath)
         except:
             logger.opt(exception=sys.exc_info()).info("Error requesting head")
             return get_error_response(500, "InternalError", "Error requesting HEAD", path)
