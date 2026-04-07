@@ -22,6 +22,7 @@ import TicketDetails from '@/components/ui/PropertiesDrawer/TicketDetails';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
 import DataLinkUsageDialog from '@/components/ui/Dialogs/dataLinkUsage/DataLinkUsageDialog';
+import EditDataLinkLabelDialog from '@/components/ui/Dialogs/EditDataLinkLabel';
 import TextDialogBtn from '@/components/ui/buttons/DialogTextBtn';
 import FgSwitch from '@/components/ui/widgets/FgSwitch';
 import { getPreferredPathForDisplay } from '@/utils';
@@ -97,6 +98,8 @@ export default function PropertiesDrawer({
 }: PropertiesDrawerProps) {
   const location = useLocation();
   const [showDataLinkDialog, setShowDataLinkDialog] = useState<boolean>(false);
+  const [showEditLabelDialog, setShowEditLabelDialog] =
+    useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('overview');
 
   const { fileQuery, fileBrowserState } = useFileBrowserContext();
@@ -105,7 +108,8 @@ export default function PropertiesDrawer({
   const {
     allProxiedPathsQuery,
     proxiedPathByFspAndPathQuery,
-    deleteProxiedPathMutation
+    deleteProxiedPathMutation,
+    updateProxiedPathMutation
   } = useProxiedPathContext();
   const { externalDataUrlQuery } = useExternalBucketContext();
 
@@ -332,6 +336,14 @@ export default function PropertiesDrawer({
                             proxiedPathByFspAndPathQuery.data?.url)!
                         }
                       />
+                      {proxiedPathByFspAndPathQuery.data ? (
+                        <Button
+                          className="!rounded-md !text-primary !text-nowrap !self-start"
+                          onClick={() => setShowEditLabelDialog(true)}
+                        >
+                          Label data link
+                        </Button>
+                      ) : null}
                       <TextDialogBtn
                         label="How to use your data link"
                         variant="solid"
@@ -446,6 +458,26 @@ export default function PropertiesDrawer({
           proxiedPath={proxiedPathByFspAndPathQuery.data}
           setShowDataLinkDialog={setShowDataLinkDialog}
           showDataLinkDialog={showDataLinkDialog}
+        />
+      ) : null}
+      {showEditLabelDialog && proxiedPathByFspAndPathQuery.data ? (
+        <EditDataLinkLabelDialog
+          currentLabel={proxiedPathByFspAndPathQuery.data.sharing_name}
+          onClose={() => setShowEditLabelDialog(false)}
+          onConfirm={async (newLabel: string) => {
+            try {
+              await updateProxiedPathMutation.mutateAsync({
+                sharing_key: proxiedPathByFspAndPathQuery.data!.sharing_key,
+                sharing_name: newLabel
+              });
+              toast.success('Data link label updated');
+            } catch (error) {
+              const msg =
+                error instanceof Error ? error.message : 'Unknown error';
+              toast.error(`Failed to update label: ${msg}`);
+            }
+          }}
+          open={showEditLabelDialog}
         />
       ) : null}
     </div>

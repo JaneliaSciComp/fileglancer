@@ -164,15 +164,8 @@ const globalFilterFn: FilterFn<unknown> = (row, _columnId, filterValue) => {
 
   const query = String(filterValue).toLowerCase();
 
-  // Search all columns except the name column
-  // NOTE: this needs to change if we allow custom sharing names
-  // For now, the sharing name is always in the file path
+  // Search all columns
   const rowValues = row.getVisibleCells().flatMap(cell => {
-    // Exclude the name column (sharing_name)
-    if (cell.column.id === 'sharing_name') {
-      return [];
-    }
-
     const value = cell.getValue();
     if (value === null || value === undefined) {
       return [''];
