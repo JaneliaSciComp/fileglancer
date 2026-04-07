@@ -210,14 +210,12 @@ export default function Table({
 
   const rows = table.getRowModel().rows;
 
-  // Build CSS grid template: name column gets 1fr (fills remaining space),
-  // all other columns get fixed pixel widths from TanStack Table.
+  // Build CSS grid template using fr units proportional to each column's size.
   const gridTemplateColumns = table
     .getVisibleLeafColumns()
-    .map(col =>
-      col.id === 'name'
-        ? `minmax(${col.columnDef.minSize ?? 100}px, 1fr)`
-        : `${col.getSize()}px`
+    .map(
+      col =>
+        `minmax(${col.columnDef.minSize ?? 0}px, ${col.getSize()}fr)`
     )
     .join(' ');
 
