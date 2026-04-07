@@ -216,18 +216,16 @@ export default function FileBrowser({
           }}
         />
       ) : zarrMetadataQuery.data?.metadata ? (
-        <div className="mb-3">
-          <ZarrPreview
-            availableVersions={availableVersions}
-            fspName={fileQuery.data?.currentFileSharePath?.name ?? ''}
-            layerType={layerType}
-            mainPanelWidth={mainPanelWidth}
-            openWithToolUrls={openWithToolUrls}
-            path={fileQuery.data?.currentFileOrFolder?.path ?? ''}
-            thumbnailQuery={thumbnailQuery}
-            zarrMetadataQuery={zarrMetadataQuery}
-          />
-        </div>
+        <ZarrPreview
+          availableVersions={availableVersions}
+          fspName={fileQuery.data?.currentFileSharePath?.name ?? ''}
+          layerType={layerType}
+          mainPanelWidth={mainPanelWidth}
+          openWithToolUrls={openWithToolUrls}
+          path={fileQuery.data?.currentFileOrFolder?.path ?? ''}
+          thumbnailQuery={thumbnailQuery}
+          zarrMetadataQuery={zarrMetadataQuery}
+        />
       ) : isZarrNullMetadata ? (
         <MetadataHint
           variant={
@@ -253,15 +251,13 @@ export default function FileBrowser({
           }}
         />
       ) : n5MetadataQuery.data ? (
-        <div className="mb-3">
-          <N5Preview
-            fspName={fileQuery.data?.currentFileSharePath?.name ?? ''}
-            mainPanelWidth={mainPanelWidth}
-            n5MetadataQuery={n5MetadataQuery}
-            openWithToolUrls={n5OpenWithToolUrls}
-            path={fileQuery.data?.currentFileOrFolder?.path ?? ''}
-          />
-        </div>
+        <N5Preview
+          fspName={fileQuery.data?.currentFileSharePath?.name ?? ''}
+          mainPanelWidth={mainPanelWidth}
+          n5MetadataQuery={n5MetadataQuery}
+          openWithToolUrls={n5OpenWithToolUrls}
+          path={fileQuery.data?.currentFileOrFolder?.path ?? ''}
+        />
       ) : null}
 
       {/* 2nd case N5/Zarr hints req'd: no detection fired, but directory has Zarr/N5 extension signals */}
@@ -305,7 +301,7 @@ export default function FileBrowser({
           </div>
         </div>
       ) : displayFiles.length > 0 ? (
-        <div data-tour="file-browser">
+        <div data-tour="file-browser" className="mt-3">
           <Table
             data={displayFiles}
             handleContextMenuClick={handleFileContextMenu}
