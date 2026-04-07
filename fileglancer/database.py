@@ -619,10 +619,8 @@ def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_
 def update_proxied_path(session: Session,
                         username: str,
                         sharing_key: str,
-                        new_sharing_name: Optional[str] = None,
-                        new_path: Optional[str] = None,
-                        new_fsp_name: Optional[str] = None) -> ProxiedPathDB:
-    """Update a proxied path"""
+                        new_sharing_name: Optional[str] = None) -> ProxiedPathDB:
+    """Update a proxied path (only sharing_name can be changed)"""
     proxied_path = get_proxied_path_by_sharing_key(session, sharing_key)
     if not proxied_path:
         raise ValueError(f"Proxied path with sharing key {sharing_key} not found")
@@ -630,16 +628,16 @@ def update_proxied_path(session: Session,
     if username != proxied_path.username:
         raise ValueError(f"Proxied path with sharing key {sharing_key} not found for user {username}")
 
-    if new_sharing_name:
+    # merge() is needed because the cached object may be detached from a prior session.
+    # The merged object is re-cached; it will become detached when this session closes,
+    # which is fine since _get_file_proxy_client only reads cached objects.
+    proxied_path = session.merge(proxied_path)
+
+    if new_sharing_name is not None:
+        if not new_sharing_name.strip():
+            raise ValueError("Sharing name cannot be empty")
         proxied_path.sharing_name = new_sharing_name
 
-    if new_fsp_name:
-        proxied_path.fsp_name = new_fsp_name
-
-    if new_path:
-        proxied_path.path = new_path
-
-    _validate_proxied_path(session, proxied_path.fsp_name, proxied_path.path)
     proxied_path.updated_at = datetime.now(UTC)
 
     session.commit()

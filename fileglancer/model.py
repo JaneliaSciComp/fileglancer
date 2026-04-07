@@ -135,7 +135,7 @@ class ProxiedPath(BaseModel):
         description="The sharing key is part of the URL proxy path. It is used to uniquely identify the proxied path."
     )
     sharing_name: str = Field(
-        description="The sharing path is part of the URL proxy path. It is mainly used to provide file extension information to the client."
+        description="A display-only label for the data link. Does not appear in the URL."
     )
     path: str = Field(
         description="The path relative to the file share path mount point"
@@ -157,6 +157,13 @@ class ProxiedPath(BaseModel):
 class ProxiedPathResponse(BaseModel):
     paths: List[ProxiedPath] = Field(
         description="A list of proxied paths"
+    )
+
+
+class UpdateProxiedPathPayload(BaseModel):
+    sharing_name: Optional[str] = Field(
+        description="New label for the data link",
+        default=None
     )
 
 

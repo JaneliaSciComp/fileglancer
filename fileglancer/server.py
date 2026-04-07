@@ -917,19 +917,17 @@ def create_app(settings):
 
 
     @app.put("/api/proxied-path/{sharing_key}", description="Update a proxied path by sharing key")
-    async def update_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path"),
-                                  fsp_name: Optional[str] = Query(default=None, description="The name of the file share path that this proxied path is associated with"),
-                                  path: Optional[str] = Query(default=None, description="The path relative to the file share path mount point"),
-                                  sharing_name: Optional[str] = Query(default=None, description="The sharing path of the proxied path"),
+    async def update_proxied_path(sharing_key: str = Path(...),
+                                  payload: UpdateProxiedPathPayload = Body(...),
                                   username: str = Depends(get_current_user)):
+        # No user context needed -- we only update sharing_name (display only),
+        # no filesystem access validation required.
         with db.get_db_session(settings.db_url) as session:
-            with _get_user_context(username): # Necessary to validate the user can access the proxied path
-                try:
-                    updated = db.update_proxied_path(session, username, sharing_key, new_path=path, new_sharing_name=sharing_name, new_fsp_name=fsp_name)
-                    return _convert_proxied_path(updated, settings.external_proxy_url)
-                except ValueError as e:
-                    logger.error(f"Error updating proxied path: {e}")
-                    raise HTTPException(status_code=400, detail=str(e))
+            try:
+                updated = db.update_proxied_path(session, username, sharing_key, new_sharing_name=payload.sharing_name)
+                return _convert_proxied_path(updated, settings.external_proxy_url)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
 
 
     @app.delete("/api/proxied-path/{sharing_key}", description="Delete a proxied path by sharing key")
