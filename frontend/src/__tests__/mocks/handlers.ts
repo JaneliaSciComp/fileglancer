@@ -35,11 +35,19 @@ export const handlers = [
       url: 'http://127.0.0.1:7878/files/testkey/' + urlSuffix
     });
   }),
+
+  http.put('/api/proxied-path/:sharingKey', async ({ params, request }) => {
+    const { sharingKey } = params;
+    const body = (await request.json()) as { sharing_name?: string };
+    return HttpResponse.json({
+      username: 'testuser',
+      sharing_key: sharingKey,
+      sharing_name: body.sharing_name || 'testshare',
       path: '/test/path',
       fsp_name: 'test_fsp',
       created_at: '2025-07-08T15:56:42.588942',
       updated_at: '2025-07-08T15:56:42.588942',
-      url: 'http://127.0.0.1:7878/files/testkey/test/path'
+      url: 'http://127.0.0.1:7878/files/' + sharingKey + '/path'
     });
   }),
 

@@ -30,6 +30,12 @@ type CreateProxiedPathPayload = {
   is_transparent?: boolean;
 };
 
+/**
+ * Payload for updating a proxied path (label only)
+ */
+type UpdateProxiedPathPayload = {
+  sharing_key: string;
+  sharing_name: string;
 };
 
 /**
@@ -181,10 +187,14 @@ export function useCreateProxiedPathMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: async (payload: CreateProxiedPathPayload) => {
-      const url = buildUrl('/api/proxied-path', null, {
+      const queryParams: Record<string, string> = {
         fsp_name: payload.fsp_name,
         path: payload.path
-      });
+      };
+      if (payload.is_transparent !== undefined) {
+        queryParams.is_transparent = String(payload.is_transparent);
+      }
+      const url = buildUrl('/api/proxied-path', null, queryParams);
       const proxiedPath = await sendRequestAndThrowForNotOk(url, 'POST');
       return proxiedPath as ProxiedPath;
     },
@@ -275,6 +285,56 @@ export function useDeleteProxiedPathMutation(): UseMutationResult<
       });
     },
     // On error, rollback
+    onError: (_err, _variables, context) => {
+      if (context?.previousPaths) {
+        queryClient.setQueryData(
+          proxiedPathQueryKeys.list(),
+          context.previousPaths
+        );
+      }
+    }
+  });
+}
+
+/**
+ * Mutation hook for updating a proxied path (label only)
+ *
+ * @example
+ * const mutation = useUpdateProxiedPathMutation();
+ * mutation.mutate({ sharing_key: 'abc123', sharing_name: 'My Link' });
+ */
+export function useUpdateProxiedPathMutation(): UseMutationResult<
+  ProxiedPath,
+  Error,
+  UpdateProxiedPathPayload,
+  { previousPaths?: ProxiedPath[] }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: UpdateProxiedPathPayload) => {
+      const url = buildUrl('/api/proxied-path/', payload.sharing_key, null);
+      const proxiedPath = await sendRequestAndThrowForNotOk(url, 'PUT', {
+        sharing_name: payload.sharing_name
+      });
+      return proxiedPath as ProxiedPath;
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: proxiedPathQueryKeys.all });
+      const previousPaths = queryClient.getQueryData<ProxiedPath[]>(
+        proxiedPathQueryKeys.list()
+      );
+      return { previousPaths };
+    },
+    onSuccess: (updatedPath: ProxiedPath) => {
+      queryClient.setQueryData(
+        proxiedPathQueryKeys.detail(updatedPath.fsp_name, updatedPath.path),
+        updatedPath
+      );
+      queryClient.invalidateQueries({
+        queryKey: proxiedPathQueryKeys.all
+      });
+    },
     onError: (_err, _variables, context) => {
       if (context?.previousPaths) {
         queryClient.setQueryData(
