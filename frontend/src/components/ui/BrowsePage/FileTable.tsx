@@ -13,6 +13,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { useHotkey } from '@tanstack/react-hotkeys';
 import { IconButton, Typography } from '@material-tailwind/react';
 import { TbFile, TbLink, TbLinkOff } from 'react-icons/tb';
+import { HiOutlineSwitchVertical } from 'react-icons/hi';
 import { HiOutlineEllipsisHorizontalCircle, HiFolder } from 'react-icons/hi2';
 
 import type { FileOrFolder } from '@/shared.types';
@@ -331,8 +332,8 @@ export default function Table({
                 {header.isPlaceholder ? null : (
                   <div
                     className={
-                      header.column.getCanSort()
-                        ? `select-none flex items-center gap-2 ${sortingEnabled ? 'cursor-pointer' : 'cursor-default opacity-50'}`
+                      header.column.columnDef.enableSorting !== false
+                        ? `select-none flex items-center gap-2 ${sortingEnabled ? 'cursor-pointer' : 'cursor-default'}`
                         : 'flex items-center gap-2'
                     }
                     onClick={
@@ -345,7 +346,17 @@ export default function Table({
                       header.column.columnDef.header,
                       header.getContext()
                     )}
-                    {sortingEnabled ? <SortIcons header={header} /> : null}
+                    {header.column.columnDef.enableSorting !== false ? (
+                      sortingEnabled ? (
+                        <SortIcons header={header} />
+                      ) : (
+                        <FgTooltip
+                          icon={HiOutlineSwitchVertical}
+                          label="Sort unavailable until all files are loaded via infinite scroll"
+                          triggerClasses="flex items-center opacity-40 cursor-not-allowed"
+                        />
+                      )
+                    ) : null}
                   </div>
                 )}
                 {header.column.getCanResize() ? (
