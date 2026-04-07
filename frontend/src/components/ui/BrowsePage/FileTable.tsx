@@ -75,7 +75,6 @@ export default function Table({
   const navigate = useNavigate();
   const [sorting, setSorting] = useState<SortingState>([]);
   const tableRef = useRef<HTMLDivElement>(null);
-  const [tableWidth, setTableWidth] = useState(0);
 
   // Use the nearest scrollable ancestor (the main panel) as the virtualizer's
   // scroll element so the entire page (zarr preview + table) scrolls together.
@@ -86,16 +85,6 @@ export default function Table({
       return;
     }
 
-    // Track table width so the Name column can fill remaining space
-    const observer = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        setTableWidth(entry.contentRect.width);
-      }
-    });
-    observer.observe(el);
-    setTableWidth(el.offsetWidth);
-
-    // Find scrollable ancestor
     let parent = el.parentElement;
     while (parent) {
       const { overflowY } = getComputedStyle(parent);
@@ -105,8 +94,6 @@ export default function Table({
       }
       parent = parent.parentElement;
     }
-
-    return () => observer.disconnect();
   }, []);
   const sortingEnabled = !hasNextPage;
 
@@ -115,16 +102,13 @@ export default function Table({
     [fileBrowserState.selectedFiles]
   );
 
-  // Fixed column widths — Name gets whatever space remains
-  const FIXED_COLUMNS_WIDTH = 80 + 200 + 100 + 70; // Type + Last Modified + Size + Actions
-  const nameColumnSize = Math.max(200, tableWidth - FIXED_COLUMNS_WIDTH);
-
   const columns = useMemo<ColumnDef<FileOrFolder>[]>(
     () => [
       {
         accessorKey: 'name',
         header: 'Name',
-        size: nameColumnSize,
+        minSize: 100,
+        size: 500,
         cell: ({ getValue, row }) => {
           const file = row.original;
           const name = getValue() as string;
@@ -167,8 +151,7 @@ export default function Table({
               </FgTooltip>
             </div>
           );
-        },
-        minSize: 200
+        }
       },
       typeColumn,
       lastModifiedColumn,
@@ -195,16 +178,12 @@ export default function Table({
             </div>
           );
         },
-        size: 70,
-        minSize: 70,
+        size: 90,
+        minSize: 80,
         enableSorting: false
       }
     ],
-    [
-      fileQuery.data?.currentFileSharePath,
-      handleContextMenuClick,
-      nameColumnSize
-    ]
+    [fileQuery.data?.currentFileSharePath, handleContextMenuClick]
   );
 
   // Clear sort when sorting becomes disabled (more pages still loading)
@@ -230,6 +209,17 @@ export default function Table({
   });
 
   const rows = table.getRowModel().rows;
+
+  // Build CSS grid template: name column gets 1fr (fills remaining space),
+  // all other columns get fixed pixel widths from TanStack Table.
+  const gridTemplateColumns = table
+    .getVisibleLeafColumns()
+    .map(col =>
+      col.id === 'name'
+        ? `minmax(${col.columnDef.minSize ?? 100}px, 1fr)`
+        : `${col.getSize()}px`
+    )
+    .join(' ');
 
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -330,15 +320,15 @@ export default function Table({
     <div className="min-w-full bg-background select-none" ref={tableRef}>
       <div className="bg-background border-b border-surface">
         {table.getHeaderGroups().map(headerGroup => (
-          <div className="flex w-full" key={headerGroup.id}>
+          <div
+            className="grid w-full"
+            key={headerGroup.id}
+            style={{ gridTemplateColumns }}
+          >
             {headerGroup.headers.map(header => (
               <div
-                className="text-left p-3 font-bold text-sm relative flex-none"
+                className="text-left p-3 font-bold text-sm relative min-w-0"
                 key={header.id}
-                style={{
-                  width: header.getSize(),
-                  minWidth: header.column.columnDef.minSize
-                }}
               >
                 {header.isPlaceholder ? null : (
                   <div
@@ -385,7 +375,7 @@ export default function Table({
           const isSelected = selectedFileNames.has(row.original.name);
           return (
             <div
-              className={`flex cursor-pointer hover:bg-surface dark:hover:bg-surface-light ${isSelected ? 'bg-primary-light/20 outline outline-1 outline-primary' : virtualRow.index % 2 === 0 ? 'bg-surface-light dark:bg-surface/50' : ''}`}
+              className={`grid cursor-pointer hover:bg-surface dark:hover:bg-surface-light ${isSelected ? 'bg-primary-light/20 outline outline-1 outline-primary' : virtualRow.index % 2 === 0 ? 'bg-surface-light dark:bg-surface/50' : ''}`}
               data-index={virtualRow.index}
               key={row.id}
               onClick={() =>
@@ -395,6 +385,7 @@ export default function Table({
               ref={virtualizer.measureElement}
               role="row"
               style={{
+                gridTemplateColumns,
                 position: 'absolute',
                 top: 0,
                 left: 0,
@@ -404,13 +395,9 @@ export default function Table({
             >
               {row.getVisibleCells().map(cell => (
                 <div
-                  className="p-3 text-foreground overflow-hidden flex-none"
+                  className="p-3 text-foreground overflow-hidden min-w-0"
                   key={cell.id}
                   role="cell"
-                  style={{
-                    width: cell.column.getSize(),
-                    minWidth: cell.column.columnDef.minSize
-                  }}
                 >
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </div>

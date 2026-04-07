@@ -26,7 +26,7 @@ export const typeColumn: ColumnDef<FileOrFolder> = {
     }
     return a ? -1 : 1; // Folders first
   },
-  size: 80,
+  size: 90,
   minSize: 80
 };
 
