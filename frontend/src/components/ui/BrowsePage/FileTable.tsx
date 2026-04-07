@@ -202,7 +202,7 @@ export default function Table({
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    columnResizeMode: 'onChange',
+    columnResizeMode: 'onEnd',
     enableColumnResizing: true,
     enableColumnFilters: false,
     enableSorting: sortingEnabled
@@ -355,6 +355,13 @@ export default function Table({
                     className="cursor-col-resize absolute z-10 -right-1 top-0 h-full w-3 bg-transparent group"
                     onMouseDown={header.getResizeHandler()}
                     onTouchStart={header.getResizeHandler()}
+                    style={{
+                      transform:
+                        table.getState().columnSizingInfo.isResizingColumn ===
+                        header.column.id
+                          ? `translateX(${table.getState().columnSizingInfo.deltaOffset ?? 0}px)`
+                          : undefined
+                    }}
                   >
                     <div className="absolute left-1/2 top-0 h-full w-[1px] bg-surface group-hover:bg-primary group-hover:w-[2px] group-focus:bg-primary group-focus:w-[2px] -translate-x-1/2" />
                   </div>
