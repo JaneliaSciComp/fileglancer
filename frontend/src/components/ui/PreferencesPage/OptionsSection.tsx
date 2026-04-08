@@ -35,7 +35,7 @@ export default function OptionsSection({
         >
           <input
             checked={option.checked}
-            className="icon-small checked:accent-secondary-light"
+            className="icon-small checked:accent-secondary-light dark:checked:accent-secondary"
             id={option.id}
             onChange={option.onChange}
             type="checkbox"

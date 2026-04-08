@@ -162,7 +162,8 @@ export default function FileViewer({ file }: FileViewerProps) {
     const mergedCodeTagProps = {
       style: {
         ...themeCodeStyles,
-        paddingBottom: '2em'
+        paddingBottom: '2em',
+        background: 'transparent'
       }
     };
 
@@ -180,7 +181,8 @@ export default function FileViewer({ file }: FileViewerProps) {
           overflow: 'visible',
           width: '100%',
           boxSizing: 'border-box',
-          minHeight: 'fit-content'
+          minHeight: 'fit-content',
+          background: 'transparent'
         }}
         language={language}
         showLineNumbers={false}

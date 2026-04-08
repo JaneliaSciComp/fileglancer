@@ -12,7 +12,7 @@ export default function InstructionBlock({ steps }: InstructionBlockProps) {
       <ol className="space-y-6 mt-3">
         {steps.map((step, index) => (
           <li className="flex items-start gap-3 text-sm" key={index}>
-            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-semibold">
+            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">
               {index + 1}
             </span>
             {typeof step === 'string' ? (

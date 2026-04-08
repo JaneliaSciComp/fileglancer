@@ -88,7 +88,7 @@ export default function FileSelectorBreadcrumbs({
     <div className="w-full py-2 px-3 border-b border-surface">
       <Breadcrumb className="bg-transparent p-0">
         <div className="flex items-center gap-1 h-5">
-          <HiOutlineSquares2X2 className="icon-default text-primary-light" />
+          <HiOutlineSquares2X2 className="icon-default text-primary-dark" />
           <HiChevronRight className="icon-default" />
         </div>
 

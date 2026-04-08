@@ -38,7 +38,7 @@ jobs:
     - name: Lint
       run: |
         set -eux
-        pixi run node-prettier-write && pixi run node-prettier-check && pixi run node-eslint-check
+        pixi run node-prettier-check && pixi run node-eslint-check
 
     - name: Test the frontend
       run: |

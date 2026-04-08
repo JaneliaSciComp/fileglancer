@@ -91,7 +91,7 @@ export default function Help() {
         {/* Tour Card */}
         <Card
           as={StartTour}
-          className="group min-h-44 p-8 md:p-12 flex flex-col gap-2 text-left w-full hover:bg-surface-light dark:hover:bg-surface hover:border-surface"
+          className="group min-h-44 p-8 md:p-12 flex flex-col gap-2 text-left w-full dark:border-surface-light hover:bg-surface-light dark:hover:bg-surface hover:border-surface"
         >
           <div className="flex items-center justify-start gap-2 w-full">
             <MdTour className="hidden md:block icon-default lg:icon-large text-primary" />
@@ -107,7 +107,7 @@ export default function Help() {
         {helpLinks.map(({ icon: Icon, title, description, url }) => (
           <Card
             as={Link}
-            className="group min-h-44 p-8 md:p-12 flex flex-col gap-2 text-left w-full hover:shadow-lg transition-shadow duration-200 hover:bg-surface-light dark:hover:bg-surface"
+            className="group min-h-44 p-8 md:p-12 flex flex-col gap-2 text-left w-full dark:border-surface-light hover:shadow-lg transition-shadow duration-200 hover:bg-surface-light dark:hover:bg-surface"
             key={url}
             rel="noopener noreferrer"
             target="_blank"

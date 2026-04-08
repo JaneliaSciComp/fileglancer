@@ -18,7 +18,7 @@ export default function Notifications() {
         </Typography>
       </div>
       {error ? (
-        <Card className="p-6">
+        <Card className="p-6 dark:border-surface-light">
           <Typography className="text-error">{error.message}</Typography>
         </Card>
       ) : notifications.length > 0 ? (
@@ -51,7 +51,7 @@ export default function Notifications() {
           </div>
         </div>
       ) : notifications.length === 0 ? (
-        <Card className="p-8 text-center">
+        <Card className="p-8 text-center dark:border-surface-light">
           <HiOutlineInformationCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <Typography className="text-foreground mb-2" type="h6">
             No notifications

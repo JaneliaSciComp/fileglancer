@@ -179,9 +179,9 @@ export default function ConvertFileDialog({
         >
           {createTicketMutation.isPending || allTicketsQuery.isFetching ? (
             <Spinner
-              customClasses="border-white"
+              customClasses="border-primary-foreground"
               text="Processing..."
-              textClasses="text-white"
+              textClasses="text-primary-foreground"
             />
           ) : (
             'Submit'
