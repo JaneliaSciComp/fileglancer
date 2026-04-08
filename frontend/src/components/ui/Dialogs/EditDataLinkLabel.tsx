@@ -42,8 +42,9 @@ export default function EditDataLinkLabelDialog({
           Edit Data Link Label
         </Typography>
         <Typography className="text-foreground" variant="small">
-          The label is only used in the data links table - it is useful for grouping data links via the sort and search functionality. Changing it will not
-          affect the sharing URL.
+          The label is only used in the data links table - it is useful for
+          grouping data links via the sort and search functionality. Changing it
+          will not affect the sharing URL.
         </Typography>
         <input
           autoFocus
@@ -65,9 +66,9 @@ export default function EditDataLinkLabelDialog({
           </Button>
           <Button
             className="!rounded-md"
+            color="error"
             onClick={onClose}
             variant="outline"
-            color="error"
           >
             Cancel
           </Button>

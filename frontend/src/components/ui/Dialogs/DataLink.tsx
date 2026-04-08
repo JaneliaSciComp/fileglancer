@@ -106,13 +106,8 @@ function BtnContainer({ children }: { readonly children: ReactNode }) {
 
 export default function DataLinkDialog(props: DataLinkDialogProps) {
   const { fspName, filePath } = useFileBrowserContext();
-  const {
-    pathPreference,
-    areDataLinksAutomatic,
-    toggleAutomaticDataLinks,
-    transparentDataLinks,
-    toggleTransparentDataLinks
-  } = usePreferencesContext();
+  const { pathPreference, areDataLinksAutomatic, transparentDataLinks } =
+    usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const [localAreDataLinksAutomatic] = useState(areDataLinksAutomatic);
 
