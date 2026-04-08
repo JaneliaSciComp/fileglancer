@@ -145,6 +145,9 @@ style/tailwind_converted.css
 config.yaml
 frontend/viewers.config.yaml
 
+# Custom viewer logos
+frontend/src/assets/custom-logos/
+
 # Claude Code
 .claude
 

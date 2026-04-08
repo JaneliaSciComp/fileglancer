@@ -13,6 +13,8 @@
 #
 # Optional:
 #   - instance_template_url: Override the viewer's template_url from the manifest
+#   - logo: Filename of logo in frontend/src/assets/ or frontend/src/assets/custom-logos/
+#     (defaults to {normalized_name}.png; custom-logos/ is gitignored for local overrides)
 #   - label: Custom tooltip text (defaults to "View in {Name}")
 
 viewers:

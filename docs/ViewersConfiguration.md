@@ -45,7 +45,7 @@ The configuration file has a single top-level key, `viewers`, containing a list 
 | `manifest_url`          | Yes      | URL to a capability manifest YAML file                                           |
 | `instance_template_url` | No       | Override the viewer's `template_url` from the manifest                           |
 | `label`                 | No       | Custom tooltip text (defaults to "View in {Name}")                               |
-| `logo`                  | No       | Filename of logo in `frontend/src/assets/` (defaults to `{normalized_name}.png`) |
+| `logo`                  | No       | Filename of logo in `frontend/src/assets/` or `frontend/src/assets/custom-logos/` (defaults to `{normalized_name}.png`) |
 
 ### Default Configuration
 
@@ -55,7 +55,7 @@ The default `viewers.config.yaml` configures four viewers:
 viewers:
   - manifest_url: "https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/neuroglancer.yaml"
 
-  - manifest_url: "https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/vizarr.yaml"
+  - manifest_url: "https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/avivator.yaml"
     instance_template_url: "https://janeliascicomp.github.io/viv/?image_url={DATA_URL}"
 
   - manifest_url: "https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/validator.yaml"
@@ -197,7 +197,7 @@ viewers:
     label: "Open in My Viewer"
 ```
 
-4. Optionally, add a logo file at `frontend/src/assets/myviewer.png` (the normalized name, lowercase with non-alphanumeric characters removed).
+4. Optionally, add a logo file at `frontend/src/assets/custom-logos/myviewer.png` (the normalized name, lowercase with non-alphanumeric characters removed). Using `custom-logos/` keeps your additions gitignored.
 
 ## How Compatibility Works
 
@@ -214,9 +214,19 @@ This replaces the previous system where `valid_ome_zarr_versions` was a global c
 
 Logo resolution follows this order:
 
-1. **Custom logo specified**: If you provide a `logo` field in the config entry, that filename is looked up in `frontend/src/assets/`
-2. **Convention-based**: If no `logo` is specified, the system looks for `frontend/src/assets/{normalized_name}.png`, where the normalized name is the viewer's name lowercased with non-alphanumeric characters removed
+1. **Custom logo specified**: If you provide a `logo` field in the config entry, that filename is looked up in `frontend/src/assets/` and `frontend/src/assets/custom-logos/`
+2. **Convention-based**: If no `logo` is specified, the system looks for `{normalized_name}.png` in both directories, where the normalized name is the viewer's name lowercased with non-alphanumeric characters removed
 3. **Fallback**: If neither is found, `frontend/src/assets/fallback_logo.png` is used
+
+### Custom logos without git changes
+
+To add logos without modifying tracked files, place them in `frontend/src/assets/custom-logos/`. This directory is gitignored, so your logos won't trigger git changes or conflict with upstream updates.
+
+1. Create the directory: `mkdir -p frontend/src/assets/custom-logos/`
+2. Place your logo PNG files there (e.g., `frontend/src/assets/custom-logos/myviewer.png`)
+3. Rebuild the application: `pixi run node-build`
+
+Logos in `custom-logos/` are resolved the same way as logos in `assets/` — by convention-based naming or by the `logo` field in the config.
 
 ### Examples
 
@@ -225,17 +235,15 @@ Logo resolution follows this order:
 ```yaml
 viewers:
   - manifest_url: "https://example.com/manifests/neuroglancer.yaml"
-    # Logo automatically resolves to @/assets/neuroglancer.png
+    # Logo automatically resolves to neuroglancer.png in assets/ or assets/custom-logos/
 ```
-
-Just add `frontend/src/assets/neuroglancer.png` -- no config needed.
 
 **Using a custom logo filename:**
 
 ```yaml
 viewers:
   - manifest_url: "https://example.com/manifests/avivator.yaml"
-    logo: "avivator.png" # Uses @/assets/avivator.png
+    logo: "avivator.png" # Looked up in assets/ and assets/custom-logos/
 ```
 
 ## Development

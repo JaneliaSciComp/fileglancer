@@ -1,12 +1,15 @@
 import fallback_logo from '@/assets/fallback_logo.png';
 
 /**
- * Map of all available logo files in the assets directory
+ * Map of all available logo files in assets/ and assets/custom-logos/
  * This is populated at build time by Vite's glob import
  */
-const LOGO_MODULES = import.meta.glob<{ default: string }>('@/assets/*.png', {
-  eager: true
-});
+const LOGO_MODULES = import.meta.glob<{ default: string }>(
+  ['@/assets/*.png', '@/assets/custom-logos/*.png'],
+  {
+    eager: true
+  }
+);
 
 /**
  * Extract filename from glob import path
@@ -20,8 +23,8 @@ function extractFileName(path: string): string {
 /**
  * Get logo path for a viewer
  * Logo resolution order:
- * 1. If customLogoPath is provided, use that from @/assets/
- * 2. If not, try to load @/assets/{viewerName}.png
+ * 1. If customLogoPath is provided, use that from @/assets/ or @/assets/custom-logos/
+ * 2. If not, try to load {viewerName}.png from @/assets/ or @/assets/custom-logos/
  * 3. If not found, use fallback logo
  *
  * @param viewerName - Name of the viewer (case-insensitive)
