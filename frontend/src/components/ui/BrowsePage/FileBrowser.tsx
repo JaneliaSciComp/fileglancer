@@ -20,7 +20,9 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
 import { useHandleDownload } from '@/hooks/useHandleDownload';
+import { useHandleView } from '@/hooks/useHandleView';
 import { detectZarrVersions } from '@/queries/zarrQueries';
+import { getBrowserRenderableType } from '@/queries/fileContentQueries';
 import { detectN5, getN5DetectionSignals } from '@/queries/n5Queries';
 import { makeMapKey } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
@@ -61,6 +63,7 @@ export default function FileBrowser({
     usePreferencesContext();
   const { displayFiles } = useHideDotFiles();
   const { handleDownload } = useHandleDownload();
+  const { handleView } = useHandleView();
 
   const {
     contextMenuCoords,
@@ -137,6 +140,16 @@ export default function FileBrowser({
           togglePropertiesDrawer();
         },
         shouldShow: !showPropertiesDrawer
+      },
+      {
+        name: 'View',
+        action: () => {
+          handleView();
+        },
+        shouldShow:
+          !fileBrowserState.selectedFiles[0]?.is_dir &&
+          !fileBrowserState.selectedFiles[0]?.is_symlink &&
+          getBrowserRenderableType(propertiesTarget.name) !== null
       },
       {
         name: 'Download',
