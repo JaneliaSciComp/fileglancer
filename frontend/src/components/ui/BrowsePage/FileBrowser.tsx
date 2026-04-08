@@ -301,7 +301,7 @@ export default function FileBrowser({
           </div>
         </div>
       ) : displayFiles.length > 0 ? (
-        <div data-tour="file-browser">
+        <div className="mt-3" data-tour="file-browser">
           <Table
             data={displayFiles}
             handleContextMenuClick={handleFileContextMenu}
