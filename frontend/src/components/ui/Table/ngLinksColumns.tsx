@@ -134,7 +134,7 @@ export function useNGLinksColumns(
               >
                 <Typography
                   as="a"
-                  className="text-left truncate block text-primary-light hover:underline focus:underline"
+                  className="text-left truncate block text-primary-dark hover:underline focus:underline"
                   href={item.neuroglancer_url}
                   rel="noreferrer"
                   target="_blank"

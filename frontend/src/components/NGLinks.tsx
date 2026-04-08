@@ -103,31 +103,32 @@ export default function NGLinks() {
 
   return (
     <>
-      <Typography className="mb-6 text-foreground font-bold" type="h5">
-        Neuroglancer Links
-      </Typography>
-      <Typography className="mb-6 text-foreground">
-        Store your Neuroglancer states for easy sharing. Create a short link and
-        share it with internal collaborators. You can update the link later if
-        needed.
-      </Typography>
-      <div className="mb-4">
-        <Button
-          className="bg-primary text-white hover:bg-primary/90"
-          onClick={handleOpenCreate}
-        >
-          <HiOutlinePlus className="icon-default mr-2" />
-          New Link
-        </Button>
+      <div data-tour="nglinks-page">
+        <Typography className="mb-6 text-foreground font-bold" type="h5">
+          Neuroglancer Links
+        </Typography>
+        <Typography className="mb-6 text-foreground">
+          Store your Neuroglancer states for easy sharing. Create a short link
+          and share it with internal collaborators. You can update the link
+          later if needed.
+        </Typography>
+        <div className="mb-4">
+          <Button data-tour="nglinks-new-button" onClick={handleOpenCreate}>
+            <HiOutlinePlus className="icon-default mr-2" />
+            New Link
+          </Button>
+        </div>
+        <div data-tour="nglinks-table">
+          <TableCard
+            columns={ngLinksColumns}
+            data={allNGLinksQuery.data || []}
+            dataType="NG links"
+            errorState={allNGLinksQuery.error}
+            gridColsClass="grid-cols-[1.2fr_2.8fr_1.2fr_1fr_0.6fr]"
+            loadingState={allNGLinksQuery.isPending}
+          />
+        </div>
       </div>
-      <TableCard
-        columns={ngLinksColumns}
-        data={allNGLinksQuery.data || []}
-        dataType="NG links"
-        errorState={allNGLinksQuery.error}
-        gridColsClass="grid-cols-[1.2fr_2.8fr_1.2fr_1fr_0.6fr]"
-        loadingState={allNGLinksQuery.isPending}
-      />
       {showDialog ? (
         <NGLinkDialog
           editItem={editItem}

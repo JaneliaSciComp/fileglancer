@@ -57,7 +57,7 @@ export default function SSHKeys() {
       ) : null}
 
       {!isLoading && !error && !hasKeys ? (
-        <Card className="mb-6 p-8 text-center">
+        <Card className="mb-6 p-8 text-center dark:border-surface-light">
           <HiOutlineKey className="mx-auto h-12 w-12 text-secondary mb-4" />
           <Typography className="text-foreground font-semibold mb-2">
             No SSH keys found

@@ -19,6 +19,7 @@ from cluster_api import create_executor, ResourceSpec, JobMonitor
 from cluster_api._types import JobStatus
 
 from fileglancer import database as db
+from fileglancer.apps.adapters import try_adapt
 from fileglancer.model import AppManifest, AppEntryPoint, AppParameter
 from fileglancer.settings import get_settings
 
@@ -37,9 +38,10 @@ def _get_repo_lock(owner: str, repo: str, branch: str) -> asyncio.Lock:
     return _repo_locks[key]
 
 
-def _parse_github_url(url: str) -> tuple[str, str, str]:
+def _parse_github_url(url: str) -> tuple[str, str, str | None]:
     """Parse a GitHub repo URL into (owner, repo, branch).
 
+    Branch is None when not specified in the URL.
     Raises ValueError if not a valid GitHub repo URL.
     """
     pattern = r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/tree/([^/]+))?/?$"
@@ -50,14 +52,17 @@ def _parse_github_url(url: str) -> tuple[str, str, str]:
             f"(e.g., https://github.com/owner/repo)."
         )
     owner, repo, branch = match.groups()
-    branch = branch or "main"
 
     # Validate segments to prevent path traversal
-    for name, value in [("owner", owner), ("repo", repo), ("branch", branch)]:
+    for name, value in [("owner", owner), ("repo", repo)]:
         if ".." in value or "\x00" in value:
             raise ValueError(
                 f"Invalid app URL: {name} '{value}' contains invalid characters"
             )
+    if branch and (".." in branch or "\x00" in branch):
+        raise ValueError(
+            f"Invalid app URL: branch '{branch}' contains invalid characters"
+        )
 
     return owner, repo, branch
 
@@ -87,6 +92,34 @@ async def _run_git(args: list[str], timeout: int = 60):
         raise ValueError(f"Git command failed: {err}")
 
 
+async def _resolve_default_branch(clone_url: str) -> str:
+    """Query a remote repo for its default branch (HEAD).
+
+    Falls back to 'main' if the remote cannot be queried.
+    """
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    try:
+        proc = await asyncio.wait_for(
+            asyncio.create_subprocess_exec(
+                "git", "ls-remote", "--symref", clone_url, "HEAD",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env,
+            ),
+            timeout=30,
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode == 0:
+            # Output: "ref: refs/heads/master\tHEAD\n..."
+            for line in stdout.decode().splitlines():
+                if line.startswith("ref:"):
+                    ref = line.split()[1]
+                    return ref.removeprefix("refs/heads/")
+    except (asyncio.TimeoutError, Exception):
+        pass
+    return "main"
+
+
 async def _ensure_repo_cache(url: str, pull: bool = False) -> Path:
     """Clone or update the GitHub repo in per-user cache. Returns repo path.
 
@@ -94,6 +127,9 @@ async def _ensure_repo_cache(url: str, pull: bool = False) -> Path:
     An asyncio lock serializes git operations for the same repo+branch.
     """
     owner, repo, branch = _parse_github_url(url)
+    clone_url = f"https://github.com/{owner}/{repo}.git"
+    if not branch:
+        branch = await _resolve_default_branch(clone_url)
     repo_dir = (_REPO_CACHE_BASE / owner / repo / branch).resolve()
     repo_dir.relative_to(_REPO_CACHE_BASE.resolve())
     lock = _get_repo_lock(owner, repo, branch)
@@ -103,11 +139,11 @@ async def _ensure_repo_cache(url: str, pull: bool = False) -> Path:
             logger.debug(f"Repo cache hit: {owner}/{repo} ({branch})")
             if pull:
                 logger.info(f"Pulling latest for {owner}/{repo} ({branch})")
-                await _run_git(["git", "-C", str(repo_dir), "pull", "origin", branch])
+                await _run_git(["git", "-C", str(repo_dir), "fetch", "origin", branch])
+                await _run_git(["git", "-C", str(repo_dir), "reset", "--hard", f"origin/{branch}"])
         else:
             logger.info(f"Cloning {owner}/{repo} ({branch}) into {repo_dir}")
             repo_dir.parent.mkdir(parents=True, exist_ok=True)
-            clone_url = f"https://github.com/{owner}/{repo}.git"
             await _run_git(
                 ["git", "clone", "--branch", branch, clone_url, str(repo_dir)],
                 timeout=120,
@@ -122,43 +158,68 @@ _SKIP_DIRS = {'.git', 'node_modules', '__pycache__', '.pixi', '.venv', 'venv'}
 def _read_manifest_file(manifest_dir: Path) -> AppManifest:
     """Read and validate a runnables.yaml file from the given directory.
 
-    Raises ValueError if the file is not found.
+    Falls back to registered manifest adapters if no runnables.yaml is found.
+    Raises ValueError if no adapter can handle the directory.
     """
     filepath = manifest_dir / _MANIFEST_FILENAME
-    if not filepath.is_file():
-        raise ValueError(
-            f"No {_MANIFEST_FILENAME} found in {manifest_dir}."
-        )
-    data = yaml.safe_load(filepath.read_text())
-    return AppManifest(**data)
+    if filepath.is_file():
+        data = yaml.safe_load(filepath.read_text())
+        return AppManifest(**data)
+
+    # Try registered adapters (e.g. Nextflow, Snakemake, etc.)
+    adapted = try_adapt(manifest_dir)
+    if adapted is not None:
+        return adapted
+
+    raise ValueError(
+        f"No {_MANIFEST_FILENAME} or recognized project config found in {manifest_dir}."
+    )
 
 
 def _find_manifests_in_repo(repo_dir: Path) -> list[tuple[str, AppManifest]]:
     """Walk the cloned repo and discover all manifest files.
 
+    First pass: walk the repo looking for runnables.yaml files.
+    If none are found, fall back to registered manifest adapters, letting
+    each adapter search the repo on its own terms (e.g. Nextflow only checks
+    the repo root for nextflow_schema.json).
+
     Returns a list of (relative_dir_path, AppManifest) tuples.
     Uses "" for root-level manifests.
     """
-    results: list[tuple[str, AppManifest]] = []
+    from fileglancer.apps.adapters import MANIFEST_ADAPTERS
 
+    # First pass: walk the repo looking for runnables.yaml files
+    results: list[tuple[str, AppManifest]] = []
     for dirpath, dirnames, filenames in os.walk(repo_dir, topdown=True):
-        # Prune directories we should skip
         dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
 
         if _MANIFEST_FILENAME not in filenames:
             continue
 
         current = Path(dirpath)
+        filepath = current / _MANIFEST_FILENAME
         try:
-            manifest = _read_manifest_file(current)
+            data = yaml.safe_load(filepath.read_text())
+            manifest = AppManifest(**data)
         except Exception as e:
             logger.warning(f"Skipping invalid manifest in {dirpath}: {e}")
             continue
 
-        # Compute relative path from repo root
         rel = current.relative_to(repo_dir)
         rel_str = str(rel) if str(rel) != "." else ""
         results.append((rel_str, manifest))
+
+    if results:
+        return results
+
+    # No runnables.yaml found — check each adapter against the repo root
+    for adapter in MANIFEST_ADAPTERS:
+        try:
+            if adapter.can_handle(repo_dir):
+                results.append(("", adapter.convert(repo_dir)))
+        except Exception as e:
+            logger.warning(f"Adapter {type(adapter).__name__} failed: {e}")
 
     return results
 
@@ -184,6 +245,18 @@ async def fetch_app_manifest(url: str, manifest_path: str = "") -> AppManifest:
     repo_dir = await _ensure_repo_cache(url)
     target_dir = repo_dir / manifest_path if manifest_path else repo_dir
     return _read_manifest_file(target_dir)
+
+
+async def get_app_branch(url: str) -> str:
+    """Return the branch name for a GitHub app URL.
+
+    If the URL doesn't specify a branch, resolves the remote's default branch.
+    """
+    _, _, branch = _parse_github_url(url)
+    if not branch:
+        clone_url = re.sub(r"(/tree/[^/]+)?/?$", ".git", url)
+        branch = await _resolve_default_branch(clone_url)
+    return branch
 
 
 # --- Requirement Verification ---
@@ -223,6 +296,36 @@ def _augmented_path(extra_paths: list[str]) -> str:
     if not extra_paths:
         return os.environ.get("PATH", "")
     return os.environ.get("PATH", "") + os.pathsep + os.pathsep.join(extra_paths)
+
+
+def merge_requirements(
+    manifest_requirements: list[str], entry_point_requirements: list[str]
+) -> list[str]:
+    """Merge manifest-level and entry-point-level requirements.
+
+    Entry-point requirements for the same tool override the manifest-level
+    version spec (e.g. entry point 'pixi>=0.50' overrides manifest 'pixi>=0.40').
+    Requirements are deduped by tool name, with entry-point taking precedence.
+    """
+    if not entry_point_requirements:
+        return manifest_requirements
+    if not manifest_requirements:
+        return entry_point_requirements
+
+    # Parse tool names from entry-point requirements
+    ep_tools = set()
+    for req in entry_point_requirements:
+        tool = _REQ_PATTERN.match(req.strip())
+        if tool:
+            ep_tools.add(tool.group(1))
+
+    # Keep manifest requirements that aren't overridden by entry-point
+    merged = [
+        req for req in manifest_requirements
+        if _REQ_PATTERN.match(req.strip()) and _REQ_PATTERN.match(req.strip()).group(1) not in ep_tools
+    ]
+    merged.extend(entry_point_requirements)
+    return merged
 
 
 def verify_requirements(requirements: list[str]):
@@ -303,16 +406,24 @@ _SHELL_METACHAR_PATTERN = re.compile(r'[;&|`$(){}!<>\n\r]')
 def validate_path_for_shell(path_value: str) -> str | None:
     """Validate path syntax for use in shell commands (no filesystem I/O).
 
-    Checks for shell metacharacters and absolute-path requirement only.
+    Checks for shell metacharacters, rejects '..', and requires paths to
+    start with '/', '~', or './'.
     Returns an error message string if invalid, or None if valid.
     """
     normalized = path_value.replace("\\", "/")
 
+    # Cloud storage URIs are passed through as opaque strings
+    if normalized.startswith(("s3://", "gs://", "https://")):
+        return None
+
     if _SHELL_METACHAR_PATTERN.search(normalized):
         return "Path contains invalid characters"
 
-    if not normalized.startswith("/") and not normalized.startswith("~"):
-        return "Must be an absolute path (starting with / or ~)"
+    if ".." in normalized:
+        return "Path must not contain '..'"
+
+    if not (normalized.startswith("/") or normalized.startswith("~") or normalized.startswith("./")):
+        return "Must be an absolute or relative path (starting with /, ~, or ./)"
 
     return None
 
@@ -329,7 +440,14 @@ def validate_path_in_filestore(path_value: str, session) -> str | None:
     if error:
         return error
 
-    expanded = os.path.expanduser(path_value.replace("\\", "/"))
+    normalized = path_value.replace("\\", "/")
+
+    # Relative paths and cloud storage URIs are not local filesystem paths;
+    # skip filestore validation.
+    if normalized.startswith("./") or normalized.startswith(("s3://", "gs://", "https://")):
+        return None
+
+    expanded = os.path.expanduser(normalized)
 
     # Resolve to a file share path
     from fileglancer.database import find_fsp_from_absolute_path
@@ -469,7 +587,14 @@ def build_command(entry_point: AppEntryPoint, parameters: dict, session=None) ->
             continue
         p, value = effective[param.key]
         validated = _validate_parameter_value(p, value, session=session)
-        parts.append(shlex.quote(validated))
+        if p.raw:
+            if _SHELL_METACHAR_PATTERN.search(validated):
+                raise ValueError(
+                    f"Parameter '{p.name}' contains forbidden shell characters"
+                )
+            parts.append(validated)
+        else:
+            parts.append(shlex.quote(validated))
 
     return (" \\\n  ").join(parts)
 
@@ -737,8 +862,11 @@ async def submit_job(
     if entry_point is None:
         raise ValueError(f"Entry point '{entry_point_id}' not found in manifest")
 
-    # Verify requirements before proceeding
-    verify_requirements(manifest.requirements)
+    # Verify requirements: merge manifest-level with entry-point-level
+    effective_requirements = merge_requirements(
+        manifest.requirements, entry_point.requirements
+    )
+    verify_requirements(effective_requirements)
 
     # Build command (with DB session for path validation against file shares)
     with db.get_db_session(settings.db_url) as session:

@@ -16,10 +16,7 @@ export default function ErrorFallback({ error }: any) {
       <div className="flex flex-col gap-4 justify-center items-center pt-8">
         {error instanceof Error ? (
           <>
-            <Typography
-              className="text-black dark:text-white font-bold"
-              type="h2"
-            >
+            <Typography className="text-surface-foreground font-bold" type="h2">
               Oops! An error occurred
             </Typography>
             <Typography
@@ -28,16 +25,13 @@ export default function ErrorFallback({ error }: any) {
             >{`${error.message ? error.message : 'Unknown error'}`}</Typography>
           </>
         ) : (
-          <Typography
-            className="text-black dark:text-white font-bold"
-            type="h2"
-          >
+          <Typography className="text-surface-foreground font-bold" type="h2">
             Oops! An unknown error occurred
           </Typography>
         )}
         <Typography
           as={Link}
-          className="text-black dark:text-white underline"
+          className="text-surface-foreground underline"
           rel="noopener noreferrer"
           target="_blank"
           to={`https://forms.clickup.com/10502797/f/a0gmd-713/NBUCBCIN78SI2BE71G?Version=${versionQuery.data?.version}&URL=${window.location}`}
@@ -48,7 +42,7 @@ export default function ErrorFallback({ error }: any) {
 
         <Typography
           as={Link}
-          className="text-black dark:text-white underline"
+          className="text-surface-foreground underline"
           rel="noopener noreferrer"
           target="_blank"
           to="/browse"
@@ -59,7 +53,7 @@ export default function ErrorFallback({ error }: any) {
 
         <img
           alt="An icon showing a magnifying glass with a question mark hovering over an eye on a page"
-          className="dark:bg-slate-50/80 rounded-full ml-4 mt-4 h-[500px] w-[500px]"
+          className="dark:bg-surface-foreground/80 rounded-full ml-4 mt-4 h-[500px] w-[500px]"
           src={errorImg}
         />
       </div>

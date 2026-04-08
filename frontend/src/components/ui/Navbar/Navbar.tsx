@@ -19,10 +19,10 @@ import {
 import {
   HiOutlineFolder,
   HiOutlineBriefcase,
-  HiOutlineCommandLine,
-  HiOutlineQueueList
+  HiOutlineRocketLaunch
 } from 'react-icons/hi2';
 import { TbBrandGithub } from 'react-icons/tb';
+import { FaRunning } from 'react-icons/fa';
 
 import ProfileMenu from '@/components/ui/Navbar/ProfileMenu';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
@@ -46,12 +46,12 @@ const LINKS = [
     href: '/nglinks'
   },
   {
-    icon: HiOutlineCommandLine,
+    icon: HiOutlineRocketLaunch,
     title: 'Apps',
     href: '/apps'
   },
   {
-    icon: HiOutlineQueueList,
+    icon: FaRunning,
     title: 'Jobs',
     href: '/apps/jobs'
   },

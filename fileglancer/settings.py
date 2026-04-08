@@ -94,12 +94,18 @@ class Settings(BaseSettings):
 
     # CLI mode - enables auto-login endpoint for standalone CLI usage
     cli_mode: bool = False
-
     # Cluster / Apps settings (mirrors py-cluster-api ClusterConfig)
     cluster: ClusterSettings = ClusterSettings()
 
     # Apps-specific settings (not passed to py-cluster-api)
     apps: AppsSettings = AppsSettings()
+
+    # Test API key for automated integration testing.
+    # NEVER set on production. The bypass activates when this value is set.
+    test_api_key: Optional[str] = None
+
+    # Username used when creating a session via the test-login endpoint.
+    test_login_username: str = "jacs"
 
     model_config = SettingsConfigDict(
         yaml_file="config.yaml",

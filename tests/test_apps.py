@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from fileglancer.model import SUPPORTED_TOOLS, AppEntryPoint, JobSubmitRequest
 from fileglancer.apps import (
     _TOOL_REGISTRY,
+    merge_requirements,
     verify_requirements,
     _container_sif_name,
     _build_container_script,
@@ -77,7 +78,7 @@ class TestCondaEnvValidation:
 # --- verify_requirements tests ---
 
 class TestVerifyRequirementsMiniforge:
-    @patch("fileglancer.apps.shutil.which")
+    @patch("fileglancer.apps.core.shutil.which")
     def test_miniforge_found_via_conda(self, mock_which):
         """miniforge binary doesn't exist, but conda does — should pass."""
         def which_side_effect(name, **kwargs):
@@ -91,14 +92,14 @@ class TestVerifyRequirementsMiniforge:
         # No version constraint, so just checking binary existence
         verify_requirements(["miniforge"])
 
-    @patch("fileglancer.apps.shutil.which")
+    @patch("fileglancer.apps.core.shutil.which")
     def test_miniforge_not_found(self, mock_which):
         mock_which.return_value = None
         with pytest.raises(ValueError, match="not installed or not on PATH"):
             verify_requirements(["miniforge"])
 
-    @patch("fileglancer.apps.subprocess.run")
-    @patch("fileglancer.apps.shutil.which")
+    @patch("fileglancer.apps.core.subprocess.run")
+    @patch("fileglancer.apps.core.shutil.which")
     def test_miniforge_version_check(self, mock_which, mock_run):
         def which_side_effect(name, **kwargs):
             if name == "miniforge":
@@ -113,8 +114,8 @@ class TestVerifyRequirementsMiniforge:
         )
         verify_requirements(["miniforge>=24.0"])
 
-    @patch("fileglancer.apps.subprocess.run")
-    @patch("fileglancer.apps.shutil.which")
+    @patch("fileglancer.apps.core.subprocess.run")
+    @patch("fileglancer.apps.core.shutil.which")
     def test_miniforge_version_too_old(self, mock_which, mock_run):
         def which_side_effect(name, **kwargs):
             if name == "miniforge":
@@ -129,6 +130,63 @@ class TestVerifyRequirementsMiniforge:
         )
         with pytest.raises(ValueError, match="does not satisfy"):
             verify_requirements(["miniforge>=24.0"])
+
+
+# --- merge_requirements tests ---
+
+class TestMergeRequirements:
+    def test_empty_both(self):
+        assert merge_requirements([], []) == []
+
+    def test_manifest_only(self):
+        assert merge_requirements(["pixi>=0.40"], []) == ["pixi>=0.40"]
+
+    def test_entry_point_only(self):
+        assert merge_requirements([], ["apptainer"]) == ["apptainer"]
+
+    def test_disjoint_requirements_merged(self):
+        result = merge_requirements(["pixi>=0.40"], ["apptainer"])
+        assert "pixi>=0.40" in result
+        assert "apptainer" in result
+
+    def test_entry_point_overrides_manifest_version(self):
+        result = merge_requirements(["pixi>=0.40"], ["pixi>=0.50"])
+        assert result == ["pixi>=0.50"]
+
+    def test_entry_point_overrides_manifest_adds_version(self):
+        result = merge_requirements(["pixi"], ["pixi>=0.50"])
+        assert result == ["pixi>=0.50"]
+
+    def test_multiple_manifest_partial_override(self):
+        result = merge_requirements(["pixi>=0.40", "npm"], ["pixi>=0.50"])
+        assert "pixi>=0.50" in result
+        assert "npm" in result
+        assert len(result) == 2
+
+    def test_no_duplicates(self):
+        result = merge_requirements(["pixi>=0.40", "npm"], ["npm", "apptainer"])
+        tools = [r.split(">")[0].split("<")[0].split("=")[0].split("!")[0] for r in result]
+        assert len(tools) == len(set(tools))
+
+
+class TestEntryPointRequirementsValidation:
+    def test_valid_requirements(self):
+        ep = AppEntryPoint(
+            id="t", name="T", command="echo",
+            requirements=["apptainer", "pixi>=0.40"],
+        )
+        assert ep.requirements == ["apptainer", "pixi>=0.40"]
+
+    def test_empty_requirements_default(self):
+        ep = AppEntryPoint(id="t", name="T", command="echo")
+        assert ep.requirements == []
+
+    def test_rejects_unsupported_tool(self):
+        with pytest.raises(ValidationError, match="Unsupported tool"):
+            AppEntryPoint(
+                id="t", name="T", command="echo",
+                requirements=["docker"],
+            )
 
 
 # --- Script generation tests ---
@@ -406,10 +464,23 @@ class TestValidatePathForShell:
     def test_valid_tilde_path(self):
         assert validate_path_for_shell("~/data/input.txt") is None
 
-    def test_rejects_relative_path(self):
+    def test_valid_relative_path(self):
+        assert validate_path_for_shell("./data/input.txt") is None
+
+    def test_rejects_bare_relative_path(self):
         error = validate_path_for_shell("relative/path.txt")
         assert error is not None
-        assert "absolute path" in error
+        assert "absolute or relative path" in error
+
+    def test_rejects_dotdot(self):
+        error = validate_path_for_shell("/data/../etc/passwd")
+        assert error is not None
+        assert ".." in error
+
+    def test_rejects_dotdot_relative(self):
+        error = validate_path_for_shell("./foo/../bar")
+        assert error is not None
+        assert ".." in error
 
     def test_rejects_metacharacters(self):
         error = validate_path_for_shell("/data/input;rm -rf /")

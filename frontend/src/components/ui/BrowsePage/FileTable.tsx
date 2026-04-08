@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
+import { useNavigate } from 'react-router';
 import {
   flexRender,
   getCoreRowModel,
@@ -8,12 +9,12 @@ import {
   type ColumnDef,
   type SortingState
 } from '@tanstack/react-table';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { useHotkey } from '@tanstack/react-hotkeys';
 import { IconButton, Typography } from '@material-tailwind/react';
 import { TbFile, TbLink, TbLinkOff } from 'react-icons/tb';
-import {
-  HiOutlineEllipsisHorizontalCircle,
-  HiOutlineFolder
-} from 'react-icons/hi2';
+import { HiOutlineSwitchVertical } from 'react-icons/hi';
+import { HiOutlineEllipsisHorizontalCircle, HiFolder } from 'react-icons/hi2';
 
 import type { FileOrFolder } from '@/shared.types';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
@@ -26,6 +27,29 @@ import {
   lastModifiedColumn,
   sizeColumn
 } from '@/components/ui/BrowsePage/fileTableColumns';
+
+const ROW_HEIGHT = 44;
+const OVERSCAN = 10;
+const LOAD_MORE_THRESHOLD = 20;
+
+function getFileLink(
+  file: FileOrFolder,
+  currentFspName: string | undefined
+): string | null {
+  if (file.is_symlink && file.symlink_target_fsp) {
+    return makeBrowseLink(
+      file.symlink_target_fsp.fsp_name,
+      file.symlink_target_fsp.subpath
+    );
+  }
+  if (file.is_symlink && !file.symlink_target_fsp) {
+    return null;
+  }
+  if (currentFspName) {
+    return makeBrowseLink(currentFspName, file.path);
+  }
+  return null;
+}
 
 type TableProps = {
   readonly data: FileOrFolder[];
@@ -41,9 +65,38 @@ export default function Table({
   showPropertiesDrawer,
   handleContextMenuClick
 }: TableProps) {
-  const { fileQuery, fileBrowserState, handleLeftClick } =
-    useFileBrowserContext();
+  const {
+    fileQuery,
+    fileBrowserState,
+    handleLeftClick,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage
+  } = useFileBrowserContext();
+  const navigate = useNavigate();
   const [sorting, setSorting] = useState<SortingState>([]);
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  // Use the nearest scrollable ancestor (the main panel) as the virtualizer's
+  // scroll element so the entire page (zarr preview + table) scrolls together.
+  const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = tableRef.current;
+    if (!el) {
+      return;
+    }
+
+    let parent = el.parentElement;
+    while (parent) {
+      const { overflowY } = getComputedStyle(parent);
+      if (overflowY === 'auto' || overflowY === 'scroll') {
+        setScrollElement(parent);
+        break;
+      }
+      parent = parent.parentElement;
+    }
+  }, []);
+  const sortingEnabled = !hasNextPage;
 
   const selectedFileNames = useMemo(
     () => new Set(fileBrowserState.selectedFiles.map(file => file.name)),
@@ -55,28 +108,16 @@ export default function Table({
       {
         accessorKey: 'name',
         header: 'Name',
+        minSize: 100,
+        size: 500,
         cell: ({ getValue, row }) => {
           const file = row.original;
           const name = getValue() as string;
-          let link = '#';
-          let isBrokenSymlink = false;
-
-          if (file.is_symlink && file.symlink_target_fsp) {
-            // Valid symlink with known target in a valid file share
-            link = makeBrowseLink(
-              file.symlink_target_fsp.fsp_name,
-              file.symlink_target_fsp.subpath
-            ) as string;
-          } else if (file.is_symlink && !file.symlink_target_fsp) {
-            // Broken symlink - no valid target
-            isBrokenSymlink = true;
-          } else if (file.is_dir && fileQuery.data?.currentFileSharePath) {
-            // Regular directory
-            link = makeBrowseLink(
-              fileQuery.data?.currentFileSharePath.name,
-              file.path
-            ) as string;
-          }
+          const link = getFileLink(
+            file,
+            fileQuery.data?.currentFileSharePath?.name
+          );
+          const isBrokenSymlink = file.is_symlink && !file.symlink_target_fsp;
 
           return (
             <div className="flex items-center gap-3 min-w-0">
@@ -85,7 +126,7 @@ export default function Table({
               ) : file.is_symlink ? (
                 <TbLink className="text-primary icon-default flex-shrink-0" />
               ) : file.is_dir ? (
-                <HiOutlineFolder className="text-foreground icon-default flex-shrink-0" />
+                <HiFolder className="text-foreground icon-default flex-shrink-0" />
               ) : (
                 <TbFile className="text-foreground icon-default flex-shrink-0" />
               )}
@@ -94,18 +135,24 @@ export default function Table({
                   <Typography className="truncate text-foreground">
                     {name}
                   </Typography>
-                ) : file.is_dir || file.is_symlink ? (
-                  <Typography as={FgStyledLink} className="truncate" to={link}>
+                ) : !isBrokenSymlink ? (
+                  <Typography
+                    as={FgStyledLink}
+                    className="truncate"
+                    onClick={(e: MouseEvent) => e.stopPropagation()}
+                    to={link ?? '#'}
+                  >
                     {name}
                   </Typography>
                 ) : (
-                  <Typography className="truncate">{name}</Typography>
+                  <Typography className="truncate text-foreground">
+                    {name}
+                  </Typography>
                 )}
               </FgTooltip>
             </div>
           );
-        },
-        size: 250
+        }
       },
       typeColumn,
       lastModifiedColumn,
@@ -132,12 +179,20 @@ export default function Table({
             </div>
           );
         },
-        size: 30,
+        size: 90,
+        minSize: 80,
         enableSorting: false
       }
     ],
     [fileQuery.data?.currentFileSharePath, handleContextMenuClick]
   );
+
+  // Clear sort when sorting becomes disabled (more pages still loading)
+  useEffect(() => {
+    if (!sortingEnabled && sorting.length > 0) {
+      setSorting([]);
+    }
+  }, [sortingEnabled, sorting.length]);
 
   const table = useReactTable({
     data,
@@ -148,79 +203,227 @@ export default function Table({
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    columnResizeMode: 'onChange', // Note - if users experience lag with resizing, might need to memoize table body https://tanstack.com/table/latest/docs/framework/react/examples/column-resizing-performant
+    columnResizeMode: 'onEnd',
     enableColumnResizing: true,
-    enableColumnFilters: false
+    enableColumnFilters: false,
+    enableSorting: sortingEnabled
+  });
+
+  const rows = table.getRowModel().rows;
+
+  // Build CSS grid template using fr units proportional to each column's size.
+  const gridTemplateColumns = table
+    .getVisibleLeafColumns()
+    .map(col => `minmax(${col.columnDef.minSize ?? 0}px, ${col.getSize()}fr)`)
+    .join(' ');
+
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollElement,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: OVERSCAN,
+    scrollMargin: tableRef.current?.offsetTop ?? 0
+  });
+
+  // Trigger loading more data when scrolling near the bottom
+  const virtualItems = virtualizer.getVirtualItems();
+  const lastVirtualItem = virtualItems[virtualItems.length - 1];
+  const lastVirtualIndex = lastVirtualItem?.index ?? 0;
+
+  useEffect(() => {
+    if (virtualItems.length === 0) {
+      return;
+    }
+
+    if (
+      lastVirtualIndex >= rows.length - LOAD_MORE_THRESHOLD &&
+      hasNextPage &&
+      !isFetchingNextPage
+    ) {
+      fetchNextPage();
+    }
+  }, [
+    lastVirtualIndex,
+    virtualItems.length,
+    rows.length,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage
+  ]);
+
+  const navigateRows = useCallback(
+    (direction: 'up' | 'down') => {
+      if (rows.length === 0) {
+        return;
+      }
+
+      const selectedName =
+        fileBrowserState.selectedFiles.length > 0
+          ? fileBrowserState.selectedFiles[0].name
+          : null;
+
+      const currentIndex = selectedName
+        ? rows.findIndex(row => row.original.name === selectedName)
+        : -1;
+
+      let nextIndex: number;
+      if (direction === 'down') {
+        nextIndex = currentIndex < rows.length - 1 ? currentIndex + 1 : 0;
+      } else {
+        nextIndex = currentIndex > 0 ? currentIndex - 1 : rows.length - 1;
+      }
+
+      handleLeftClick(rows[nextIndex].original, showPropertiesDrawer);
+      virtualizer.scrollToIndex(nextIndex, { align: 'auto' });
+    },
+    [
+      rows,
+      fileBrowserState.selectedFiles,
+      handleLeftClick,
+      showPropertiesDrawer,
+      virtualizer
+    ]
+  );
+
+  useHotkey('ArrowDown', e => {
+    e.preventDefault();
+    navigateRows('down');
+  });
+
+  useHotkey('ArrowUp', e => {
+    e.preventDefault();
+    navigateRows('up');
+  });
+
+  useHotkey('Enter', e => {
+    if (fileBrowserState.selectedFiles.length === 0) {
+      return;
+    }
+
+    const link = getFileLink(
+      fileBrowserState.selectedFiles[0],
+      fileQuery.data?.currentFileSharePath?.name
+    );
+    if (!link) {
+      return;
+    }
+
+    e.preventDefault();
+    navigate(link);
   });
 
   return (
-    <div className="min-w-full bg-background select-none">
-      <table className="w-full">
-        <thead>
-          {table.getHeaderGroups().map(headerGroup => (
-            <tr className="border-b border-surface" key={headerGroup.id}>
-              {headerGroup.headers.map(header => (
-                <th
-                  className="text-left p-3 font-bold text-sm relative"
-                  key={header.id}
-                  style={{ width: header.getSize() }}
-                >
-                  {header.isPlaceholder ? null : (
-                    <div
-                      className={
-                        header.column.getCanSort()
-                          ? 'cursor-pointer select-none flex items-center gap-2'
-                          : 'flex items-center gap-2'
-                      }
-                      onClick={header.column.getToggleSortingHandler()}
-                    >
-                      {flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                      <SortIcons header={header} />
-                    </div>
-                  )}
-                  {header.column.getCanResize() ? (
-                    <div
-                      className="cursor-col-resize absolute z-10 -right-1 top-0 h-full w-3 bg-transparent group"
-                      onMouseDown={header.getResizeHandler()}
-                      onTouchStart={header.getResizeHandler()}
-                    >
-                      <div className="absolute left-1/2 top-0 h-full w-[1px] bg-surface group-hover:bg-primary group-hover:w-[2px] group-focus:bg-primary group-focus:w-[2px] -translate-x-1/2" />
-                    </div>
-                  ) : null}
-                </th>
-              ))}
-            </tr>
-          ))}
-        </thead>
-        <tbody>
-          {table.getRowModel().rows.map((row, index) => {
-            const isSelected = selectedFileNames.has(row.original.name);
-            return (
-              <tr
-                className={`cursor-pointer hover:bg-primary-light/30 focus:bg-primary-light/30 ${isSelected && 'bg-primary-light/30'} ${index % 2 === 0 && !isSelected && 'bg-surface/50'}`}
-                key={row.id}
-                onClick={() =>
-                  handleLeftClick(row.original, showPropertiesDrawer)
-                }
-                onContextMenu={e => handleContextMenuClick(e, row.original)}
+    <div className="min-w-full bg-background select-none" ref={tableRef}>
+      <div className="bg-background border-b border-surface">
+        {table.getHeaderGroups().map(headerGroup => (
+          <div
+            className="grid w-full"
+            key={headerGroup.id}
+            style={{ gridTemplateColumns }}
+          >
+            {headerGroup.headers.map(header => (
+              <div
+                className="text-left p-3 font-bold text-sm relative min-w-0"
+                key={header.id}
               >
-                {row.getVisibleCells().map(cell => (
-                  <td
-                    className="p-3 text-grey-700"
-                    key={cell.id}
-                    style={{ width: cell.column.getSize() }}
+                {header.isPlaceholder ? null : (
+                  <div
+                    className={
+                      header.column.columnDef.enableSorting !== false
+                        ? `select-none flex items-center gap-2 ${sortingEnabled ? 'cursor-pointer' : 'cursor-default'}`
+                        : 'flex items-center gap-2'
+                    }
+                    onClick={
+                      sortingEnabled
+                        ? header.column.getToggleSortingHandler()
+                        : undefined
+                    }
                   >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                    {flexRender(
+                      header.column.columnDef.header,
+                      header.getContext()
+                    )}
+                    {header.column.columnDef.enableSorting !== false ? (
+                      sortingEnabled ? (
+                        <SortIcons header={header} />
+                      ) : (
+                        <FgTooltip
+                          icon={HiOutlineSwitchVertical}
+                          label="Sort unavailable until all files are loaded via infinite scroll"
+                          triggerClasses="flex items-center opacity-40 cursor-not-allowed"
+                        />
+                      )
+                    ) : null}
+                  </div>
+                )}
+                {header.column.getCanResize() ? (
+                  <div
+                    className="cursor-col-resize absolute z-10 -right-1 top-0 h-full w-3 bg-transparent group"
+                    onMouseDown={header.getResizeHandler()}
+                    onTouchStart={header.getResizeHandler()}
+                    style={{
+                      transform:
+                        table.getState().columnSizingInfo.isResizingColumn ===
+                        header.column.id
+                          ? `translateX(${table.getState().columnSizingInfo.deltaOffset ?? 0}px)`
+                          : undefined
+                    }}
+                  >
+                    <div className="absolute left-1/2 top-0 h-full w-[1px] bg-surface group-hover:bg-primary group-hover:w-[2px] group-focus:bg-primary group-focus:w-[2px] -translate-x-1/2" />
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          position: 'relative'
+        }}
+      >
+        {virtualItems.map(virtualRow => {
+          const row = rows[virtualRow.index];
+          const isSelected = selectedFileNames.has(row.original.name);
+          return (
+            <div
+              className={`grid cursor-pointer hover:bg-surface dark:hover:bg-surface-light ${isSelected ? 'bg-primary-light/20 outline outline-1 outline-primary' : virtualRow.index % 2 === 0 ? 'bg-surface-light dark:bg-surface/50' : ''}`}
+              data-index={virtualRow.index}
+              key={row.id}
+              onClick={() =>
+                handleLeftClick(row.original, showPropertiesDrawer)
+              }
+              onContextMenu={e => handleContextMenuClick(e, row.original)}
+              ref={virtualizer.measureElement}
+              role="row"
+              style={{
+                gridTemplateColumns,
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualRow.start - virtualizer.options.scrollMargin}px)`
+              }}
+            >
+              {row.getVisibleCells().map(cell => (
+                <div
+                  className="p-3 text-foreground overflow-hidden min-w-0"
+                  key={cell.id}
+                  role="cell"
+                >
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+      {isFetchingNextPage ? (
+        <div className="flex items-center justify-center py-3 text-sm text-foreground/60">
+          Loading more files...
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -113,7 +113,7 @@ export default function AddAppDialog({
       <div className="mb-4">
         <label className="block text-foreground text-sm font-medium mb-1">
           Branch
-          <span className="text-secondary font-normal ml-1">(optional)</span>
+          <span className="text-foreground font-normal ml-1">(optional)</span>
         </label>
         <input
           className="w-full p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary"

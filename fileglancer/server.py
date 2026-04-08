@@ -1297,6 +1297,8 @@ def create_app(settings):
 
     @app.get("/api/files/{path_name}")
     async def get_file_metadata(path_name: str, subpath: Optional[str] = Query(''),
+                                limit: Optional[int] = Query(None),
+                                cursor: Optional[str] = Query(None),
                                 username: str = Depends(get_current_user)):
         """Handle GET requests to list directory contents or return info for the file/folder itself"""
 
@@ -1319,8 +1321,18 @@ def create_app(settings):
 
                     if file_info.is_dir:
                         try:
-                            files = list(filestore.yield_file_infos(subpath, current_user=username, session=session))
-                            result["files"] = [json.loads(f.model_dump_json()) for f in files]
+                            if limit is not None:
+                                files, has_more, next_cursor, total_count = filestore.yield_file_infos_paginated(
+                                    subpath, current_user=username, session=session,
+                                    limit=limit, cursor=cursor
+                                )
+                                result["files"] = [json.loads(f.model_dump_json()) for f in files]
+                                result["has_more"] = has_more
+                                result["next_cursor"] = next_cursor
+                                result["total_count"] = total_count
+                            else:
+                                files = list(filestore.yield_file_infos(subpath, current_user=username, session=session))
+                                result["files"] = [json.loads(f.model_dump_json()) for f in files]
                         except PermissionError:
                             logger.error(f"Permission denied when listing files in directory: {subpath}")
                             result["files"] = []
@@ -1524,6 +1536,7 @@ def create_app(settings):
                 # Update name/description from manifest
                 user_app.name = user_app.manifest.name
                 user_app.description = user_app.manifest.description
+                user_app.branch = await apps_module.get_app_branch(app_entry["url"])
             except Exception as e:
                 logger.warning(f"Failed to fetch manifest for {app_entry['url']}: {e}")
             result.append(user_app)
@@ -1560,6 +1573,7 @@ def create_app(settings):
                 (a["url"], a.get("manifest_path", "")) for a in app_list
             }
 
+            branch = await apps_module.get_app_branch(body.url)
             new_apps: list[UserApp] = []
             for manifest_path, manifest in discovered:
                 if (body.url, manifest_path) in existing_keys:
@@ -1576,6 +1590,7 @@ def create_app(settings):
                 new_apps.append(UserApp(
                     url=body.url,
                     manifest_path=manifest_path,
+                    branch=branch,
                     name=manifest.name,
                     description=manifest.description,
                     added_at=now,
@@ -1644,9 +1659,11 @@ def create_app(settings):
                     break
             db.set_user_preference(session, username, "apps", {"apps": app_list})
 
+        branch = await apps_module.get_app_branch(body.url)
         return UserApp(
             url=body.url,
             manifest_path=body.manifest_path,
+            branch=branch,
             name=manifest.name,
             description=manifest.description,
             added_at=added_at,
@@ -1682,21 +1699,22 @@ def create_app(settings):
             if body.resources:
                 resources_dict = body.resources.model_dump(exclude_none=True)
 
-            db_job = await apps_module.submit_job(
-                username=username,
-                app_url=body.app_url,
-                entry_point_id=body.entry_point_id,
-                parameters=body.parameters,
-                resources=resources_dict,
-                extra_args=body.extra_args,
-                pull_latest=body.pull_latest,
-                manifest_path=body.manifest_path,
-                env=body.env,
-                pre_run=body.pre_run,
-                post_run=body.post_run,
-                container=body.container,
-                container_args=body.container_args,
-            )
+            with _get_user_context(username):
+                db_job = await apps_module.submit_job(
+                    username=username,
+                    app_url=body.app_url,
+                    entry_point_id=body.entry_point_id,
+                    parameters=body.parameters,
+                    resources=resources_dict,
+                    extra_args=body.extra_args,
+                    pull_latest=body.pull_latest,
+                    manifest_path=body.manifest_path,
+                    env=body.env,
+                    pre_run=body.pre_run,
+                    post_run=body.post_run,
+                    container=body.container,
+                    container_args=body.container_args,
+                )
             return _convert_job(db_job)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
@@ -1846,6 +1864,42 @@ def create_app(settings):
         logger.info(f"User {username} logged in via simple authentication")
 
         return response
+
+
+    @app.post("/api/auth/test-login", include_in_schema=False)
+    async def test_login(request: Request):
+        """Create a session for automated testing. Requires test_api_key to be set in settings."""
+        if not settings.test_api_key:
+            raise HTTPException(status_code=404, detail="Not found")
+
+        import secrets as _secrets
+        api_key = request.headers.get("X-API-Key", "")
+        if not api_key or not _secrets.compare_digest(api_key, settings.test_api_key):
+            raise HTTPException(status_code=401, detail="Invalid API key")
+
+        username = settings.test_login_username
+
+        expires_at = datetime.now(UTC) + timedelta(hours=settings.session_expiry_hours)
+
+        with db.get_db_session(settings.db_url) as session:
+            user_session = db.create_session(
+                session=session,
+                username=username,
+                email=None,
+                expires_at=expires_at,
+                session_secret_key=settings.session_secret_key,
+                okta_access_token=None,
+                okta_id_token=None
+            )
+            session_id = user_session.session_id
+
+        response = JSONResponse(content={"success": True, "username": username})
+        auth.create_session_cookie(response, session_id, settings)
+
+        logger.info(f"User {username} logged in via test API key")
+
+        return response
+
 
     # Return 404 error at /attributes.json
     # Required for Neuroglancer to be able to render N5 volumes

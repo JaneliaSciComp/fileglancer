@@ -335,6 +335,8 @@ class AppParameter(BaseModel):
     min: Optional[float] = Field(description="Minimum value for numeric types", default=None)
     max: Optional[float] = Field(description="Maximum value for numeric types", default=None)
     pattern: Optional[str] = Field(description="Regex validation pattern for string types", default=None)
+    hidden: bool = Field(description="Whether the parameter is hidden by default in the UI", default=False)
+    raw: bool = Field(description="If true, value is appended to the command without shell quoting", default=False)
 
     @field_validator("flag")
     @classmethod
@@ -387,6 +389,10 @@ class AppEntryPoint(BaseModel):
     description: Optional[str] = Field(description="Description of the entry point", default=None)
     command: str = Field(description="The base CLI command to execute")
     parameters: List[AppParameterItem] = Field(description="Parameters for this entry point", default=[])
+    env_parameters: List[AppParameterItem] = Field(
+        description="Parameters shown in the Environment tab (e.g. Nextflow profiles)",
+        default=[],
+    )
     resources: Optional[AppResourceDefaults] = Field(description="Default resource requirements", default=None)
     env: Optional[Dict[str, str]] = Field(description="Default environment variables", default=None)
     pre_run: Optional[str] = Field(description="Script to run before the main command", default=None)
@@ -407,6 +413,19 @@ class AppEntryPoint(BaseModel):
         description="Default extra arguments for container exec (e.g. '--nv')",
         default=None,
     )
+    requirements: List[str] = Field(
+        description="Required tools for this entry point, e.g. ['apptainer']. Merged with manifest-level requirements.",
+        default=[],
+    )
+
+    @field_validator("requirements")
+    @classmethod
+    def validate_entry_point_requirements(cls, v):
+        for req in v:
+            tool = re.split(r"[><=!]", req)[0].strip()
+            if tool not in SUPPORTED_TOOLS:
+                raise ValueError(f"Unsupported tool: '{tool}'. Supported: {SUPPORTED_TOOLS}")
+        return v
 
     @field_validator("conda_env")
     @classmethod
@@ -449,7 +468,7 @@ class AppEntryPoint(BaseModel):
     def flat_parameters(self) -> List[AppParameter]:
         """Return a flat list of all parameters, traversing sections."""
         result = []
-        for item in self.parameters:
+        for item in (*self.env_parameters, *self.parameters):
             if isinstance(item, AppParameterSection):
                 result.extend(item.parameters)
             else:
@@ -519,6 +538,7 @@ class UserApp(BaseModel):
     """A user's saved app reference"""
     url: str = Field(description="URL to the app manifest")
     manifest_path: str = Field(description="Relative directory path to the manifest within the repo", default="")
+    branch: Optional[str] = Field(description="Git branch used", default=None)
     name: str = Field(description="App name from manifest")
     description: Optional[str] = Field(description="App description from manifest", default=None)
     added_at: datetime = Field(description="When the app was added")

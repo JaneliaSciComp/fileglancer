@@ -10,6 +10,7 @@ import {
 } from 'react-icons/hi';
 
 import FileSelectorButton from '@/components/ui/BrowsePage/FileSelector/FileSelectorButton';
+import FgSwitch from '@/components/ui/widgets/FgSwitch';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { validatePaths } from '@/queries/appsQueries';
 import { useClusterDefaultsQuery } from '@/queries/jobsQueries';
@@ -73,7 +74,9 @@ function ParameterField({
             onChange={e => onChange(e.target.checked)}
             type="checkbox"
           />
-          <span className="text-foreground text-sm">{param.name}</span>
+          <span className="text-foreground text-sm font-semibold">
+            {param.name}
+          </span>
         </label>
       );
 
@@ -94,7 +97,7 @@ function ParameterField({
               );
             }
           }}
-          placeholder={param.description || param.name}
+          placeholder={param.name}
           step={param.type === 'integer' ? 1 : 'any'}
           type="number"
           value={value !== undefined && value !== null ? String(value) : ''}
@@ -124,12 +127,19 @@ function ParameterField({
           <input
             className={`flex-1 ${baseInputClass}`}
             onChange={e => onChange(e.target.value)}
-            placeholder={param.description || `Select a ${param.type}...`}
+            placeholder={`Select a ${param.type}...`}
             type="text"
             value={value !== undefined && value !== null ? String(value) : ''}
           />
           <FileSelectorButton
-            initialPath={typeof value === 'string' ? value : undefined}
+            initialPath={
+              typeof value === 'string' &&
+              !value.startsWith('s3://') &&
+              !value.startsWith('gs://') &&
+              !value.startsWith('https://')
+                ? value
+                : undefined
+            }
             label="Browse..."
             mode={param.type === 'file' ? 'file' : 'directory'}
             onSelect={path => onChange(path)}
@@ -143,7 +153,7 @@ function ParameterField({
         <input
           className={baseInputClass}
           onChange={e => onChange(e.target.value)}
-          placeholder={param.description || param.name}
+          placeholder={param.name}
           type="text"
           value={value !== undefined && value !== null ? String(value) : ''}
         />
@@ -166,7 +176,7 @@ function ParameterFieldRow({
     <div>
       {param.type !== 'boolean' ? (
         <label
-          className="block text-foreground text-sm font-medium mb-1"
+          className="block text-foreground text-sm font-semibold mb-1"
           htmlFor={`param-${param.key}`}
         >
           {param.name}
@@ -174,13 +184,13 @@ function ParameterFieldRow({
         </label>
       ) : null}
       {param.description && param.type !== 'boolean' ? (
-        <Typography className="text-secondary mb-1" type="small">
+        <Typography className="text-foreground mb-1" type="small">
           {param.description}
         </Typography>
       ) : null}
       <ParameterField onChange={onChange} param={param} value={value} />
       {param.description && param.type === 'boolean' ? (
-        <Typography className="text-secondary mt-1" type="small">
+        <Typography className="text-foreground mt-1" type="small">
           {param.description}
         </Typography>
       ) : null}
@@ -228,10 +238,10 @@ function EnvVarRows({
 }) {
   return (
     <div>
-      <label className="block text-foreground text-sm font-medium mb-1">
+      <label className="block text-foreground text-sm font-semibold mb-1">
         Environment Variables
       </label>
-      <Typography className="text-secondary mb-2" type="small">
+      <Typography className="text-foreground mb-2" type="small">
         Variables exported in the job script before the command runs
       </Typography>
       {envVars.map((envVar, idx) => (
@@ -249,7 +259,7 @@ function EnvVarRows({
             type="text"
             value={envVar.key}
           />
-          <span className="text-secondary">=</span>
+          <span className="text-foreground">=</span>
           <input
             className="flex-[2] p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary font-mono text-sm"
             onChange={e =>
@@ -264,7 +274,7 @@ function EnvVarRows({
             value={envVar.value}
           />
           <button
-            className="p-1 text-secondary hover:text-error transition-colors"
+            className="p-1 text-foreground hover:text-error transition-colors"
             onClick={() => setEnvVars(prev => prev.filter((_, i) => i !== idx))}
             title="Remove variable"
             type="button"
@@ -308,10 +318,10 @@ function EnvironmentSectionContent({
       <EnvVarRows envVars={envVars} setEnvVars={setEnvVars} />
 
       <div>
-        <label className="block text-foreground text-sm font-medium mb-1">
+        <label className="block text-foreground text-sm font-semibold mb-1">
           Pre-run Script
         </label>
-        <Typography className="text-secondary mb-1" type="small">
+        <Typography className="text-foreground mb-1" type="small">
           Shell commands to run before the main command (e.g. module loads)
         </Typography>
         <textarea
@@ -324,10 +334,10 @@ function EnvironmentSectionContent({
       </div>
 
       <div>
-        <label className="block text-foreground text-sm font-medium mb-1">
+        <label className="block text-foreground text-sm font-semibold mb-1">
           Post-run Script
         </label>
-        <Typography className="text-secondary mb-1" type="small">
+        <Typography className="text-foreground mb-1" type="small">
           Shell commands to run after the main command completes
         </Typography>
         <textarea
@@ -355,10 +365,10 @@ function ResourcesSectionContent({
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-foreground text-sm font-medium mb-1">
+        <label className="block text-foreground text-sm font-semibold mb-1">
           CPUs
         </label>
-        <Typography className="text-secondary mb-1" type="small">
+        <Typography className="text-foreground mb-1" type="small">
           Number of CPU cores to allocate for the job
         </Typography>
         <input
@@ -376,10 +386,10 @@ function ResourcesSectionContent({
         />
       </div>
       <div>
-        <label className="block text-foreground text-sm font-medium mb-1">
+        <label className="block text-foreground text-sm font-semibold mb-1">
           Memory
         </label>
-        <Typography className="text-secondary mb-1" type="small">
+        <Typography className="text-foreground mb-1" type="small">
           Amount of RAM to allocate (e.g. &quot;16 GB&quot;, &quot;512 MB&quot;)
         </Typography>
         <input
@@ -396,10 +406,10 @@ function ResourcesSectionContent({
         />
       </div>
       <div>
-        <label className="block text-foreground text-sm font-medium mb-1">
+        <label className="block text-foreground text-sm font-semibold mb-1">
           Time Limit
         </label>
-        <Typography className="text-secondary mb-1" type="small">
+        <Typography className="text-foreground mb-1" type="small">
           Maximum run time before the job is killed (HH:MM format)
         </Typography>
         <input
@@ -436,10 +446,10 @@ function SubmitOptionsSectionContent({
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-foreground text-sm font-medium mb-1">
+        <label className="block text-foreground text-sm font-semibold mb-1">
           Queue
         </label>
-        <Typography className="text-secondary mb-1" type="small">
+        <Typography className="text-foreground mb-1" type="small">
           Cluster queue/partition to submit the job to
         </Typography>
         <input
@@ -456,10 +466,10 @@ function SubmitOptionsSectionContent({
         />
       </div>
       <div>
-        <label className="block text-foreground text-sm font-medium mb-1">
+        <label className="block text-foreground text-sm font-semibold mb-1">
           Extra Arguments
         </label>
-        <Typography className="text-secondary mb-1" type="small">
+        <Typography className="text-foreground mb-1" type="small">
           Additional CLI arguments for the submit command
         </Typography>
         <input
@@ -518,7 +528,7 @@ function EnvironmentTabContent({
         <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
           <div className="text-foreground font-bold text-sm">Environment</div>
           <HiChevronDown
-            className={`h-4 w-4 text-secondary transition-transform ${
+            className={`h-4 w-4 text-foreground transition-transform ${
               openEnvSections.includes('environment') ? 'rotate-180' : ''
             }`}
           />
@@ -540,7 +550,7 @@ function EnvironmentTabContent({
           <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
             <div className="text-foreground font-bold text-sm">Container</div>
             <HiChevronDown
-              className={`h-4 w-4 text-secondary transition-transform ${
+              className={`h-4 w-4 text-foreground transition-transform ${
                 openEnvSections.includes('apptainer') ? 'rotate-180' : ''
               }`}
             />
@@ -548,7 +558,7 @@ function EnvironmentTabContent({
           <Accordion.Content className="pt-4 pb-2 pl-4">
             <div className="space-y-4">
               <div>
-                <label className="block text-foreground text-sm font-medium mb-1">
+                <label className="block text-foreground text-sm font-semibold mb-1">
                   Container Image
                 </label>
                 <input
@@ -560,10 +570,10 @@ function EnvironmentTabContent({
                 />
               </div>
               <div>
-                <label className="block text-foreground text-sm font-medium mb-1">
+                <label className="block text-foreground text-sm font-semibold mb-1">
                   Extra Apptainer Arguments
                 </label>
-                <Typography className="text-secondary mb-1" type="small">
+                <Typography className="text-foreground mb-1" type="small">
                   Additional flags passed to apptainer exec
                 </Typography>
                 <input
@@ -609,7 +619,7 @@ function ClusterTabContent({
         <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
           <div className="text-foreground font-bold text-sm">Resources</div>
           <HiChevronDown
-            className={`h-4 w-4 text-secondary transition-transform ${
+            className={`h-4 w-4 text-foreground transition-transform ${
               openClusterSections.includes('resources') ? 'rotate-180' : ''
             }`}
           />
@@ -628,7 +638,7 @@ function ClusterTabContent({
             Submit Options
           </div>
           <HiChevronDown
-            className={`h-4 w-4 text-secondary transition-transform ${
+            className={`h-4 w-4 text-foreground transition-transform ${
               openClusterSections.includes('submitOptions') ? 'rotate-180' : ''
             }`}
           />
@@ -663,7 +673,10 @@ export default function AppLaunchForm({
 }: AppLaunchFormProps) {
   const { defaultExtraArgs } = usePreferencesContext();
   const clusterDefaultsQuery = useClusterDefaultsQuery();
-  const allParams = flattenParameters(entryPoint.parameters);
+  const allParams = flattenParameters([
+    ...entryPoint.parameters,
+    ...(entryPoint.env_parameters ?? [])
+  ]);
 
   // Initialize parameter values: external values override defaults
   const defaultValues: Record<string, unknown> = {};
@@ -737,6 +750,11 @@ export default function AppLaunchForm({
   const [openEnvSections, setOpenEnvSections] = useState<string[]>(
     entryPoint.container ? ['environment', 'apptainer'] : ['environment']
   );
+  const [openEnvParamSections, setOpenEnvParamSections] = useState<string[]>(
+    (entryPoint.env_parameters ?? [])
+      .filter(item => isParameterSection(item) && !item.collapsed)
+      .map(item => (item as AppParameterSection).section)
+  );
   const [openClusterSections, setOpenClusterSections] = useState<string[]>([
     'resources',
     'submitOptions'
@@ -771,16 +789,24 @@ export default function AppLaunchForm({
         if (isNaN(numVal)) {
           newErrors[param.key] = `${param.name} must be a valid number`;
         } else {
-          if (param.min !== undefined && numVal < param.min) {
+          if (
+            param.min !== null &&
+            param.min !== undefined &&
+            numVal < param.min
+          ) {
             newErrors[param.key] =
               `${param.name} must be at least ${param.min}`;
           }
-          if (param.max !== undefined && numVal > param.max) {
+          if (
+            param.max !== null &&
+            param.max !== undefined &&
+            numVal > param.max
+          ) {
             newErrors[param.key] = `${param.name} must be at most ${param.max}`;
           }
         }
       }
-      // Validate file/directory paths are absolute
+      // Validate file/directory paths (skip URI schemes like s3://)
       if (
         val !== undefined &&
         val !== null &&
@@ -789,26 +815,46 @@ export default function AppLaunchForm({
         typeof val === 'string'
       ) {
         const normalized = convertBackToForwardSlash(val);
-        if (!normalized.startsWith('/') && !normalized.startsWith('~')) {
-          newErrors[param.key] =
-            `${param.name} must be an absolute path (starting with / or ~)`;
+        if (
+          !normalized.startsWith('s3://') &&
+          !normalized.startsWith('gs://') &&
+          !normalized.startsWith('https://')
+        ) {
+          if (normalized.includes('..')) {
+            newErrors[param.key] = `${param.name} must not contain '..'`;
+          } else if (
+            !normalized.startsWith('/') &&
+            !normalized.startsWith('~') &&
+            !normalized.startsWith('./')
+          ) {
+            newErrors[param.key] =
+              `${param.name} must be an absolute or relative path (starting with /, ~, or ./)`;
+          }
         }
       }
     }
     setErrors(newErrors);
 
-    // Auto-expand sections that contain errors
+    // Auto-expand sections that contain errors and reveal hidden params if needed
     if (Object.keys(newErrors).length > 0) {
       const sectionsToOpen = new Set(openSections);
+      let hasHiddenError = false;
       for (const item of entryPoint.parameters) {
-        if (
-          isParameterSection(item) &&
-          item.parameters.some(p => newErrors[p.key])
-        ) {
-          sectionsToOpen.add(item.section);
+        if (isParameterSection(item)) {
+          if (item.parameters.some(p => newErrors[p.key])) {
+            sectionsToOpen.add(item.section);
+          }
+          if (item.parameters.some(p => p.hidden && newErrors[p.key])) {
+            hasHiddenError = true;
+          }
+        } else if (item.hidden && newErrors[item.key]) {
+          hasHiddenError = true;
         }
       }
       setOpenSections([...sectionsToOpen]);
+      if (hasHiddenError) {
+        setShowHidden(true);
+      }
     }
 
     return Object.keys(newErrors).length === 0;
@@ -837,7 +883,14 @@ export default function AppLaunchForm({
         ) {
           const normalized = convertBackToForwardSlash(val);
           params[key] = normalized;
-          pathParams[key] = normalized;
+          // Skip server-side path validation for URI schemes (e.g. s3://)
+          if (
+            !normalized.startsWith('s3://') &&
+            !normalized.startsWith('gs://') &&
+            !normalized.startsWith('https://')
+          ) {
+            pathParams[key] = normalized;
+          }
         } else {
           params[key] = val;
         }
@@ -894,22 +947,70 @@ export default function AppLaunchForm({
     );
   };
 
-  const hasSections = entryPoint.parameters.some(isParameterSection);
+  const [showHidden, setShowHidden] = useState(false);
+
+  // Check if any parameters are marked as hidden
+  const hasHiddenParams = allParams.some(p => p.hidden);
+
+  // Filter out hidden parameters from display when toggle is off
+  const filterHiddenParams = (params: AppParameter[]) =>
+    showHidden ? params : params.filter(p => !p.hidden);
+
+  const visibleParameters = entryPoint.parameters
+    .map(item => {
+      if (isParameterSection(item)) {
+        const filteredParams = filterHiddenParams(item.parameters);
+        // Hide the section entirely if all its parameters are hidden
+        if (filteredParams.length === 0) {
+          return null;
+        }
+        return { ...item, parameters: filteredParams };
+      }
+      if (!showHidden && item.hidden) {
+        return null;
+      }
+      return item;
+    })
+    .filter(Boolean) as (AppParameter | AppParameterSection)[];
+
+  const hasSections = visibleParameters.some(isParameterSection);
+
+  const submitButton = (
+    <Button
+      className="!rounded-md"
+      disabled={submitting || validating}
+      onClick={handleSubmit}
+    >
+      <HiOutlinePlay className="icon-small mr-2" />
+      {validating
+        ? 'Validating...'
+        : submitting
+          ? 'Submitting...'
+          : entryPoint.type === 'service'
+            ? 'Start Service'
+            : 'Submit Job'}
+    </Button>
+  );
 
   return (
     <div>
-      <Typography className="text-foreground font-bold mb-1" type="h5">
-        {entryPoint.name}
-      </Typography>
-      <Typography className="text-secondary block mb-4" type="small">
-        {manifest.name}
-        {manifest.version ? ` v${manifest.version}` : ''}
-      </Typography>
-      {entryPoint.description ? (
-        <Typography className="text-secondary block mb-4" type="small">
-          {entryPoint.description}
-        </Typography>
-      ) : null}
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <Typography className="font-bold mb-1" type="h5">
+            {entryPoint.name}
+          </Typography>
+          <Typography className="block mb-1">
+            {manifest.name}
+            {manifest.version ? ` v${manifest.version}` : ''}
+          </Typography>
+          {entryPoint.description ? (
+            <Typography className="block mb-6">
+              {entryPoint.description}
+            </Typography>
+          ) : null}
+        </div>
+        {submitButton}
+      </div>
 
       {/* Tabs */}
       <Tabs onValueChange={setActiveTab} value={activeTab}>
@@ -927,6 +1028,31 @@ export default function AppLaunchForm({
         </Tabs.List>
 
         <Tabs.Panel className="pt-4" value="parameters">
+          {hasHiddenParams ? (
+            <div className="flex justify-end mb-2">
+              <FgSwitch
+                checked={showHidden}
+                id="show-hidden-toggle"
+                label="Show hidden"
+                onChange={() => {
+                  if (!showHidden) {
+                    // Expand sections that contain hidden parameters
+                    const sectionsWithHidden = entryPoint.parameters
+                      .filter(
+                        item =>
+                          isParameterSection(item) &&
+                          item.parameters.some(p => p.hidden)
+                      )
+                      .map(item => (item as AppParameterSection).section);
+                    setOpenSections(prev => [
+                      ...new Set([...prev, ...sectionsWithHidden])
+                    ]);
+                  }
+                  setShowHidden(prev => !prev);
+                }}
+              />
+            </div>
+          ) : null}
           <div className="max-w-2xl space-y-4">
             {hasSections ? (
               <Accordion
@@ -936,7 +1062,7 @@ export default function AppLaunchForm({
                 type="multiple"
                 value={openSections}
               >
-                {entryPoint.parameters.map(item =>
+                {visibleParameters.map(item =>
                   isParameterSection(item) ? (
                     <Accordion.Item
                       key={`section-${item.section}`}
@@ -944,17 +1070,20 @@ export default function AppLaunchForm({
                     >
                       <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
                         <div className="text-left">
-                          <div className="text-foreground font-medium text-sm">
+                          <Typography className="text-foreground font-semibold text-base">
                             {item.section}
-                          </div>
+                          </Typography>
                           {item.description ? (
-                            <Typography className="text-secondary" type="small">
+                            <Typography
+                              className="text-foreground"
+                              type="small"
+                            >
                               {item.description}
                             </Typography>
                           ) : null}
                         </div>
                         <HiChevronDown
-                          className={`h-4 w-4 text-secondary transition-transform ${
+                          className={`h-4 w-4 text-foreground transition-transform ${
                             openSections.includes(item.section)
                               ? 'rotate-180'
                               : ''
@@ -982,7 +1111,7 @@ export default function AppLaunchForm({
                 )}
               </Accordion>
             ) : (
-              entryPoint.parameters.map(item =>
+              visibleParameters.map(item =>
                 isParameterSection(item) ? null : (
                   <ParameterFieldRow
                     error={errors[item.key]}
@@ -1007,15 +1136,57 @@ export default function AppLaunchForm({
                 onChange={e => setPullLatest(e.target.checked)}
                 type="checkbox"
               />
-              <span className="text-foreground text-sm">
+              <span className="text-foreground text-sm font-semibold">
                 Pull latest code before running
               </span>
             </label>
-            <Typography className="text-secondary mt-1" type="small">
+            <Typography className="text-foreground mt-1" type="small">
               When enabled, runs git pull to fetch the latest code from GitHub
               before starting the job.
             </Typography>
           </div>
+
+          {(entryPoint.env_parameters ?? []).length > 0 ? (
+            <Accordion
+              onValueChange={
+                setOpenEnvParamSections as Dispatch<
+                  SetStateAction<string | string[]>
+                >
+              }
+              type="multiple"
+              value={openEnvParamSections}
+            >
+              {(entryPoint.env_parameters ?? []).map(item =>
+                isParameterSection(item) ? (
+                  <Accordion.Item
+                    key={`env-section-${item.section}`}
+                    value={item.section}
+                  >
+                    <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
+                      <div className="text-foreground font-bold text-sm">
+                        {item.section}
+                      </div>
+                      <HiChevronDown
+                        className={`h-4 w-4 text-secondary transition-transform ${
+                          openEnvParamSections.includes(item.section)
+                            ? 'rotate-180'
+                            : ''
+                        }`}
+                      />
+                    </Accordion.Trigger>
+                    <Accordion.Content className="pt-4 pb-2 pl-4">
+                      <SectionContent
+                        errors={errors}
+                        onParamChange={handleChange}
+                        section={item}
+                        values={values}
+                      />
+                    </Accordion.Content>
+                  </Accordion.Item>
+                ) : null
+              )}
+            </Accordion>
+          ) : null}
 
           <EnvironmentTabContent
             containerArgs={containerArgs}
@@ -1053,21 +1224,8 @@ export default function AppLaunchForm({
         </div>
       ) : null}
 
-      {/* Submit */}
-      <Button
-        className="!rounded-md mt-6"
-        disabled={submitting || validating}
-        onClick={handleSubmit}
-      >
-        <HiOutlinePlay className="icon-small mr-2" />
-        {validating
-          ? 'Validating...'
-          : submitting
-            ? 'Submitting...'
-            : entryPoint.type === 'service'
-              ? 'Start Service'
-              : 'Submit Job'}
-      </Button>
+      {/* Submit (bottom) */}
+      <div className="flex justify-end mt-6">{submitButton}</div>
     </div>
   );
 }

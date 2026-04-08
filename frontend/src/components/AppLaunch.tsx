@@ -6,7 +6,7 @@ import {
   useSearchParams
 } from 'react-router';
 
-import { Button, Typography } from '@material-tailwind/react';
+import { Button, Card, Typography } from '@material-tailwind/react';
 import {
   HiOutlineArrowLeft,
   HiOutlineDownload,
@@ -168,7 +168,7 @@ export default function AppLaunch() {
       {/* Not-installed banner */}
       {!appsQuery.isPending && !isInstalled ? (
         <div className="mb-4 p-3 flex items-center gap-3 border border-primary-light rounded-lg bg-surface/30">
-          <Typography className="text-secondary flex-1" type="small">
+          <Typography className="text-foreground flex-1" type="small">
             This app is not in your library. Install it for quick access from
             the Apps page.
           </Typography>
@@ -231,52 +231,43 @@ export default function AppLaunch() {
         />
       ) : manifest ? (
         <div className="max-w-2xl">
-          <Typography className="text-foreground font-bold mb-1" type="h5">
+          <Typography className="font-bold mb-1" type="h5">
             {manifest.name}
           </Typography>
           {manifest.description ? (
-            <Typography className="text-secondary mb-4" type="small">
-              {manifest.description}
-            </Typography>
+            <Typography className="mb-6">{manifest.description}</Typography>
           ) : null}
-          <Typography className="text-foreground font-medium mb-3" type="p">
-            Select an entry point:
-          </Typography>
-          <div className="space-y-2">
+          <Typography className="mb-3">Select an entry point:</Typography>
+          <div className="space-y-4">
             {manifest.runnables.map(ep => (
-              <div
-                className="flex items-center justify-between gap-4 p-3 border border-primary-light rounded-lg bg-background hover:bg-surface/30 transition-colors"
+              <Card
+                className="p-4 flex flex-col gap-2 text-left w-full"
                 key={ep.id}
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Typography
-                      className="text-foreground font-medium"
-                      type="small"
-                    >
-                      {ep.name}
-                    </Typography>
-                    {ep.type === 'service' ? (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-info/10 text-info border border-info/30">
-                        Service
-                      </span>
-                    ) : null}
-                  </div>
-                  {ep.description ? (
-                    <Typography className="text-secondary mt-1" type="small">
-                      {ep.description}
-                    </Typography>
+                <div className="flex items-center gap-2">
+                  <Typography className="text-foreground font-semibold">
+                    {ep.name}
+                  </Typography>
+                  {ep.type === 'service' ? (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-info/10 text-info border border-info/30">
+                      Service
+                    </span>
                   ) : null}
                 </div>
+                {ep.description ? (
+                  <Typography className="text-sm md:text-base text-foreground">
+                    {ep.description}
+                  </Typography>
+                ) : null}
                 <Button
-                  className="!rounded-md flex-shrink-0"
+                  className="!rounded-md flex-shrink-0 self-start"
                   onClick={() => setSelectedEntryPoint(ep)}
                   size="sm"
                 >
                   <HiOutlinePlay className="icon-small mr-1" />
                   Select
                 </Button>
-              </div>
+              </Card>
             ))}
           </div>
         </div>

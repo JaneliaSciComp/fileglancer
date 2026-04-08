@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 
-import { Button, Tabs, Typography } from '@material-tailwind/react';
+import { Button, Card, Tabs, Typography } from '@material-tailwind/react';
 import {
   HiOutlineArrowLeft,
   HiOutlineDownload,
@@ -15,6 +15,7 @@ import {
   coy
 } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
+import AnsiText from '@/components/ui/AppsPage/AnsiText';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import type { JobFileInfo, FileSharePath } from '@/shared.types';
 import JobStatusBadge from '@/components/ui/AppsPage/JobStatusBadge';
@@ -41,26 +42,26 @@ function FilePreview({
   readonly isDarkMode: boolean;
 }) {
   if (content === undefined) {
-    return (
-      <Typography className="text-secondary p-4" type="small">
-        Loading...
-      </Typography>
-    );
+    return <Typography className="text-foreground p-4">Loading...</Typography>;
   }
 
   if (content === null) {
     return (
-      <Typography className="text-secondary p-4 italic" type="small">
+      <Typography className="text-foreground p-4 italic">
         File not available
       </Typography>
     );
+  }
+
+  if (language === 'text') {
+    return <AnsiText content={content} isDarkMode={isDarkMode} />;
   }
 
   const theme = isDarkMode ? materialDark : coy;
   const themeCodeStyles = theme['code[class*="language-"]'] || {};
 
   return (
-    <div className="border border-primary-light rounded">
+    <Card className="overflow-hidden dark:border-surface-light">
       <SyntaxHighlighter
         codeTagProps={{
           style: {
@@ -86,7 +87,7 @@ function FilePreview({
       >
         {content}
       </SyntaxHighlighter>
-    </div>
+    </Card>
   );
 }
 
@@ -125,7 +126,7 @@ function FilePathLink({
 
   return (
     <Link
-      className="text-primary-light text-sm font-mono hover:underline"
+      className="text-primary-dark text-sm font-mono hover:underline"
       to={browseUrl}
     >
       {displayPath}
@@ -248,26 +249,36 @@ export default function JobDetail() {
         <div>
           {/* Job Info Header */}
           <div className="mb-6">
-            <Typography className="text-foreground font-bold mb-1" type="h5">
-              {job.app_name} &mdash; {job.entry_point_name}
-            </Typography>
+            <div className="flex items-center justify-between">
+              <Typography className="font-bold mb-1" type="h5">
+                {job.app_name} &mdash; {job.entry_point_name}
+              </Typography>
+              <Button
+                className="!rounded-md"
+                onClick={handleRelaunch}
+                variant="outline"
+              >
+                <HiOutlineRefresh className="icon-small mr-2" />
+                Relaunch
+              </Button>
+            </div>
             <div className="flex flex-wrap items-center gap-4 mt-2">
               <JobStatusBadge status={job.status} />
-              <Typography className="text-secondary" type="small">
+              <Typography className="text-foreground">
                 Submitted: {formatDateString(job.created_at)}
               </Typography>
               {job.started_at ? (
-                <Typography className="text-secondary" type="small">
+                <Typography className="text-foreground">
                   Started: {formatDateString(job.started_at)}
                 </Typography>
               ) : null}
               {job.finished_at ? (
-                <Typography className="text-secondary" type="small">
+                <Typography className="text-foreground">
                   Finished: {formatDateString(job.finished_at)}
                 </Typography>
               ) : null}
               {job.exit_code !== null && job.exit_code !== undefined ? (
-                <Typography className="text-secondary" type="small">
+                <Typography className="text-foreground">
                   Exit code: {job.exit_code}
                 </Typography>
               ) : null}
@@ -282,10 +293,10 @@ export default function JobDetail() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-success" />
                 </span>
-                <Typography className="text-foreground flex-1" type="small">
+                <Typography className="text-foreground flex-1">
                   Service is running at{' '}
                   <a
-                    className="text-primary-light hover:underline font-mono"
+                    className="text-primary-dark hover:underline font-mono"
                     href={job.service_url}
                     rel="noopener noreferrer"
                     target="_blank"
@@ -299,13 +310,12 @@ export default function JobDetail() {
                   disabled={cancelMutation.isPending}
                   onClick={() => setShowStopConfirm(true)}
                   size="sm"
-                  variant="outline"
                 >
                   <HiOutlineStop className="icon-small mr-1" />
                   {cancelMutation.isPending ? 'Stopping...' : 'Stop Service'}
                 </Button>
                 <a
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-success text-white hover:bg-success/90 transition-colors"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-success text-success-foreground hover:bg-success/90 transition-colors"
                   href={job.service_url}
                   rel="noopener noreferrer"
                   target="_blank"
@@ -320,7 +330,7 @@ export default function JobDetail() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-warning opacity-75" />
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-warning" />
                 </span>
-                <Typography className="text-foreground flex-1" type="small">
+                <Typography className="text-foreground flex-1">
                   Service is starting up...
                 </Typography>
                 <Button
@@ -329,7 +339,6 @@ export default function JobDetail() {
                   disabled={cancelMutation.isPending}
                   onClick={() => setShowStopConfirm(true)}
                   size="sm"
-                  variant="outline"
                 >
                   <HiOutlineStop className="icon-small mr-1" />
                   {cancelMutation.isPending ? 'Stopping...' : 'Stop Service'}
@@ -346,7 +355,7 @@ export default function JobDetail() {
             <Typography className="text-foreground font-bold mb-2" type="h6">
               Stop Service
             </Typography>
-            <Typography className="text-secondary mb-4" type="small">
+            <Typography className="text-foreground mb-4">
               Are you sure you want to stop this service? It will be terminated
               and the URL will no longer be accessible.
             </Typography>
@@ -354,7 +363,6 @@ export default function JobDetail() {
               <Button
                 className="!rounded-md"
                 onClick={() => setShowStopConfirm(false)}
-                variant="outline"
               >
                 Cancel
               </Button>
@@ -396,34 +404,23 @@ export default function JobDetail() {
 
             <Tabs.Panel className="pt-4" value="parameters">
               {Object.keys(job.parameters).length > 0 ? (
-                <div className="border border-primary-light rounded p-3 bg-surface/30">
+                <Card className="p-3 dark:border-surface-light">
                   {Object.entries(job.parameters).map(([key, value]) => (
                     <div className="flex gap-2 py-1" key={key}>
-                      <Typography
-                        className="text-secondary font-medium"
-                        type="small"
-                      >
+                      <Typography className="text-foreground font-semibold">
                         {key}:
                       </Typography>
-                      <Typography className="text-foreground" type="small">
+                      <Typography className="text-foreground">
                         {String(value)}
                       </Typography>
                     </div>
                   ))}
-                </div>
+                </Card>
               ) : (
-                <Typography className="text-secondary italic" type="small">
+                <Typography className="text-foreground italic">
                   No parameters
                 </Typography>
               )}
-              <Button
-                className="!rounded-md mt-4"
-                onClick={handleRelaunch}
-                variant="outline"
-              >
-                <HiOutlineRefresh className="icon-small mr-2" />
-                Relaunch
-              </Button>
             </Tabs.Panel>
 
             <Tabs.Panel className="pt-4" value="script">
@@ -457,7 +454,6 @@ export default function JobDetail() {
                       handleDownload(stdoutQuery.data!, `job-${id}-stdout.log`)
                     }
                     size="sm"
-                    variant="outline"
                   >
                     <HiOutlineDownload className="icon-small mr-2" />
                     Download
@@ -487,7 +483,6 @@ export default function JobDetail() {
                       handleDownload(stderrQuery.data!, `job-${id}-stderr.log`)
                     }
                     size="sm"
-                    variant="outline"
                   >
                     <HiOutlineDownload className="icon-small mr-2" />
                     Download

@@ -84,6 +84,19 @@ Fileglancer supports dynamic configuration of OME-Zarr viewers through `viewers.
 
 For detailed configuration options, examples, and documentation on adding custom viewers, see [ViewersConfiguration.md](ViewersConfiguration.md).
 
+
+### Testing Configuration
+
+Optionally, to run Playwright tests against a development deployment with OKTA authentication enabled, add the below to the configuration file.
+**Note:** Do NOT add this configuration to a production deployment.
+
+```yaml
+#
+# Bypass OKTA multifactor authentication for integration tests against a development deployment
+#
+test_api_key: "<your-generated-key>"
+```
+
 ### Feature Flags
 
 Optional features can be enabled via Vite environment variables. Create or edit `frontend/.env`:

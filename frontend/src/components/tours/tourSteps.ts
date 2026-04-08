@@ -132,6 +132,29 @@ export const tourSteps: StepOptions[] = [
     buttons: [backButton, takeAnotherTourButton, exitButton]
   },
 
+  // NG Links workflow
+  {
+    id: 'nglinks-start',
+    title: 'Neuroglancer Links',
+    text: 'On this page, you can create and manage short links for Neuroglancer viewer states. Short links make it easy to share specific views with collaborators.',
+    attachTo: { element: '[data-tour="nglinks-page"]', on: 'top' },
+    buttons: [backButton, nextButton, exitButton]
+  },
+  {
+    id: 'nglinks-new-link',
+    title: 'Create a New Link',
+    text: 'Click this button to open the link creation dialog.<br><br>In <b>URL Mode</b>, paste a full Neuroglancer URL.<br><br>In <b>State Mode</b>, paste a Neuroglancer JSON state object and specify a base URL.<br><br>Optionally add a <b>Title</b> (appears in the browser tab) and a <b>Name</b> (used in the shortened link URL).',
+    attachTo: { element: '[data-tour="nglinks-new-button"]', on: 'bottom' },
+    buttons: [backButton, nextButton, exitButton]
+  },
+  {
+    id: 'nglinks-table',
+    title: 'Managing Your Links',
+    text: 'Your created links appear in this table. You can click a short link to open it in Neuroglancer, use the actions menu to copy, edit, or delete links.',
+    attachTo: { element: '[data-tour="nglinks-table"]', on: 'top' },
+    buttons: [backButton, takeAnotherTourButton, exitButton]
+  },
+
   // File Conversion workflow
   {
     id: 'conversion-start',

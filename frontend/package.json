@@ -1,7 +1,7 @@
 {
     "name": "fileglancer",
     "type": "module",
-    "version": "2.7.0-a0",
+    "version": "2.7.0-a4",
     "description": "Browse, share, and publish files on the Janelia file system",
     "keywords": [
         "ngff",
@@ -32,9 +32,11 @@
     "dependencies": {
         "@bioimagetools/capability-manifest": "^0.3.3",
         "@material-tailwind/react": "^3.0.0-beta.24",
+        "@tanstack/react-hotkeys": "^0.4.1",
         "@tanstack/react-query": "^5.90.2",
         "@tanstack/react-table": "^8.21.3",
         "@types/js-yaml": "^4.0.9",
+        "@tanstack/react-virtual": "^3.13.23",
         "@types/react-syntax-highlighter": "^15.5.13",
         "@vitejs/plugin-react": "^5.0.0",
         "autoprefixer": "^10.4.21",
@@ -79,7 +81,7 @@
         "eslint-plugin-react-hooks": "^5.2.0",
         "eslint-plugin-react-refresh": "^0.4.19",
         "globals": "^15.15.0",
-        "happy-dom": "^20.0.10",
+        "happy-dom": "^20.8.9",
         "lefthook": "^1.12.2",
         "msw": "^2.10.4",
         "prettier": "^3.5.3",

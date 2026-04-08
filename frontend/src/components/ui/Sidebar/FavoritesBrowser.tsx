@@ -79,10 +79,10 @@ export default function FavoritesBrowser({
           displayFileSharePaths.length === 0 &&
           displayFolders.length === 0 ? (
             <div className="px-4 py-6 text-center">
-              <Typography className="text-sm text-gray-500">
+              <Typography className="text-sm text-foreground/60">
                 No favorites match your filter '{searchQuery}'
               </Typography>
-              <Typography className="text-xs text-gray-400 mt-1">
+              <Typography className="text-xs text-foreground/40 mt-1">
                 Try broadening your search to see more results
               </Typography>
             </div>

@@ -185,8 +185,11 @@ test.describe('Symlink Navigation and Display', () => {
   test('context menu works on symlinks', async ({ fileglancerPage: page }) => {
     // Right-click on the symlink text in the table to open context menu
     // Following the pattern from file-operations.spec.ts
-    await page
-      .getByText('symlink_to_file', { exact: true })
+    const symlinkRow = page
+      .getByRole('row')
+      .filter({ hasText: 'symlink_to_file' });
+    await symlinkRow
+      .getByText('Symlink', { exact: true })
       .click({ button: 'right' });
 
     // Verify context menu appears - wait for it to be visible
@@ -219,8 +222,8 @@ test.describe('Symlink Navigation and Display', () => {
     ).toBeVisible();
 
     // Verify the name is NOT a hyperlink (should be plain Typography)
-    // Get the text element and verify it's not an anchor
-    const nameCell = brokenLinkRow.locator('td').first();
+    // Get the name cell and verify it's not an anchor
+    const nameCell = brokenLinkRow.getByRole('cell').first();
     const linkElement = nameCell.locator('a');
     await expect(linkElement).not.toBeVisible();
 

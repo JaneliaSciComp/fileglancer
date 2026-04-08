@@ -78,14 +78,14 @@ function StatusCell({ status }: { readonly status: string }) {
       <span
         className={`px-2 py-1 rounded-full text-xs ${
           status === 'Open'
-            ? 'bg-blue-200 text-blue-800'
+            ? 'bg-info-light text-info dark:bg-info-dark dark:text-info'
             : status === 'Pending'
-              ? 'bg-yellow-200 text-yellow-800'
+              ? 'bg-warning-light text-warning dark:bg-warning-dark'
               : status === 'Work in progress'
-                ? 'bg-purple-200 text-purple-800'
+                ? 'bg-secondary/10 text-secondary dark:bg-secondary-dark/30'
                 : status === 'Done'
-                  ? 'bg-green-200 text-green-800'
-                  : 'bg-gray-200 text-gray-800'
+                  ? 'bg-success-light text-success dark:bg-success-dark'
+                  : 'bg-surface text-surface-foreground'
         }`}
       >
         {status}

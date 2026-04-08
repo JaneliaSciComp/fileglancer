@@ -76,6 +76,7 @@ type AppParameter = {
   min?: number;
   max?: number;
   pattern?: string;
+  hidden?: boolean;
 };
 
 type AppParameterSection = {
@@ -113,6 +114,7 @@ type AppEntryPoint = {
   description?: string;
   command: string;
   parameters: AppParameterItem[];
+  env_parameters?: AppParameterItem[];
   resources?: AppResourceDefaults;
   env?: Record<string, string>;
   pre_run?: string;
@@ -134,6 +136,7 @@ type AppManifest = {
 type UserApp = {
   url: string;
   manifest_path: string;
+  branch?: string;
   name: string;
   description?: string;
   added_at: string;

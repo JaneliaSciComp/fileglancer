@@ -64,10 +64,10 @@ export default function Apps() {
 
   return (
     <div>
-      <Typography className="mb-4 text-foreground font-bold" type="h5">
+      <Typography className="mb-6 text-foreground font-bold" type="h5">
         Apps
       </Typography>
-      <Typography className="mb-4 text-foreground" type="small">
+      <Typography className="mb-6 text-foreground">
         Run command-line tools on the compute cluster. Add apps by URL to get
         started.
       </Typography>
@@ -80,7 +80,7 @@ export default function Apps() {
       </div>
 
       {appsQuery.isPending ? (
-        <Typography className="text-secondary mb-6" type="small">
+        <Typography className="text-foreground mb-6" type="small">
           Loading apps...
         </Typography>
       ) : appsQuery.isError ? (
@@ -102,7 +102,7 @@ export default function Apps() {
         </div>
       ) : (
         <div className="mb-8 p-6 border border-dashed border-primary-light rounded-lg text-center">
-          <Typography className="text-secondary" type="small">
+          <Typography className="text-foreground" type="small">
             No apps configured. Click &quot;Add App&quot; to get started.
           </Typography>
         </div>

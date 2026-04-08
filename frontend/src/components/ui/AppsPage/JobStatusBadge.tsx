@@ -5,8 +5,8 @@ const STATUS_STYLES: Record<
   { bg: string; text: string; label: string }
 > = {
   PENDING: {
-    bg: 'bg-secondary/20',
-    text: 'text-secondary',
+    bg: 'bg-surface',
+    text: 'text-foreground',
     label: 'Pending'
   },
   RUNNING: {

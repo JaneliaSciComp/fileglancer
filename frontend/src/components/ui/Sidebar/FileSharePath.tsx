@@ -34,7 +34,7 @@ export default function FileSharePathComponent({
   return (
     <List.Item className="file-share-path pl-6 w-full flex items-center justify-between rounded-md cursor-pointer text-foreground hover:!bg-primary-light/30 focus:!bg-primary-light/30">
       <Link
-        className="max-w-[calc(100%-1rem)] grow flex flex-col gap-1 !text-foreground hover:!text-black focus:!text-black dark:hover:!text-white dark:focus:!text-white"
+        className="max-w-[calc(100%-1rem)] grow flex flex-col gap-1 !text-foreground hover:!text-surface-foreground focus:!text-surface-foreground"
         to={link}
       >
         <div className="flex gap-1 items-center max-w-full">

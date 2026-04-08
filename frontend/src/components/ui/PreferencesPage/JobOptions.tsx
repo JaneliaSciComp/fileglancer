@@ -67,7 +67,7 @@ export default function JobOptions() {
             value={localExtraArgs}
           />
           <button
-            className="mt-2 block px-3 py-1 text-sm rounded bg-primary text-white hover:bg-primary-dark transition-colors disabled:opacity-50"
+            className="mt-2 block px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary-dark transition-colors disabled:opacity-50"
             disabled={!isExtraArgsDirty || savingExtraArgs}
             onClick={handleSaveExtraArgs}
             type="button"
@@ -96,7 +96,7 @@ export default function JobOptions() {
             value={localCacheDir}
           />
           <button
-            className="mt-2 block px-3 py-1 text-sm rounded bg-primary text-white hover:bg-primary-dark transition-colors disabled:opacity-50"
+            className="mt-2 block px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary-dark transition-colors disabled:opacity-50"
             disabled={!isCacheDirDirty || savingCacheDir}
             onClick={handleSaveCacheDir}
             type="button"

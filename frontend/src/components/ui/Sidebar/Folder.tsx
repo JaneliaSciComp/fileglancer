@@ -16,7 +16,6 @@ import {
 import MissingFolderFavoriteDialog from './MissingFolderFavoriteDialog';
 import FgTooltip from '../widgets/FgTooltip';
 import type { FileSharePath } from '@/shared.types';
-import { fileQueryKeys } from '@/queries/fileQueries';
 
 import {
   FolderFavorite,
@@ -77,7 +76,7 @@ export default function Folder({
         subpath: folderPath
       });
       await queryClient.fetchQuery({
-        queryKey: fileQueryKeys.filePath(fsp.name, folderPath),
+        queryKey: ['folder-exists', fsp.name, folderPath],
         queryFn: async () => {
           const response = await fetch(url);
           if (!response.ok) {
@@ -129,7 +128,7 @@ export default function Folder({
         }
       >
         <Link
-          className="w-[calc(100%-2rem)] flex flex-col items-start gap-2 short:gap-1 !text-foreground hover:!text-black focus:!text-black hover:dark:!text-white focus:dark:!text-white"
+          className="w-[calc(100%-2rem)] flex flex-col items-start gap-2 short:gap-1 !text-foreground hover:!text-surface-foreground focus:!text-surface-foreground"
           to={link}
         >
           <div className="w-full flex gap-1 items-center">
@@ -142,7 +141,7 @@ export default function Folder({
           </div>
           <FgTooltip label={displayPath} triggerClasses="w-full">
             <Typography
-              className={`text-left text-sm short:text-xs truncate ${isFavoritable ? '' : 'text-foreground/60 group-hover:text-black group-hover:dark:text-white'}`}
+              className={`text-left text-sm short:text-xs truncate ${isFavoritable ? '' : 'text-foreground/60 group-hover:text-surface-foreground'}`}
             >
               {displayPath}
             </Typography>
