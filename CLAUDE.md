@@ -180,7 +180,7 @@ Fileglancer uses a manifest-based viewer configuration system. Each viewer is de
 
 To customize viewers:
 
-1. Copy `frontend/viewers.config.yaml.template` to `frontend/viewers.config.yaml`
+1. Copy `frontend/src/config/viewers.config.yaml` to `frontend/viewers.config.yaml`
 2. Edit `frontend/viewers.config.yaml` (add/remove `manifest_url` entries, override URLs or labels)
 3. Rebuild application: `pixi run node-build`
 

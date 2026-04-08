@@ -74,7 +74,7 @@ Fileglancer supports dynamic configuration of OME-Zarr viewers through `viewers.
 
 **Quick Setup:**
 
-1. Copy the template into the frontend directory: `cp frontend/viewers.config.yaml.template frontend/viewers.config.yaml`
+1. Copy the default config: `cp frontend/src/config/viewers.config.yaml frontend/viewers.config.yaml`
 
 2. Edit `frontend/viewers.config.yaml` to enable/disable viewers or customize URLs
 

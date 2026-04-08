@@ -15,7 +15,7 @@ Each viewer is defined by a **capability manifest** hosted at a URL. The configu
 
 ## Quick Start
 
-1. Copy the template into the frontend directory: `cp frontend/viewers.config.yaml.template frontend/viewers.config.yaml`
+1. Copy the default config: `cp frontend/src/config/viewers.config.yaml frontend/viewers.config.yaml`
 2. Edit `frontend/viewers.config.yaml` to customize viewers
 3. Rebuild the application: `pixi run node-build`
 
@@ -30,7 +30,7 @@ There are two config locations, with the `frontend/` override taking precedence 
 | `frontend/viewers.config.yaml` | **Local override** — gitignored, safe to customize without merge conflicts |
 | `frontend/src/config/viewers.config.yaml` | **Default config** — committed source file, used when no override exists |
 
-Copy `frontend/viewers.config.yaml.template` to `frontend/viewers.config.yaml` to create a local override. This file is listed in `.gitignore` so your customizations will not conflict with upstream updates.
+Copy `frontend/src/config/viewers.config.yaml` to `frontend/viewers.config.yaml` to create a local override. This file is listed in `.gitignore` so your customizations will not conflict with upstream updates.
 
 **Important:** The config is bundled at build time. Changes require rebuilding the application.
 
@@ -242,7 +242,7 @@ viewers:
 
 When developing with custom configurations:
 
-1. Copy `frontend/viewers.config.yaml.template` to `frontend/viewers.config.yaml`
+1. Copy the default config: `cp frontend/src/config/viewers.config.yaml frontend/viewers.config.yaml`
 2. Edit `frontend/viewers.config.yaml`
 3. Rebuild frontend: `pixi run node-build` or use watch mode: `pixi run dev-watch`
 4. Check the browser console for viewer initialization messages

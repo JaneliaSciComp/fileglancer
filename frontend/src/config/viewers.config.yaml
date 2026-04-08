@@ -1,5 +1,19 @@
-# Default Fileglancer OME-Zarr Viewers Configuration
-# Can be overridden by providing a custom viewers.config.yaml file in the frontend/ directory
+# Fileglancer OME-Zarr Viewers Configuration
+#
+# To customize, copy this file to frontend/viewers.config.yaml (which is
+# gitignored) and edit your copy. The override takes precedence at build time.
+#
+# After editing, rebuild with: pixi run node-build
+# (or use watch mode: pixi run dev-watch)
+#
+# Each viewer entry requires:
+#   - manifest_url: URL or absolute path to a capability manifest YAML file
+#     Use absolute paths (e.g. /viewers/neuroglancer.yaml) for manifests bundled
+#     in the public/ directory, or full URLs for externally hosted manifests.
+#
+# Optional:
+#   - instance_template_url: Override the viewer's template_url from the manifest
+#   - label: Custom tooltip text (defaults to "View in {Name}")
 
 viewers:
   - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/viewers-config/frontend/public/viewers/neuroglancer.yaml'
