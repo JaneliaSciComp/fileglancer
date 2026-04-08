@@ -38,4 +38,4 @@ capabilities:
   bioformats2raw_layout: false
 
   # Is the OMERO metadata used to e.g. color the channels?
-  omero_metadata: false
+  omero_metadata: true
