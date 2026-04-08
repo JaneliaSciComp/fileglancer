@@ -154,7 +154,7 @@ Use `instance_template_url` to point to a custom deployment of a viewer while st
 
 ```yaml
 viewers:
-  - manifest_url: "https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/vizarr.yaml"
+  - manifest_url: "https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/main/frontend/public/viewers/avivator.yaml"
     instance_template_url: "https://my-avivator-instance.example.com/?image_url={dataLink}"
     logo: avivator.png
 ```
@@ -234,7 +234,7 @@ Just add `frontend/src/assets/neuroglancer.png` -- no config needed.
 
 ```yaml
 viewers:
-  - manifest_url: "https://example.com/manifests/vizarr.yaml"
+  - manifest_url: "https://example.com/manifests/avivator.yaml"
     logo: "avivator.png" # Uses @/assets/avivator.png
 ```
 

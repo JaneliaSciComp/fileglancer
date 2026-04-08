@@ -324,14 +324,14 @@ viewers:
       const yaml = `
 viewers:
   - manifest_url: /viewers/neuroglancer.yaml
-  - manifest_url: /viewers/vizarr.yaml
+  - manifest_url: /viewers/avivator.yaml
 `;
 
       const result = parseViewersConfig(yaml);
 
       expect(result.viewers).toHaveLength(2);
       expect(result.viewers[0].manifest_url).toBe('/viewers/neuroglancer.yaml');
-      expect(result.viewers[1].manifest_url).toBe('/viewers/vizarr.yaml');
+      expect(result.viewers[1].manifest_url).toBe('/viewers/avivator.yaml');
     });
 
     it('should handle URL with special characters', () => {

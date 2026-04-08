@@ -154,10 +154,10 @@ describe('DataToolLinks - Edge Cases', () => {
           template_url: 'https://neuroglancer.com/#!{DATA_URL}'
         }
       },
-      vizarr: {
+      avivator: {
         viewer: {
           name: 'Avivator',
-          template_url: 'https://vizarr.com/?url={DATA_URL}'
+          template_url: 'https://avivator.com/?url={DATA_URL}'
         }
       }
     };
@@ -207,7 +207,7 @@ describe('DataToolLinks - Edge Cases', () => {
       expect(neuroglancerLogo).toBeTruthy();
       expect(neuroglancerLogo?.getAttribute('src')).toContain('neuroglancer');
 
-      // Check for avivator logo (name for viewer in vizarr.yaml)
+      // Check for avivator logo (name for viewer in avivator.yaml)
       const vizarrLogo = images.find(
         img => img.getAttribute('alt') === 'View in Avivator'
       );
@@ -269,10 +269,10 @@ describe('DataToolLinks - Expected Behavior', () => {
           template_url: 'https://neuroglancer.com/#!{DATA_URL}'
         }
       },
-      vizarr: {
+      avivator: {
         viewer: {
           name: 'Avivator',
-          template_url: 'https://vizarr.com/?url={DATA_URL}'
+          template_url: 'https://avivator.com/?url={DATA_URL}'
         }
       }
     };

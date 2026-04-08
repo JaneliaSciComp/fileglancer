@@ -4,7 +4,7 @@
 viewers:
   - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/viewers-config/frontend/public/viewers/neuroglancer.yaml'
 
-  - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/viewers-config/frontend/public/viewers/vizarr.yaml'
+  - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/viewers-config/frontend/public/viewers/avivator.yaml'
 
   - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/viewers-config/frontend/public/viewers/validator.yaml'
 
