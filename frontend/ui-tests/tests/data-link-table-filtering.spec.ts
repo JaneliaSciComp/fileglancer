@@ -73,7 +73,10 @@ test.describe('Data Link Table Filtering', () => {
       await page.reload();
 
       // Navigate to Links page
-      const linksNavButton = page.getByRole('link', { name: 'Data links' });
+      const linksNavButton = page.getByRole('link', {
+        name: 'Data Links',
+        exact: true
+      });
       await linksNavButton.click();
       await expect(page.getByRole('heading', { name: /links/i })).toBeVisible();
 
