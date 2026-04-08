@@ -5,7 +5,7 @@ import tempfile
 import shutil
 
 from contextlib import contextmanager
-from unittest.mock import Mock
+from unittest.mock import Mock, MagicMock, patch
 from typing import List, Callable, Optional
 
 from fileglancer import database
@@ -490,3 +490,218 @@ def test_validate_path_nonexistent(filestore):
 def test_validate_path_escape(filestore):
     """Path escape attempt returns confinement error."""
     assert filestore.validate_path("../outside.txt") == "Path is not within an allowed file share"
+
+
+# --- _check_permissions ---
+
+class TestCheckPermissions:
+
+    def _make_stat(self, mode):
+        """Create a mock stat_result with the given mode."""
+        sr = MagicMock(spec=os.stat_result)
+        sr.st_mode = mode
+        return sr
+
+    def test_owner_read_write(self):
+        mode = stat.S_IRUSR | stat.S_IWUSR
+        sr = self._make_stat(mode)
+        has_read, has_write = FileInfo._check_permissions(sr, "alice", "alice", "staff")
+        assert has_read is True
+        assert has_write is True
+
+    def test_owner_read_only(self):
+        mode = stat.S_IRUSR
+        sr = self._make_stat(mode)
+        has_read, has_write = FileInfo._check_permissions(sr, "alice", "alice", "staff")
+        assert has_read is True
+        assert has_write is False
+
+    def test_owner_no_permissions(self):
+        mode = 0
+        sr = self._make_stat(mode)
+        has_read, has_write = FileInfo._check_permissions(sr, "alice", "alice", "staff")
+        assert has_read is False
+        assert has_write is False
+
+    def test_group_member_read_write(self):
+        mode = stat.S_IRGRP | stat.S_IWGRP
+        sr = self._make_stat(mode)
+        user_groups = {"staff", "dev"}
+        has_read, has_write = FileInfo._check_permissions(
+            sr, "bob", "alice", "staff", user_groups=user_groups
+        )
+        assert has_read is True
+        assert has_write is True
+
+    def test_group_member_read_only(self):
+        mode = stat.S_IRGRP
+        sr = self._make_stat(mode)
+        user_groups = {"staff"}
+        has_read, has_write = FileInfo._check_permissions(
+            sr, "bob", "alice", "staff", user_groups=user_groups
+        )
+        assert has_read is True
+        assert has_write is False
+
+    def test_other_user_read_write(self):
+        mode = stat.S_IROTH | stat.S_IWOTH
+        sr = self._make_stat(mode)
+        user_groups = {"dev"}  # not in "staff"
+        has_read, has_write = FileInfo._check_permissions(
+            sr, "charlie", "alice", "staff", user_groups=user_groups
+        )
+        assert has_read is True
+        assert has_write is True
+
+    def test_other_user_no_permissions(self):
+        mode = stat.S_IRUSR | stat.S_IWUSR  # only owner
+        sr = self._make_stat(mode)
+        user_groups = {"dev"}
+        has_read, has_write = FileInfo._check_permissions(
+            sr, "charlie", "alice", "staff", user_groups=user_groups
+        )
+        assert has_read is False
+        assert has_write is False
+
+    def test_owner_check_takes_priority_over_group(self):
+        """Owner permissions apply even if group perms are more permissive."""
+        mode = stat.S_IRGRP | stat.S_IWGRP  # group has rw, owner has nothing
+        sr = self._make_stat(mode)
+        user_groups = {"staff"}
+        has_read, has_write = FileInfo._check_permissions(
+            sr, "alice", "alice", "staff", user_groups=user_groups
+        )
+        # Owner match checked first, owner has no perms
+        assert has_read is False
+        assert has_write is False
+
+    def test_group_check_takes_priority_over_other(self):
+        """Group permissions apply even if other perms are more permissive."""
+        mode = stat.S_IROTH | stat.S_IWOTH  # only other has perms
+        sr = self._make_stat(mode)
+        user_groups = {"staff"}
+        has_read, has_write = FileInfo._check_permissions(
+            sr, "bob", "alice", "staff", user_groups=user_groups
+        )
+        # Group match, but group has no perms
+        assert has_read is False
+        assert has_write is False
+
+
+# --- _get_user_groups ---
+
+class TestGetUserGroups:
+
+    @patch("fileglancer.filestore.pwd")
+    @patch("fileglancer.filestore.grp")
+    def test_includes_supplementary_groups(self, mock_grp, mock_pwd):
+        """Returns groups where the user appears in gr_mem."""
+        mock_grp.getgrall.return_value = [
+            MagicMock(gr_name="staff", gr_mem=["alice", "bob"]),
+            MagicMock(gr_name="dev", gr_mem=["alice"]),
+            MagicMock(gr_name="ops", gr_mem=["charlie"]),
+        ]
+        mock_pwd.getpwnam.return_value = MagicMock(pw_gid=100)
+        mock_grp.getgrgid.return_value = MagicMock(gr_name="primary")
+
+        groups = FileInfo._get_user_groups("alice")
+        assert "staff" in groups
+        assert "dev" in groups
+        assert "ops" not in groups
+
+    @patch("fileglancer.filestore.pwd")
+    @patch("fileglancer.filestore.grp")
+    def test_includes_primary_group(self, mock_grp, mock_pwd):
+        """Returns the user's primary group even if not in gr_mem."""
+        mock_grp.getgrall.return_value = []
+        mock_pwd.getpwnam.return_value = MagicMock(pw_gid=100)
+        mock_grp.getgrgid.return_value = MagicMock(gr_name="primary")
+
+        groups = FileInfo._get_user_groups("alice")
+        assert "primary" in groups
+
+    @patch("fileglancer.filestore.pwd")
+    @patch("fileglancer.filestore.grp")
+    def test_handles_unknown_user(self, mock_grp, mock_pwd):
+        """Returns empty set if user doesn't exist."""
+        mock_grp.getgrall.return_value = []
+        mock_pwd.getpwnam.side_effect = KeyError("no such user")
+
+        groups = FileInfo._get_user_groups("nonexistent")
+        assert groups == set()
+
+    @patch("fileglancer.filestore.pwd")
+    @patch("fileglancer.filestore.grp")
+    def test_handles_getgrall_failure(self, mock_grp, mock_pwd):
+        """Gracefully handles grp.getgrall() failure."""
+        mock_grp.getgrall.side_effect = OSError("nss failure")
+        mock_pwd.getpwnam.return_value = MagicMock(pw_gid=100)
+        mock_grp.getgrgid.return_value = MagicMock(gr_name="primary")
+
+        groups = FileInfo._get_user_groups("alice")
+        # Still gets primary group despite getgrall failure
+        assert "primary" in groups
+
+
+# --- _file_info_from_direntry ---
+
+class TestFileInfoFromDirentry:
+
+    @pytest.fixture
+    def direntry_dir(self):
+        """Create a temp directory with files for DirEntry tests."""
+        temp_dir = tempfile.mkdtemp()
+        chroot = os.path.join(temp_dir, "chroot")
+        os.makedirs(os.path.join(chroot, "subdir"))
+        with open(os.path.join(chroot, "file.txt"), "w") as f:
+            f.write("content")
+        yield chroot
+        shutil.rmtree(temp_dir)
+
+    @pytest.fixture
+    def direntry_store(self, direntry_dir):
+        fsp = FileSharePath(zone="test", name="test", mount_path=direntry_dir)
+        return Filestore(fsp)
+
+    def test_regular_file(self, direntry_dir, direntry_store):
+        """DirEntry for a regular file produces correct FileInfo."""
+        with os.scandir(direntry_dir) as entries:
+            file_entry = next(e for e in entries if e.name == "file.txt")
+        info = direntry_store._file_info_from_direntry(file_entry)
+        assert info.name == "file.txt"
+        assert not info.is_dir
+        assert not info.is_symlink
+        assert info.size == len("content")
+
+    def test_directory(self, direntry_dir, direntry_store):
+        """DirEntry for a directory produces correct FileInfo."""
+        with os.scandir(direntry_dir) as entries:
+            dir_entry = next(e for e in entries if e.name == "subdir")
+        info = direntry_store._file_info_from_direntry(dir_entry)
+        assert info.name == "subdir"
+        assert info.is_dir
+        assert info.size == 0
+
+    def test_symlink(self, direntry_dir, direntry_store):
+        """DirEntry for a symlink is detected correctly."""
+        target = os.path.join(direntry_dir, "file.txt")
+        link = os.path.join(direntry_dir, "link_to_file")
+        os.symlink(target, link)
+
+        with os.scandir(direntry_dir) as entries:
+            link_entry = next(e for e in entries if e.name == "link_to_file")
+        info = direntry_store._file_info_from_direntry(link_entry)
+        assert info.name == "link_to_file"
+        assert info.is_symlink
+
+    def test_broken_symlink(self, direntry_dir, direntry_store):
+        """DirEntry for a broken symlink is handled gracefully."""
+        link = os.path.join(direntry_dir, "broken_link")
+        os.symlink("/nonexistent/target", link)
+
+        with os.scandir(direntry_dir) as entries:
+            link_entry = next(e for e in entries if e.name == "broken_link")
+        info = direntry_store._file_info_from_direntry(link_entry)
+        assert info.name == "broken_link"
+        assert info.is_symlink
+        assert info.symlink_target_fsp is None
