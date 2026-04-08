@@ -45,10 +45,7 @@ export default function BreadcrumbSegment({
       {to ? (
         // React Router navigation
         <BreadcrumbLink as={FgStyledLink} to={to}>
-          <Typography
-            className="font-medium text-primary-dark"
-            variant="small"
-          >
+          <Typography className="font-medium text-primary-dark" variant="small">
             {label}
           </Typography>
         </BreadcrumbLink>

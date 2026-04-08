@@ -73,7 +73,10 @@ export default function NewFolderButton({
               type="submit"
             >
               {mutations.createFolder.isPending ? (
-                <Spinner customClasses="border-primary-foreground" text="Creating..." />
+                <Spinner
+                  customClasses="border-primary-foreground"
+                  text="Creating..."
+                />
               ) : (
                 'Submit'
               )}

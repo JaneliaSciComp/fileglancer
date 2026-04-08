@@ -16,10 +16,7 @@ export default function ErrorFallback({ error }: any) {
       <div className="flex flex-col gap-4 justify-center items-center pt-8">
         {error instanceof Error ? (
           <>
-            <Typography
-              className="text-surface-foreground font-bold"
-              type="h2"
-            >
+            <Typography className="text-surface-foreground font-bold" type="h2">
               Oops! An error occurred
             </Typography>
             <Typography
@@ -28,10 +25,7 @@ export default function ErrorFallback({ error }: any) {
             >{`${error.message ? error.message : 'Unknown error'}`}</Typography>
           </>
         ) : (
-          <Typography
-            className="text-surface-foreground font-bold"
-            type="h2"
-          >
+          <Typography className="text-surface-foreground font-bold" type="h2">
             Oops! An unknown error occurred
           </Typography>
         )}
