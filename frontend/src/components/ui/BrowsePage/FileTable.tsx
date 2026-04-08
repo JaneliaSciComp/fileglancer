@@ -214,10 +214,7 @@ export default function Table({
   // Build CSS grid template using fr units proportional to each column's size.
   const gridTemplateColumns = table
     .getVisibleLeafColumns()
-    .map(
-      col =>
-        `minmax(${col.columnDef.minSize ?? 0}px, ${col.getSize()}fr)`
-    )
+    .map(col => `minmax(${col.columnDef.minSize ?? 0}px, ${col.getSize()}fr)`)
     .join(' ');
 
   const virtualizer = useVirtualizer({
