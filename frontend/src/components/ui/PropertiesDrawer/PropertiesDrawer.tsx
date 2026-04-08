@@ -3,7 +3,6 @@ import {
   Button,
   Card,
   IconButton,
-  Switch,
   Typography,
   Tabs
 } from '@material-tailwind/react';
@@ -24,6 +23,7 @@ import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
 import DataLinkUsageDialog from '@/components/ui/Dialogs/dataLinkUsage/DataLinkUsageDialog';
 import TextDialogBtn from '@/components/ui/buttons/DialogTextBtn';
+import FgSwitch from '@/components/ui/widgets/FgSwitch';
 import { getPreferredPathForDisplay } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
@@ -269,41 +269,34 @@ export default function PropertiesDrawer({
               ) : fileBrowserState.propertiesTarget.is_dir ? (
                 <>
                   <div className="flex flex-col gap-2 min-w-[175px] max-w-full pt-2">
-                    <div className="flex items-center gap-2 max-w-full">
-                      <Switch
-                        checked={
-                          externalDataUrlQuery.data ||
-                          proxiedPathByFspAndPathQuery.data
-                            ? true
-                            : false
-                        }
-                        className="before:bg-primary/50 after:border-primary/50 checked:disabled:before:bg-surface checked:disabled:before:border checked:disabled:before:border-surface-dark checked:disabled:after:border-surface-dark"
-                        disabled={Boolean(
-                          externalDataUrlQuery.data ||
-                            fileBrowserState.propertiesTarget.hasRead === false
-                        )}
-                        id="share-switch"
-                        onChange={async () => {
-                          if (
-                            areDataLinksAutomatic &&
-                            !proxiedPathByFspAndPathQuery.data
-                          ) {
-                            await handleCreateDataLink();
-                          } else {
-                            setShowDataLinkDialog(true);
-                          }
-                        }}
-                      />
-                      <Typography
-                        as="label"
-                        className={`${externalDataUrlQuery.data || fileBrowserState.propertiesTarget.hasRead === false ? 'cursor-default' : 'cursor-pointer'} text-foreground font-semibold`}
-                        htmlFor="share-switch"
-                      >
-                        {proxiedPathByFspAndPathQuery.data
+                    <FgSwitch
+                      checked={
+                        externalDataUrlQuery.data ||
+                        proxiedPathByFspAndPathQuery.data
+                          ? true
+                          : false
+                      }
+                      disabled={Boolean(
+                        externalDataUrlQuery.data ||
+                          fileBrowserState.propertiesTarget.hasRead === false
+                      )}
+                      id="share-switch"
+                      label={
+                        proxiedPathByFspAndPathQuery.data
                           ? 'Delete data link'
-                          : 'Create data link'}
-                      </Typography>
-                    </div>
+                          : 'Create data link'
+                      }
+                      onChange={async () => {
+                        if (
+                          areDataLinksAutomatic &&
+                          !proxiedPathByFspAndPathQuery.data
+                        ) {
+                          await handleCreateDataLink();
+                        } else {
+                          setShowDataLinkDialog(true);
+                        }
+                      }}
+                    />
                     <Typography
                       className="text-foreground whitespace-normal w-full"
                       type="small"

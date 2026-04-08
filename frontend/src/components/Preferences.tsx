@@ -18,7 +18,7 @@ export default function Preferences() {
         Preferences
       </Typography>
 
-      <Card className="min-h-max shrink-0">
+      <Card className="min-h-max shrink-0 dark:border-surface-light">
         <Card.Header>
           <Typography className="font-semibold" type="lead">
             Format to use for file paths:
@@ -28,7 +28,7 @@ export default function Preferences() {
           <div className="flex items-center gap-2">
             <input
               checked={pathPreference[0] === 'linux_path'}
-              className="icon-small checked:accent-secondary-light"
+              className="icon-small checked:accent-secondary-light dark:accent-secondary-dark"
               id="linux_path"
               onChange={async (event: ChangeEvent<HTMLInputElement>) => {
                 if (event.target.checked) {
@@ -58,7 +58,7 @@ export default function Preferences() {
           <div className="flex items-center gap-2">
             <input
               checked={pathPreference[0] === 'windows_path'}
-              className="icon-small checked:accent-secondary-light"
+              className="icon-small checked:accent-secondary-light dark:accent-secondary-dark"
               id="windows_path"
               onChange={async (event: ChangeEvent<HTMLInputElement>) => {
                 if (event.target.checked) {
@@ -87,7 +87,7 @@ export default function Preferences() {
           <div className="flex items-center gap-2">
             <input
               checked={pathPreference[0] === 'mac_path'}
-              className="icon-small checked:accent-secondary-light"
+              className="icon-small checked:accent-secondary-light dark:accent-secondary-dark"
               id="mac_path"
               onChange={async (event: ChangeEvent<HTMLInputElement>) => {
                 if (event.target.checked) {
@@ -113,7 +113,7 @@ export default function Preferences() {
         </Card.Body>
       </Card>
 
-      <Card className="mt-6 min-h-max shrink-0">
+      <Card className="mt-6 min-h-max shrink-0 dark:border-surface-light">
         <Card.Header>
           <Typography className="font-semibold" type="lead">
             Options:

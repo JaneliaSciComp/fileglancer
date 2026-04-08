@@ -24,7 +24,7 @@ function MessageContent() {
         <li>
           Contact{' '}
           <a
-            className="text-primary-light hover:underline focus:underline"
+            className="text-primary-dark hover:underline focus:underline"
             href="mailto:support@hhmi.org"
           >
             support
@@ -84,7 +84,7 @@ export function ServerDownOverlay({
 
   return (
     <Dialog open={open}>
-      <Dialog.Overlay className="bg-black/50">
+      <Dialog.Overlay className="bg-foreground/50">
         <Dialog.Content className="p-8 bg-surface-light max-w-md mx-auto">
           <div className="flex flex-col items-center text-center space-y-6">
             <div className="flex items-center justify-center w-16 h-16 bg-warning/10 rounded-full">

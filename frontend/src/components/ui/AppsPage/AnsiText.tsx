@@ -111,7 +111,7 @@ function AnsiText({ content, isDarkMode }: AnsiTextProps) {
   const segments = useMemo(() => parseAnsi(content), [content]);
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden dark:border-surface-light">
       <pre
         style={{
           margin: 0,

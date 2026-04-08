@@ -143,7 +143,7 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
     {
       name: 'Unshare',
       action: (props: ProxiedPathRowActionProps) => props.handleUnshare(),
-      color: 'text-red-600'
+      color: 'text-error'
     }
   ];
 

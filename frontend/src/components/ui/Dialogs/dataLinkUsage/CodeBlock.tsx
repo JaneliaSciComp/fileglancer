@@ -47,7 +47,7 @@ export default function CodeBlock({
     wordBreak: 'break-word' as const,
     overflowX: 'hidden' as const,
     borderRadius: '0.5rem',
-    background: isDarkMode ? '#2f2f2f' : '#fdfdfd'
+    background: 'transparent'
   };
 
   const mergedCustomStyle = customStyle
@@ -62,12 +62,13 @@ export default function CodeBlock({
       ...themeCodeStyles,
       paddingBottom: '1.5em',
       whiteSpace: 'pre-wrap' as const,
-      wordBreak: 'break-word' as const
+      wordBreak: 'break-word' as const,
+      background: 'transparent'
     }
   };
 
   return (
-    <div className="relative w-full min-w-0 rounded-lg border border-surface dark:border-foreground/30 bg-[#fdfdfd] dark:bg-[#2f2f2f] [&_pre]:!bg-[#fdfdfd] dark:[&_pre]:!bg-[#2f2f2f]">
+    <div className="relative w-full min-w-0 rounded-lg border border-surface dark:border-foreground/30 bg-surface-light dark:bg-surface">
       <SyntaxHighlighter
         codeTagProps={mergedCodeTagProps}
         customStyle={mergedCustomStyle}

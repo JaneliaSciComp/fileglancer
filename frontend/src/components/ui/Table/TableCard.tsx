@@ -492,7 +492,7 @@ function TableCard<TData>({
   headerActions
 }: TableProps<TData>) {
   return (
-    <Card className="min-h-48">
+    <Card className="min-h-48 dark:border-surface-light">
       <Table
         columns={columns}
         data={data}

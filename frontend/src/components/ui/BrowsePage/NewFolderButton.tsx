@@ -73,17 +73,20 @@ export default function NewFolderButton({
               type="submit"
             >
               {mutations.createFolder.isPending ? (
-                <Spinner customClasses="border-white" text="Creating..." />
+                <Spinner
+                  customClasses="border-primary-foreground"
+                  text="Creating..."
+                />
               ) : (
                 'Submit'
               )}
             </Button>
             {!newName.trim() ? (
-              <Typography className="text-sm text-gray-500">
+              <Typography className="text-sm text-foreground/60">
                 Please enter a folder name
               </Typography>
             ) : newName.trim() && isDuplicateName ? (
-              <Typography className="text-sm text-red-500">
+              <Typography className="text-sm text-error">
                 A file or folder with this name already exists
               </Typography>
             ) : null}

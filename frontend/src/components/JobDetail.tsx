@@ -61,7 +61,7 @@ function FilePreview({
   const themeCodeStyles = theme['code[class*="language-"]'] || {};
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden dark:border-surface-light">
       <SyntaxHighlighter
         codeTagProps={{
           style: {
@@ -126,7 +126,7 @@ function FilePathLink({
 
   return (
     <Link
-      className="text-primary-light text-sm font-mono hover:underline"
+      className="text-primary-dark text-sm font-mono hover:underline"
       to={browseUrl}
     >
       {displayPath}
@@ -296,7 +296,7 @@ export default function JobDetail() {
                 <Typography className="text-foreground flex-1">
                   Service is running at{' '}
                   <a
-                    className="text-primary-light hover:underline font-mono"
+                    className="text-primary-dark hover:underline font-mono"
                     href={job.service_url}
                     rel="noopener noreferrer"
                     target="_blank"
@@ -315,7 +315,7 @@ export default function JobDetail() {
                   {cancelMutation.isPending ? 'Stopping...' : 'Stop Service'}
                 </Button>
                 <a
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-success text-white hover:bg-success/90 transition-colors"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-success text-success-foreground hover:bg-success/90 transition-colors"
                   href={job.service_url}
                   rel="noopener noreferrer"
                   target="_blank"
@@ -404,7 +404,7 @@ export default function JobDetail() {
 
             <Tabs.Panel className="pt-4" value="parameters">
               {Object.keys(job.parameters).length > 0 ? (
-                <Card className="p-3">
+                <Card className="p-3 dark:border-surface-light">
                   {Object.entries(job.parameters).map(([key, value]) => (
                     <div className="flex gap-2 py-1" key={key}>
                       <Typography className="text-foreground font-semibold">

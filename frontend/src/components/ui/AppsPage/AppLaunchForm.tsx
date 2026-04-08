@@ -4,13 +4,13 @@ import type { Dispatch, SetStateAction } from 'react';
 import { Accordion, Button, Tabs, Typography } from '@material-tailwind/react';
 import {
   HiChevronDown,
-  HiOutlineEye,
   HiOutlinePlus,
   HiOutlinePlay,
   HiOutlineTrash
 } from 'react-icons/hi';
 
 import FileSelectorButton from '@/components/ui/BrowsePage/FileSelector/FileSelectorButton';
+import FgSwitch from '@/components/ui/widgets/FgSwitch';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { validatePaths } from '@/queries/appsQueries';
 import { useClusterDefaultsQuery } from '@/queries/jobsQueries';
@@ -1032,26 +1032,27 @@ export default function AppLaunchForm({
         <Tabs.Panel className="pt-4" value="parameters">
           {hasHiddenParams ? (
             <div className="flex justify-end mb-2">
-              <button
-                aria-label="Toggle hidden parameters"
-                className="flex items-center gap-2 cursor-pointer text-sm text-secondary"
-                onClick={() => setShowHidden(prev => !prev)}
-                type="button"
-              >
-                <HiOutlineEye className="h-4 w-4" />
-                Show hidden
-                <span
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                    showHidden ? 'bg-primary' : 'bg-primary-light'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                      showHidden ? 'translate-x-[18px]' : 'translate-x-[2px]'
-                    }`}
-                  />
-                </span>
-              </button>
+              <FgSwitch
+                checked={showHidden}
+                id="show-hidden-toggle"
+                label="Show hidden"
+                onChange={() => {
+                  if (!showHidden) {
+                    // Expand sections that contain hidden parameters
+                    const sectionsWithHidden = entryPoint.parameters
+                      .filter(
+                        item =>
+                          isParameterSection(item) &&
+                          item.parameters.some(p => p.hidden)
+                      )
+                      .map(item => (item as AppParameterSection).section);
+                    setOpenSections(prev => [
+                      ...new Set([...prev, ...sectionsWithHidden])
+                    ]);
+                  }
+                  setShowHidden(prev => !prev);
+                }}
+              />
             </div>
           ) : null}
           <div className="max-w-2xl space-y-4">

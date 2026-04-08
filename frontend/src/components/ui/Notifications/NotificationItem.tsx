@@ -128,7 +128,7 @@ export const NotificationItem = ({
         <div className="flex items-center justify-between">
           <div className="font-medium text-sm">{notification.title}</div>
           {notification.created_at ? (
-            <div className="text-xs text-gray-500 dark:text-gray-400 ml-2 flex-shrink-0">
+            <div className="text-xs text-foreground/70 ml-2 flex-shrink-0">
               {formatNotificationDate(notification.created_at)}
             </div>
           ) : null}
@@ -138,7 +138,7 @@ export const NotificationItem = ({
       {showDismissButton && onDismiss ? (
         <button
           aria-label="Dismiss notification"
-          className={`${styles.close} flex-shrink-0 ml-3 p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors`}
+          className={`${styles.close} flex-shrink-0 ml-3 p-1 rounded-md hover:bg-foreground/5 dark:hover:bg-foreground/10 transition-colors`}
           onClick={() => onDismiss(notification.id)}
           type="button"
         >
@@ -146,7 +146,7 @@ export const NotificationItem = ({
         </button>
       ) : null}
       {isDismissed ? (
-        <div className="flex-shrink-0 ml-3 text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
+        <div className="flex-shrink-0 ml-3 text-xs text-foreground/70 bg-surface dark:bg-surface px-2 py-1 rounded">
           Dismissed
         </div>
       ) : null}

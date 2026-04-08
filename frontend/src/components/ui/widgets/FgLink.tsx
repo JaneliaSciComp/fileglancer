@@ -20,7 +20,7 @@ export function FgStyledLink({
   textSize = 'default',
   onClick
 }: StyledLinkProps) {
-  const baseClasses = 'text-primary-light hover:underline focus:underline';
+  const baseClasses = 'text-primary-dark hover:underline focus:underline';
   const textClasses = {
     default: 'text-base',
     large: 'text-lg',
