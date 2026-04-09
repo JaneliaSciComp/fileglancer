@@ -5,10 +5,11 @@ import {
   materialDark,
   coy
 } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { HiOutlineDownload } from 'react-icons/hi';
 import { Formatter } from 'fracturedjsonjs';
 
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-import { formatFileSize, formatUnixTimestamp } from '@/utils';
+import { formatFileSize, formatUnixTimestamp, getFileURL } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
 import {
   useFileContentQuery,
@@ -220,6 +221,8 @@ export default function FileViewer({ file }: FileViewerProps) {
   // Determine if we should show JSON format toggle
   const showJsonToggle = isJsonFile && !isBinary;
 
+  const downloadUrl = fspName ? getFileURL(fspName, file.path) : null;
+
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
       {/* File info header */}
@@ -233,17 +236,24 @@ export default function FileViewer({ file }: FileViewerProps) {
             {formatUnixTimestamp(file.last_modified)}
           </Typography>
         </div>
-        {showJsonToggle ? (
-          <div className="flex items-center gap-2 shrink-0">
-            <Typography className="text-foreground text-sm whitespace-nowrap">
-              Format JSON
-            </Typography>
-            <Switch
-              checked={formatJson}
-              onChange={() => setFormatJson(!formatJson)}
-            />
-          </div>
-        ) : null}
+        <div className="flex items-center gap-3 shrink-0">
+          {showJsonToggle ? (
+            <div className="flex items-center gap-2">
+              <Typography className="text-foreground text-sm whitespace-nowrap">
+                Format JSON
+              </Typography>
+              <Switch
+                checked={formatJson}
+                onChange={() => setFormatJson(!formatJson)}
+              />
+            </div>
+          ) : null}
+          {downloadUrl ? (
+            <a download={file.name} href={downloadUrl} title="Download file">
+              <HiOutlineDownload className="text-foreground hover:text-primary text-xl" />
+            </a>
+          ) : null}
+        </div>
       </div>
 
       {/* File content viewer */}
