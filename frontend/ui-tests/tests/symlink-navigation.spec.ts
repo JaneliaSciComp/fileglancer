@@ -222,8 +222,8 @@ test.describe('Symlink Navigation and Display', () => {
     ).toBeVisible();
 
     // Verify the name is NOT a hyperlink (should be plain Typography)
-    // Get the text element and verify it's not an anchor
-    const nameCell = brokenLinkRow.locator('td').first();
+    // Get the name cell and verify it's not an anchor
+    const nameCell = brokenLinkRow.getByRole('cell').first();
     const linkElement = nameCell.locator('a');
     await expect(linkElement).not.toBeVisible();
 

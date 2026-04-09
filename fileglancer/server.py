@@ -1297,6 +1297,8 @@ def create_app(settings):
 
     @app.get("/api/files/{path_name}")
     async def get_file_metadata(path_name: str, subpath: Optional[str] = Query(''),
+                                limit: Optional[int] = Query(None),
+                                cursor: Optional[str] = Query(None),
                                 username: str = Depends(get_current_user)):
         """Handle GET requests to list directory contents or return info for the file/folder itself"""
 
@@ -1319,8 +1321,18 @@ def create_app(settings):
 
                     if file_info.is_dir:
                         try:
-                            files = list(filestore.yield_file_infos(subpath, current_user=username, session=session))
-                            result["files"] = [json.loads(f.model_dump_json()) for f in files]
+                            if limit is not None:
+                                files, has_more, next_cursor, total_count = filestore.yield_file_infos_paginated(
+                                    subpath, current_user=username, session=session,
+                                    limit=limit, cursor=cursor
+                                )
+                                result["files"] = [json.loads(f.model_dump_json()) for f in files]
+                                result["has_more"] = has_more
+                                result["next_cursor"] = next_cursor
+                                result["total_count"] = total_count
+                            else:
+                                files = list(filestore.yield_file_infos(subpath, current_user=username, session=session))
+                                result["files"] = [json.loads(f.model_dump_json()) for f in files]
                         except PermissionError:
                             logger.error(f"Permission denied when listing files in directory: {subpath}")
                             result["files"] = []

@@ -46,13 +46,17 @@ export function getBrowserRenderableType(
   const ext = filename.toLowerCase().split('.').pop() ?? '';
   return BROWSER_RENDERABLE_EXTENSIONS[ext] ?? null;
 }
+// Number of bytes to fetch for binary hex preview
+const BINARY_PREVIEW_BYTES = 512;
 
 // Query keys for file content and metadata
 export const fileContentQueryKeys = {
   detail: (fspName: string, filePath: string) =>
     ['fileContent', fspName, filePath] as const,
   head: (fspName: string, filePath: string) =>
-    ['fileContentHead', fspName, filePath] as const
+    ['fileContentHead', fspName, filePath] as const,
+  binaryPreview: (fspName: string, filePath: string) =>
+    ['fileBinaryPreview', fspName, filePath] as const
 };
 
 // Type for HEAD response metadata
@@ -136,5 +140,37 @@ export function useFileContentQuery(
       }
       return failureCount < 3; // Default retry behavior
     }
+  });
+}
+
+/**
+ * Fetch the first BINARY_PREVIEW_BYTES bytes of a file using an HTTP Range
+ * request. Used to render a hex preview for binary files.
+ * Enabled only after HEAD confirms the file is binary.
+ */
+export function useFileBinaryPreviewQuery(
+  fspName: string | undefined,
+  filePath: string,
+  enabled: boolean = true
+): UseQueryResult<Uint8Array, Error> {
+  return useQuery<Uint8Array, Error>({
+    queryKey: fileContentQueryKeys.binaryPreview(fspName || '', filePath),
+    queryFn: async ({ signal }: QueryFunctionContext) => {
+      const url = buildUrl('/api/content/', fspName!, { subpath: filePath });
+      const response = await sendFetchRequest(url, 'GET', undefined, {
+        signal,
+        headers: { Range: `bytes=0-${BINARY_PREVIEW_BYTES - 1}` }
+      });
+      // 206 Partial Content or 200 OK (if server ignores Range) are both fine
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch binary preview: ${response.statusText}`
+        );
+      }
+      return new Uint8Array(await response.arrayBuffer());
+    },
+    enabled: !!fspName && !!filePath && enabled,
+    staleTime: 5 * 60 * 1000,
+    retry: false
   });
 }

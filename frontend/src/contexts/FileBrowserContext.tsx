@@ -49,6 +49,11 @@ type FileBrowserContextType = {
   // Server state query (single source of truth)
   fileQuery: ReturnType<typeof useFileQuery>;
 
+  // Infinite scroll helpers (derived from fileQuery for convenience)
+  fetchNextPage: () => void;
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+
   // File operation mutations
   mutations: {
     delete: UseMutationResult<
@@ -299,6 +304,11 @@ export const FileBrowserContextProvider = ({
 
         // Server state query
         fileQuery,
+
+        // Infinite scroll helpers
+        fetchNextPage: fileQuery.fetchNextPage,
+        hasNextPage: fileQuery.hasNextPage,
+        isFetchingNextPage: fileQuery.isFetchingNextPage,
 
         // File operation mutations
         mutations: {

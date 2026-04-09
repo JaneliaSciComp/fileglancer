@@ -154,7 +154,8 @@ async function sendFetchRequest(
     headers: {
       ...(method !== 'GET' &&
         method !== 'HEAD' &&
-        method !== 'DELETE' && { 'Content-Type': 'application/json' })
+        method !== 'DELETE' && { 'Content-Type': 'application/json' }),
+      ...options?.headers
     },
     ...(method !== 'GET' &&
       method !== 'HEAD' &&
