@@ -144,7 +144,10 @@ export default function FileBrowser({
       {
         name: 'View',
         action: () => {
-          handleView();
+          const result = handleView();
+          if (!result.success) {
+            toast.error(`Error viewing file: ${result.error}`);
+          }
         },
         shouldShow:
           !propertiesTarget.is_dir &&
