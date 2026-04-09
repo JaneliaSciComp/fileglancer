@@ -12,6 +12,27 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import useCopyTooltip from './useCopyTooltip';
 import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
 
+const VALID_URL_PREFIX_RE = /^[A-Za-z0-9\-._~/!@$&'()*+,;:=]+$/;
+
+export function validateUrlPrefix(value: string): string | null {
+  if (!value || !value.trim()) {
+    return 'Data link name must not be empty';
+  }
+  if (!VALID_URL_PREFIX_RE.test(value)) {
+    const invalidChars = [
+      ...new Set([...value].filter(c => !VALID_URL_PREFIX_RE.test(c)))
+    ];
+    return `Contains invalid URL characters: ${invalidChars.join(' ')}`;
+  }
+  if (value.startsWith('/') || value.endsWith('/')) {
+    return 'Data link name must not start or end with /';
+  }
+  if (value.includes('//')) {
+    return 'Data link name must not contain consecutive slashes';
+  }
+  return null;
+}
+
 // Overload for ZarrPreview usage with required parameters
 export default function useDataToolLinks(
   setShowDataLinkDialog: Dispatch<SetStateAction<boolean>>,
@@ -96,6 +117,12 @@ export default function useDataToolLinks(
             urlPrefix = path.split('/').pop() || path;
             break;
         }
+      }
+
+      const validationError = validateUrlPrefix(urlPrefix);
+      if (validationError) {
+        toast.error(validationError);
+        return false;
       }
 
       await createProxiedPathMutation.mutateAsync({

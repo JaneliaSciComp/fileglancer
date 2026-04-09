@@ -1,13 +1,14 @@
 /* eslint-disable react/destructuring-assignment */
 // Props are used for TypeScript type narrowing purposes and cannot be destructured at the beginning
 
-import { useState, SetStateAction } from 'react';
+import { useState, useMemo, SetStateAction } from 'react';
 import type { ReactNode, Dispatch } from 'react';
 import { Button, Typography } from '@material-tailwind/react';
 import { Link } from 'react-router';
 
 import type { ProxiedPath } from '@/contexts/ProxiedPathContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import { validateUrlPrefix } from '@/hooks/useDataToolLinks';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { getPreferredPathForDisplay, makeMapKey } from '@/utils';
@@ -51,14 +52,17 @@ type DataLinkDialogProps =
   | DeleteLinkDialogProps;
 
 function CreateLinkBtn({
-  onConfirm
+  onConfirm,
+  disabled
 }: {
   readonly onConfirm: () => Promise<void>;
+  readonly disabled?: boolean;
 }) {
   return (
     <Button
       className="!rounded-md flex items-center gap-2"
       color="error"
+      disabled={disabled}
       onClick={async () => {
         await onConfirm();
       }}
@@ -150,6 +154,14 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
     dataLinkCustomSubpath || folderNameOnly
   );
 
+  const customSubpathError = useMemo(
+    () =>
+      dataLinkSubpathMode === 'custom'
+        ? validateUrlPrefix(customSubpath)
+        : null,
+    [customSubpath, dataLinkSubpathMode]
+  );
+
   // Compute preview based on current mode
   function getPreviewPath(): string {
     switch (dataLinkSubpathMode) {
@@ -201,16 +213,24 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               Enter the name for your data link:
             </Typography>
             <input
-              className="w-full p-2 rounded border border-outline bg-surface text-foreground font-mono text-sm"
+              className={`w-full p-2 rounded border bg-surface text-foreground font-mono text-sm ${customSubpathError ? 'border-error' : 'border-outline'}`}
               onChange={e => setCustomSubpath(e.target.value)}
               type="text"
               value={customSubpath}
             />
+            {customSubpathError ? (
+              <Typography className="text-error text-xs">
+                {customSubpathError}
+              </Typography>
+            ) : null}
             <Typography className="text-foreground text-sm font-mono break-all bg-surface/30 p-2 rounded">
               {dataLinkPreview}
             </Typography>
             <BtnContainer>
-              <CreateLinkBtn onConfirm={handleConfirmWithPrefix} />
+              <CreateLinkBtn
+                disabled={!!customSubpathError}
+                onConfirm={handleConfirmWithPrefix}
+              />
               <CancelBtn onCancel={props.onCancel} />
             </BtnContainer>
             <Typography className="text-xs text-foreground">
@@ -236,7 +256,10 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               be able to view these data.
             </Typography>
             <BtnContainer>
-              <CreateLinkBtn onConfirm={handleConfirmWithPrefix} />
+              <CreateLinkBtn
+                disabled={!!customSubpathError}
+                onConfirm={handleConfirmWithPrefix}
+              />
               <CancelBtn onCancel={props.onCancel} />
             </BtnContainer>
             <div className="flex flex-col gap-2 mt-4">
@@ -245,12 +268,19 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               </Typography>
               <DataLinkOptions checkboxesOnly />
               {dataLinkSubpathMode === 'custom' ? (
-                <input
-                  className="w-full p-2 rounded border border-outline bg-surface text-foreground font-mono text-sm"
-                  onChange={e => setCustomSubpath(e.target.value)}
-                  type="text"
-                  value={customSubpath}
-                />
+                <>
+                  <input
+                    className={`w-full p-2 rounded border bg-surface text-foreground font-mono text-sm ${customSubpathError ? 'border-error' : 'border-outline'}`}
+                    onChange={e => setCustomSubpath(e.target.value)}
+                    type="text"
+                    value={customSubpath}
+                  />
+                  {customSubpathError ? (
+                    <Typography className="text-error text-xs">
+                      {customSubpathError}
+                    </Typography>
+                  ) : null}
+                </>
               ) : null}
               <Typography className="text-foreground text-sm font-mono break-all bg-surface/30 p-2 rounded">
                 {dataLinkPreview}

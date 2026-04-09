@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import sys
 import pwd
 import grp
@@ -110,6 +111,26 @@ def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optiona
         updated_at=db_path.updated_at,
         url=url
     )
+
+
+# Regex: allow unreserved URI chars (RFC 3986), plus / for path separators and common safe chars
+_VALID_URL_PREFIX_RE = re.compile(r'^[A-Za-z0-9\-._~/!@$&\'()*+,;:=]+$')
+
+
+def _validate_url_prefix(url_prefix: str) -> None:
+    """Validate that a url_prefix is non-empty and contains only URL-safe characters."""
+    if not url_prefix or not url_prefix.strip():
+        raise HTTPException(status_code=400, detail="Data link name must not be empty")
+    if not _VALID_URL_PREFIX_RE.match(url_prefix):
+        invalid_chars = set(c for c in url_prefix if not re.match(r"[A-Za-z0-9\-._~/!@$&'()*+,;:=]", c))
+        raise HTTPException(
+            status_code=400,
+            detail=f"Data link name contains invalid URL characters: {' '.join(sorted(invalid_chars))}"
+        )
+    if url_prefix.startswith('/') or url_prefix.endswith('/'):
+        raise HTTPException(status_code=400, detail="Data link name must not start or end with /")
+    if '//' in url_prefix:
+        raise HTTPException(status_code=400, detail="Data link name must not contain consecutive slashes")
 
 
 def _convert_ticket(db_ticket: db.TicketDB) -> Ticket:
@@ -869,6 +890,7 @@ def create_app(settings):
 
         if url_prefix is None:
             url_prefix = os.path.basename(path)
+        _validate_url_prefix(url_prefix)
         sharing_name = url_prefix
         logger.info(f"Creating proxied path for {username} with sharing name {sharing_name} and fsp_name {fsp_name} and path {path} (url_prefix={url_prefix})")
         with db.get_db_session(settings.db_url) as session:
@@ -913,6 +935,8 @@ def create_app(settings):
                                   path: Optional[str] = Query(default=None, description="The path relative to the file share path mount point"),
                                   sharing_name: Optional[str] = Query(default=None, description="The sharing path of the proxied path"),
                                   username: str = Depends(get_current_user)):
+        if sharing_name is not None:
+            _validate_url_prefix(sharing_name)
         with db.get_db_session(settings.db_url) as session:
             with _get_user_context(username): # Necessary to validate the user can access the proxied path
                 try:
