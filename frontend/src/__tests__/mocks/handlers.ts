@@ -20,10 +20,9 @@ export const handlers = [
 
   http.post('/api/proxied-path', ({ request }) => {
     const url = new URL(request.url);
-    const isTransparent = url.searchParams.get('is_transparent') === 'true';
     const path = url.searchParams.get('path') || '/test/path';
     const pathBasename = path.split('/').pop() || path;
-    const urlSuffix = isTransparent ? path : pathBasename;
+    const urlPrefix = url.searchParams.get('url_prefix') || pathBasename;
     return HttpResponse.json({
       username: 'testuser',
       sharing_key: 'testkey',
@@ -32,7 +31,8 @@ export const handlers = [
       fsp_name: url.searchParams.get('fsp_name') || 'test_fsp',
       created_at: '2025-07-08T15:56:42.588942',
       updated_at: '2025-07-08T15:56:42.588942',
-      url: 'http://127.0.0.1:7878/files/testkey/' + urlSuffix
+      url: 'http://127.0.0.1:7878/files/testkey/' + urlPrefix,
+      url_prefix: urlPrefix
     });
   }),
 

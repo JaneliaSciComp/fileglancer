@@ -1257,18 +1257,19 @@ def test_create_non_transparent_proxied_path(test_client, temp_dir):
     assert data["url"].endswith(f"/{data['sharing_key']}/test_proxied_path")
 
 
-def test_create_transparent_proxied_path(test_client, temp_dir):
-    """Test creating a transparent link uses full relative path in URL"""
+def test_create_proxied_path_with_custom_url_prefix(test_client, temp_dir):
+    """Test creating a link with a custom url_prefix"""
     # Create nested dirs for a multi-segment path
     nested_path = os.path.join(temp_dir, "a", "b", "c")
     os.makedirs(nested_path, exist_ok=True)
     path = "a/b/c"
 
-    response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path={path}&is_transparent=true")
+    response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path={path}&url_prefix=custom/prefix")
     assert response.status_code == 200
     data = response.json()
-    # URL should include linux_path prefix and full relative path
-    assert data["url"].endswith(f"/{data['sharing_key']}/tempdir/test/path/a/b/c")
+    # URL should use the custom url_prefix
+    assert data["url"].endswith(f"/{data['sharing_key']}/custom/prefix")
+    assert data["url_prefix"] == "custom/prefix"
 
 
 def test_proxy_resolve_non_transparent(test_client, temp_dir):
@@ -1290,22 +1291,22 @@ def test_proxy_resolve_non_transparent(test_client, temp_dir):
     assert response.text == "hello"
 
 
-def test_proxy_resolve_transparent(test_client, temp_dir):
-    """Test that a transparent link resolves correctly via full path prefix match"""
+def test_proxy_resolve_custom_url_prefix(test_client, temp_dir):
+    """Test that a link with custom url_prefix resolves correctly"""
     nested_dir = os.path.join(temp_dir, "a", "b")
     os.makedirs(nested_dir, exist_ok=True)
     test_file = os.path.join(nested_dir, "data.txt")
     with open(test_file, "w") as f:
-        f.write("transparent hello")
+        f.write("custom prefix hello")
 
-    response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path=a/b&is_transparent=true")
+    response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path=a/b&url_prefix=my/custom/prefix")
     assert response.status_code == 200
     sharing_key = response.json()["sharing_key"]
 
-    # Access through the proxy using linux_path prefix + full path
-    response = test_client.get(f"/files/{sharing_key}/tempdir/test/path/a/b/data.txt")
+    # Access through the proxy using the custom url_prefix
+    response = test_client.get(f"/files/{sharing_key}/my/custom/prefix/data.txt")
     assert response.status_code == 200
-    assert response.text == "transparent hello"
+    assert response.text == "custom prefix hello"
 
 
 def test_proxy_path_boundary_guard(test_client, temp_dir):
@@ -1346,21 +1347,21 @@ def test_proxy_resolve_url_encoded_path_non_transparent(test_client, temp_dir):
     assert response.text == "encoded hello"
 
 
-def test_proxy_resolve_url_encoded_path_transparent(test_client, temp_dir):
-    """Test that a transparent link resolves when the path contains URL-encoded characters"""
+def test_proxy_resolve_url_encoded_path_custom_prefix(test_client, temp_dir):
+    """Test that a link with URL-encoded characters in url_prefix resolves correctly"""
     nested_dir = os.path.join(temp_dir, "my folder", "sub dir")
     os.makedirs(nested_dir, exist_ok=True)
     with open(os.path.join(nested_dir, "file.txt"), "w") as f:
-        f.write("encoded transparent hello")
+        f.write("encoded custom prefix hello")
 
-    response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path=my folder/sub dir&is_transparent=true")
+    response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path=my folder/sub dir&url_prefix=my folder/sub dir")
     assert response.status_code == 200
     sharing_key = response.json()["sharing_key"]
 
-    # Request with URL-encoded spaces in the full path (includes linux_path prefix)
-    response = test_client.get(f"/files/{sharing_key}/tempdir/test/path/my%20folder/sub%20dir/file.txt")
+    # Request with URL-encoded spaces in the url_prefix
+    response = test_client.get(f"/files/{sharing_key}/my%20folder/sub%20dir/file.txt")
     assert response.status_code == 200
-    assert response.text == "encoded transparent hello"
+    assert response.text == "encoded custom prefix hello"
 
 
 def test_proxy_resolve_special_characters_in_path(test_client, temp_dir):
@@ -1380,19 +1381,19 @@ def test_proxy_resolve_special_characters_in_path(test_client, temp_dir):
     assert response.text == "special chars"
 
 
-def test_proxy_reject_transparent_url_on_non_transparent_link(test_client, temp_dir):
-    """Test that a non-transparent link rejects requests using the full path"""
+def test_proxy_reject_mismatched_url_prefix(test_client, temp_dir):
+    """Test that a link rejects requests with a different prefix than url_prefix"""
     nested_dir = os.path.join(temp_dir, "a", "b")
     os.makedirs(nested_dir, exist_ok=True)
     with open(os.path.join(nested_dir, "file.txt"), "w") as f:
         f.write("should not be accessible")
 
-    # Create non-transparent link for "a/b"
+    # Create link for "a/b" with default url_prefix (basename "b")
     response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path=a/b")
     assert response.status_code == 200
     sharing_key = response.json()["sharing_key"]
 
-    # Attempt to access via full path (transparent-style) — should be rejected
+    # Attempt to access via full path "a/b" — should be rejected since url_prefix is just "b"
     response = test_client.get(f"/files/{sharing_key}/a/b/file.txt")
     assert response.status_code == 404
 

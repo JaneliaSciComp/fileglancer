@@ -149,6 +149,9 @@ class ProxiedPath(BaseModel):
     updated_at: datetime = Field(
         description="When this proxied path was last updated"
     )
+    url_prefix: str = Field(
+        description="The URL path prefix that appears after the sharing key in the proxy URL"
+    )
     url: Optional[HttpUrl] = Field(
         description="The URL for accessing the data via the proxy",
         default=None

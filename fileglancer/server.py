@@ -92,23 +92,10 @@ def _convert_external_bucket(db_bucket: db.ExternalBucketDB) -> ExternalBucket:
     )
 
 
-def _get_linux_path(session, fsp_name: str) -> Optional[str]:
-    """Look up the linux_path for a file share path by name."""
-    fsp = db.get_file_share_path(session, fsp_name)
-    return fsp.linux_path if fsp else None
-
-
-def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optional[HttpUrl], linux_path: Optional[str] = None) -> ProxiedPath:
+def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optional[HttpUrl]) -> ProxiedPath:
     """Convert a database ProxiedPathDB model to a Pydantic ProxiedPath model"""
     if external_proxy_url:
-        if db_path.is_transparent:
-            if linux_path:
-                full_path = f"{linux_path.strip('/')}/{db_path.path}"
-            else:
-                full_path = db_path.path
-            url = f"{external_proxy_url}/{db_path.sharing_key}/{quote(full_path, safe='/')}"
-        else:
-            url = f"{external_proxy_url}/{db_path.sharing_key}/{quote(os.path.basename(db_path.path))}"
+        url = f"{external_proxy_url}/{db_path.sharing_key}/{quote(db_path.url_prefix, safe='/')}"
     else:
         logger.warning(f"No external proxy URL was provided, proxy links will not be available.")
         url = None
@@ -118,6 +105,7 @@ def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optiona
         sharing_name=db_path.sharing_name,
         fsp_name=db_path.fsp_name,
         path=db_path.path,
+        url_prefix=db_path.url_prefix,
         created_at=db_path.created_at,
         updated_at=db_path.updated_at,
         url=url
@@ -230,29 +218,13 @@ def create_app(settings):
             if not proxied_path:
                 return get_nosuchbucket_response(captured_path), None, ""
 
-            # Match captured_path against the expected prefix for this link type.
-            # Transparent links use the full stored path; non-transparent use only the basename.
-            # We restrict matching to the link's type to prevent non-transparent links
-            # from accepting full-path URLs (which would leak directory structure).
+            # Match captured_path against the stored url_prefix.
             # The unquote() fallback handles clients like Vol-E viewer that send URLs
             # with literal % characters instead of proper URL encoding — FastAPI
             # auto-decodes path params, so we need to match the decoded form too.
-            if proxied_path.is_transparent:
-                # Transparent links include the linux_path prefix in the URL
-                fsp_for_prefix = db.get_file_share_path(session, proxied_path.fsp_name)
-                linux_path = fsp_for_prefix.linux_path if fsp_for_prefix and fsp_for_prefix.linux_path else None
-                if linux_path:
-                    full_prefix = f"{linux_path.strip('/')}/{proxied_path.path}"
-                else:
-                    full_prefix = proxied_path.path
-                subpath = try_strip_prefix(captured_path, full_prefix)
-                if subpath is None:
-                    subpath = try_strip_prefix(captured_path, unquote(full_prefix))
-            else:
-                path_basename = os.path.basename(proxied_path.path)
-                subpath = try_strip_prefix(captured_path, path_basename)
-                if subpath is None:
-                    subpath = try_strip_prefix(captured_path, unquote(path_basename))
+            subpath = try_strip_prefix(captured_path, proxied_path.url_prefix)
+            if subpath is None:
+                subpath = try_strip_prefix(captured_path, unquote(proxied_path.url_prefix))
             if subpath is None:
                 return get_error_response(404, "NoSuchKey", f"Path mismatch for sharing key {sharing_key}", captured_path), None, ""
 
@@ -892,17 +864,18 @@ def create_app(settings):
               description="Create a new proxied path")
     async def create_proxied_path(fsp_name: str = Query(..., description="The name of the file share path that this proxied path is associated with"),
                                   path: str = Query(..., description="The path relative to the file share path mount point"),
-                                  is_transparent: bool = Query(False, description="Whether to create a transparent link"),
+                                  url_prefix: Optional[str] = Query(None, description="The URL path prefix after the sharing key. Defaults to basename of path."),
                                   username: str = Depends(get_current_user)):
 
-        sharing_name = os.path.basename(path)
-        logger.info(f"Creating proxied path for {username} with sharing name {sharing_name} and fsp_name {fsp_name} and path {path} (transparent={is_transparent})")
+        if url_prefix is None:
+            url_prefix = os.path.basename(path)
+        sharing_name = url_prefix
+        logger.info(f"Creating proxied path for {username} with sharing name {sharing_name} and fsp_name {fsp_name} and path {path} (url_prefix={url_prefix})")
         with db.get_db_session(settings.db_url) as session:
             with _get_user_context(username): # Necessary to validate the user can access the proxied path
                 try:
-                    new_path = db.create_proxied_path(session, username, sharing_name, fsp_name, path, is_transparent=is_transparent)
-                    linux_path = _get_linux_path(session, fsp_name) if is_transparent else None
-                    return _convert_proxied_path(new_path, settings.external_proxy_url, linux_path=linux_path)
+                    new_path = db.create_proxied_path(session, username, sharing_name, fsp_name, path, url_prefix=url_prefix)
+                    return _convert_proxied_path(new_path, settings.external_proxy_url)
                 except ValueError as e:
                     logger.error(f"Error creating proxied path: {e}")
                     raise HTTPException(status_code=400, detail=str(e))
@@ -916,16 +889,7 @@ def create_app(settings):
 
         with db.get_db_session(settings.db_url) as session:
             db_proxied_paths = db.get_proxied_paths(session, username, fsp_name, path)
-            # Cache linux_path lookups by fsp_name for transparent paths
-            linux_path_cache: Dict[str, Optional[str]] = {}
-            proxied_paths = []
-            for db_path in db_proxied_paths:
-                lp = None
-                if db_path.is_transparent:
-                    if db_path.fsp_name not in linux_path_cache:
-                        linux_path_cache[db_path.fsp_name] = _get_linux_path(session, db_path.fsp_name)
-                    lp = linux_path_cache[db_path.fsp_name]
-                proxied_paths.append(_convert_proxied_path(db_path, settings.external_proxy_url, linux_path=lp))
+            proxied_paths = [_convert_proxied_path(db_path, settings.external_proxy_url) for db_path in db_proxied_paths]
             return ProxiedPathResponse(paths=proxied_paths)
 
 
@@ -940,23 +904,23 @@ def create_app(settings):
                 raise HTTPException(status_code=404, detail="Proxied path not found for sharing key {sharing_key}")
             if path.username != username:
                 raise HTTPException(status_code=404, detail="Proxied path not found for username {username} and sharing key {sharing_key}")
-            lp = _get_linux_path(session, path.fsp_name) if path.is_transparent else None
-            return _convert_proxied_path(path, settings.external_proxy_url, linux_path=lp)
+            return _convert_proxied_path(path, settings.external_proxy_url)
 
 
     @app.put("/api/proxied-path/{sharing_key}", description="Update a proxied path by sharing key")
-    async def update_proxied_path(sharing_key: str = Path(...),
-                                  payload: UpdateProxiedPathPayload = Body(...),
+    async def update_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path"),
+                                  fsp_name: Optional[str] = Query(default=None, description="The name of the file share path that this proxied path is associated with"),
+                                  path: Optional[str] = Query(default=None, description="The path relative to the file share path mount point"),
+                                  sharing_name: Optional[str] = Query(default=None, description="The sharing path of the proxied path"),
                                   username: str = Depends(get_current_user)):
-        # No user context needed -- we only update sharing_name (display only),
-        # no filesystem access validation required.
         with db.get_db_session(settings.db_url) as session:
-            try:
-                updated = db.update_proxied_path(session, username, sharing_key, new_sharing_name=payload.sharing_name)
-                lp = _get_linux_path(session, updated.fsp_name) if updated.is_transparent else None
-                return _convert_proxied_path(updated, settings.external_proxy_url, linux_path=lp)
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail=str(e))
+            with _get_user_context(username): # Necessary to validate the user can access the proxied path
+                try:
+                    updated = db.update_proxied_path(session, username, sharing_key, new_path=path, new_sharing_name=sharing_name, new_fsp_name=fsp_name)
+                    return _convert_proxied_path(updated, settings.external_proxy_url)
+                except ValueError as e:
+                    logger.error(f"Error updating proxied path: {e}")
+                    raise HTTPException(status_code=400, detail=str(e))
 
 
     @app.delete("/api/proxied-path/{sharing_key}", description="Delete a proxied path by sharing key")

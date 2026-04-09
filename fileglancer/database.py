@@ -95,7 +95,7 @@ class ProxiedPathDB(Base):
     sharing_name = Column(String, nullable=False)
     fsp_name = Column(String, nullable=False)
     path = Column(String, nullable=False)
-    is_transparent = Column(Boolean, nullable=False, server_default="0")
+    url_prefix = Column(String, nullable=False, server_default="")
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
@@ -590,7 +590,7 @@ def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
         raise ValueError(f"Path {path} is not accessible relative to {fsp_name}")
 
 
-def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_name: str, path: str, is_transparent: bool = False) -> ProxiedPathDB:
+def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_name: str, path: str, url_prefix: str = "") -> ProxiedPathDB:
     """Create a new proxied path"""
     _validate_proxied_path(session, fsp_name, path)
 
@@ -602,7 +602,7 @@ def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_
         sharing_name=sharing_name,
         fsp_name=fsp_name,
         path=path,
-        is_transparent=is_transparent,
+        url_prefix=url_prefix,
         created_at=now,
         updated_at=now
     )
