@@ -33,7 +33,8 @@ type PreferencesApiResponse = {
   layout?: { value: string };
   hideDotFiles?: { value: boolean };
   areDataLinksAutomatic?: { value: boolean };
-  transparentDataLinks?: { value: boolean };
+  dataLinkSubpathMode?: { value: string };
+  dataLinkCustomSubpath?: { value: string };
   disableNeuroglancerStateGeneration?: { value: boolean };
   disableHeuristicalLayerTypeDetection?: { value: boolean };
   useLegacyMultichannelApproach?: { value: boolean };
@@ -66,7 +67,8 @@ export type PreferencesQueryData = {
   layout: string;
   hideDotFiles: boolean;
   areDataLinksAutomatic: boolean;
-  transparentDataLinks: boolean;
+  dataLinkSubpathMode: 'name' | 'full_path' | 'custom';
+  dataLinkCustomSubpath: string;
   disableNeuroglancerStateGeneration: boolean;
   disableHeuristicalLayerTypeDetection: boolean;
   useLegacyMultichannelApproach: boolean;
@@ -231,7 +233,12 @@ const createTransformPreferences = (
       layout: rawData.layout?.value || '',
       hideDotFiles: rawData.hideDotFiles?.value || false,
       areDataLinksAutomatic: rawData.areDataLinksAutomatic?.value ?? false,
-      transparentDataLinks: rawData.transparentDataLinks?.value ?? false,
+      dataLinkSubpathMode:
+        (rawData.dataLinkSubpathMode?.value as
+          | 'name'
+          | 'full_path'
+          | 'custom') ?? 'name',
+      dataLinkCustomSubpath: rawData.dataLinkCustomSubpath?.value ?? '',
       disableNeuroglancerStateGeneration:
         rawData.disableNeuroglancerStateGeneration?.value || false,
       disableHeuristicalLayerTypeDetection:

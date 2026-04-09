@@ -22,7 +22,7 @@ export default function useDataToolLinks(
   handleCreateDataLink: (pathOverride?: string) => Promise<boolean>;
   handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
   handleToolClick: (toolKey: PendingToolKey) => Promise<void>;
-  handleDialogConfirm: () => Promise<void>;
+  handleDialogConfirm: (urlPrefixOverride?: string) => Promise<void>;
   handleDialogCancel: () => void;
   showCopiedTooltip: boolean;
 };
@@ -34,7 +34,7 @@ export default function useDataToolLinks(
   handleCreateDataLink: (pathOverride?: string) => Promise<boolean>;
   handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
   handleToolClick: (toolKey: PendingToolKey) => Promise<void>;
-  handleDialogConfirm: () => Promise<void>;
+  handleDialogConfirm: (urlPrefixOverride?: string) => Promise<void>;
   handleDialogCancel: () => void;
   showCopiedTooltip: boolean;
 };
@@ -57,13 +57,14 @@ export default function useDataToolLinks(
     currentDirProxiedPathQuery
   } = useProxiedPathContext();
 
-  const { areDataLinksAutomatic, transparentDataLinks } =
+  const { areDataLinksAutomatic, dataLinkSubpathMode, dataLinkCustomSubpath } =
     usePreferencesContext();
   const { externalDataUrlQuery } = useExternalBucketContext();
   const { handleCopy, showCopiedTooltip } = useCopyTooltip();
 
   const handleCreateDataLink = async (
-    pathOverride?: string
+    pathOverride?: string,
+    urlPrefixOverride?: string
   ): Promise<boolean> => {
     const path = pathOverride || fileBrowserState.dataLinkPath;
     if (!fileQuery.data?.currentFileSharePath) {
@@ -76,10 +77,31 @@ export default function useDataToolLinks(
     }
 
     try {
+      let urlPrefix: string;
+      if (urlPrefixOverride !== undefined) {
+        urlPrefix = urlPrefixOverride;
+      } else {
+        const linuxPath = fileQuery.data.currentFileSharePath.linux_path;
+        switch (dataLinkSubpathMode) {
+          case 'full_path':
+            urlPrefix = linuxPath
+              ? `${linuxPath.replace(/\/+$/, '')}/${path}`
+              : path;
+            break;
+          case 'custom':
+            urlPrefix = dataLinkCustomSubpath || path.split('/').pop() || path;
+            break;
+          case 'name':
+          default:
+            urlPrefix = path.split('/').pop() || path;
+            break;
+        }
+      }
+
       await createProxiedPathMutation.mutateAsync({
         fsp_name: fileQuery.data.currentFileSharePath.name,
         path,
-        is_transparent: transparentDataLinks
+        url_prefix: urlPrefix
       });
       toast.success('Data link created successfully');
       await allProxiedPathsQuery.refetch();
@@ -174,7 +196,7 @@ export default function useDataToolLinks(
 
   const handleToolClick = async (toolKey: PendingToolKey) => {
     if (!currentDirProxiedPathQuery.data && !externalDataUrlQuery.data) {
-      if (areDataLinksAutomatic) {
+      if (areDataLinksAutomatic && dataLinkSubpathMode !== 'custom') {
         await createLinkAndExecuteAction(toolKey);
       } else {
         setPendingToolKey?.(toolKey);
@@ -190,11 +212,32 @@ export default function useDataToolLinks(
 
   // First case is for link creation through a data tool button click
   // Second case is for link creation through the PropertiesDrawer dialog
-  const handleDialogConfirm = async () => {
+  const handleDialogConfirm = async (urlPrefixOverride?: string) => {
     if (pendingToolKey) {
-      await createLinkAndExecuteAction();
+      if (urlPrefixOverride !== undefined) {
+        const success = await handleCreateDataLink(
+          fileQuery.data?.currentFileOrFolder?.path,
+          urlPrefixOverride
+        );
+        if (success) {
+          // Wait for URLs to update then execute tool action
+          let attempts = 0;
+          const maxAttempts = 50;
+          while (attempts < maxAttempts) {
+            const currentUrls = currentUrlsRef.current;
+            if (currentUrls && currentUrls.copy && currentUrls.copy !== '') {
+              await executeToolAction(pendingToolKey, currentUrls);
+              break;
+            }
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+          }
+        }
+      } else {
+        await createLinkAndExecuteAction();
+      }
     } else {
-      await handleCreateDataLink();
+      await handleCreateDataLink(undefined, urlPrefixOverride);
     }
     setShowDataLinkDialog?.(false);
   };

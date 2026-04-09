@@ -26,7 +26,7 @@ interface CommonDataLinkDialogProps {
 interface CreateLinkFromToolsProps extends CommonDataLinkDialogProps {
   tools: true;
   action: 'create';
-  onConfirm: () => Promise<void>;
+  onConfirm: (urlPrefixOverride?: string) => Promise<void>;
   onCancel: () => void;
   setPendingToolKey: Dispatch<SetStateAction<PendingToolKey>>;
 }
@@ -34,7 +34,7 @@ interface CreateLinkFromToolsProps extends CommonDataLinkDialogProps {
 interface CreateLinkNotFromToolsProps extends CommonDataLinkDialogProps {
   tools: false;
   action: 'create';
-  onConfirm: () => Promise<void>;
+  onConfirm: (urlPrefixOverride?: string) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -106,23 +106,28 @@ function BtnContainer({ children }: { readonly children: ReactNode }) {
 
 export default function DataLinkDialog(props: DataLinkDialogProps) {
   const { fspName, filePath } = useFileBrowserContext();
-  const { pathPreference, areDataLinksAutomatic, transparentDataLinks } =
-    usePreferencesContext();
+  const {
+    pathPreference,
+    areDataLinksAutomatic,
+    dataLinkSubpathMode,
+    dataLinkCustomSubpath
+  } = usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const [localAreDataLinksAutomatic] = useState(areDataLinksAutomatic);
 
-  function getDisplayPath(): string {
-    const fspKey =
-      props.action === 'delete'
-        ? makeMapKey('fsp', props.proxiedPath.fsp_name)
-        : fspName
-          ? makeMapKey('fsp', fspName)
-          : '';
+  const fspKey =
+    props.action === 'delete'
+      ? makeMapKey('fsp', props.proxiedPath.fsp_name)
+      : fspName
+        ? makeMapKey('fsp', fspName)
+        : '';
 
-    const pathFsp =
-      fspKey && zonesAndFspQuery.isSuccess
-        ? (zonesAndFspQuery.data[fspKey] as FileSharePath)
-        : null;
+  const pathFsp =
+    fspKey && zonesAndFspQuery.isSuccess
+      ? (zonesAndFspQuery.data[fspKey] as FileSharePath)
+      : null;
+
+  function getDisplayPath(): string {
     const targetPath =
       props.action === 'delete' ? props.proxiedPath.path : filePath;
 
@@ -132,10 +137,49 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
   }
   const displayPath = getDisplayPath();
 
-  // Generate a preview data link URL
+  // Generate preview components
   const folderNameOnly = filePath ? filePath.split('/').pop() || filePath : '';
-  const pathPortion = transparentDataLinks ? filePath || '' : folderNameOnly;
-  const dataLinkPreview = `https://.../<key>/${pathPortion}`;
+  const linuxPath = pathFsp?.linux_path;
+  const transparentPath =
+    linuxPath && filePath
+      ? `${linuxPath.replace(/\/+$/, '')}/${filePath}`
+      : filePath || '';
+
+  // Custom subpath local state (only used in this dialog, not persisted)
+  const [customSubpath, setCustomSubpath] = useState(
+    dataLinkCustomSubpath || folderNameOnly
+  );
+
+  // Compute preview based on current mode
+  function getPreviewPath(): string {
+    switch (dataLinkSubpathMode) {
+      case 'full_path':
+        return transparentPath;
+      case 'custom':
+        return customSubpath;
+      case 'name':
+      default:
+        return folderNameOnly;
+    }
+  }
+  const dataLinkPreview = `https://.../<key>/${getPreviewPath()}`;
+
+  // Whether this dialog was triggered by automatic+custom mode
+  const isAutoCustom =
+    props.action === 'create' &&
+    localAreDataLinksAutomatic &&
+    dataLinkSubpathMode === 'custom';
+
+  const handleConfirmWithPrefix = async () => {
+    if (props.action !== 'create') {
+      return;
+    }
+    if (dataLinkSubpathMode === 'custom') {
+      await props.onConfirm(customSubpath);
+    } else {
+      await props.onConfirm();
+    }
+  };
 
   return (
     <FgDialog
@@ -148,7 +192,39 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
       open={props.showDataLinkDialog}
     >
       <div className="flex flex-col gap-2 my-4">
-        {props.action === 'create' && localAreDataLinksAutomatic ? (
+        {props.action === 'create' && isAutoCustom ? (
+          <>
+            <Typography className="text-foreground font-semibold">
+              Set data link name
+            </Typography>
+            <Typography className="text-foreground">
+              Enter the name for your data link:
+            </Typography>
+            <input
+              className="w-full p-2 rounded border border-outline bg-surface text-foreground font-mono text-sm"
+              onChange={e => setCustomSubpath(e.target.value)}
+              type="text"
+              value={customSubpath}
+            />
+            <Typography className="text-foreground text-sm font-mono break-all bg-surface/30 p-2 rounded">
+              {dataLinkPreview}
+            </Typography>
+            <BtnContainer>
+              <CreateLinkBtn onConfirm={handleConfirmWithPrefix} />
+              <CancelBtn onCancel={props.onCancel} />
+            </BtnContainer>
+            <Typography className="text-xs text-foreground">
+              You're seeing this because you enabled custom data link naming in
+              your{' '}
+              <Link className="text-primary underline" to="/preferences">
+                preferences
+              </Link>
+              .
+            </Typography>
+          </>
+        ) : props.action === 'create' &&
+          localAreDataLinksAutomatic &&
+          dataLinkSubpathMode !== 'custom' ? (
           <> </>
         ) : props.action === 'create' && !localAreDataLinksAutomatic ? (
           <>
@@ -160,7 +236,7 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               be able to view these data.
             </Typography>
             <BtnContainer>
-              <CreateLinkBtn onConfirm={props.onConfirm} />
+              <CreateLinkBtn onConfirm={handleConfirmWithPrefix} />
               <CancelBtn onCancel={props.onCancel} />
             </BtnContainer>
             <div className="flex flex-col gap-2 mt-4">
@@ -168,6 +244,14 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
                 Data link settings:
               </Typography>
               <DataLinkOptions checkboxesOnly />
+              {dataLinkSubpathMode === 'custom' ? (
+                <input
+                  className="w-full p-2 rounded border border-outline bg-surface text-foreground font-mono text-sm"
+                  onChange={e => setCustomSubpath(e.target.value)}
+                  type="text"
+                  value={customSubpath}
+                />
+              ) : null}
               <Typography className="text-foreground text-sm font-mono break-all bg-surface/30 p-2 rounded">
                 {dataLinkPreview}
               </Typography>
