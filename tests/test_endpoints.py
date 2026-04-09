@@ -290,8 +290,13 @@ def test_update_proxied_path(test_client):
     data = response.json()
     sharing_key = data["sharing_key"]
 
+    # Update the proxied path
+    new_path = "new_test_proxied_path"
+
+    response = test_client.put(f"/api/proxied-path/{sharing_key}?fsp_name=tempdir&path={new_path}")
     assert response.status_code == 200
     updated_data = response.json()
+    assert updated_data["path"] == new_path
 
 
 def test_delete_proxied_path(test_client):
@@ -1391,23 +1396,6 @@ def test_proxy_reject_mismatched_url_prefix(test_client, temp_dir):
     # Attempt to access via full path "a/b" — should be rejected since url_prefix is just "b"
     response = test_client.get(f"/files/{sharing_key}/a/b/file.txt")
     assert response.status_code == 404
-
-
-def test_update_sharing_name_does_not_change_url(test_client, temp_dir):
-    """Test that updating sharing_name doesn't affect the URL"""
-    path = "test_proxied_path"
-    response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path={path}")
-    assert response.status_code == 200
-    original_data = response.json()
-    original_url = original_data["url"]
-
-    # Update the sharing name
-    sharing_key = original_data["sharing_key"]
-    response = test_client.put(f"/api/proxied-path/{sharing_key}", json={"sharing_name": "my_custom_name"})
-    assert response.status_code == 200
-    updated_data = response.json()
-    assert updated_data["sharing_name"] == "my_custom_name"
-    assert updated_data["url"] == original_url
 
 
 def test_broken_symlink_in_file_listing(test_client, temp_dir):

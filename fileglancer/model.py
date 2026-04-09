@@ -163,13 +163,6 @@ class ProxiedPathResponse(BaseModel):
     )
 
 
-class UpdateProxiedPathPayload(BaseModel):
-    sharing_name: Optional[str] = Field(
-        description="New label for the data link",
-        default=None
-    )
-
-
 class ExternalBucket(BaseModel):
     """An external bucket for S3-compatible storage"""
     id: int = Field(
