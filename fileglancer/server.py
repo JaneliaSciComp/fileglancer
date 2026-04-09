@@ -889,7 +889,9 @@ def create_app(settings):
                                   username: str = Depends(get_current_user)):
 
         if url_prefix is None:
-            url_prefix = os.path.basename(path)
+            url_prefix = quote(os.path.basename(path), safe='/')
+        elif not _VALID_URL_PREFIX_RE.match(url_prefix):
+            url_prefix = quote(url_prefix, safe='/')
         _validate_url_prefix(url_prefix)
         sharing_name = url_prefix
         logger.info(f"Creating proxied path for {username} with sharing name {sharing_name} and fsp_name {fsp_name} and path {path} (url_prefix={url_prefix})")
