@@ -633,6 +633,7 @@ def update_proxied_path(session: Session,
 
     if new_sharing_name:
         proxied_path.sharing_name = new_sharing_name
+        proxied_path.url_prefix = new_sharing_name
 
     if new_fsp_name:
         proxied_path.fsp_name = new_fsp_name
