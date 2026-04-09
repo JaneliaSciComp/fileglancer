@@ -31,14 +31,6 @@ type CreateProxiedPathPayload = {
 };
 
 /**
- * Payload for updating a proxied path (label only)
- */
-type UpdateProxiedPathPayload = {
-  sharing_key: string;
-  sharing_name: string;
-};
-
-/**
  * Payload for deleting a proxied path
  */
 type DeleteProxiedPathPayload = {
