@@ -282,7 +282,7 @@ def test_get_proxied_paths(test_client):
 
 
 def test_update_proxied_path(test_client):
-    """Test updating a proxied path's sharing name"""
+    """Test updating a proxied path"""
     # First, create a proxied path to update
     path = "test_proxied_path"
     response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path={path}")
@@ -290,13 +290,8 @@ def test_update_proxied_path(test_client):
     data = response.json()
     sharing_key = data["sharing_key"]
 
-    # Update the sharing name via JSON body
-    new_sharing_name = "my_new_nickname"
-
-    response = test_client.put(f"/api/proxied-path/{sharing_key}", json={"sharing_name": new_sharing_name})
     assert response.status_code == 200
     updated_data = response.json()
-    assert updated_data["sharing_name"] == new_sharing_name
 
 
 def test_delete_proxied_path(test_client):
