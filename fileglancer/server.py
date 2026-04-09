@@ -935,8 +935,6 @@ def create_app(settings):
                                   path: Optional[str] = Query(default=None, description="The path relative to the file share path mount point"),
                                   sharing_name: Optional[str] = Query(default=None, description="The sharing path of the proxied path"),
                                   username: str = Depends(get_current_user)):
-        if sharing_name is not None:
-            _validate_url_prefix(sharing_name)
         with db.get_db_session(settings.db_url) as session:
             with _get_user_context(username): # Necessary to validate the user can access the proxied path
                 try:
