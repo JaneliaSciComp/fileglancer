@@ -2,11 +2,8 @@ import { useState, useMemo } from 'react';
 import type { MouseEvent } from 'react';
 import { Typography } from '@material-tailwind/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import toast from 'react-hot-toast';
-
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
 import DataLinkUsageDialog from '@/components/ui/Dialogs/dataLinkUsage/DataLinkUsageDialog';
-import EditDataLinkLabelDialog from '@/components/ui/Dialogs/EditDataLinkLabel';
 import DataLinksActionsMenu from '@/components/ui/Menus/DataLinksActions';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
@@ -39,7 +36,6 @@ export type PathCellValue = {
 type ProxiedPathRowActionProps = {
   handleCopyPath: (path: string) => Promise<void>;
   handleCopyUrl: (item: ProxiedPath) => Promise<void>;
-  handleEditLabel: () => void;
   handleUnshare: () => void;
   handleViewDataLinkUsage: () => void;
   item: ProxiedPath;
@@ -61,7 +57,7 @@ function createPathMap(
   };
 }
 
-function LabelCell({
+function NameCell({
   item,
   onContextMenu
 }: {
@@ -128,16 +124,11 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
   const [showDataLinkDialog, setShowDataLinkDialog] = useState<boolean>(false);
   const [showDataLinkUsageDialog, setShowDataLinkUsageDialog] =
     useState<boolean>(false);
-  const [showEditLabelDialog, setShowEditLabelDialog] =
-    useState<boolean>(false);
   const { handleDeleteDataLink } = useDataToolLinks(setShowDataLinkDialog);
   const { pathPreference } = usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
-  const {
-    deleteProxiedPathMutation,
-    allProxiedPathsQuery,
-    updateProxiedPathMutation
-  } = useProxiedPathContext();
+  const { deleteProxiedPathMutation, allProxiedPathsQuery } =
+    useProxiedPathContext();
 
   const { handleCopyPath, handleCopyUrl, handleUnshare } = useProxiedPathRow({
     setShowDataLinkDialog
@@ -157,28 +148,7 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
     setShowDataLinkUsageDialog(true);
   };
 
-  const handleEditLabel = () => {
-    setShowEditLabelDialog(true);
-  };
-
-  const handleConfirmLabel = async (newLabel: string) => {
-    try {
-      await updateProxiedPathMutation.mutateAsync({
-        sharing_key: item.sharing_key,
-        sharing_name: newLabel
-      });
-      toast.success('Data link label updated');
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(`Failed to update label: ${msg}`);
-    }
-  };
-
   const menuItems: MenuItem<ProxiedPathRowActionProps>[] = [
-    {
-      name: 'Edit label',
-      action: (props: ProxiedPathRowActionProps) => props.handleEditLabel()
-    },
     {
       name: 'Copy path',
       action: async (props: ProxiedPathRowActionProps) => {
@@ -206,7 +176,6 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
   const actionProps = {
     handleCopyPath,
     handleCopyUrl,
-    handleEditLabel,
     handleUnshare,
     handleViewDataLinkUsage,
     item,
@@ -250,15 +219,6 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
           path={item.path}
         />
       ) : null}
-      {/* Edit label dialog */}
-      {showEditLabelDialog ? (
-        <EditDataLinkLabelDialog
-          currentLabel={item.sharing_name}
-          onClose={() => setShowEditLabelDialog(false)}
-          onConfirm={handleConfirmLabel}
-          open={showEditLabelDialog}
-        />
-      ) : null}
     </div>
   );
 }
@@ -271,11 +231,11 @@ export function useLinksColumns(): ColumnDef<ProxiedPath>[] {
     () => [
       {
         accessorKey: 'sharing_name',
-        header: 'Label',
+        header: 'Name',
         cell: ({ row, table }) => {
           const item = row.original;
           const onContextMenu = table.options.meta?.onCellContextMenu;
-          return <LabelCell item={item} onContextMenu={onContextMenu} />;
+          return <NameCell item={item} onContextMenu={onContextMenu} />;
         },
         enableSorting: true
       },
