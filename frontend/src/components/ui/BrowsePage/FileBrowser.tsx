@@ -147,8 +147,8 @@ export default function FileBrowser({
           handleView();
         },
         shouldShow:
-          !fileBrowserState.selectedFiles[0]?.is_dir &&
-          !fileBrowserState.selectedFiles[0]?.is_symlink &&
+          !propertiesTarget.is_dir &&
+          !propertiesTarget.is_symlink &&
           getBrowserRenderableType(propertiesTarget.name) !== null
       },
       {
