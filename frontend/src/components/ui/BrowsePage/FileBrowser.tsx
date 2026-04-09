@@ -22,7 +22,7 @@ import useHideDotFiles from '@/hooks/useHideDotFiles';
 import { useHandleDownload } from '@/hooks/useHandleDownload';
 import { useHandleView } from '@/hooks/useHandleView';
 import { detectZarrVersions } from '@/queries/zarrQueries';
-import { getBrowserRenderableType } from '@/queries/fileContentQueries';
+import { getBrowserRenderableType } from '@/utils/fileTypes';
 import { detectN5, getN5DetectionSignals } from '@/queries/n5Queries';
 import { makeMapKey } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
