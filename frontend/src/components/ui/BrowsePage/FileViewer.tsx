@@ -12,8 +12,10 @@ import { formatFileSize, formatUnixTimestamp } from '@/utils';
 import type { FileOrFolder } from '@/shared.types';
 import {
   useFileContentQuery,
-  useFileMetadataQuery
+  useFileMetadataQuery,
+  useFileBinaryPreviewQuery
 } from '@/queries/fileContentQueries';
+import HexDump from './HexDump';
 import useDarkMode from '@/hooks/useDarkMode';
 
 type FileViewerProps = {
@@ -84,12 +86,17 @@ export default function FileViewer({ file }: FileViewerProps) {
   const isDarkMode = useDarkMode();
   const [formatJson, setFormatJson] = useState<boolean>(true);
 
-  // First, fetch metadata to check if file is binary
   const metadataQuery = useFileMetadataQuery(fspName, file.path);
 
-  // Only fetch content if metadata indicates it's not binary
-  const shouldFetchContent =
-    metadataQuery.isSuccess && !metadataQuery.data.isBinary;
+  const isBinary = metadataQuery.data?.isBinary === true;
+
+  const binaryPreviewQuery = useFileBinaryPreviewQuery(
+    fspName,
+    file.path,
+    isBinary
+  );
+
+  const shouldFetchContent = metadataQuery.isSuccess && !isBinary;
   const contentQuery = useFileContentQuery(
     shouldFetchContent ? fspName : undefined,
     file.path
@@ -99,6 +106,30 @@ export default function FileViewer({ file }: FileViewerProps) {
   const isJsonFile = language === 'json';
 
   const renderViewer = () => {
+    // Binary file: show hex preview as soon as the first bytes arrive
+    if (isBinary) {
+      if (binaryPreviewQuery.isPending) {
+        return (
+          <Typography className="p-4 text-foreground">
+            Loading binary preview...
+          </Typography>
+        );
+      }
+      if (binaryPreviewQuery.error) {
+        return (
+          <Typography className="p-4 text-foreground/60">
+            Binary file — preview unavailable
+          </Typography>
+        );
+      }
+      return (
+        <HexDump
+          bytes={binaryPreviewQuery.data!}
+          totalFileSize={file.size ?? undefined}
+        />
+      );
+    }
+
     if (metadataQuery.isLoading) {
       return (
         <Typography className="p-4 text-foreground">
@@ -111,15 +142,6 @@ export default function FileViewer({ file }: FileViewerProps) {
       return (
         <Typography className="p-4 text-error">
           Error: {metadataQuery.error.message}
-        </Typography>
-      );
-    }
-
-    // If file is binary, show a message instead of trying to load content
-    if (metadataQuery.data?.isBinary) {
-      return (
-        <Typography className="p-4 text-foreground">
-          Binary file - preview not available
         </Typography>
       );
     }
@@ -196,8 +218,7 @@ export default function FileViewer({ file }: FileViewerProps) {
   };
 
   // Determine if we should show JSON format toggle
-  const showJsonToggle =
-    isJsonFile && metadataQuery.isSuccess && !metadataQuery.data.isBinary;
+  const showJsonToggle = isJsonFile && !isBinary;
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
