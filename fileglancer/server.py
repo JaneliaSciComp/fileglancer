@@ -114,7 +114,7 @@ def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optiona
 
 
 # Regex: allow unreserved URI chars (RFC 3986), plus / for path separators and common safe chars
-_VALID_URL_PREFIX_RE = re.compile(r'^[A-Za-z0-9\-._~/!@$&\'()*+,;:=]+$')
+_VALID_URL_PREFIX_RE = re.compile(r'^[A-Za-z0-9\-._~/!@$&\'()*+,;:=%]+$')
 
 
 def _validate_url_prefix(url_prefix: str) -> None:
