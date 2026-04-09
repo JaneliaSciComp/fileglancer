@@ -92,11 +92,21 @@ def _convert_external_bucket(db_bucket: db.ExternalBucketDB) -> ExternalBucket:
     )
 
 
-def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optional[HttpUrl]) -> ProxiedPath:
+def _get_linux_path(session, fsp_name: str) -> Optional[str]:
+    """Look up the linux_path for a file share path by name."""
+    fsp = db.get_file_share_path(session, fsp_name)
+    return fsp.linux_path if fsp else None
+
+
+def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optional[HttpUrl], linux_path: Optional[str] = None) -> ProxiedPath:
     """Convert a database ProxiedPathDB model to a Pydantic ProxiedPath model"""
     if external_proxy_url:
         if db_path.is_transparent:
-            url = f"{external_proxy_url}/{db_path.sharing_key}/{quote(db_path.path, safe='/')}"
+            if linux_path:
+                full_path = f"{linux_path.strip('/')}/{db_path.path}"
+            else:
+                full_path = db_path.path
+            url = f"{external_proxy_url}/{db_path.sharing_key}/{quote(full_path, safe='/')}"
         else:
             url = f"{external_proxy_url}/{db_path.sharing_key}/{quote(os.path.basename(db_path.path))}"
     else:
@@ -228,9 +238,16 @@ def create_app(settings):
             # with literal % characters instead of proper URL encoding — FastAPI
             # auto-decodes path params, so we need to match the decoded form too.
             if proxied_path.is_transparent:
-                subpath = try_strip_prefix(captured_path, proxied_path.path)
+                # Transparent links include the linux_path prefix in the URL
+                fsp_for_prefix = db.get_file_share_path(session, proxied_path.fsp_name)
+                linux_path = fsp_for_prefix.linux_path if fsp_for_prefix and fsp_for_prefix.linux_path else None
+                if linux_path:
+                    full_prefix = f"{linux_path.strip('/')}/{proxied_path.path}"
+                else:
+                    full_prefix = proxied_path.path
+                subpath = try_strip_prefix(captured_path, full_prefix)
                 if subpath is None:
-                    subpath = try_strip_prefix(captured_path, unquote(proxied_path.path))
+                    subpath = try_strip_prefix(captured_path, unquote(full_prefix))
             else:
                 path_basename = os.path.basename(proxied_path.path)
                 subpath = try_strip_prefix(captured_path, path_basename)
@@ -884,7 +901,8 @@ def create_app(settings):
             with _get_user_context(username): # Necessary to validate the user can access the proxied path
                 try:
                     new_path = db.create_proxied_path(session, username, sharing_name, fsp_name, path, is_transparent=is_transparent)
-                    return _convert_proxied_path(new_path, settings.external_proxy_url)
+                    linux_path = _get_linux_path(session, fsp_name) if is_transparent else None
+                    return _convert_proxied_path(new_path, settings.external_proxy_url, linux_path=linux_path)
                 except ValueError as e:
                     logger.error(f"Error creating proxied path: {e}")
                     raise HTTPException(status_code=400, detail=str(e))
@@ -898,7 +916,16 @@ def create_app(settings):
 
         with db.get_db_session(settings.db_url) as session:
             db_proxied_paths = db.get_proxied_paths(session, username, fsp_name, path)
-            proxied_paths = [_convert_proxied_path(db_path, settings.external_proxy_url) for db_path in db_proxied_paths]
+            # Cache linux_path lookups by fsp_name for transparent paths
+            linux_path_cache: Dict[str, Optional[str]] = {}
+            proxied_paths = []
+            for db_path in db_proxied_paths:
+                lp = None
+                if db_path.is_transparent:
+                    if db_path.fsp_name not in linux_path_cache:
+                        linux_path_cache[db_path.fsp_name] = _get_linux_path(session, db_path.fsp_name)
+                    lp = linux_path_cache[db_path.fsp_name]
+                proxied_paths.append(_convert_proxied_path(db_path, settings.external_proxy_url, linux_path=lp))
             return ProxiedPathResponse(paths=proxied_paths)
 
 
@@ -913,7 +940,8 @@ def create_app(settings):
                 raise HTTPException(status_code=404, detail="Proxied path not found for sharing key {sharing_key}")
             if path.username != username:
                 raise HTTPException(status_code=404, detail="Proxied path not found for username {username} and sharing key {sharing_key}")
-            return _convert_proxied_path(path, settings.external_proxy_url)
+            lp = _get_linux_path(session, path.fsp_name) if path.is_transparent else None
+            return _convert_proxied_path(path, settings.external_proxy_url, linux_path=lp)
 
 
     @app.put("/api/proxied-path/{sharing_key}", description="Update a proxied path by sharing key")
@@ -925,7 +953,8 @@ def create_app(settings):
         with db.get_db_session(settings.db_url) as session:
             try:
                 updated = db.update_proxied_path(session, username, sharing_key, new_sharing_name=payload.sharing_name)
-                return _convert_proxied_path(updated, settings.external_proxy_url)
+                lp = _get_linux_path(session, updated.fsp_name) if updated.is_transparent else None
+                return _convert_proxied_path(updated, settings.external_proxy_url, linux_path=lp)
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e))
 

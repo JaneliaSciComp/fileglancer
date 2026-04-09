@@ -1267,8 +1267,8 @@ def test_create_transparent_proxied_path(test_client, temp_dir):
     response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path={path}&is_transparent=true")
     assert response.status_code == 200
     data = response.json()
-    # URL should use full relative path
-    assert data["url"].endswith(f"/{data['sharing_key']}/a/b/c")
+    # URL should include linux_path prefix and full relative path
+    assert data["url"].endswith(f"/{data['sharing_key']}/tempdir/test/path/a/b/c")
 
 
 def test_proxy_resolve_non_transparent(test_client, temp_dir):
@@ -1302,8 +1302,8 @@ def test_proxy_resolve_transparent(test_client, temp_dir):
     assert response.status_code == 200
     sharing_key = response.json()["sharing_key"]
 
-    # Access through the proxy using full path prefix
-    response = test_client.get(f"/files/{sharing_key}/a/b/data.txt")
+    # Access through the proxy using linux_path prefix + full path
+    response = test_client.get(f"/files/{sharing_key}/tempdir/test/path/a/b/data.txt")
     assert response.status_code == 200
     assert response.text == "transparent hello"
 
@@ -1357,8 +1357,8 @@ def test_proxy_resolve_url_encoded_path_transparent(test_client, temp_dir):
     assert response.status_code == 200
     sharing_key = response.json()["sharing_key"]
 
-    # Request with URL-encoded spaces in the full path
-    response = test_client.get(f"/files/{sharing_key}/my%20folder/sub%20dir/file.txt")
+    # Request with URL-encoded spaces in the full path (includes linux_path prefix)
+    response = test_client.get(f"/files/{sharing_key}/tempdir/test/path/my%20folder/sub%20dir/file.txt")
     assert response.status_code == 200
     assert response.text == "encoded transparent hello"
 
