@@ -11,7 +11,12 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { validateUrlPrefix } from '@/hooks/useDataToolLinks';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
-import { getPreferredPathForDisplay, makeMapKey } from '@/utils';
+import { makeMapKey } from '@/utils';
+import {
+  getPreferredPathForDisplay,
+  joinPaths,
+  normalizePosixStylePath
+} from '@/utils/pathHandling';
 import type { FileSharePath } from '@/shared.types';
 import type { PendingToolKey } from '@/hooks/useZarrMetadata';
 import FgDialog from './FgDialog';
@@ -142,7 +147,7 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
   const linuxPath = pathFsp?.linux_path;
   const transparentPath =
     linuxPath && filePath
-      ? `${linuxPath.replace(/\/+$/, '')}/${filePath}`
+      ? normalizePosixStylePath(joinPaths(linuxPath, filePath))
       : filePath || '';
 
   // Custom subpath local state (only used in this dialog, not persisted)

@@ -9,10 +9,15 @@ import {
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useExternalBucketContext } from '@/contexts/ExternalBucketContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import {
+  escapePathForUrl,
+  joinPaths,
+  normalizePosixStylePath
+} from '@/utils/pathHandling';
 import useCopyTooltip from './useCopyTooltip';
 import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
 
-const VALID_URL_PREFIX_RE = /^[A-Za-z0-9\-._~/!@$&'()*+,;:=]+$/;
+const VALID_URL_PREFIX_RE = /^[A-Za-z0-9\-._~/!@$&'()*+,;:=%]+$/;
 
 export function validateUrlPrefix(value: string): string | null {
   if (!value || !value.trim()) {
@@ -105,16 +110,18 @@ export default function useDataToolLinks(
         const linuxPath = fileQuery.data.currentFileSharePath.linux_path;
         switch (dataLinkSubpathMode) {
           case 'full_path':
-            urlPrefix = linuxPath
-              ? `${linuxPath.replace(/\/+$/, '')}/${path}`
-              : path;
+            urlPrefix = escapePathForUrl(
+              normalizePosixStylePath(
+                linuxPath ? joinPaths(linuxPath, path) : path
+              )
+            );
             break;
           case 'custom':
             urlPrefix = path.split('/').pop() || path;
             break;
           case 'name':
           default:
-            urlPrefix = path.split('/').pop() || path;
+            urlPrefix = escapePathForUrl(path.split('/').pop() || path);
             break;
         }
       }
