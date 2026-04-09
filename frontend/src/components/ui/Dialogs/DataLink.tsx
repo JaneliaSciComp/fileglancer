@@ -110,12 +110,8 @@ function BtnContainer({ children }: { readonly children: ReactNode }) {
 
 export default function DataLinkDialog(props: DataLinkDialogProps) {
   const { fspName, filePath } = useFileBrowserContext();
-  const {
-    pathPreference,
-    areDataLinksAutomatic,
-    dataLinkSubpathMode,
-    dataLinkCustomSubpath
-  } = usePreferencesContext();
+  const { pathPreference, areDataLinksAutomatic, dataLinkSubpathMode } =
+    usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const [localAreDataLinksAutomatic] = useState(areDataLinksAutomatic);
 
@@ -150,9 +146,7 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
       : filePath || '';
 
   // Custom subpath local state (only used in this dialog, not persisted)
-  const [customSubpath, setCustomSubpath] = useState(
-    dataLinkCustomSubpath || folderNameOnly
-  );
+  const [customSubpath, setCustomSubpath] = useState(folderNameOnly);
 
   const customSubpathError = useMemo(
     () =>

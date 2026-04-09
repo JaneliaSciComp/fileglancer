@@ -78,7 +78,7 @@ export default function useDataToolLinks(
     currentDirProxiedPathQuery
   } = useProxiedPathContext();
 
-  const { areDataLinksAutomatic, dataLinkSubpathMode, dataLinkCustomSubpath } =
+  const { areDataLinksAutomatic, dataLinkSubpathMode } =
     usePreferencesContext();
   const { externalDataUrlQuery } = useExternalBucketContext();
   const { handleCopy, showCopiedTooltip } = useCopyTooltip();
@@ -110,7 +110,7 @@ export default function useDataToolLinks(
               : path;
             break;
           case 'custom':
-            urlPrefix = dataLinkCustomSubpath || path.split('/').pop() || path;
+            urlPrefix = path.split('/').pop() || path;
             break;
           case 'name':
           default:

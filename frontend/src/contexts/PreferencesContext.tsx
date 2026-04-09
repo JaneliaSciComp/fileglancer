@@ -49,7 +49,6 @@ type PreferencesContextType = {
   hideDotFiles: boolean;
   areDataLinksAutomatic: boolean;
   dataLinkSubpathMode: 'name' | 'full_path' | 'custom';
-  dataLinkCustomSubpath: string;
   disableNeuroglancerStateGeneration: boolean;
   disableHeuristicalLayerTypeDetection: boolean;
   useLegacyMultichannelApproach: boolean;
@@ -544,7 +543,6 @@ export const PreferencesProvider = ({
     areDataLinksAutomatic:
       preferencesQuery.data?.areDataLinksAutomatic ?? false,
     dataLinkSubpathMode: preferencesQuery.data?.dataLinkSubpathMode ?? 'name',
-    dataLinkCustomSubpath: preferencesQuery.data?.dataLinkCustomSubpath ?? '',
     disableNeuroglancerStateGeneration:
       preferencesQuery.data?.disableNeuroglancerStateGeneration || false,
     disableHeuristicalLayerTypeDetection:

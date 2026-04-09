@@ -34,7 +34,6 @@ type PreferencesApiResponse = {
   hideDotFiles?: { value: boolean };
   areDataLinksAutomatic?: { value: boolean };
   dataLinkSubpathMode?: { value: string };
-  dataLinkCustomSubpath?: { value: string };
   disableNeuroglancerStateGeneration?: { value: boolean };
   disableHeuristicalLayerTypeDetection?: { value: boolean };
   useLegacyMultichannelApproach?: { value: boolean };
@@ -68,7 +67,6 @@ export type PreferencesQueryData = {
   hideDotFiles: boolean;
   areDataLinksAutomatic: boolean;
   dataLinkSubpathMode: 'name' | 'full_path' | 'custom';
-  dataLinkCustomSubpath: string;
   disableNeuroglancerStateGeneration: boolean;
   disableHeuristicalLayerTypeDetection: boolean;
   useLegacyMultichannelApproach: boolean;
@@ -238,7 +236,6 @@ const createTransformPreferences = (
           | 'name'
           | 'full_path'
           | 'custom') ?? 'name',
-      dataLinkCustomSubpath: rawData.dataLinkCustomSubpath?.value ?? '',
       disableNeuroglancerStateGeneration:
         rawData.disableNeuroglancerStateGeneration?.value || false,
       disableHeuristicalLayerTypeDetection:
