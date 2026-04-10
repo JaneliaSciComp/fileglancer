@@ -1,7 +1,7 @@
 import { Breadcrumb } from '@material-tailwind/react';
 import { HiChevronRight, HiOutlineSquares2X2 } from 'react-icons/hi2';
 
-import BreadcrumbSegment from '@/components/ui/BrowsePage/BreadcrumbSegment';
+import BreadcrumbSegment from '@/components/ui/widgets/BreadcrumbSegment';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { makePathSegmentArray, joinPaths } from '@/utils/pathHandling';
 import { makeMapKey, getPreferredPathForDisplay } from '@/utils';

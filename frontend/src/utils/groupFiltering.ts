@@ -9,7 +9,11 @@ import type { FileSharePath } from '@/shared.types';
  * @returns true if the user has access, false otherwise
  */
 function shouldDisplayFsp(fsp: FileSharePath, userGroups: string[]): boolean {
-  return userGroups.includes(fsp.group) || fsp.group === 'public';
+  return (
+    userGroups.includes(fsp.group) ||
+    fsp.group === 'public' ||
+    fsp.group === 'local'
+  );
 }
 
 /**

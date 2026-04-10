@@ -3,11 +3,8 @@ import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router';
 
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
-import { FileSharePath, Result } from '@/shared.types';
-import {
-  convertBackToForwardSlash,
-  makeBrowseLink
-} from '@/utils/pathHandling';
+import type { Result } from '@/shared.types';
+import { makeBrowseLink, resolvePathToFsp } from '@/utils/pathHandling';
 import { createSuccess, handleError } from '@/utils/errorHandling';
 
 export default function useNavigationInput(initialValue: string = '') {
@@ -41,64 +38,11 @@ export default function useNavigationInput(initialValue: string = '') {
     }
 
     try {
-      // Trim white space and, if necessary, convert backslashes to forward slashes
-      const normalizedInput = convertBackToForwardSlash(inputValue.trim());
+      const resolved = resolvePathToFsp(inputValue, zonesAndFspQuery.data);
 
-      // Track best match
-      let bestMatch: {
-        fspObject: FileSharePath;
-        matchedPath: string;
-        subpath: string;
-      } | null = null;
-
-      const keys = Object.keys(zonesAndFspQuery.data);
-      for (const key of keys) {
-        // Iterate through only the objects in zonesAndFileSharePathsMap that have a key that start with "fsp_"
-        if (key.startsWith('fsp_')) {
-          const fspObject = zonesAndFspQuery.data[key] as FileSharePath;
-          const linuxPath = fspObject.linux_path || '';
-          const macPath = fspObject.mac_path || '';
-          const windowsPath = convertBackToForwardSlash(fspObject.windows_path);
-
-          let matchedPath: string | null = null;
-          let subpath = '';
-          // Check if the normalized input starts with any of the mount paths
-          // If a match is found, extract the subpath
-          // Collect all potential matches
-          if (normalizedInput.startsWith(linuxPath)) {
-            matchedPath = linuxPath;
-            subpath = normalizedInput.replace(linuxPath, '');
-          } else if (normalizedInput.startsWith(macPath)) {
-            matchedPath = macPath;
-            subpath = normalizedInput.replace(macPath, '');
-          } else if (normalizedInput.startsWith(windowsPath)) {
-            matchedPath = windowsPath;
-            subpath = normalizedInput.replace(windowsPath, '');
-          }
-
-          if (matchedPath) {
-            // The best match is the one with the longest matched path (most specific)
-            if (
-              !bestMatch ||
-              matchedPath.length > bestMatch.matchedPath.length
-            ) {
-              bestMatch = {
-                fspObject,
-                matchedPath,
-                subpath
-              };
-            }
-          }
-        }
-      }
-
-      if (bestMatch) {
-        const browseLink = makeBrowseLink(
-          bestMatch.fspObject.name,
-          bestMatch.subpath
-        );
+      if (resolved) {
+        const browseLink = makeBrowseLink(resolved.fsp.name, resolved.subpath);
         navigate(browseLink);
-        // Clear the inputValue
         setInputValue('');
         return createSuccess(undefined);
       } else {
