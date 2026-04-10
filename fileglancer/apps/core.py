@@ -707,6 +707,11 @@ def _run_as_user(username: str, request: dict) -> dict:
         **identity_kwargs,
     )
 
+    # Forward worker stderr (contains cluster_api and worker logs)
+    if result.stderr:
+        for line in result.stderr.decode().rstrip().splitlines():
+            logger.debug(f"[worker:{action}] {line}")
+
     if result.stdout:
         try:
             response = json.loads(result.stdout)

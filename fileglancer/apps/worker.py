@@ -209,7 +209,17 @@ _ACTIONS = {
 
 
 def main():
+    import logging
     import pwd as _pwd
+
+    # Configure cluster_api logging so debug output reaches the parent
+    # process via stderr.  The parent captures stderr separately.
+    log_level = os.environ.get("FGC_LOG_LEVEL", "INFO").upper()
+    logging.basicConfig(
+        level=log_level,
+        format="%(levelname)s | %(name)s:%(funcName)s:%(lineno)d - %(message)s",
+        stream=sys.stderr,
+    )
 
     request = json.loads(sys.stdin.buffer.read())
     action = request.get("action")
