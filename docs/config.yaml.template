@@ -125,6 +125,12 @@ session_cookie_name: fg_session
 session_cookie_secure: true
 
 #
+# Environment setup — sourced at startup before any scheduler commands.
+# Useful when running as a systemd service where login scripts don't run.
+#
+# env_source_script: /misc/lsf/conf/profile.lsf  # Source a shell script to set env vars
+
+#
 # Settings for the Apps feature
 #
 # apps:

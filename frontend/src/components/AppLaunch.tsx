@@ -104,7 +104,7 @@ export default function AppLaunch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manifest]);
 
-  const handleSubmit = async (
+  const handleSubmit = (
     parameters: Record<string, unknown>,
     resources?: AppResourceDefaults,
     extraArgs?: string,
@@ -118,8 +118,9 @@ export default function AppLaunch() {
     if (!selectedEntryPoint) {
       return;
     }
-    try {
-      await submitJobMutation.mutateAsync({
+    submitJobMutation.reset();
+    submitJobMutation.mutate(
+      {
         app_url: appUrl,
         manifest_path: manifestPath,
         entry_point_id: selectedEntryPoint.id,
@@ -132,14 +133,14 @@ export default function AppLaunch() {
         post_run: postRun,
         container,
         container_args: containerArgs
-      });
-      toast.success('Job submitted');
-      navigate('/apps/jobs');
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Failed to submit job';
-      toast.error(message);
-    }
+      },
+      {
+        onSuccess: () => {
+          toast.success('Job submitted');
+          navigate('/apps/jobs');
+        }
+      }
+    );
   };
 
   const handleInstall = async () => {
@@ -227,6 +228,7 @@ export default function AppLaunch() {
           initialValues={relaunchParameters}
           manifest={manifest}
           onSubmit={handleSubmit}
+          submitError={submitJobMutation.error?.message}
           submitting={submitJobMutation.isPending}
         />
       ) : manifest ? (

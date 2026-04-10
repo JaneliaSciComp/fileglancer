@@ -302,6 +302,38 @@ def create_app(settings):
         logger.debug(f"  external_proxy_url: {settings.external_proxy_url}")
         logger.debug(f"  atlassian_url: {settings.atlassian_url}")
 
+        # Source a shell script to import environment variables
+        # (e.g., /misc/lsf/conf/profile.lsf). This runs the script
+        # in a bash subshell and captures the resulting environment,
+        # applying any new/changed vars to this process. Pixi strips
+        # inherited env vars, so they must be set inside the process.
+        #
+        if settings.env_source_script:
+            import subprocess as _sp
+            script = settings.env_source_script
+            try:
+                result = _sp.run(
+                    ["bash", "-c", f". {script} && env -0"],
+                    capture_output=True, text=True, timeout=10,
+                )
+                if result.returncode == 0:
+                    sourced_env = dict(
+                        line.split("=", 1)
+                        for line in result.stdout.split("\0")
+                        if "=" in line
+                    )
+                    for key, value in sourced_env.items():
+                        if os.environ.get(key) != value:
+                            os.environ[key] = value
+                            logger.debug(f"  env_source_script set: {key}={value}")
+                else:
+                    logger.warning(
+                        f"env_source_script failed (rc={result.returncode}): "
+                        f"{result.stderr.strip()}"
+                    )
+            except Exception as e:
+                logger.warning(f"env_source_script error: {e}")
+
         # Initialize database (run migrations once at startup)
         db.initialize_database(settings.db_url)
 
@@ -1544,7 +1576,8 @@ def create_app(settings):
                              username: str = Depends(get_current_user)):
         try:
             logger.info(f"Fetching manifest for URL: '{body.url}' path: '{body.manifest_path}'")
-            manifest = await apps_module.fetch_app_manifest(body.url, body.manifest_path)
+            manifest = await apps_module.fetch_app_manifest(body.url, body.manifest_path,
+                                                                username=username)
             return manifest
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
@@ -1571,7 +1604,8 @@ def create_app(settings):
             # Try to fetch manifest from local clone
             try:
                 user_app.manifest = await apps_module.fetch_app_manifest(
-                    app_entry["url"], app_entry.get("manifest_path", "")
+                    app_entry["url"], app_entry.get("manifest_path", ""),
+                    username=username,
                 )
                 # Update name/description from manifest
                 user_app.name = user_app.manifest.name
@@ -1588,7 +1622,8 @@ def create_app(settings):
                            username: str = Depends(get_current_user)):
         # Clone the repo and discover all manifests
         try:
-            discovered = await apps_module.discover_app_manifests(body.url)
+            discovered = await apps_module.discover_app_manifests(body.url,
+                                                                   username=username)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
@@ -1672,12 +1707,13 @@ def create_app(settings):
     async def update_user_app(body: ManifestFetchRequest,
                               username: str = Depends(get_current_user)):
         try:
-            await apps_module._ensure_repo_cache(body.url, pull=True)
+            await apps_module._ensure_repo_cache(body.url, pull=True, username=username)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to pull latest code: {str(e)}")
 
         try:
-            manifest = await apps_module.fetch_app_manifest(body.url, body.manifest_path)
+            manifest = await apps_module.fetch_app_manifest(body.url, body.manifest_path,
+                                                            username=username)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
@@ -1716,11 +1752,12 @@ def create_app(settings):
     async def validate_paths(body: PathValidationRequest,
                              username: str = Depends(get_current_user)):
         errors = {}
-        with db.get_db_session(settings.db_url) as session:
-            for param_key, path_value in body.paths.items():
-                error = apps_module.validate_path_in_filestore(path_value, session)
-                if error:
-                    errors[param_key] = error
+        with _get_user_context(username):
+            with db.get_db_session(settings.db_url) as session:
+                for param_key, path_value in body.paths.items():
+                    error = apps_module.validate_path_in_filestore(path_value, session)
+                    if error:
+                        errors[param_key] = error
         return PathValidationResponse(errors=errors)
 
     @app.get("/api/cluster-defaults",
@@ -1739,23 +1776,23 @@ def create_app(settings):
             if body.resources:
                 resources_dict = body.resources.model_dump(exclude_none=True)
 
+            db_job = await apps_module.submit_job(
+                username=username,
+                app_url=body.app_url,
+                entry_point_id=body.entry_point_id,
+                parameters=body.parameters,
+                resources=resources_dict,
+                extra_args=body.extra_args,
+                pull_latest=body.pull_latest,
+                manifest_path=body.manifest_path,
+                env=body.env,
+                pre_run=body.pre_run,
+                post_run=body.post_run,
+                container=body.container,
+                container_args=body.container_args,
+            )
             with _get_user_context(username):
-                db_job = await apps_module.submit_job(
-                    username=username,
-                    app_url=body.app_url,
-                    entry_point_id=body.entry_point_id,
-                    parameters=body.parameters,
-                    resources=resources_dict,
-                    extra_args=body.extra_args,
-                    pull_latest=body.pull_latest,
-                    manifest_path=body.manifest_path,
-                    env=body.env,
-                    pre_run=body.pre_run,
-                    post_run=body.post_run,
-                    container=body.container,
-                    container_args=body.container_args,
-                )
-            return _convert_job(db_job)
+                return _convert_job(db_job)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
@@ -1768,7 +1805,8 @@ def create_app(settings):
                        username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
             db_jobs = db.get_jobs_by_username(session, username, status)
-            jobs = [_convert_job(j) for j in db_jobs]
+            with _get_user_context(username):
+                jobs = [_convert_job(j) for j in db_jobs]
             return JobResponse(jobs=jobs)
 
     @app.get("/api/jobs/{job_id}", response_model=Job,
@@ -1779,7 +1817,8 @@ def create_app(settings):
             db_job = db.get_job(session, job_id, username)
             if db_job is None:
                 raise HTTPException(status_code=404, detail="Job not found")
-            return _convert_job(db_job, include_files=True)
+            with _get_user_context(username):
+                return _convert_job(db_job, include_files=True)
 
     @app.post("/api/jobs/{job_id}/cancel",
               description="Cancel a running job")
@@ -1787,7 +1826,8 @@ def create_app(settings):
                          username: str = Depends(get_current_user)):
         try:
             db_job = await apps_module.cancel_job(job_id, username)
-            return _convert_job(db_job)
+            with _get_user_context(username):
+                return _convert_job(db_job)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
@@ -1809,7 +1849,8 @@ def create_app(settings):
         if file_type not in ("script", "stdout", "stderr"):
             raise HTTPException(status_code=400, detail="file_type must be script, stdout, or stderr")
         try:
-            content = await apps_module.get_job_file_content(job_id, username, file_type)
+            with _get_user_context(username):
+                content = await apps_module.get_job_file_content(job_id, username, file_type)
             if content is None:
                 raise HTTPException(status_code=404, detail=f"File not found: {file_type}")
             return PlainTextResponse(content)

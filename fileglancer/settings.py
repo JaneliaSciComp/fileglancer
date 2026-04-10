@@ -32,6 +32,7 @@ class ClusterSettings(BaseModel):
     completed_retention_minutes: float = 10.0
     command_timeout: float = 100.0
     suppress_job_email: bool = True
+    poll_all_users: bool = False
 
 
 class AppsSettings(BaseModel):
@@ -94,6 +95,11 @@ class Settings(BaseSettings):
 
     # CLI mode - enables auto-login endpoint for standalone CLI usage
     cli_mode: bool = False
+
+    # Shell script sourced at startup to import environment variables.
+    # Useful for setting up scheduler env (e.g., /misc/lsf/conf/profile.lsf).
+    env_source_script: Optional[str] = None
+
     # Cluster / Apps settings (mirrors py-cluster-api ClusterConfig)
     cluster: ClusterSettings = ClusterSettings()
 

@@ -37,8 +37,9 @@ interface AppLaunchFormProps {
     postRun?: string,
     container?: string,
     containerArgs?: string
-  ) => Promise<void>;
+  ) => void;
   readonly submitting: boolean;
+  readonly submitError?: string;
   readonly initialValues?: Record<string, unknown>;
   readonly initialResources?: AppResourceDefaults;
   readonly initialExtraArgs?: string;
@@ -661,6 +662,7 @@ export default function AppLaunchForm({
   entryPoint,
   onSubmit,
   submitting,
+  submitError,
   initialValues: externalValues,
   initialResources,
   initialExtraArgs: externalExtraArgs,
@@ -934,7 +936,7 @@ export default function AppLaunchForm({
     }
     const hasEnv = Object.keys(envRecord).length > 0;
 
-    await onSubmit(
+    onSubmit(
       params,
       hasResourceOverrides ? resources : undefined,
       extraArgs.trim() || undefined,
@@ -1221,6 +1223,13 @@ export default function AppLaunchForm({
       {Object.keys(errors).length > 0 ? (
         <div className="mt-6 mb-4 p-3 bg-error/10 rounded text-error text-sm">
           Please fix the errors above before submitting.
+        </div>
+      ) : null}
+
+      {/* Submission error */}
+      {submitError ? (
+        <div className="mt-6 mb-4 p-3 bg-error/10 rounded text-error text-sm">
+          {submitError}
         </div>
       ) : null}
 
