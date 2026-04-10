@@ -95,6 +95,7 @@ class ProxiedPathDB(Base):
     sharing_name = Column(String, nullable=False)
     fsp_name = Column(String, nullable=False)
     path = Column(String, nullable=False)
+    url_prefix = Column(String, nullable=False, server_default="")
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
@@ -589,7 +590,7 @@ def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
         raise ValueError(f"Path {path} is not accessible relative to {fsp_name}")
 
 
-def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_name: str, path: str) -> ProxiedPathDB:
+def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_name: str, path: str, url_prefix: str = "") -> ProxiedPathDB:
     """Create a new proxied path"""
     _validate_proxied_path(session, fsp_name, path)
 
@@ -601,6 +602,7 @@ def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_
         sharing_name=sharing_name,
         fsp_name=fsp_name,
         path=path,
+        url_prefix=url_prefix,
         created_at=now,
         updated_at=now
     )
@@ -612,6 +614,7 @@ def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_
     cache[sharing_key] = proxied_path
     logger.debug(f"Cached new proxied path for sharing key: {sharing_key}, cache size: {len(cache)}")
     return proxied_path
+
 
 
 def update_proxied_path(session: Session,
@@ -630,6 +633,7 @@ def update_proxied_path(session: Session,
 
     if new_sharing_name:
         proxied_path.sharing_name = new_sharing_name
+        proxied_path.url_prefix = new_sharing_name
 
     if new_fsp_name:
         proxied_path.fsp_name = new_fsp_name

@@ -48,6 +48,7 @@ type PreferencesContextType = {
   layout: string;
   hideDotFiles: boolean;
   areDataLinksAutomatic: boolean;
+  dataLinkSubpathMode: 'name' | 'full_path' | 'custom';
   disableNeuroglancerStateGeneration: boolean;
   disableHeuristicalLayerTypeDetection: boolean;
   useLegacyMultichannelApproach: boolean;
@@ -77,6 +78,9 @@ type PreferencesContextType = {
   setLayoutWithPropertiesOpen: () => Promise<Result<void>>;
   toggleHideDotFiles: () => Promise<Result<void>>;
   toggleAutomaticDataLinks: () => Promise<Result<void>>;
+  setDataLinkSubpathMode: (
+    mode: 'name' | 'full_path' | 'custom'
+  ) => Promise<Result<void>>;
   toggleDisableNeuroglancerStateGeneration: () => Promise<Result<void>>;
   toggleDisableHeuristicalLayerTypeDetection: () => Promise<Result<void>>;
   toggleUseLegacyMultichannelApproach: () => Promise<Result<void>>;
@@ -210,6 +214,20 @@ export const PreferencesProvider = ({
       'areDataLinksAutomatic',
       preferencesQuery.data?.areDataLinksAutomatic ?? true
     );
+  };
+
+  const setDataLinkSubpathMode = async (
+    mode: 'name' | 'full_path' | 'custom'
+  ): Promise<Result<void>> => {
+    try {
+      await updatePreferenceMutation.mutateAsync({
+        key: 'dataLinkSubpathMode',
+        value: mode
+      });
+      return createSuccess(undefined);
+    } catch (error) {
+      return handleError(error);
+    }
   };
 
   const toggleDisableNeuroglancerStateGeneration = async (): Promise<
@@ -524,6 +542,7 @@ export const PreferencesProvider = ({
     hideDotFiles: preferencesQuery.data?.hideDotFiles || false,
     areDataLinksAutomatic:
       preferencesQuery.data?.areDataLinksAutomatic ?? false,
+    dataLinkSubpathMode: preferencesQuery.data?.dataLinkSubpathMode ?? 'name',
     disableNeuroglancerStateGeneration:
       preferencesQuery.data?.disableNeuroglancerStateGeneration || false,
     disableHeuristicalLayerTypeDetection:
@@ -555,6 +574,7 @@ export const PreferencesProvider = ({
     setLayoutWithPropertiesOpen,
     toggleHideDotFiles,
     toggleAutomaticDataLinks,
+    setDataLinkSubpathMode,
     toggleDisableNeuroglancerStateGeneration,
     toggleDisableHeuristicalLayerTypeDetection,
     toggleUseLegacyMultichannelApproach,

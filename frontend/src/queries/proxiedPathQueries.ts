@@ -27,6 +27,7 @@ type ProxiedPathApiResponse = {
 type CreateProxiedPathPayload = {
   fsp_name: string;
   path: string;
+  url_prefix?: string;
 };
 
 /**
@@ -178,10 +179,14 @@ export function useCreateProxiedPathMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: async (payload: CreateProxiedPathPayload) => {
-      const url = buildUrl('/api/proxied-path', null, {
+      const queryParams: Record<string, string> = {
         fsp_name: payload.fsp_name,
         path: payload.path
-      });
+      };
+      if (payload.url_prefix !== undefined) {
+        queryParams.url_prefix = payload.url_prefix;
+      }
+      const url = buildUrl('/api/proxied-path', null, queryParams);
       const proxiedPath = await sendRequestAndThrowForNotOk(url, 'POST');
       return proxiedPath as ProxiedPath;
     },

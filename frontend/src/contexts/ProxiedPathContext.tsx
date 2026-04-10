@@ -18,6 +18,7 @@ export type ProxiedPath = {
   created_at: string;
   updated_at: string;
   url: string;
+  url_prefix: string;
 };
 
 type ProxiedPathContextType = {

@@ -100,7 +100,8 @@ export default function PropertiesDrawer({
   const [activeTab, setActiveTab] = useState<string>('overview');
 
   const { fileQuery, fileBrowserState } = useFileBrowserContext();
-  const { pathPreference, areDataLinksAutomatic } = usePreferencesContext();
+  const { pathPreference, areDataLinksAutomatic, dataLinkSubpathMode } =
+    usePreferencesContext();
   const { ticketByPathQuery } = useTicketContext();
   const {
     allProxiedPathsQuery,
@@ -289,6 +290,7 @@ export default function PropertiesDrawer({
                       onChange={async () => {
                         if (
                           areDataLinksAutomatic &&
+                          dataLinkSubpathMode !== 'custom' &&
                           !proxiedPathByFspAndPathQuery.data
                         ) {
                           await handleCreateDataLink();
