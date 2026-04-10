@@ -48,7 +48,7 @@ export default function DataLinkOptions({
     const result = await setDataLinkSubpathMode(mode);
     if (result.success) {
       const label = SUBPATH_MODES.find(m => m.value === mode)?.label;
-      toast.success(`Data link subpath set to: ${label}`);
+      toast.success(`Link name format set to: ${label}`);
     } else {
       toast.error(result.error);
     }
