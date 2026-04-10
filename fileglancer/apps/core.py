@@ -435,13 +435,6 @@ def validate_path_in_filestore(path_value: str, session) -> str | None:
     mounts via the database. Returns an error message string if invalid,
     or None if valid.
     """
-    # Resolve Mac/Windows/alternate-Linux paths to mount_path format first,
-    # before syntax validation rejects them.
-    from fileglancer.database import resolve_any_path_format
-    resolved = resolve_any_path_format(session, path_value)
-    if resolved is not None:
-        path_value = resolved
-
     # Syntax check first
     error = validate_path_for_shell(path_value)
     if error:
@@ -522,14 +515,6 @@ def _validate_parameter_value(param: AppParameter, value, session=None) -> str:
 
     if param.type in ("file", "directory"):
         str_val = str_val.replace("\\", "/")
-        # Resolve Mac (smb://), Windows (//server/share), or alternate Linux
-        # paths to the server's mount_path so validation and shell commands
-        # use the canonical server path.
-        if session is not None:
-            from fileglancer.database import resolve_any_path_format
-            resolved = resolve_any_path_format(session, str_val)
-            if resolved is not None:
-                str_val = resolved
         # Expand ~ so the path works inside shlex.quote() single quotes,
         # where the shell would not perform tilde expansion.
         # Use euid so this works when the server runs as root with seteuid.
