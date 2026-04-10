@@ -39,6 +39,7 @@ type PreferencesApiResponse = {
   useLegacyMultichannelApproach?: { value: boolean };
   isFilteredByGroups?: { value: boolean };
   showTutorial?: { value: boolean };
+  showAppsAndJobsPages?: { value: boolean };
   defaultExtraArgs?: { value: string };
   apptainerCacheDir?: { value: string };
   zone?: { value: ZonePreference[] };
@@ -72,6 +73,7 @@ export type PreferencesQueryData = {
   useLegacyMultichannelApproach: boolean;
   isFilteredByGroups: boolean;
   showTutorial: boolean;
+  showAppsAndJobsPages: boolean;
   defaultExtraArgs: string;
   apptainerCacheDir: string;
 };
@@ -244,6 +246,7 @@ const createTransformPreferences = (
         rawData.useLegacyMultichannelApproach?.value || false,
       isFilteredByGroups: rawData.isFilteredByGroups?.value ?? true,
       showTutorial: rawData.showTutorial?.value ?? true,
+      showAppsAndJobsPages: rawData.showAppsAndJobsPages?.value || false,
       defaultExtraArgs: rawData.defaultExtraArgs?.value || '',
       apptainerCacheDir: rawData.apptainerCacheDir?.value || ''
     };

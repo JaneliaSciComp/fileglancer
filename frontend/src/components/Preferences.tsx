@@ -7,6 +7,7 @@ import DataLinkOptions from '@/components/ui/PreferencesPage/DataLinkOptions';
 import DisplayOptions from '@/components/ui/PreferencesPage/DisplayOptions';
 import JobOptions from '@/components/ui/PreferencesPage/JobOptions';
 import NeuroglancerOptions from '@/components/ui/PreferencesPage/NeuroglancerOptions';
+import ExperimentalOptions from '@/components/ui/PreferencesPage/ExperimentalOptions';
 
 export default function Preferences() {
   const { pathPreference, handlePathPreferenceSubmit } =
@@ -124,6 +125,7 @@ export default function Preferences() {
           <DataLinkOptions />
           <NeuroglancerOptions />
           <JobOptions />
+          <ExperimentalOptions />
         </Card.Body>
       </Card>
     </>

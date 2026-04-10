@@ -27,6 +27,7 @@ import { FaRunning } from 'react-icons/fa';
 import ProfileMenu from '@/components/ui/Navbar/ProfileMenu';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import useTheme from '@/hooks/useTheme';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { trackEvent } from '@/utils/fathom';
 
 const LINKS = [
@@ -101,10 +102,20 @@ function LogoSvg() {
 
 // Links list component
 function NavList() {
+  const { showAppsAndJobsPages } = usePreferencesContext();
   const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
-  const filteredLinks = tasksEnabled
-    ? LINKS
-    : LINKS.filter(link => link.href !== '/jobs');
+  const filteredLinks = LINKS.filter(link => {
+    if (link.href === '/apps' && !showAppsAndJobsPages) {
+      return false;
+    }
+    if (link.href === '/apps/jobs' && !showAppsAndJobsPages) {
+      return false;
+    }
+    if (link.href === '/jobs' && !tasksEnabled) {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <>

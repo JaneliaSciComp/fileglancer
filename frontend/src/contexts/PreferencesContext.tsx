@@ -54,6 +54,7 @@ type PreferencesContextType = {
   useLegacyMultichannelApproach: boolean;
   isFilteredByGroups: boolean;
   showTutorial: boolean;
+  showAppsAndJobsPages: boolean;
   defaultExtraArgs: string;
   apptainerCacheDir: string;
 
@@ -86,6 +87,7 @@ type PreferencesContextType = {
   toggleUseLegacyMultichannelApproach: () => Promise<Result<void>>;
   toggleFilterByGroups: () => Promise<Result<void>>;
   toggleShowTutorial: () => Promise<Result<void>>;
+  toggleShowAppsAndJobsPages: () => Promise<Result<void>>;
   updateDefaultExtraArgs: (args: string) => Promise<Result<void>>;
   updateApptainerCacheDir: (dir: string) => Promise<Result<void>>;
   handleFavoriteChange: (
@@ -261,6 +263,13 @@ export const PreferencesProvider = ({
     return togglePreference(
       'showTutorial',
       preferencesQuery.data?.showTutorial ?? true
+    );
+  };
+
+  const toggleShowAppsAndJobsPages = async (): Promise<Result<void>> => {
+    return togglePreference(
+      'showAppsAndJobsPages',
+      preferencesQuery.data?.showAppsAndJobsPages || false
     );
   };
 
@@ -551,6 +560,7 @@ export const PreferencesProvider = ({
       preferencesQuery.data?.useLegacyMultichannelApproach || false,
     isFilteredByGroups: preferencesQuery.data?.isFilteredByGroups ?? true,
     showTutorial: preferencesQuery.data?.showTutorial ?? true,
+    showAppsAndJobsPages: preferencesQuery.data?.showAppsAndJobsPages || false,
     defaultExtraArgs: preferencesQuery.data?.defaultExtraArgs || '',
     apptainerCacheDir: preferencesQuery.data?.apptainerCacheDir || '',
 
@@ -580,6 +590,7 @@ export const PreferencesProvider = ({
     toggleUseLegacyMultichannelApproach,
     toggleFilterByGroups,
     toggleShowTutorial,
+    toggleShowAppsAndJobsPages,
     updateDefaultExtraArgs,
     updateApptainerCacheDir,
     handleFavoriteChange,
