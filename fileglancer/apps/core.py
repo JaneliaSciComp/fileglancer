@@ -579,6 +579,13 @@ def _validate_parameter_value(param: AppParameter, value, session=None) -> str:
 
     if param.type in ("file", "directory"):
         str_val = str_val.replace("\\", "/")
+        # Expand ~ so the path works inside shlex.quote() single quotes,
+        # where the shell would not perform tilde expansion.
+        # Use euid so this works when the server runs as root with seteuid.
+        if str_val.startswith("~/") or str_val == "~":
+            import pwd
+            home = pwd.getpwuid(os.geteuid()).pw_dir
+            str_val = home + str_val[1:]
         if session is not None:
             error = validate_path_in_filestore(str_val, session)
         else:

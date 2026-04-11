@@ -1,12 +1,15 @@
 import {
-  useQuery,
-  UseQueryResult,
+  useInfiniteQuery,
   useMutation,
+  useQueryClient
+} from '@tanstack/react-query';
+import type {
+  UseInfiniteQueryResult,
   UseMutationResult,
-  useQueryClient,
-  QueryFunctionContext
+  InfiniteData
 } from '@tanstack/react-query';
 
+import { default as log } from '@/logger';
 import { sendFetchRequest, buildUrl, makeMapKey } from '@/utils';
 import { normalizePosixStylePath } from '@/utils/pathHandling';
 import type { FileOrFolder, FileSharePath } from '@/shared.types';
@@ -17,16 +20,23 @@ import {
   sendRequestAndThrowForNotOk
 } from './queryUtils';
 
-type FileBrowserResponse = {
+const PAGE_SIZE = 200;
+
+type FileBrowserPageResponse = {
   info: FileOrFolder;
   files: FileOrFolder[];
+  has_more?: boolean;
+  next_cursor?: string | null;
+  total_count?: number | null;
 };
 
-type FileQueryData = {
+export type FileQueryData = {
   currentFileSharePath: FileSharePath | null;
   currentFileOrFolder: FileOrFolder | null;
   files: FileOrFolder[];
-  errorMessage?: string; // For permission errors that should be displayed but not thrown
+  errorMessage?: string;
+  hasMore: boolean;
+  totalCount: number | null;
 };
 
 // Query key factory for hierarchical cache management
@@ -40,33 +50,38 @@ export const fileQueryKeys = {
 export default function useFileQuery(
   fspName: string | undefined,
   folderName: string
-): UseQueryResult<FileQueryData, Error> {
+): UseInfiniteQueryResult<FileQueryData, Error> {
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
 
-  // Function to fetch files for the current FSP and current folder
-  const fetchFileInfo = async ({
-    signal
-  }: QueryFunctionContext): Promise<FileBrowserResponse> => {
+  const fetchFileInfoPage = async ({
+    signal,
+    pageParam
+  }: {
+    signal: AbortSignal;
+    pageParam: string | null;
+  }): Promise<FileBrowserPageResponse> => {
     if (!fspName) {
       throw new Error('No file share path selected');
     }
 
-    const url = buildUrl(
-      '/api/files/',
-      fspName,
-      folderName ? { subpath: folderName } : null
-    );
+    const queryParams: Record<string, string> = {
+      limit: String(PAGE_SIZE)
+    };
+    if (folderName) {
+      queryParams.subpath = folderName;
+    }
+    if (pageParam) {
+      queryParams.cursor = pageParam;
+    }
 
-    // Don't use sendRequestAndThrowForNotOk here because we want to handle certain
-    // error statuses (403, 404) differently
+    const url = buildUrl('/api/files/', fspName, queryParams);
     const response = await sendFetchRequest(url, 'GET', undefined, { signal });
     const body = await getResponseJsonOrError(response);
 
     if (response.ok) {
-      return body as FileBrowserResponse;
+      return body as FileBrowserPageResponse;
     }
 
-    // Handle error responses
     if (response.status === 403) {
       const errorMessage =
         body.info && body.info.owner
@@ -80,8 +95,9 @@ export default function useFileQuery(
     }
   };
 
-  const transformData = (data: FileBrowserResponse): FileQueryData => {
-    // This should never happen because query is disabled when !fspName
+  const transformData = (
+    data: InfiniteData<FileBrowserPageResponse>
+  ): FileQueryData => {
     if (!fspName) {
       throw new Error('fspName is required for transforming file query data');
     }
@@ -90,8 +106,9 @@ export default function useFileQuery(
     const currentFileSharePath =
       (zonesAndFspQuery.data?.[fspKey] as FileSharePath) || null;
 
-    // Normalize the path in the current file or folder
-    let currentFileOrFolder: FileOrFolder | null = data.info;
+    // Use info from first page
+    const firstPage = data.pages[0];
+    let currentFileOrFolder: FileOrFolder | null = firstPage?.info ?? null;
     if (currentFileOrFolder) {
       currentFileOrFolder = {
         ...currentFileOrFolder,
@@ -99,36 +116,52 @@ export default function useFileQuery(
       };
     }
 
-    // Normalize file paths and sort: directories first, then alphabetically
-    // Handle partial data case (403 error with only info, no files)
-    const rawFiles = 'files' in data ? data.files : [];
-    let files = (rawFiles || []).map(file => ({
-      ...file,
-      path: normalizePosixStylePath(file.path)
-    })) as FileOrFolder[];
-
-    files = files.sort((a: FileOrFolder, b: FileOrFolder) => {
-      if (a.is_dir === b.is_dir) {
-        return a.name.localeCompare(b.name);
+    // Flatten all pages' files (order preserved from backend sort)
+    const allFiles: FileOrFolder[] = [];
+    for (const page of data.pages) {
+      const rawFiles = 'files' in page ? page.files : [];
+      for (const file of rawFiles || []) {
+        allFiles.push({
+          ...file,
+          path: normalizePosixStylePath(file.path)
+        } as FileOrFolder);
       }
-      return a.is_dir ? -1 : 1;
-    });
+    }
+
+    const lastPage = data.pages[data.pages.length - 1];
+    const totalCount = lastPage?.total_count ?? null;
+
+    if (totalCount !== null) {
+      log.info(
+        `Loaded ${allFiles.length} of ${totalCount} items (${data.pages.length} pages)`
+      );
+    }
 
     return {
       currentFileSharePath,
       currentFileOrFolder,
-      files
+      files: allFiles,
+      hasMore: lastPage?.has_more ?? false,
+      totalCount
     };
   };
 
-  return useQuery<FileBrowserResponse, Error, FileQueryData>({
+  return useInfiniteQuery<
+    FileBrowserPageResponse,
+    Error,
+    FileQueryData,
+    readonly (string | undefined)[],
+    string | null
+  >({
     queryKey: fileQueryKeys.filePath(fspName || '', folderName),
-    queryFn: fetchFileInfo,
+    queryFn: fetchFileInfoPage,
     select: transformData,
+    initialPageParam: null,
+    getNextPageParam: lastPage =>
+      lastPage.has_more ? (lastPage.next_cursor ?? null) : null,
     enabled: !!fspName && !!zonesAndFspQuery.data,
-    staleTime: 5 * 60 * 1000, // 5 minutes - file listings don't change that often
+    staleTime: 5 * 60 * 1000,
     retry: (failureCount, error) => {
-      // Do not retry on permission errors or Internal Server Errors
       if (
         error instanceof Error &&
         (error.message.includes('permission') ||
@@ -136,7 +169,7 @@ export default function useFileQuery(
       ) {
         return false;
       }
-      return failureCount < 3; // Default retry behavior
+      return failureCount < 3;
     }
   });
 }

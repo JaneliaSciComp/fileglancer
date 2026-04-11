@@ -33,11 +33,13 @@ type PreferencesApiResponse = {
   layout?: { value: string };
   hideDotFiles?: { value: boolean };
   areDataLinksAutomatic?: { value: boolean };
+  dataLinkSubpathMode?: { value: string };
   disableNeuroglancerStateGeneration?: { value: boolean };
   disableHeuristicalLayerTypeDetection?: { value: boolean };
   useLegacyMultichannelApproach?: { value: boolean };
   isFilteredByGroups?: { value: boolean };
   showTutorial?: { value: boolean };
+  showAppsAndJobsPages?: { value: boolean };
   defaultExtraArgs?: { value: string };
   apptainerCacheDir?: { value: string };
   zone?: { value: ZonePreference[] };
@@ -65,11 +67,13 @@ export type PreferencesQueryData = {
   layout: string;
   hideDotFiles: boolean;
   areDataLinksAutomatic: boolean;
+  dataLinkSubpathMode: 'name' | 'full_path' | 'custom';
   disableNeuroglancerStateGeneration: boolean;
   disableHeuristicalLayerTypeDetection: boolean;
   useLegacyMultichannelApproach: boolean;
   isFilteredByGroups: boolean;
   showTutorial: boolean;
+  showAppsAndJobsPages: boolean;
   defaultExtraArgs: string;
   apptainerCacheDir: string;
 };
@@ -229,6 +233,11 @@ const createTransformPreferences = (
       layout: rawData.layout?.value || '',
       hideDotFiles: rawData.hideDotFiles?.value || false,
       areDataLinksAutomatic: rawData.areDataLinksAutomatic?.value ?? false,
+      dataLinkSubpathMode:
+        (rawData.dataLinkSubpathMode?.value as
+          | 'name'
+          | 'full_path'
+          | 'custom') ?? 'name',
       disableNeuroglancerStateGeneration:
         rawData.disableNeuroglancerStateGeneration?.value || false,
       disableHeuristicalLayerTypeDetection:
@@ -237,6 +246,7 @@ const createTransformPreferences = (
         rawData.useLegacyMultichannelApproach?.value || false,
       isFilteredByGroups: rawData.isFilteredByGroups?.value ?? true,
       showTutorial: rawData.showTutorial?.value ?? true,
+      showAppsAndJobsPages: rawData.showAppsAndJobsPages?.value || false,
       defaultExtraArgs: rawData.defaultExtraArgs?.value || '',
       apptainerCacheDir: rawData.apptainerCacheDir?.value || ''
     };

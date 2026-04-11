@@ -16,7 +16,6 @@ import {
 import MissingFolderFavoriteDialog from './MissingFolderFavoriteDialog';
 import FgTooltip from '../widgets/FgTooltip';
 import type { FileSharePath } from '@/shared.types';
-import { fileQueryKeys } from '@/queries/fileQueries';
 
 import {
   FolderFavorite,
@@ -77,7 +76,7 @@ export default function Folder({
         subpath: folderPath
       });
       await queryClient.fetchQuery({
-        queryKey: fileQueryKeys.filePath(fsp.name, folderPath),
+        queryKey: ['folder-exists', fsp.name, folderPath],
         queryFn: async () => {
           const response = await fetch(url);
           if (!response.ok) {

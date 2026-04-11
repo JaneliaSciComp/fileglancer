@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import sys
 import pwd
 import grp
@@ -95,7 +96,7 @@ def _convert_external_bucket(db_bucket: db.ExternalBucketDB) -> ExternalBucket:
 def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optional[HttpUrl]) -> ProxiedPath:
     """Convert a database ProxiedPathDB model to a Pydantic ProxiedPath model"""
     if external_proxy_url:
-        url = f"{external_proxy_url}/{db_path.sharing_key}/{quote(db_path.sharing_name)}"
+        url = f"{external_proxy_url}/{db_path.sharing_key}/{quote(db_path.url_prefix, safe='/')}"
     else:
         logger.warning(f"No external proxy URL was provided, proxy links will not be available.")
         url = None
@@ -105,10 +106,31 @@ def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optiona
         sharing_name=db_path.sharing_name,
         fsp_name=db_path.fsp_name,
         path=db_path.path,
+        url_prefix=db_path.url_prefix,
         created_at=db_path.created_at,
         updated_at=db_path.updated_at,
         url=url
     )
+
+
+# Regex: allow unreserved URI chars (RFC 3986), plus / for path separators and common safe chars
+_VALID_URL_PREFIX_RE = re.compile(r'^[A-Za-z0-9\-._~/!@$&\'()*+,;:=%]+$')
+
+
+def _validate_url_prefix(url_prefix: str) -> None:
+    """Validate that a url_prefix is non-empty and contains only URL-safe characters."""
+    if not url_prefix or not url_prefix.strip():
+        raise HTTPException(status_code=400, detail="Data link name must not be empty")
+    if not _VALID_URL_PREFIX_RE.match(url_prefix):
+        invalid_chars = set(c for c in url_prefix if not re.match(r"[A-Za-z0-9\-._~/!@$&'()*+,;:=]", c))
+        raise HTTPException(
+            status_code=400,
+            detail=f"Data link name contains invalid URL characters: {' '.join(sorted(invalid_chars))}"
+        )
+    if url_prefix.startswith('/') or url_prefix.endswith('/'):
+        raise HTTPException(status_code=400, detail="Data link name must not start or end with /")
+    if '//' in url_prefix:
+        raise HTTPException(status_code=400, detail="Data link name must not contain consecutive slashes")
 
 
 def _convert_ticket(db_ticket: db.TicketDB) -> Ticket:
@@ -199,29 +221,43 @@ def create_app(settings):
             return CurrentUserContext()
 
 
-    def _get_file_proxy_client(sharing_key: str, sharing_name: str) -> Tuple[FileProxyClient, UserContext] | Tuple[Response, None]:
+    def _get_file_proxy_client(sharing_key: str, captured_path: str) -> Tuple[FileProxyClient | Response, UserContext | None, str]:
+        """Resolve a sharing key and captured path to a FileProxyClient.
+
+        Returns (client, user_context, subpath) on success, or (error_response, None, "") on failure.
+        """
+        def try_strip_prefix(captured: str, prefix: str) -> str | None:
+            if captured == prefix:
+                return ""
+            if captured.startswith(prefix + "/"):
+                return captured[len(prefix) + 1:]
+            return None
+
         with db.get_db_session(settings.db_url) as session:
 
             proxied_path = db.get_proxied_path_by_sharing_key(session, sharing_key)
             if not proxied_path:
-                return get_nosuchbucket_response(sharing_name), None
+                return get_nosuchbucket_response(captured_path), None, ""
 
-            # Vol-E viewer sends URLs with literal % characters (not URL-encoded)
-            # FastAPI automatically decodes path parameters - % chars are treated as escapes, creating a garbled sharing_name if they're present
-            # We therefore need to handle two cases:
-            #   1. Properly encoded requests (sharing_name matches DB value of proxied_path.sharing_name)
-            #   2. Vol-E's unencoded requests (unquote(proxied_path.sharing_name) matches the garbled request value)
-            if proxied_path.sharing_name != sharing_name and unquote(proxied_path.sharing_name) != sharing_name:
-                return get_error_response(404, "NoSuchKey", f"Sharing name mismatch for sharing key {sharing_key}", sharing_name), None
+            # Match captured_path against the stored url_prefix.
+            # The unquote() fallback handles clients like Vol-E viewer that send URLs
+            # with literal % characters instead of proper URL encoding — FastAPI
+            # auto-decodes path params, so we need to match the decoded form too.
+            subpath = try_strip_prefix(captured_path, proxied_path.url_prefix)
+            if subpath is None:
+                subpath = try_strip_prefix(captured_path, unquote(proxied_path.url_prefix))
+            if subpath is None:
+                return get_error_response(404, "NoSuchKey", f"Path mismatch for sharing key {sharing_key}", captured_path), None, ""
 
             fsp = db.get_file_share_path(session, proxied_path.fsp_name)
             if not fsp:
-                return get_error_response(400, "InvalidArgument", f"File share path {proxied_path.fsp_name} not found", sharing_name), None
+                return get_error_response(400, "InvalidArgument", f"File share path {proxied_path.fsp_name} not found", captured_path), None, ""
             # Expand ~ to user's home directory before constructing the mount path
             expanded_mount_path = os.path.expanduser(fsp.mount_path)
             mount_path = f"{expanded_mount_path}/{proxied_path.path}"
+            target_name = captured_path.rsplit('/', 1)[-1] if captured_path else os.path.basename(proxied_path.path)
             # Use 256KB buffer for better performance on network filesystems
-            return FileProxyClient(proxy_kwargs={'target_name': sharing_name}, path=mount_path, buffer_size=256*1024), _get_user_context(proxied_path.username)
+            return FileProxyClient(proxy_kwargs={'target_name': target_name}, path=mount_path, buffer_size=256*1024), _get_user_context(proxied_path.username), subpath
 
 
     @asynccontextmanager
@@ -881,14 +917,20 @@ def create_app(settings):
               description="Create a new proxied path")
     async def create_proxied_path(fsp_name: str = Query(..., description="The name of the file share path that this proxied path is associated with"),
                                   path: str = Query(..., description="The path relative to the file share path mount point"),
+                                  url_prefix: Optional[str] = Query(None, description="The URL path prefix after the sharing key. Defaults to basename of path."),
                                   username: str = Depends(get_current_user)):
 
-        sharing_name = os.path.basename(path)
-        logger.info(f"Creating proxied path for {username} with sharing name {sharing_name} and fsp_name {fsp_name} and path {path}")
+        if url_prefix is None:
+            url_prefix = quote(os.path.basename(path), safe='/')
+        elif not _VALID_URL_PREFIX_RE.match(url_prefix):
+            url_prefix = quote(url_prefix, safe='/')
+        _validate_url_prefix(url_prefix)
+        sharing_name = url_prefix
+        logger.info(f"Creating proxied path for {username} with sharing name {sharing_name} and fsp_name {fsp_name} and path {path} (url_prefix={url_prefix})")
         with db.get_db_session(settings.db_url) as session:
             with _get_user_context(username): # Necessary to validate the user can access the proxied path
                 try:
-                    new_path = db.create_proxied_path(session, username, sharing_name, fsp_name, path)
+                    new_path = db.create_proxied_path(session, username, sharing_name, fsp_name, path, url_prefix=url_prefix)
                     return _convert_proxied_path(new_path, settings.external_proxy_url)
                 except ValueError as e:
                     logger.error(f"Error creating proxied path: {e}")
@@ -1002,12 +1044,10 @@ def create_app(settings):
         return NeuroglancerShortLinkResponse(links=links)
 
 
-    @app.get("/files/{sharing_key}/{sharing_name}")
-    @app.get("/files/{sharing_key}/{sharing_name}/{path:path}")
+    @app.get("/files/{sharing_key}/{path:path}")
     async def target_dispatcher(request: Request,
                                 sharing_key: str,
-                                sharing_name: str,
-                                path: str | None = '',
+                                path: str = '',
                                 list_type: Optional[int] = Query(None, alias="list-type"),
                                 continuation_token: Optional[str] = Query(None, alias="continuation-token"),
                                 delimiter: Optional[str] = Query(None, alias="delimiter"),
@@ -1020,7 +1060,7 @@ def create_app(settings):
         if 'acl' in request.query_params:
             return get_read_access_acl()
 
-        client, ctx = _get_file_proxy_client(sharing_key, sharing_name)
+        client, ctx, subpath = _get_file_proxy_client(sharing_key, path)
         if isinstance(client, Response):
             return client
 
@@ -1037,7 +1077,7 @@ def create_app(settings):
             # Open file in user context, then immediately exit
             # The file descriptor retains access rights after we switch back to root
             with ctx:
-                handle = await client.open_object(path, range_header)
+                handle = await client.open_object(subpath, range_header)
 
             # Context exited! Now stream without holding the lock
             if isinstance(handle, ObjectHandle):
@@ -1047,14 +1087,14 @@ def create_app(settings):
                 return handle
 
 
-    @app.head("/files/{sharing_key}/{sharing_name}/{path:path}")
-    async def head_object(sharing_key: str, sharing_name: str, path: str):
+    @app.head("/files/{sharing_key}/{path:path}")
+    async def head_object(sharing_key: str, path: str = ''):
         try:
-            client, ctx = _get_file_proxy_client(sharing_key, sharing_name)
+            client, ctx, subpath = _get_file_proxy_client(sharing_key, path)
             if isinstance(client, Response):
                 return client
             with ctx:
-                return await client.head_object(path)
+                return await client.head_object(subpath)
         except:
             logger.opt(exception=sys.exc_info()).info("Error requesting head")
             return get_error_response(500, "InternalError", "Error requesting HEAD", path)
@@ -1329,6 +1369,8 @@ def create_app(settings):
 
     @app.get("/api/files/{path_name}")
     async def get_file_metadata(path_name: str, subpath: Optional[str] = Query(''),
+                                limit: Optional[int] = Query(None),
+                                cursor: Optional[str] = Query(None),
                                 username: str = Depends(get_current_user)):
         """Handle GET requests to list directory contents or return info for the file/folder itself"""
 
@@ -1351,8 +1393,18 @@ def create_app(settings):
 
                     if file_info.is_dir:
                         try:
-                            files = list(filestore.yield_file_infos(subpath, current_user=username, session=session))
-                            result["files"] = [json.loads(f.model_dump_json()) for f in files]
+                            if limit is not None:
+                                files, has_more, next_cursor, total_count = filestore.yield_file_infos_paginated(
+                                    subpath, current_user=username, session=session,
+                                    limit=limit, cursor=cursor
+                                )
+                                result["files"] = [json.loads(f.model_dump_json()) for f in files]
+                                result["has_more"] = has_more
+                                result["next_cursor"] = next_cursor
+                                result["total_count"] = total_count
+                            else:
+                                files = list(filestore.yield_file_infos(subpath, current_user=username, session=session))
+                                result["files"] = [json.loads(f.model_dump_json()) for f in files]
                         except PermissionError:
                             logger.error(f"Permission denied when listing files in directory: {subpath}")
                             result["files"] = []

@@ -18,16 +18,36 @@ export const handlers = [
     return HttpResponse.json({ paths: [] }, { status: 200 });
   }),
 
-  http.post('/api/proxied-path', () => {
+  http.post('/api/proxied-path', ({ request }) => {
+    const url = new URL(request.url);
+    const path = url.searchParams.get('path') || '/test/path';
+    const pathBasename = path.split('/').pop() || path;
+    const urlPrefix = url.searchParams.get('url_prefix') || pathBasename;
     return HttpResponse.json({
       username: 'testuser',
       sharing_key: 'testkey',
-      sharing_name: 'testshare',
+      sharing_name: pathBasename,
+      path: path,
+      fsp_name: url.searchParams.get('fsp_name') || 'test_fsp',
+      created_at: '2025-07-08T15:56:42.588942',
+      updated_at: '2025-07-08T15:56:42.588942',
+      url: 'http://127.0.0.1:7878/files/testkey/' + urlPrefix,
+      url_prefix: urlPrefix
+    });
+  }),
+
+  http.put('/api/proxied-path/:sharingKey', async ({ params, request }) => {
+    const { sharingKey } = params;
+    const body = (await request.json()) as { sharing_name?: string };
+    return HttpResponse.json({
+      username: 'testuser',
+      sharing_key: sharingKey,
+      sharing_name: body.sharing_name || 'testshare',
       path: '/test/path',
       fsp_name: 'test_fsp',
       created_at: '2025-07-08T15:56:42.588942',
       updated_at: '2025-07-08T15:56:42.588942',
-      url: 'http://127.0.0.1:7878/files/testkey/test/path'
+      url: 'http://127.0.0.1:7878/files/' + sharingKey + '/path'
     });
   }),
 

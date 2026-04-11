@@ -15,7 +15,6 @@ from loguru import logger
 
 from .database import find_fsp_from_absolute_path
 from .model import FileSharePath
-from .utils import is_likely_binary
 
 # Default buffer size for streaming file contents
 DEFAULT_BUFFER_SIZE = 8192
@@ -126,7 +125,8 @@ class FileInfo(BaseModel):
     def from_stat(cls, path: str, absolute_path: str,
                   lstat_result: os.stat_result, stat_result: os.stat_result,
                   current_user: str = None, session = None,
-                  root_path: Optional[str] = None):
+                  root_path: Optional[str] = None,
+                  user_groups: Optional[set[str]] = None):
         """
         Create FileInfo from pre-computed stat results.
 
@@ -138,6 +138,7 @@ class FileInfo(BaseModel):
             current_user: Username for permission checking (optional).
             session: Database session for symlink resolution (optional).
             root_path: Filestore root for defense-in-depth validation in symlink reading (optional).
+            user_groups: Pre-computed user group set to avoid per-file getgrall() (optional).
         """
         if path is None or path == "":
             raise ValueError("Path cannot be None or empty")
@@ -153,21 +154,18 @@ class FileInfo(BaseModel):
         try:
             owner = pwd.getpwuid(stat_result.st_uid).pw_name
         except KeyError:
-            # If the user ID is not found, use the user ID as the owner
             owner = str(stat_result.st_uid)
 
         try:
             group = grp.getgrgid(stat_result.st_gid).gr_name
         except KeyError:
-            # If the group ID is not found, use the group ID as the group
             group = str(stat_result.st_gid)
 
         # Calculate read/write permissions for current user
         hasRead = None
         hasWrite = None
         if current_user is not None:
-            hasRead = cls._has_read_permission(stat_result, current_user, owner, group)
-            hasWrite = cls._has_write_permission(stat_result, current_user, owner, group)
+            hasRead, hasWrite = cls._check_permissions(stat_result, current_user, owner, group, user_groups)
 
         # Resolve symlink target to file share path if applicable
         symlink_target_fsp = cls._get_symlink_target_fsp(absolute_path, is_symlink, session, root_path)
@@ -189,60 +187,45 @@ class FileInfo(BaseModel):
         )
 
     @staticmethod
-    def _has_read_permission(stat_result: os.stat_result, current_user: str, owner: str, group: str) -> bool:
-        """Check if current user has read permission"""
-        mode = stat_result.st_mode
-
-        # Check owner permissions
-        if current_user == owner:
-            return bool(mode & stat.S_IRUSR)
-
-        # Check group permissions
+    def _get_user_groups(username: str) -> set[str]:
+        """Compute all groups a user belongs to. Call once per listing, not per file."""
+        groups: set[str] = set()
         try:
-            user_groups = [g.gr_name for g in grp.getgrall() if current_user in g.gr_mem]
-            # Also add user's primary group
-            try:
-                primary_gid = pwd.getpwnam(current_user).pw_gid
-                primary_group = grp.getgrgid(primary_gid).gr_name
-                user_groups.append(primary_group)
-            except (KeyError, OSError):
-                pass
-
-            if group in user_groups:
-                return bool(mode & stat.S_IRGRP)
+            for g in grp.getgrall():
+                if username in g.gr_mem:
+                    groups.add(g.gr_name)
         except (KeyError, OSError):
             pass
-
-        # Check other permissions
-        return bool(mode & stat.S_IROTH)
+        try:
+            primary_gid = pwd.getpwnam(username).pw_gid
+            primary_group = grp.getgrgid(primary_gid).gr_name
+            groups.add(primary_group)
+        except (KeyError, OSError):
+            pass
+        return groups
 
     @staticmethod
-    def _has_write_permission(stat_result: os.stat_result, current_user: str, owner: str, group: str) -> bool:
-        """Check if current user has write permission"""
+    def _check_permissions(stat_result: os.stat_result, current_user: str,
+                           owner: str, group: str,
+                           user_groups: Optional[set[str]] = None) -> tuple[bool, bool]:
+        """Check if current user has read and write permission.
+
+        Args:
+            user_groups: Pre-computed set of group names the user belongs to.
+                When provided, avoids the expensive grp.getgrall() call.
+        """
         mode = stat_result.st_mode
 
-        # Check owner permissions
         if current_user == owner:
-            return bool(mode & stat.S_IWUSR)
+            return bool(mode & stat.S_IRUSR), bool(mode & stat.S_IWUSR)
 
-        # Check group permissions
-        try:
-            user_groups = [g.gr_name for g in grp.getgrall() if current_user in g.gr_mem]
-            # Also add user's primary group
-            try:
-                primary_gid = pwd.getpwnam(current_user).pw_gid
-                primary_group = grp.getgrgid(primary_gid).gr_name
-                user_groups.append(primary_group)
-            except (KeyError, OSError):
-                pass
+        if user_groups is None:
+            user_groups = FileInfo._get_user_groups(current_user)
 
-            if group in user_groups:
-                return bool(mode & stat.S_IWGRP)
-        except (KeyError, OSError):
-            pass
+        if group in user_groups:
+            return bool(mode & stat.S_IRGRP), bool(mode & stat.S_IWGRP)
 
-        # Check other permissions
-        return bool(mode & stat.S_IWOTH)
+        return bool(mode & stat.S_IROTH), bool(mode & stat.S_IWOTH)
 
 
 class Filestore:
@@ -288,7 +271,8 @@ class Filestore:
         return full_path
 
 
-    def _get_file_info_from_path(self, full_path: str, current_user: str = None, session = None) -> FileInfo:
+    def _get_file_info_from_path(self, full_path: str, current_user: str = None, session = None,
+                                    user_groups: Optional[set[str]] = None) -> FileInfo:
         """
         Get the FileInfo for a file or directory at the given path.
 
@@ -357,8 +341,47 @@ class Filestore:
             rel_path, full_path, lstat_result, stat_result,
             current_user=current_user, session=session,
             root_path=self.root_path,
+            user_groups=user_groups,
         )
 
+
+    def _file_info_from_direntry(self, entry: os.DirEntry, current_user: str = None, session = None,
+                                    user_groups: Optional[set[str]] = None) -> FileInfo:
+        """Build a FileInfo from a DirEntry, using entry.stat() instead of os.lstat/os.stat.
+
+        DirEntry.stat(follow_symlinks=False) uses fstatat() with the directory fd
+        still open, which is significantly faster than os.lstat() on a full path.
+
+        This method is only called from yield_file_infos_paginated where the
+        parent directory was already validated by _check_path_in_root, so entries
+        from os.scandir() are guaranteed to be within root.
+        """
+        root_real = os.path.realpath(self.root_path)
+        full_path = entry.path
+
+        lstat_result = entry.stat(follow_symlinks=False)
+        is_symlink = stat.S_ISLNK(lstat_result.st_mode)
+        if is_symlink:
+            try:
+                stat_result = entry.stat(follow_symlinks=True)
+            except (FileNotFoundError, PermissionError, OSError) as e:
+                logger.warning(f"Broken symlink detected: {full_path}: {e}")
+                stat_result = lstat_result
+        else:
+            stat_result = lstat_result
+
+        full_real = os.path.realpath(full_path)
+        if full_real == root_real:
+            rel_path = '.'
+        else:
+            rel_path = os.path.relpath(full_real, root_real)
+
+        return FileInfo.from_stat(
+            rel_path, full_path, lstat_result, stat_result,
+            current_user=current_user, session=session,
+            root_path=self.root_path,
+            user_groups=user_groups,
+        )
 
     def get_root_path(self) -> str:
         """
@@ -438,40 +461,6 @@ class Filestore:
             FileNotFoundError: If the file does not exist
             PermissionError: If the file cannot be read
         """
-        full_path = self._check_path_in_root(path)
-
-        # Directories are not binary
-        if os.path.isdir(full_path):
-            return False
-
-        try:
-            with open(full_path, 'rb') as f:
-                sample = f.read(sample_size)
-                return is_likely_binary(sample)
-        except Exception as e:
-            # If we can't read the file, assume it's binary to be safe
-            logger.warning(f"Could not read file sample for binary detection: {e}")
-            return True
-
-
-    def check_is_binary(self, path: Optional[str] = None, sample_size: int = 4096) -> bool:
-        """
-        Check if a file is likely binary by reading a sample of its contents.
-
-        Args:
-            path (str): The relative path to the file to check.
-                May be None, in which case the root is checked (always returns False for directories).
-            sample_size (int): Number of bytes to read for binary detection. Defaults to 4096.
-
-        Returns:
-            bool: True if the file appears to be binary, False otherwise.
-                Returns False for directories.
-
-        Raises:
-            ValueError: If path attempts to escape root directory
-            FileNotFoundError: If the file does not exist
-            PermissionError: If the file cannot be read
-        """
         from .utils import is_likely_binary
 
         full_path = self._check_path_in_root(path)
@@ -489,6 +478,68 @@ class Filestore:
             logger.warning(f"Could not read file sample for binary detection: {e}")
             return True
 
+
+    def yield_file_infos_paginated(self, path: Optional[str] = None, current_user: str = None,
+                                    session = None, limit: int = 200,
+                                    cursor: Optional[str] = None) -> tuple[list[FileInfo], bool, Optional[str], int]:
+        """
+        Return a page of FileInfo objects for children of the given path.
+
+        Uses os.scandir() for efficient directory listing. DirEntry.is_dir() is
+        free (cached from readdir on Linux) so sorting dirs-first costs no extra
+        syscalls. Only entries in the returned page are stat'd.
+
+        Args:
+            path: Relative path to the directory to list.
+            current_user: Username for permission checking.
+            session: Database session for symlink resolution.
+            limit: Maximum number of entries to return.
+            cursor: Name of the last entry from the previous page. Entries after
+                this name (in sort order) are returned.
+
+        Returns:
+            Tuple of (file_infos, has_more, next_cursor, total_count).
+        """
+        full_path = self._check_path_in_root(path)
+
+        # Compute user groups once for the entire listing
+        user_groups = FileInfo._get_user_groups(current_user) if current_user else None
+
+        # Collect and sort all entries — scandir's is_dir() is free on Linux
+        entries = list(os.scandir(full_path))
+        entries.sort(key=lambda e: (not e.is_dir(follow_symlinks=False), e.name))
+        total_count = len(entries)
+
+        # Apply cursor: skip past the cursor entry
+        if cursor:
+            cursor_index = None
+            for i, e in enumerate(entries):
+                if e.name == cursor:
+                    cursor_index = i
+                    break
+            if cursor_index is not None:
+                entries = entries[cursor_index + 1:]
+            else:
+                # Cursor not found (entry deleted?) — start from beginning
+                pass
+
+        # Apply limit
+        has_more = len(entries) > limit
+        page_entries = entries[:limit]
+
+        # Build FileInfo using DirEntry.stat() (faster than os.lstat on full path)
+        file_infos = []
+        for entry in page_entries:
+            try:
+                file_infos.append(
+                    self._file_info_from_direntry(entry, current_user, session, user_groups)
+                )
+            except PermissionError as e:
+                logger.error(f"Permission denied accessing entry: {entry.path}: {e}")
+                continue
+
+        next_cursor = page_entries[-1].name if has_more and page_entries else None
+        return file_infos, has_more, next_cursor, total_count
 
     def yield_file_infos(self, path: Optional[str] = None, current_user: str = None, session = None) -> Generator[FileInfo, None, None]:
         """
@@ -508,17 +559,19 @@ class Filestore:
         """
         full_path = self._check_path_in_root(path)
 
-        entries = os.listdir(full_path)
+        # Compute user groups once for the entire listing
+        user_groups = FileInfo._get_user_groups(current_user) if current_user else None
+
+        entries = list(os.scandir(full_path))
         # Sort entries in alphabetical order, with directories listed first
-        entries.sort(key=lambda e: (not os.path.isdir(
-                                        os.path.join(full_path, e)), e))
+        # DirEntry.is_dir() is free on Linux (cached from readdir)
+        entries.sort(key=lambda e: (not e.is_dir(follow_symlinks=False), e.name))
         for entry in entries:
-            entry_path = os.path.join(full_path, entry)
             try:
-                yield self._get_file_info_from_path(entry_path, current_user, session)
+                yield self._file_info_from_direntry(entry, current_user, session, user_groups)
             except PermissionError as e:
                 # Skip files we don't have permission to access
-                logger.error(f"Permission denied accessing entry: {entry_path}: {e}")
+                logger.error(f"Permission denied accessing entry: {entry.path}: {e}")
                 continue
 
 

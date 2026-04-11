@@ -53,6 +53,7 @@ type Result<T> = Success<T> | Failure;
 
 type FetchRequestOptions = {
   signal?: AbortSignal;
+  headers?: Record<string, string>;
 };
 
 // --- App / Job types ---
