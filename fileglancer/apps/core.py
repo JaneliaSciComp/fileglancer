@@ -1446,7 +1446,7 @@ def get_job_file_paths(db_job: db.JobDB) -> dict[str, dict]:
     return files
 
 
-async def get_job_file_content(job_id: int, username: str, file_type: str) -> Optional[str]:
+def get_job_file_content(job_id: int, username: str, file_type: str) -> Optional[str]:
     """Read the content of a job file (script, stdout, or stderr).
 
     All job files live in the job's work directory:
