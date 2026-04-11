@@ -696,14 +696,14 @@ def _run_as_user(username: str, request: dict) -> dict:
     else:
         logger.debug(
             f"Spawning worker action={action} as current user "
-            f"(euid={os.geteuid()}, not root — no identity switch)"
+            f"(euid={os.geteuid()})"
         )
 
     result = subprocess.run(
         [sys.executable, "-m", "fileglancer.apps.worker"],
         input=json.dumps(request).encode(),
         capture_output=True,
-        env={**os.environ, "HOME": pw.pw_dir},
+        env={**os.environ, "HOME": pw.pw_dir, "FGC_LOG_LEVEL": get_settings().log_level},
         **identity_kwargs,
     )
 
