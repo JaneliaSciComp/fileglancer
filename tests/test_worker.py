@@ -363,6 +363,47 @@ class TestUserWorkerExecute:
             child.close()
 
 
+    @pytest.mark.asyncio
+    async def test_concurrent_execute_serialized(self):
+        """Concurrent execute() calls are serialized — responses never get swapped."""
+        worker, child = self._make_worker_pair()
+        try:
+            import threading
+
+            def mock_worker():
+                """Echo worker: returns the action name in the response."""
+                for _ in range(20):
+                    try:
+                        req = _recv(child)
+                    except ConnectionError:
+                        break
+                    action = req.get("action", "unknown")
+                    if action == "shutdown":
+                        break
+                    # Simulate some work
+                    time.sleep(0.01)
+                    _send(child, {"action_echo": action, "seq": req.get("seq")})
+
+            t = threading.Thread(target=mock_worker, daemon=True)
+            t.start()
+
+            # Fire 10 concurrent requests with different actions
+            async def make_request(seq):
+                action = f"action_{seq}"
+                result = await worker.execute(action, seq=seq)
+                # Verify we got OUR response back, not someone else's
+                assert result["action_echo"] == action
+                assert result["seq"] == seq
+
+            await asyncio.gather(*[make_request(i) for i in range(10)])
+
+            _send(child, {"action": "shutdown"})  # won't be read, but close cleanly
+            t.join(timeout=5)
+        finally:
+            worker.sock.close()
+            child.close()
+
+
 # ---------------------------------------------------------------------------
 # Action handler tests (user_worker.py actions run in-process)
 # ---------------------------------------------------------------------------

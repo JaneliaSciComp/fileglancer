@@ -73,6 +73,7 @@ class UserWorker:
         self.sock = sock
         self.last_activity = time.monotonic()
         self._busy = False
+        self._lock = asyncio.Lock()  # serialize requests to the worker
 
     @property
     def is_alive(self) -> bool:
@@ -88,33 +89,38 @@ class UserWorker:
         If the worker sends a file descriptor (SCM_RIGHTS), the response
         dict will contain a ``_file_handle`` key with an open file object.
 
+        Requests are serialized per-worker via an asyncio lock — the worker
+        subprocess handles one request at a time, so concurrent callers
+        must not interleave their sends/receives on the shared socket.
+
         Raises WorkerError on application-level errors from the worker.
         Raises WorkerDead if the subprocess has exited.
         """
         if not self.is_alive:
             raise WorkerDead(f"Worker for {self.username} is dead (rc={self.process.returncode})")
 
-        self._busy = True
-        self.last_activity = time.monotonic()
-        try:
-            request = {"action": action, **kwargs}
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                None, self._send_and_recv, request)
-
-            if response.get("error"):
-                # Close any fd that arrived with an error response
-                fh = response.pop("_file_handle", None)
-                if fh is not None:
-                    fh.close()
-                raise WorkerError(response["error"])
-
-            return response
-        except (BrokenPipeError, ConnectionResetError, OSError) as e:
-            raise WorkerDead(f"Worker for {self.username} connection lost: {e}") from e
-        finally:
-            self._busy = False
+        async with self._lock:
+            self._busy = True
             self.last_activity = time.monotonic()
+            try:
+                request = {"action": action, **kwargs}
+                loop = asyncio.get_event_loop()
+                response = await loop.run_in_executor(
+                    None, self._send_and_recv, request)
+
+                if response.get("error"):
+                    # Close any fd that arrived with an error response
+                    fh = response.pop("_file_handle", None)
+                    if fh is not None:
+                        fh.close()
+                    raise WorkerError(response["error"])
+
+                return response
+            except (BrokenPipeError, ConnectionResetError, OSError) as e:
+                raise WorkerDead(f"Worker for {self.username} connection lost: {e}") from e
+            finally:
+                self._busy = False
+                self.last_activity = time.monotonic()
 
     def _send_and_recv(self, request: dict) -> dict:
         """Send a request and receive the response (blocking, runs in thread).
