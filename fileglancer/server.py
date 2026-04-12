@@ -1198,7 +1198,7 @@ def create_app(settings):
                                         target_name=info["target_name"],
                                         path=subpath)
             return Response(headers=result.get("headers", {}), status_code=result.get("status_code", 200))
-        except:
+        except Exception:
             logger.opt(exception=sys.exc_info()).info("Error requesting head")
             return get_error_response(500, "InternalError", "Error requesting HEAD", path)
 
