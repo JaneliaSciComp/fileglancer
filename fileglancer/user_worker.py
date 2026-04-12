@@ -163,12 +163,12 @@ def _action_list_dir(request: dict, ctx: WorkerContext) -> dict:
     try:
         with db.get_db_session(ctx.db_url) as session:
             file_info = filestore.get_file_info(subpath, current_user=current_user, session=session)
-            result = {"info": json.loads(file_info.model_dump_json())}
+            result = {"info": file_info.model_dump(mode="json")}
 
             if file_info.is_dir:
                 try:
                     files = list(filestore.yield_file_infos(subpath, current_user=current_user, session=session))
-                    result["files"] = [json.loads(f.model_dump_json()) for f in files]
+                    result["files"] = [f.model_dump(mode="json") for f in files]
                 except PermissionError:
                     result["files"] = []
                     result["error"] = "Permission denied when listing directory contents"
@@ -211,7 +211,7 @@ def _action_list_dir_paged(request: dict, ctx: WorkerContext) -> dict:
     try:
         with db.get_db_session(ctx.db_url) as session:
             file_info = filestore.get_file_info(subpath, current_user=current_user, session=session)
-            result = {"info": json.loads(file_info.model_dump_json())}
+            result = {"info": file_info.model_dump(mode="json")}
 
             if file_info.is_dir:
                 try:
@@ -219,7 +219,7 @@ def _action_list_dir_paged(request: dict, ctx: WorkerContext) -> dict:
                         subpath, current_user=current_user, session=session,
                         limit=limit, cursor=cursor
                     )
-                    result["files"] = [json.loads(f.model_dump_json()) for f in files]
+                    result["files"] = [f.model_dump(mode="json") for f in files]
                     result["has_more"] = has_more
                     result["next_cursor"] = next_cursor
                     result["total_count"] = total_count
@@ -260,7 +260,7 @@ def _action_get_file_info(request: dict, ctx: WorkerContext) -> dict:
     try:
         with db.get_db_session(ctx.db_url) as session:
             file_info = filestore.get_file_info(subpath, current_user=ctx.username, session=session)
-            return {"info": json.loads(file_info.model_dump_json())}
+            return {"info": file_info.model_dump(mode="json")}
     except FileNotFoundError:
         return {"error": "File or directory not found", "status_code": 404}
     except PermissionError:
@@ -354,7 +354,7 @@ def _action_head_file(request: dict, ctx: WorkerContext) -> dict:
         is_binary = filestore.check_is_binary(subpath) if not file_info.is_dir else False
 
         return {
-            "info": json.loads(file_info.model_dump_json()),
+            "info": file_info.model_dump(mode="json"),
             "content_type": content_type,
             "is_binary": is_binary,
         }
@@ -477,7 +477,7 @@ def _action_update_file(request: dict, ctx: WorkerContext) -> dict:
 
     try:
         old_file_info = filestore.get_file_info(subpath, ctx.username)
-        result = {"info": json.loads(old_file_info.model_dump_json())}
+        result = {"info": old_file_info.model_dump(mode="json")}
 
         if new_permissions is not None and new_permissions != old_file_info.permissions:
             filestore.change_file_permissions(subpath, new_permissions)
