@@ -142,43 +142,57 @@ class UserWorker:
         # Receive header + payload + optional fd, all via recvmsg
         fds = array.array("i")
         raw = b""
-        # First, read at least the header
-        while len(raw) < _HEADER_SIZE:
-            msg, ancdata, flags, addr = self.sock.recvmsg(
-                max(_HEADER_SIZE - len(raw), 4096),
-                socket.CMSG_LEN(struct.calcsize("i")),
-            )
-            if not msg:
-                raise ConnectionError("Worker closed connection")
-            raw += msg
-            for cmsg_level, cmsg_type, cmsg_data in ancdata:
-                if cmsg_level == socket.SOL_SOCKET and cmsg_type == socket.SCM_RIGHTS:
-                    fds.frombytes(cmsg_data[:len(cmsg_data) - (len(cmsg_data) % fds.itemsize)])
+        try:
+            # First, read at least the header
+            while len(raw) < _HEADER_SIZE:
+                msg, ancdata, flags, addr = self.sock.recvmsg(
+                    max(_HEADER_SIZE - len(raw), 4096),
+                    socket.CMSG_LEN(struct.calcsize("i")),
+                )
+                if not msg:
+                    raise ConnectionError("Worker closed connection")
+                raw += msg
+                for cmsg_level, cmsg_type, cmsg_data in ancdata:
+                    if cmsg_level == socket.SOL_SOCKET and cmsg_type == socket.SCM_RIGHTS:
+                        fds.frombytes(cmsg_data[:len(cmsg_data) - (len(cmsg_data) % fds.itemsize)])
 
-        (length,) = struct.unpack(_HEADER_FMT, raw[:_HEADER_SIZE])
-        if length > _MAX_MESSAGE_SIZE:
-            raise WorkerError(f"Response too large: {length} bytes")
+            (length,) = struct.unpack(_HEADER_FMT, raw[:_HEADER_SIZE])
+            if length > _MAX_MESSAGE_SIZE:
+                raise WorkerError(f"Response too large: {length} bytes")
 
-        # We may have read some payload bytes with the header
-        total_needed = _HEADER_SIZE + length
-        while len(raw) < total_needed:
-            msg, ancdata, flags, addr = self.sock.recvmsg(
-                total_needed - len(raw),
-                socket.CMSG_LEN(struct.calcsize("i")),
-            )
-            if not msg:
-                raise ConnectionError("Worker closed connection mid-message")
-            raw += msg
-            for cmsg_level, cmsg_type, cmsg_data in ancdata:
-                if cmsg_level == socket.SOL_SOCKET and cmsg_type == socket.SCM_RIGHTS:
-                    fds.frombytes(cmsg_data[:len(cmsg_data) - (len(cmsg_data) % fds.itemsize)])
+            # We may have read some payload bytes with the header
+            total_needed = _HEADER_SIZE + length
+            while len(raw) < total_needed:
+                msg, ancdata, flags, addr = self.sock.recvmsg(
+                    total_needed - len(raw),
+                    socket.CMSG_LEN(struct.calcsize("i")),
+                )
+                if not msg:
+                    raise ConnectionError("Worker closed connection mid-message")
+                raw += msg
+                for cmsg_level, cmsg_type, cmsg_data in ancdata:
+                    if cmsg_level == socket.SOL_SOCKET and cmsg_type == socket.SCM_RIGHTS:
+                        fds.frombytes(cmsg_data[:len(cmsg_data) - (len(cmsg_data) % fds.itemsize)])
 
-        body = raw[_HEADER_SIZE:_HEADER_SIZE + length]
-        response = json.loads(body)
+            body = raw[_HEADER_SIZE:_HEADER_SIZE + length]
+            response = json.loads(body)
+        except Exception:
+            # Close any fds received before the error to prevent leaks
+            for fd_val in fds:
+                try:
+                    os.close(fd_val)
+                except OSError:
+                    pass
+            raise
 
-        # If an fd arrived, wrap it in a file object
+        # If an fd arrived, wrap it in a file object and close any extras
         if fds:
             response["_file_handle"] = os.fdopen(fds[0], "rb")
+            for extra_fd in fds[1:]:
+                try:
+                    os.close(extra_fd)
+                except OSError:
+                    pass
 
         return response
 
