@@ -602,12 +602,10 @@ def _action_get_job_file_paths(request: dict, ctx: WorkerContext) -> dict:
     """Get job file path info."""
     from fileglancer.apps.core import get_job_file_paths
     from fileglancer import database as db
-    from fileglancer.settings import get_settings
 
-    settings = get_settings()
     job_id = request["job_id"]
 
-    with db.get_db_session(settings.db_url) as session:
+    with db.get_db_session(ctx.db_url) as session:
         db_job = db.get_job(session, job_id, ctx.username)
         if db_job is None:
             return {"error": f"Job {job_id} not found", "status_code": 404}
@@ -619,12 +617,10 @@ def _action_get_service_url(request: dict, ctx: WorkerContext) -> dict:
     """Read service URL from job work directory."""
     from fileglancer.apps.core import get_service_url
     from fileglancer import database as db
-    from fileglancer.settings import get_settings
 
-    settings = get_settings()
     job_id = request["job_id"]
 
-    with db.get_db_session(settings.db_url) as session:
+    with db.get_db_session(ctx.db_url) as session:
         db_job = db.get_job(session, job_id, ctx.username)
         if db_job is None:
             return {"error": f"Job {job_id} not found", "status_code": 404}
