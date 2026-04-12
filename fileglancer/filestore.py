@@ -658,6 +658,35 @@ class Filestore:
                 file_handle.close()
 
 
+    @staticmethod
+    def _stream_contents(file_handle, buffer_size: int = DEFAULT_BUFFER_SIZE) -> Generator[bytes, None, None]:
+        """Stream from an open file handle. Handle is closed when done."""
+        try:
+            while True:
+                chunk = file_handle.read(buffer_size)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            file_handle.close()
+
+    @staticmethod
+    def _stream_range(start: int, end: int, content_length: int,
+                      file_handle, buffer_size: int = DEFAULT_BUFFER_SIZE) -> Generator[bytes, None, None]:
+        """Stream a byte range from an open file handle. Handle is closed when done."""
+        try:
+            file_handle.seek(start)
+            remaining = content_length
+            while remaining > 0:
+                chunk_size = min(buffer_size, remaining)
+                chunk = file_handle.read(chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+                remaining -= len(chunk)
+        finally:
+            file_handle.close()
+
     def rename_file_or_dir(self, old_path: str, new_path: str):
         """
         Rename a file at the given old path to the new path.
