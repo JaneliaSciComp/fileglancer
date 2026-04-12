@@ -246,6 +246,7 @@ def create_app(settings):
                 logger.error(f"Worker dead for {username}: {e}")
                 raise HTTPException(status_code=503, detail="Service temporarily unavailable")
             except WorkerError as e:
+                logger.error(f"Worker error for {username} action={action}: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         else:
             # Dev/test mode: run action directly in-process
