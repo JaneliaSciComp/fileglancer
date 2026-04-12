@@ -221,8 +221,8 @@ class WorkerPool:
         self._workers: dict[str, UserWorker] = {}
         self._locks: dict[str, asyncio.Lock] = {}
         self._eviction_task: Optional[asyncio.Task] = None
-        self.max_workers = 50
-        self.idle_timeout = 300  # seconds
+        self.max_workers = settings.worker_pool_max_workers
+        self.idle_timeout = settings.worker_pool_idle_timeout
 
     def _get_lock(self, username: str) -> asyncio.Lock:
         if username not in self._locks:
@@ -351,7 +351,7 @@ class WorkerPool:
     async def _eviction_loop(self):
         """Periodically evict idle workers."""
         while True:
-            await asyncio.sleep(60)
+            await asyncio.sleep(min(60, self.idle_timeout))
             now = time.monotonic()
             to_evict = []
             for name, worker in list(self._workers.items()):
