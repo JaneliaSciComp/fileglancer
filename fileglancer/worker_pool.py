@@ -119,34 +119,50 @@ class UserWorker:
     def _send_and_recv(self, request: dict) -> dict:
         """Send a request and receive the response (blocking, runs in thread).
 
-        Uses recvmsg() which transparently handles optional SCM_RIGHTS fds.
+        All receives use recvmsg() so that SCM_RIGHTS file descriptors are
+        captured transparently — the ancillary data arrives with the first
+        bytes of the message, so we must use recvmsg for the header too.
         """
         # Send
         payload = json.dumps(request).encode()
         header = struct.pack(_HEADER_FMT, len(payload))
         self.sock.sendall(header + payload)
 
-        # Receive header
-        header = self._recvall(_HEADER_SIZE)
-        (length,) = struct.unpack(_HEADER_FMT, header)
-        if length > _MAX_MESSAGE_SIZE:
-            raise WorkerError(f"Response too large: {length} bytes")
-
-        # Receive payload + optional fd via recvmsg
+        # Receive header + payload + optional fd, all via recvmsg
         fds = array.array("i")
-        body = b""
-        while len(body) < length:
+        raw = b""
+        # First, read at least the header
+        while len(raw) < _HEADER_SIZE:
             msg, ancdata, flags, addr = self.sock.recvmsg(
-                length - len(body),
-                socket.CMSG_LEN(struct.calcsize("i")),  # space for 1 fd
+                max(_HEADER_SIZE - len(raw), 4096),
+                socket.CMSG_LEN(struct.calcsize("i")),
             )
             if not msg:
-                raise ConnectionError("Worker closed connection mid-message")
-            body += msg
+                raise ConnectionError("Worker closed connection")
+            raw += msg
             for cmsg_level, cmsg_type, cmsg_data in ancdata:
                 if cmsg_level == socket.SOL_SOCKET and cmsg_type == socket.SCM_RIGHTS:
                     fds.frombytes(cmsg_data[:len(cmsg_data) - (len(cmsg_data) % fds.itemsize)])
 
+        (length,) = struct.unpack(_HEADER_FMT, raw[:_HEADER_SIZE])
+        if length > _MAX_MESSAGE_SIZE:
+            raise WorkerError(f"Response too large: {length} bytes")
+
+        # We may have read some payload bytes with the header
+        total_needed = _HEADER_SIZE + length
+        while len(raw) < total_needed:
+            msg, ancdata, flags, addr = self.sock.recvmsg(
+                total_needed - len(raw),
+                socket.CMSG_LEN(struct.calcsize("i")),
+            )
+            if not msg:
+                raise ConnectionError("Worker closed connection mid-message")
+            raw += msg
+            for cmsg_level, cmsg_type, cmsg_data in ancdata:
+                if cmsg_level == socket.SOL_SOCKET and cmsg_type == socket.SCM_RIGHTS:
+                    fds.frombytes(cmsg_data[:len(cmsg_data) - (len(cmsg_data) % fds.itemsize)])
+
+        body = raw[_HEADER_SIZE:_HEADER_SIZE + length]
         response = json.loads(body)
 
         # If an fd arrived, wrap it in a file object
@@ -154,16 +170,6 @@ class UserWorker:
             response["_file_handle"] = os.fdopen(fds[0], "rb")
 
         return response
-
-    def _recvall(self, n: int) -> bytes:
-        """Read exactly n bytes from the socket."""
-        data = bytearray()
-        while len(data) < n:
-            chunk = self.sock.recv(n - len(data))
-            if not chunk:
-                raise ConnectionError("Worker closed connection")
-            data.extend(chunk)
-        return bytes(data)
 
     async def shutdown(self, timeout: float = 5.0):
         """Ask the worker to shut down gracefully, then force-kill if needed."""
