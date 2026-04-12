@@ -320,9 +320,9 @@ def _action_open_file(request: dict, ctx: WorkerContext) -> dict:
             return {"redirect": True, "fsp_name": fsp.name, "subpath": relative_subpath or ""}
         return {"error": str(e), "status_code": 400}
     except FileNotFoundError:
-        return {"error": "File or directory not found", "status_code": 404}
+        return {"error": f"File or directory not found: {fsp_name}/{subpath}", "status_code": 404}
     except PermissionError:
-        return {"error": "Permission denied", "status_code": 403}
+        return {"error": f"Permission denied: {fsp_name}/{subpath}", "status_code": 403}
 
 
 def _action_head_file(request: dict, ctx: WorkerContext) -> dict:

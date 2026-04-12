@@ -49,7 +49,9 @@ _MAX_MESSAGE_SIZE = 64 * 1024 * 1024  # 64 MB safety limit
 
 class WorkerError(Exception):
     """Raised when a worker returns an error response."""
-    pass
+    def __init__(self, message: str, status_code: int = 500):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 class WorkerDead(Exception):
@@ -113,7 +115,10 @@ class UserWorker:
                     fh = response.pop("_file_handle", None)
                     if fh is not None:
                         fh.close()
-                    raise WorkerError(response["error"])
+                    raise WorkerError(
+                        response["error"],
+                        status_code=response.get("status_code", 500),
+                    )
 
                 return response
             except (BrokenPipeError, ConnectionResetError, OSError) as e:
