@@ -254,6 +254,10 @@ class WorkerPool:
             if len(self._workers) >= self.max_workers:
                 await self._evict_lru()
 
+                # If still at capacity (all workers busy), refuse rather than exceed the limit
+                if len(self._workers) >= self.max_workers:
+                    raise WorkerError("Worker pool at capacity, try again later", status_code=503)
+
             # Spawn new worker
             new_worker = await self._spawn_worker(username)
             self._workers[username] = new_worker
