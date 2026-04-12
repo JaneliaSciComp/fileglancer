@@ -246,7 +246,7 @@ def create_app(settings):
                 logger.error(f"Worker dead for {username}: {e}")
                 raise HTTPException(status_code=503, detail="Service temporarily unavailable")
             except WorkerError as e:
-                raise  # Let caller handle application-level errors
+                raise HTTPException(status_code=500, detail=str(e))
         else:
             # Dev/test mode: run action directly in-process
             from fileglancer.user_worker import _ACTIONS, WorkerContext
@@ -1799,8 +1799,10 @@ def create_app(settings):
             if content is None:
                 raise HTTPException(status_code=404, detail=f"File not found: {file_type}")
             return PlainTextResponse(content)
-        except WorkerError as e:
-            raise HTTPException(status_code=404, detail=str(e))
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     def _ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
         """Re-attach UTC timezone to naive datetimes from the DB.
