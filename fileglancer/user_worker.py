@@ -253,13 +253,18 @@ def _action_get_file_info(request: dict, ctx: WorkerContext) -> dict:
 
     filestore, error = _get_filestore(fsp_name, ctx.db_url)
     if filestore is None:
-        return {"error": error}
+        return {"error": error, "status_code": 404 if "not found" in error else 500}
 
     from fileglancer import database as db
 
-    with db.get_db_session(ctx.db_url) as session:
-        file_info = filestore.get_file_info(subpath, current_user=ctx.username, session=session)
-        return {"info": json.loads(file_info.model_dump_json())}
+    try:
+        with db.get_db_session(ctx.db_url) as session:
+            file_info = filestore.get_file_info(subpath, current_user=ctx.username, session=session)
+            return {"info": json.loads(file_info.model_dump_json())}
+    except FileNotFoundError:
+        return {"error": "File or directory not found", "status_code": 404}
+    except PermissionError:
+        return {"error": "Permission denied", "status_code": 403}
 
 
 def _action_check_binary(request: dict, ctx: WorkerContext) -> dict:
@@ -269,10 +274,15 @@ def _action_check_binary(request: dict, ctx: WorkerContext) -> dict:
 
     filestore, error = _get_filestore(fsp_name, ctx.db_url)
     if filestore is None:
-        return {"error": error}
+        return {"error": error, "status_code": 404 if "not found" in error else 500}
 
-    is_binary = filestore.check_is_binary(subpath)
-    return {"is_binary": is_binary}
+    try:
+        is_binary = filestore.check_is_binary(subpath)
+        return {"is_binary": is_binary}
+    except FileNotFoundError:
+        return {"error": "File or directory not found", "status_code": 404}
+    except PermissionError:
+        return {"error": "Permission denied", "status_code": 403}
 
 
 def _action_open_file(request: dict, ctx: WorkerContext) -> dict:
