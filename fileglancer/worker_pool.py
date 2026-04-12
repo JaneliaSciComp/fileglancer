@@ -317,8 +317,10 @@ class WorkerPool:
         # Close child's end in the parent
         child_sock.close()
 
-        # Keep the socket blocking — all I/O runs in a thread via run_in_executor
+        # Keep the socket blocking — all I/O runs in a thread via run_in_executor.
+        # Set a timeout so a hung worker can't block a thread forever.
         parent_sock.setblocking(True)
+        parent_sock.settimeout(120)
 
         # Start a background task to forward worker stderr to loguru
         asyncio.create_task(self._forward_stderr(username, process))
