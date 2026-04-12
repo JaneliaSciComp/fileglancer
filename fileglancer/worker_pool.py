@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import array
 import asyncio
-import grp
 import json
 import os
 import pwd
@@ -284,9 +283,7 @@ class WorkerPool:
         # Build identity kwargs (only switch if running as root)
         identity_kwargs: dict = {}
         if os.geteuid() == 0:
-            groups = [g.gr_gid for g in grp.getgrall() if username in g.gr_mem]
-            if pw.pw_gid not in groups:
-                groups.append(pw.pw_gid)
+            groups = os.getgrouplist(username, pw.pw_gid)
             identity_kwargs = {
                 "user": pw.pw_uid,
                 "group": pw.pw_gid,
