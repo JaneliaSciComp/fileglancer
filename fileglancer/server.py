@@ -231,6 +231,11 @@ def create_app(settings):
         When use_access_flags=False (dev/test mode), runs the action directly
         in the current process since no identity switching is needed.
 
+        If the worker opens a file and passes back a file descriptor (e.g.
+        open_file, s3_open_object), the response dict will contain a
+        ``_file_handle`` key with an open file object.  Callers that don't
+        need it can ignore this key.
+
         Raises HTTPException on worker-level errors or dead workers.
         """
         if worker_pool is not None:
@@ -250,7 +255,10 @@ def create_app(settings):
                 raise HTTPException(status_code=500, detail=f"Unknown action: {action}")
             ctx = WorkerContext(username=username, db_url=settings.db_url)
             request = {"action": action, **kwargs}
-            return handler(request, ctx)
+            result = handler(request, ctx)
+            # Strip the raw fd (not meaningful in-process), keep _file_handle
+            result.pop("_fd", None)
+            return result
 
     def _resolve_proxy_info(sharing_key: str, captured_path: str) -> Tuple[dict | Response, str]:
         """Resolve a sharing key to proxy info (mount_path, target_name, username, subpath).
@@ -1140,20 +1148,16 @@ def create_app(settings):
         else:
             range_header = request.headers.get("range")
 
-            result = await _worker_exec(info["username"], "s3_open_object",
-                                        mount_path=info["mount_path"],
-                                        target_name=info["target_name"],
-                                        path=subpath,
-                                        range_header=range_header)
+            result = await _worker_exec(
+                info["username"], "s3_open_object",
+                mount_path=info["mount_path"],
+                target_name=info["target_name"],
+                path=subpath,
+                range_header=range_header)
 
-            if result.get("type") == "handle":
-                # Worker validated access and returned file metadata
-                # Open the file in main process (root can read anything)
-                resolved_path = result["resolved_path"]
-                if resolved_path is None:
-                    return get_error_response(404, "NoSuchKey", "File not found", subpath)
-
-                file_handle = open(resolved_path, "rb")
+            file_handle = result.pop("_file_handle", None)
+            if result.get("type") == "handle" and file_handle is not None:
+                # Worker opened the file and passed the fd via SCM_RIGHTS
                 from x2s3.client_file import FileObjectHandle, file_iterator
                 handle = FileObjectHandle(
                     target_name=result["target_name"],
@@ -1317,7 +1321,7 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
-        # Worker validates path and returns metadata (runs as user)
+        # Worker opens the file as the user and passes the fd back
         result = await _worker_exec(username, "open_file", fsp_name=filestore_name, subpath=subpath)
 
         if result.get("redirect"):
@@ -1328,14 +1332,11 @@ def create_app(settings):
         if "error" in result:
             raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
 
-        full_path = result["full_path"]
+        file_handle = result.get("_file_handle")
+
         file_size = result["file_size"]
         content_type = result["content_type"]
         file_name = subpath.split('/')[-1] if subpath else ''
-
-        # Open file in main process — the worker validated access;
-        # main process runs as root so it can open the validated path
-        file_handle = open(full_path, 'rb')
 
         range_header = request.headers.get('Range')
 

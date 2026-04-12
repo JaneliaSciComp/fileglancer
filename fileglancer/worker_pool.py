@@ -6,26 +6,30 @@ fork time via subprocess.Popen kwargs), so the main Uvicorn process
 never calls seteuid/setegid/setgroups.
 
 Workers communicate with the main process over a Unix socketpair using
-a length-prefixed JSON protocol.  The main process dispatches all
-user-scoped work (file I/O, cluster ops, git ops) to the appropriate
-worker, keeping the async event loop free.
+a length-prefixed JSON protocol.  When a worker response includes a file
+descriptor (e.g. an opened file for streaming), it arrives transparently
+via SCM_RIGHTS — callers see a ``_file_handle`` key in the response dict.
 
 Usage from server.py:
 
     pool = WorkerPool(settings)
     worker = await pool.get_worker(username)
     result = await worker.execute("list_dir", fsp_name="home", subpath="Documents")
+
+    # For actions that open files, the fd arrives automatically:
+    result = await worker.execute("open_file", fsp_name="home", subpath="data.bin")
+    file_handle = result.get("_file_handle")  # open file object, or None
 """
 
 from __future__ import annotations
 
+import array
 import asyncio
-import ctypes
-import ctypes.util
 import grp
 import json
 import os
 import pwd
+import socket
 import struct
 import subprocess
 import sys
@@ -56,16 +60,17 @@ class WorkerDead(Exception):
 class UserWorker:
     """Wraps a single persistent worker subprocess for one user.
 
-    IPC uses a Unix socketpair with length-prefixed JSON messages.
-    The worker handles one request at a time (serial).
+    IPC uses a blocking Unix socket accessed from a thread (via
+    run_in_executor) so the async event loop is never blocked.
+    All receives use recvmsg(), which transparently handles both
+    plain messages and messages carrying file descriptors via SCM_RIGHTS.
     """
 
     def __init__(self, username: str, process: subprocess.Popen,
-                 reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+                 sock: socket.socket):
         self.username = username
         self.process = process
-        self.reader = reader
-        self.writer = writer
+        self.sock = sock
         self.last_activity = time.monotonic()
         self._busy = False
 
@@ -80,6 +85,9 @@ class UserWorker:
     async def execute(self, action: str, **kwargs) -> Any:
         """Send a request to the worker and return the parsed response.
 
+        If the worker sends a file descriptor (SCM_RIGHTS), the response
+        dict will contain a ``_file_handle`` key with an open file object.
+
         Raises WorkerError on application-level errors from the worker.
         Raises WorkerDead if the subprocess has exited.
         """
@@ -90,39 +98,81 @@ class UserWorker:
         self.last_activity = time.monotonic()
         try:
             request = {"action": action, **kwargs}
-            await self._send(request)
-            response = await self._recv()
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None, self._send_and_recv, request)
 
             if response.get("error"):
+                # Close any fd that arrived with an error response
+                fh = response.pop("_file_handle", None)
+                if fh is not None:
+                    fh.close()
                 raise WorkerError(response["error"])
 
             return response
-        except (BrokenPipeError, ConnectionResetError, asyncio.IncompleteReadError) as e:
+        except (BrokenPipeError, ConnectionResetError, OSError) as e:
             raise WorkerDead(f"Worker for {self.username} connection lost: {e}") from e
         finally:
             self._busy = False
             self.last_activity = time.monotonic()
 
-    async def _send(self, data: dict):
-        payload = json.dumps(data).encode()
-        header = struct.pack(_HEADER_FMT, len(payload))
-        self.writer.write(header + payload)
-        await self.writer.drain()
+    def _send_and_recv(self, request: dict) -> dict:
+        """Send a request and receive the response (blocking, runs in thread).
 
-    async def _recv(self) -> dict:
-        header = await self.reader.readexactly(_HEADER_SIZE)
+        Uses recvmsg() which transparently handles optional SCM_RIGHTS fds.
+        """
+        # Send
+        payload = json.dumps(request).encode()
+        header = struct.pack(_HEADER_FMT, len(payload))
+        self.sock.sendall(header + payload)
+
+        # Receive header
+        header = self._recvall(_HEADER_SIZE)
         (length,) = struct.unpack(_HEADER_FMT, header)
         if length > _MAX_MESSAGE_SIZE:
             raise WorkerError(f"Response too large: {length} bytes")
-        payload = await self.reader.readexactly(length)
-        return json.loads(payload)
+
+        # Receive payload + optional fd via recvmsg
+        fds = array.array("i")
+        body = b""
+        while len(body) < length:
+            msg, ancdata, flags, addr = self.sock.recvmsg(
+                length - len(body),
+                socket.CMSG_LEN(struct.calcsize("i")),  # space for 1 fd
+            )
+            if not msg:
+                raise ConnectionError("Worker closed connection mid-message")
+            body += msg
+            for cmsg_level, cmsg_type, cmsg_data in ancdata:
+                if cmsg_level == socket.SOL_SOCKET and cmsg_type == socket.SCM_RIGHTS:
+                    fds.frombytes(cmsg_data[:len(cmsg_data) - (len(cmsg_data) % fds.itemsize)])
+
+        response = json.loads(body)
+
+        # If an fd arrived, wrap it in a file object
+        if fds:
+            response["_file_handle"] = os.fdopen(fds[0], "rb")
+
+        return response
+
+    def _recvall(self, n: int) -> bytes:
+        """Read exactly n bytes from the socket."""
+        data = bytearray()
+        while len(data) < n:
+            chunk = self.sock.recv(n - len(data))
+            if not chunk:
+                raise ConnectionError("Worker closed connection")
+            data.extend(chunk)
+        return bytes(data)
 
     async def shutdown(self, timeout: float = 5.0):
         """Ask the worker to shut down gracefully, then force-kill if needed."""
         if not self.is_alive:
             return
         try:
-            await self._send({"action": "shutdown"})
+            payload = json.dumps({"action": "shutdown"}).encode()
+            header = struct.pack(_HEADER_FMT, len(payload))
+            self.sock.sendall(header + payload)
         except (BrokenPipeError, ConnectionResetError, OSError):
             pass
 
@@ -137,7 +187,10 @@ class UserWorker:
             self.process.kill()
             self.process.wait()
 
-        self.writer.close()
+        try:
+            self.sock.close()
+        except OSError:
+            pass
 
 
 class WorkerPool:
@@ -232,15 +285,13 @@ class WorkerPool:
         # Close child's end in the parent
         child_sock.close()
 
-        # Wrap the parent socket fd in asyncio streams
-        loop = asyncio.get_event_loop()
-        reader, writer = await asyncio.open_connection(sock=parent_sock)
+        # Keep the socket blocking — all I/O runs in a thread via run_in_executor
+        parent_sock.setblocking(True)
 
         # Start a background task to forward worker stderr to loguru
         asyncio.create_task(self._forward_stderr(username, process))
 
-        worker = UserWorker(username, process, reader, writer)
-        return worker
+        return UserWorker(username, process, parent_sock)
 
     async def _forward_stderr(self, username: str, process: subprocess.Popen):
         """Forward worker stderr lines to loguru in the background."""

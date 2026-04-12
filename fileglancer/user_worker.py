@@ -86,6 +86,21 @@ def _send(sock: socket.socket, data: dict):
     sock.sendall(header + payload)
 
 
+def _send_with_fd(sock: socket.socket, data: dict, fd: int):
+    """Send a length-prefixed JSON message with a file descriptor via SCM_RIGHTS."""
+    import array as _array
+
+    payload = json.dumps(data, default=str).encode()
+    header = struct.pack(_HEADER_FMT, len(payload))
+    full_msg = header + payload
+
+    fds = _array.array("i", [fd])
+    sock.sendmsg(
+        [full_msg],
+        [(socket.SOL_SOCKET, socket.SCM_RIGHTS, fds)],
+    )
+
+
 def _recv(sock: socket.socket) -> dict:
     """Receive a length-prefixed JSON message."""
     header = _recvall(sock, _HEADER_SIZE)
@@ -261,11 +276,11 @@ def _action_check_binary(request: dict, ctx: WorkerContext) -> dict:
 
 
 def _action_open_file(request: dict, ctx: WorkerContext) -> dict:
-    """Open a file and return its metadata.
+    """Open a file and return its metadata + open file descriptor.
 
-    The actual file content is read and returned as part of the response
-    for simplicity.  For very large files, fd passing via SCM_RIGHTS
-    could be added as an optimization.
+    The worker opens the file as the user and passes the fd back to the
+    main process via SCM_RIGHTS.  The response includes "_fd" key with the
+    fd number — the main loop uses _send_with_fd() for these responses.
     """
     fsp_name = request["fsp_name"]
     subpath = request.get("subpath", "")
@@ -286,10 +301,15 @@ def _action_open_file(request: dict, ctx: WorkerContext) -> dict:
         content_type = guess_content_type(file_name)
         full_path = filestore._check_path_in_root(subpath)
 
+        # Open the file — the fd retains user's access rights
+        file_handle = open(full_path, 'rb')
+        fd = file_handle.fileno()
+
         return {
-            "full_path": full_path,
             "file_size": file_info.size,
             "content_type": content_type,
+            "_fd": fd,
+            "_file_handle": file_handle,  # kept alive until fd is sent
         }
     except RootCheckError as e:
         from fileglancer import database as db
@@ -653,17 +673,13 @@ def _action_s3_head_object(request: dict, ctx: WorkerContext) -> dict:
 
 
 def _action_s3_open_object(request: dict, ctx: WorkerContext) -> dict:
-    """S3-compatible open object — open the file and return metadata.
+    """S3-compatible open object — open the file and pass the fd back.
 
-    The actual file descriptor stays open in this process;
-    for now we return the path so the main process can open it
-    with the fd still valid via the user context.
-    Actually: the worker opens the file and returns metadata.
-    The main process will open its own fd (the worker already proved
-    access is valid by running as the user).
+    The worker opens the file as the user via FileProxyClient.open_object(),
+    then passes the file descriptor to the main process via SCM_RIGHTS.
+    The main process wraps it in a StreamingResponse.
     """
     from x2s3.client_file import FileProxyClient, FileObjectHandle
-    from x2s3.utils import get_nosuchkey_response, get_error_response
 
     mount_path = request["mount_path"]
     target_name = request["target_name"]
@@ -679,8 +695,8 @@ def _action_s3_open_object(request: dict, ctx: WorkerContext) -> dict:
     result = _run_async(client.open_object(path, range_header))
 
     if isinstance(result, FileObjectHandle):
-        # Return metadata; the file handle stays open in the worker
-        # The main process will need to stream from here
+        # Keep the file handle alive and pass the fd
+        fd = result.file_handle.fileno()
         response = {
             "type": "handle",
             "status_code": result.status_code,
@@ -691,10 +707,11 @@ def _action_s3_open_object(request: dict, ctx: WorkerContext) -> dict:
             "target_name": result.target_name,
             "start": result.start,
             "end": result.end,
-            # Include the resolved path so main process can open it
-            "resolved_path": client._safe_path(path),
+            "_fd": fd,
+            "_file_handle": result.file_handle,  # kept alive until fd is sent
         }
-        result.close()
+        # Don't close the handle — the fd needs to survive transfer
+        # The main process will close it after streaming
         return response
     else:
         # Error response
@@ -1012,7 +1029,17 @@ def main():
 
         try:
             result = handler(request, ctx)
-            _send(sock, result)
+
+            # If the result contains a file descriptor, send it via SCM_RIGHTS
+            fd = result.pop("_fd", None)
+            file_handle = result.pop("_file_handle", None)
+            if fd is not None:
+                _send_with_fd(sock, result, fd)
+                # Close our copy of the fd — the main process has its own now
+                if file_handle is not None:
+                    file_handle.close()
+            else:
+                _send(sock, result)
         except Exception as e:
             logger.exception(f"Error handling action {action}")
             _send(sock, {"error": str(e)})
