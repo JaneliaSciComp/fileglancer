@@ -259,7 +259,7 @@ class WorkerPool:
             }
 
         # Create Unix socketpair for IPC
-        parent_sock, child_sock = os.socketpair()
+        parent_sock, child_sock = socket.socketpair()
 
         env = {
             **os.environ,
