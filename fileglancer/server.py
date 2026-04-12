@@ -257,7 +257,11 @@ def create_app(settings):
                 raise HTTPException(status_code=500, detail=f"Unknown action: {action}")
             ctx = WorkerContext(username=username, db_url=settings.db_url)
             request = {"action": action, **kwargs}
-            result = handler(request, ctx)
+            try:
+                result = handler(request, ctx)
+            except Exception as e:
+                logger.error(f"Action handler error for {username} action={action}: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
             # Strip the raw fd (not meaningful in-process), keep _file_handle
             result.pop("_fd", None)
             return result
