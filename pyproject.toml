@@ -40,7 +40,7 @@ dependencies = [
     "sqlalchemy >=2.0.44",
     "uvicorn >=0.38.0",
     "x2s3 >=1.1.1",
-    "py-cluster-api >=0.4.0"
+    "py-cluster-api >=0.5.0"
 ]
 
 [project.scripts]

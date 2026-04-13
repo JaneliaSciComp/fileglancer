@@ -1850,7 +1850,7 @@ def create_app(settings):
             raise HTTPException(status_code=400, detail="file_type must be script, stdout, or stderr")
         try:
             with _get_user_context(username):
-                content = await apps_module.get_job_file_content(job_id, username, file_type)
+                content = apps_module.get_job_file_content(job_id, username, file_type)
             if content is None:
                 raise HTTPException(status_code=404, detail=f"File not found: {file_type}")
             return PlainTextResponse(content)

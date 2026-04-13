@@ -703,16 +703,21 @@ def _run_as_user(username: str, request: dict) -> dict:
     else:
         logger.debug(
             f"Spawning worker action={action} as current user "
-            f"(euid={os.geteuid()}, not root — no identity switch)"
+            f"(euid={os.geteuid()})"
         )
 
     result = subprocess.run(
         [sys.executable, "-m", "fileglancer.apps.worker"],
         input=json.dumps(request).encode(),
         capture_output=True,
-        env={**os.environ, "HOME": pw.pw_dir},
+        env={**os.environ, "HOME": pw.pw_dir, "FGC_LOG_LEVEL": get_settings().log_level},
         **identity_kwargs,
     )
+
+    # Forward worker stderr (contains cluster_api and worker logs)
+    if result.stderr:
+        for line in result.stderr.decode().rstrip().splitlines():
+            logger.debug(f"[worker:{action}] {line}")
 
     if result.stdout:
         try:
@@ -1448,7 +1453,7 @@ def get_job_file_paths(db_job: db.JobDB) -> dict[str, dict]:
     return files
 
 
-async def get_job_file_content(job_id: int, username: str, file_type: str) -> Optional[str]:
+def get_job_file_content(job_id: int, username: str, file_type: str) -> Optional[str]:
     """Read the content of a job file (script, stdout, or stderr).
 
     All job files live in the job's work directory:
