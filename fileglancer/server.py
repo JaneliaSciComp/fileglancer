@@ -35,9 +35,9 @@ from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
 from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header
-from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext, UserContextConfigurationError
 from fileglancer.filestore import Filestore, RootCheckError
 from fileglancer.log import AccessLogMiddleware
+from fileglancer.worker_pool import WorkerPool, WorkerError, WorkerDead
 from fileglancer import sshkeys
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response
@@ -214,17 +214,55 @@ def create_app(settings):
     # Define ui_dir for serving static files and SPA
     ui_dir = PathLib(__file__).parent / "ui"
 
-    def _get_user_context(username: str) -> UserContext:
-        if settings.use_access_flags:
-            return EffectiveUserContext(username)
+    # Per-user persistent worker pool (only used when use_access_flags=True)
+    worker_pool = WorkerPool(settings) if settings.use_access_flags else None
+
+    async def _worker_exec(username: str, action: str, **kwargs):
+        """Dispatch an action to the per-user worker and return the result.
+
+        When use_access_flags=True, dispatches to the persistent worker pool.
+        When use_access_flags=False (dev/test mode), runs the action directly
+        in the current process since no identity switching is needed.
+
+        If the worker opens a file and passes back a file descriptor (e.g.
+        open_file, s3_open_object), the response dict will contain a
+        ``_file_handle`` key with an open file object.  Callers that don't
+        need it can ignore this key.
+
+        Raises HTTPException on worker-level errors or dead workers.
+        """
+        if worker_pool is not None:
+            try:
+                worker = await worker_pool.get_worker(username)
+                return await worker.execute(action, **kwargs)
+            except WorkerDead as e:
+                logger.error(f"Worker dead for {username}: {e}")
+                raise HTTPException(status_code=503, detail="Service temporarily unavailable")
+            except WorkerError as e:
+                if e.status_code >= 500:
+                    logger.error(f"Worker error for {username} action={action}: {e}")
+                raise HTTPException(status_code=e.status_code, detail=str(e))
         else:
-            return CurrentUserContext()
+            # Dev/test mode: run action directly in-process
+            from fileglancer.user_worker import _ACTIONS, WorkerContext
+            handler = _ACTIONS.get(action)
+            if handler is None:
+                raise HTTPException(status_code=500, detail=f"Unknown action: {action}")
+            ctx = WorkerContext(username=username, db_url=settings.db_url)
+            request = {"action": action, **kwargs}
+            try:
+                result = handler(request, ctx)
+            except Exception as e:
+                logger.error(f"Action handler error for {username} action={action}: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+            # Strip the raw fd (not meaningful in-process), keep _file_handle
+            result.pop("_fd", None)
+            return result
 
+    def _resolve_proxy_info(sharing_key: str, captured_path: str) -> Tuple[dict | Response, str]:
+        """Resolve a sharing key to proxy info (mount_path, target_name, username, subpath).
 
-    def _get_file_proxy_client(sharing_key: str, captured_path: str) -> Tuple[FileProxyClient | Response, UserContext | None, str]:
-        """Resolve a sharing key and captured path to a FileProxyClient.
-
-        Returns (client, user_context, subpath) on success, or (error_response, None, "") on failure.
+        Returns (info_dict, subpath) on success, or (error_response, "") on failure.
         """
         def try_strip_prefix(captured: str, prefix: str) -> str | None:
             if captured == prefix:
@@ -237,27 +275,25 @@ def create_app(settings):
 
             proxied_path = db.get_proxied_path_by_sharing_key(session, sharing_key)
             if not proxied_path:
-                return get_nosuchbucket_response(captured_path), None, ""
+                return get_nosuchbucket_response(captured_path), ""
 
-            # Match captured_path against the stored url_prefix.
-            # The unquote() fallback handles clients like Vol-E viewer that send URLs
-            # with literal % characters instead of proper URL encoding — FastAPI
-            # auto-decodes path params, so we need to match the decoded form too.
             subpath = try_strip_prefix(captured_path, proxied_path.url_prefix)
             if subpath is None:
                 subpath = try_strip_prefix(captured_path, unquote(proxied_path.url_prefix))
             if subpath is None:
-                return get_error_response(404, "NoSuchKey", f"Path mismatch for sharing key {sharing_key}", captured_path), None, ""
+                return get_error_response(404, "NoSuchKey", f"Path mismatch for sharing key {sharing_key}", captured_path), ""
 
             fsp = db.get_file_share_path(session, proxied_path.fsp_name)
             if not fsp:
-                return get_error_response(400, "InvalidArgument", f"File share path {proxied_path.fsp_name} not found", captured_path), None, ""
-            # Expand ~ to user's home directory before constructing the mount path
+                return get_error_response(400, "InvalidArgument", f"File share path {proxied_path.fsp_name} not found", captured_path), ""
             expanded_mount_path = os.path.expanduser(fsp.mount_path)
             mount_path = f"{expanded_mount_path}/{proxied_path.path}"
             target_name = captured_path.rsplit('/', 1)[-1] if captured_path else os.path.basename(proxied_path.path)
-            # Use 256KB buffer for better performance on network filesystems
-            return FileProxyClient(proxy_kwargs={'target_name': target_name}, path=mount_path, buffer_size=256*1024), _get_user_context(proxied_path.username), subpath
+            return {
+                "mount_path": mount_path,
+                "target_name": target_name,
+                "username": proxied_path.username,
+            }, subpath
 
 
     @asynccontextmanager
@@ -352,6 +388,11 @@ def create_app(settings):
         else:
             logger.debug(f"No notifications file found at {notifications_file}")
 
+        # Start worker pool eviction loop (only when using access flags)
+        if worker_pool is not None:
+            await worker_pool.start_eviction_loop()
+            logger.info("Worker pool started")
+
         # Start cluster job monitor
         try:
             await apps_module.start_job_monitor()
@@ -367,6 +408,14 @@ def create_app(settings):
             await apps_module.stop_job_monitor()
         except Exception as e:
             logger.warning(f"Error stopping cluster job monitor: {e}")
+
+        # Cleanup: shut down all workers
+        if worker_pool is not None:
+            try:
+                await worker_pool.shutdown_all()
+                logger.info("Worker pool shut down")
+            except Exception as e:
+                logger.warning(f"Error shutting down worker pool: {e}")
 
     app = FastAPI(lifespan=lifespan)
 
@@ -409,14 +458,6 @@ def create_app(settings):
     async def validation_exception_handler(request, exc):
         return JSONResponse({"error":str(exc)}, status_code=400)
 
-
-    @app.exception_handler(UserContextConfigurationError)
-    async def user_context_config_error_handler(request, exc):
-        logger.error(f"User context configuration error: {exc}")
-        return JSONResponse(
-            {"error": str(exc)},
-            status_code=500
-        )
 
     @app.exception_handler(PermissionError)
     async def permission_error_handler(request, exc):
@@ -927,14 +968,18 @@ def create_app(settings):
         _validate_url_prefix(url_prefix)
         sharing_name = url_prefix
         logger.info(f"Creating proxied path for {username} with sharing name {sharing_name} and fsp_name {fsp_name} and path {path} (url_prefix={url_prefix})")
+        # Validate the user can access the path via worker
+        validation = await _worker_exec(username, "validate_proxied_path", fsp_name=fsp_name, path=path)
+        if "error" in validation:
+            raise HTTPException(status_code=400, detail=validation["error"])
+
         with db.get_db_session(settings.db_url) as session:
-            with _get_user_context(username): # Necessary to validate the user can access the proxied path
-                try:
-                    new_path = db.create_proxied_path(session, username, sharing_name, fsp_name, path, url_prefix=url_prefix)
-                    return _convert_proxied_path(new_path, settings.external_proxy_url)
-                except ValueError as e:
-                    logger.error(f"Error creating proxied path: {e}")
-                    raise HTTPException(status_code=400, detail=str(e))
+            try:
+                new_path = db.create_proxied_path(session, username, sharing_name, fsp_name, path, url_prefix=url_prefix)
+                return _convert_proxied_path(new_path, settings.external_proxy_url)
+            except ValueError as e:
+                logger.error(f"Error creating proxied path: {e}")
+                raise HTTPException(status_code=400, detail=str(e))
 
 
     @app.get("/api/proxied-path", response_model=ProxiedPathResponse,
@@ -969,14 +1014,25 @@ def create_app(settings):
                                   path: Optional[str] = Query(default=None, description="The path relative to the file share path mount point"),
                                   sharing_name: Optional[str] = Query(default=None, description="The sharing path of the proxied path"),
                                   username: str = Depends(get_current_user)):
+        # If path or fsp_name is changing, validate access via worker
+        if path is not None or fsp_name is not None:
+            with db.get_db_session(settings.db_url) as session:
+                existing = db.get_proxied_path_by_sharing_key(session, sharing_key)
+            if existing:
+                validate_fsp = fsp_name or existing.fsp_name
+                validate_path = path or existing.path
+                validation = await _worker_exec(username, "validate_proxied_path",
+                                                fsp_name=validate_fsp, path=validate_path)
+                if "error" in validation:
+                    raise HTTPException(status_code=400, detail=validation["error"])
+
         with db.get_db_session(settings.db_url) as session:
-            with _get_user_context(username): # Necessary to validate the user can access the proxied path
-                try:
-                    updated = db.update_proxied_path(session, username, sharing_key, new_path=path, new_sharing_name=sharing_name, new_fsp_name=fsp_name)
-                    return _convert_proxied_path(updated, settings.external_proxy_url)
-                except ValueError as e:
-                    logger.error(f"Error updating proxied path: {e}")
-                    raise HTTPException(status_code=400, detail=str(e))
+            try:
+                updated = db.update_proxied_path(session, username, sharing_key, new_path=path, new_sharing_name=sharing_name, new_fsp_name=fsp_name)
+                return _convert_proxied_path(updated, settings.external_proxy_url)
+            except ValueError as e:
+                logger.error(f"Error updating proxied path: {e}")
+                raise HTTPException(status_code=400, detail=str(e))
 
 
     @app.delete("/api/proxied-path/{sharing_key}", description="Delete a proxied path by sharing key")
@@ -1060,42 +1116,78 @@ def create_app(settings):
         if 'acl' in request.query_params:
             return get_read_access_acl()
 
-        client, ctx, subpath = _get_file_proxy_client(sharing_key, path)
-        if isinstance(client, Response):
-            return client
+        info, subpath = _resolve_proxy_info(sharing_key, path)
+        if isinstance(info, Response):
+            return info
 
         if list_type:
             if list_type == 2:
-                with ctx:
-                    return await client.list_objects_v2(continuation_token, delimiter, \
-                        encoding_type, fetch_owner, max_keys, prefix, start_after)
+                result = await _worker_exec(info["username"], "s3_list_objects",
+                                            mount_path=info["mount_path"],
+                                            target_name=info["target_name"],
+                                            continuation_token=continuation_token,
+                                            delimiter=delimiter,
+                                            encoding_type=encoding_type,
+                                            fetch_owner=fetch_owner,
+                                            max_keys=max_keys,
+                                            prefix=prefix,
+                                            start_after=start_after)
+                return Response(content=result["body"], media_type=result.get("media_type", "application/xml"),
+                                status_code=result.get("status_code", 200))
             else:
                 return get_error_response(400, "InvalidArgument", f"Invalid list type {list_type}", path)
         else:
             range_header = request.headers.get("range")
 
-            # Open file in user context, then immediately exit
-            # The file descriptor retains access rights after we switch back to root
-            with ctx:
-                handle = await client.open_object(subpath, range_header)
+            result = await _worker_exec(
+                info["username"], "s3_open_object",
+                mount_path=info["mount_path"],
+                target_name=info["target_name"],
+                path=subpath,
+                range_header=range_header)
 
-            # Context exited! Now stream without holding the lock
-            if isinstance(handle, ObjectHandle):
-                return client.stream_object(handle)
+            file_handle = result.pop("_file_handle", None)
+            if result.get("type") == "handle" and file_handle is not None:
+                # Worker opened the file and passed the fd via SCM_RIGHTS
+                from x2s3.client_file import FileObjectHandle, file_iterator
+                handle = FileObjectHandle(
+                    target_name=result["target_name"],
+                    key=result["key"],
+                    status_code=result["status_code"],
+                    headers=result["headers"],
+                    media_type=result.get("media_type"),
+                    content_length=result["content_length"],
+                    file_handle=file_handle,
+                    start=result["start"],
+                    end=result["end"],
+                )
+                return StreamingResponse(
+                    file_iterator(handle, 256 * 1024),
+                    status_code=handle.status_code,
+                    headers=handle.headers,
+                    media_type=handle.media_type,
+                )
             else:
-                # Error response (e.g., file not found, invalid range)
-                return handle
+                # Error response
+                return Response(
+                    content=result.get("body", ""),
+                    status_code=result.get("status_code", 500),
+                    headers=result.get("headers", {}),
+                )
 
 
     @app.head("/files/{sharing_key}/{path:path}")
     async def head_object(sharing_key: str, path: str = ''):
         try:
-            client, ctx, subpath = _get_file_proxy_client(sharing_key, path)
-            if isinstance(client, Response):
-                return client
-            with ctx:
-                return await client.head_object(subpath)
-        except:
+            info, subpath = _resolve_proxy_info(sharing_key, path)
+            if isinstance(info, Response):
+                return info
+            result = await _worker_exec(info["username"], "s3_head_object",
+                                        mount_path=info["mount_path"],
+                                        target_name=info["target_name"],
+                                        path=subpath)
+            return Response(headers=result.get("headers", {}), status_code=result.get("status_code", 200))
+        except Exception:
             logger.opt(exception=sys.exc_info()).info("Error requesting head")
             return get_error_response(500, "InternalError", "Error requesting HEAD", path)
 
@@ -1130,59 +1222,18 @@ def create_app(settings):
     @app.get("/api/profile", description="Get the current user's profile")
     async def get_profile(username: str = Depends(get_current_user)):
         """Get the current user's profile"""
-        with _get_user_context(username):
-
-            # Find matching file share path for home directory
-            with db.get_db_session(settings.db_url) as session:
-                paths = db.get_file_share_paths(session)
-
-                # First, check if there's a "home" FSP (for ~/ paths)
-                home_fsp = next((fsp for fsp in paths if fsp.mount_path in ('~', '~/')), None)
-                if home_fsp:
-                    home_directory_name = "."
-                else:
-                    # If no "home" FSP exists, fall back to finding by mount path
-                    home_directory_path = os.path.expanduser(f"~{username}")
-                    home_parent = os.path.dirname(home_directory_path)
-                    home_fsp = next((fsp for fsp in paths if fsp.mount_path == home_parent), None)
-                    home_directory_name = os.path.basename(home_directory_path)
-
-                home_fsp_name = home_fsp.name if home_fsp else None
-
-            # Get user groups
-            user_groups = []
-            try:
-                user_info = pwd.getpwnam(username)
-                all_groups = grp.getgrall()
-                for group in all_groups:
-                    if username in group.gr_mem:
-                        user_groups.append(group.gr_name)
-                primary_group = grp.getgrgid(user_info.pw_gid).gr_name
-                if primary_group not in user_groups:
-                    user_groups.append(primary_group)
-            except Exception as e:
-                logger.error(f"Error getting groups for user {username}: {str(e)}")
-
-            return {
-                "username": username,
-                "homeFileSharePathName": home_fsp_name,
-                "homeDirectoryName": home_directory_name,
-                "groups": user_groups,
-            }
+        result = await _worker_exec(username, "get_profile")
+        return result
 
     # SSH Key Management endpoints
     @app.get("/api/ssh-keys", response_model=sshkeys.SSHKeyListResponse,
              description="List Fileglancer-managed SSH keys")
     async def list_ssh_keys(username: str = Depends(get_current_user)):
         """List SSH keys with 'fileglancer' in the comment from authorized_keys"""
-        with _get_user_context(username):
-            try:
-                ssh_dir = sshkeys.get_ssh_directory()
-                keys = sshkeys.list_ssh_keys(ssh_dir)
-                return sshkeys.SSHKeyListResponse(keys=keys)
-            except Exception as e:
-                logger.error(f"Error listing SSH keys for {username}: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
+        result = await _worker_exec(username, "list_ssh_keys")
+        if "error" in result:
+            raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
+        return sshkeys.SSHKeyListResponse(keys=[sshkeys.SSHKeyInfo(**k) for k in result["keys"]])
 
     @app.post("/api/ssh-keys/generate-temp",
               description="Generate a temporary SSH key and return private key for one-time copy")
@@ -1194,21 +1245,23 @@ def create_app(settings):
 
         The private key is streamed securely and the temporary files are deleted
         after the response is sent. Key info is included in response headers:
-        - X-SSH-Key-Filename
-        - X-SSH-Key-Type
         - X-SSH-Key-Fingerprint
         - X-SSH-Key-Comment
         """
-        with _get_user_context(username):
-            try:
-                ssh_dir = sshkeys.get_ssh_directory()
-                return sshkeys.generate_temp_key_and_authorize(ssh_dir, request.passphrase)
-
-            except RuntimeError as e:
-                raise HTTPException(status_code=500, detail=str(e))
-            except Exception as e:
-                logger.error(f"Error generating temp SSH key for {username}: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
+        result = await _worker_exec(username, "generate_ssh_key", passphrase=request.passphrase)
+        if "error" in result:
+            raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
+        # Reconstruct the response with headers
+        headers = {}
+        if result.get("fingerprint"):
+            headers["X-SSH-Key-Fingerprint"] = result["fingerprint"]
+        if result.get("comment"):
+            headers["X-SSH-Key-Comment"] = result["comment"]
+        return Response(
+            content=result["private_key"],
+            media_type="application/x-pem-file",
+            headers=headers,
+        )
 
     # File content endpoint
     @app.head("/api/content/{path_name:path}")
@@ -1222,40 +1275,32 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
-        with _get_user_context(username):
-            filestore, error = _get_filestore(filestore_name)
-            if filestore is None:
-                raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
+        result = await _worker_exec(username, "head_file", fsp_name=filestore_name, subpath=subpath)
+        if result.get("redirect"):
+            redirect_url = f"/api/content/{result['fsp_name']}"
+            if result.get("subpath"):
+                redirect_url += f"?subpath={result['subpath']}"
+            return RedirectResponse(url=redirect_url, status_code=307)
+        if "error" in result:
+            raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
 
-            file_name = subpath.split('/')[-1] if subpath else ''
-            content_type = guess_content_type(file_name)
+        info = result["info"]
+        file_name = subpath.split('/')[-1] if subpath else ''
+        content_type = result["content_type"]
+        is_binary = result["is_binary"]
 
-            try:
-                file_info = filestore.get_file_info(subpath)
+        headers = {
+            'Accept-Ranges': 'bytes',
+            'X-Is-Binary': 'true' if is_binary else 'false',
+        }
+        if content_type == 'application/octet-stream' and file_name:
+            headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+        if info.get("size") is not None:
+            headers['Content-Length'] = str(info["size"])
+        if info.get("last_modified") is not None:
+            headers['Last-Modified'] = format_timestamp(info["last_modified"])
 
-                is_binary = filestore.check_is_binary(subpath)
-
-                headers = {
-                    'Accept-Ranges': 'bytes',
-                    'X-Is-Binary': 'true' if is_binary else 'false',
-                }
-
-                if content_type == 'application/octet-stream' and file_name:
-                    headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
-
-                if hasattr(file_info, 'size') and file_info.size is not None:
-                    headers['Content-Length'] = str(file_info.size)
-
-                if hasattr(file_info, 'last_modified') and file_info.last_modified is not None:
-                    headers['Last-Modified'] = format_timestamp(file_info.last_modified)
-
-                return Response(status_code=200, headers=headers, media_type=content_type)
-
-            except FileNotFoundError:
-                logger.warning(f"File not found in {filestore_name}: {subpath}")
-                raise HTTPException(status_code=404, detail="File not found")
-            except PermissionError:
-                raise HTTPException(status_code=403, detail="Permission denied")
+        return Response(status_code=200, headers=headers, media_type=content_type)
 
 
     @app.get("/api/content/{path_name:path}")
@@ -1267,59 +1312,22 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
-        # Open file with user's permissions, then immediately release the context
-        # The file descriptor retains the access rights after we switch back to root
-        with _get_user_context(username):
-            filestore, error = _get_filestore(filestore_name)
-            if filestore is None:
-                raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
+        # Worker opens the file as the user and passes the fd back
+        result = await _worker_exec(username, "open_file", fsp_name=filestore_name, subpath=subpath)
 
-            file_name = subpath.split('/')[-1] if subpath else ''
-            content_type = guess_content_type(file_name)
+        if result.get("redirect"):
+            redirect_url = f"/api/content/{result['fsp_name']}"
+            if result.get("subpath"):
+                redirect_url += f"?subpath={result['subpath']}"
+            return RedirectResponse(url=redirect_url, status_code=307)
+        if "error" in result:
+            raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
 
-            try:
-                file_info = filestore.get_file_info(subpath)
-                if file_info.is_dir:
-                    raise HTTPException(status_code=400, detail="Cannot download directory content")
+        file_handle = result.get("_file_handle")
 
-                file_size = file_info.size
-
-                # Open the file while we have user's permissions
-                full_path = filestore._check_path_in_root(subpath)
-                file_handle = open(full_path, 'rb')
-
-            except RootCheckError as e:
-                # Path attempts to escape root directory - try to find a valid fsp for this absolute path
-                logger.info(f"RootCheckError caught for {filestore_name}/{subpath}: {e}")
-
-                # Use the full_path from the exception
-                full_path = e.full_path
-
-                with db.get_db_session(settings.db_url) as session:
-                    match = db.find_fsp_from_absolute_path(session, full_path)
-
-                if match:
-                    fsp, relative_subpath = match
-                    # Construct the correct URL
-                    if relative_subpath:
-                        redirect_url = f"/api/content/{fsp.name}?subpath={relative_subpath}"
-                    else:
-                        redirect_url = f"/api/content/{fsp.name}"
-
-                    logger.info(f"Redirecting from /api/content/{filestore_name}?subpath={subpath} to {redirect_url}")
-                    return RedirectResponse(url=redirect_url, status_code=307)
-
-                # If no match found, return the original error message
-                logger.error(f"No valid file share found for path: {full_path}")
-                raise HTTPException(status_code=400, detail=str(e))
-            except FileNotFoundError:
-                logger.error(f"File not found in {filestore_name}: {subpath}")
-                raise HTTPException(status_code=404, detail="File or directory not found")
-            except PermissionError:
-                raise HTTPException(status_code=403, detail="Permission denied")
-
-        # Context exited! We're back to root, but file_handle retains user's access rights
-        # Now we can stream the file asynchronously without holding the user context lock
+        file_size = result["file_size"]
+        content_type = result["content_type"]
+        file_name = subpath.split('/')[-1] if subpath else ''
 
         range_header = request.headers.get('Range')
 
@@ -1344,8 +1352,10 @@ def create_app(settings):
             if content_type == 'application/octet-stream' and file_name:
                 headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
 
+            # Construct a temporary filestore just for streaming
+            # (stream_file_range only needs the file_handle)
             return StreamingResponse(
-                filestore.stream_file_range(start=start, end=end, file_handle=file_handle),
+                Filestore._stream_range(start=start, end=end, content_length=content_length, file_handle=file_handle),
                 status_code=206,
                 headers=headers,
                 media_type=content_type
@@ -1360,7 +1370,7 @@ def create_app(settings):
                 headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
 
             return StreamingResponse(
-                filestore.stream_file_contents(file_handle=file_handle),
+                Filestore._stream_contents(file_handle=file_handle),
                 status_code=200,
                 headers=headers,
                 media_type=content_type
@@ -1379,73 +1389,27 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
-        with _get_user_context(username):
-            filestore, error = _get_filestore(filestore_name)
-            if filestore is None:
-                raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
+        if limit is not None:
+            result = await _worker_exec(username, "list_dir_paged",
+                                        fsp_name=filestore_name, subpath=subpath,
+                                        limit=limit, cursor=cursor)
+        else:
+            result = await _worker_exec(username, "list_dir",
+                                        fsp_name=filestore_name, subpath=subpath)
 
-            try:
-                with db.get_db_session(settings.db_url) as session:
-                    file_info = filestore.get_file_info(subpath, current_user=username, session=session)
-                    logger.trace(f"File info: {file_info}")
-
-                    result = {"info": json.loads(file_info.model_dump_json())}
-
-                    if file_info.is_dir:
-                        try:
-                            if limit is not None:
-                                files, has_more, next_cursor, total_count = filestore.yield_file_infos_paginated(
-                                    subpath, current_user=username, session=session,
-                                    limit=limit, cursor=cursor
-                                )
-                                result["files"] = [json.loads(f.model_dump_json()) for f in files]
-                                result["has_more"] = has_more
-                                result["next_cursor"] = next_cursor
-                                result["total_count"] = total_count
-                            else:
-                                files = list(filestore.yield_file_infos(subpath, current_user=username, session=session))
-                                result["files"] = [json.loads(f.model_dump_json()) for f in files]
-                        except PermissionError:
-                            logger.error(f"Permission denied when listing files in directory: {subpath}")
-                            result["files"] = []
-                            result["error"] = "Permission denied when listing directory contents"
-                            return JSONResponse(content=result, status_code=403)
-                        except FileNotFoundError:
-                            logger.error(f"Directory not found during listing: {subpath}")
-                            result["files"] = []
-                            result["error"] = "Directory contents not found"
-                            return JSONResponse(content=result, status_code=404)
-
-                    return result
-
-            except RootCheckError as e:
-                # Path attempts to escape root directory - try to find a valid fsp for this absolute path
-                logger.info(f"RootCheckError caught for {filestore_name}/{subpath}: {e}")
-
-                full_path = e.full_path
-
-                with db.get_db_session(settings.db_url) as session:
-                    match = db.find_fsp_from_absolute_path(session, full_path)
-
-                if match:
-                    fsp, relative_subpath = match
-                    # Construct the correct URL
-                    if relative_subpath:
-                        redirect_url = f"/api/files/{fsp.name}?subpath={relative_subpath}"
-                    else:
-                        redirect_url = f"/api/files/{fsp.name}"
-
-                    logger.info(f"Redirecting from /api/files/{filestore_name}?subpath={subpath} to {redirect_url}")
-                    return RedirectResponse(url=redirect_url, status_code=307)
-
-                # If no match found, return the original error message
-                logger.error(f"No valid file share found for path: {full_path}")
-                raise HTTPException(status_code=400, detail=str(e))
-            except FileNotFoundError:
-                logger.error(f"File or directory not found: {subpath}")
-                raise HTTPException(status_code=404, detail="File or directory not found")
-            except PermissionError:
-                raise HTTPException(status_code=403, detail="Permission denied")
+        if result.get("redirect"):
+            redirect_url = f"/api/files/{result['fsp_name']}"
+            if result.get("subpath"):
+                redirect_url += f"?subpath={result['subpath']}"
+            return RedirectResponse(url=redirect_url, status_code=307)
+        if "error" in result and "status_code" in result:
+            status_code = result["status_code"]
+            if status_code == 403 or status_code == 404:
+                return JSONResponse(content=result, status_code=status_code)
+            raise HTTPException(status_code=status_code, detail=result["error"])
+        if "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+        return result
 
 
     @app.post("/api/files/{path_name}")
@@ -1474,30 +1438,19 @@ def create_app(settings):
         # Use the validated and sanitized path for all operations
         validated_subpath = normalized_path
 
-        with _get_user_context(username):
-            filestore, error = _get_filestore(path_name)
-            if filestore is None:
-                raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
+        file_type = body.get("type")
+        if file_type == "directory":
+            logger.info(f"User {username} creating directory {path_name}/{validated_subpath}")
+            result = await _worker_exec(username, "create_dir", fsp_name=path_name, subpath=validated_subpath)
+        elif file_type == "file":
+            logger.info(f"User {username} creating file {path_name}/{validated_subpath}")
+            result = await _worker_exec(username, "create_file", fsp_name=path_name, subpath=validated_subpath)
+        else:
+            raise HTTPException(status_code=400, detail="Invalid file type")
 
-            try:
-                file_type = body.get("type")
-                if file_type == "directory":
-                    logger.info(f"User {username} creating directory {path_name}/{validated_subpath}")
-                    # Path is validated above - safe to use in filesystem operation
-                    filestore.create_dir(validated_subpath)
-                elif file_type == "file":
-                    logger.info(f"User {username} creating file {path_name}/{validated_subpath}")
-                    # Path is validated above - safe to use in filesystem operation
-                    filestore.create_empty_file(validated_subpath)
-                else:
-                    raise HTTPException(status_code=400, detail="Invalid file type")
-
-            except FileExistsError:
-                raise HTTPException(status_code=409, detail="A file or directory with this name already exists")
-            except PermissionError as e:
-                raise HTTPException(status_code=403, detail=str(e))
-
-            return JSONResponse(status_code=201, content={"message": "Item created"})
+        if "error" in result:
+            raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
+        return JSONResponse(status_code=201, content={"message": "Item created"})
 
 
     @app.patch("/api/files/{path_name}")
@@ -1506,47 +1459,26 @@ def create_app(settings):
                                  body: Dict = Body(...),
                                  username: str = Depends(get_current_user)):
         """Handle PATCH requests to rename or update file permissions"""
-        with _get_user_context(username):
-            filestore, error = _get_filestore(path_name)
-            if filestore is None:
-                raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
-            old_file_info = filestore.get_file_info(subpath, username)
-            new_path = body.get("path")
-            new_permissions = body.get("permissions")
+        new_path = body.get("path")
+        new_permissions = body.get("permissions")
 
-            # Validate and sanitize new_path if renaming
-            validated_new_path = new_path
-            if new_path is not None and new_path != old_file_info.path:
-                # Normalize the path to prevent path traversal
-                normalized_new_path = os.path.normpath(new_path)
+        # Validate and sanitize new_path if renaming
+        validated_new_path = new_path
+        if new_path is not None:
+            normalized_new_path = os.path.normpath(new_path)
+            if normalized_new_path.startswith('..') or os.path.isabs(normalized_new_path):
+                raise HTTPException(status_code=400, detail="New path cannot escape the current directory")
+            new_filename = os.path.basename(normalized_new_path)
+            _validate_filename(new_filename)
+            validated_new_path = normalized_new_path
 
-                # Security check: Ensure normalized path doesn't escape directory
-                if normalized_new_path.startswith('..') or os.path.isabs(normalized_new_path):
-                    raise HTTPException(status_code=400, detail="New path cannot escape the current directory")
-
-                # Validate the filename portion for invalid characters
-                new_filename = os.path.basename(normalized_new_path)
-                _validate_filename(new_filename)
-
-                # Use the validated path
-                validated_new_path = normalized_new_path
-
-            try:
-                if new_permissions is not None and new_permissions != old_file_info.permissions:
-                    logger.info(f"User {username} changing permissions of {old_file_info.absolute_path} to {new_permissions}")
-                    filestore.change_file_permissions(subpath, new_permissions)
-
-                if new_path is not None and new_path != old_file_info.path:
-                    logger.info(f"User {username} renaming {old_file_info.absolute_path} to {validated_new_path}")
-                    # Path is validated above - safe to use in filesystem operation
-                    filestore.rename_file_or_dir(old_file_info.path, validated_new_path)
-
-            except PermissionError as e:
-                raise HTTPException(status_code=403, detail=str(e))
-            except OSError as e:
-                raise HTTPException(status_code=500, detail=str(e))
-
-            return JSONResponse(status_code=200, content={"message": "Permissions changed"})
+        result = await _worker_exec(username, "update_file",
+                                    fsp_name=path_name, subpath=subpath,
+                                    new_path=validated_new_path,
+                                    new_permissions=new_permissions)
+        if "error" in result:
+            raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
+        return JSONResponse(status_code=200, content={"message": "Permissions changed"})
 
 
     @app.delete("/api/files/{fsp_name}")
@@ -1554,18 +1486,11 @@ def create_app(settings):
                                  subpath: Optional[str] = Query(''),
                                  username: str = Depends(get_current_user)):
         """Handle DELETE requests to remove a file or (empty) directory"""
-        with _get_user_context(username):
-            filestore, error = _get_filestore(fsp_name)
-            if filestore is None:
-                raise HTTPException(status_code=404 if "not found" in error else 500, detail=error)
-
-            try:
-                logger.info(f"User {username} deleting {filestore.get_root_path()}/{subpath}")
-                filestore.remove_file_or_dir(subpath)
-            except PermissionError as e:
-                raise HTTPException(status_code=403, detail=str(e))
-
-            return JSONResponse(status_code=200, content={"message": "Item deleted"})
+        logger.info(f"User {username} deleting {fsp_name}/{subpath}")
+        result = await _worker_exec(username, "delete", fsp_name=fsp_name, subpath=subpath)
+        if "error" in result:
+            raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
+        return JSONResponse(status_code=200, content={"message": "Item deleted"})
 
 
     # --- Apps & Jobs API ---
@@ -1751,14 +1676,8 @@ def create_app(settings):
               description="Validate file/directory paths for app parameters")
     async def validate_paths(body: PathValidationRequest,
                              username: str = Depends(get_current_user)):
-        errors = {}
-        with _get_user_context(username):
-            with db.get_db_session(settings.db_url) as session:
-                for param_key, path_value in body.paths.items():
-                    error = apps_module.validate_path_in_filestore(path_value, session)
-                    if error:
-                        errors[param_key] = error
-        return PathValidationResponse(errors=errors)
+        result = await _worker_exec(username, "validate_paths", paths=body.paths)
+        return PathValidationResponse(errors=result.get("errors", {}))
 
     @app.get("/api/cluster-defaults",
              description="Get cluster configuration defaults")
@@ -1791,8 +1710,7 @@ def create_app(settings):
                 container=body.container,
                 container_args=body.container_args,
             )
-            with _get_user_context(username):
-                return _convert_job(db_job)
+            return _convert_job(db_job)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
@@ -1805,8 +1723,17 @@ def create_app(settings):
                        username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
             db_jobs = db.get_jobs_by_username(session, username, status)
-            with _get_user_context(username):
-                jobs = [_convert_job(j) for j in db_jobs]
+            # For listing, read service_url for running service jobs via worker
+            jobs = []
+            for j in db_jobs:
+                service_url = None
+                if getattr(j, 'entry_point_type', 'job') == 'service' and j.status == 'RUNNING':
+                    try:
+                        result = await _worker_exec(username, "get_service_url", job_id=j.id)
+                        service_url = result.get("service_url")
+                    except Exception:
+                        pass
+                jobs.append(_convert_job(j, service_url=service_url))
             return JobResponse(jobs=jobs)
 
     @app.get("/api/jobs/{job_id}", response_model=Job,
@@ -1817,8 +1744,16 @@ def create_app(settings):
             db_job = db.get_job(session, job_id, username)
             if db_job is None:
                 raise HTTPException(status_code=404, detail="Job not found")
-            with _get_user_context(username):
-                return _convert_job(db_job, include_files=True)
+            # Read file paths and service URL via worker
+            files_result = await _worker_exec(username, "get_job_file_paths", job_id=job_id)
+            service_url = None
+            if getattr(db_job, 'entry_point_type', 'job') == 'service' and db_job.status == 'RUNNING':
+                try:
+                    svc_result = await _worker_exec(username, "get_service_url", job_id=job_id)
+                    service_url = svc_result.get("service_url")
+                except Exception:
+                    pass
+            return _convert_job(db_job, service_url=service_url, files=files_result.get("files"))
 
     @app.post("/api/jobs/{job_id}/cancel",
               description="Cancel a running job")
@@ -1826,8 +1761,7 @@ def create_app(settings):
                          username: str = Depends(get_current_user)):
         try:
             db_job = await apps_module.cancel_job(job_id, username)
-            with _get_user_context(username):
-                return _convert_job(db_job)
+            return _convert_job(db_job)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
@@ -1849,13 +1783,17 @@ def create_app(settings):
         if file_type not in ("script", "stdout", "stderr"):
             raise HTTPException(status_code=400, detail="file_type must be script, stdout, or stderr")
         try:
-            with _get_user_context(username):
-                content = await apps_module.get_job_file_content(job_id, username, file_type)
+            result = await _worker_exec(username, "get_job_file", job_id=job_id, file_type=file_type)
+            if "error" in result:
+                raise HTTPException(status_code=result.get("status_code", 404), detail=result["error"])
+            content = result.get("content")
             if content is None:
                 raise HTTPException(status_code=404, detail=f"File not found: {file_type}")
             return PlainTextResponse(content)
-        except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e))
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     def _ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
         """Re-attach UTC timezone to naive datetimes from the DB.
@@ -1870,11 +1808,12 @@ def create_app(settings):
             return dt.replace(tzinfo=UTC)
         return dt
 
-    def _convert_job(db_job: db.JobDB, include_files: bool = False) -> Job:
-        """Convert a database JobDB to a Pydantic Job model."""
-        files = None
-        if include_files:
-            files = apps_module.get_job_file_paths(db_job)
+    def _convert_job(db_job: db.JobDB, service_url: str = None, files: dict = None) -> Job:
+        """Convert a database JobDB to a Pydantic Job model.
+
+        File-reading fields (service_url, files) must be passed in pre-computed
+        by the caller, since they require user-context file I/O.
+        """
         return Job(
             id=db_job.id,
             app_url=db_job.app_url,
@@ -1894,7 +1833,7 @@ def create_app(settings):
             container_args=db_job.container_args,
             pull_latest=db_job.pull_latest,
             cluster_job_id=db_job.cluster_job_id,
-            service_url=apps_module.get_service_url(db_job),
+            service_url=service_url,
             created_at=_ensure_utc(db_job.created_at),
             started_at=_ensure_utc(db_job.started_at),
             finished_at=_ensure_utc(db_job.finished_at),

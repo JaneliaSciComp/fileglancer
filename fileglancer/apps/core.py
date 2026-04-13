@@ -140,7 +140,7 @@ async def _ensure_repo_cache(url: str, pull: bool = False,
 
     When username is provided, the work is delegated to a worker subprocess
     that runs with the target user's real UID/GID, avoiding the process-wide
-    euid race condition that EffectiveUserContext has with concurrent async
+    euid race condition that seteuid/setegid has with concurrent async
     requests.  When username is None, git commands run in-process (used by
     the worker subprocess itself, or in single-user dev mode).
     """
