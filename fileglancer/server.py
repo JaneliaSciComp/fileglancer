@@ -35,7 +35,6 @@ from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
 from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header
-from fileglancer.user_context import UserContext, EffectiveUserContext, CurrentUserContext, UserContextConfigurationError
 from fileglancer.filestore import Filestore, RootCheckError
 from fileglancer.log import AccessLogMiddleware
 from fileglancer.worker_pool import WorkerPool, WorkerError, WorkerDead
@@ -217,12 +216,6 @@ def create_app(settings):
 
     # Per-user persistent worker pool (only used when use_access_flags=True)
     worker_pool = WorkerPool(settings) if settings.use_access_flags else None
-
-    def _get_user_context(username: str) -> UserContext:
-        if settings.use_access_flags:
-            return EffectiveUserContext(username)
-        else:
-            return CurrentUserContext()
 
     async def _worker_exec(username: str, action: str, **kwargs):
         """Dispatch an action to the per-user worker and return the result.
@@ -465,14 +458,6 @@ def create_app(settings):
     async def validation_exception_handler(request, exc):
         return JSONResponse({"error":str(exc)}, status_code=400)
 
-
-    @app.exception_handler(UserContextConfigurationError)
-    async def user_context_config_error_handler(request, exc):
-        logger.error(f"User context configuration error: {exc}")
-        return JSONResponse(
-            {"error": str(exc)},
-            status_code=500
-        )
 
     @app.exception_handler(PermissionError)
     async def permission_error_handler(request, exc):
