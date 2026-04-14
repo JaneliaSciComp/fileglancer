@@ -37,7 +37,7 @@ export default function useZarrMetadata() {
   const {
     validViewers,
     isInitialized: viewersInitialized,
-    getCompatibleViewers
+    getViewersCompatibleWithImage
   } = useViewersContext();
 
   // Fetch Zarr metadata
@@ -126,7 +126,7 @@ export default function useZarrMetadata() {
         labels: metadata.labels
       };
 
-      compatibleViewers = getCompatibleViewers(omeZarrMetadata);
+      compatibleViewers = getViewersCompatibleWithImage(omeZarrMetadata);
 
       // Create a Set for lookup of compatible viewer keys
       // Needed to mark incompatible but valid (as defined by the viewer config) viewers as null in openWithToolUrls
@@ -245,7 +245,7 @@ export default function useZarrMetadata() {
     zarrMetadataQuery.data?.availableOmeZarrVersions,
     validViewers,
     viewersInitialized,
-    getCompatibleViewers
+    getViewersCompatibleWithImage
   ]);
 
   return {

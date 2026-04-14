@@ -41,7 +41,7 @@ interface ViewersContextType {
   validViewers: ValidViewer[];
   isInitialized: boolean;
   error: string | null;
-  getCompatibleViewers: (metadata: OmeZarrMetadata) => ValidViewer[];
+  getViewersCompatibleWithImage: (metadata: OmeZarrMetadata) => ValidViewer[];
 }
 
 const ViewersContext = createContext<ViewersContextType | undefined>(undefined);
@@ -112,10 +112,7 @@ export function ViewersProvider({
               10_000
             )
           );
-          manifestsMap = await Promise.race([
-            manifestsPromise,
-            timeoutPromise
-          ]);
+          manifestsMap = await Promise.race([manifestsPromise, timeoutPromise]);
           log.info(`Loaded ${manifestsMap.size} viewer capability manifests`);
         } catch (manifestError) {
           throw new Error(
@@ -198,7 +195,7 @@ export function ViewersProvider({
     initialize();
   }, []);
 
-  const getCompatibleViewers = useCallback(
+  const getViewersCompatibleWithImage = useCallback(
     (metadata: OmeZarrMetadata): ValidViewer[] => {
       if (!isInitialized || !metadata) {
         return [];
@@ -224,7 +221,12 @@ export function ViewersProvider({
 
   return (
     <ViewersContext.Provider
-      value={{ validViewers, isInitialized, error, getCompatibleViewers }}
+      value={{
+        validViewers,
+        isInitialized,
+        error,
+        getViewersCompatibleWithImage
+      }}
     >
       {children}
     </ViewersContext.Provider>
