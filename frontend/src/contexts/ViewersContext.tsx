@@ -102,10 +102,20 @@ export function ViewersProvider({
         // Extract manifest URLs
         const manifestUrls = configEntries.map(entry => entry.manifest_url);
 
-        // Load capability manifests
+        // Load capability manifests (with a 10s timeout to avoid hanging on unreachable URLs)
         let manifestsMap: Map<string, ViewerManifest>;
         try {
-          manifestsMap = await loadManifestsFromUrls(manifestUrls);
+          const manifestsPromise = loadManifestsFromUrls(manifestUrls);
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error('Manifest loading timed out after 10s')),
+              10_000
+            )
+          );
+          manifestsMap = await Promise.race([
+            manifestsPromise,
+            timeoutPromise
+          ]);
           log.info(`Loaded ${manifestsMap.size} viewer capability manifests`);
         } catch (manifestError) {
           throw new Error(
