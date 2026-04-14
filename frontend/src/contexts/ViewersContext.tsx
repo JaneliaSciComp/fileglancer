@@ -9,6 +9,7 @@ import {
 import {
   loadManifestsFromUrls,
   validateViewer,
+  getLogoUrl,
   type ViewerManifest,
   type OmeZarrMetadata
 } from '@bioimagetools/capability-manifest';
@@ -17,7 +18,6 @@ import {
   parseViewersConfig,
   type ViewerConfigEntry
 } from '@/config/viewersConfig';
-import { getViewerLogo } from '@/config/viewerLogos';
 
 /**
  * Validated viewer with all necessary information
@@ -147,7 +147,7 @@ export function ViewersProvider({
           const key = normalizeViewerName(manifest.viewer.name);
           const displayName = manifest.viewer.name;
           const label = entry.label || `View in ${displayName}`;
-          const logoPath = getViewerLogo(manifest.viewer.name, entry.logo);
+          const logoPath = getLogoUrl(manifest);
 
           validated.push({
             key,

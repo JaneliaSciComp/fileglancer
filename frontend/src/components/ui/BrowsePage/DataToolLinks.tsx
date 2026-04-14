@@ -1,5 +1,6 @@
 import { Typography } from '@material-tailwind/react';
 import { Link } from 'react-router';
+import fallback_logo from '@/assets/fallback_logo.png';
 import { HiOutlineClipboardCopy } from 'react-icons/hi';
 import { HiOutlineEllipsisHorizontalCircle } from 'react-icons/hi2';
 
@@ -46,6 +47,9 @@ function ToolLink({
           <img
             alt={logoAlt}
             className="max-h-7 max-w-7 rounded-sm"
+            onError={e => {
+              e.currentTarget.src = fallback_logo;
+            }}
             src={logoSrc}
           />
         </Link>
