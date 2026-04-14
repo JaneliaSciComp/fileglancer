@@ -5,8 +5,12 @@ rooted at a specific directory.
 
 import os
 import stat
-import pwd
-import grp
+try:
+    import pwd
+    import grp
+except ImportError:
+    pwd = None  # type: ignore[assignment]
+    grp = None  # type: ignore[assignment]
 import shutil
 
 from pydantic import BaseModel

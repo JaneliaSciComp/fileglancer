@@ -1,11 +1,18 @@
 """Apps module for fetching manifests, building commands, and managing cluster jobs."""
 
 import asyncio
-import fcntl
-import grp
+try:
+    import fcntl
+except ImportError:
+    fcntl = None  # type: ignore[assignment]
+try:
+    import grp
+    import pwd
+except ImportError:
+    grp = None  # type: ignore[assignment]
+    pwd = None  # type: ignore[assignment]
 import json
 import os
-import pwd
 import re
 import shlex
 import shutil
