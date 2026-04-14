@@ -17,8 +17,7 @@ const ViewerConfigEntrySchema = z.object(
     instance_template_url: z
       .string({ message: '"instance_template_url" must be a string' })
       .optional(),
-    label: z.string({ message: '"label" must be a string' }).optional(),
-    logo: z.string({ message: '"logo" must be a string' }).optional()
+    label: z.string({ message: '"label" must be a string' }).optional()
   },
   {
     error: iss => {

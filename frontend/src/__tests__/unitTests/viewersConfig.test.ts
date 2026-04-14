@@ -16,7 +16,6 @@ viewers:
       );
       expect(result.viewers[0].instance_template_url).toBeUndefined();
       expect(result.viewers[0].label).toBeUndefined();
-      expect(result.viewers[0].logo).toBeUndefined();
     });
 
     it('should parse config with multiple viewers', () => {
@@ -46,7 +45,6 @@ viewers:
   - manifest_url: https://example.com/viewer.yaml
     instance_template_url: https://example.com/viewer?url={dataLink}
     label: Custom Viewer Label
-    logo: custom-logo.png
 `;
       const result = parseViewersConfig(yaml);
 
@@ -58,7 +56,6 @@ viewers:
         'https://example.com/viewer?url={dataLink}'
       );
       expect(result.viewers[0].label).toBe('Custom Viewer Label');
-      expect(result.viewers[0].logo).toBe('custom-logo.png');
     });
 
     it('should parse config with manifest_url only (no optional fields)', () => {
@@ -141,7 +138,6 @@ other_field: value
       const yaml = `
 viewers:
   - label: Custom Label
-    logo: custom.png
 `;
 
       expect(() => parseViewersConfig(yaml)).toThrow(
@@ -193,16 +189,6 @@ viewers:
       expect(() => parseViewersConfig(yaml)).toThrow(
         /"label" must be a string/
       );
-    });
-
-    it('should throw error when logo is not a string', () => {
-      const yaml = `
-viewers:
-  - manifest_url: https://example.com/viewer.yaml
-    logo: 123
-`;
-
-      expect(() => parseViewersConfig(yaml)).toThrow(/"logo" must be a string/);
     });
 
     it('should throw error when instance_template_url is not a string', () => {
@@ -271,7 +257,6 @@ viewers:
   - manifest_url: https://example.com/viewer.yaml
     instance_template_url: https://example.com/viewer?url={dataLink}
     label: Custom Label
-    logo: custom.png
 `;
 
       const result = parseViewersConfig(yaml);
@@ -279,8 +264,7 @@ viewers:
       expect(result.viewers[0]).toEqual({
         manifest_url: 'https://example.com/viewer.yaml',
         instance_template_url: 'https://example.com/viewer?url={dataLink}',
-        label: 'Custom Label',
-        logo: 'custom.png'
+        label: 'Custom Label'
       });
     });
 
@@ -352,7 +336,6 @@ viewers:
 viewers:
   - manifest_url: https://example.com/viewer.yaml
     label: ""
-    logo: ""
     instance_template_url: ""
 `;
 
@@ -361,7 +344,6 @@ viewers:
       expect(result.viewers[0]).toEqual({
         manifest_url: 'https://example.com/viewer.yaml',
         label: '',
-        logo: '',
         instance_template_url: ''
       });
     });
