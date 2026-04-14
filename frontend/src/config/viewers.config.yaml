@@ -13,15 +13,13 @@
 #
 # Optional:
 #   - instance_template_url: Override the viewer's template_url from the manifest
-#   - logo: Filename of logo in frontend/src/assets/ or frontend/src/assets/custom-logos/
-#     (defaults to {normalized_name}.png; custom-logos/ is gitignored for local overrides)
 #   - label: Custom tooltip text (defaults to "View in {Name}")
 
 viewers:
-  - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/viewers-config/frontend/public/viewers/neuroglancer.yaml'
+  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/neuroglancer.yaml'
 
-  - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/viewers-config/frontend/public/viewers/avivator.yaml'
+  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/avivator.yaml'
 
-  - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/viewers-config/frontend/public/viewers/validator.yaml'
+  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/validator.yaml'
 
-  - manifest_url: 'https://raw.githubusercontent.com/JaneliaSciComp/fileglancer/viewers-config/frontend/public/viewers/vole.yaml'
+  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/vole.yaml'
