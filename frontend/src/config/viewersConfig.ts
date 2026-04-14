@@ -16,6 +16,10 @@ const ViewerConfigEntrySchema = z.object(
       }),
     instance_template_url: z
       .string({ message: '"instance_template_url" must be a string' })
+      .refine(val => val.startsWith('/') || URL.canParse(val), {
+        message:
+          '"instance_template_url" must be a valid URL or an absolute path starting with /'
+      })
       .optional(),
     label: z.string({ message: '"label" must be a string' }).optional()
   },

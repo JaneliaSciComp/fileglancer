@@ -332,20 +332,30 @@ viewers:
     });
 
     it('should handle empty optional strings', () => {
-      const yaml = `
+      // Empty label is allowed (it's a display string)
+      const yamlValid = `
 viewers:
   - manifest_url: https://example.com/viewer.yaml
     label: ""
-    instance_template_url: ""
 `;
 
-      const result = parseViewersConfig(yaml);
+      const result = parseViewersConfig(yamlValid);
 
       expect(result.viewers[0]).toEqual({
         manifest_url: 'https://example.com/viewer.yaml',
-        label: '',
-        instance_template_url: ''
+        label: ''
       });
+
+      // Empty instance_template_url is rejected (must be a valid URL or path)
+      const yamlInvalid = `
+viewers:
+  - manifest_url: https://example.com/viewer.yaml
+    instance_template_url: ""
+`;
+
+      expect(() => parseViewersConfig(yamlInvalid)).toThrow(
+        /"instance_template_url" must be a valid URL or an absolute path starting with \//
+      );
     });
   });
 });
