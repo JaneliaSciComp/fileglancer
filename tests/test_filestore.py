@@ -149,8 +149,8 @@ def test_rename_file_or_dir_invalid_path(filestore):
 
 
 def test_rename_file_or_dir_invalid_new_path(filestore):
-    # Windows raises FileNotFoundError; Linux/macOS raise NotADirectoryError
-    with pytest.raises((NotADirectoryError, FileNotFoundError)):
+    # Windows raises OSError (WinError 87) or FileNotFoundError; Linux/macOS raise NotADirectoryError
+    with pytest.raises((NotADirectoryError, FileNotFoundError, OSError)):
         filestore.rename_file_or_dir("test.txt", "test.txt/subdir")
 
 
