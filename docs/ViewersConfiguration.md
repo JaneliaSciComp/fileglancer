@@ -55,13 +55,10 @@ viewers:
   - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/neuroglancer.yaml"
 
   - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/avivator.yaml"
-    instance_template_url: "https://janeliascicomp.github.io/viv/?image_url={DATA_URL}"
 
   - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/validator.yaml"
-    label: "View in OME-Zarr Validator"
 
   - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/vole.yaml"
-    label: "View in Vol-E"
 ```
 
 ## Capability Manifest Files
