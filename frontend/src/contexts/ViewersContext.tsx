@@ -55,9 +55,6 @@ async function loadViewersConfig(): Promise<ViewerConfigEntry[]> {
   try {
     const module = await import('@/config/viewers.config.yaml?raw');
     configYaml = module.default;
-    log.info(
-      'Using custom viewers configuration from src/config/viewers.config.yaml'
-    );
   } catch (error) {
     throw new Error(
       `Failed to load viewers configuration: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -78,7 +75,10 @@ async function loadViewersConfig(): Promise<ViewerConfigEntry[]> {
  * Normalize viewer name to a valid key
  */
 function normalizeViewerName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
 export function ViewersProvider({
