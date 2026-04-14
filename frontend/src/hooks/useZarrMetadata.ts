@@ -5,6 +5,7 @@ import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
 import { useExternalBucketContext } from '@/contexts/ExternalBucketContext';
 import { useViewersContext } from '@/contexts/ViewersContext';
+import type { OmeZarrMetadata } from '@bioimagetools/capability-manifest';
 import {
   useZarrMetadataQuery,
   useOmeZarrThumbnailQuery,
@@ -113,15 +114,17 @@ export default function useZarrMetadata() {
     // If we have multiscales metadata (OME-Zarr), use capability checking to filter
     if (metadata?.multiscale) {
       // Convert our metadata to OmeZarrMetadata format for capability checking
-      const omeZarrMetadata = {
+      const omeZarrMetadata: OmeZarrMetadata = {
         version: zarrMetadataQuery.data?.availableOmeZarrVersions.sort(
           (a, b) => parseFloat(b) - parseFloat(a)
         )[0],
-        axes: metadata.multiscale?.axes,
-        multiscales: metadata.multiscale ? [metadata.multiscale] : undefined,
-        omero: metadata.omero,
+        axes: metadata.multiscale?.axes as OmeZarrMetadata['axes'],
+        multiscales: metadata.multiscale
+          ? ([metadata.multiscale] as OmeZarrMetadata['multiscales'])
+          : undefined,
+        omero: metadata.omero as OmeZarrMetadata['omero'],
         labels: metadata.labels
-      } as any; // Type assertion needed due to internal type differences
+      };
 
       compatibleViewers = getCompatibleViewers(omeZarrMetadata);
 
