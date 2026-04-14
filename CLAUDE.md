@@ -173,7 +173,7 @@ Key settings:
 
 Fileglancer uses a manifest-based viewer configuration system. Each viewer is defined by a **capability manifest** (a YAML file describing the viewer's name, URL template, and capabilities). The config file lists manifest URLs and optional overrides.
 
-- **Configuration file**: `frontend/src/config/viewers.config.yaml` -- lists viewers by `manifest_url` with optional `instance_template_url`, `label`, and `logo` overrides
+- **Configuration file**: `frontend/src/config/viewers.config.yaml` -- lists viewers by `manifest_url` with optional `instance_template_url` and `label` overrides
 - **Manifest files**: `frontend/public/viewers/*.yaml` -- capability manifest YAML files defining each viewer's identity and supported features
 - **Compatibility**: Handled by the `@bioimagetools/capability-manifest` library, which checks dataset metadata against manifest capabilities at runtime
 - **Documentation**: See `docs/ViewersConfiguration.md`
