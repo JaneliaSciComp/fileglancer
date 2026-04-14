@@ -19,7 +19,11 @@ vi.mock('@/logger', () => ({
 // Mock capability manifest to avoid network requests in tests
 const mockCapabilityManifest = vi.hoisted(() => ({
   loadManifestsFromUrls: vi.fn(),
-  validateViewer: vi.fn()
+  validateViewer: vi.fn(),
+  getLogoUrl: vi.fn(
+    (manifest: { viewer: { name: string } }) =>
+      `https://icons.example.com/${manifest.viewer.name.toLowerCase().replace(/\s+/g, '-')}.png`
+  )
 }));
 
 vi.mock('@bioimagetools/capability-manifest', () => mockCapabilityManifest);
@@ -68,7 +72,8 @@ describe('DataToolLinks - Error Scenarios', () => {
     // Default mock: return empty Map (no manifests loaded)
     mockCapabilityManifest.loadManifestsFromUrls.mockResolvedValue(new Map());
     mockCapabilityManifest.validateViewer.mockReturnValue({
-      compatible: false,
+      dataCompatible: false,
+      dataFeaturesSupported: false,
       errors: [
         {
           capability: 'test',
@@ -179,7 +184,8 @@ describe('DataToolLinks - Edge Cases', () => {
 
     // Mock validateViewer to return compatible for all viewers
     mockCapabilityManifest.validateViewer.mockReturnValue({
-      compatible: true,
+      dataCompatible: true,
+      dataFeaturesSupported: true,
       errors: [],
       warnings: []
     });
@@ -294,7 +300,8 @@ describe('DataToolLinks - Expected Behavior', () => {
 
     // Mock validateViewer to return compatible for all viewers
     mockCapabilityManifest.validateViewer.mockReturnValue({
-      compatible: true,
+      dataCompatible: true,
+      dataFeaturesSupported: true,
       errors: [],
       warnings: []
     });
