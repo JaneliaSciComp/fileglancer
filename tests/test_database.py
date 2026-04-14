@@ -268,7 +268,7 @@ def test_find_fsp_from_absolute_path_exact_match(db_session, temp_dir):
     result = find_fsp_from_absolute_path(db_session, nested_dir)
     assert result is not None
     assert result[0].name == "test_mount"
-    assert result[1] == os.path.join("subdir", "nested")
+    assert result[1] == "subdir/nested"
 
 
 def test_find_fsp_from_absolute_path_no_match(db_session, temp_dir):

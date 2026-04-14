@@ -1,7 +1,8 @@
 """Tests for the job poll loop: file-lock election and status-update logic."""
 
 import asyncio
-import fcntl
+import pytest
+fcntl = pytest.importorskip("fcntl", reason="fcntl is not available on Windows")
 import multiprocessing
 import time
 from datetime import datetime, UTC

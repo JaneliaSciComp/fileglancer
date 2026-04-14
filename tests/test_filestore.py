@@ -1,5 +1,6 @@
 import os
 import stat
+import sys
 import pytest
 import tempfile
 import shutil
@@ -148,7 +149,8 @@ def test_rename_file_or_dir_invalid_path(filestore):
 
 
 def test_rename_file_or_dir_invalid_new_path(filestore):
-    with pytest.raises(NotADirectoryError):
+    # Windows raises FileNotFoundError; Linux/macOS raise NotADirectoryError
+    with pytest.raises((NotADirectoryError, FileNotFoundError)):
         filestore.rename_file_or_dir("test.txt", "test.txt/subdir")
 
 
@@ -194,6 +196,7 @@ def test_create_empty_file(filestore, test_dir):
     assert os.path.exists(os.path.join(test_dir, "newfile.txt"))
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows chmod does not support full Unix permission bits")
 def test_change_file_permissions(filestore, test_dir):
     filestore.change_file_permissions("test.txt", "-rw-r--r--")
     fullpath = os.path.join(test_dir, "test.txt")
