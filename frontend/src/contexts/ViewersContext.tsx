@@ -196,7 +196,7 @@ export function ViewersProvider({
 
       return validViewers.filter(viewer => {
         const result = validateViewer(viewer.manifest, metadata);
-        if (!result.compatible) {
+        if (!result.dataCompatible) {
           log.info(
             `Viewer "${viewer.displayName}" is not compatible with this dataset: ${result.errors.map(e => e.message).join('; ')}`
           );
@@ -206,7 +206,7 @@ export function ViewersProvider({
             `Viewer "${viewer.displayName}" warnings: ${result.warnings.map(w => w.message).join('; ')}`
           );
         }
-        return result.compatible;
+        return result.dataCompatible;
       });
     },
     [validViewers, isInitialized]
