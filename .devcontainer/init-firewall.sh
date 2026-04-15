@@ -84,9 +84,6 @@ ALLOWED_DOMAINS=(
     "conda-mapping.prefix.dev"
     "prefix.dev"
     "repo.prefix.dev"
-    # Fileglancer
-    "fileglancer.int.janelia.org"
-    "s3.janelia.org"
 )
 
 for domain in "${ALLOWED_DOMAINS[@]}"; do
