@@ -70,9 +70,9 @@ Instead of using the `file_share_mounts` setting, you can configure file share p
 
 ### Viewers Configuration
 
-Fileglancer supports dynamic configuration of OME-Zarr viewers through `viewers.config.yaml`. This allows you to customize which viewers are available in your deployment and configure custom viewer URLs.
+Fileglancer supports dynamic configuration of OME-Zarr viewers through `viewers.config.yaml`. This allows you to customize which viewers are available in your deployment and configure custom viewer URLs. No configuration is required to use the default viewers defined in `frontend/src/config/viewers.config.yaml`.
 
-**Quick Setup:**
+**To customize viewers:**
 
 1. Copy the default config: `cp frontend/src/config/viewers.config.yaml frontend/viewers.config.yaml`
 

@@ -13,7 +13,9 @@ The viewer system is built on capability manifests:
 
 Each viewer is defined by a **capability manifest** hosted at a URL. The configuration file simply lists manifest URLs and optional overrides. At runtime, the manifests are fetched, and the `@bioimagetools/capability-manifest` library determines which viewers are compatible with a given dataset based on the manifest's declared capabilities.
 
-## Quick Start
+## Customize Viewers
+
+**Note:** No configuration is required to use the default viewers defined in `frontend/src/config/viewers.config.yaml`.
 
 1. Copy the default config: `cp frontend/src/config/viewers.config.yaml frontend/viewers.config.yaml`
 2. Edit `frontend/viewers.config.yaml` to customize viewers
@@ -63,77 +65,7 @@ viewers:
 
 ## Capability Manifest Files
 
-Manifest files describe a viewer's identity and capabilities. The default manifests are hosted in the [`@bioimagetools/capability-manifest`](https://github.com/BioImageTools/capability-manifest) repository. You can host your own manifest files anywhere accessible via URL.
-
-### Manifest Structure
-
-A manifest has two sections: `viewer` (identity) and `capabilities` (what the viewer supports).
-
-#### Example: `neuroglancer.yaml`
-
-```yaml
-viewer:
-  name: "Neuroglancer"
-  version: "2.41.2"
-  repo: "https://github.com/google/neuroglancer"
-  template_url: https://neuroglancer-demo.appspot.com/#!{"layers":[{"name":"image","source":"{DATA_URL}","type":"image"}]}
-
-capabilities:
-  ome_zarr_versions: [0.4, 0.5]
-  compression_codecs: ["blosc", "zstd", "zlib", "lz4", "gzip"]
-  rfcs_supported: []
-  axes: true
-  scale: true
-  translation: true
-  channels: true
-  timepoints: true
-  labels: false
-  hcs_plates: false
-  bioformats2raw_layout: false
-  omero_metadata: false
-```
-
-### Viewer Section
-
-| Field          | Description                                                    |
-| -------------- | -------------------------------------------------------------- |
-| `name`         | Display name for the viewer                                    |
-| `version`      | Viewer version                                                 |
-| `repo`         | Repository URL                                                 |
-| `template_url` | URL template with `{DATA_URL}` placeholder for the dataset URL |
-
-### Capabilities Section
-
-| Field                   | Type     | Description                                                  |
-| ----------------------- | -------- | ------------------------------------------------------------ |
-| `ome_zarr_versions`     | number[] | Supported OME-Zarr specification versions                    |
-| `compression_codecs`    | string[] | Supported compression codecs (e.g., "blosc", "zstd", "gzip") |
-| `rfcs_supported`        | string[] | Additional RFCs supported                                    |
-| `axes`                  | boolean  | Whether axis names and units are respected                   |
-| `scale`                 | boolean  | Whether scaling factors on multiscales are respected         |
-| `translation`           | boolean  | Whether translation factors on multiscales are respected     |
-| `channels`              | boolean  | Whether multiple channels are supported                      |
-| `timepoints`            | boolean  | Whether multiple timepoints are supported                    |
-| `labels`                | boolean  | Whether labels are loaded when available                     |
-| `hcs_plates`            | boolean  | Whether HCS plates are loaded when available                 |
-| `bioformats2raw_layout` | boolean  | Whether bioformats2raw layout is handled                     |
-| `omero_metadata`        | boolean  | Whether OMERO metadata is used (e.g., channel colors)        |
-
-## URL Templates and `{DATA_URL}` Placeholder
-
-The `{DATA_URL}` placeholder in a manifest's `template_url` (or a config entry's `instance_template_url`) is replaced at runtime with the actual dataset URL. Internally, `{DATA_URL}` is normalized to `{dataLink}` for consistency with the rest of the application.
-
-For example, given this manifest `template_url`:
-
-```
-https://neuroglancer-demo.appspot.com/#!{"layers":[{"name":"image","source":"{DATA_URL}","type":"image"}]}
-```
-
-When a user clicks the viewer link for a dataset at `https://example.com/data.zarr`, the final URL becomes:
-
-```
-https://neuroglancer-demo.appspot.com/#!{"layers":[{"name":"image","source":"https://example.com/data.zarr","type":"image"}]}
-```
+Manifest files describe a viewer's identity and capabilities. The default manifests are hosted in the [`@bioimagetools/capability-manifest`](https://github.com/BioImageTools/capability-manifest) repository. You can host your own manifest files anywhere accessible via URL. See the [`@bioimagetools/capability-manifest`](https://github.com/BioImageTools/capability-manifest) repository for information on how to format a viewer manifest.
 
 ## Configuration Examples
 
@@ -159,29 +91,7 @@ viewers:
 
 To add a new viewer, create a capability manifest YAML file, host it at a URL, and reference it in the config:
 
-1. Create a manifest file (e.g., `my-viewer.yaml`):
-
-```yaml
-viewer:
-  name: "My Viewer"
-  version: "1.0.0"
-  repo: "https://github.com/example/my-viewer"
-  template_url: "https://viewer.example.com/?data={DATA_URL}"
-
-capabilities:
-  ome_zarr_versions: [0.4, 0.5]
-  compression_codecs: ["blosc", "gzip"]
-  rfcs_supported: []
-  axes: true
-  scale: true
-  translation: true
-  channels: true
-  timepoints: false
-  labels: false
-  hcs_plates: false
-  bioformats2raw_layout: false
-  omero_metadata: false
-```
+1. Create a manifest file (e.g., `my-viewer.yaml`). Follow the format guidelines in the [`@bioimagetools/capability-manifest`](https://github.com/BioImageTools/capability-manifest) repository.
 
 2. Host the manifest at an accessible URL (e.g., on GitHub or any web server).
 
@@ -192,8 +102,6 @@ viewers:
   - manifest_url: "https://example.com/manifests/my-viewer.yaml"
     label: "Open in My Viewer"
 ```
-
-4. Optionally, add a `logo` field to the viewer's capability manifest pointing to a hosted logo image. If no logo is specified, one is derived by convention from the viewer name. If the logo fails to load, a fallback image is shown.
 
 ## How Compatibility Works
 
