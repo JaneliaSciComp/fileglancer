@@ -126,9 +126,9 @@ export default function FileBrowser({
     const propertiesTarget = fileBrowserState.propertiesTarget;
     const isFavorite = Boolean(
       fspName &&
-        folderPreferenceMap[
-          makeMapKey('folder', `${fspName}_${propertiesTarget.path}`)
-        ]
+      folderPreferenceMap[
+        makeMapKey('folder', `${fspName}_${propertiesTarget.path}`)
+      ]
     );
 
     return [

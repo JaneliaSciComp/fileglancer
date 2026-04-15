@@ -83,7 +83,7 @@ export default function useZarrMetadata() {
         setLayerType(determinedLayerType);
       } catch (error) {
         if (!signal.aborted) {
-          console.error('Error determining layer type:', error);
+          log.error('Error determining layer type:', error);
           setLayerType('image'); // Default fallback
         }
       }

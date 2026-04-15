@@ -1,6 +1,7 @@
 import * as zarr from 'zarrita';
 import { Axis } from 'ome-zarr.js';
 import { HiQuestionMarkCircle } from 'react-icons/hi';
+import { default as log } from '@/logger';
 
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import {
@@ -58,7 +59,7 @@ function getAxisData(metadata: Metadata) {
       };
     });
   } catch (error) {
-    console.error('Error getting axis data: ', error);
+    log.error('Error getting axis data: ', error);
     return [];
   }
 }

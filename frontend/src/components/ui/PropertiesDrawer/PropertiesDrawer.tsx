@@ -279,7 +279,7 @@ export default function PropertiesDrawer({
                       }
                       disabled={Boolean(
                         externalDataUrlQuery.data ||
-                          fileBrowserState.propertiesTarget.hasRead === false
+                        fileBrowserState.propertiesTarget.hasRead === false
                       )}
                       id="share-switch"
                       label={
