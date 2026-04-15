@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import type { MouseEvent } from 'react';
 import { Typography } from '@material-tailwind/react';
 import type { ColumnDef } from '@tanstack/react-table';
-
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
 import DataLinkUsageDialog from '@/components/ui/Dialogs/dataLinkUsage/DataLinkUsageDialog';
 import DataLinksActionsMenu from '@/components/ui/Menus/DataLinksActions';
@@ -56,6 +55,33 @@ function createPathMap(
     linux_path: getPreferredPathForDisplay(['linux_path'], pathFsp, path),
     windows_path: getPreferredPathForDisplay(['windows_path'], pathFsp, path)
   };
+}
+
+function NameCell({
+  item,
+  onContextMenu
+}: {
+  readonly item: ProxiedPath;
+  readonly onContextMenu?: (
+    e: MouseEvent<HTMLElement>,
+    data: { value: string }
+  ) => void;
+}) {
+  return (
+    <div
+      className="flex items-center truncate w-full h-full"
+      onContextMenu={e => {
+        e.preventDefault();
+        onContextMenu?.(e, { value: item.sharing_name });
+      }}
+    >
+      <FgTooltip label={item.sharing_name} triggerClasses={TRIGGER_CLASSES}>
+        <Typography className="text-foreground truncate select-all">
+          {item.sharing_name}
+        </Typography>
+      </FgTooltip>
+    </div>
+  );
 }
 
 function PathCell({
@@ -206,28 +232,10 @@ export function useLinksColumns(): ColumnDef<ProxiedPath>[] {
       {
         accessorKey: 'sharing_name',
         header: 'Name',
-        cell: ({ cell, row, table }) => {
+        cell: ({ row, table }) => {
           const item = row.original;
           const onContextMenu = table.options.meta?.onCellContextMenu;
-          return (
-            <div
-              className="flex items-center truncate w-full h-full"
-              key={cell.id}
-              onContextMenu={e => {
-                e.preventDefault();
-                onContextMenu?.(e, { value: item.sharing_name });
-              }}
-            >
-              <FgTooltip
-                label={item.sharing_name}
-                triggerClasses={TRIGGER_CLASSES}
-              >
-                <Typography className="text-foreground truncate select-all">
-                  {item.sharing_name}
-                </Typography>
-              </FgTooltip>
-            </div>
-          );
+          return <NameCell item={item} onContextMenu={onContextMenu} />;
         },
         enableSorting: true
       },

@@ -9,12 +9,16 @@ import {
   HiOutlineTrash
 } from 'react-icons/hi';
 
-import FileSelectorButton from '@/components/ui/BrowsePage/FileSelector/FileSelectorButton';
+import FileSelectorButton from '@/components/ui/FileSelector/FileSelectorButton';
 import FgSwitch from '@/components/ui/widgets/FgSwitch';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
+import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { validatePaths } from '@/queries/appsQueries';
 import { useClusterDefaultsQuery } from '@/queries/jobsQueries';
-import { convertBackToForwardSlash } from '@/utils/pathHandling';
+import {
+  convertBackToForwardSlash,
+  resolvePathToFsp
+} from '@/utils/pathHandling';
 import { flattenParameters, isParameterSection } from '@/shared.types';
 import type {
   AppEntryPoint,
@@ -37,8 +41,9 @@ interface AppLaunchFormProps {
     postRun?: string,
     container?: string,
     containerArgs?: string
-  ) => Promise<void>;
+  ) => void;
   readonly submitting: boolean;
+  readonly submitError?: string;
   readonly initialValues?: Record<string, unknown>;
   readonly initialResources?: AppResourceDefaults;
   readonly initialExtraArgs?: string;
@@ -61,6 +66,13 @@ function ParameterField({
   readonly value: unknown;
   readonly onChange: (value: unknown) => void;
 }) {
+  // For file/directory fields, track a display-formatted path separately from
+  // the server-formatted value used for submission. When the user selects a
+  // path via the file selector, the display path uses their OS preference
+  // (e.g. Windows backslashes) while the stored value stays in server format.
+  // Manual edits clear the override so the input shows exactly what was typed.
+  const [fileDisplayPath, setFileDisplayPath] = useState<string | null>(null);
+
   const baseInputClass =
     'w-full p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary';
 
@@ -126,10 +138,16 @@ function ParameterField({
         <div className="flex gap-2">
           <input
             className={`flex-1 ${baseInputClass}`}
-            onChange={e => onChange(e.target.value)}
+            onChange={e => {
+              setFileDisplayPath(null);
+              onChange(e.target.value);
+            }}
             placeholder={`Select a ${param.type}...`}
             type="text"
-            value={value !== undefined && value !== null ? String(value) : ''}
+            value={
+              fileDisplayPath ??
+              (value !== undefined && value !== null ? String(value) : '')
+            }
           />
           <FileSelectorButton
             initialPath={
@@ -142,7 +160,10 @@ function ParameterField({
             }
             label="Browse..."
             mode={param.type === 'file' ? 'file' : 'directory'}
-            onSelect={path => onChange(path)}
+            onSelect={(serverPath, displayPath) => {
+              onChange(serverPath);
+              setFileDisplayPath(displayPath);
+            }}
             useServerPath
           />
         </div>
@@ -661,6 +682,7 @@ export default function AppLaunchForm({
   entryPoint,
   onSubmit,
   submitting,
+  submitError,
   initialValues: externalValues,
   initialResources,
   initialExtraArgs: externalExtraArgs,
@@ -672,6 +694,7 @@ export default function AppLaunchForm({
   initialContainerArgs
 }: AppLaunchFormProps) {
   const { defaultExtraArgs } = usePreferencesContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const clusterDefaultsQuery = useClusterDefaultsQuery();
   const allParams = flattenParameters([
     ...entryPoint.parameters,
@@ -760,6 +783,24 @@ export default function AppLaunchForm({
     'submitOptions'
   ]);
 
+  /**
+   * Resolve a path in any OS format (Mac smb://, Windows UNC, Linux) to
+   * the server's mount_path + subpath. Returns the original value if FSP
+   * data isn't loaded or no match is found.
+   */
+  const resolveToServerPath = (val: string): string => {
+    const fspData = zonesAndFspQuery.data;
+    if (!fspData) {
+      return val;
+    }
+    const result = resolvePathToFsp(val, fspData);
+    if (!result) {
+      return val;
+    }
+    const { fsp, subpath } = result;
+    return subpath ? `${fsp.mount_path}/${subpath}` : fsp.mount_path;
+  };
+
   const handleChange = (paramId: string, value: unknown) => {
     setValues(prev => ({ ...prev, [paramId]: value }));
     // Clear error on change
@@ -814,7 +855,9 @@ export default function AppLaunchForm({
         (param.type === 'file' || param.type === 'directory') &&
         typeof val === 'string'
       ) {
-        const normalized = convertBackToForwardSlash(val);
+        // Resolve Mac/Windows/alternate-Linux paths to server mount_path
+        const resolved = resolveToServerPath(val);
+        const normalized = convertBackToForwardSlash(resolved);
         if (
           !normalized.startsWith('s3://') &&
           !normalized.startsWith('gs://') &&
@@ -881,7 +924,9 @@ export default function AppLaunchForm({
           (paramDef.type === 'file' || paramDef.type === 'directory') &&
           typeof val === 'string'
         ) {
-          const normalized = convertBackToForwardSlash(val);
+          // Resolve Mac/Windows/alternate-Linux paths to server mount_path
+          const resolved = resolveToServerPath(val);
+          const normalized = convertBackToForwardSlash(resolved);
           params[key] = normalized;
           // Skip server-side path validation for URI schemes (e.g. s3://)
           if (
@@ -934,7 +979,7 @@ export default function AppLaunchForm({
     }
     const hasEnv = Object.keys(envRecord).length > 0;
 
-    await onSubmit(
+    onSubmit(
       params,
       hasResourceOverrides ? resources : undefined,
       extraArgs.trim() || undefined,
@@ -1221,6 +1266,13 @@ export default function AppLaunchForm({
       {Object.keys(errors).length > 0 ? (
         <div className="mt-6 mb-4 p-3 bg-error/10 rounded text-error text-sm">
           Please fix the errors above before submitting.
+        </div>
+      ) : null}
+
+      {/* Submission error */}
+      {submitError ? (
+        <div className="mt-6 mb-4 p-3 bg-error/10 rounded text-error text-sm">
+          {submitError}
         </div>
       ) : null}
 

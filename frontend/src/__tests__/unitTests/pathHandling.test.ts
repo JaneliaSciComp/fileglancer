@@ -12,7 +12,8 @@ import {
   convertBackToForwardSlash,
   escapePathForUrl,
   normalizePosixStylePath,
-  removeTrailingSlashes
+  removeTrailingSlashes,
+  resolvePathToFsp
 } from '@/utils/pathHandling';
 import type { FileSharePath } from '@/shared.types';
 
@@ -242,6 +243,151 @@ describe('makePathSegmentArray', () => {
 describe('removeLastSegmentFromPath', () => {
   test('removes last segment from POSIX-style path', () => {
     expect(removeLastSegmentFromPath('/a/b/c.txt')).toBe('/a/b');
+  });
+});
+
+describe('resolvePathToFsp', () => {
+  const fspA = {
+    zone: 'Zone1',
+    name: 'fsp_a',
+    group: 'group1',
+    storage: 'primary',
+    mount_path: '/mount/a',
+    linux_path: '/linux/a',
+    mac_path: 'smb://mac/a',
+    windows_path: '\\\\win\\a'
+  } as FileSharePath;
+
+  const fspB = {
+    zone: 'Zone1',
+    name: 'fsp_b',
+    group: 'group1',
+    storage: 'primary',
+    mount_path: '/mount/b',
+    linux_path: '/linux/b',
+    mac_path: 'smb://mac/b',
+    windows_path: '\\\\win\\b'
+  } as FileSharePath;
+
+  const zonesAndFspData: Record<string, unknown> = {
+    zone_Zone1: { name: 'Zone1', fileSharePaths: [fspA, fspB] },
+    fsp_fsp_a: fspA,
+    fsp_fsp_b: fspB
+  };
+
+  test('matches a Linux-style path', () => {
+    const result = resolvePathToFsp('/linux/a/sub/folder', zonesAndFspData);
+    expect(result).not.toBeNull();
+    expect(result!.fsp.name).toBe('fsp_a');
+    expect(result!.subpath).toBe('sub/folder');
+  });
+
+  test('matches a Mac-style path', () => {
+    const result = resolvePathToFsp('smb://mac/b/deep/path', zonesAndFspData);
+    expect(result).not.toBeNull();
+    expect(result!.fsp.name).toBe('fsp_b');
+    expect(result!.subpath).toBe('deep/path');
+  });
+
+  test('matches a Windows-style path with backslashes', () => {
+    const result = resolvePathToFsp('\\\\win\\a\\sub\\folder', zonesAndFspData);
+    expect(result).not.toBeNull();
+    expect(result!.fsp.name).toBe('fsp_a');
+    expect(result!.subpath).toBe('sub/folder');
+  });
+
+  test('matches a mount_path', () => {
+    const result = resolvePathToFsp('/mount/b/file.txt', zonesAndFspData);
+    expect(result).not.toBeNull();
+    expect(result!.fsp.name).toBe('fsp_b');
+    expect(result!.subpath).toBe('file.txt');
+  });
+
+  test('returns null when no FSP matches', () => {
+    const result = resolvePathToFsp('/unknown/path', zonesAndFspData);
+    expect(result).toBeNull();
+  });
+
+  test('returns empty subpath when path matches exactly', () => {
+    const result = resolvePathToFsp('/linux/a', zonesAndFspData);
+    expect(result).not.toBeNull();
+    expect(result!.fsp.name).toBe('fsp_a');
+    expect(result!.subpath).toBe('');
+  });
+
+  test('strips leading slash from subpath', () => {
+    const result = resolvePathToFsp('/linux/a/child', zonesAndFspData);
+    expect(result).not.toBeNull();
+    expect(result!.subpath).toBe('child');
+  });
+
+  test('trims whitespace from input', () => {
+    const result = resolvePathToFsp('  /linux/a/child  ', zonesAndFspData);
+    expect(result).not.toBeNull();
+    expect(result!.fsp.name).toBe('fsp_a');
+    expect(result!.subpath).toBe('child');
+  });
+
+  test('picks the longest (most specific) match', () => {
+    const fspShort = {
+      zone: 'Zone1',
+      name: 'fsp_short',
+      group: 'g',
+      storage: 'primary',
+      mount_path: '/data',
+      linux_path: '/data',
+      mac_path: null,
+      windows_path: null
+    } as FileSharePath;
+
+    const fspLong = {
+      zone: 'Zone1',
+      name: 'fsp_long',
+      group: 'g',
+      storage: 'primary',
+      mount_path: '/data/science',
+      linux_path: '/data/science',
+      mac_path: null,
+      windows_path: null
+    } as FileSharePath;
+
+    const data: Record<string, unknown> = {
+      fsp_fsp_short: fspShort,
+      fsp_fsp_long: fspLong
+    };
+
+    const result = resolvePathToFsp('/data/science/images', data);
+    expect(result).not.toBeNull();
+    expect(result!.fsp.name).toBe('fsp_long');
+    expect(result!.subpath).toBe('images');
+  });
+
+  test('does not match partial path segments', () => {
+    // '/linux/abc' should not match fsp_a whose linux_path is '/linux/a'
+    const result = resolvePathToFsp('/linux/abc', zonesAndFspData);
+    expect(result).toBeNull();
+  });
+
+  test('handles FSPs with null path fields', () => {
+    const fspNulls = {
+      zone: 'Zone1',
+      name: 'fsp_nulls',
+      group: 'g',
+      storage: 'primary',
+      mount_path: '/only/mount',
+      linux_path: null,
+      mac_path: null,
+      windows_path: null
+    } as FileSharePath;
+
+    const data: Record<string, unknown> = {
+      fsp_fsp_nulls: fspNulls
+    };
+
+    const result = resolvePathToFsp('/only/mount/sub', data);
+    expect(result).not.toBeNull();
+    expect(result!.fsp.name).toBe('fsp_nulls');
+    expect(result!.subpath).toBe('sub');
   });
 });
 

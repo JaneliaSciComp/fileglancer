@@ -95,6 +95,7 @@ class ProxiedPathDB(Base):
     sharing_name = Column(String, nullable=False)
     fsp_name = Column(String, nullable=False)
     path = Column(String, nullable=False)
+    url_prefix = Column(String, nullable=False, server_default="")
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
@@ -526,6 +527,53 @@ def _clear_sharing_key_cache():
         logger.debug(f"Cleared entire sharing key cache, removed {old_size} entries")
 
 
+def _find_best_fsp_match(
+    fsps: list[FileSharePath],
+    normalized_input: str,
+    get_candidates: callable,
+    separator: str = "/",
+) -> Optional[tuple[FileSharePath, str]]:
+    """Find the FSP whose candidate path is the longest prefix of *normalized_input*.
+
+    Used by ``find_fsp_from_absolute_path`` to check filesystem-resolved mount paths.
+
+    Args:
+        fsps: All file share paths to search.
+        normalized_input: The input path, already normalised by the caller.
+        get_candidates: ``fn(fsp) -> list[str | None]`` returning the candidate
+            prefix strings to test for each FSP.
+        separator: The path separator used for the boundary check (``/`` or
+            ``os.sep``).
+
+    Returns:
+        ``(best_fsp, subpath)`` for the longest match, or *None*.
+    """
+    best_fsp: Optional[FileSharePath] = None
+    best_len = 0
+
+    for fsp in fsps:
+        for candidate in get_candidates(fsp):
+            if not candidate:
+                continue
+            if (
+                normalized_input.startswith(candidate)
+                and len(candidate) > best_len
+            ):
+                rest = normalized_input[len(candidate):]
+                if rest == "" or rest.startswith(separator):
+                    best_fsp = fsp
+                    best_len = len(candidate)
+
+    if best_fsp is None:
+        return None
+
+    subpath = normalized_input[best_len:]
+    if subpath.startswith(separator):
+        subpath = subpath.lstrip(separator)
+
+    return (best_fsp, subpath)
+
+
 def find_fsp_from_absolute_path(session: Session, absolute_path: str) -> Optional[tuple[FileSharePath, str]]:
     """
     Find the file share path that exactly matches the given absolute path.
@@ -546,27 +594,20 @@ def find_fsp_from_absolute_path(session: Session, absolute_path: str) -> Optiona
     # Get all file share paths
     paths = get_file_share_paths(session)
 
+    # Pre-compute expanded mount paths so the helper can use them
+    expanded_mounts: dict[str, str] = {}
     for fsp in paths:
-        # Expand ~ to user's home directory and resolve symlinks to match Filestore behavior
-        expanded_mount_path = os.path.expanduser(fsp.mount_path)
-        expanded_mount_path = os.path.realpath(expanded_mount_path)
+        expanded = os.path.expanduser(fsp.mount_path)
+        expanded_mounts[fsp.name] = os.path.realpath(expanded)
 
-        # Check if the normalized path starts with this mount path
-        if normalized_path.startswith(expanded_mount_path):
-            # Calculate the relative subpath
-            if normalized_path == expanded_mount_path:
-                subpath = ""
-                logger.trace(f"Found exact match for path: {absolute_path} in fsp: {fsp.name} with subpath: {subpath}")
-                return (fsp, subpath)
-            else:
-                # Ensure we're matching on a directory boundary
-                remainder = normalized_path[len(expanded_mount_path):]
-                if remainder.startswith(os.sep):
-                    subpath = remainder.lstrip(os.sep)
-                    logger.trace(f"Found exact match for path: {absolute_path} in fsp: {fsp.name} with subpath: {subpath}")
-                    return (fsp, subpath)
+    def _expanded_mount(fsp: FileSharePath):
+        return [expanded_mounts[fsp.name]]
 
-    return None
+    result = _find_best_fsp_match(paths, normalized_path, _expanded_mount, separator=os.sep)
+    if result is not None:
+        fsp, subpath = result
+        logger.trace(f"Found exact match for path: {absolute_path} in fsp: {fsp.name} with subpath: {subpath}")
+    return result
 
 
 def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
@@ -589,7 +630,7 @@ def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
         raise ValueError(f"Path {path} is not accessible relative to {fsp_name}")
 
 
-def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_name: str, path: str) -> ProxiedPathDB:
+def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_name: str, path: str, url_prefix: str = "") -> ProxiedPathDB:
     """Create a new proxied path"""
     _validate_proxied_path(session, fsp_name, path)
 
@@ -601,6 +642,7 @@ def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_
         sharing_name=sharing_name,
         fsp_name=fsp_name,
         path=path,
+        url_prefix=url_prefix,
         created_at=now,
         updated_at=now
     )
@@ -612,6 +654,7 @@ def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_
     cache[sharing_key] = proxied_path
     logger.debug(f"Cached new proxied path for sharing key: {sharing_key}, cache size: {len(cache)}")
     return proxied_path
+
 
 
 def update_proxied_path(session: Session,
@@ -630,6 +673,7 @@ def update_proxied_path(session: Session,
 
     if new_sharing_name:
         proxied_path.sharing_name = new_sharing_name
+        proxied_path.url_prefix = new_sharing_name
 
     if new_fsp_name:
         proxied_path.fsp_name = new_fsp_name

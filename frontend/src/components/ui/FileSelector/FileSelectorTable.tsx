@@ -9,7 +9,7 @@ import {
 } from '@tanstack/react-table';
 import { Typography } from '@material-tailwind/react';
 import {
-  HiOutlineFolder,
+  HiFolder,
   HiOutlineSquares2X2,
   HiOutlineRectangleStack
 } from 'react-icons/hi2';
@@ -34,6 +34,7 @@ type FileSelectorTableProps = {
     name: string;
     isDir: boolean;
     fullPath: string;
+    displayPath: string;
   } | null;
   readonly zonesData: Record<string, FileSharePath | Zone> | undefined;
   readonly onItemClick: (item: FileOrFolder) => void;
@@ -95,7 +96,7 @@ export default function FileSelectorTable({
           } else {
             // At filesystem level: show folder or file icon
             icon = file.is_dir ? (
-              <HiOutlineFolder className="text-foreground icon-default flex-shrink-0" />
+              <HiFolder className="text-foreground icon-default flex-shrink-0" />
             ) : (
               <TbFile className="text-foreground icon-default flex-shrink-0" />
             );
@@ -182,14 +183,14 @@ export default function FileSelectorTable({
               const isSelected = selectedItem?.name === row.original.name;
               return (
                 <tr
-                  className={`cursor-pointer hover:bg-primary-light/20 focus:bg-primary-light/20 ${isSelected && 'bg-primary-light/20'} ${index % 2 === 0 && !isSelected && 'bg-surface/50'}`}
+                  className={`cursor-pointer hover:bg-surface dark:hover:bg-surface-light ${isSelected ? 'bg-primary-light/30 outline outline-1 outline-primary' : index % 2 === 0 ? 'bg-surface-light dark:bg-surface/50' : ''}`}
                   key={row.id}
                   onClick={() => onItemClick(row.original)}
                   onDoubleClick={() => onItemDoubleClick(row.original)}
                 >
                   {row.getVisibleCells().map(cell => (
                     <td
-                      className="p-3 text-foreground"
+                      className="p-3 text-foreground overflow-hidden"
                       key={cell.id}
                       style={{ width: cell.column.getSize() }}
                     >
