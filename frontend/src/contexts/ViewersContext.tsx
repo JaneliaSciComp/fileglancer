@@ -14,10 +14,7 @@ import {
   type OmeZarrMetadata
 } from '@bioimagetools/capability-manifest';
 import { default as log } from '@/logger';
-import {
-  parseViewersConfig,
-  type ViewerConfigEntry
-} from '@/config/viewersConfig';
+import { useViewersConfigQuery } from '@/queries/viewersConfigQueries';
 
 /**
  * Validated viewer with all necessary information
@@ -47,31 +44,6 @@ interface ViewersContextType {
 const ViewersContext = createContext<ViewersContextType | undefined>(undefined);
 
 /**
- * Load viewers configuration from build-time config file
- */
-async function loadViewersConfig(): Promise<ViewerConfigEntry[]> {
-  let configYaml: string;
-
-  try {
-    const module = await import('@/config/viewers.config.yaml?raw');
-    configYaml = module.default;
-  } catch (error) {
-    throw new Error(
-      `Failed to load viewers configuration: ${error instanceof Error ? error.message : 'Unknown error'}`
-    );
-  }
-
-  try {
-    const config = parseViewersConfig(configYaml);
-    return config.viewers;
-  } catch (error) {
-    throw new Error(
-      `Failed to parse viewers configuration: ${error instanceof Error ? error.message : 'Unknown error'}`
-    );
-  }
-}
-
-/**
  * Normalize viewer name to a valid key
  */
 function normalizeViewerName(name: string): string {
@@ -90,17 +62,22 @@ export function ViewersProvider({
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function initialize() {
-      try {
-        log.info('Initializing viewers configuration...');
+  const {
+    data: configEntries,
+    isError: isConfigError,
+    error: configError
+  } = useViewersConfigQuery();
 
-        // Load viewer config entries
-        const configEntries = await loadViewersConfig();
-        log.info(`Loaded configuration for ${configEntries.length} viewers`);
+  useEffect(() => {
+    if (!configEntries) return;
+    const entries = configEntries;
+
+    async function loadManifests() {
+      try {
+        log.info(`Loaded configuration for ${entries.length} viewers`);
 
         // Extract manifest URLs
-        const manifestUrls = configEntries.map(entry => entry.manifest_url);
+        const manifestUrls = entries.map(entry => entry.manifest_url);
 
         // Load capability manifests (with a 10s timeout to avoid hanging on unreachable URLs)
         let manifestsMap: Map<string, ViewerManifest>;
@@ -123,7 +100,7 @@ export function ViewersProvider({
         const validated: ValidViewer[] = [];
 
         // Map through viewer config entries to validate
-        for (const entry of configEntries) {
+        for (const entry of entries) {
           const manifest = manifestsMap.get(entry.manifest_url);
 
           if (!manifest) {
@@ -192,8 +169,18 @@ export function ViewersProvider({
       }
     }
 
-    initialize();
-  }, []);
+    loadManifests();
+  }, [configEntries]);
+
+  // Handle query-level errors
+  useEffect(() => {
+    if (isConfigError && configError) {
+      const errorMessage = configError.message;
+      log.error('Failed to load viewers configuration:', errorMessage);
+      setError(errorMessage);
+      setIsInitialized(true);
+    }
+  }, [isConfigError, configError]);
 
   const getViewersCompatibleWithImage = useCallback(
     (metadata: OmeZarrMetadata): ValidViewer[] => {

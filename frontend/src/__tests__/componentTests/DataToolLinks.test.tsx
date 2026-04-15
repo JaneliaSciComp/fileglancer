@@ -196,29 +196,29 @@ describe('DataToolLinks - Edge Cases', () => {
       // Test that viewers with known logo files render correctly in the component
       renderDataToolLinks();
 
+      // Wait for viewer logos to load (async: config query + manifest loading)
       await waitFor(
         () => {
-          expect(screen.getByText('Test Tools')).toBeInTheDocument();
+          const images = screen.getAllByRole('img');
+
+          // Check for neuroglancer logo (known viewer with logo)
+          const neuroglancerLogo = images.find(
+            img => img.getAttribute('alt') === 'View in Neuroglancer'
+          );
+          expect(neuroglancerLogo).toBeTruthy();
+          expect(neuroglancerLogo?.getAttribute('src')).toContain(
+            'neuroglancer'
+          );
+
+          // Check for avivator logo (name for viewer in avivator.yaml)
+          const vizarrLogo = images.find(
+            img => img.getAttribute('alt') === 'View in Avivator'
+          );
+          expect(vizarrLogo).toBeTruthy();
+          expect(vizarrLogo?.getAttribute('src')).toContain('avivator');
         },
         { timeout: 3000 }
       );
-
-      // Check that images are rendered
-      const images = screen.getAllByRole('img');
-
-      // Check for neuroglancer logo (known viewer with logo)
-      const neuroglancerLogo = images.find(
-        img => img.getAttribute('alt') === 'View in Neuroglancer'
-      );
-      expect(neuroglancerLogo).toBeTruthy();
-      expect(neuroglancerLogo?.getAttribute('src')).toContain('neuroglancer');
-
-      // Check for avivator logo (name for viewer in avivator.yaml)
-      const vizarrLogo = images.find(
-        img => img.getAttribute('alt') === 'View in Avivator'
-      );
-      expect(vizarrLogo).toBeTruthy();
-      expect(vizarrLogo?.getAttribute('src')).toContain('avivator');
     });
   });
 
@@ -232,19 +232,17 @@ describe('DataToolLinks - Edge Cases', () => {
 
       renderDataToolLinks(urls);
 
+      // Wait for viewer logos to load asynchronously
       await waitFor(
         () => {
-          expect(screen.getByText('Test Tools')).toBeInTheDocument();
+          const images = screen.getAllByRole('img');
+          const neuroglancerLogo = images.find(
+            img => img.getAttribute('alt') === 'View in Neuroglancer'
+          );
+          expect(neuroglancerLogo).toBeTruthy();
         },
         { timeout: 3000 }
       );
-
-      // Should have neuroglancer logo
-      const images = screen.getAllByRole('img');
-      const neuroglancerLogo = images.find(
-        img => img.getAttribute('alt') === 'View in Neuroglancer'
-      );
-      expect(neuroglancerLogo).toBeTruthy();
 
       // Copy button is an SVG icon, find by aria-label
       const copyButton = screen.getByLabelText('Copy data URL');
@@ -311,16 +309,14 @@ describe('DataToolLinks - Expected Behavior', () => {
     it('should render valid viewer icons and copy icon', async () => {
       renderDataToolLinks();
 
+      // Wait for viewer logos to load asynchronously
       await waitFor(
         () => {
-          expect(screen.getByText('Test Tools')).toBeInTheDocument();
+          const images = screen.getAllByRole('img');
+          expect(images.length).toBeGreaterThanOrEqual(1);
         },
         { timeout: 3000 }
       );
-
-      // Should render viewer logos
-      const images = screen.getAllByRole('img');
-      expect(images.length).toBeGreaterThanOrEqual(1);
 
       // Copy button is an SVG icon, find by aria-label
       const copyButton = screen.getByLabelText('Copy data URL');
@@ -352,30 +348,28 @@ describe('DataToolLinks - Expected Behavior', () => {
     it('should render multiple viewer logos when URLs are provided', async () => {
       renderDataToolLinks();
 
+      // Wait for viewer logos to load asynchronously
       await waitFor(
         () => {
-          expect(screen.getByText('Test Tools')).toBeInTheDocument();
+          const images = screen.getAllByRole('img');
+          expect(images.length).toBeGreaterThanOrEqual(2);
+
+          const neuroglancerLogo = images.find(
+            img => img.getAttribute('alt') === 'View in Neuroglancer'
+          );
+          const vizarrLogo = images.find(
+            img => img.getAttribute('alt') === 'View in Avivator'
+          );
+
+          expect(neuroglancerLogo).toBeTruthy();
+          expect(vizarrLogo).toBeTruthy();
         },
         { timeout: 3000 }
-      );
-
-      // Verify viewer logos are present (img elements)
-      const images = screen.getAllByRole('img');
-      expect(images.length).toBeGreaterThanOrEqual(2);
-
-      const neuroglancerLogo = images.find(
-        img => img.getAttribute('alt') === 'View in Neuroglancer'
-      );
-      const vizarrLogo = images.find(
-        img => img.getAttribute('alt') === 'View in Avivator'
       );
 
       // Copy icon is an SVG, not an img — verify separately
       const copyButton = screen.getByLabelText('Copy data URL');
       expect(copyButton).toBeInTheDocument();
-
-      expect(neuroglancerLogo).toBeTruthy();
-      expect(vizarrLogo).toBeTruthy();
     });
   });
 
@@ -398,16 +392,16 @@ describe('DataToolLinks - Expected Behavior', () => {
     it('should show viewer tooltip labels', async () => {
       renderDataToolLinks();
 
+      // Wait for viewer logos to load asynchronously
       await waitFor(
         () => {
-          expect(screen.getByText('Test Tools')).toBeInTheDocument();
+          const neuroglancerButton = screen.getByAltText(
+            'View in Neuroglancer'
+          );
+          expect(neuroglancerButton).toBeInTheDocument();
         },
         { timeout: 3000 }
       );
-
-      // Viewer buttons should have correct aria-labels from their config
-      const neuroglancerButton = screen.getByAltText('View in Neuroglancer');
-      expect(neuroglancerButton).toBeInTheDocument();
 
       const vizarrButton = screen.getByAltText('View in Avivator');
       expect(vizarrButton).toBeInTheDocument();
