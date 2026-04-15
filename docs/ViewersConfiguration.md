@@ -21,20 +21,47 @@ Each viewer is defined by a **capability manifest** hosted at a URL. The configu
 2. Edit `frontend/viewers.config.yaml` to customize viewers
 3. Rebuild the application: `pixi run node-build`
 
+## Runtime Configuration (System Deployments)
+
+For deployments where Fileglancer is installed from PyPI and the frontend is pre-built, you can override the viewers configuration at runtime without rebuilding.
+
+Set the `FGC_VIEWERS_CONFIG` environment variable (or `viewers_config` in `config.yaml`) to the absolute path of a `viewers.config.yaml` file on disk:
+
+```env
+FGC_VIEWERS_CONFIG=/opt/deploy/viewers.config.yaml
+```
+
+Or in `config.yaml`:
+
+```yaml
+viewers_config: /opt/deploy/viewers.config.yaml
+```
+
+When set, the application serves this file via the API and the frontend uses it instead of the bundled config. The file follows the same format as the build-time `viewers.config.yaml`.
+
+### Precedence
+
+The viewers configuration is resolved in the following order (highest priority first):
+
+1. **Runtime API config** — served from the path in `FGC_VIEWERS_CONFIG` (no rebuild required)
+2. **Build-time override** — `frontend/viewers.config.yaml` (requires rebuild)
+3. **Build-time default** — `frontend/src/config/viewers.config.yaml` (requires rebuild)
+
 ## Configuration File
 
 ### Location
 
-There are two config locations, with the `frontend/` override taking precedence at build time:
+There are three config locations, resolved in order of precedence:
 
 | Location | Purpose |
 | -------- | ------- |
-| `frontend/viewers.config.yaml` | **Local override** — gitignored, safe to customize without merge conflicts |
+| Path in `FGC_VIEWERS_CONFIG` | **Runtime override** — served via API, no rebuild required; ideal for system deployments |
+| `frontend/viewers.config.yaml` | **Build-time override** — gitignored, safe to customize without merge conflicts |
 | `frontend/src/config/viewers.config.yaml` | **Default config** — committed source file, used when no override exists |
 
 Copy `frontend/src/config/viewers.config.yaml` to `frontend/viewers.config.yaml` to create a local override. This file is listed in `.gitignore` so your customizations will not conflict with upstream updates.
 
-**Important:** The config is bundled at build time. Changes require rebuilding the application.
+**Important:** The build-time configs are bundled at build time and changes require rebuilding the application. Runtime config via `FGC_VIEWERS_CONFIG` does **not** require rebuilding.
 
 ### Structure
 

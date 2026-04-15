@@ -6,6 +6,10 @@
 # After editing, rebuild with: pixi run node-build
 # (or use watch mode: pixi run dev-watch)
 #
+# For system deployments (e.g. installed from PyPI), you can also set
+# FGC_VIEWERS_CONFIG=/path/to/viewers.config.yaml to override viewers at
+# runtime without rebuilding. See docs/ViewersConfiguration.md for details.
+#
 # Each viewer entry requires:
 #   - manifest_url: URL or absolute path to a capability manifest YAML file
 #     Use absolute paths (e.g. /viewers/neuroglancer.yaml) for manifests bundled
