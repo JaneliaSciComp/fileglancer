@@ -69,7 +69,9 @@ export function ViewersProvider({
   } = useViewersConfigQuery();
 
   useEffect(() => {
-    if (!configEntries) return;
+    if (!configEntries) {
+      return;
+    }
     const entries = configEntries;
 
     async function loadManifests() {
