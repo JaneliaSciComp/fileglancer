@@ -153,8 +153,7 @@ export default function ChangePermissions({
             className="!rounded-md"
             disabled={Boolean(
               mutations.changePermissions.isPending ||
-                localPermissions ===
-                  fileBrowserState.propertiesTarget.permissions
+              localPermissions === fileBrowserState.propertiesTarget.permissions
             )}
             type="submit"
           >

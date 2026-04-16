@@ -1,0 +1,29 @@
+# Fileglancer OME-Zarr Viewers Configuration
+#
+# To customize, copy this file to frontend/viewers.config.yaml (which is
+# gitignored) and edit your copy. The override takes precedence at build time.
+#
+# After editing, rebuild with: pixi run node-build
+# (or use watch mode: pixi run dev-watch)
+#
+# For system deployments (e.g. installed from PyPI), you can also set
+# FGC_VIEWERS_CONFIG=/path/to/viewers.config.yaml to override viewers at
+# runtime without rebuilding. See docs/ViewersConfiguration.md for details.
+#
+# Each viewer entry requires:
+#   - manifest_url: URL or absolute path to a capability manifest YAML file
+#     Use absolute paths (e.g. /viewers/neuroglancer.yaml) for manifests bundled
+#     in the public/ directory, or full URLs for externally hosted manifests.
+#
+# Optional:
+#   - instance_template_url: Override the viewer's template_url from the manifest
+#   - label: Custom tooltip text (defaults to "View in {Name}")
+
+viewers:
+  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/neuroglancer.yaml'
+
+  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/avivator.yaml'
+
+  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/validator.yaml'
+
+  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/vole.yaml'

@@ -49,9 +49,6 @@ export type N5Metadata = {
 export type N5OpenWithToolUrls = {
   copy: string;
   neuroglancer: string;
-  validator: null;
-  vole: null;
-  avivator: null;
 };
 
 type N5MetadataQueryParams = {

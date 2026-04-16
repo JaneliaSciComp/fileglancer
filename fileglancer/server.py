@@ -442,6 +442,22 @@ def create_app(settings):
         return {"version": APP_VERSION}
 
 
+    @app.get("/api/viewers-config", include_in_schema=False)
+    async def get_viewers_config():
+        if not settings.viewers_config:
+            raise HTTPException(status_code=404, detail="No viewers configuration")
+
+        config_path = PathLib(settings.viewers_config)
+        if not config_path.exists() or not config_path.is_file():
+            logger.warning(f"Viewers config file not found: {settings.viewers_config}")
+            raise HTTPException(status_code=404, detail="Viewers configuration file not found")
+
+        return PlainTextResponse(
+            content=config_path.read_text(encoding="utf-8"),
+            media_type="text/yaml"
+        )
+
+
     # Authentication routes
     @app.get("/api/auth/login", include_in_schema=settings.enable_okta_auth,
              description="Initiate OKTA OAuth login flow")

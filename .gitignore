@@ -143,6 +143,7 @@ style/tailwind_converted.css
 
 # Configs
 config.yaml
+frontend/viewers.config.yaml
 
 # Claude Code
 .claude

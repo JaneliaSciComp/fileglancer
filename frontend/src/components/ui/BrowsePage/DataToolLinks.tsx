@@ -1,16 +1,14 @@
 import { Typography } from '@material-tailwind/react';
 import { Link } from 'react-router';
+import fallback_logo from '@/assets/fallback_logo.png';
 import { HiOutlineClipboardCopy } from 'react-icons/hi';
 import { HiOutlineEllipsisHorizontalCircle } from 'react-icons/hi2';
 
-import neuroglancer_logo from '@/assets/neuroglancer.png';
-import validator_logo from '@/assets/ome-ngff-validator.png';
-import volE_logo from '@/assets/aics_website-3d-cell-viewer.png';
-import avivator_logo from '@/assets/vizarr_logo.png';
 import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import DialogIconBtn from '@/components/ui/buttons/DialogIconBtn';
 import DataLinkUsageDialog from '@/components/ui/Dialogs/dataLinkUsage/DataLinkUsageDialog';
+import { useViewersContext } from '@/contexts/ViewersContext';
 
 const CIRCLE_CLASSES =
   'rounded-full bg-surface-light dark:bg-primary/15 hover:bg-surface dark:hover:bg-primary/25 w-12 h-12 flex items-center justify-center cursor-pointer transform active:scale-90 transition-all duration-75';
@@ -49,6 +47,9 @@ function ToolLink({
           <img
             alt={logoAlt}
             className="max-h-7 max-w-7 rounded-sm"
+            onError={e => {
+              e.currentTarget.src = fallback_logo;
+            }}
             src={logoSrc}
           />
         </Link>
@@ -77,6 +78,8 @@ export default function DataToolLinks({
   readonly title: string;
   readonly urls: OpenWithToolUrls | null;
 }) {
+  const { validViewers } = useViewersContext();
+
   if (!urls) {
     return null;
   }
@@ -89,53 +92,27 @@ export default function DataToolLinks({
       <div
         className={`flex flex-wrap gap-2 items-start ${compact ? 'max-w-[13.5rem]' : ''}`}
       >
-        {urls.neuroglancer !== null ? (
-          <ToolLink
-            label="Neuroglancer"
-            logoAlt="Neuroglancer logo"
-            logoSrc={neuroglancer_logo}
-            onToolClick={onToolClick}
-            toolKey="neuroglancer"
-            tooltipLabel="View in Neuroglancer"
-            url={urls.neuroglancer}
-          />
-        ) : null}
+        {validViewers.map(viewer => {
+          const url = urls[viewer.key];
 
-        {urls.vole !== null ? (
-          <ToolLink
-            label="Vol-E"
-            logoAlt="Vol-E logo"
-            logoSrc={volE_logo}
-            onToolClick={onToolClick}
-            toolKey="vole"
-            tooltipLabel="View in Vol-E"
-            url={urls.vole}
-          />
-        ) : null}
+          // null means incompatible, don't show
+          if (url === null || url === undefined) {
+            return null;
+          }
 
-        {urls.avivator !== null ? (
-          <ToolLink
-            label="Avivator"
-            logoAlt="Avivator logo"
-            logoSrc={avivator_logo}
-            onToolClick={onToolClick}
-            toolKey="avivator"
-            tooltipLabel="View in Avivator"
-            url={urls.avivator}
-          />
-        ) : null}
-
-        {urls.validator !== null ? (
-          <ToolLink
-            label="Validator"
-            logoAlt="OME-Zarr Validator logo"
-            logoSrc={validator_logo}
-            onToolClick={onToolClick}
-            toolKey="validator"
-            tooltipLabel="View in OME-Zarr Validator"
-            url={urls.validator}
-          />
-        ) : null}
+          return (
+            <ToolLink
+              key={viewer.key}
+              label={viewer.displayName}
+              logoAlt={viewer.label}
+              logoSrc={viewer.logoPath}
+              onToolClick={onToolClick}
+              toolKey={viewer.key as PendingToolKey}
+              tooltipLabel={viewer.label}
+              url={url}
+            />
+          );
+        })}
 
         <div className="flex flex-col items-center w-16">
           <FgTooltip

@@ -1426,3 +1426,86 @@ def test_broken_symlink_in_file_listing(test_client, temp_dir):
     regular = next((f for f in files if f["name"] == "regular.txt"), None)
     assert regular is not None, "Regular file should be in response"
     assert regular["is_symlink"] is False, "Regular file should not be marked as symlink"
+
+
+def test_viewers_config_not_set(test_client):
+    """Test that /api/viewers-config returns 404 when viewers_config is not set"""
+    response = test_client.get("/api/viewers-config")
+    assert response.status_code == 404
+
+
+def test_viewers_config_file_exists(temp_dir):
+    """Test that /api/viewers-config returns file contents as text/yaml when file exists"""
+    # Create a test viewers config file
+    config_content = "viewers:\n  - manifest_url: 'https://example.com/manifest.yaml'\n"
+    config_path = os.path.join(temp_dir, "viewers.config.yaml")
+    with open(config_path, 'w') as f:
+        f.write(config_content)
+
+    # Create app with viewers_config set
+    db_path = os.path.join(temp_dir, "test_vc.db")
+    db_url = f"sqlite:///{db_path}"
+    engine = create_engine(db_url)
+    Session = sessionmaker(bind=engine)
+    db_session = Session()
+    Base.metadata.create_all(engine)
+
+    settings = Settings(db_url=db_url, file_share_mounts=[], viewers_config=config_path)
+
+    import fileglancer.settings
+    import fileglancer.database
+    original_get_settings = fileglancer.settings.get_settings
+    fileglancer.settings.get_settings = lambda: settings
+    fileglancer.database.get_settings = lambda: settings
+
+    app = create_app(settings)
+    from fileglancer.server import get_current_user
+    app.dependency_overrides[get_current_user] = lambda: "testuser"
+    client = TestClient(app)
+
+    try:
+        response = client.get("/api/viewers-config")
+        assert response.status_code == 200
+        assert "text/yaml" in response.headers["content-type"]
+        assert response.text == config_content
+    finally:
+        db_session.close()
+        engine.dispose()
+        from fileglancer.database import dispose_engine
+        dispose_engine(db_url)
+        fileglancer.settings.get_settings = original_get_settings
+        fileglancer.database.get_settings = original_get_settings
+
+
+def test_viewers_config_file_missing(temp_dir):
+    """Test that /api/viewers-config returns 404 when configured file doesn't exist"""
+    db_path = os.path.join(temp_dir, "test_vcm.db")
+    db_url = f"sqlite:///{db_path}"
+    engine = create_engine(db_url)
+    Session = sessionmaker(bind=engine)
+    db_session = Session()
+    Base.metadata.create_all(engine)
+
+    settings = Settings(db_url=db_url, file_share_mounts=[], viewers_config="/nonexistent/viewers.config.yaml")
+
+    import fileglancer.settings
+    import fileglancer.database
+    original_get_settings = fileglancer.settings.get_settings
+    fileglancer.settings.get_settings = lambda: settings
+    fileglancer.database.get_settings = lambda: settings
+
+    app = create_app(settings)
+    from fileglancer.server import get_current_user
+    app.dependency_overrides[get_current_user] = lambda: "testuser"
+    client = TestClient(app)
+
+    try:
+        response = client.get("/api/viewers-config")
+        assert response.status_code == 404
+    finally:
+        db_session.close()
+        engine.dispose()
+        from fileglancer.database import dispose_engine
+        dispose_engine(db_url)
+        fileglancer.settings.get_settings = original_get_settings
+        fileglancer.database.get_settings = original_get_settings

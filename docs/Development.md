@@ -45,16 +45,16 @@ By default, Fileglancer provides access to each user's home directory without re
 
 ```yaml
 file_share_mounts:
-  - "~/" # User's home directory (default)
+  - "~/"                    # User's home directory (default)
 ```
 
 You can add additional file share paths by editing your `config.yaml`:
 
 ```yaml
 file_share_mounts:
-  - "~/" # User's home directory
-  - "/groups/scicomp/data" # Shared data directory
-  - "/opt/data" # Another shared directory
+  - "~/"                    # User's home directory
+  - "/groups/scicomp/data"  # Shared data directory
+  - "/opt/data"             # Another shared directory
 ```
 
 **How Home Directories Work:**
@@ -68,8 +68,24 @@ file_share_mounts:
 
 Instead of using the `file_share_mounts` setting, you can configure file share paths in the database. This is useful for production deployments where you want centralized management of file share paths. To use the paths in the database, set `file_share_mounts: []`. See [fileglancer-janelia](https://github.com/JaneliaSciComp/fileglancer-janelia) for an example of populating the file share paths in the database, using a private wiki source.
 
+### Viewers Configuration
 
-### Testing configuration
+Fileglancer supports dynamic configuration of OME-Zarr viewers through `viewers.config.yaml`. This allows you to customize which viewers are available in your deployment and configure custom viewer URLs. No configuration is required to use the default viewers defined in `frontend/src/config/viewers.config.yaml`.
+
+**To customize viewers:**
+
+1. Copy the default config: `cp frontend/src/config/viewers.config.yaml frontend/viewers.config.yaml`
+
+2. Edit `frontend/viewers.config.yaml` to enable/disable viewers or customize URLs
+
+3. Rebuild the application: `pixi run node-build` or use watch mode in development: `pixi run dev-watch`
+
+**Note:** The configuration file is bundled at build time, so changes require rebuilding the application. `frontend/viewers.config.yaml` is gitignored so your customizations will not conflict with upstream updates. The default configuration includes Neuroglancer, Avivator, OME-Zarr Validator, and Vol-E viewers.
+
+For detailed configuration options, examples, and documentation on adding custom viewers, see [ViewersConfiguration.md](ViewersConfiguration.md).
+
+
+### Testing Configuration
 
 Optionally, to run Playwright tests against a development deployment with OKTA authentication enabled, add the below to the configuration file.
 **Note:** Do NOT add this configuration to a production deployment.

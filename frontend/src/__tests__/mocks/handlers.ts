@@ -281,6 +281,11 @@ export const handlers = [
     return HttpResponse.json({ authenticated: true });
   }),
 
+  // Viewers config - 404 means no runtime config, fall through to bundled default
+  http.get('/api/viewers-config', () => {
+    return HttpResponse.json(null, { status: 404 });
+  }),
+
   // File content for Zarr metadata files
   http.get('/api/content/:fspName', ({ params, request }) => {
     const url = new URL(request.url);

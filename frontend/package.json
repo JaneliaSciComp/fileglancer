@@ -30,15 +30,18 @@
         "test": "vitest"
     },
     "dependencies": {
+        "@bioimagetools/capability-manifest": "0.5.0",
         "@material-tailwind/react": "^3.0.0-beta.24",
         "@tanstack/react-hotkeys": "^0.4.1",
         "@tanstack/react-query": "^5.90.2",
         "@tanstack/react-table": "^8.21.3",
         "@tanstack/react-virtual": "^3.13.23",
+        "@types/js-yaml": "^4.0.9",
         "@types/react-syntax-highlighter": "^15.5.13",
         "@vitejs/plugin-react": "^5.0.0",
         "autoprefixer": "^10.4.21",
         "fracturedjsonjs": "^5.0.1",
+        "js-yaml": "^4.1.1",
         "loglevel": "^1.9.2",
         "npm-run-all2": "^7.0.2",
         "ome-zarr.js": "^0.0.17",
@@ -55,7 +58,8 @@
         "react-syntax-highlighter": "^16.1.0",
         "shepherd.js": "^14.5.1",
         "tailwindcss": "^3.4.17",
-        "zarrita": "^0.5.1"
+        "zarrita": "^0.5.1",
+        "zod": "^4.3.6"
     },
     "devDependencies": {
         "@eslint/css": "^0.8.1",
