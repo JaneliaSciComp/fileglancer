@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  Badge,
   IconButton,
   Typography,
   Collapse,
@@ -7,6 +8,7 @@ import {
   List
 } from '@material-tailwind/react';
 import { Link } from 'react-router-dom';
+import type { IconType } from 'react-icons';
 import {
   HiOutlineInformationCircle,
   HiOutlineMoon,
@@ -27,46 +29,16 @@ import { FaRunning } from 'react-icons/fa';
 import ProfileMenu from '@/components/ui/Navbar/ProfileMenu';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import useTheme from '@/hooks/useTheme';
+import { useActiveJobCount } from '@/hooks/useActiveJobCount';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { trackEvent } from '@/utils/fathom';
 
-const LINKS = [
-  {
-    icon: HiOutlineFolder,
-    title: 'Browse Files',
-    href: '/browse'
-  },
-  {
-    icon: HiOutlineShare,
-    title: 'Data Links',
-    href: '/links'
-  },
-  {
-    icon: HiOutlineEye,
-    title: 'NG Links',
-    href: '/nglinks'
-  },
-  {
-    icon: HiOutlineRocketLaunch,
-    title: 'Apps',
-    href: '/apps'
-  },
-  {
-    icon: FaRunning,
-    title: 'Jobs',
-    href: '/apps/jobs'
-  },
-  {
-    icon: HiOutlineBriefcase,
-    title: 'Tasks',
-    href: '/jobs'
-  },
-  {
-    icon: HiOutlineInformationCircle,
-    title: 'Help',
-    href: '/help'
-  }
-];
+type NavLink = {
+  icon: IconType;
+  title: string;
+  href: string;
+  badge?: number;
+};
 
 // Logo SVG component to reduce JSX nesting depth
 function LogoSvg() {
@@ -104,7 +76,24 @@ function LogoSvg() {
 function NavList() {
   const { showAppsAndJobsPages } = usePreferencesContext();
   const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
-  const filteredLinks = LINKS.filter(link => {
+  const activeJobCount = useActiveJobCount();
+
+  const links: NavLink[] = [
+    { icon: HiOutlineFolder, title: 'Browse Files', href: '/browse' },
+    { icon: HiOutlineShare, title: 'Data Links', href: '/links' },
+    { icon: HiOutlineEye, title: 'NG Links', href: '/nglinks' },
+    { icon: HiOutlineRocketLaunch, title: 'Apps', href: '/apps' },
+    {
+      icon: FaRunning,
+      title: 'Jobs',
+      href: '/apps/jobs',
+      badge: activeJobCount
+    },
+    { icon: HiOutlineBriefcase, title: 'Tasks', href: '/jobs' },
+    { icon: HiOutlineInformationCircle, title: 'Help', href: '/help' }
+  ];
+
+  const filteredLinks = links.filter(link => {
     if (link.href === '/apps' && !showAppsAndJobsPages) {
       return false;
     }
@@ -119,26 +108,46 @@ function NavList() {
 
   return (
     <>
-      {filteredLinks.map(({ icon: Icon, title, href }) => (
-        <List.Item
-          as={Link}
-          className="flex items-center dark:!text-foreground hover:bg-hover-gradient hover:dark:bg-hover-gradient-dark focus:bg-hover-gradient focus:dark:bg-hover-gradient-dark hover:!text-foreground focus:!text-foreground"
-          key={title}
-          onClick={() =>
-            trackEvent({
-              eventId: `navbar_${title.toLowerCase().replace(' ', '_')}_click`
-            })
-          }
-          to={href}
-        >
-          <List.ItemStart className="flex items-center mr-1.5">
-            <Icon className="stroke-2 icon-default short:icon-xsmall" />
-          </List.ItemStart>
-          <Typography className="short:text-xs" type="small">
-            {title}
-          </Typography>
-        </List.Item>
-      ))}
+      {filteredLinks.map(({ icon: Icon, title, href, badge }) => {
+        const listItem = (
+          <List.Item
+            as={Link}
+            className="flex items-center dark:!text-foreground hover:bg-hover-gradient hover:dark:bg-hover-gradient-dark focus:bg-hover-gradient focus:dark:bg-hover-gradient-dark hover:!text-foreground focus:!text-foreground"
+            key={title}
+            onClick={() =>
+              trackEvent({
+                eventId: `navbar_${title.toLowerCase().replace(' ', '_')}_click`
+              })
+            }
+            to={href}
+          >
+            <List.ItemStart className="flex items-center mr-1.5">
+              <Icon className="stroke-2 icon-default short:icon-xsmall" />
+            </List.ItemStart>
+            <Typography className="short:text-xs" type="small">
+              {title}
+            </Typography>
+          </List.Item>
+        );
+
+        if (badge !== undefined && badge > 0) {
+          return (
+            <Badge
+              color="info"
+              key={title}
+              overlap="square"
+              placement="top-end"
+            >
+              <Badge.Content>{listItem}</Badge.Content>
+              <Badge.Indicator className="p-0 pointer-events-none text-[10px] min-w-4 min-h-4">
+                {badge > 9 ? '9+' : badge}
+              </Badge.Indicator>
+            </Badge>
+          );
+        }
+
+        return listItem;
+      })}
     </>
   );
 }
