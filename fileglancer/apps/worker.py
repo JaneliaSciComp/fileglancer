@@ -215,6 +215,9 @@ def main():
     # Configure cluster_api logging so debug output reaches the parent
     # process via stderr.  The parent captures stderr separately.
     log_level = os.environ.get("FGC_LOG_LEVEL", "INFO").upper()
+    # Map loguru-specific levels to their nearest stdlib equivalents
+    _LOGURU_TO_STDLIB = {"TRACE": "DEBUG", "SUCCESS": "INFO"}
+    log_level = _LOGURU_TO_STDLIB.get(log_level, log_level)
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(logging.Formatter(
         "%(levelname)s | %(name)s:%(funcName)s:%(lineno)d - %(message)s"
