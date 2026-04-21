@@ -3,28 +3,30 @@
 import asyncio
 import fcntl
 import multiprocessing
+import os
+import signal
+import subprocess
 import time
 from datetime import datetime, UTC
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch, MagicMock, call
 
-from fileglancer.apps.core import _poll_jobs, _POLL_LOCK_PATH
+from fileglancer.apps.core import _poll_jobs, _poll_local_jobs, _POLL_LOCK_PATH
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_settings(**overrides):
+def _make_settings(executor="lsf", **overrides):
     """Return a minimal Settings-like object for poll tests."""
     cluster = SimpleNamespace(
         poll_interval=0.05,
         zombie_timeout_minutes=30.0,
-        **{k: v for k, v in {
-            "executor": "local",
-        }.items()},
+        executor=executor,
     )
-    cluster.model_dump = lambda exclude_none=False: {"executor": "local"}
+    cluster.model_dump = lambda exclude_none=False: {"executor": executor}
     settings = SimpleNamespace(
         cluster=cluster,
         db_url="sqlite:///unused",
@@ -33,7 +35,7 @@ def _make_settings(**overrides):
 
 
 def _make_db_job(job_id, cluster_job_id, status, username="alice",
-                 created_at=None):
+                 created_at=None, work_dir=None):
     """Return a mock DB job row."""
     job = SimpleNamespace(
         id=job_id,
@@ -41,6 +43,7 @@ def _make_db_job(job_id, cluster_job_id, status, username="alice",
         status=status,
         username=username,
         created_at=created_at or datetime.now(UTC),
+        work_dir=work_dir,
     )
     return job
 
@@ -245,3 +248,130 @@ class TestPollLockElection:
         p2.join(timeout=5)
 
         assert won_count.value == 1, f"Expected 1 poll winner, got {won_count.value}"
+
+
+# ---------------------------------------------------------------------------
+# Test: local executor PID-based polling
+# ---------------------------------------------------------------------------
+
+class TestPollLocalJobs:
+    """_poll_local_jobs checks PID files and process liveness to determine
+    job status, bypassing the worker subprocess that can't track local
+    executor processes across invocations."""
+
+    def test_running_process_transitions_to_running(self, tmp_path):
+        """A PENDING job whose PID is still alive should become RUNNING."""
+        # Start a long-running process
+        proc = subprocess.Popen(["sleep", "60"])
+        pid_file = tmp_path / "job.pid"
+        pid_file.write_text(str(proc.pid))
+
+        try:
+            job = _make_db_job(1, "1", "PENDING", work_dir=str(tmp_path))
+            mock_session = MagicMock()
+
+            with patch("fileglancer.apps.core.db") as mock_db:
+                result = _poll_local_jobs(mock_session, [job])
+
+            assert result is True  # still active
+            mock_db.update_job_status.assert_called_once()
+            _, kwargs = mock_db.update_job_status.call_args
+            assert kwargs.get("status") or mock_db.update_job_status.call_args[0][2] == "RUNNING"
+        finally:
+            proc.terminate()
+            proc.wait()
+
+    def test_exited_process_transitions_to_done(self, tmp_path):
+        """A job whose process has exited with code 0 should become DONE."""
+        # Start and immediately wait for a process that exits successfully
+        proc = subprocess.Popen(["true"])
+        proc.wait()
+        pid_file = tmp_path / "job.pid"
+        pid_file.write_text(str(proc.pid))
+        exit_code_file = tmp_path / "exit_code"
+        exit_code_file.write_text("0")
+
+        job = _make_db_job(1, "1", "RUNNING", work_dir=str(tmp_path))
+        mock_session = MagicMock()
+
+        with patch("fileglancer.apps.core.db") as mock_db:
+            result = _poll_local_jobs(mock_session, [job])
+
+        assert result is False  # no more active jobs
+        mock_db.update_job_status.assert_called_once()
+        args = mock_db.update_job_status.call_args[0]
+        assert args[2] == "DONE"
+
+    def test_exited_process_with_error_transitions_to_failed(self, tmp_path):
+        """A job whose process exited with non-zero code should become FAILED."""
+        proc = subprocess.Popen(["false"])
+        proc.wait()
+        pid_file = tmp_path / "job.pid"
+        pid_file.write_text(str(proc.pid))
+        exit_code_file = tmp_path / "exit_code"
+        exit_code_file.write_text("1")
+
+        job = _make_db_job(1, "1", "RUNNING", work_dir=str(tmp_path))
+        mock_session = MagicMock()
+
+        with patch("fileglancer.apps.core.db") as mock_db:
+            result = _poll_local_jobs(mock_session, [job])
+
+        assert result is False
+        args = mock_db.update_job_status.call_args[0]
+        assert args[2] == "FAILED"
+
+    def test_already_running_not_updated_again(self, tmp_path):
+        """A RUNNING job whose PID is still alive should not be updated."""
+        proc = subprocess.Popen(["sleep", "60"])
+        pid_file = tmp_path / "job.pid"
+        pid_file.write_text(str(proc.pid))
+
+        try:
+            job = _make_db_job(1, "1", "RUNNING", work_dir=str(tmp_path))
+            mock_session = MagicMock()
+
+            with patch("fileglancer.apps.core.db") as mock_db:
+                _poll_local_jobs(mock_session, [job])
+
+            mock_db.update_job_status.assert_not_called()
+        finally:
+            proc.terminate()
+            proc.wait()
+
+    def test_missing_pid_file_keeps_polling(self, tmp_path):
+        """A job with no PID file should be treated as still active."""
+        job = _make_db_job(1, "1", "PENDING", work_dir=str(tmp_path))
+        mock_session = MagicMock()
+
+        with patch("fileglancer.apps.core.db") as mock_db:
+            result = _poll_local_jobs(mock_session, [job])
+
+        assert result is True
+        mock_db.update_job_status.assert_not_called()
+
+    def test_poll_jobs_routes_local_executor(self, tmp_path):
+        """_poll_jobs should route to _poll_local_jobs when executor is local."""
+        settings = _make_settings(executor="local")
+
+        proc = subprocess.Popen(["sleep", "60"])
+        pid_file = tmp_path / "job.pid"
+        pid_file.write_text(str(proc.pid))
+
+        try:
+            job = _make_db_job(1, "1", "PENDING", work_dir=str(tmp_path))
+            mock_session = MagicMock()
+
+            with patch("fileglancer.apps.core.db") as mock_db:
+                mock_db.get_db_session.return_value.__enter__ = lambda _: mock_session
+                mock_db.get_db_session.return_value.__exit__ = MagicMock(return_value=False)
+                mock_db.get_active_jobs.return_value = [job]
+
+                result = _poll_jobs(settings)
+
+            assert result is True
+            # Should NOT have called _run_as_user (cluster-based polling)
+            mock_db.update_job_status.assert_called_once()
+        finally:
+            proc.terminate()
+            proc.wait()
