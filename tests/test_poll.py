@@ -3,8 +3,6 @@
 import asyncio
 import fcntl
 import multiprocessing
-import os
-import signal
 import subprocess
 import time
 from datetime import datetime, UTC
@@ -275,8 +273,7 @@ class TestPollLocalJobs:
 
             assert result is True  # still active
             mock_db.update_job_status.assert_called_once()
-            _, kwargs = mock_db.update_job_status.call_args
-            assert kwargs.get("status") or mock_db.update_job_status.call_args[0][2] == "RUNNING"
+            assert mock_db.update_job_status.call_args[0][2] == "RUNNING"
         finally:
             proc.terminate()
             proc.wait()
