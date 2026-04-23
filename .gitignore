@@ -148,3 +148,6 @@ config.yaml
 .claude
 
 notifications.yaml
+
+# Local VSCode settings
+.vscode/
