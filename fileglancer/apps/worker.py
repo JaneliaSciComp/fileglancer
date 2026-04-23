@@ -71,6 +71,16 @@ async def _submit(request: dict) -> dict:
         resources=resource_spec,
     )
 
+    # For local executor, write the subprocess PID to disk so the poll
+    # loop can check process liveness across worker invocations.
+    # Only LocalExecutor has a _processes dict; HPC executors don't.
+    processes = getattr(executor, "_processes", None)
+    if processes is not None:
+        proc = processes.get(job.job_id)
+        if proc is not None:
+            pid_file = work_dir / "job.pid"
+            pid_file.write_text(str(proc.pid))
+
     return {"job_id": job.job_id, "script_path": job.script_path}
 
 
