@@ -15,6 +15,41 @@ export default function usePermissionsDialog() {
   );
 
   /**
+   * For execute positions (3, 6, 9), determine the correct character based on
+   * whether execute is set and whether a special bit (sticky) is active.
+   * Position 9 uses 't'/'T' for sticky bit; positions 3 and 6 use 's'/'S' for setuid/setgid.
+   */
+  function getExecuteChar(
+    position: number,
+    execute: boolean,
+    currentChar: string
+  ): string {
+    const hasSpecial =
+      position === 9
+        ? currentChar === 't' || currentChar === 'T'
+        : currentChar === 's' || currentChar === 'S';
+
+    if (hasSpecial) {
+      // Special bit is set - use lowercase (with execute) or uppercase (without)
+      const specialChar = position === 9 ? 't' : 's';
+      return execute ? specialChar : specialChar.toUpperCase();
+    }
+    return execute ? 'x' : '-';
+  }
+
+  /**
+   * For the sticky bit toggle at position 9, determine the correct character
+   * based on whether sticky is set and whether execute is also set.
+   */
+  function getStickyChar(sticky: boolean, currentChar: string): string {
+    const hasExecute = currentChar === 'x' || currentChar === 't';
+    if (sticky) {
+      return hasExecute ? 't' : 'T';
+    }
+    return hasExecute ? 'x' : '-';
+  }
+
+  /**
    * Handles local permission state changes based on user input to the form.
    * This local state is necessary to track the user's changes before the form is submitted,
    * which causes the state in the fileglancer db to update.
@@ -25,26 +60,34 @@ export default function usePermissionsDialog() {
     if (!localPermissions) {
       return null; // If the local permissions are not set, this means the fileBrowserState is not set, return null
     }
-    // Extract the value (w - write or r - read) and position in the UNIX permission string
-    // (1 - 8) from the input name
+    // Extract the value (r, w, x, or t for sticky) and position in the UNIX permission string
+    // from the input name
     const { name, checked } = event.target;
     const [value, position] = name.split('_');
+    const pos = parseInt(position);
 
     setLocalPermissions(prev => {
       if (!prev) {
         return prev; // If the prev local permission string is null, that means the fileBrowserState isn't set yet, so return null
       }
-      // Split the previous local permission string at every character in the string
       const splitPermissions = prev.split('');
-      // If the event checked the input, set that value (r/w) at that position in the string
-      if (checked) {
-        splitPermissions.splice(parseInt(position), 1, value);
+      const currentChar = splitPermissions[pos];
+
+      if (value === 'x') {
+        // Execute toggle - must account for sticky/setuid/setgid special bits
+        splitPermissions[pos] = getExecuteChar(pos, checked, currentChar);
+      } else if (value === 't') {
+        // Sticky bit toggle at position 9
+        splitPermissions[pos] = getStickyChar(checked, currentChar);
+      } else if (checked) {
+        // Read or write - set the value at that position
+        splitPermissions[pos] = value;
       } else {
-        // If the event unchecked the input, set the value to "-" at that posiiton in the string
-        splitPermissions.splice(parseInt(position), 1, '-');
+        // Unchecked read or write - set to '-'
+        splitPermissions[pos] = '-';
       }
-      const newPermissions = splitPermissions.join('');
-      return newPermissions;
+
+      return splitPermissions.join('');
     });
   }
 

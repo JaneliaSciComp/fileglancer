@@ -64,6 +64,7 @@ export default function ChangePermissions({
                 </th>
                 <th className="px-3 py-2 text-left font-medium">Read</th>
                 <th className="px-3 py-2 text-left font-medium">Write</th>
+                <th className="px-3 py-2 text-left font-medium">Execute</th>
               </tr>
             </thead>
 
@@ -73,7 +74,7 @@ export default function ChangePermissions({
                   <td className="p-3 font-medium">
                     Owner: {fileBrowserState.propertiesTarget.owner}
                   </td>
-                  {/* Owner read/write */}
+                  {/* Owner read/write/execute */}
                   <td className="p-3">
                     <input
                       aria-label="r_1"
@@ -93,13 +94,26 @@ export default function ChangePermissions({
                       type="checkbox"
                     />
                   </td>
+                  <td className="p-3">
+                    <input
+                      aria-label="x_3"
+                      checked={
+                        localPermissions[3] === 'x' ||
+                        localPermissions[3] === 's'
+                      }
+                      className="accent-secondary-light hover:cursor-pointer"
+                      name="x_3"
+                      onChange={event => handleLocalPermissionChange(event)}
+                      type="checkbox"
+                    />
+                  </td>
                 </tr>
 
                 <tr className="border-b border-surface dark:border-surface-light">
                   <td className="p-3 font-medium">
                     Group: {fileBrowserState.propertiesTarget.group}
                   </td>
-                  {/* Group read/write */}
+                  {/* Group read/write/execute */}
                   <td className="p-3">
                     <input
                       aria-label="r_4"
@@ -120,11 +134,24 @@ export default function ChangePermissions({
                       type="checkbox"
                     />
                   </td>
+                  <td className="p-3">
+                    <input
+                      aria-label="x_6"
+                      checked={
+                        localPermissions[6] === 'x' ||
+                        localPermissions[6] === 's'
+                      }
+                      className="accent-secondary-light hover:cursor-pointer"
+                      name="x_6"
+                      onChange={event => handleLocalPermissionChange(event)}
+                      type="checkbox"
+                    />
+                  </td>
                 </tr>
 
                 <tr>
                   <td className="p-3 font-medium">Everyone else</td>
-                  {/* Everyone else read/write */}
+                  {/* Everyone else read/write/execute */}
                   <td className="p-3">
                     <input
                       aria-label="r_7"
@@ -145,10 +172,39 @@ export default function ChangePermissions({
                       type="checkbox"
                     />
                   </td>
+                  <td className="p-3">
+                    <input
+                      aria-label="x_9"
+                      checked={
+                        localPermissions[9] === 'x' ||
+                        localPermissions[9] === 't'
+                      }
+                      className="accent-secondary-light hover:cursor-pointer"
+                      name="x_9"
+                      onChange={event => handleLocalPermissionChange(event)}
+                      type="checkbox"
+                    />
+                  </td>
                 </tr>
               </tbody>
             ) : null}
           </table>
+
+          {fileBrowserState.propertiesTarget.is_dir && localPermissions ? (
+            <label className="flex items-center gap-2 my-4 text-sm text-foreground">
+              <input
+                aria-label="t_9"
+                checked={
+                  localPermissions[9] === 't' || localPermissions[9] === 'T'
+                }
+                className="accent-secondary-light hover:cursor-pointer"
+                name="t_9"
+                onChange={event => handleLocalPermissionChange(event)}
+                type="checkbox"
+              />
+              Only owner can delete and rename files in this directory
+            </label>
+          ) : null}
           <Button
             className="!rounded-md"
             disabled={Boolean(

@@ -18,9 +18,9 @@ function PermissionIcon({
 export default function PermissionsTable({
   file
 }: {
-  readonly file: FileOrFolder | null;
+  readonly file: FileOrFolder;
 }) {
-  const permissions = file ? parsePermissions(file.permissions) : null;
+  const permissions = parsePermissions(file.permissions);
 
   return (
     <div className="w-full min-w-max overflow-hidden rounded-lg border border-surface mt-4">
@@ -32,6 +32,7 @@ export default function PermissionsTable({
             </th>
             <th className="px-3 py-2 text-center font-medium">Read</th>
             <th className="px-3 py-2 text-center font-medium">Write</th>
+            <th className="px-3 py-2 text-center font-medium">Execute</th>
           </tr>
         </thead>
         <tbody className="text-sm">
@@ -49,6 +50,11 @@ export default function PermissionsTable({
                 <PermissionIcon hasPermission={permissions.owner.write} />
               ) : null}
             </td>
+            <td className="p-3">
+              {permissions ? (
+                <PermissionIcon hasPermission={permissions.owner.execute} />
+              ) : null}
+            </td>
           </tr>
           <tr className="border-b border-surface">
             <td className="p-3 font-medium">
@@ -64,6 +70,11 @@ export default function PermissionsTable({
                 <PermissionIcon hasPermission={permissions.group.write} />
               ) : null}
             </td>
+            <td className="p-3">
+              {permissions ? (
+                <PermissionIcon hasPermission={permissions.group.execute} />
+              ) : null}
+            </td>
           </tr>
           <tr>
             <td className="p-3 font-medium">Everyone else</td>
@@ -77,9 +88,17 @@ export default function PermissionsTable({
                 <PermissionIcon hasPermission={permissions.others.write} />
               ) : null}
             </td>
+            <td className="p-3">
+              <PermissionIcon hasPermission={permissions.others.execute} />
+            </td>
           </tr>
         </tbody>
       </table>
+      {file.is_dir && permissions.stickyBit ? (
+        <p className="mt-2 text-sm text-foreground/70">
+          Sticky bit set: only owner can delete and rename files
+        </p>
+      ) : null}
     </div>
   );
 }
