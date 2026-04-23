@@ -133,7 +133,7 @@ function NavList() {
         if (badge !== undefined && badge > 0) {
           return (
             <Badge
-              color="info"
+              color="secondary"
               key={title}
               overlap="square"
               placement="top-end"
