@@ -1,11 +1,18 @@
 """Apps module for fetching manifests, building commands, and managing cluster jobs."""
 
 import asyncio
-import fcntl
-import grp
+try:
+    import fcntl
+except ImportError:
+    fcntl = None  # type: ignore[assignment]
+try:
+    import grp
+    import pwd
+except ImportError:
+    grp = None  # type: ignore[assignment]
+    pwd = None  # type: ignore[assignment]
 import json
 import os
-import pwd
 import re
 import shlex
 import shutil
@@ -465,6 +472,7 @@ def verify_requirements(requirements: list[str]):
 
 # Characters that are dangerous in shell commands
 _SHELL_METACHAR_PATTERN = re.compile(r'[;&|`$(){}!<>\n\r]')
+_WINDOWS_DRIVE_PATTERN = re.compile(r'^[a-zA-Z]:/')
 
 
 def validate_path_for_shell(path_value: str) -> str | None:
@@ -486,7 +494,8 @@ def validate_path_for_shell(path_value: str) -> str | None:
     if ".." in normalized:
         return "Path must not contain '..'"
 
-    if not (normalized.startswith("/") or normalized.startswith("~") or normalized.startswith("./")):
+    if not (normalized.startswith("/") or normalized.startswith("~") or normalized.startswith("./")
+            or _WINDOWS_DRIVE_PATTERN.match(normalized)):
         return "Must be an absolute or relative path (starting with /, ~, or ./)"
 
     return None
@@ -583,8 +592,11 @@ def _validate_parameter_value(param: AppParameter, value, session=None) -> str:
         # where the shell would not perform tilde expansion.
         # Use euid so this works when the server runs as root with seteuid.
         if str_val.startswith("~/") or str_val == "~":
-            import pwd
-            home = pwd.getpwuid(os.geteuid()).pw_dir
+            try:
+                home = pwd.getpwuid(os.geteuid()).pw_dir
+            except (AttributeError, KeyError):
+                home = os.path.expanduser("~")
+            home = home.replace("\\", "/")
             str_val = home + str_val[1:]
         if session is not None:
             error = validate_path_in_filestore(str_val, session)

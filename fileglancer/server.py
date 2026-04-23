@@ -2,8 +2,12 @@ import logging
 import os
 import re
 import sys
-import pwd
-import grp
+try:
+    import pwd
+    import grp
+except ImportError:
+    pwd = None  # type: ignore[assignment]
+    grp = None  # type: ignore[assignment]
 import json
 import secrets
 from datetime import datetime, timedelta, timezone, UTC

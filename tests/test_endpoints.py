@@ -7,6 +7,7 @@ from unittest.mock import patch, MagicMock
 from urllib.parse import quote
 
 import pytest
+from conftest import requires_symlinks
 from fastapi.testclient import TestClient
 from pydantic import HttpUrl
 
@@ -897,6 +898,7 @@ def test_delete_ticket_not_found(mock_delete, test_client):
 
 # Symlink tests for /api/files and /api/content endpoints
 
+@requires_symlinks
 def test_get_files_with_symlink_to_same_fsp(test_client, temp_dir):
     """Test /api/files endpoint with a symlink pointing within the same FSP"""
     # Create a target directory within the FSP
@@ -923,6 +925,7 @@ def test_get_files_with_symlink_to_same_fsp(test_client, temp_dir):
     assert "target_file.txt" in file_names
 
 
+@requires_symlinks
 def test_get_files_with_symlink_outside_fsp(test_client, temp_dir):
     """Test /api/files endpoint with a symlink pointing outside the FSP"""
     # Create a separate directory outside the temp_dir (FSP root)
@@ -979,6 +982,7 @@ def test_get_files_with_symlink_outside_fsp(test_client, temp_dir):
         shutil.rmtree(external_dir)
 
 
+@requires_symlinks
 def test_get_files_with_nested_symlink_outside_fsp(test_client, temp_dir):
     """Test /api/files endpoint with a symlink pointing outside FSP to a subdirectory"""
     # Create a separate directory outside the temp_dir (FSP root - created above)
@@ -1039,6 +1043,7 @@ def test_get_files_with_nested_symlink_outside_fsp(test_client, temp_dir):
         shutil.rmtree(external_dir)
 
 
+@requires_symlinks
 def test_get_files_with_symlink_no_matching_fsp(test_client, temp_dir):
     """Test /api/files endpoint with a symlink pointing to a path with no matching FSP"""
     # Create a separate directory outside the temp_dir
@@ -1068,6 +1073,7 @@ def test_get_files_with_symlink_no_matching_fsp(test_client, temp_dir):
         shutil.rmtree(external_dir)
 
 
+@requires_symlinks
 def test_get_content_with_symlink_to_same_fsp(test_client, temp_dir):
     """Test /api/content endpoint with a symlink pointing within the same FSP"""
     # Create a target file within the FSP
@@ -1086,6 +1092,7 @@ def test_get_content_with_symlink_to_same_fsp(test_client, temp_dir):
     assert response.text == target_content
 
 
+@requires_symlinks
 def test_get_content_with_symlink_outside_fsp(test_client, temp_dir):
     """Test /api/content endpoint with a symlink pointing outside the FSP"""
     # Create a separate directory outside the temp_dir (FSP root)
@@ -1140,6 +1147,7 @@ def test_get_content_with_symlink_outside_fsp(test_client, temp_dir):
         shutil.rmtree(external_dir)
 
 
+@requires_symlinks
 def test_get_content_with_symlink_no_matching_fsp(test_client, temp_dir):
     """Test /api/content endpoint with a symlink pointing to a path with no matching FSP"""
     # Create a separate directory outside the temp_dir
@@ -1169,6 +1177,7 @@ def test_get_content_with_symlink_no_matching_fsp(test_client, temp_dir):
         shutil.rmtree(external_dir)
 
 
+@requires_symlinks
 def test_get_content_traversal_through_directory_symlink(test_client, temp_dir):
     """Test that accessing a file through a directory symlink pointing outside the FSP is blocked"""
     external_dir = tempfile.mkdtemp()
@@ -1194,6 +1203,7 @@ def test_get_content_traversal_through_directory_symlink(test_client, temp_dir):
         shutil.rmtree(external_dir)
 
 
+@requires_symlinks
 def test_get_content_double_hop_symlink(test_client, temp_dir):
     """Test that accessing a file through a chain of symlinks pointing outside the FSP is blocked"""
     external_dir = tempfile.mkdtemp()
@@ -1225,6 +1235,7 @@ def test_get_content_double_hop_symlink(test_client, temp_dir):
         shutil.rmtree(hop_dir)
 
 
+@requires_symlinks
 def test_head_content_with_symlink(test_client, temp_dir):
     """Test HEAD request to /api/content endpoint with a symlink"""
     # Create a target file within the FSP
@@ -1398,6 +1409,7 @@ def test_proxy_reject_mismatched_url_prefix(test_client, temp_dir):
     assert response.status_code == 404
 
 
+@requires_symlinks
 def test_broken_symlink_in_file_listing(test_client, temp_dir):
     """Test that broken symlinks appear in /api/files response with correct properties"""
     # Create a broken symlink pointing to a nonexistent path

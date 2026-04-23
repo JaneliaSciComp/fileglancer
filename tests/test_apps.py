@@ -551,7 +551,7 @@ class TestBuildCommandTildeExpansion:
     def test_tilde_expanded_in_directory_param(self, entry_point):
         import os
         cmd = build_command(entry_point, {"output_dir": "~/data/output"})
-        home = os.path.expanduser("~")
+        home = os.path.expanduser("~").replace("\\", "/")
         expected = f"{home}/data/output"
         assert expected in cmd
         assert "~" not in cmd
@@ -559,7 +559,7 @@ class TestBuildCommandTildeExpansion:
     def test_bare_tilde_expanded(self, entry_point):
         import os
         cmd = build_command(entry_point, {"output_dir": "~"})
-        home = os.path.expanduser("~")
+        home = os.path.expanduser("~").replace("\\", "/")
         assert home in cmd
         assert "~" not in cmd
 
