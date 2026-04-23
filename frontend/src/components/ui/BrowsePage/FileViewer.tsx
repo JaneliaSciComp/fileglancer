@@ -173,7 +173,7 @@ export default function FileViewer({ file }: FileViewerProps) {
         const formatter = new Formatter();
         formatter.Options.IndentSpaces = 2;
         formatter.Options.MaxTableRowComplexity = 1;
-        displayContent = formatter.Serialize(parsed);
+        displayContent = formatter.Serialize(parsed) ?? content;
       } catch {
         // If JSON parsing fails, show original content
         displayContent = content;
