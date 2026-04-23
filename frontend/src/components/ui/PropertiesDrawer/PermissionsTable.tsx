@@ -23,82 +23,93 @@ export default function PermissionsTable({
   const permissions = parsePermissions(file.permissions);
 
   return (
-    <div className="w-full min-w-max overflow-hidden rounded-lg border border-surface mt-4">
-      <table className="w-full min-w-max">
-        <thead className="border-b border-surface bg-surface-dark text-sm font-medium">
-          <tr>
-            <th className="px-3 py-2 text-start font-medium">
-              Who can view or edit this data?
-            </th>
-            <th className="px-3 py-2 text-center font-medium">Read</th>
-            <th className="px-3 py-2 text-center font-medium">Write</th>
-            <th className="px-3 py-2 text-center font-medium">Execute</th>
-          </tr>
-        </thead>
-        <tbody className="text-sm">
-          <tr className="border-b border-surface">
-            <td className="p-3 font-medium">
-              Owner: {file ? file.owner : null}
-            </td>
-            <td className="p-3">
-              {permissions ? (
-                <PermissionIcon hasPermission={permissions.owner.read} />
-              ) : null}
-            </td>
-            <td className="p-3">
-              {permissions ? (
-                <PermissionIcon hasPermission={permissions.owner.write} />
-              ) : null}
-            </td>
-            <td className="p-3">
-              {permissions ? (
-                <PermissionIcon hasPermission={permissions.owner.execute} />
-              ) : null}
-            </td>
-          </tr>
-          <tr className="border-b border-surface">
-            <td className="p-3 font-medium">
-              Group: {file ? file.group : null}
-            </td>
-            <td className="p-3">
-              {permissions ? (
-                <PermissionIcon hasPermission={permissions.group.read} />
-              ) : null}
-            </td>
-            <td className="p-3">
-              {permissions ? (
-                <PermissionIcon hasPermission={permissions.group.write} />
-              ) : null}
-            </td>
-            <td className="p-3">
-              {permissions ? (
-                <PermissionIcon hasPermission={permissions.group.execute} />
-              ) : null}
-            </td>
-          </tr>
-          <tr>
-            <td className="p-3 font-medium">Everyone else</td>
-            <td className="p-3">
-              {permissions ? (
-                <PermissionIcon hasPermission={permissions.others.read} />
-              ) : null}
-            </td>
-            <td className="p-3">
-              {permissions ? (
-                <PermissionIcon hasPermission={permissions.others.write} />
-              ) : null}
-            </td>
-            <td className="p-3">
-              <PermissionIcon hasPermission={permissions.others.execute} />
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      {file.is_dir && permissions.stickyBit ? (
-        <p className="mt-2 text-sm text-foreground/70">
-          Sticky bit set: only owner can delete and rename files
-        </p>
-      ) : null}
-    </div>
+    <>
+      <div className="w-full min-w-[333px] overflow-hidden rounded-lg border border-surface mt-4">
+        <table className="w-full">
+          <thead className="border-b border-surface bg-surface-dark text-sm">
+            <tr>
+              <th className="px-3 py-2 text-start font-medium">Who</th>
+              <th className="px-3 py-2 text-start font-medium">Read</th>
+              <th className="px-3 py-2 text-start font-medium">Write</th>
+              <th className="px-3 py-2 text-start font-medium">Execute</th>
+            </tr>
+          </thead>
+          <tbody className="text-sm">
+            <tr className="border-b border-surface">
+              <td className="p-3 font-medium">
+                Owner: {file ? file.owner : null}
+              </td>
+              <td className="p-3">
+                {permissions ? (
+                  <PermissionIcon hasPermission={permissions.owner.read} />
+                ) : null}
+              </td>
+              <td className="p-3">
+                {permissions ? (
+                  <PermissionIcon hasPermission={permissions.owner.write} />
+                ) : null}
+              </td>
+              <td className="p-3">
+                {permissions ? (
+                  <PermissionIcon hasPermission={permissions.owner.execute} />
+                ) : null}
+              </td>
+            </tr>
+            <tr className="border-b border-surface">
+              <td className="p-3 font-medium">
+                Group: {file ? file.group : null}
+              </td>
+              <td className="p-3">
+                {permissions ? (
+                  <PermissionIcon hasPermission={permissions.group.read} />
+                ) : null}
+              </td>
+              <td className="p-3">
+                {permissions ? (
+                  <PermissionIcon hasPermission={permissions.group.write} />
+                ) : null}
+              </td>
+              <td className="p-3">
+                {permissions ? (
+                  <PermissionIcon hasPermission={permissions.group.execute} />
+                ) : null}
+              </td>
+            </tr>
+            <tr>
+              <td className="p-3 font-medium">Everyone else</td>
+              <td className="p-3">
+                {permissions ? (
+                  <PermissionIcon hasPermission={permissions.others.read} />
+                ) : null}
+              </td>
+              <td className="p-3">
+                {permissions ? (
+                  <PermissionIcon hasPermission={permissions.others.write} />
+                ) : null}
+              </td>
+              <td className="p-3">
+                {permissions ? (
+                  <PermissionIcon hasPermission={permissions.others.execute} />
+                ) : null}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div className="w-full min-w-[333px] overflow-hidden rounded-lg border border-surface my-2">
+        <table className="w-full">
+          <tbody className="text-sm">
+            <tr>
+              <td className="p-3">Only owner can delete or rename files?</td>
+              <td className="p-3">
+                {permissions ? (
+                  <PermissionIcon hasPermission={permissions.stickyBit} />
+                ) : null}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
