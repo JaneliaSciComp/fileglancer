@@ -453,14 +453,15 @@ export function useUpdateMyData() {
 ## Build Output
 
 - **Development build**: Outputs to `../fileglancer/ui/`
-- **Served by**: FastAPI backend at `/fg/` path
-- **Static assets**: `/fg/assets/` (Vite asset hashing applied)
+- **Served by**: FastAPI backend at `/` path
+- **Static assets**: `/assets/` (Vite asset hashing applied)
 
 ## Environment Variables
 
 - `.env` - Local environment configuration
 - Variables must be prefixed with `VITE_` to be exposed to frontend
 - Access via `import.meta.env.VITE_VAR_NAME`
+- `VITE_DESIGN_SYSTEM_PREVIEW` - When `true`, exposes `/design-system` and `/design-system/colors` routes for the design system preview.
 
 ## Troubleshooting
 
