@@ -340,15 +340,15 @@ export function useUpdateMyData() {
 
 ### Routing
 
-- **Base path**: `/fg/` (configured in `vite.config.ts`)
+- **Base path**: `/` (configured in `vite.config.ts`)
 - **Routes**:
-  - `/fg/` - Dashboard/Browse (default)
-  - `/fg/browse` - File browser
-  - `/fg/jobs` - Background jobs
-  - `/fg/links` - Data links management
-  - `/fg/help` - Help/support
-  - `/fg/preferences` - User preferences
-  - `/fg/notifications` - Notifications
+  - `/` - Dashboard/Browse (default)
+  - `/browse` - File browser
+  - `/jobs` - Background jobs
+  - `/links` - Data links management
+  - `/help` - Help/support
+  - `/preferences` - User preferences
+  - `/notifications` - Notifications
 - **Route definitions**: See `src/App.tsx`
 - **Navigation**: Use React Router's `useNavigate()`, `Link`, or `NavLink`
 
