@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { HiDownload, HiHome, HiOutlinePlus, HiSearch } from 'react-icons/hi';
+
+import FgBadge from '@/components/designSystem/atoms/FgBadge';
 import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgLink from '@/components/designSystem/atoms/FgLink';
@@ -35,6 +37,46 @@ function IconPreview() {
       </PreviewCard>
     </div>
   );
+
+function BadgePreview() {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-foreground">FgBadge</h3>
+      <PreviewCard>
+        <SectionLabel>Color palette</SectionLabel>
+        <Row>
+          <FgBadge color="primary">Primary</FgBadge>
+          <FgBadge color="secondary">Secondary</FgBadge>
+          <FgBadge color="success">Success</FgBadge>
+          <FgBadge color="error">Error</FgBadge>
+          <FgBadge color="warning">Warning</FgBadge>
+          <FgBadge color="info">Info</FgBadge>
+          <FgBadge color="neutral">Neutral</FgBadge>
+        </Row>
+
+        <SectionLabel>Variants</SectionLabel>
+        <Row>
+          <FgBadge variant="default">Default</FgBadge>
+          <FgBadge variant="pill">Pill</FgBadge>
+        </Row>
+
+        <SectionLabel>With dot indicator</SectionLabel>
+        <Row>
+          <FgBadge color="success" dot>
+            Active
+          </FgBadge>
+          <FgBadge color="error" dot>
+            Offline
+          </FgBadge>
+          <FgBadge color="warning" dot variant="pill">
+            Pending
+          </FgBadge>
+        </Row>
+      </PreviewCard>
+    </div>
+  );
+}
+
 function LinkPreview() {
   return (
     <div className="space-y-4">
@@ -128,6 +170,7 @@ export default function PreviewPage() {
         </Link>
       </div>
 
+          <BadgePreview />
           <LinkPreview />
           <ExternalLinkPreview />
     </div>
