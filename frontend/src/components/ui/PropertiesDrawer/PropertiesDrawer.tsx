@@ -1,12 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, IconButton, Typography, Tabs } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
-import {
-  HiExternalLink,
-  HiOutlineDocument,
-  HiOutlineDuplicate,
-  HiX
-} from 'react-icons/hi';
+import { HiOutlineDocument, HiOutlineDuplicate, HiX } from 'react-icons/hi';
 import { HiFolder } from 'react-icons/hi2';
 import { useLocation } from 'react-router';
 
@@ -16,6 +11,7 @@ import PermissionsTable from '@/components/ui/PropertiesDrawer/PermissionsTable'
 import OverviewTable from '@/components/ui/PropertiesDrawer/OverviewTable';
 import TicketDetails from '@/components/ui/PropertiesDrawer/TicketDetails';
 import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
 import DataLinkUsageDialog from '@/components/ui/Dialogs/dataLinkUsage/DataLinkUsageDialog';
@@ -308,17 +304,12 @@ export default function PropertiesDrawer({
                     </Typography>
                     {!externalDataUrlQuery.data &&
                     !proxiedPathByFspAndPathQuery.data ? (
-                      <a
-                        className="flex items-center gap-1 text-primary hover:underline"
+                      <FgExternalLink
                         href="https://fileglancer-docs.janelia.org/features/data-sharing/"
-                        rel="noopener noreferrer"
-                        target="_blank"
+                        size="sm"
                       >
-                        <Typography type="small">
-                          Learn more about data links
-                        </Typography>
-                        <HiExternalLink className="icon-xsmall" />
-                      </a>
+                        Learn more about data links
+                      </FgExternalLink>
                     ) : null}
                   </div>
                   {(externalDataUrlQuery.data ??

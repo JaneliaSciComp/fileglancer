@@ -5,7 +5,6 @@ import { Card, Tabs, Typography } from '@material-tailwind/react';
 import {
   HiOutlineArrowLeft,
   HiOutlineDownload,
-  HiOutlineExternalLink,
   HiOutlineRefresh,
   HiOutlineStop
 } from 'react-icons/hi';
@@ -32,6 +31,7 @@ import {
   useJobFileQuery,
   useCancelJobMutation
 } from '@/queries/jobsQueries';
+import FgExternalLink from './designSystem/atoms/FgExternalLink';
 
 function FilePreview({
   content,
@@ -313,18 +313,11 @@ export default function JobDetail() {
                   onClick={() => setShowStopConfirm(true)}
                   size="sm"
                 >
-                  <HiOutlineStop className="icon-small mr-1" />
-                  {cancelMutation.isPending ? 'Stopping...' : 'Stop Service'}
-                </Button>
-                <a
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-success text-success-foreground hover:bg-success/90 transition-colors"
-                  href={job.service_url}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  <HiOutlineExternalLink className="h-4 w-4" />
+                  Stop Service
+                </FgButton>
+                <FgExternalLink href={job.service_url}>
                   Open Service
-                </a>
+                </FgExternalLink>
               </div>
             ) : (
               <div className="mb-4 p-3 flex items-center gap-3 border border-warning rounded-lg bg-warning/10">

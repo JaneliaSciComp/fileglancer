@@ -1,6 +1,7 @@
 import logger from '@/logger';
 import { Typography } from '@material-tailwind/react';
 
+import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 import FgLink from '@/components/designSystem/atoms/FgLink';
 import errorImg from '@/assets/error_icon_gradient.png';
 import useVersionQuery from '@/queries/versionQuery';
@@ -29,16 +30,13 @@ export default function ErrorFallback({ error }: any) {
             Oops! An unknown error occurred
           </Typography>
         )}
-        <Typography
-          as={Link}
-          className="text-surface-foreground underline"
-          rel="noopener noreferrer"
-          target="_blank"
-          to={`https://forms.clickup.com/10502797/f/a0gmd-713/NBUCBCIN78SI2BE71G?Version=${versionQuery.data?.version}&URL=${window.location}`}
-          type="h5"
+        <FgExternalLink
+          className="text-surface-foreground underline text-xl font-semibold"
+          href={`https://forms.clickup.com/10502797/f/a0gmd-713/NBUCBCIN78SI2BE71G?Version=${versionQuery.data?.version}&URL=${window.location}`}
+          size="lg"
         >
           Submit a bug report
-        </Typography>
+        </FgExternalLink>
 
         <FgLink
           className="text-surface-foreground underline text-xl font-semibold"

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { HiDownload, HiHome, HiOutlinePlus, HiSearch } from 'react-icons/hi';
+import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgLink from '@/components/designSystem/atoms/FgLink';
 function SectionLabel({ children }: { readonly children: string }) {
@@ -56,6 +57,36 @@ function LinkPreview() {
   );
 }
 
+function ExternalLinkPreview() {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-foreground">FgExternalLink</h3>
+      <PreviewCard>
+        <SectionLabel>With and without icon</SectionLabel>
+        <Row>
+          <FgExternalLink href="https://example.com">With icon</FgExternalLink>
+          <FgExternalLink href="https://example.com" showIcon={false}>
+            Without icon
+          </FgExternalLink>
+        </Row>
+
+        <SectionLabel>Sizes</SectionLabel>
+        <Row>
+          <FgExternalLink href="https://example.com" size="sm">
+            Small
+          </FgExternalLink>
+          <FgExternalLink href="https://example.com" size="md">
+            Medium
+          </FgExternalLink>
+          <FgExternalLink href="https://example.com" size="lg">
+            Large
+          </FgExternalLink>
+        </Row>
+      </PreviewCard>
+    </div>
+  );
+}
+
 export default function PreviewPage() {
   const [isDark, setIsDark] = useState(
     document.documentElement.classList.contains('dark')
@@ -98,6 +129,7 @@ export default function PreviewPage() {
       </div>
 
           <LinkPreview />
+          <ExternalLinkPreview />
     </div>
   );
 }
