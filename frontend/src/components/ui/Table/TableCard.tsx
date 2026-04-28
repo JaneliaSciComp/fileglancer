@@ -40,6 +40,7 @@ import {
 import { HiXMark } from 'react-icons/hi2';
 import toast from 'react-hot-toast';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import { TableRowSkeleton } from '@/components/ui/widgets/Loaders';
 import { formatDateString } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
@@ -90,12 +91,13 @@ function SortIcons<TData, TValue>({
   return (
     <div className="flex items-center">
       {{
-        asc: <HiSortAscending className="icon-default text-foreground" />,
-        desc: <HiSortDescending className="icon-default text-foreground" />
+        asc: <FgIcon className="text-foreground" icon={HiSortAscending} />,
+        desc: <FgIcon className="text-foreground" icon={HiSortDescending} />
       }[header.column.getIsSorted() as string] ?? null}
       {header.column.getCanSort() ? (
-        <HiOutlineSwitchVertical
-          className={`icon-default text-foreground/40 dark:text-foreground/60 hover:text-foreground/100 group-hover/sort:text-foreground/100 ${(header.column.getIsSorted() as string) ? 'hidden' : ''}`}
+        <FgIcon
+          className={`text-foreground/40 dark:text-foreground/60 hover:text-foreground/100 group-hover/sort:text-foreground/100 ${(header.column.getIsSorted() as string) ? 'hidden' : ''}`}
+          icon={HiOutlineSwitchVertical}
         />
       ) : null}
     </div>
@@ -121,7 +123,7 @@ const DebouncedInput = forwardRef<
         value={value}
       >
         <Input.Icon>
-          <HiOutlineSearch />
+          <FgIcon icon={HiOutlineSearch} />
         </Input.Icon>
       </Input>
     </div>
@@ -224,25 +226,25 @@ function TableHeader({
               disabled={!table.getCanPreviousPage()}
               onClick={() => table.firstPage()}
             >
-              <HiChevronDoubleLeft className="icon-default" />
+              <FgIcon icon={HiChevronDoubleLeft} />
             </IconButton>
             <IconButton
               disabled={!table.getCanPreviousPage()}
               onClick={() => table.previousPage()}
             >
-              <HiChevronLeft className="icon-default" />
+              <FgIcon icon={HiChevronLeft} />
             </IconButton>
             <IconButton
               disabled={!table.getCanNextPage()}
               onClick={() => table.nextPage()}
             >
-              <HiChevronRight className="icon-default" />
+              <FgIcon icon={HiChevronRight} />
             </IconButton>
             <IconButton
               disabled={!table.getCanNextPage()}
               onClick={() => table.lastPage()}
             >
-              <HiChevronDoubleRight className="icon-default" />
+              <FgIcon icon={HiChevronDoubleRight} />
             </IconButton>
           </ButtonGroup>
         </div>
@@ -279,7 +281,7 @@ function TableHeader({
               onClick={clearSearch}
               type="button"
             >
-              <HiXMark className="h-5 w-5 font-bold" />
+              <FgIcon className="font-bold" icon={HiXMark} />
             </button>
           ) : null}
         </div>

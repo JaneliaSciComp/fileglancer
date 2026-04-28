@@ -6,6 +6,8 @@ import {
 } from 'react-icons/hi';
 import { HiOutlineExclamationTriangle } from 'react-icons/hi2';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
+
 const formatNotificationDate = (dateString?: string): string => {
   if (!dateString) {
     return '';
@@ -39,18 +41,16 @@ const formatNotificationDate = (dateString?: string): string => {
 };
 
 export const NotificationIcon = ({ type }: { readonly type: string }) => {
-  const iconClass = 'h-5 w-5';
-
   switch (type) {
     case 'warning':
-      return <HiOutlineExclamationTriangle className={iconClass} />;
+      return <FgIcon icon={HiOutlineExclamationTriangle} />;
     case 'success':
-      return <HiOutlineCheckCircle className={iconClass} />;
+      return <FgIcon icon={HiOutlineCheckCircle} />;
     case 'error':
-      return <HiOutlineXCircle className={iconClass} />;
+      return <FgIcon icon={HiOutlineXCircle} />;
     case 'info':
     default:
-      return <HiOutlineInformationCircle className={iconClass} />;
+      return <FgIcon icon={HiOutlineInformationCircle} />;
   }
 };
 
@@ -142,7 +142,7 @@ export const NotificationItem = ({
           onClick={() => onDismiss(notification.id)}
           type="button"
         >
-          <HiOutlineX className="h-4 w-4" />
+          <FgIcon icon={HiOutlineX} size="sm" />
         </button>
       ) : null}
       {isDismissed ? (

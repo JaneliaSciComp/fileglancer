@@ -1,7 +1,38 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
+import { HiDownload, HiHome, HiOutlinePlus, HiSearch } from 'react-icons/hi';
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
+function SectionLabel({ children }: { readonly children: string }) {
+  return <p className="text-sm font-medium text-foreground/70">{children}</p>;
+}
 
-const componentCategories = ['Atoms', 'Molecules', 'Organisms', 'Templates'];
+function Row({ children }: { readonly children: React.ReactNode }) {
+  return <div className="flex flex-wrap items-center gap-3">{children}</div>;
+}
+
+function PreviewCard({ children }: { readonly children: React.ReactNode }) {
+  return (
+    <div className="space-y-4 rounded-lg border border-surface-dark p-4">
+      {children}
+    </div>
+  );
+}
+
+function IconPreview() {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-foreground">FgIcon</h3>
+      <PreviewCard>
+        <SectionLabel>Sizes</SectionLabel>
+        <Row>
+          <FgIcon icon={HiHome} label="Home xs" size="xs" />
+          <FgIcon icon={HiHome} label="Home sm" size="sm" />
+          <FgIcon icon={HiHome} label="Home md" size="md" />
+          <FgIcon icon={HiHome} label="Home lg" size="lg" />
+        </Row>
+      </PreviewCard>
+    </div>
+  );
 
 export default function PreviewPage() {
   const [isDark, setIsDark] = useState(

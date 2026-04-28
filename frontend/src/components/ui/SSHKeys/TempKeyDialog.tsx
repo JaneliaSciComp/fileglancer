@@ -7,6 +7,7 @@ import {
 } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import type { TempKeyResult } from '@/queries/sshKeyQueries';
 
@@ -48,7 +49,11 @@ export default function TempKeyDialog({
   return (
     <FgDialog onClose={handleClose} open={true}>
       <div className="flex items-center gap-2 mb-4">
-        <HiOutlineExclamation className="text-warning h-6 w-6" />
+        <FgIcon
+          className="h-6 w-6"
+          color="warning"
+          icon={HiOutlineExclamation}
+        />
         <Typography className="text-foreground font-semibold text-lg">
           SSH Key Generated
         </Typography>

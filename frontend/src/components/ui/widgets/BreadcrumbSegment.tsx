@@ -5,7 +5,8 @@ import {
 } from '@material-tailwind/react';
 import { HiMiniSlash } from 'react-icons/hi2';
 
-import { FgStyledLink } from '@/components/ui/widgets/FgLink';
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
+import FgLink from '@/components/designSystem/atoms/FgLink';
 
 type BreadcrumbSegmentProps = {
   readonly label: string;
@@ -44,7 +45,7 @@ export default function BreadcrumbSegment({
     <>
       {to ? (
         // React Router navigation
-        <BreadcrumbLink as={FgStyledLink} to={to}>
+        <BreadcrumbLink as={FgLink} to={to}>
           <Typography className="font-medium text-primary-dark" variant="small">
             {label}
           </Typography>
@@ -62,9 +63,9 @@ export default function BreadcrumbSegment({
       )}
       <BreadcrumbSeparator>
         {pathPreference[0] === 'windows_path' ? (
-          <HiMiniSlash className="icon-default transform scale-x-[-1]" />
+          <FgIcon className="transform scale-x-[-1]" icon={HiMiniSlash} />
         ) : (
-          <HiMiniSlash className="icon-default" />
+          <FgIcon icon={HiMiniSlash} />
         )}
       </BreadcrumbSeparator>
     </>

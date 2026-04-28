@@ -5,6 +5,8 @@ import { HiOutlineStar, HiStar } from 'react-icons/hi';
 import { HiOutlineRectangleStack } from 'react-icons/hi2';
 import toast from 'react-hot-toast';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
+
 import type { FileSharePath } from '@/shared.types';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import {
@@ -38,7 +40,11 @@ export default function FileSharePathComponent({
         to={link}
       >
         <div className="flex gap-1 items-center max-w-full">
-          <HiOutlineRectangleStack className="icon-small short:icon-xsmall stroke-2" />
+          <FgIcon
+            className="short:icon-xsmall stroke-2"
+            icon={HiOutlineRectangleStack}
+            size="sm"
+          />
           <Typography className="truncate text-sm leading-4 short:text-xs font-semibold">
             {fsp.storage}
           </Typography>
@@ -75,9 +81,17 @@ export default function FileSharePathComponent({
             variant="ghost"
           >
             {isFavoritePath ? (
-              <HiStar className="icon-small short:icon-xsmall mb-[2px]" />
+              <FgIcon
+                className="short:icon-xsmall mb-[2px]"
+                icon={HiStar}
+                size="sm"
+              />
             ) : (
-              <HiOutlineStar className="icon-small short:icon-xsmall mb-[2px]" />
+              <FgIcon
+                className="short:icon-xsmall mb-[2px]"
+                icon={HiOutlineStar}
+                size="sm"
+              />
             )}
           </IconButton>
         </div>

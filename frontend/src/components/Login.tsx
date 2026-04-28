@@ -1,6 +1,8 @@
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { HiQuestionMarkCircle, HiLogin } from 'react-icons/hi';
+
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useSimpleLoginMutation } from '@/queries/authQueries';
 import { useEffect } from 'react';
@@ -60,7 +62,11 @@ export default function Login() {
           className="flex items-start p-6 border rounded-lg dark:border-surface-light hover:bg-accent hover:border-accent-foreground transition-colors group"
           to="/help"
         >
-          <HiQuestionMarkCircle className="w-8 h-8 mr-4 text-primary flex-shrink-0" />
+          <FgIcon
+            className="mr-4 text-primary flex-shrink-0"
+            icon={HiQuestionMarkCircle}
+            size="lg"
+          />
           <div>
             <h2 className="text-xl font-semibold mb-2 group-hover:text-accent-foreground">
               Help & Documentation
@@ -112,7 +118,11 @@ export default function Login() {
         ) : (
           <div className="p-6 border-2 border-primary rounded-lg">
             <div className="flex items-start mb-4">
-              <HiLogin className="w-8 h-8 mr-4 text-primary flex-shrink-0 scale-x-[-1]" />
+              <FgIcon
+                className="mr-4 text-primary flex-shrink-0 scale-x-[-1]"
+                icon={HiLogin}
+                size="lg"
+              />
               <div>
                 <h2 className="text-xl font-semibold mb-2 text-primary">
                   Log In with OKTA

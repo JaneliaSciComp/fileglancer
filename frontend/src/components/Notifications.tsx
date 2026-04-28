@@ -1,5 +1,7 @@
 import { Card, Typography } from '@material-tailwind/react';
 import { HiOutlineInformationCircle } from 'react-icons/hi';
+
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import { useNotificationContext } from '@/contexts/NotificationsContext';
 import {
   getNotificationStyles,
@@ -52,7 +54,10 @@ export default function Notifications() {
         </div>
       ) : notifications.length === 0 ? (
         <Card className="p-8 text-center dark:border-surface-light">
-          <HiOutlineInformationCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <FgIcon
+            className="h-12 w-12 mx-auto text-muted-foreground mb-4"
+            icon={HiOutlineInformationCircle}
+          />
           <Typography className="text-foreground mb-2" type="h6">
             No notifications
           </Typography>

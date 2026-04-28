@@ -4,6 +4,7 @@ import { Button, Input, Typography } from '@material-tailwind/react';
 import { HiOutlineFolder, HiOutlineFunnel, HiXMark } from 'react-icons/hi2';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FileSelectorBreadcrumbs from './FileSelectorBreadcrumbs';
 import FileSelectorTable from './FileSelectorTable';
 import { Spinner } from '@/components/ui/widgets/Loaders';
@@ -150,7 +151,7 @@ export default function FileSelectorButton({
               value={searchQuery}
             >
               <Input.Icon>
-                <HiOutlineFunnel className="h-full w-full" />
+                <FgIcon className="h-full w-full" icon={HiOutlineFunnel} />
               </Input.Icon>
             </Input>
             {searchQuery ? (
@@ -160,7 +161,7 @@ export default function FileSelectorButton({
                 onClick={clearSearch}
                 type="button"
               >
-                <HiXMark className="h-5 w-5 font-bold" />
+                <FgIcon className="font-bold" icon={HiXMark} />
               </button>
             ) : null}
           </div>

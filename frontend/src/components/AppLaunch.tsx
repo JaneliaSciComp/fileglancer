@@ -14,6 +14,7 @@ import {
 } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import AppLaunchForm from '@/components/ui/AppsPage/AppLaunchForm';
 import { buildGithubUrl } from '@/utils';
 import {

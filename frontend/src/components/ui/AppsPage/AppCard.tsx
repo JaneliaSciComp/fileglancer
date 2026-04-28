@@ -10,6 +10,7 @@ import {
 } from 'react-icons/hi';
 
 import AppInfoDialog from '@/components/ui/AppsPage/AppInfoDialog';
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import type { UserApp } from '@/shared.types';
 
@@ -52,7 +53,7 @@ export default function AppCard({
               size="sm"
               variant="ghost"
             >
-              <HiOutlineInformationCircle className="icon-default" />
+              <FgIcon icon={HiOutlineInformationCircle} />
             </IconButton>
           </FgTooltip>
           <FgTooltip label="Remove app">
@@ -68,7 +69,7 @@ export default function AppCard({
               size="sm"
               variant="ghost"
             >
-              <HiOutlineTrash className="icon-default" />
+              <FgIcon icon={HiOutlineTrash} />
             </IconButton>
           </FgTooltip>
         </div>

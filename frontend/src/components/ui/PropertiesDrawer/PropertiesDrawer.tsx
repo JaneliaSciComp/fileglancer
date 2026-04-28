@@ -16,6 +16,8 @@ import {
 import { HiFolder } from 'react-icons/hi2';
 import { useLocation } from 'react-router';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
+
 import PermissionsTable from '@/components/ui/PropertiesDrawer/PermissionsTable';
 import OverviewTable from '@/components/ui/PropertiesDrawer/OverviewTable';
 import TicketDetails from '@/components/ui/PropertiesDrawer/TicketDetails';
@@ -84,7 +86,7 @@ function CopyPathButton({
         }}
         variant="ghost"
       >
-        <HiOutlineDuplicate className="icon-small" />
+        <FgIcon icon={HiOutlineDuplicate} size="sm" />
       </IconButton>
     </div>
   );
@@ -148,7 +150,7 @@ export default function PropertiesDrawer({
             size="sm"
             variant="ghost"
           >
-            <HiX className="icon-default" />
+            <FgIcon icon={HiX} />
           </IconButton>
         </div>
 
@@ -158,9 +160,9 @@ export default function PropertiesDrawer({
             {fileBrowserState.propertiesTarget.is_symlink ? (
               <>
                 {fileBrowserState.propertiesTarget.symlink_target_fsp ? (
-                  <TbLink className="icon-default" />
+                  <FgIcon icon={TbLink} />
                 ) : (
-                  <TbLinkOff className="icon-default text-error" />
+                  <FgIcon color="error" icon={TbLinkOff} />
                 )}
                 <div className="flex flex-col min-w-0 gap-1">
                   <FgTooltip
@@ -176,9 +178,9 @@ export default function PropertiesDrawer({
             ) : (
               <>
                 {fileBrowserState.propertiesTarget.is_dir ? (
-                  <HiFolder className="icon-default" />
+                  <FgIcon icon={HiFolder} />
                 ) : (
-                  <HiOutlineDocument className="icon-default" />
+                  <FgIcon icon={HiOutlineDocument} />
                 )}
                 <FgTooltip
                   label={fileBrowserState.propertiesTarget.name}

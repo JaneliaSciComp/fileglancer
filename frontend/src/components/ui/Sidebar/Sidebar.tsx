@@ -2,6 +2,7 @@ import type { ChangeEvent } from 'react';
 import { Card, Input } from '@material-tailwind/react';
 import { HiOutlineFunnel, HiXMark } from 'react-icons/hi2';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FavoritesBrowser from './FavoritesBrowser';
 import ZonesBrowser from './ZonesBrowser';
 import useFilteredZonesAndFavorites from '@/hooks/useFilteredZonesAndFavorites';
@@ -31,7 +32,7 @@ export default function Sidebar() {
           value={searchQuery}
         >
           <Input.Icon>
-            <HiOutlineFunnel className="h-full w-full" />
+            <FgIcon className="h-full w-full" icon={HiOutlineFunnel} />
           </Input.Icon>
         </Input>
         {searchQuery ? (
@@ -41,7 +42,7 @@ export default function Sidebar() {
             onClick={clearSearch}
             type="button"
           >
-            <HiXMark className="h-5 w-5 font-bold" />
+            <FgIcon className="font-bold" icon={HiXMark} />
           </button>
         ) : null}
       </div>

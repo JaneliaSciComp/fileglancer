@@ -1,6 +1,7 @@
 import { Breadcrumb } from '@material-tailwind/react';
 import { HiChevronRight, HiOutlineSquares2X2 } from 'react-icons/hi2';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import BreadcrumbSegment from '@/components/ui/widgets/BreadcrumbSegment';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { makePathSegmentArray, joinPaths } from '@/utils/pathHandling';
@@ -88,8 +89,8 @@ export default function FileSelectorBreadcrumbs({
     <div className="w-full py-2 px-3 border-b border-surface">
       <Breadcrumb className="bg-transparent p-0">
         <div className="flex items-center gap-1 h-5">
-          <HiOutlineSquares2X2 className="icon-default text-primary-dark" />
-          <HiChevronRight className="icon-default" />
+          <FgIcon className="text-primary-dark" icon={HiOutlineSquares2X2} />
+          <FgIcon icon={HiChevronRight} />
         </div>
 
         {segments.map((segment, index) => {

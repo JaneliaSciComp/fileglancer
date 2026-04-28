@@ -20,7 +20,8 @@ import type { FileOrFolder } from '@/shared.types';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { makeBrowseLink } from '@/utils/index';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
-import { FgStyledLink } from '@/components/ui/widgets/FgLink';
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
+import FgLink from '@/components/designSystem/atoms/FgLink';
 import { SortIcons } from '@/components/ui/Table/TableCard';
 import {
   typeColumn,
@@ -122,13 +123,27 @@ export default function Table({
           return (
             <div className="flex items-center gap-3 min-w-0">
               {isBrokenSymlink ? (
-                <TbLinkOff className="text-error icon-default flex-shrink-0" />
+                <FgIcon
+                  className="flex-shrink-0"
+                  color="error"
+                  icon={TbLinkOff}
+                />
               ) : file.is_symlink ? (
-                <TbLink className="text-primary icon-default flex-shrink-0" />
+                <FgIcon
+                  className="flex-shrink-0"
+                  color="primary"
+                  icon={TbLink}
+                />
               ) : file.is_dir ? (
-                <HiFolder className="text-foreground icon-default flex-shrink-0" />
+                <FgIcon
+                  className="text-foreground flex-shrink-0"
+                  icon={HiFolder}
+                />
               ) : (
-                <TbFile className="text-foreground icon-default flex-shrink-0" />
+                <FgIcon
+                  className="text-foreground flex-shrink-0"
+                  icon={TbFile}
+                />
               )}
               <FgTooltip label={name} triggerClasses="max-w-full truncate">
                 {isBrokenSymlink ? (
@@ -137,7 +152,7 @@ export default function Table({
                   </Typography>
                 ) : !isBrokenSymlink ? (
                   <Typography
-                    as={FgStyledLink}
+                    as={FgLink}
                     className="truncate"
                     onClick={(e: MouseEvent) => e.stopPropagation()}
                     to={link ?? '#'}
@@ -174,7 +189,10 @@ export default function Table({
                 }}
                 variant="ghost"
               >
-                <HiOutlineEllipsisHorizontalCircle className="icon-default text-foreground" />
+                <FgIcon
+                  className="text-foreground"
+                  icon={HiOutlineEllipsisHorizontalCircle}
+                />
               </IconButton>
             </div>
           );

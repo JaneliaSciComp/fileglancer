@@ -9,6 +9,7 @@ import {
 } from '@material-tailwind/react';
 import { HiX } from 'react-icons/hi';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import {
   FolderFavorite,
   usePreferencesContext
@@ -55,7 +56,7 @@ export default function MissingFolderFavoriteDialog({
             size="sm"
             variant="outline"
           >
-            <HiX className="icon-default" />
+            <FgIcon icon={HiX} />
           </IconButton>
           <Typography className="my-8 text-large">
             Folder <span className="font-semibold">{displayPath}</span> does not

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button, Card, Typography } from '@material-tailwind/react';
 import { HiOutlinePlus, HiOutlineKey } from 'react-icons/hi';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import { useSSHKeysQuery } from '@/queries/sshKeyQueries';
 import type { TempKeyResult } from '@/queries/sshKeyQueries';
 import SSHKeyCard from '@/components/ui/SSHKeys/SSHKeyCard';
@@ -58,7 +59,11 @@ export default function SSHKeys() {
 
       {!isLoading && !error && !hasKeys ? (
         <Card className="mb-6 p-8 text-center dark:border-surface-light">
-          <HiOutlineKey className="mx-auto h-12 w-12 text-secondary mb-4" />
+          <FgIcon
+            className="mx-auto h-12 w-12 mb-4"
+            color="secondary"
+            icon={HiOutlineKey}
+          />
           <Typography className="text-foreground font-semibold mb-2">
             No SSH keys found
           </Typography>

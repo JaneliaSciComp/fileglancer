@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { HiChevronRight, HiOutlineDuplicate } from 'react-icons/hi';
 import { HiOutlineSquares2X2 } from 'react-icons/hi2';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import BreadcrumbSegment from '@/components/ui/widgets/BreadcrumbSegment';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
@@ -47,8 +48,8 @@ export default function Crumbs() {
     <div className="w-full py-2 px-3">
       <Breadcrumb className="bg-transparent p-0 group">
         <div className="flex items-center gap-1 h-5">
-          <HiOutlineSquares2X2 className="icon-default text-primary-dark" />
-          <HiChevronRight className="icon-default" />
+          <FgIcon className="text-primary-dark" icon={HiOutlineSquares2X2} />
+          <FgIcon icon={HiChevronRight} />
         </div>
 
         {/* Path segments */}
@@ -103,7 +104,7 @@ export default function Crumbs() {
           }}
           variant="ghost"
         >
-          <HiOutlineDuplicate className="icon-small" />
+          <FgIcon icon={HiOutlineDuplicate} size="sm" />
         </IconButton>
       </Breadcrumb>
     </div>

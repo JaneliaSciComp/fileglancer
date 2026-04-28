@@ -3,6 +3,8 @@ import { Dialog, Button, Typography } from '@material-tailwind/react';
 import { HiOutlineExclamationTriangle } from 'react-icons/hi2';
 import { HiRefresh } from 'react-icons/hi';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
+
 type ServerDownOverlayProps = {
   readonly open: boolean;
   readonly onRetry: () => void;
@@ -88,7 +90,11 @@ export function ServerDownOverlay({
         <Dialog.Content className="p-8 bg-surface-light max-w-md mx-auto">
           <div className="flex flex-col items-center text-center space-y-6">
             <div className="flex items-center justify-center w-16 h-16 bg-warning/10 rounded-full">
-              <HiOutlineExclamationTriangle className="w-8 h-8 text-warning" />
+              <FgIcon
+                className="w-8 h-8"
+                color="warning"
+                icon={HiOutlineExclamationTriangle}
+              />
             </div>
 
             <div className="space-y-2">
