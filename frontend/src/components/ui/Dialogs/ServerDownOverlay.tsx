@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Dialog, Button, Typography } from '@material-tailwind/react';
+import { Dialog, Typography } from '@material-tailwind/react';
 import { HiOutlineExclamationTriangle } from 'react-icons/hi2';
 import { HiRefresh } from 'react-icons/hi';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 
 type ServerDownOverlayProps = {
   readonly open: boolean;
@@ -40,15 +41,9 @@ function MessageContent() {
 
 function RetryButton({ onRetry }: { readonly onRetry: () => void }) {
   return (
-    <Button
-      autoFocus
-      className="w-full flex items-center justify-center gap-2"
-      color="primary"
-      onClick={onRetry}
-    >
-      <HiRefresh className="w-4 h-4" />
+    <FgButton autoFocus className="w-full" icon={HiRefresh} onClick={onRetry}>
       Try To Reconnect
-    </Button>
+    </FgButton>
   );
 }
 

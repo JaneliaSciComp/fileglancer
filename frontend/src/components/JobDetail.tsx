@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 
-import { Button, Card, Tabs, Typography } from '@material-tailwind/react';
+import { Card, Tabs, Typography } from '@material-tailwind/react';
 import {
   HiOutlineArrowLeft,
   HiOutlineDownload,
@@ -16,6 +16,7 @@ import {
 } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 import AnsiText from '@/components/ui/AppsPage/AnsiText';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import type { JobFileInfo, FileSharePath } from '@/shared.types';
 import JobStatusBadge from '@/components/ui/AppsPage/JobStatusBadge';
@@ -207,14 +208,14 @@ export default function JobDetail() {
 
   return (
     <div>
-      <Button
-        className="!rounded-md mb-6"
+      <FgButton
+        className="mb-6"
+        icon={HiOutlineArrowLeft}
         onClick={() => navigate('/apps/jobs')}
         variant="outline"
       >
-        <HiOutlineArrowLeft className="icon-small mr-2" />
         Back to Jobs
-      </Button>
+      </FgButton>
 
       {jobQuery.isPending ? (
         <div className="animate-pulse">
@@ -253,14 +254,13 @@ export default function JobDetail() {
               <Typography className="font-bold mb-1" type="h5">
                 {job.app_name} &mdash; {job.entry_point_name}
               </Typography>
-              <Button
-                className="!rounded-md"
+              <FgButton
+                icon={HiOutlineRefresh}
                 onClick={handleRelaunch}
                 variant="outline"
               >
-                <HiOutlineRefresh className="icon-small mr-2" />
                 Relaunch
-              </Button>
+              </FgButton>
             </div>
             <div className="flex flex-wrap items-center gap-4 mt-2">
               <JobStatusBadge status={job.status} />
@@ -304,10 +304,12 @@ export default function JobDetail() {
                     {job.service_url}
                   </a>
                 </Typography>
-                <Button
-                  className="!rounded-md"
+                <FgButton
                   color="error"
                   disabled={cancelMutation.isPending}
+                  icon={HiOutlineStop}
+                  loading={cancelMutation.isPending}
+                  loadingText="Stopping"
                   onClick={() => setShowStopConfirm(true)}
                   size="sm"
                 >
@@ -333,16 +335,16 @@ export default function JobDetail() {
                 <Typography className="text-foreground flex-1">
                   Service is starting up...
                 </Typography>
-                <Button
-                  className="!rounded-md"
+                <FgButton
                   color="error"
                   disabled={cancelMutation.isPending}
+                  loading={cancelMutation.isPending}
+                  loadingText="Stopping..."
                   onClick={() => setShowStopConfirm(true)}
                   size="sm"
                 >
-                  <HiOutlineStop className="icon-small mr-1" />
-                  {cancelMutation.isPending ? 'Stopping...' : 'Stop Service'}
-                </Button>
+                  Stop Service
+                </FgButton>
               </div>
             )
           ) : null}
@@ -360,24 +362,25 @@ export default function JobDetail() {
               and the URL will no longer be accessible.
             </Typography>
             <div className="flex justify-end gap-2">
-              <Button
-                className="!rounded-md"
+              <FgButton
                 onClick={() => setShowStopConfirm(false)}
+                variant="ghost"
               >
                 Cancel
-              </Button>
-              <Button
-                className="!rounded-md"
+              </FgButton>
+              <FgButton
                 color="error"
                 disabled={cancelMutation.isPending}
+                icon={HiOutlineStop}
+                loading={cancelMutation.isPending}
+                loadingText="Stopping..."
                 onClick={() => {
                   cancelMutation.mutate(job.id);
                   setShowStopConfirm(false);
                 }}
               >
-                <HiOutlineStop className="icon-small mr-1" />
-                {cancelMutation.isPending ? 'Stopping...' : 'Stop Service'}
-              </Button>
+                Stop Service
+              </FgButton>
             </div>
           </FgDialog>
 
@@ -448,16 +451,15 @@ export default function JobDetail() {
                   zonesAndFspMap={zonesAndFspQuery.data || {}}
                 />
                 {stdoutQuery.data !== undefined && stdoutQuery.data !== null ? (
-                  <Button
-                    className="!rounded-md"
+                  <FgButton
+                    icon={HiOutlineDownload}
                     onClick={() =>
                       handleDownload(stdoutQuery.data!, `job-${id}-stdout.log`)
                     }
                     size="sm"
                   >
-                    <HiOutlineDownload className="icon-small mr-2" />
                     Download
-                  </Button>
+                  </FgButton>
                 ) : null}
               </div>
               <FilePreview
@@ -477,16 +479,15 @@ export default function JobDetail() {
                   zonesAndFspMap={zonesAndFspQuery.data || {}}
                 />
                 {stderrQuery.data !== undefined && stderrQuery.data !== null ? (
-                  <Button
-                    className="!rounded-md"
+                  <FgButton
+                    icon={HiOutlineDownload}
                     onClick={() =>
                       handleDownload(stderrQuery.data!, `job-${id}-stderr.log`)
                     }
                     size="sm"
                   >
-                    <HiOutlineDownload className="icon-small mr-2" />
                     Download
-                  </Button>
+                  </FgButton>
                 ) : null}
               </div>
               <FilePreview

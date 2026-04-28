@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import { HiQuestionMarkCircle, HiLogin } from 'react-icons/hi';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useSimpleLoginMutation } from '@/queries/authQueries';
 import { useEffect } from 'react';
@@ -106,13 +107,14 @@ export default function Login() {
                   {simpleLoginMutation.error.message}
                 </div>
               ) : null}
-              <button
-                className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                disabled={simpleLoginMutation.isPending}
+              <FgButton
+                className="w-full"
+                loading={simpleLoginMutation.isPending}
+                loadingText="Logging in..."
                 type="submit"
               >
-                {simpleLoginMutation.isPending ? 'Logging in...' : 'Log In'}
-              </button>
+                Log In
+              </FgButton>
             </form>
           </div>
         ) : (
@@ -132,12 +134,12 @@ export default function Login() {
                 </p>
               </div>
             </div>
-            <a
-              className="block w-full px-4 py-2 bg-primary text-primary-foreground rounded-md font-medium text-center hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors"
+            <FgButton
+              className="w-full"
               href={`/api/auth/login?next=${encodeURIComponent(nextUrl)}`}
             >
               Log In
-            </a>
+            </FgButton>
           </div>
         )}
       </div>

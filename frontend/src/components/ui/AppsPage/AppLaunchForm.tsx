@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
-import { Accordion, Button, Tabs, Typography } from '@material-tailwind/react';
+import { Accordion, Tabs, Typography } from '@material-tailwind/react';
 import {
   HiChevronDown,
   HiOutlinePlus,
@@ -306,14 +306,14 @@ function EnvVarRows({
           </button>
         </div>
       ))}
-      <button
-        className="flex items-center gap-1 text-sm text-primary hover:text-primary-dark transition-colors"
+      <FgButton
+        icon={HiOutlinePlus}
         onClick={() => setEnvVars(prev => [...prev, { key: '', value: '' }])}
-        type="button"
+        size="sm"
+        variant="link"
       >
-        <HiOutlinePlus className="h-4 w-4" />
         Add variable
-      </button>
+      </FgButton>
     </div>
   );
 }
@@ -1031,20 +1031,16 @@ export default function AppLaunchForm({
   const hasSections = visibleParameters.some(isParameterSection);
 
   const submitButton = (
-    <Button
+    <FgButton
       className="!rounded-md"
-      disabled={submitting || validating}
+      disabled={validating || submitting}
+      icon={HiOutlinePlay}
+      loading={validating || submitting}
+      loadingText={validating ? 'Validating...' : 'Submitting...'}
       onClick={handleSubmit}
     >
-      <HiOutlinePlay className="icon-small mr-2" />
-      {validating
-        ? 'Validating...'
-        : submitting
-          ? 'Submitting...'
-          : entryPoint.type === 'service'
-            ? 'Start Service'
-            : 'Submit Job'}
-    </Button>
+      {entryPoint.type === 'service' ? 'Start Service' : 'Submit Job'}
+    </FgButton>
   );
 
   return (

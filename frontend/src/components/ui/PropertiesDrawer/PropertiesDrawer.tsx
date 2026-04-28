@@ -1,11 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  Button,
-  Card,
-  IconButton,
-  Typography,
-  Tabs
-} from '@material-tailwind/react';
+import { Card, IconButton, Typography, Tabs } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 import {
   HiExternalLink,
@@ -21,6 +15,7 @@ import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import PermissionsTable from '@/components/ui/PropertiesDrawer/PermissionsTable';
 import OverviewTable from '@/components/ui/PropertiesDrawer/OverviewTable';
 import TicketDetails from '@/components/ui/PropertiesDrawer/TicketDetails';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
 import DataLinkUsageDialog from '@/components/ui/Dialogs/dataLinkUsage/DataLinkUsageDialog';
@@ -368,8 +363,8 @@ export default function PropertiesDrawer({
               value="permissions"
             >
               <PermissionsTable file={fileBrowserState.propertiesTarget} />
-              <Button
-                className="!rounded-md !text-primary !text-nowrap !self-start"
+              <FgButton
+                className="!text-primary !text-nowrap !self-start"
                 disabled={fileBrowserState.propertiesTarget.hasWrite === false}
                 onClick={() => {
                   setShowPermissionsDialog(true);
@@ -377,7 +372,7 @@ export default function PropertiesDrawer({
                 variant="outline"
               >
                 Change Permissions
-              </Button>
+              </FgButton>
             </Tabs.Panel>
 
             {/*Task panel*/}
@@ -409,7 +404,7 @@ export default function PropertiesDrawer({
                       OME-Zarr format, suitable for viewing in external viewers
                       like Neuroglancer.
                     </Typography>
-                    <Button
+                    <FgButton
                       data-tour="open-conversion-request"
                       disabled={
                         fileBrowserState.propertiesTarget.hasRead === false
@@ -420,7 +415,7 @@ export default function PropertiesDrawer({
                       variant="outline"
                     >
                       Open conversion request
-                    </Button>
+                    </FgButton>
                   </>
                 )}
               </Tabs.Panel>

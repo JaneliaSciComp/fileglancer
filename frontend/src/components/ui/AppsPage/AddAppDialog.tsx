@@ -1,8 +1,8 @@
 import { useState } from 'react';
-
-import { Button, Typography } from '@material-tailwind/react';
+import { Typography } from '@material-tailwind/react';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 
 const GITHUB_URL_PATTERN = /^https?:\/\/github\.com\/[^/]+\/[^/]+\/?$/;
 
@@ -132,16 +132,17 @@ export default function AddAppDialog({
       </div>
 
       <div className="flex gap-3">
-        <Button
-          className="!rounded-md"
+        <FgButton
           disabled={!urlIsValid || adding}
+          loading={adding}
+          loadingText="Adding..."
           onClick={handleAdd}
         >
-          {adding ? 'Adding...' : 'Add App'}
-        </Button>
-        <Button className="!rounded-md" onClick={handleClose} variant="outline">
+          Add App
+        </FgButton>
+        <FgButton onClick={handleClose} variant="ghost">
           Cancel
-        </Button>
+        </FgButton>
       </div>
     </FgDialog>
   );

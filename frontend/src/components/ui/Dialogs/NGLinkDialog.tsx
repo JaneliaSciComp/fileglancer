@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { ChangeEvent } from 'react';
-import { Button, Typography } from '@material-tailwind/react';
+import { Typography } from '@material-tailwind/react';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import type {
@@ -13,6 +13,7 @@ import {
   validateJsonState,
   constructNeuroglancerUrl
 } from '@/utils';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 
 type NGLinkDialogProps = {
   readonly open: boolean;
@@ -446,26 +447,17 @@ export default function NGLinkDialog({
 
       {/* Action Buttons */}
       <div className="flex gap-3">
-        <Button
-          className="!rounded-md"
+        <FgButton
           disabled={pending}
+          loading={pending}
+          loadingText={isEditMode ? 'Saving...' : 'Creating...'}
           onClick={handleSubmit}
         >
-          {pending
-            ? isEditMode
-              ? 'Saving...'
-              : 'Creating...'
-            : isEditMode
-              ? 'Save and copy link'
-              : 'Create and copy link'}
-        </Button>
-        <Button
-          className="!rounded-md"
-          onClick={resetAndClose}
-          variant="outline"
-        >
+          {isEditMode ? 'Save and copy link' : 'Create and copy link'}
+        </FgButton>
+        <FgButton onClick={resetAndClose} variant="ghost">
           Cancel
-        </Button>
+        </FgButton>
       </div>
     </FgDialog>
   );

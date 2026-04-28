@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Card, Typography } from '@material-tailwind/react';
+import { Card, Typography } from '@material-tailwind/react';
 import { HiOutlinePlus, HiOutlineKey } from 'react-icons/hi';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
@@ -9,6 +9,7 @@ import SSHKeyCard from '@/components/ui/SSHKeys/SSHKeyCard';
 import GenerateTempKeyDialog from '@/components/ui/SSHKeys/GenerateTempKeyDialog';
 import TempKeyDialog from '@/components/ui/SSHKeys/TempKeyDialog';
 import { Spinner } from '@/components/ui/widgets/Loaders';
+import FgButton from './designSystem/atoms/FgButton';
 
 export default function SSHKeys() {
   const [showGenerateTempDialog, setShowGenerateTempDialog] = useState(false);
@@ -45,15 +46,9 @@ export default function SSHKeys() {
           <Typography className="text-error">
             Failed to load SSH keys: {error.message}
           </Typography>
-          <Button
-            className="mt-2"
-            color="error"
-            onClick={() => refetch()}
-            size="sm"
-            variant="outline"
-          >
+          <FgButton className="mt-2" onClick={() => refetch()} size="sm">
             Retry
-          </Button>
+          </FgButton>
         </Card>
       ) : null}
 
@@ -70,28 +65,26 @@ export default function SSHKeys() {
           <Typography className="text-secondary mb-4">
             Generate an SSH key to enable integration with Seqera Platform.
           </Typography>
-          <Button
-            color="primary"
+          <FgButton
+            icon={HiOutlinePlus}
             onClick={() => setShowGenerateTempDialog(true)}
             size="sm"
           >
-            <HiOutlinePlus className="icon-default mr-1" />
             New Key
-          </Button>
+          </FgButton>
         </Card>
       ) : null}
 
       {!isLoading && !error && hasKeys ? (
         <div className="mb-6">
           <div className="mb-4">
-            <Button
-              color="primary"
+            <FgButton
+              icon={HiOutlinePlus}
               onClick={() => setShowGenerateTempDialog(true)}
               size="sm"
             >
-              <HiOutlinePlus className="icon-default mr-1" />
               New Key
-            </Button>
+            </FgButton>
           </div>
           <div className="space-y-4">
             {keys.map(key => (
