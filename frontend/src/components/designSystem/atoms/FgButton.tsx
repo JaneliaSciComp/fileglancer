@@ -62,7 +62,11 @@ const FgButton = forwardRef<HTMLButtonElement, FgButtonProps>(
     const iconElement = icon ? <FgIcon icon={icon} size="sm" /> : null;
 
     const content = loading ? (
-      <Spinner text={loadingText} />
+      <Spinner
+        customClasses="border-current border-t-transparent"
+        text={loadingText}
+        textClasses="text-current"
+      />
     ) : (
       <span className="inline-flex items-center gap-2">
         {iconPosition === 'left' ? iconElement : null}
