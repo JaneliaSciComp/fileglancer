@@ -1,7 +1,7 @@
 import logger from '@/logger';
-import { Link } from 'react-router';
 import { Typography } from '@material-tailwind/react';
 
+import FgLink from '@/components/designSystem/atoms/FgLink';
 import errorImg from '@/assets/error_icon_gradient.png';
 import useVersionQuery from '@/queries/versionQuery';
 
@@ -40,16 +40,13 @@ export default function ErrorFallback({ error }: any) {
           Submit a bug report
         </Typography>
 
-        <Typography
-          as={Link}
-          className="text-surface-foreground underline"
-          rel="noopener noreferrer"
-          target="_blank"
+        <FgLink
+          className="text-surface-foreground underline text-xl font-semibold"
+          size="lg"
           to="/browse"
-          type="h5"
         >
           Go back home
-        </Typography>
+        </FgLink>
 
         <img
           alt="An icon showing a magnifying glass with a question mark hovering over an eye on a page"

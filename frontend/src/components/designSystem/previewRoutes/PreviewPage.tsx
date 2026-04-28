@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { HiDownload, HiHome, HiOutlinePlus, HiSearch } from 'react-icons/hi';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
+import FgLink from '@/components/designSystem/atoms/FgLink';
 function SectionLabel({ children }: { readonly children: string }) {
   return <p className="text-sm font-medium text-foreground/70">{children}</p>;
 }
@@ -33,6 +34,27 @@ function IconPreview() {
       </PreviewCard>
     </div>
   );
+function LinkPreview() {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-foreground">FgLink</h3>
+      <PreviewCard>
+        <SectionLabel>Sizes</SectionLabel>
+        <Row>
+          <FgLink size="sm" to="/design-system">
+            Small link
+          </FgLink>
+          <FgLink size="md" to="/design-system">
+            Medium link
+          </FgLink>
+          <FgLink size="lg" to="/design-system">
+            Large link
+          </FgLink>
+        </Row>
+      </PreviewCard>
+    </div>
+  );
+}
 
 export default function PreviewPage() {
   const [isDark, setIsDark] = useState(
@@ -75,24 +97,7 @@ export default function PreviewPage() {
         </Link>
       </div>
 
-      {/* Empty state */}
-      <p className="text-foreground/60">
-        Components will appear here as batches are built.
-      </p>
-
-      {/* Planned categories */}
-      <div className="space-y-6">
-        {componentCategories.map(category => (
-          <section key={category}>
-            <h2 className="border-b border-surface-dark pb-2 text-xl font-semibold text-foreground">
-              {category}
-            </h2>
-            <p className="mt-2 text-sm text-foreground/50">
-              No components yet.
-            </p>
-          </section>
-        ))}
-      </div>
+          <LinkPreview />
     </div>
   );
 }
