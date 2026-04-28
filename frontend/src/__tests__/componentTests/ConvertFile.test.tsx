@@ -71,9 +71,7 @@ describe('Convert File dialog', () => {
       'output_file.zarr'
     );
     await user.click(
-      screen.getByText('Submit', {
-        selector: 'button[type="submit"]'
-      })
+      screen.getByRole('button', { name: 'Submit' })
     );
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith('Ticket created!');
@@ -104,9 +102,7 @@ describe('Convert File dialog', () => {
       'output_file.zarr'
     );
     await user.click(
-      screen.getByText('Submit', {
-        selector: 'button[type="submit"]'
-      })
+      screen.getByRole('button', { name: 'Submit' })
     );
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(

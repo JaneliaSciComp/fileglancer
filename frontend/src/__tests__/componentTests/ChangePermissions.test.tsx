@@ -55,9 +55,7 @@ describe('Change Permissions dialog', () => {
     );
 
     await waitFor(() => {
-      const btn = screen.getByText('Change Permissions', {
-        selector: 'button[type="submit"]'
-      });
+      const btn = screen.getByRole('button', { name: 'Change Permissions' });
       expect(btn).toBeInTheDocument();
     });
   });
@@ -67,8 +65,8 @@ describe('Change Permissions dialog', () => {
   });
 
   it('disables submit button when no changes are made', () => {
-    const submitButton = screen.getByText('Change Permissions', {
-      selector: 'button[type="submit"]'
+    const submitButton = screen.getByRole('button', {
+      name: 'Change Permissions'
     });
     expect(submitButton).toBeDisabled();
   });
@@ -90,9 +88,7 @@ describe('Change Permissions dialog', () => {
     const checkbox = screen.getByRole('checkbox', { name: 'w_8' });
     await user.click(checkbox);
     await user.click(
-      screen.getByText('Change Permissions', {
-        selector: 'button[type="submit"]'
-      })
+      screen.getByRole('button', { name: 'Change Permissions' })
     );
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith('Permissions changed!');
@@ -117,9 +113,7 @@ describe('Change Permissions dialog', () => {
     const checkbox = screen.getByRole('checkbox', { name: 'w_8' });
     await user.click(checkbox);
     await user.click(
-      screen.getByText('Change Permissions', {
-        selector: 'button[type="submit"]'
-      })
+      screen.getByRole('button', { name: 'Change Permissions' })
     );
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
