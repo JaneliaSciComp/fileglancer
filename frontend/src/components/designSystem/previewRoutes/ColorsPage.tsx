@@ -97,7 +97,7 @@ export const lightModeColors: ModeColors = {
       variants: {
         default: '#dc2626',
         dark: '#991b1b',
-        light: '#fef2f2',
+        light: '#f25555',
         foreground: '#FFFFFF'
       }
     }

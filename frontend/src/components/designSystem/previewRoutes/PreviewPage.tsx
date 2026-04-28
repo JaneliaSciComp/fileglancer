@@ -3,9 +3,13 @@ import { Link } from 'react-router';
 import { HiDownload, HiHome, HiOutlinePlus, HiSearch } from 'react-icons/hi';
 
 import FgBadge from '@/components/designSystem/atoms/FgBadge';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgLink from '@/components/designSystem/atoms/FgLink';
+
+const emptyCategories = ['Molecules', 'Organisms', 'Templates'];
+
 function SectionLabel({ children }: { readonly children: string }) {
   return <p className="text-sm font-medium text-foreground/70">{children}</p>;
 }
@@ -37,6 +41,63 @@ function IconPreview() {
       </PreviewCard>
     </div>
   );
+}
+
+function ButtonPreview() {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-foreground">FgButton</h3>
+      <PreviewCard>
+        <SectionLabel>Variants</SectionLabel>
+        <Row>
+          <FgButton variant="solid">Solid</FgButton>
+          <FgButton variant="outline">Outline</FgButton>
+          <FgButton variant="ghost">Ghost</FgButton>
+          <FgButton variant="link">Link</FgButton>
+        </Row>
+
+        <SectionLabel>Link variant with icon</SectionLabel>
+        <Row>
+          <FgButton icon={HiOutlinePlus} size="sm" variant="link">
+            Add variable
+          </FgButton>
+        </Row>
+
+        <SectionLabel>Colors</SectionLabel>
+        <Row>
+          <FgButton color="primary">Primary</FgButton>
+          <FgButton color="secondary">Secondary</FgButton>
+          <FgButton color="error">Error</FgButton>
+          <FgButton color="success">Success</FgButton>
+          <FgButton color="warning">Warning</FgButton>
+          <FgButton color="info">Info</FgButton>
+        </Row>
+
+        <SectionLabel>Loading state</SectionLabel>
+        <Row>
+          <FgButton loading loadingText="Saving...">
+            Save
+          </FgButton>
+        </Row>
+
+        <SectionLabel>With icon</SectionLabel>
+        <Row>
+          <FgButton icon={HiDownload} iconPosition="left">
+            Download
+          </FgButton>
+          <FgButton icon={HiSearch} iconPosition="right">
+            Search
+          </FgButton>
+        </Row>
+
+        <SectionLabel>Disabled</SectionLabel>
+        <Row>
+          <FgButton disabled>Disabled</FgButton>
+        </Row>
+      </PreviewCard>
+    </div>
+  );
+}
 
 function BadgePreview() {
   return (
@@ -170,9 +231,29 @@ export default function PreviewPage() {
         </Link>
       </div>
 
+      {/* Atoms */}
+      <section>
+        <h2 className="border-b border-surface-dark pb-2 text-xl font-semibold text-foreground">
+          Atoms
+        </h2>
+        <div className="mt-4 space-y-8">
+          <IconPreview />
+          <ButtonPreview />
           <BadgePreview />
           <LinkPreview />
           <ExternalLinkPreview />
+        </div>
+      </section>
+
+      {/* Empty categories */}
+      {emptyCategories.map(category => (
+        <section key={category}>
+          <h2 className="border-b border-surface-dark pb-2 text-xl font-semibold text-foreground">
+            {category}
+          </h2>
+          <p className="mt-2 text-sm text-foreground/50">No components yet.</p>
+        </section>
+      ))}
     </div>
   );
 }
