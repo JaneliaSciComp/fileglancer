@@ -32,7 +32,7 @@ interface ModeColors {
   colorGroups: ColorGroup[];
 }
 
-const lightModeColors: ModeColors = {
+export const lightModeColors: ModeColors = {
   simpleColors: [
     { name: 'background', hex: '#FFFFFF' },
     { name: 'foreground', hex: '#4B5563' }
@@ -104,7 +104,7 @@ const lightModeColors: ModeColors = {
   ]
 };
 
-const darkModeColors: ModeColors = {
+export const darkModeColors: ModeColors = {
   simpleColors: [
     { name: 'background', hex: '#111827' },
     { name: 'foreground', hex: '#D1D5DB' }
