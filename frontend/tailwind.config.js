@@ -95,7 +95,7 @@ const config = {
         error: {
           default: '#dc2626', // main error color (red-600)
           dark: '#991b1b', // darker variant (red-800)
-          light: '#fef2f2', // lighter variant (red-50)
+          light: '#f25555', // lighter variant — visible step from default, ~3.4:1 contrast with white text
           foreground: '#FFFFFF' // text color for use on default/dark backgrounds
         }
       },

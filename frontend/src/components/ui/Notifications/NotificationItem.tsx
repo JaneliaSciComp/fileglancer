@@ -77,7 +77,7 @@ export const getNotificationStyles = (type: string) => {
     case 'error':
       return {
         container:
-          'bg-error-light dark:bg-error-dark border border-error-dark dark:border-error',
+          'bg-error/10 dark:bg-error-dark border border-error-dark dark:border-error',
         icon: 'text-error',
         text: 'text-error-dark dark:text-error-light',
         close:
