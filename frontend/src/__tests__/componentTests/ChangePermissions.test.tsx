@@ -73,7 +73,9 @@ describe('Change Permissions dialog', () => {
 
   it('should update local permissions when input is checked', async () => {
     const user = userEvent.setup();
-    const checkbox = screen.getByRole('checkbox', { name: 'w_8' });
+    const checkbox = screen.getByRole('checkbox', {
+      name: 'Everyone else can write'
+    });
 
     expect(checkbox).not.toBeChecked();
     await user.click(checkbox);
@@ -85,7 +87,9 @@ describe('Change Permissions dialog', () => {
 
   it('calls toast.success for an ok HTTP response', async () => {
     const user = userEvent.setup();
-    const checkbox = screen.getByRole('checkbox', { name: 'w_8' });
+    const checkbox = screen.getByRole('checkbox', {
+      name: 'Everyone else can write'
+    });
     await user.click(checkbox);
     await user.click(
       screen.getByRole('button', { name: 'Change Permissions' })
@@ -110,7 +114,9 @@ describe('Change Permissions dialog', () => {
     );
 
     const user = userEvent.setup();
-    const checkbox = screen.getByRole('checkbox', { name: 'w_8' });
+    const checkbox = screen.getByRole('checkbox', {
+      name: 'Everyone else can write'
+    });
     await user.click(checkbox);
     await user.click(
       screen.getByRole('button', { name: 'Change Permissions' })

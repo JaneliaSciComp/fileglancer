@@ -74,9 +74,9 @@ describe('NGLinkDialog', () => {
       );
 
       await waitFor(() => {
-        expect(
-          screen.getByLabelText('Title (optional, appears in tab name)')
-        ).toHaveValue('Test Title');
+        expect(screen.getByRole('textbox', { name: /title/i })).toHaveValue(
+          'Test Title'
+        );
       });
     });
   });
@@ -117,12 +117,8 @@ describe('NGLinkDialog', () => {
       );
 
       expect(screen.getByLabelText('Neuroglancer URL')).toHaveValue('');
-      expect(
-        screen.getByLabelText('Title (optional, appears in tab name)')
-      ).toHaveValue('');
-      expect(
-        screen.getByLabelText('Name (optional, used in shortened link)')
-      ).toHaveValue('');
+      expect(screen.getByRole('textbox', { name: /title/i })).toHaveValue('');
+      expect(screen.getByRole('textbox', { name: /^name/i })).toHaveValue('');
     });
   });
 });
