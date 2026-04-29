@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react';
 import { useTicketContext } from '@/contexts/TicketsContext';
 import { createSuccess, handleError } from '@/utils/errorHandling';
 import { joinPaths } from '@/utils/pathHandling';
+import useFileNameValidation from '@/hooks/useFileNameValidation';
 import type { Result } from '@/shared.types';
 
 export default function useConvertFileDialog() {
@@ -23,20 +24,7 @@ export default function useConvertFileDialog() {
     };
   }, [destinationFolder]);
 
-  // Validation for output filename
-  const filenameValidation = useMemo(() => {
-    const trimmed = outputFilename.trim();
-    const hasSlashes = /[/\\]/.test(trimmed);
-    const hasConsecutiveDots = /\.{2,}/.test(trimmed);
-    const isEmpty = trimmed.length === 0;
-
-    return {
-      isValid: !isEmpty && !hasSlashes && !hasConsecutiveDots,
-      isEmpty,
-      hasSlashes,
-      hasConsecutiveDots
-    };
-  }, [outputFilename]);
+  const filenameValidation = useFileNameValidation(outputFilename);
 
   async function handleTicketSubmit(): Promise<Result<void>> {
     if (!tasksEnabled) {
