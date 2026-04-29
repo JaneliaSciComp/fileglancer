@@ -13,6 +13,7 @@ import FgRadio from '@/components/designSystem/atoms/formElements/FgRadio';
 import FgSelect from '@/components/designSystem/atoms/formElements/FgSelect';
 import FgSwitch from '@/components/designSystem/atoms/formElements/FgSwitch';
 import FgTextarea from '@/components/designSystem/atoms/formElements/FgTextarea';
+import FgFieldSet from '@/components/designSystem/molecules/FgFieldSet';
 import FgFormField from '@/components/designSystem/molecules/FgFormField';
 
 const emptyCategories = ['Organisms', 'Templates'];
@@ -394,6 +395,78 @@ function SwitchPreview() {
   );
 }
 
+function FieldSetPreview() {
+  const [pathFormat, setPathFormat] = useState('linux');
+  const [mode, setMode] = useState('url');
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-foreground">FgFieldSet</h3>
+      <PreviewCard>
+        <SectionLabel>Vertical radio group</SectionLabel>
+        <FgFieldSet legend="File path format">
+          <div className="mt-1 space-y-2">
+            <FgRadio
+              checked={pathFormat === 'linux'}
+              color="secondary"
+              id="fs-linux"
+              label="Linux"
+              name="fs-path-format"
+              onChange={() => setPathFormat('linux')}
+            />
+            <FgRadio
+              checked={pathFormat === 'windows'}
+              color="secondary"
+              id="fs-windows"
+              label="Windows"
+              name="fs-path-format"
+              onChange={() => setPathFormat('windows')}
+            />
+            <FgRadio
+              checked={pathFormat === 'mac'}
+              color="secondary"
+              id="fs-mac"
+              label="macOS"
+              name="fs-path-format"
+              onChange={() => setPathFormat('mac')}
+            />
+          </div>
+        </FgFieldSet>
+
+        <SectionLabel>Inline radio group</SectionLabel>
+        <FgFieldSet inline legend="Input mode">
+          <FgRadio
+            checked={mode === 'url'}
+            id="fs-mode-url"
+            label="URL"
+            name="fs-mode"
+            onChange={() => setMode('url')}
+          />
+          <FgRadio
+            checked={mode === 'state'}
+            id="fs-mode-state"
+            label="State"
+            name="fs-mode"
+            onChange={() => setMode('state')}
+          />
+        </FgFieldSet>
+
+        <SectionLabel>Checkbox group</SectionLabel>
+        <FgFieldSet legend="Display options">
+          <div className="mt-1 space-y-2">
+            <FgCheckbox
+              color="secondary"
+              defaultChecked
+              label="Hide dot files"
+            />
+            <FgCheckbox color="secondary" label="Show tutorial" />
+          </div>
+        </FgFieldSet>
+      </PreviewCard>
+    </div>
+  );
+}
+
 function FormFieldPreview() {
   return (
     <div className="space-y-4">
@@ -508,6 +581,7 @@ export default function PreviewPage() {
         </h2>
         <div className="mt-4 space-y-8">
           <FormFieldPreview />
+          <FieldSetPreview />
         </div>
       </section>
 
