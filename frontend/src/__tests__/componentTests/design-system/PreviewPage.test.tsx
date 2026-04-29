@@ -26,9 +26,21 @@ describe('PreviewPage', () => {
     expect(screen.getByText('FgBadge')).toBeInTheDocument();
     expect(screen.getByText('FgLink')).toBeInTheDocument();
     expect(screen.getByText('FgExternalLink')).toBeInTheDocument();
+    expect(screen.getByText('FgInput')).toBeInTheDocument();
+    expect(screen.getByText('FgTextarea')).toBeInTheDocument();
+    expect(screen.getByText('FgSelect')).toBeInTheDocument();
+    expect(screen.getByText('FgCheckbox')).toBeInTheDocument();
+    expect(screen.getByText('FgRadio')).toBeInTheDocument();
+    expect(screen.getByText('FgSwitch')).toBeInTheDocument();
   });
 
-  it('renders empty category placeholders', () => {
+  it('renders molecule component sections', () => {
+    renderWithRouter(<PreviewPage />);
+
+    expect(screen.getByText('FgFormField')).toBeInTheDocument();
+  });
+
+  it('renders category section headings', () => {
     renderWithRouter(<PreviewPage />);
 
     expect(

@@ -4,11 +4,18 @@ import { HiDownload, HiHome, HiOutlinePlus, HiSearch } from 'react-icons/hi';
 
 import FgBadge from '@/components/designSystem/atoms/FgBadge';
 import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgCheckbox from '@/components/designSystem/atoms/formElements/FgCheckbox';
 import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
+import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
 import FgLink from '@/components/designSystem/atoms/FgLink';
+import FgRadio from '@/components/designSystem/atoms/formElements/FgRadio';
+import FgSelect from '@/components/designSystem/atoms/formElements/FgSelect';
+import FgSwitch from '@/components/designSystem/atoms/formElements/FgSwitch';
+import FgTextarea from '@/components/designSystem/atoms/formElements/FgTextarea';
+import FgFormField from '@/components/designSystem/molecules/FgFormField';
 
-const emptyCategories = ['Molecules', 'Organisms', 'Templates'];
+const emptyCategories = ['Organisms', 'Templates'];
 
 function SectionLabel({ children }: { readonly children: string }) {
   return <p className="text-sm font-medium text-foreground/70">{children}</p>;
@@ -190,6 +197,249 @@ function ExternalLinkPreview() {
   );
 }
 
+function InputPreview() {
+  const [value, setValue] = useState('');
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-foreground">FgInput</h3>
+      <PreviewCard>
+        <SectionLabel>Sizes</SectionLabel>
+        <Row>
+          <FgInput placeholder="Small" size="sm" />
+          <FgInput placeholder="Medium" size="md" />
+          <FgInput placeholder="Large" size="lg" />
+        </Row>
+
+        <SectionLabel>Interactive</SectionLabel>
+        <FgInput
+          onChange={e => setValue(e.target.value)}
+          placeholder="Type something..."
+          value={value}
+        />
+
+        <SectionLabel>Error state</SectionLabel>
+        <FgInput error placeholder="Invalid input" />
+
+        <SectionLabel>Disabled</SectionLabel>
+        <FgInput disabled placeholder="Disabled input" />
+      </PreviewCard>
+    </div>
+  );
+}
+
+function TextareaPreview() {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-foreground">FgTextarea</h3>
+      <PreviewCard>
+        <SectionLabel>Default</SectionLabel>
+        <FgTextarea placeholder="Enter a description..." rows={3} />
+
+        <SectionLabel>Error state</SectionLabel>
+        <FgTextarea error placeholder="Invalid content" rows={3} />
+      </PreviewCard>
+    </div>
+  );
+}
+
+function SelectPreview() {
+  const [value, setValue] = useState('');
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-foreground">FgSelect</h3>
+      <PreviewCard>
+        <SectionLabel>Default</SectionLabel>
+        <FgSelect onChange={e => setValue(e.target.value)} value={value}>
+          <option value="">Select an option...</option>
+          <option value="apple">Apple</option>
+          <option value="banana">Banana</option>
+          <option value="cherry">Cherry</option>
+        </FgSelect>
+
+        <SectionLabel>Error state</SectionLabel>
+        <FgSelect defaultValue="" error>
+          <option value="">Select an option...</option>
+          <option value="one">One</option>
+          <option value="two">Two</option>
+        </FgSelect>
+      </PreviewCard>
+    </div>
+  );
+}
+
+function CheckboxPreview() {
+  const [checked, setChecked] = useState(false);
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-foreground">FgCheckbox</h3>
+      <PreviewCard>
+        <SectionLabel>Primary color</SectionLabel>
+        <Row>
+          <FgCheckbox
+            checked={checked}
+            color="primary"
+            label="Accept terms"
+            onChange={() => setChecked(!checked)}
+          />
+        </Row>
+
+        <SectionLabel>Secondary color</SectionLabel>
+        <Row>
+          <FgCheckbox color="secondary" defaultChecked label="Notify me" />
+        </Row>
+
+        <SectionLabel>Checked</SectionLabel>
+        <Row>
+          <FgCheckbox checked label="Already checked" readOnly />
+        </Row>
+
+        <SectionLabel>Disabled</SectionLabel>
+        <Row>
+          <FgCheckbox disabled label="Cannot change" />
+        </Row>
+      </PreviewCard>
+    </div>
+  );
+}
+
+function RadioPreview() {
+  const [selected, setSelected] = useState('option1');
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-foreground">FgRadio</h3>
+      <PreviewCard>
+        <SectionLabel>Secondary color (group)</SectionLabel>
+        <div className="space-y-2">
+          <FgRadio
+            checked={selected === 'option1'}
+            color="secondary"
+            id="radio-opt1"
+            label="Option 1"
+            name="demo-group"
+            onChange={() => setSelected('option1')}
+          />
+          <FgRadio
+            checked={selected === 'option2'}
+            color="secondary"
+            id="radio-opt2"
+            label="Option 2"
+            name="demo-group"
+            onChange={() => setSelected('option2')}
+          />
+          <FgRadio
+            checked={selected === 'option3'}
+            color="secondary"
+            id="radio-opt3"
+            label="Option 3"
+            name="demo-group"
+            onChange={() => setSelected('option3')}
+          />
+        </div>
+
+        <SectionLabel>Primary color</SectionLabel>
+        <Row>
+          <FgRadio
+            checked
+            color="primary"
+            id="radio-primary"
+            label="Primary radio"
+            name="primary-group"
+            readOnly
+          />
+        </Row>
+      </PreviewCard>
+    </div>
+  );
+}
+
+function SwitchPreview() {
+  const [enabled, setEnabled] = useState(false);
+  const [stateDemo, setStateDemo] = useState(true);
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-foreground">FgSwitch</h3>
+      <PreviewCard>
+        <SectionLabel>Interactive</SectionLabel>
+        <FgSwitch
+          checked={enabled}
+          id="switch-demo"
+          label="Enable feature"
+          onChange={() => setEnabled(!enabled)}
+        />
+
+        <SectionLabel>With on/off state</SectionLabel>
+        <FgSwitch
+          checked={stateDemo}
+          id="switch-state"
+          label="Notifications"
+          onChange={() => setStateDemo(!stateDemo)}
+          showState
+        />
+
+        <SectionLabel>Disabled</SectionLabel>
+        <FgSwitch
+          checked={false}
+          disabled
+          id="switch-disabled"
+          label="Disabled switch"
+          onChange={() => {}}
+        />
+      </PreviewCard>
+    </div>
+  );
+}
+
+function FormFieldPreview() {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-foreground">FgFormField</h3>
+      <PreviewCard>
+        <SectionLabel>With label</SectionLabel>
+        <FgFormField htmlFor="ff-basic" label="Username">
+          <FgInput id="ff-basic" placeholder="Enter username" />
+        </FgFormField>
+
+        <SectionLabel>Default (required assumed)</SectionLabel>
+        <FgFormField htmlFor="ff-required" label="Email">
+          <FgInput id="ff-required" placeholder="you@example.com" />
+        </FgFormField>
+
+        <SectionLabel>Optional</SectionLabel>
+        <FgFormField htmlFor="ff-optional" label="Nickname" optional>
+          <FgInput id="ff-optional" placeholder="Optional nickname" />
+        </FgFormField>
+
+        <SectionLabel>With error message</SectionLabel>
+        <FgFormField
+          error="This field is required"
+          htmlFor="ff-error"
+          label="Password"
+        >
+          <FgInput error id="ff-error" placeholder="Enter password" />
+        </FgFormField>
+
+        <SectionLabel>With helper text</SectionLabel>
+        <FgFormField
+          helperText="Must be at least 8 characters"
+          htmlFor="ff-helper"
+          label="Password"
+        >
+          <FgInput
+            id="ff-helper"
+            placeholder="Enter password"
+            type="password"
+          />
+        </FgFormField>
+      </PreviewCard>
+    </div>
+  );
+}
+
 export default function PreviewPage() {
   const [isDark, setIsDark] = useState(
     document.documentElement.classList.contains('dark')
@@ -242,6 +492,22 @@ export default function PreviewPage() {
           <BadgePreview />
           <LinkPreview />
           <ExternalLinkPreview />
+          <InputPreview />
+          <TextareaPreview />
+          <SelectPreview />
+          <CheckboxPreview />
+          <RadioPreview />
+          <SwitchPreview />
+        </div>
+      </section>
+
+      {/* Molecules */}
+      <section>
+        <h2 className="border-b border-surface-dark pb-2 text-xl font-semibold text-foreground">
+          Molecules
+        </h2>
+        <div className="mt-4 space-y-8">
+          <FormFieldPreview />
         </div>
       </section>
 
