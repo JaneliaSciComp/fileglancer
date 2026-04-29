@@ -216,23 +216,41 @@ async function sendFetchRequest(
 }
 
 // Parse the Unix-style permissions string (e.g., "drwxr-xr-x")
+// Execute positions (3, 6, 9) can contain:
+//   'x' = execute only
+//   's'/'S' = setuid/setgid (positions 3, 6)
+//   't'/'T' = sticky bit (position 9)
+// Lowercase means execute is also set; uppercase means execute is not set.
 const parsePermissions = (permissionString: string) => {
   // Owner permissions (positions 1-3)
   const ownerRead = permissionString[1] === 'r';
   const ownerWrite = permissionString[2] === 'w';
+  const ownerExecute = 'xsS'.includes(permissionString[3])
+    ? permissionString[3] === 'x' || permissionString[3] === 's'
+    : false;
 
   // Group permissions (positions 4-6)
   const groupRead = permissionString[4] === 'r';
   const groupWrite = permissionString[5] === 'w';
+  const groupExecute = 'xsS'.includes(permissionString[6])
+    ? permissionString[6] === 'x' || permissionString[6] === 's'
+    : false;
 
   // Others/everyone permissions (positions 7-9)
   const othersRead = permissionString[7] === 'r';
   const othersWrite = permissionString[8] === 'w';
+  const othersExecute = 'xtT'.includes(permissionString[9])
+    ? permissionString[9] === 'x' || permissionString[9] === 't'
+    : false;
+
+  // Sticky bit is shown at position 9 as 't' (with execute) or 'T' (without execute)
+  const stickyBit = permissionString[9] === 't' || permissionString[9] === 'T';
 
   return {
-    owner: { read: ownerRead, write: ownerWrite },
-    group: { read: groupRead, write: groupWrite },
-    others: { read: othersRead, write: othersWrite }
+    owner: { read: ownerRead, write: ownerWrite, execute: ownerExecute },
+    group: { read: groupRead, write: groupWrite, execute: groupExecute },
+    others: { read: othersRead, write: othersWrite, execute: othersExecute },
+    stickyBit
   };
 };
 

@@ -748,17 +748,23 @@ class Filestore:
             raise ValueError("Permissions must be a string of length 10")
         full_path = self._check_path_in_root(path)
         # Convert permission string (like '-rw-r--r--') to octal mode
+        # Execute positions (3, 6, 9) can contain special characters:
+        #   'x' = execute, 's'/'S' = setuid/setgid, 't'/'T' = sticky bit
+        #   Lowercase = execute set, uppercase = execute not set
         mode = 0
         # Owner permissions (positions 1-3)
         if permissions[1] == 'r': mode |= stat.S_IRUSR
         if permissions[2] == 'w': mode |= stat.S_IWUSR
-        if permissions[3] == 'x': mode |= stat.S_IXUSR
+        if permissions[3] in ('x', 's'): mode |= stat.S_IXUSR
+        if permissions[3] in ('s', 'S'): mode |= stat.S_ISUID
         # Group permissions (positions 4-6)
         if permissions[4] == 'r': mode |= stat.S_IRGRP
         if permissions[5] == 'w': mode |= stat.S_IWGRP
-        if permissions[6] == 'x': mode |= stat.S_IXGRP
+        if permissions[6] in ('x', 's'): mode |= stat.S_IXGRP
+        if permissions[6] in ('s', 'S'): mode |= stat.S_ISGID
         # Other permissions (positions 7-9)
         if permissions[7] == 'r': mode |= stat.S_IROTH
         if permissions[8] == 'w': mode |= stat.S_IWOTH
-        if permissions[9] == 'x': mode |= stat.S_IXOTH
+        if permissions[9] in ('x', 't'): mode |= stat.S_IXOTH
+        if permissions[9] in ('t', 'T'): mode |= stat.S_ISVTX
         os.chmod(full_path, mode)

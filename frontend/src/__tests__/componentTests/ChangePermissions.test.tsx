@@ -73,7 +73,7 @@ describe('Change Permissions dialog', () => {
     expect(submitButton).toBeDisabled();
   });
 
-  it('should update local permissions when input is checked', async () => {
+  it('should update local permissions when write input is checked', async () => {
     const user = userEvent.setup();
     const checkbox = screen.getByRole('checkbox', { name: 'w_8' });
 
@@ -83,6 +83,38 @@ describe('Change Permissions dialog', () => {
     // Checkboxes are updated based on the local permissions state
     // Initial mock target state is 'drwxrwxr-x', it should now be 'drwxrwxrwx'
     expect(checkbox).toBeChecked();
+  });
+
+  it('should update local permissions when execute input is toggled', async () => {
+    const user = userEvent.setup();
+    // Owner execute is at position 3 - initial 'drwxrwxr-x' has 'x' at position 3
+    const checkbox = screen.getByRole('checkbox', { name: 'x_3' });
+
+    expect(checkbox).toBeChecked();
+    await user.click(checkbox);
+    expect(checkbox).not.toBeChecked();
+  });
+
+  it('should show sticky bit checkbox for directories', () => {
+    const stickyCheckbox = screen.getByRole('checkbox', { name: 't_9' });
+    expect(stickyCheckbox).toBeInTheDocument();
+    // Initial 'drwxrwxr-x' does not have sticky bit
+    expect(stickyCheckbox).not.toBeChecked();
+  });
+
+  it('should toggle sticky bit while preserving execute', async () => {
+    const user = userEvent.setup();
+    const stickyCheckbox = screen.getByRole('checkbox', { name: 't_9' });
+    const executeCheckbox = screen.getByRole('checkbox', { name: 'x_9' });
+
+    // Initial 'drwxrwxr-x' has execute at position 9
+    expect(executeCheckbox).toBeChecked();
+    expect(stickyCheckbox).not.toBeChecked();
+
+    // Enable sticky bit - should change 'x' to 't' (sticky + execute)
+    await user.click(stickyCheckbox);
+    expect(stickyCheckbox).toBeChecked();
+    expect(executeCheckbox).toBeChecked(); // execute preserved
   });
 
   it('calls toast.success for an ok HTTP response', async () => {
