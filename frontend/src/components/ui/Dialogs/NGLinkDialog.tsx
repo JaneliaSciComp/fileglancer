@@ -18,6 +18,7 @@ import FgFormField from '@/components/designSystem/molecules/FgFormField';
 import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
 import FgRadio from '@/components/designSystem/atoms/formElements/FgRadio';
 import FgTextarea from '@/components/designSystem/atoms/formElements/FgTextarea';
+import FgFieldSet from '@/components/designSystem/molecules/FgFieldSet';
 
 type NGLinkDialogProps = {
   readonly open: boolean;
@@ -263,11 +264,11 @@ export default function NGLinkDialog({
 
       <div className="flex flex-col gap-2">
         {/* Mode Selector */}
-        <div className="mb-4 flex gap-4">
+        <FgFieldSet className="mb-4" inline legend="Input mode">
           <FgRadio
             checked={inputMode === 'url'}
             id="mode-url"
-            label="URL Mode"
+            label="URL"
             name="input-mode"
             onChange={() => handleModeChange('url')}
             value="url"
@@ -275,12 +276,12 @@ export default function NGLinkDialog({
           <FgRadio
             checked={inputMode === 'state'}
             id="mode-state"
-            label="State Mode"
+            label="State"
             name="input-mode"
             onChange={() => handleModeChange('state')}
             value="state"
           />
-        </div>
+        </FgFieldSet>
 
         {/* URL Mode Fields */}
         {inputMode === 'url' ? (
