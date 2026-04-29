@@ -371,3 +371,7 @@ export type {
   NeuroglancerParseError,
   JsonValidationResult
 } from './neuroglancerUrl';
+
+// Re-export filename validation utility
+export { validateFileName } from './validateFileName';
+export type { FileNameValidation } from './validateFileName';
