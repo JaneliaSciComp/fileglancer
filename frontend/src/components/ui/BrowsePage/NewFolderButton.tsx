@@ -7,6 +7,8 @@ import DialogIconBtn from '@/components/ui/buttons/DialogIconBtn';
 import useNewFolderDialog from '@/hooks/useNewFolderDialog';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgFormField from '@/components/designSystem/molecules/FgFormField';
+import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
 
 type NewFolderButtonProps = {
   readonly triggerClasses: string;
@@ -16,11 +18,19 @@ export default function NewFolderButton({
   triggerClasses
 }: NewFolderButtonProps) {
   const { fspName, mutations } = useFileBrowserContext();
-  const { handleNewFolderSubmit, newName, setNewName, isDuplicateName } =
-    useNewFolderDialog();
+  const {
+    handleNewFolderSubmit,
+    newName,
+    setNewName,
+    isDuplicateName,
+    nameValidation
+  } = useNewFolderDialog();
 
   const isSubmitDisabled =
-    !newName.trim() || isDuplicateName || mutations.createFolder.isPending;
+    !newName.trim() ||
+    !nameValidation.isValid ||
+    isDuplicateName ||
+    mutations.createFolder.isPending;
 
   const formSubmit = async (
     event: React.FormEvent<HTMLFormElement>,
@@ -47,24 +57,23 @@ export default function NewFolderButton({
       {closeDialog => (
         <form onSubmit={e => formSubmit(e, closeDialog)}>
           <div className="mt-8 flex flex-col gap-2">
-            <Typography
-              as="label"
-              className="text-foreground font-semibold"
+            <FgFormField
+              error={nameValidation.errorMessage}
               htmlFor="new_name"
+              label="Create a New Folder"
             >
-              Create a New Folder
-            </Typography>
-            <input
-              autoFocus
-              className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background"
-              id="new_name"
-              onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                setNewName(event.target.value);
-              }}
-              placeholder="Folder name ..."
-              type="text"
-              value={newName}
-            />
+              <FgInput
+                autoFocus
+                id="new_name"
+                onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                  setNewName(event.target.value);
+                }}
+                placeholder="Folder name ..."
+                size="lg"
+                type="text"
+                value={newName}
+              />
+            </FgFormField>
           </div>
           <div className="flex items-center gap-2">
             <FgButton

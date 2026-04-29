@@ -5,6 +5,7 @@ import TextWithFilePath from './TextWithFilePath';
 import usePermissionsDialog from '@/hooks/usePermissionsDialog';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgCheckbox from '@/components/designSystem/atoms/formElements/FgCheckbox';
 
 type ChangePermissionsProps = {
   readonly showPermissionsDialog: boolean;
@@ -74,22 +75,23 @@ export default function ChangePermissions({
                   </td>
                   {/* Owner read/write */}
                   <td className="p-3">
-                    <input
-                      aria-label="r_1"
+                    <FgCheckbox
                       checked={localPermissions[1] === 'r'}
+                      color="secondary"
                       disabled
+                      hideLabel
+                      label="Owner can read, cannot be changed"
                       name="r_1"
-                      type="checkbox"
                     />
                   </td>
                   <td className="p-3">
-                    <input
-                      aria-label="w_2"
+                    <FgCheckbox
                       checked={localPermissions[2] === 'w'}
-                      className="accent-secondary-light hover:cursor-pointer"
+                      color="secondary"
+                      hideLabel
+                      label="Owner can write"
                       name="w_2"
                       onChange={event => handleLocalPermissionChange(event)}
-                      type="checkbox"
                     />
                   </td>
                 </tr>
@@ -100,23 +102,23 @@ export default function ChangePermissions({
                   </td>
                   {/* Group read/write */}
                   <td className="p-3">
-                    <input
-                      aria-label="r_4"
+                    <FgCheckbox
                       checked={localPermissions[4] === 'r'}
-                      className="accent-secondary-light hover:cursor-pointer"
+                      color="secondary"
+                      hideLabel
+                      label="Group can read"
                       name="r_4"
                       onChange={event => handleLocalPermissionChange(event)}
-                      type="checkbox"
                     />
                   </td>
                   <td className="p-3">
-                    <input
-                      aria-label="w_5"
+                    <FgCheckbox
                       checked={localPermissions[5] === 'w'}
-                      className="accent-secondary-light hover:cursor-pointer"
+                      color="secondary"
+                      hideLabel
+                      label="Group can write"
                       name="w_5"
                       onChange={event => handleLocalPermissionChange(event)}
-                      type="checkbox"
                     />
                   </td>
                 </tr>
@@ -125,23 +127,23 @@ export default function ChangePermissions({
                   <td className="p-3 font-medium">Everyone else</td>
                   {/* Everyone else read/write */}
                   <td className="p-3">
-                    <input
-                      aria-label="r_7"
+                    <FgCheckbox
                       checked={localPermissions[7] === 'r'}
-                      className="accent-secondary-light hover:cursor-pointer"
+                      color="secondary"
+                      hideLabel
+                      label="Everyone else can read"
                       name="r_7"
                       onChange={event => handleLocalPermissionChange(event)}
-                      type="checkbox"
                     />
                   </td>
                   <td className="p-3">
-                    <input
-                      aria-label="w_8"
+                    <FgCheckbox
                       checked={localPermissions[8] === 'w'}
-                      className="accent-secondary-light hover:cursor-pointer"
+                      color="secondary"
+                      hideLabel
+                      label="Everyone else can write"
                       name="w_8"
                       onChange={event => handleLocalPermissionChange(event)}
-                      type="checkbox"
                     />
                   </td>
                 </tr>
