@@ -18,6 +18,13 @@ export default function usePermissionsDialog() {
    * For execute positions (3, 6, 9), determine the correct character based on
    * whether execute is set and whether a special bit (sticky) is active.
    * Position 9 uses 't'/'T' for sticky bit; positions 3 and 6 use 's'/'S' for setuid/setgid.
+   *
+   * Note on setuid/setgid: this dialog has no toggle for setuid (position 3) or
+   * setgid (position 6), so users cannot set or clear them here. However, those
+   * bits round-trip safely: if the file already has them set, toggling the
+   * Execute checkbox preserves the special bit (lowercase when execute is on,
+   * uppercase when off), and the backend in filestore.py honors 's'/'S' in the
+   * incoming permission string.
    */
   function getExecuteChar(
     position: number,
