@@ -98,6 +98,13 @@ export default function PermissionsTable({
       </div>
       <div className="w-full min-w-[333px] overflow-hidden rounded-lg border border-surface my-2">
         <table className="w-full">
+          <thead className="border-b border-surface bg-surface-dark text-sm">
+            <tr>
+              <th className="px-3 py-2 text-start font-medium" colspan="2">
+                Additional permissions
+              </th>
+            </tr>
+          </thead>
           <tbody className="text-sm">
             <tr>
               <td className="p-3">Only owner can delete or rename files?</td>
