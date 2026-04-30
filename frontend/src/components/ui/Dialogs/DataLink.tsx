@@ -3,7 +3,8 @@
 
 import { useState, useMemo, SetStateAction } from 'react';
 import type { ReactNode, Dispatch } from 'react';
-import { Button, Typography } from '@material-tailwind/react';
+import { Accordion, Button, Typography } from '@material-tailwind/react';
+import { HiChevronDown } from 'react-icons/hi';
 import { Link } from 'react-router';
 
 import type { ProxiedPath } from '@/contexts/ProxiedPathContext';
@@ -21,7 +22,9 @@ import type { FileSharePath } from '@/shared.types';
 import type { PendingToolKey } from '@/hooks/useZarrMetadata';
 import FgDialog from './FgDialog';
 import TextWithFilePath from './TextWithFilePath';
-import DataLinkOptions from '@/components/ui/PreferencesPage/DataLinkOptions';
+import DataLinkOptions, {
+  SubpathModeOptions
+} from '@/components/ui/PreferencesPage/DataLinkOptions';
 import DeleteBtn from '@/components/ui/buttons/DeleteBtn';
 
 interface CommonDataLinkDialogProps {
@@ -152,6 +155,9 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
 
   // Custom subpath local state (only used in this dialog, not persisted)
   const [customSubpath, setCustomSubpath] = useState(folderNameOnly);
+  const [openAdvancedSections, setOpenAdvancedSections] = useState<string[]>(
+    []
+  );
 
   const customSubpathError = useMemo(
     () =>
@@ -254,6 +260,12 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               If you share the data link with internal collaborators, they will
               be able to view these data.
             </Typography>
+            <div className="flex flex-col gap-2">
+              <Typography className="font-semibold text-foreground">
+                Don't ask me this again:
+              </Typography>
+              <DataLinkOptions checkboxesOnly hideSubpathMode />
+            </div>
             <BtnContainer>
               <CreateLinkBtn
                 disabled={!!customSubpathError}
@@ -262,10 +274,36 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               <CancelBtn onCancel={props.onCancel} />
             </BtnContainer>
             <div className="flex flex-col gap-2 mt-4">
-              <Typography className="font-semibold text-foreground">
-                Data link settings:
-              </Typography>
-              <DataLinkOptions checkboxesOnly />
+              <Accordion
+                onValueChange={
+                  setOpenAdvancedSections as Dispatch<
+                    SetStateAction<string | string[]>
+                  >
+                }
+                type="multiple"
+                value={openAdvancedSections}
+              >
+                <Accordion.Item value="advanced">
+                  <Accordion.Trigger className="flex w-full items-center justify-between py-2">
+                    <div className="text-foreground font-semibold text-sm">
+                      Advanced settings
+                    </div>
+                    <HiChevronDown
+                      className={`h-4 w-4 text-foreground transition-transform ${
+                        openAdvancedSections.includes('advanced')
+                          ? 'rotate-180'
+                          : ''
+                      }`}
+                    />
+                  </Accordion.Trigger>
+                  <Accordion.Content className="pt-2 pb-2 flex flex-col gap-2">
+                    <SubpathModeOptions />
+                    <Typography className="text-foreground text-sm font-mono break-all bg-surface/30 p-2 rounded">
+                      {dataLinkPreview}
+                    </Typography>
+                  </Accordion.Content>
+                </Accordion.Item>
+              </Accordion>
               {dataLinkSubpathMode === 'custom' ? (
                 <>
                   <input
@@ -281,9 +319,6 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
                   ) : null}
                 </>
               ) : null}
-              <Typography className="text-foreground text-sm font-mono break-all bg-surface/30 p-2 rounded">
-                {dataLinkPreview}
-              </Typography>
               <Typography className="text-xs text-foreground">
                 You can always modify settings on the{' '}
                 <Link className="text-primary underline" to="/preferences">
