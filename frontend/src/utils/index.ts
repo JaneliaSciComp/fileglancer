@@ -243,6 +243,9 @@ const parsePermissions = (permissionString: string) => {
     ? permissionString[9] === 'x' || permissionString[9] === 't'
     : false;
 
+  // Setgid is shown at position 6 as 's' (with execute) or 'S' (without execute)
+  const setgid = permissionString[6] === 's' || permissionString[6] === 'S';
+
   // Sticky bit is shown at position 9 as 't' (with execute) or 'T' (without execute)
   const stickyBit = permissionString[9] === 't' || permissionString[9] === 'T';
 
@@ -250,6 +253,7 @@ const parsePermissions = (permissionString: string) => {
     owner: { read: ownerRead, write: ownerWrite, execute: ownerExecute },
     group: { read: groupRead, write: groupWrite, execute: groupExecute },
     others: { read: othersRead, write: othersWrite, execute: othersExecute },
+    setgid,
     stickyBit
   };
 };

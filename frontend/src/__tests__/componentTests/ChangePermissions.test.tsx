@@ -117,6 +117,28 @@ describe('Change Permissions dialog', () => {
     expect(executeCheckbox).toBeChecked(); // execute preserved
   });
 
+  it('should show setgid checkbox for directories', () => {
+    const setgidCheckbox = screen.getByRole('checkbox', { name: 's_6' });
+    expect(setgidCheckbox).toBeInTheDocument();
+    // Initial 'drwxrwxr-x' does not have setgid
+    expect(setgidCheckbox).not.toBeChecked();
+  });
+
+  it('should toggle setgid while preserving group execute', async () => {
+    const user = userEvent.setup();
+    const setgidCheckbox = screen.getByRole('checkbox', { name: 's_6' });
+    const groupExecuteCheckbox = screen.getByRole('checkbox', { name: 'x_6' });
+
+    // Initial 'drwxrwxr-x' has group execute at position 6
+    expect(groupExecuteCheckbox).toBeChecked();
+    expect(setgidCheckbox).not.toBeChecked();
+
+    // Enable setgid - should change 'x' to 's' (setgid + execute)
+    await user.click(setgidCheckbox);
+    expect(setgidCheckbox).toBeChecked();
+    expect(groupExecuteCheckbox).toBeChecked(); // execute preserved
+  });
+
   it('calls toast.success for an ok HTTP response', async () => {
     const user = userEvent.setup();
     const checkbox = screen.getByRole('checkbox', { name: 'w_8' });

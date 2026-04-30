@@ -107,6 +107,17 @@ export default function PermissionsTable({
               </tr>
             </thead>
             <tbody className="text-sm">
+              <tr className="border-b border-surface">
+                <td className="p-3">
+                  New files created in this directory belong to group{' '}
+                  <em>{file.group}</em>, regardless of creator's primary group
+                </td>
+                <td className="p-3">
+                  {permissions ? (
+                    <PermissionIcon hasPermission={permissions.setgid} />
+                  ) : null}
+                </td>
+              </tr>
               <tr>
                 <td className="p-3">
                   Only owner can delete and rename files in this directory

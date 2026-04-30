@@ -16,15 +16,14 @@ export default function usePermissionsDialog() {
 
   /**
    * For execute positions (3, 6, 9), determine the correct character based on
-   * whether execute is set and whether a special bit (sticky) is active.
+   * whether execute is set and whether a special bit (sticky/setgid) is active.
    * Position 9 uses 't'/'T' for sticky bit; positions 3 and 6 use 's'/'S' for setuid/setgid.
    *
-   * Note on setuid/setgid: this dialog has no toggle for setuid (position 3) or
-   * setgid (position 6), so users cannot set or clear them here. However, those
-   * bits round-trip safely: if the file already has them set, toggling the
-   * Execute checkbox preserves the special bit (lowercase when execute is on,
-   * uppercase when off), and the backend in filestore.py honors 's'/'S' in the
-   * incoming permission string.
+   * Note on setuid: this dialog has no toggle for setuid (position 3), so users
+   * cannot set or clear it here. However, the bit round-trips safely: if the
+   * file already has it set, toggling the Execute checkbox preserves the
+   * special bit (lowercase when execute is on, uppercase when off), and the
+   * backend in filestore.py honors 's'/'S' in the incoming permission string.
    */
   function getExecuteChar(
     position: number,
@@ -57,6 +56,18 @@ export default function usePermissionsDialog() {
   }
 
   /**
+   * For the setgid toggle at position 6, determine the correct character
+   * based on whether setgid is set and whether group execute is also set.
+   */
+  function getSetgidChar(setgid: boolean, currentChar: string): string {
+    const hasExecute = currentChar === 'x' || currentChar === 's';
+    if (setgid) {
+      return hasExecute ? 's' : 'S';
+    }
+    return hasExecute ? 'x' : '-';
+  }
+
+  /**
    * Handles local permission state changes based on user input to the form.
    * This local state is necessary to track the user's changes before the form is submitted,
    * which causes the state in the fileglancer db to update.
@@ -67,8 +78,8 @@ export default function usePermissionsDialog() {
     if (!localPermissions) {
       return null; // If the local permissions are not set, this means the fileBrowserState is not set, return null
     }
-    // Extract the value (r, w, x, or t for sticky) and position in the UNIX permission string
-    // from the input name
+    // Extract the value (r, w, x, s for setgid, or t for sticky) and position
+    // in the UNIX permission string from the input name
     const { name, checked } = event.target;
     const [value, position] = name.split('_');
     const pos = parseInt(position);
@@ -86,6 +97,9 @@ export default function usePermissionsDialog() {
       } else if (value === 't') {
         // Sticky bit toggle at position 9
         splitPermissions[pos] = getStickyChar(checked, currentChar);
+      } else if (value === 's') {
+        // Setgid toggle at position 6
+        splitPermissions[pos] = getSetgidChar(checked, currentChar);
       } else if (checked) {
         // Read or write - set the value at that position
         splitPermissions[pos] = value;
