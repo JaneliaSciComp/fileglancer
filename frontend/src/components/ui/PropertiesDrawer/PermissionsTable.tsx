@@ -110,7 +110,8 @@ export default function PermissionsTable({
               <tr className="border-b border-surface">
                 <td className="p-3">
                   New files created in this directory belong to group{' '}
-                  <em>{file.group}</em>, regardless of creator's primary group
+                  <em>{file.group}</em>, regardless of the file creator's
+                  primary group
                 </td>
                 <td className="p-3">
                   {permissions ? (
