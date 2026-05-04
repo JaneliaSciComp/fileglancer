@@ -90,7 +90,8 @@
     },
     "overrides": {
         "qs": ">=6.14.1",
-        "vite": "npm:rolldown-vite@latest"
+        "vite": "npm:rolldown-vite@latest",
+        "zarrita": "^0.7.3"
     },
     "publishConfig": {
         "access": "public"
