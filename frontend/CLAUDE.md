@@ -462,7 +462,6 @@ export function useUpdateMyData() {
 - Variables must be prefixed with `VITE_` to be exposed to frontend
 - Access via `import.meta.env.VITE_VAR_NAME`
 
-
 ## Storybook
 
 Component documentation lives in Storybook, not in-app routes.

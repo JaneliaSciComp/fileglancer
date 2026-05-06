@@ -23,7 +23,7 @@ const preview: Preview = {
 
   decorators: [
     // Wrap all stories in MemoryRouter so FgLink (react-router <Link>) works
-    (Story) => createElement(MemoryRouter, null, createElement(Story)),
+    Story => createElement(MemoryRouter, null, createElement(Story)),
 
     // Dark mode toggle in the Storybook toolbar
     withThemeByClassName({
