@@ -24,8 +24,6 @@
         "dev": "vite",
         "build": "vite build",
         "build:prod": "vite build --mode production",
-        "clean:lintcache": "rimraf .eslintcache .stylelintcache",
-        "clean:all": "npm run clean:lintcache",
         "watch": "vite build --watch --minify=false",
         "test": "vitest"
     },
@@ -81,7 +79,6 @@
         "lefthook": "^1.12.2",
         "msw": "^2.10.4",
         "prettier": "^3.5.3",
-        "rimraf": "^5.0.1",
         "typescript": "~5.8.2",
         "typescript-eslint": "^8.32.1",
         "vite": "npm:rolldown-vite@latest",
