@@ -21,12 +21,18 @@ jobs:
           CHROMATIC_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
           CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.ref }}
           CHROMATIC_SLUG: ${{ github.repository }}
-      - uses: actions/setup-node@v6
+
+      - name: Install pixi
+        uses: prefix-dev/setup-pixi@v0.9.4
         with:
-          node-version: 24.14.0
+          pixi-version: v0.65.0
+          cache: false
+          manifest-path: pyproject.toml
+
       - name: Install dependencies
-        # ⚠️ See your package manager's documentation for the correct command to install dependencies in a CI environment.
-        run: npm ci
+        run: |
+          pixi run dev-install
+
       - name: Run Chromatic
         uses: chromaui/action@latest
         with:
