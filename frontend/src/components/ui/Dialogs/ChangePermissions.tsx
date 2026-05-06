@@ -226,8 +226,7 @@ export default function ChangePermissions({
           <FgButton
             disabled={Boolean(
               mutations.changePermissions.isPending ||
-                localPermissions ===
-                  fileBrowserState.propertiesTarget.permissions
+              localPermissions === fileBrowserState.propertiesTarget.permissions
             )}
             loading={mutations.changePermissions.isPending}
             loadingText="Updating..."
