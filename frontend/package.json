@@ -25,7 +25,9 @@
         "build": "vite build",
         "build:prod": "vite build --mode production",
         "watch": "vite build --watch --minify=false",
-        "test": "vitest"
+        "test": "vitest",
+        "storybook": "storybook dev -p 6006",
+        "build-storybook": "storybook build"
     },
     "dependencies": {
         "@material-tailwind/react": "^3.0.0-beta.24",
@@ -56,10 +58,16 @@
         "zarrita": "^0.5.1"
     },
     "devDependencies": {
+        "@chromatic-com/storybook": "^5.1.2",
         "@eslint/css": "^0.8.1",
         "@eslint/js": "^9.26.0",
         "@eslint/json": "^0.12.0",
         "@eslint/markdown": "^6.4.0",
+        "@storybook/addon-a11y": "^10.3.6",
+        "@storybook/addon-docs": "^10.3.6",
+        "@storybook/addon-themes": "^10.3.6",
+        "@storybook/addon-vitest": "^10.3.6",
+        "@storybook/react-vite": "^10.3.6",
         "@tanstack/eslint-plugin-query": "^5.91.0",
         "@testing-library/dom": "^10.4.0",
         "@testing-library/jest-dom": "^6.6.3",
@@ -67,27 +75,31 @@
         "@testing-library/user-event": "^14.6.1",
         "@types/react": "^18.3.0",
         "@types/react-dom": "^18.3.0",
-        "@vitest/coverage-v8": "^3.1.3",
+        "@vitest/browser": "~3.1.3",
+        "@vitest/coverage-v8": "~3.1.3",
+        "chromatic": "^16.9.0",
         "eslint": "^9.26.0",
         "eslint-config-prettier": "^10.1.5",
         "eslint-plugin-prettier": "^5.4.0",
         "eslint-plugin-react": "^7.37.5",
         "eslint-plugin-react-hooks": "^5.2.0",
         "eslint-plugin-react-refresh": "^0.4.19",
+        "eslint-plugin-storybook": "^10.3.6",
         "globals": "^15.15.0",
         "happy-dom": "^20.8.9",
         "lefthook": "^1.12.2",
         "msw": "^2.10.4",
+        "playwright": "^1.59.1",
         "prettier": "^3.5.3",
+        "storybook": "^10.3.6",
         "typescript": "~5.8.2",
         "typescript-eslint": "^8.32.1",
-        "vite": "npm:rolldown-vite@latest",
-        "vite-plugin-node-polyfills": "^0.23.0",
-        "vitest": "^3.1.3"
+        "vite": "^8.0.0",
+        "vite-plugin-node-polyfills": "^0.26.0",
+        "vitest": "~3.1.3"
     },
     "overrides": {
-        "qs": ">=6.14.1",
-        "vite": "npm:rolldown-vite@latest"
+        "qs": ">=6.14.1"
     },
     "publishConfig": {
         "access": "public"

@@ -140,6 +140,8 @@ test-ui = { cmd = "npm --prefix frontend/ui-tests run test ", depends-on = ["nod
 test-launch = "pixi run uvicorn fileglancer.server:app --no-access-log --port 7879"
 dev-install = { depends-on = ["node-build", "pip-install"] }
 dev-watch = { cmd = "cd frontend && NODE_ENV=development npm run watch" }
+storybook = { cmd = "npm run storybook", cwd = "frontend" }
+storybook-build = { cmd = "npm run build-storybook", cwd = "frontend" }
 dev-vite = { cmd = "cd frontend && npx vite" }
 dev-vite-remote = { cmd = "cd frontend && SSL_KEYFILE=/opt/certs/cert.key SSL_CERTFILE=/opt/certs/cert.crt npx vite" }
 dev-launch = "pixi run uvicorn fileglancer.server:app --no-access-log --port 7878 --reload"
