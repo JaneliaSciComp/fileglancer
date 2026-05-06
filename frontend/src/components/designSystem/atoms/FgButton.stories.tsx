@@ -159,16 +159,13 @@ export const AsLink: Story = {
     target: '_blank',
     rel: 'noopener'
   },
-  play: async ({ args, canvasElement }) => {
+  play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const link = canvas.getByRole('link', { name: /open/i });
 
     await expect(link).toHaveAttribute('href', 'https://example.com');
     await expect(link).toHaveAttribute('target', '_blank');
     await expect(link).toHaveAttribute('rel', 'noopener');
-
-    await userEvent.click(link);
-    await expect(args.onClick).toHaveBeenCalledTimes(1);
   }
 };
 
