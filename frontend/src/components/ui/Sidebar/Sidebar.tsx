@@ -15,7 +15,8 @@ export default function Sidebar() {
     filteredZonesMap,
     filteredZoneFavorites,
     filteredFileSharePathFavorites,
-    filteredFolderFavorites
+    filteredFolderFavorites,
+    hasResultsOutsideGroups
   } = useFilteredZonesAndFavorites();
 
   return (
@@ -55,6 +56,7 @@ export default function Sidebar() {
         />
         <ZonesBrowser
           filteredZonesMap={filteredZonesMap}
+          hasResultsOutsideGroups={hasResultsOutsideGroups}
           searchQuery={searchQuery}
         />
       </div>

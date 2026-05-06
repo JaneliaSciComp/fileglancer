@@ -1,6 +1,7 @@
 import { Collapse, Typography, List } from '@material-tailwind/react';
 import { HiChevronRight } from 'react-icons/hi';
 import { HiSquares2X2 } from 'react-icons/hi2';
+import toast from 'react-hot-toast';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import { ZonesAndFileSharePathsMap } from '@/shared.types';
@@ -13,13 +14,15 @@ import FgLink from '@/components/designSystem/atoms/FgLink';
 
 export default function ZonesBrowser({
   searchQuery,
-  filteredZonesMap
+  filteredZonesMap,
+  hasResultsOutsideGroups
 }: {
   readonly searchQuery: string;
   readonly filteredZonesMap: ZonesAndFileSharePathsMap;
+  readonly hasResultsOutsideGroups: boolean;
 }) {
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
-  const { isFilteredByGroups } = usePreferencesContext();
+  const { isFilteredByGroups, toggleFilterByGroups } = usePreferencesContext();
   const { openZones, toggleOpenZones } = useOpenZones();
 
   const displayZones: ZonesAndFileSharePathsMap =
@@ -70,11 +73,45 @@ export default function ZonesBrowser({
             Object.keys(displayZones).length === 0 ? (
               <div className="px-4 py-6 text-center">
                 <Typography className="text-sm text-foreground/60">
-                  No zones match your filter '{searchQuery}'
+                  No zones match your filter &apos;{searchQuery}&apos;
                 </Typography>
-                <Typography className="text-xs text-foreground/60 mt-1">
-                  Try broadening your search to see more results
-                </Typography>
+                {hasResultsOutsideGroups ? (
+                  <div className="mt-3 px-2 py-3 bg-surface rounded-md text-left">
+                    <Typography className="text-xs text-foreground/70">
+                      Results exist in Zones outside your groups.
+                    </Typography>
+                    <Typography className="text-xs text-foreground mt-2">
+                      Change your zone display preferences to view:
+                    </Typography>
+                    <div className="flex items-center gap-2 mt-2">
+                      <input
+                        checked={isFilteredByGroups}
+                        className="icon-small checked:accent-secondary-light dark:checked:accent-secondary"
+                        id="sidebar_is_filtered_by_groups"
+                        onChange={async () => {
+                          const result = await toggleFilterByGroups();
+                          if (result.success) {
+                            toast.success('All Zones are now visible');
+                          } else {
+                            toast.error(result.error);
+                          }
+                        }}
+                        type="checkbox"
+                      />
+                      <Typography
+                        as="label"
+                        className="text-xs text-foreground"
+                        htmlFor="sidebar_is_filtered_by_groups"
+                      >
+                        Display Zones for your groups only
+                      </Typography>
+                    </div>
+                  </div>
+                ) : (
+                  <Typography className="text-xs text-foreground/60 mt-1">
+                    Try broadening your search to see more results
+                  </Typography>
+                )}
               </div>
             ) : (
               Object.entries(displayZones).map(([key, value]) => {

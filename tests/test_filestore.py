@@ -200,6 +200,26 @@ def test_change_file_permissions(filestore, test_dir):
     assert stat.S_IMODE(os.stat(fullpath).st_mode) == 0o644
 
 
+def test_change_file_permissions_with_execute(filestore, test_dir):
+    filestore.change_file_permissions("test.txt", "-rwxr-xr-x")
+    fullpath = os.path.join(test_dir, "test.txt")
+    assert stat.S_IMODE(os.stat(fullpath).st_mode) == 0o755
+
+
+def test_change_dir_permissions_with_sticky_bit(filestore, test_dir):
+    subdir = os.path.join(test_dir, "sticky_dir")
+    os.makedirs(subdir, exist_ok=True)
+    filestore.change_file_permissions("sticky_dir", "drwxrwxrwt")
+    assert stat.S_IMODE(os.stat(subdir).st_mode) == 0o1777
+
+
+def test_change_dir_permissions_sticky_without_execute(filestore, test_dir):
+    subdir = os.path.join(test_dir, "sticky_dir2")
+    os.makedirs(subdir, exist_ok=True)
+    filestore.change_file_permissions("sticky_dir2", "drwxrwxrwT")
+    assert stat.S_IMODE(os.stat(subdir).st_mode) == 0o1776
+
+
 def test_change_file_permissions_invalid_permissions(filestore):
     with pytest.raises(ValueError):
         filestore.change_file_permissions("test.txt", "invalid")
