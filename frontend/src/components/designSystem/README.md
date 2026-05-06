@@ -9,7 +9,7 @@ A library of UI-only, reusable components built on our existing Material Tailwin
 
 Semantic color classes are defined in `tailwind.config.js`.
 
-All design-system components use the `Fg` prefix (e.g. `FgButton`, `FgDialog`) and are previewed at `/design-system`.
+All design-system components use the `Fg` prefix (e.g. `FgButton`, `FgDialog`) and are previewed in Storybook (`pixi run storybook`).
 
 ---
 
@@ -29,7 +29,7 @@ All design-system components use the `Fg` prefix (e.g. `FgButton`, `FgDialog`) a
 
 7. **Every component has a Vitest test.** Minimum: renders with props, emits callbacks, renders correctly in dark mode.
 
-8. **Every component has a preview entry** in the `/design-system` preview route.
+8. **Every component has a Storybook story.** Co-locate `ComponentName.stories.tsx` next to the component file.
 
 9. **Every interactive component has a `focus-visible` style.** Keyboard users must see focus.
 
