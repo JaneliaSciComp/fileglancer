@@ -1,0 +1,34 @@
+name: "Chromatic"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: main
+  pull_request:
+    branches: "*"
+
+jobs:
+  chromatic:
+    name: Run Chromatic
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+        env:
+          CHROMATIC_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.ref }}
+          CHROMATIC_SLUG: ${{ github.repository }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.14.0
+      - name: Install dependencies
+        # ⚠️ See your package manager's documentation for the correct command to install dependencies in a CI environment.
+        run: npm ci
+      - name: Run Chromatic
+        uses: chromaui/action@latest
+        with:
+          # ⚠️ Make sure to configure a `CHROMATIC_PROJECT_TOKEN` repository secret
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
