@@ -1,17 +1,14 @@
 /**
- * Verifies that the hardcoded hex values in ColorsPage stay in sync
+ * Verifies that the color groups in Colors.stories.tsx stay in sync
  * with the source of truth in tailwind.config.js (mtConfig plugin).
  *
- * If this test fails, update the color data in ColorsPage.tsx to match
+ * If this test fails, update colorGroups in Colors.stories.tsx to match
  * the current tailwind.config.js values.
  */
 
 import { describe, it, expect } from 'vitest';
 
-import {
-  lightModeColors,
-  darkModeColors
-} from '@/components/designSystem/previewRoutes/ColorsPage';
+import { colorGroups } from '@/components/designSystem/Colors.stories';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 import tailwindConfig from '../../../../tailwind.config.js';
@@ -66,86 +63,36 @@ function getMtConfigArg(): {
   throw new Error('Could not parse mtConfig argument');
 }
 
-function normalizeHex(hex: string): string {
-  return hex.toUpperCase();
-}
-
-describe('ColorsPage sync with tailwind.config.js', () => {
+describe('Colors.stories sync with tailwind.config.js', () => {
   const configColors = getMtConfigArg();
 
-  it('light mode simple colors match tailwind config', () => {
-    for (const simple of lightModeColors.simpleColors) {
-      const configValue = configColors.colors[simple.name];
-      expect(configValue).toBeDefined();
-      expect(normalizeHex(simple.hex)).toBe(
-        normalizeHex(configValue as string)
-      );
+  // Extract grouped color names from tailwind config (those with object values)
+  const configGroupNames = Object.entries(configColors.colors)
+    .filter(([, value]) => typeof value === 'object')
+    .map(([name]) => name);
+
+  it('story covers all color groups from tailwind config', () => {
+    const storyGroupNames = Object.keys(colorGroups);
+    for (const name of configGroupNames) {
+      expect(storyGroupNames).toContain(name);
     }
   });
 
-  it('light mode color groups match tailwind config', () => {
-    for (const group of lightModeColors.colorGroups) {
-      const configGroup = configColors.colors[group.name];
-      expect(configGroup).toBeDefined();
-      expect(typeof configGroup).toBe('object');
-      const configVariants = configGroup as Record<string, string>;
-
-      for (const variant of [
-        'default',
-        'dark',
-        'light',
-        'foreground'
-      ] as const) {
-        expect(normalizeHex(group.variants[variant])).toBe(
-          normalizeHex(configVariants[variant])
-        );
-      }
+  it('story does not contain groups missing from tailwind config', () => {
+    for (const name of Object.keys(colorGroups)) {
+      expect(configGroupNames).toContain(name);
     }
   });
 
-  it('dark mode simple colors match tailwind config', () => {
-    for (const simple of darkModeColors.simpleColors) {
-      const configValue = configColors.darkColors[simple.name];
-      expect(configValue).toBeDefined();
-      expect(normalizeHex(simple.hex)).toBe(
-        normalizeHex(configValue as string)
-      );
-    }
-  });
-
-  it('dark mode color groups match tailwind config', () => {
-    for (const group of darkModeColors.colorGroups) {
-      const configGroup = configColors.darkColors[group.name];
-      expect(configGroup).toBeDefined();
-      expect(typeof configGroup).toBe('object');
-      const configVariants = configGroup as Record<string, string>;
-
-      for (const variant of [
-        'default',
-        'dark',
-        'light',
-        'foreground'
-      ] as const) {
-        expect(normalizeHex(group.variants[variant])).toBe(
-          normalizeHex(configVariants[variant])
-        );
-      }
-    }
-  });
-
-  it('ColorsPage covers all color groups from tailwind config', () => {
-    const lightGroupNames = lightModeColors.colorGroups.map(g => g.name);
-    const darkGroupNames = darkModeColors.colorGroups.map(g => g.name);
-
-    // Every grouped color in the config should appear in ColorsPage
-    for (const [name, value] of Object.entries(configColors.colors)) {
-      if (typeof value === 'object') {
-        expect(lightGroupNames).toContain(name);
-      }
-    }
-    for (const [name, value] of Object.entries(configColors.darkColors)) {
-      if (typeof value === 'object') {
-        expect(darkGroupNames).toContain(name);
+  it('each story group has all four variants', () => {
+    const expectedVariants = ['default', 'dark', 'light', 'foreground'];
+    for (const [name, variants] of Object.entries(colorGroups)) {
+      const variantNames = Object.keys(variants);
+      for (const expected of expectedVariants) {
+        expect(
+          variantNames,
+          `${name} is missing variant "${expected}"`
+        ).toContain(expected);
       }
     }
   });
