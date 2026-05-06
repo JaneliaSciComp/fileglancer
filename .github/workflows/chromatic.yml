@@ -11,6 +11,9 @@ jobs:
   chromatic:
     name: Run Chromatic
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -21,18 +24,12 @@ jobs:
           CHROMATIC_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
           CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.ref }}
           CHROMATIC_SLUG: ${{ github.repository }}
-
-      - name: Install pixi
-        uses: prefix-dev/setup-pixi@v0.9.4
+      - uses: actions/setup-node@v6
         with:
-          pixi-version: v0.65.0
-          cache: false
-          manifest-path: pyproject.toml
-
+          node-version: 24.14.0
       - name: Install dependencies
-        run: |
-          pixi run dev-install
-
+        # ⚠️ See your package manager's documentation for the correct command to install dependencies in a CI environment.
+        run: npm ci
       - name: Run Chromatic
         uses: chromaui/action@latest
         with:
