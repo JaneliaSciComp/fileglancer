@@ -97,6 +97,7 @@ platforms = ["osx-arm64", "osx-64", "linux-64", "linux-aarch64"]
 test-pip-install = { cmd = "pip install -e .", default-environment = "test" }
 test-backend = { cmd = "pytest --cov=fileglancer --cov-report=html --cov-report=term", depends-on = ["test-pip-install"], default-environment = "test" }
 test-frontend = { cmd = "cd frontend && npm test", default-environment = "test" }
+test-storybook = { cmd = "cd frontend && npm run test:storybook", default-environment = "test" }
 
 [tool.pixi.feature.test.dependencies]
 coverage = ">=7.10.6,<8"
