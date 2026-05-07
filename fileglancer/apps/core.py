@@ -937,6 +937,12 @@ def _poll_jobs(settings):
         if not jobs_to_poll:
             return True  # zombie jobs still pending, keep polling
 
+        # Local executor: poll by checking PID files instead of spawning
+        # a worker subprocess (which would create a fresh executor with
+        # no knowledge of the running processes).
+        if settings.cluster.executor == "local":
+            return _poll_local_jobs(session, jobs_to_poll)
+
         # Pick any user to run bjobs as (bjobs -u all sees all users' jobs)
         poll_username = jobs_to_poll[0].username
         # Pass current known statuses so stubs are seeded correctly.
@@ -980,6 +986,81 @@ def _poll_jobs(settings):
             logger.info(f"Job {db_job.id} status updated: {old_status} -> {new_status}")
 
         return True
+
+
+def _poll_local_jobs(session, jobs_to_poll: list) -> bool:
+    """Poll local executor jobs by checking PID files and process liveness.
+
+    The local executor runs jobs as bash subprocesses.  The submit worker
+    writes the PID to ``{work_dir}/job.pid``, and the script writes its
+    exit code to ``{work_dir}/exit_code`` via an EXIT trap.
+
+    Returns True if there are still active jobs, False otherwise.
+    """
+    still_active = False
+
+    for db_job in jobs_to_poll:
+        work_dir = Path(db_job.work_dir) if db_job.work_dir else None
+        if not work_dir:
+            still_active = True
+            continue
+
+        pid_file = work_dir / "job.pid"
+        if not pid_file.exists():
+            still_active = True
+            continue
+
+        try:
+            pid = int(pid_file.read_text().strip())
+        except (ValueError, OSError):
+            still_active = True
+            continue
+
+        old_status = db_job.status
+        try:
+            os.kill(pid, 0)
+            # Process is still alive
+            still_active = True
+            if old_status == "PENDING":
+                db.update_job_status(
+                    session, db_job.id, "RUNNING",
+                    started_at=datetime.now(UTC),
+                )
+                logger.info(f"Job {db_job.id} status updated: PENDING -> RUNNING")
+        except ProcessLookupError:
+            # Process has exited — read exit code from the trap file
+            exit_code = _read_exit_code(work_dir)
+            new_status = "DONE" if exit_code == 0 else "FAILED"
+            now = datetime.now(UTC)
+            db.update_job_status(
+                session, db_job.id, new_status,
+                exit_code=exit_code,
+                finished_at=now,
+                started_at=now if old_status == "PENDING" else None,
+            )
+            logger.info(f"Job {db_job.id} status updated: {old_status} -> {new_status}")
+        except PermissionError:
+            # Process exists but owned by another user — still running
+            still_active = True
+            if old_status == "PENDING":
+                db.update_job_status(
+                    session, db_job.id, "RUNNING",
+                    started_at=datetime.now(UTC),
+                )
+                logger.info(f"Job {db_job.id} status updated: PENDING -> RUNNING")
+
+    return still_active
+
+
+def _read_exit_code(work_dir: Path) -> int | None:
+    """Read the exit code written by the EXIT trap in the job script."""
+    exit_code_file = work_dir / "exit_code"
+    if not exit_code_file.exists():
+        return None
+    try:
+        return int(exit_code_file.read_text().strip())
+    except (ValueError, OSError):
+        return None
 
 
 def _parse_iso_dt(s: str | None) -> datetime | None:
@@ -1192,6 +1273,12 @@ async def submit_job(
         "unset PIXI_PROJECT_MANIFEST",
         f"export FG_WORK_DIR={shlex.quote(str(work_dir))}",
     ]
+    # For local executor, trap EXIT to write the exit code to a file so
+    # PID-based polling can determine the final status after the process exits.
+    if settings.cluster.executor == "local":
+        preamble_lines.append(
+            'trap \'echo $? > "$FG_WORK_DIR/exit_code"\' EXIT'
+        )
     if settings.apps.extra_paths:
         path_suffix = os.pathsep.join(shlex.quote(p) for p in settings.apps.extra_paths)
         preamble_lines.append(f"export PATH=$PATH:{path_suffix}")

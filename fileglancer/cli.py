@@ -112,6 +112,12 @@ def cli():
               help='Enable auto-reload.')
 @click.option('--workers', default=None, type=int,
               help='Number of worker processes.')
+@click.option('--file-share-mounts', '-f', multiple=True,
+              help='File share path to mount (can be specified multiple times). '
+                   'If you have many mounts, it is easier to set these via the config file. '
+                   'File share paths specified here will override the config file setting. '
+                   'Use ~/ prefix for home directory.'
+                   )
 @click.option('--ssl-keyfile', type=click.Path(exists=True),
               help='SSL key file path.')
 @click.option('--ssl-certfile', type=click.Path(exists=True),
@@ -130,9 +136,16 @@ def cli():
               help='Automatically find an available port if the specified port is in use.')
 @click.option('--no-browser', is_flag=True, default=False,
               help='Do not open web browser automatically.')
+
 def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
-          ssl_ca_certs, ssl_version, ssl_cert_reqs, ssl_ciphers, timeout_keep_alive, auto_port, no_browser):
+          ssl_ca_certs, ssl_version, ssl_cert_reqs, ssl_ciphers, timeout_keep_alive, auto_port, no_browser,
+          file_share_mounts):
     """Start the Fileglancer server using uvicorn."""
+
+    # Set file share mounts from CLI if provided
+    if file_share_mounts:
+        os.environ['FGC_FILE_SHARE_MOUNTS'] = json.dumps(list(file_share_mounts))
+        logger.debug(f"Setting FGC_FILE_SHARE_MOUNTS={os.environ['FGC_FILE_SHARE_MOUNTS']}")
 
     # Set up default external proxy URL if not already configured
     # Need to set this before loading settings as it is required in the Settings model
