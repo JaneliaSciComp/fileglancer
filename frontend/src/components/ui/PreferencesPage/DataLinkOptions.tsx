@@ -6,6 +6,7 @@ import OptionsSection from '@/components/ui/PreferencesPage/OptionsSection';
 
 type DataLinkOptionsProps = {
   readonly checkboxesOnly?: boolean;
+  readonly hideSubpathMode?: boolean;
 };
 
 const SUBPATH_MODES = [
@@ -14,15 +15,60 @@ const SUBPATH_MODES = [
   { value: 'custom' as const, label: 'Custom' }
 ];
 
+export function SubpathModeOptions({
+  indented = false
+}: {
+  readonly indented?: boolean;
+}) {
+  const { dataLinkSubpathMode, setDataLinkSubpathMode } =
+    usePreferencesContext();
+
+  const handleSubpathModeChange = async (
+    mode: 'name' | 'full_path' | 'custom'
+  ) => {
+    const result = await setDataLinkSubpathMode(mode);
+    if (result.success) {
+      const label = SUBPATH_MODES.find(m => m.value === mode)?.label;
+      toast.success(`Link name format set to: ${label}`);
+    } else {
+      toast.error(result.error);
+    }
+  };
+
+  return (
+    <div className={indented ? 'pl-4' : ''}>
+      <Typography className={`text-foreground ${indented ? 'mt-2' : ''} mb-1`}>
+        Link name format:
+      </Typography>
+      {SUBPATH_MODES.map(mode => (
+        <div className="flex items-center gap-2" key={mode.value}>
+          <input
+            checked={dataLinkSubpathMode === mode.value}
+            className="icon-small accent-secondary-light dark:accent-secondary"
+            id={`subpath_mode_${mode.value}`}
+            name="subpath_mode"
+            onChange={() => handleSubpathModeChange(mode.value)}
+            type="radio"
+          />
+          <Typography
+            as="label"
+            className="text-foreground"
+            htmlFor={`subpath_mode_${mode.value}`}
+          >
+            {mode.label}
+          </Typography>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function DataLinkOptions({
-  checkboxesOnly = false
+  checkboxesOnly = false,
+  hideSubpathMode = false
 }: DataLinkOptionsProps) {
-  const {
-    areDataLinksAutomatic,
-    toggleAutomaticDataLinks,
-    dataLinkSubpathMode,
-    setDataLinkSubpathMode
-  } = usePreferencesContext();
+  const { areDataLinksAutomatic, toggleAutomaticDataLinks } =
+    usePreferencesContext();
 
   const automaticOption = {
     checked: areDataLinksAutomatic,
@@ -42,18 +88,6 @@ export default function DataLinkOptions({
     }
   };
 
-  const handleSubpathModeChange = async (
-    mode: 'name' | 'full_path' | 'custom'
-  ) => {
-    const result = await setDataLinkSubpathMode(mode);
-    if (result.success) {
-      const label = SUBPATH_MODES.find(m => m.value === mode)?.label;
-      toast.success(`Link name format set to: ${label}`);
-    } else {
-      toast.error(result.error);
-    }
-  };
-
   return (
     <>
       <OptionsSection
@@ -61,32 +95,9 @@ export default function DataLinkOptions({
         header="Data Links"
         options={[automaticOption]}
       />
-      <div className={checkboxesOnly ? '' : 'pl-4'}>
-        <Typography
-          className={`text-foreground ${checkboxesOnly ? '' : 'mt-2'} mb-1`}
-        >
-          Link name format:
-        </Typography>
-        {SUBPATH_MODES.map(mode => (
-          <div className="flex items-center gap-2" key={mode.value}>
-            <input
-              checked={dataLinkSubpathMode === mode.value}
-              className="icon-small accent-secondary-light dark:accent-secondary"
-              id={`subpath_mode_${mode.value}`}
-              name="subpath_mode"
-              onChange={() => handleSubpathModeChange(mode.value)}
-              type="radio"
-            />
-            <Typography
-              as="label"
-              className="text-foreground"
-              htmlFor={`subpath_mode_${mode.value}`}
-            >
-              {mode.label}
-            </Typography>
-          </div>
-        ))}
-      </div>
+      {hideSubpathMode ? null : (
+        <SubpathModeOptions indented={!checkboxesOnly} />
+      )}
     </>
   );
 }
