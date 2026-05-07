@@ -40,7 +40,7 @@ dependencies = [
     "sqlalchemy >=2.0.44",
     "packaging >=24.0",
     "uvicorn >=0.38.0",
-    "x2s3 >=1.1.1",  # using local patched version via pixi pypi-dependencies
+    "x2s3 >=1.2.0",
     "py-cluster-api >=0.5.0"
 ]
 
@@ -185,7 +185,6 @@ uvicorn = ">=0.38.0,<0.39"
 
 [tool.pixi.pypi-dependencies]
 fileglancer = { path = ".", editable = true }
-x2s3 = { git = "https://github.com/mkitti/x2s3", branch = "mkitti-uvloop-optional" }
 
 [dependency-groups]
 release = ["build>=1.3.0,<2"]
