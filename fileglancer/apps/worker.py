@@ -71,6 +71,16 @@ async def _submit(request: dict) -> dict:
         resources=resource_spec,
     )
 
+    # For local executor, write the subprocess PID to disk so the poll
+    # loop can check process liveness across worker invocations.
+    # Only LocalExecutor has a _processes dict; HPC executors don't.
+    processes = getattr(executor, "_processes", None)
+    if processes is not None:
+        proc = processes.get(job.job_id)
+        if proc is not None:
+            pid_file = work_dir / "job.pid"
+            pid_file.write_text(str(proc.pid))
+
     return {"job_id": job.job_id, "script_path": job.script_path}
 
 
@@ -209,7 +219,22 @@ _ACTIONS = {
 
 
 def main():
+    import logging
     import pwd as _pwd
+
+    # Configure cluster_api logging so debug output reaches the parent
+    # process via stderr.  The parent captures stderr separately.
+    log_level = os.environ.get("FGC_LOG_LEVEL", "INFO").upper()
+    # Map loguru-specific levels to their nearest stdlib equivalents
+    _LOGURU_TO_STDLIB = {"TRACE": "DEBUG", "SUCCESS": "INFO"}
+    log_level = _LOGURU_TO_STDLIB.get(log_level, log_level)
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter(
+        "%(levelname)s | %(name)s:%(funcName)s:%(lineno)d - %(message)s"
+    ))
+    cluster_logger = logging.getLogger("cluster_api")
+    cluster_logger.addHandler(handler)
+    cluster_logger.setLevel(log_level)
 
     request = json.loads(sys.stdin.buffer.read())
     action = request.get("action")

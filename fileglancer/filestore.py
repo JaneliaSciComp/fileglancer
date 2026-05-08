@@ -5,8 +5,12 @@ rooted at a specific directory.
 
 import os
 import stat
-import pwd
-import grp
+try:
+    import pwd
+    import grp
+except ImportError:
+    pwd = None  # type: ignore[assignment]
+    grp = None  # type: ignore[assignment]
 import shutil
 
 from pydantic import BaseModel
@@ -69,7 +73,12 @@ class FileInfo(BaseModel):
                 if not (parent_real == root_real or parent_real.startswith(root_real + os.sep)):
                     logger.warning(f"Refusing to read symlink outside root: {path}")
                     return None
-            return os.readlink(path)
+            result = os.readlink(path)
+            # Windows prefixes symlink targets with \\?\ (extended-length path).
+            # Strip it so path comparisons work uniformly.
+            if result.startswith("\\\\?\\"):
+                result = result[4:]
+            return result
         except OSError as e:
             logger.warning(f"Failed to read symlink target for {path}: {e}")
             return None
@@ -153,12 +162,12 @@ class FileInfo(BaseModel):
 
         try:
             owner = pwd.getpwuid(stat_result.st_uid).pw_name
-        except KeyError:
+        except (KeyError, AttributeError):
             owner = str(stat_result.st_uid)
 
         try:
             group = grp.getgrgid(stat_result.st_gid).gr_name
-        except KeyError:
+        except (KeyError, AttributeError):
             group = str(stat_result.st_gid)
 
         # Calculate read/write permissions for current user
@@ -194,13 +203,13 @@ class FileInfo(BaseModel):
             for g in grp.getgrall():
                 if username in g.gr_mem:
                     groups.add(g.gr_name)
-        except (KeyError, OSError):
+        except (KeyError, OSError, AttributeError):
             pass
         try:
             primary_gid = pwd.getpwnam(username).pw_gid
             primary_group = grp.getgrgid(primary_gid).gr_name
             groups.add(primary_group)
-        except (KeyError, OSError):
+        except (KeyError, OSError, AttributeError):
             pass
         return groups
 
@@ -777,17 +786,23 @@ class Filestore:
             raise ValueError("Permissions must be a string of length 10")
         full_path = self._check_path_in_root(path)
         # Convert permission string (like '-rw-r--r--') to octal mode
+        # Execute positions (3, 6, 9) can contain special characters:
+        #   'x' = execute, 's'/'S' = setuid/setgid, 't'/'T' = sticky bit
+        #   Lowercase = execute set, uppercase = execute not set
         mode = 0
         # Owner permissions (positions 1-3)
         if permissions[1] == 'r': mode |= stat.S_IRUSR
         if permissions[2] == 'w': mode |= stat.S_IWUSR
-        if permissions[3] == 'x': mode |= stat.S_IXUSR
+        if permissions[3] in ('x', 's'): mode |= stat.S_IXUSR
+        if permissions[3] in ('s', 'S'): mode |= stat.S_ISUID
         # Group permissions (positions 4-6)
         if permissions[4] == 'r': mode |= stat.S_IRGRP
         if permissions[5] == 'w': mode |= stat.S_IWGRP
-        if permissions[6] == 'x': mode |= stat.S_IXGRP
+        if permissions[6] in ('x', 's'): mode |= stat.S_IXGRP
+        if permissions[6] in ('s', 'S'): mode |= stat.S_ISGID
         # Other permissions (positions 7-9)
         if permissions[7] == 'r': mode |= stat.S_IROTH
         if permissions[8] == 'w': mode |= stat.S_IWOTH
-        if permissions[9] == 'x': mode |= stat.S_IXOTH
+        if permissions[9] in ('x', 't'): mode |= stat.S_IXOTH
+        if permissions[9] in ('t', 'T'): mode |= stat.S_ISVTX
         os.chmod(full_path, mode)

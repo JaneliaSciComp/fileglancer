@@ -46,7 +46,9 @@ describe('Data Link dialog', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('my_zarr', { exact: false })).toBeInTheDocument();
+      expect(
+        screen.getByText('Are you sure you want to create a data link?')
+      ).toBeInTheDocument();
     });
   });
 

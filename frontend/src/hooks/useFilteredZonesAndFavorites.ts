@@ -35,11 +35,14 @@ export default function useSearchFilter() {
   const [filteredFolderFavorites, setFilteredFolderFavorites] = useState<
     FolderFavorite[]
   >([]);
+  const [hasResultsOutsideGroups, setHasResultsOutsideGroups] =
+    useState<boolean>(false);
 
   const filterZonesMap = useCallback(
     (query: string) => {
       if (!zonesAndFspQuery.isSuccess) {
         setFilteredZonesMap({});
+        setHasResultsOutsideGroups(false);
         return;
       }
 
@@ -92,7 +95,28 @@ export default function useSearchFilter() {
         })
         .filter(Boolean); // Remove null entries
 
-      setFilteredZonesMap(Object.fromEntries(matches as [string, Zone][]));
+      const filteredResult = Object.fromEntries(matches as [string, Zone][]);
+      setFilteredZonesMap(filteredResult);
+
+      // Check if there would be results without group filtering
+      if (isFilteredByGroups && Object.keys(filteredResult).length === 0) {
+        const unfilteredMatches = Object.entries(zonesAndFspQuery.data).some(
+          ([key, value]) => {
+            if (key.startsWith('zone')) {
+              const zone = value as Zone;
+              const zoneNameMatches = zone.name.toLowerCase().includes(query);
+              const hasMatchingFsps = zone.fileSharePaths.some(fsp =>
+                fsp.name.toLowerCase().includes(query)
+              );
+              return zoneNameMatches || hasMatchingFsps;
+            }
+            return false;
+          }
+        );
+        setHasResultsOutsideGroups(unfilteredMatches);
+      } else {
+        setHasResultsOutsideGroups(false);
+      }
     },
     [zonesAndFspQuery, isFilteredByGroups, profile]
   );
@@ -147,6 +171,7 @@ export default function useSearchFilter() {
       filterAllFavorites(searchQuery);
     } else if (searchQuery === '' && isFilteredByGroups && profile?.groups) {
       // When search query is empty but group filtering is enabled, apply group filter
+      setHasResultsOutsideGroups(false);
       if (!zonesAndFspQuery.isSuccess) {
         setFilteredZonesMap({});
         setFilteredZoneFavorites([]);
@@ -189,6 +214,7 @@ export default function useSearchFilter() {
       setFilteredZoneFavorites([]);
       setFilteredFileSharePathFavorites([]);
       setFilteredFolderFavorites([]);
+      setHasResultsOutsideGroups(false);
     }
   }, [
     searchQuery,
@@ -208,6 +234,7 @@ export default function useSearchFilter() {
     filteredZoneFavorites,
     filteredFileSharePathFavorites,
     filteredFolderFavorites,
+    hasResultsOutsideGroups,
     handleSearchChange,
     clearSearch
   };

@@ -385,7 +385,9 @@ function Table<TData>({
         clearTimeout(timerRef.current);
       }
     };
-  }, [inputValue, debounceMs, table]);
+    // We only want to trigger this effect when inputValue or debounceMs changes, not on every render when globalFilter changes
+    //eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputValue, debounceMs]);
 
   const handleInputChange = useCallback((value: string): void => {
     setInputValue(value);
