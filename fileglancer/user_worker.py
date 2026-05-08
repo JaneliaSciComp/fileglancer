@@ -24,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import ctypes
 import ctypes.util
+import functools
 import json
 import logging
 import os
@@ -162,15 +163,27 @@ def _get_filestore(fsp_name: str, db_url: str):
     return filestore, None
 
 
-def _action_list_dir(request: dict, ctx: WorkerContext) -> dict:
+def with_filestore(fn):
+    """Resolve request["fsp_name"] to a Filestore and pass it as the third arg.
+
+    Returns an error response if the filestore can't be resolved (404 for
+    missing fsp, 500 for unmounted) so the handler body never has to deal
+    with the not-found case.
+    """
+    @functools.wraps(fn)
+    def wrapper(request: dict, ctx: WorkerContext) -> dict:
+        filestore, error = _get_filestore(request["fsp_name"], ctx.db_url)
+        if filestore is None:
+            return {"error": error, "status_code": 404 if "not found" in error else 500}
+        return fn(request, ctx, filestore)
+    return wrapper
+
+
+@with_filestore
+def _action_list_dir(request: dict, ctx: WorkerContext, filestore) -> dict:
     """List directory contents."""
-    fsp_name = request["fsp_name"]
     subpath = request.get("subpath", "")
     current_user = ctx.username
-
-    filestore, error = _get_filestore(fsp_name, ctx.db_url)
-    if filestore is None:
-        return {"error": error, "status_code": 404 if "not found" in error else 500}
 
     from fileglancer import database as db
     from fileglancer.filestore import RootCheckError
@@ -208,17 +221,13 @@ def _action_list_dir(request: dict, ctx: WorkerContext) -> dict:
         return {"error": "Permission denied", "status_code": 403}
 
 
-def _action_list_dir_paged(request: dict, ctx: WorkerContext) -> dict:
+@with_filestore
+def _action_list_dir_paged(request: dict, ctx: WorkerContext, filestore) -> dict:
     """List directory contents with pagination."""
-    fsp_name = request["fsp_name"]
     subpath = request.get("subpath", "")
     current_user = ctx.username
     limit = request.get("limit", 200)
     cursor = request.get("cursor")
-
-    filestore, error = _get_filestore(fsp_name, ctx.db_url)
-    if filestore is None:
-        return {"error": error, "status_code": 404 if "not found" in error else 500}
 
     from fileglancer import database as db
     from fileglancer.filestore import RootCheckError
@@ -261,14 +270,10 @@ def _action_list_dir_paged(request: dict, ctx: WorkerContext) -> dict:
         return {"error": "Permission denied", "status_code": 403}
 
 
-def _action_get_file_info(request: dict, ctx: WorkerContext) -> dict:
+@with_filestore
+def _action_get_file_info(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Get metadata for a single file or directory."""
-    fsp_name = request["fsp_name"]
     subpath = request.get("subpath", "")
-
-    filestore, error = _get_filestore(fsp_name, ctx.db_url)
-    if filestore is None:
-        return {"error": error, "status_code": 404 if "not found" in error else 500}
 
     from fileglancer import database as db
 
@@ -282,14 +287,10 @@ def _action_get_file_info(request: dict, ctx: WorkerContext) -> dict:
         return {"error": "Permission denied", "status_code": 403}
 
 
-def _action_check_binary(request: dict, ctx: WorkerContext) -> dict:
+@with_filestore
+def _action_check_binary(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Check if a file is binary."""
-    fsp_name = request["fsp_name"]
     subpath = request.get("subpath", "")
-
-    filestore, error = _get_filestore(fsp_name, ctx.db_url)
-    if filestore is None:
-        return {"error": error, "status_code": 404 if "not found" in error else 500}
 
     try:
         is_binary = filestore.check_is_binary(subpath)
@@ -300,7 +301,8 @@ def _action_check_binary(request: dict, ctx: WorkerContext) -> dict:
         return {"error": "Permission denied", "status_code": 403}
 
 
-def _action_open_file(request: dict, ctx: WorkerContext) -> dict:
+@with_filestore
+def _action_open_file(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Open a file and return its metadata + open file descriptor.
 
     The worker opens the file as the user and passes the fd back to the
@@ -309,10 +311,6 @@ def _action_open_file(request: dict, ctx: WorkerContext) -> dict:
     """
     fsp_name = request["fsp_name"]
     subpath = request.get("subpath", "")
-
-    filestore, error = _get_filestore(fsp_name, ctx.db_url)
-    if filestore is None:
-        return {"error": error}
 
     from fileglancer.filestore import RootCheckError
     from fileglancer.utils import guess_content_type
@@ -350,14 +348,10 @@ def _action_open_file(request: dict, ctx: WorkerContext) -> dict:
         return {"error": f"Permission denied: {fsp_name}/{subpath}", "status_code": 403}
 
 
-def _action_head_file(request: dict, ctx: WorkerContext) -> dict:
+@with_filestore
+def _action_head_file(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Get file metadata and binary check for HEAD requests."""
-    fsp_name = request["fsp_name"]
     subpath = request.get("subpath", "")
-
-    filestore, error = _get_filestore(fsp_name, ctx.db_url)
-    if filestore is None:
-        return {"error": error}
 
     from fileglancer.filestore import RootCheckError
     from fileglancer.utils import guess_content_type
@@ -387,14 +381,10 @@ def _action_head_file(request: dict, ctx: WorkerContext) -> dict:
         return {"error": "Permission denied", "status_code": 403}
 
 
-def _action_create_dir(request: dict, ctx: WorkerContext) -> dict:
+@with_filestore
+def _action_create_dir(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Create a directory."""
-    fsp_name = request["fsp_name"]
     subpath = request["subpath"]
-
-    filestore, error = _get_filestore(fsp_name, ctx.db_url)
-    if filestore is None:
-        return {"error": error}
 
     try:
         filestore.create_dir(subpath)
@@ -405,14 +395,10 @@ def _action_create_dir(request: dict, ctx: WorkerContext) -> dict:
         return {"error": str(e), "status_code": 403}
 
 
-def _action_create_file(request: dict, ctx: WorkerContext) -> dict:
+@with_filestore
+def _action_create_file(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Create an empty file."""
-    fsp_name = request["fsp_name"]
     subpath = request["subpath"]
-
-    filestore, error = _get_filestore(fsp_name, ctx.db_url)
-    if filestore is None:
-        return {"error": error}
 
     try:
         filestore.create_empty_file(subpath)
@@ -423,15 +409,11 @@ def _action_create_file(request: dict, ctx: WorkerContext) -> dict:
         return {"error": str(e), "status_code": 403}
 
 
-def _action_rename(request: dict, ctx: WorkerContext) -> dict:
+@with_filestore
+def _action_rename(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Rename a file or directory."""
-    fsp_name = request["fsp_name"]
     old_path = request["old_path"]
     new_path = request["new_path"]
-
-    filestore, error = _get_filestore(fsp_name, ctx.db_url)
-    if filestore is None:
-        return {"error": error}
 
     try:
         filestore.rename_file_or_dir(old_path, new_path)
@@ -442,14 +424,10 @@ def _action_rename(request: dict, ctx: WorkerContext) -> dict:
         return {"error": str(e), "status_code": 500}
 
 
-def _action_delete(request: dict, ctx: WorkerContext) -> dict:
+@with_filestore
+def _action_delete(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Delete a file or directory."""
-    fsp_name = request["fsp_name"]
     subpath = request["subpath"]
-
-    filestore, error = _get_filestore(fsp_name, ctx.db_url)
-    if filestore is None:
-        return {"error": error}
 
     try:
         filestore.remove_file_or_dir(subpath)
@@ -460,15 +438,11 @@ def _action_delete(request: dict, ctx: WorkerContext) -> dict:
         return {"error": str(e), "status_code": 500}
 
 
-def _action_chmod(request: dict, ctx: WorkerContext) -> dict:
+@with_filestore
+def _action_chmod(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Change file permissions."""
-    fsp_name = request["fsp_name"]
     subpath = request["subpath"]
     permissions = request["permissions"]
-
-    filestore, error = _get_filestore(fsp_name, ctx.db_url)
-    if filestore is None:
-        return {"error": error}
 
     try:
         filestore.change_file_permissions(subpath, permissions)
@@ -479,16 +453,12 @@ def _action_chmod(request: dict, ctx: WorkerContext) -> dict:
         return {"error": str(e), "status_code": 500}
 
 
-def _action_update_file(request: dict, ctx: WorkerContext) -> dict:
+@with_filestore
+def _action_update_file(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Handle rename and/or permission change on a file."""
-    fsp_name = request["fsp_name"]
     subpath = request.get("subpath", "")
     new_path = request.get("new_path")
     new_permissions = request.get("new_permissions")
-
-    filestore, error = _get_filestore(fsp_name, ctx.db_url)
-    if filestore is None:
-        return {"error": error}
 
     try:
         old_file_info = filestore.get_file_info(subpath, ctx.username)
@@ -747,18 +717,14 @@ def _action_s3_open_object(request: dict, ctx: WorkerContext) -> dict:
 # Action handlers — proxied path validation
 # ---------------------------------------------------------------------------
 
-def _action_validate_proxied_path(request: dict, ctx: WorkerContext) -> dict:
+@with_filestore
+def _action_validate_proxied_path(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Validate that the user can access a proxied path.
 
     Runs within the user's context (the worker IS the user), so
     filesystem permission checks just work.
     """
-    fsp_name = request["fsp_name"]
     path = request["path"]
-
-    filestore, error = _get_filestore(fsp_name, ctx.db_url)
-    if filestore is None:
-        return {"error": error}
 
     try:
         filestore.get_file_info(path)
