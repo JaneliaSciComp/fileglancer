@@ -131,8 +131,19 @@ def _recvall(sock: socket.socket, n: int) -> Optional[bytes]:
 # Action handlers — file operations
 # ---------------------------------------------------------------------------
 
+# Per-worker cache of verified Filestore instances. Once a mount has been
+# successfully verified, we trust it for the lifetime of the worker process —
+# workers are short-lived enough (idle eviction) that we don't need to handle
+# unmount/remount mid-session.
+_filestore_cache: dict[str, Any] = {}
+
+
 def _get_filestore(fsp_name: str, db_url: str):
     """Look up a FileSharePath and return a Filestore instance."""
+    cached = _filestore_cache.get(fsp_name)
+    if cached is not None:
+        return cached, None
+
     from fileglancer import database as db
     from fileglancer.filestore import Filestore
 
@@ -147,6 +158,7 @@ def _get_filestore(fsp_name: str, db_url: str):
     except FileNotFoundError:
         return None, f"File share path '{fsp_name}' is not mounted"
 
+    _filestore_cache[fsp_name] = filestore
     return filestore, None
 
 

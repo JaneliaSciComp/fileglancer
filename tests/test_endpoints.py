@@ -85,6 +85,11 @@ def test_app(temp_dir):
     from fileglancer.database import dispose_engine
     dispose_engine(db_url)
 
+    # Clear the per-process filestore cache so subsequent tests don't see
+    # stale Filestore instances pointing at this test's temp directory
+    from fileglancer.user_worker import _filestore_cache
+    _filestore_cache.clear()
+
     # Restore original get_settings and clear cache
     fileglancer.settings.get_settings = original_get_settings
     fileglancer.database.get_settings = original_get_settings
