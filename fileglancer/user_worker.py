@@ -776,15 +776,21 @@ def _action_validate_proxied_path(request: dict, ctx: WorkerContext, filestore) 
 # Action handlers — cluster operations (absorbed from apps/worker.py)
 # ---------------------------------------------------------------------------
 
-@action("submit")
-def _action_submit(request: dict, ctx: WorkerContext) -> dict:
-    """Create work dir, symlink repo, submit job via py-cluster-api."""
-    from cluster_api import create_executor, ResourceSpec
+def _get_executor(request: dict):
+    """Build a py-cluster-api executor from request['cluster_config']."""
+    from cluster_api import create_executor
 
     config = request["cluster_config"]
     config.pop("extra_args", None)
+    return create_executor(**config)
 
-    executor = create_executor(**config)
+
+@action("submit")
+def _action_submit(request: dict, ctx: WorkerContext) -> dict:
+    """Create work dir, symlink repo, submit job via py-cluster-api."""
+    from cluster_api import ResourceSpec
+
+    executor = _get_executor(request)
 
     work_dir = Path(request["work_dir"])
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -821,12 +827,7 @@ def _action_submit(request: dict, ctx: WorkerContext) -> dict:
 @action("cancel")
 def _action_cancel(request: dict, ctx: WorkerContext) -> dict:
     """Cancel a cluster job via py-cluster-api."""
-    from cluster_api import create_executor
-
-    config = request["cluster_config"]
-    config.pop("extra_args", None)
-
-    executor = create_executor(**config)
+    executor = _get_executor(request)
     _run_async(executor.cancel(request["job_id"]))
     return {"status": "ok"}
 
@@ -834,13 +835,9 @@ def _action_cancel(request: dict, ctx: WorkerContext) -> dict:
 @action("poll")
 def _action_poll(request: dict, ctx: WorkerContext) -> dict:
     """Poll job statuses via py-cluster-api."""
-    from cluster_api import create_executor
     from cluster_api._types import JobRecord, JobStatus
 
-    config = request["cluster_config"]
-    config.pop("extra_args", None)
-
-    executor = create_executor(**config)
+    executor = _get_executor(request)
 
     known_statuses = request.get("job_statuses", {})
     for cid in request["cluster_job_ids"]:
@@ -874,12 +871,7 @@ def _action_poll(request: dict, ctx: WorkerContext) -> dict:
 @action("reconnect")
 def _action_reconnect(request: dict, ctx: WorkerContext) -> dict:
     """Reconnect to existing jobs via py-cluster-api."""
-    from cluster_api import create_executor
-
-    config = request["cluster_config"]
-    config.pop("extra_args", None)
-
-    executor = create_executor(**config)
+    executor = _get_executor(request)
     reconnected = _run_async(executor.reconnect())
 
     jobs = {}
