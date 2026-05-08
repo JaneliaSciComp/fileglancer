@@ -513,8 +513,6 @@ def _action_validate_paths(request: dict, ctx: WorkerContext) -> dict:
 
 def _action_get_profile(request: dict, ctx: WorkerContext) -> dict:
     """Get user profile information."""
-    import grp as _grp
-
     from fileglancer import database as db
 
     username = ctx.username
@@ -535,6 +533,7 @@ def _action_get_profile(request: dict, ctx: WorkerContext) -> dict:
 
     user_groups = []
     try:
+        import grp as _grp
         user_info = pwd.getpwnam(username)
         all_groups = _grp.getgrall()
         for group in all_groups:
