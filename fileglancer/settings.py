@@ -113,6 +113,11 @@ class Settings(BaseSettings):
     # Username used when creating a session via the test-login endpoint.
     test_login_username: str = "jacs"
 
+    # Optional path to a viewers configuration YAML file.
+    # When set, the file is served at GET /api/viewers-config, allowing
+    # runtime customization of OME-Zarr viewers without rebuilding the frontend.
+    viewers_config: Optional[str] = None
+
     model_config = SettingsConfigDict(
         yaml_file="config.yaml",
         env_file='.env',

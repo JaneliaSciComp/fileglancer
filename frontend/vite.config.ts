@@ -3,15 +3,22 @@ import fs from 'fs';
 import path from 'path';
 import react from '@vitejs/plugin-react';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
+import { resolveViewersConfigPath } from './src/config/resolveViewersConfigPath';
+
+const viewersConfigPath = resolveViewersConfigPath(__dirname);
 
 // https://vite.dev/config/
 export default defineConfig({
   base: '/',
   plugins: [react(), nodePolyfills({ include: ['path'] })],
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src')
-    }
+    alias: [
+      {
+        find: /^@\/config\/viewers\.config\.yaml(\?.*)?$/,
+        replacement: viewersConfigPath + '$1'
+      },
+      { find: '@', replacement: path.resolve(__dirname, './src') }
+    ]
   },
   css: {
     lightningcss: {

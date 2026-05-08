@@ -1,6 +1,7 @@
 import * as zarr from 'zarrita';
 import { Axis } from 'ome-zarr.js';
 import { HiQuestionMarkCircle } from 'react-icons/hi';
+import { default as log } from '@/logger';
 
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import {
@@ -13,7 +14,7 @@ import FgTooltip from '@/components/ui/widgets/FgTooltip';
 type ZarrMetadataTableProps = {
   readonly metadata: Metadata;
   readonly layerType: 'auto' | 'image' | 'segmentation' | null;
-  readonly availableVersions?: ('v2' | 'v3')[];
+  readonly availableZarrVersions?: number[];
 };
 
 function getSizeString(shapes: number[][] | undefined) {
@@ -58,7 +59,7 @@ function getAxisData(metadata: Metadata) {
       };
     });
   } catch (error) {
-    console.error('Error getting axis data: ', error);
+    log.error('Error getting axis data: ', error);
     return [];
   }
 }
@@ -66,7 +67,7 @@ function getAxisData(metadata: Metadata) {
 export default function ZarrMetadataTable({
   metadata,
   layerType,
-  availableVersions
+  availableZarrVersions
 }: ZarrMetadataTableProps) {
   const { disableHeuristicalLayerTypeDetection } = usePreferencesContext();
   const { zarrVersion, multiscale, shapes } = metadata;
@@ -85,8 +86,8 @@ export default function ZarrMetadataTable({
           <tr className="h-11 border-y border-surface-dark">
             <td className="px-3 py-2 font-semibold">Zarr Version</td>
             <td className="px-3 py-2">
-              {availableVersions && availableVersions.length > 1
-                ? availableVersions.join(', ')
+              {availableZarrVersions && availableZarrVersions.length > 0
+                ? availableZarrVersions.join(', ')
                 : zarrVersion}
             </td>
           </tr>
