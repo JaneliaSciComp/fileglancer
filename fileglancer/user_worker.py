@@ -790,8 +790,7 @@ def _get_executor(request: dict):
     """Build a py-cluster-api executor from request['cluster_config']."""
     from cluster_api import create_executor
 
-    config = request["cluster_config"]
-    config.pop("extra_args", None)
+    config = {k: v for k, v in request["cluster_config"].items() if k != "extra_args"}
     return create_executor(**config)
 
 
