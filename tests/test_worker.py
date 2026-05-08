@@ -10,10 +10,16 @@ import json
 import os
 import socket
 import struct
+import sys
 import tempfile
 import time
 
 import pytest
+
+pytestmark = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Worker subsystem uses fork/setuid/SCM_RIGHTS (Unix-only)",
+)
 
 from fileglancer.user_worker import (
     _send,

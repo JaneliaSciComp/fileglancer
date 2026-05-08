@@ -27,7 +27,10 @@ import ctypes.util
 import json
 import logging
 import os
-import pwd
+try:
+    import pwd
+except ImportError:
+    pwd = None  # type: ignore[assignment]
 import socket
 import struct
 import sys
