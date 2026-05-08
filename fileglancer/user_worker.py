@@ -154,6 +154,35 @@ def action(name: str):
 # unmount/remount mid-session.
 _filestore_cache: dict[str, Any] = {}
 
+# Per-username cache of supplementary group names. Keyed by username so the
+# in-process dev/test path (which serves multiple users from one process)
+# stays correct; in subprocess mode there's only ever one entry.
+_user_groups_cache: dict[str, list[str]] = {}
+
+
+def _get_user_groups(username: str) -> list[str]:
+    """Return the supplementary group names for a user.
+
+    Uses os.getgrouplist (NSS initgroups) instead of grp.getgrall, which
+    enumerates every group on the system and is very slow on LDAP/NIS hosts.
+    Result is cached for the lifetime of the process.
+    """
+    cached = _user_groups_cache.get(username)
+    if cached is not None:
+        return cached
+
+    import grp as _grp
+    pw = pwd.getpwnam(username)
+    gids = os.getgrouplist(username, pw.pw_gid)
+    names = []
+    for gid in gids:
+        try:
+            names.append(_grp.getgrgid(gid).gr_name)
+        except KeyError:
+            continue
+    _user_groups_cache[username] = names
+    return names
+
 
 def _get_filestore(fsp_name: str, db_url: str):
     """Look up a FileSharePath and return a Filestore instance.
@@ -555,15 +584,7 @@ def _action_get_profile(request: dict, ctx: WorkerContext) -> dict:
 
     user_groups = []
     try:
-        import grp as _grp
-        user_info = pwd.getpwnam(username)
-        all_groups = _grp.getgrall()
-        for group in all_groups:
-            if username in group.gr_mem:
-                user_groups.append(group.gr_name)
-        primary_group = _grp.getgrgid(user_info.pw_gid).gr_name
-        if primary_group not in user_groups:
-            user_groups.append(primary_group)
+        user_groups = _get_user_groups(username)
     except Exception as e:
         logger.error(f"Error getting groups for user {username}: {e}")
 

@@ -87,8 +87,9 @@ def test_app(temp_dir):
 
     # Clear the per-process filestore cache so subsequent tests don't see
     # stale Filestore instances pointing at this test's temp directory
-    from fileglancer.user_worker import _filestore_cache
+    from fileglancer.user_worker import _filestore_cache, _user_groups_cache
     _filestore_cache.clear()
+    _user_groups_cache.clear()
 
     # Restore original get_settings and clear cache
     fileglancer.settings.get_settings = original_get_settings
