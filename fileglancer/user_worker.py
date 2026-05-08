@@ -844,7 +844,7 @@ def _action_cancel(request: dict, ctx: WorkerContext) -> dict:
 @action("poll")
 def _action_poll(request: dict, ctx: WorkerContext) -> dict:
     """Poll job statuses via py-cluster-api."""
-    from cluster_api._types import JobRecord, JobStatus
+    from cluster_api import JobStatus
 
     executor = _get_executor(request)
 
@@ -855,12 +855,7 @@ def _action_poll(request: dict, ctx: WorkerContext) -> dict:
             seed_status = JobStatus(db_status)
         except ValueError:
             seed_status = JobStatus.PENDING
-        executor._jobs[cid] = JobRecord(
-            job_id=cid,
-            name="",
-            command="",
-            status=seed_status,
-        )
+        executor.track(cid, status=seed_status)
 
     _run_async(executor.poll())
 
