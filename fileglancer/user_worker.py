@@ -129,6 +129,22 @@ def _recvall(sock: socket.socket, n: int) -> Optional[bytes]:
 
 
 # ---------------------------------------------------------------------------
+# Action registry
+# ---------------------------------------------------------------------------
+
+# Populated by @action(name) decorators on each handler.
+_ACTIONS: dict[str, Any] = {}
+
+
+def action(name: str):
+    """Register a handler under the given action name."""
+    def decorator(fn):
+        _ACTIONS[name] = fn
+        return fn
+    return decorator
+
+
+# ---------------------------------------------------------------------------
 # Action handlers — file operations
 # ---------------------------------------------------------------------------
 
@@ -179,6 +195,7 @@ def with_filestore(fn):
     return wrapper
 
 
+@action("list_dir")
 @with_filestore
 def _action_list_dir(request: dict, ctx: WorkerContext, filestore) -> dict:
     """List directory contents."""
@@ -221,6 +238,7 @@ def _action_list_dir(request: dict, ctx: WorkerContext, filestore) -> dict:
         return {"error": "Permission denied", "status_code": 403}
 
 
+@action("list_dir_paged")
 @with_filestore
 def _action_list_dir_paged(request: dict, ctx: WorkerContext, filestore) -> dict:
     """List directory contents with pagination."""
@@ -270,6 +288,7 @@ def _action_list_dir_paged(request: dict, ctx: WorkerContext, filestore) -> dict
         return {"error": "Permission denied", "status_code": 403}
 
 
+@action("get_file_info")
 @with_filestore
 def _action_get_file_info(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Get metadata for a single file or directory."""
@@ -287,6 +306,7 @@ def _action_get_file_info(request: dict, ctx: WorkerContext, filestore) -> dict:
         return {"error": "Permission denied", "status_code": 403}
 
 
+@action("check_binary")
 @with_filestore
 def _action_check_binary(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Check if a file is binary."""
@@ -301,6 +321,7 @@ def _action_check_binary(request: dict, ctx: WorkerContext, filestore) -> dict:
         return {"error": "Permission denied", "status_code": 403}
 
 
+@action("open_file")
 @with_filestore
 def _action_open_file(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Open a file and return its metadata + open file descriptor.
@@ -348,6 +369,7 @@ def _action_open_file(request: dict, ctx: WorkerContext, filestore) -> dict:
         return {"error": f"Permission denied: {fsp_name}/{subpath}", "status_code": 403}
 
 
+@action("head_file")
 @with_filestore
 def _action_head_file(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Get file metadata and binary check for HEAD requests."""
@@ -381,6 +403,7 @@ def _action_head_file(request: dict, ctx: WorkerContext, filestore) -> dict:
         return {"error": "Permission denied", "status_code": 403}
 
 
+@action("create_dir")
 @with_filestore
 def _action_create_dir(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Create a directory."""
@@ -395,6 +418,7 @@ def _action_create_dir(request: dict, ctx: WorkerContext, filestore) -> dict:
         return {"error": str(e), "status_code": 403}
 
 
+@action("create_file")
 @with_filestore
 def _action_create_file(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Create an empty file."""
@@ -409,6 +433,7 @@ def _action_create_file(request: dict, ctx: WorkerContext, filestore) -> dict:
         return {"error": str(e), "status_code": 403}
 
 
+@action("rename")
 @with_filestore
 def _action_rename(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Rename a file or directory."""
@@ -424,6 +449,7 @@ def _action_rename(request: dict, ctx: WorkerContext, filestore) -> dict:
         return {"error": str(e), "status_code": 500}
 
 
+@action("delete")
 @with_filestore
 def _action_delete(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Delete a file or directory."""
@@ -438,6 +464,7 @@ def _action_delete(request: dict, ctx: WorkerContext, filestore) -> dict:
         return {"error": str(e), "status_code": 500}
 
 
+@action("chmod")
 @with_filestore
 def _action_chmod(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Change file permissions."""
@@ -453,6 +480,7 @@ def _action_chmod(request: dict, ctx: WorkerContext, filestore) -> dict:
         return {"error": str(e), "status_code": 500}
 
 
+@action("update_file")
 @with_filestore
 def _action_update_file(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Handle rename and/or permission change on a file."""
@@ -478,6 +506,7 @@ def _action_update_file(request: dict, ctx: WorkerContext, filestore) -> dict:
         return {"error": str(e), "status_code": 500}
 
 
+@action("validate_paths")
 def _action_validate_paths(request: dict, ctx: WorkerContext) -> dict:
     """Validate file/directory paths for app parameters."""
     from fileglancer.apps.core import validate_path_in_filestore
@@ -493,6 +522,7 @@ def _action_validate_paths(request: dict, ctx: WorkerContext) -> dict:
     return {"errors": errors}
 
 
+@action("get_profile")
 def _action_get_profile(request: dict, ctx: WorkerContext) -> dict:
     """Get user profile information."""
     from fileglancer import database as db
@@ -539,6 +569,7 @@ def _action_get_profile(request: dict, ctx: WorkerContext) -> dict:
 # Action handlers — SSH keys
 # ---------------------------------------------------------------------------
 
+@action("list_ssh_keys")
 def _action_list_ssh_keys(request: dict, ctx: WorkerContext) -> dict:
     """List SSH keys."""
     from fileglancer import sshkeys
@@ -550,6 +581,7 @@ def _action_list_ssh_keys(request: dict, ctx: WorkerContext) -> dict:
         return {"error": str(e), "status_code": 500}
 
 
+@action("generate_ssh_key")
 def _action_generate_ssh_key(request: dict, ctx: WorkerContext) -> dict:
     """Generate a temporary SSH key and authorize it."""
     from fileglancer import sshkeys
@@ -571,6 +603,7 @@ def _action_generate_ssh_key(request: dict, ctx: WorkerContext) -> dict:
 # Action handlers — job files
 # ---------------------------------------------------------------------------
 
+@action("get_job_file")
 def _action_get_job_file(request: dict, ctx: WorkerContext) -> dict:
     """Read job file content (script, stdout, stderr)."""
     from fileglancer.apps.core import get_job_file_content
@@ -582,6 +615,7 @@ def _action_get_job_file(request: dict, ctx: WorkerContext) -> dict:
     return {"content": content}
 
 
+@action("get_job_file_paths")
 def _action_get_job_file_paths(request: dict, ctx: WorkerContext) -> dict:
     """Get job file path info."""
     from fileglancer.apps.core import get_job_file_paths
@@ -597,6 +631,7 @@ def _action_get_job_file_paths(request: dict, ctx: WorkerContext) -> dict:
     return {"files": files}
 
 
+@action("get_service_url")
 def _action_get_service_url(request: dict, ctx: WorkerContext) -> dict:
     """Read service URL from job work directory."""
     from fileglancer.apps.core import get_service_url
@@ -616,6 +651,7 @@ def _action_get_service_url(request: dict, ctx: WorkerContext) -> dict:
 # Action handlers — S3 proxy
 # ---------------------------------------------------------------------------
 
+@action("s3_list_objects")
 def _action_s3_list_objects(request: dict, ctx: WorkerContext) -> dict:
     """S3-compatible list objects."""
     from x2s3.client_file import FileProxyClient
@@ -644,6 +680,7 @@ def _action_s3_list_objects(request: dict, ctx: WorkerContext) -> dict:
     return {"body": result.body.decode(), "media_type": result.media_type, "status_code": result.status_code}
 
 
+@action("s3_head_object")
 def _action_s3_head_object(request: dict, ctx: WorkerContext) -> dict:
     """S3-compatible head object."""
     from x2s3.client_file import FileProxyClient
@@ -662,6 +699,7 @@ def _action_s3_head_object(request: dict, ctx: WorkerContext) -> dict:
     return {"headers": headers, "status_code": result.status_code}
 
 
+@action("s3_open_object")
 def _action_s3_open_object(request: dict, ctx: WorkerContext) -> dict:
     """S3-compatible open object — open the file and pass the fd back.
 
@@ -717,6 +755,7 @@ def _action_s3_open_object(request: dict, ctx: WorkerContext) -> dict:
 # Action handlers — proxied path validation
 # ---------------------------------------------------------------------------
 
+@action("validate_proxied_path")
 @with_filestore
 def _action_validate_proxied_path(request: dict, ctx: WorkerContext, filestore) -> dict:
     """Validate that the user can access a proxied path.
@@ -737,6 +776,7 @@ def _action_validate_proxied_path(request: dict, ctx: WorkerContext, filestore) 
 # Action handlers — cluster operations (absorbed from apps/worker.py)
 # ---------------------------------------------------------------------------
 
+@action("submit")
 def _action_submit(request: dict, ctx: WorkerContext) -> dict:
     """Create work dir, symlink repo, submit job via py-cluster-api."""
     from cluster_api import create_executor, ResourceSpec
@@ -778,6 +818,7 @@ def _action_submit(request: dict, ctx: WorkerContext) -> dict:
     return {"job_id": job.job_id, "script_path": job.script_path}
 
 
+@action("cancel")
 def _action_cancel(request: dict, ctx: WorkerContext) -> dict:
     """Cancel a cluster job via py-cluster-api."""
     from cluster_api import create_executor
@@ -790,6 +831,7 @@ def _action_cancel(request: dict, ctx: WorkerContext) -> dict:
     return {"status": "ok"}
 
 
+@action("poll")
 def _action_poll(request: dict, ctx: WorkerContext) -> dict:
     """Poll job statuses via py-cluster-api."""
     from cluster_api import create_executor
@@ -829,6 +871,7 @@ def _action_poll(request: dict, ctx: WorkerContext) -> dict:
     return {"jobs": jobs}
 
 
+@action("reconnect")
 def _action_reconnect(request: dict, ctx: WorkerContext) -> dict:
     """Reconnect to existing jobs via py-cluster-api."""
     from cluster_api import create_executor
@@ -857,6 +900,7 @@ def _action_reconnect(request: dict, ctx: WorkerContext) -> dict:
 # Action handlers — git/manifest operations (absorbed from apps/worker.py)
 # ---------------------------------------------------------------------------
 
+@action("ensure_repo")
 def _action_ensure_repo(request: dict, ctx: WorkerContext) -> dict:
     """Clone or update a GitHub repo in the current user's cache."""
     from fileglancer.apps.core import _ensure_repo_cache
@@ -867,6 +911,7 @@ def _action_ensure_repo(request: dict, ctx: WorkerContext) -> dict:
     return {"repo_dir": str(repo_dir)}
 
 
+@action("discover_manifests")
 def _action_discover_manifests(request: dict, ctx: WorkerContext) -> dict:
     """Clone/pull repo and discover all manifests."""
     from fileglancer.apps.core import _ensure_repo_cache, _find_manifests_in_repo
@@ -883,6 +928,7 @@ def _action_discover_manifests(request: dict, ctx: WorkerContext) -> dict:
     }
 
 
+@action("read_manifest")
 def _action_read_manifest(request: dict, ctx: WorkerContext) -> dict:
     """Fetch and read a single manifest from a cached repo."""
     from fileglancer.apps.core import _ensure_repo_cache, _read_manifest_file
@@ -894,50 +940,6 @@ def _action_read_manifest(request: dict, ctx: WorkerContext) -> dict:
     target_dir = repo_dir / manifest_path if manifest_path else repo_dir
     manifest = _read_manifest_file(target_dir)
     return {"manifest": manifest.model_dump(mode="json")}
-
-
-# ---------------------------------------------------------------------------
-# Action registry
-# ---------------------------------------------------------------------------
-
-_ACTIONS: dict[str, Any] = {
-    # File operations
-    "list_dir": _action_list_dir,
-    "list_dir_paged": _action_list_dir_paged,
-    "get_file_info": _action_get_file_info,
-    "check_binary": _action_check_binary,
-    "open_file": _action_open_file,
-    "head_file": _action_head_file,
-    "create_dir": _action_create_dir,
-    "create_file": _action_create_file,
-    "rename": _action_rename,
-    "delete": _action_delete,
-    "chmod": _action_chmod,
-    "update_file": _action_update_file,
-    "validate_paths": _action_validate_paths,
-    "validate_proxied_path": _action_validate_proxied_path,
-    "get_profile": _action_get_profile,
-    # SSH keys
-    "list_ssh_keys": _action_list_ssh_keys,
-    "generate_ssh_key": _action_generate_ssh_key,
-    # Job files
-    "get_job_file": _action_get_job_file,
-    "get_job_file_paths": _action_get_job_file_paths,
-    "get_service_url": _action_get_service_url,
-    # S3 proxy
-    "s3_list_objects": _action_s3_list_objects,
-    "s3_head_object": _action_s3_head_object,
-    "s3_open_object": _action_s3_open_object,
-    # Cluster operations
-    "submit": _action_submit,
-    "cancel": _action_cancel,
-    "poll": _action_poll,
-    "reconnect": _action_reconnect,
-    # Git/manifest operations
-    "ensure_repo": _action_ensure_repo,
-    "discover_manifests": _action_discover_manifests,
-    "read_manifest": _action_read_manifest,
-}
 
 
 # ---------------------------------------------------------------------------
