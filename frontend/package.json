@@ -80,7 +80,7 @@
         "happy-dom": "^20.8.9",
         "lefthook": "^1.12.2",
         "msw": "^2.10.4",
-        "prettier": "^3.5.3",
+        "prettier": "3.8.3",
         "rimraf": "^5.0.1",
         "typescript": "~5.8.2",
         "typescript-eslint": "^8.32.1",
