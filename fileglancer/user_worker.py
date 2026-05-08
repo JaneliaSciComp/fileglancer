@@ -156,7 +156,11 @@ _filestore_cache: dict[str, Any] = {}
 
 
 def _get_filestore(fsp_name: str, db_url: str):
-    """Look up a FileSharePath and return a Filestore instance."""
+    """Look up a FileSharePath and return a Filestore instance.
+
+    Returns (filestore, None) on success, or (None, error_response) on failure
+    where error_response is a dict ready to be returned from a handler.
+    """
     cached = _filestore_cache.get(fsp_name)
     if cached is not None:
         return cached, None
@@ -167,13 +171,19 @@ def _get_filestore(fsp_name: str, db_url: str):
     with db.get_db_session(db_url) as session:
         fsp = db.get_file_share_path(session, fsp_name)
         if fsp is None:
-            return None, f"File share path '{fsp_name}' not found"
+            return None, {
+                "error": f"File share path '{fsp_name}' not found",
+                "status_code": 404,
+            }
 
     filestore = Filestore(fsp)
     try:
         filestore.get_file_info(None)
     except FileNotFoundError:
-        return None, f"File share path '{fsp_name}' is not mounted"
+        return None, {
+            "error": f"File share path '{fsp_name}' is not mounted",
+            "status_code": 503,
+        }
 
     _filestore_cache[fsp_name] = filestore
     return filestore, None
@@ -182,15 +192,15 @@ def _get_filestore(fsp_name: str, db_url: str):
 def with_filestore(fn):
     """Resolve request["fsp_name"] to a Filestore and pass it as the third arg.
 
-    Returns an error response if the filestore can't be resolved (404 for
-    missing fsp, 500 for unmounted) so the handler body never has to deal
-    with the not-found case.
+    Returns an error response if the filestore can't be resolved (404 for a
+    missing fsp, 503 for an unmounted one) so the handler body never has to
+    deal with the not-found case.
     """
     @functools.wraps(fn)
     def wrapper(request: dict, ctx: WorkerContext) -> dict:
-        filestore, error = _get_filestore(request["fsp_name"], ctx.db_url)
+        filestore, error_response = _get_filestore(request["fsp_name"], ctx.db_url)
         if filestore is None:
-            return {"error": error, "status_code": 404 if "not found" in error else 500}
+            return error_response
         return fn(request, ctx, filestore)
     return wrapper
 
