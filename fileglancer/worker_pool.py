@@ -331,7 +331,12 @@ class WorkerPool:
         return UserWorker(username, process, parent_sock)
 
     async def _forward_stderr(self, username: str, process: subprocess.Popen):
-        """Forward worker stderr lines to loguru in the background."""
+        """Forward worker stderr lines to loguru in the background.
+
+        If this task dies, the worker's stderr pipe will eventually fill and
+        block the worker on its next write — so failures here are logged
+        loudly rather than swallowed.
+        """
         try:
             loop = asyncio.get_event_loop()
             while True:
@@ -340,7 +345,7 @@ class WorkerPool:
                     break
                 logger.debug(f"[worker:{username}] {line.decode().rstrip()}")
         except Exception:
-            pass
+            logger.exception(f"stderr forwarder for worker {username} crashed")
 
     async def _evict_lru(self):
         """Evict the least-recently-used idle worker."""
