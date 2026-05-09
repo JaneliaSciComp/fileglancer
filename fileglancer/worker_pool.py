@@ -104,6 +104,8 @@ class UserWorker:
         if not self.is_alive:
             raise WorkerDead(f"Worker for {self.username} is dead (rc={self.process.returncode})")
 
+        logger.debug(f"Delegating {action} to worker for {self.username} (pid={self.process.pid})")
+
         async with self._lock:
             self._busy = True
             self.last_activity = time.monotonic()
