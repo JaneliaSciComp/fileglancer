@@ -182,7 +182,7 @@ class TestUserWorkerIPC:
             def wait(self): pass
             def kill(self): pass
 
-        worker = UserWorker("testuser", FakeProcess(), parent)
+        worker = UserWorker("testuser", FakeProcess(), parent, db_proxy=None)
         return worker, child
 
     def test_send_and_recv_basic(self):
@@ -277,7 +277,7 @@ class TestUserWorkerExecute:
             def wait(self): pass
             def kill(self): pass
 
-        worker = UserWorker("testuser", FakeProcess(), parent)
+        worker = UserWorker("testuser", FakeProcess(), parent, db_proxy=None)
         return worker, child
 
     @pytest.mark.asyncio
@@ -330,7 +330,7 @@ class TestUserWorkerExecute:
             def wait(self): pass
             def kill(self): pass
 
-        worker = UserWorker("testuser", DeadProcess(), parent)
+        worker = UserWorker("testuser", DeadProcess(), parent, db_proxy=None)
         with pytest.raises(WorkerDead):
             await worker.execute("anything")
         parent.close()
@@ -432,10 +432,12 @@ class TestActionHandlers:
 
     @pytest.fixture
     def ctx(self, temp_dir):
-        """Create a WorkerContext with a test database."""
+        """Create a WorkerContext with a LocalDbProxy backed by the test database."""
         from fileglancer.settings import get_settings
+        from fileglancer.user_worker import LocalDbProxy
         settings = get_settings()
-        return WorkerContext(username=os.environ.get("USER", "test"), db_url=settings.db_url)
+        return WorkerContext(username=os.environ.get("USER", "test"),
+                              db=LocalDbProxy(settings.db_url))
 
     def test_get_profile(self, ctx):
         handler = _ACTIONS["get_profile"]
@@ -475,8 +477,9 @@ class TestWorkerMainLoop:
                 username = str(uid)
 
             from fileglancer.settings import get_settings
+            from fileglancer.user_worker import LocalDbProxy
             settings = get_settings()
-            ctx = WorkerContext(username=username, db_url=settings.db_url)
+            ctx = WorkerContext(username=username, db=LocalDbProxy(settings.db_url))
 
             while True:
                 try:

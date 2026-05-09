@@ -71,10 +71,11 @@ class UserWorker:
     """
 
     def __init__(self, username: str, process: subprocess.Popen,
-                 sock: socket.socket):
+                 sock: socket.socket, db_proxy):
         self.username = username
         self.process = process
         self.sock = sock
+        self.db_proxy = db_proxy  # LocalDbProxy used to satisfy worker db_requests
         self.last_activity = time.monotonic()
         self._busy = False
         self._lock = asyncio.Lock()  # serialize requests to the worker
@@ -130,22 +131,38 @@ class UserWorker:
                 self.last_activity = time.monotonic()
 
     def _send_and_recv(self, request: dict) -> dict:
-        """Send a request and receive the response (blocking, runs in thread).
+        """Send a request and receive the action response (blocking, runs in thread).
+
+        Loops on receive: any inbound ``_kind == "db_request"`` message is a
+        reverse-RPC from the worker (which has no DB credentials) asking the
+        parent to run a DB query on its behalf. We dispatch it, send back a
+        ``db_response``, and keep reading. Anything else is the action result.
+        """
+        self._send_msg(request)
+
+        while True:
+            response = self._recv_msg()
+            if response.get("_kind") == "db_request":
+                self._handle_db_request(response)
+                continue
+            return response
+
+    def _send_msg(self, msg: dict):
+        """Send a length-prefixed JSON message."""
+        payload = json.dumps(msg).encode()
+        header = struct.pack(_HEADER_FMT, len(payload))
+        self.sock.sendall(header + payload)
+
+    def _recv_msg(self) -> dict:
+        """Receive one length-prefixed JSON message, capturing any SCM_RIGHTS fd.
 
         All receives use recvmsg() so that SCM_RIGHTS file descriptors are
         captured transparently — the ancillary data arrives with the first
         bytes of the message, so we must use recvmsg for the header too.
         """
-        # Send
-        payload = json.dumps(request).encode()
-        header = struct.pack(_HEADER_FMT, len(payload))
-        self.sock.sendall(header + payload)
-
-        # Receive header + payload + optional fd, all via recvmsg
         fds = array.array("i")
         raw = b""
         try:
-            # First, read at least the header
             while len(raw) < _HEADER_SIZE:
                 msg, ancdata, flags, addr = self.sock.recvmsg(
                     max(_HEADER_SIZE - len(raw), 4096),
@@ -162,7 +179,6 @@ class UserWorker:
             if length > _MAX_MESSAGE_SIZE:
                 raise WorkerError(f"Response too large: {length} bytes")
 
-            # We may have read some payload bytes with the header
             total_needed = _HEADER_SIZE + length
             while len(raw) < total_needed:
                 msg, ancdata, flags, addr = self.sock.recvmsg(
@@ -187,7 +203,6 @@ class UserWorker:
                     pass
             raise
 
-        # If an fd arrived, wrap it in a file object and close any extras
         if fds:
             response["_file_handle"] = os.fdopen(fds[0], "rb")
             for extra_fd in fds[1:]:
@@ -197,6 +212,32 @@ class UserWorker:
                     pass
 
         return response
+
+    def _handle_db_request(self, request: dict):
+        """Run a DB query on behalf of the worker and send the result back."""
+        from fileglancer.user_worker import DB_METHODS, serialize_db_result
+
+        method = request.get("method")
+        kwargs = request.get("kwargs", {}) or {}
+        if method not in DB_METHODS:
+            self._send_msg({
+                "_kind": "db_response",
+                "ok": False,
+                "error": f"Unknown db method: {method}",
+            })
+            return
+
+        try:
+            value = getattr(self.db_proxy, method)(**kwargs)
+            result = serialize_db_result(method, value)
+            self._send_msg({"_kind": "db_response", "ok": True, "result": result})
+        except Exception as e:
+            logger.exception(f"db_request {method} for {self.username} failed")
+            self._send_msg({
+                "_kind": "db_response",
+                "ok": False,
+                "error": f"{type(e).__name__}: {e}",
+            })
 
     async def shutdown(self, timeout: float = 5.0):
         """Ask the worker to shut down gracefully, then force-kill if needed."""
@@ -233,12 +274,17 @@ class WorkerPool:
     """
 
     def __init__(self, settings: Settings):
+        from fileglancer.user_worker import LocalDbProxy
+
         self.settings = settings
         self._workers: dict[str, UserWorker] = {}
         self._locks: dict[str, asyncio.Lock] = {}
         self._eviction_task: Optional[asyncio.Task] = None
         self.max_workers = settings.worker_pool_max_workers
         self.idle_timeout = settings.worker_pool_idle_timeout
+        # All worker DB requests are satisfied by this proxy in the parent;
+        # the worker subprocess never sees the DB URL.
+        self._db_proxy = LocalDbProxy(settings.db_url)
 
     def _get_lock(self, username: str) -> asyncio.Lock:
         if username not in self._locks:
@@ -296,13 +342,17 @@ class WorkerPool:
         # Create Unix socketpair for IPC
         parent_sock, child_sock = socket.socketpair()
 
+        # Worker subprocess deliberately does NOT receive the DB URL — it
+        # runs as the (untrusted) target user, so credentials would be
+        # readable via /proc/<pid>/environ. All DB queries reverse-RPC back
+        # to the parent over the IPC socket instead.
         env = {
             **os.environ,
             "HOME": pw.pw_dir,
             "FGC_LOG_LEVEL": self.settings.log_level,
-            "FGC_DB_URL": self.settings.db_url,
             "FGC_WORKER_FD": str(child_sock.fileno()),
         }
+        env.pop("FGC_DB_URL", None)
 
         logger.info(
             f"Spawning persistent worker for {username} "
@@ -328,7 +378,7 @@ class WorkerPool:
         # Start a background task to forward worker stderr to loguru
         asyncio.create_task(self._forward_stderr(username, process))
 
-        return UserWorker(username, process, parent_sock)
+        return UserWorker(username, process, parent_sock, self._db_proxy)
 
     async def _forward_stderr(self, username: str, process: subprocess.Popen):
         """Forward worker stderr lines to loguru in the background.

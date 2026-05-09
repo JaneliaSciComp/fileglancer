@@ -145,6 +145,113 @@ def action(name: str):
 
 
 # ---------------------------------------------------------------------------
+# DB proxy
+# ---------------------------------------------------------------------------
+#
+# Worker subprocesses run as the (untrusted) target user, so we don't give
+# them the database URL. Instead, action handlers go through a DbProxy that
+# reverse-RPCs back to the parent over the same socket. The parent runs the
+# query with full credentials and returns the result.
+#
+# In dev/test mode (no subprocess), the same handlers use LocalDbProxy which
+# calls the database functions directly.
+#
+# DB_METHODS is the whitelist of methods both proxies expose; the parent's
+# inbound dispatch only accepts these names.
+
+from types import SimpleNamespace
+
+
+def _job_db_to_dict(j) -> dict:
+    """Serialize a JobDB row to a JSON-safe dict for transport to the worker.
+
+    Only includes fields used by worker-side handlers (read_job_file,
+    get_job_file_paths, get_service_url) — keep this list minimal so the
+    worker sees as little of the DB row as possible.
+    """
+    return {
+        "id": j.id,
+        "app_name": j.app_name,
+        "entry_point_id": j.entry_point_id,
+        "entry_point_type": getattr(j, "entry_point_type", "job"),
+        "status": j.status,
+        "work_dir": j.work_dir,
+    }
+
+
+class LocalDbProxy:
+    """DbProxy backed by a real database connection.
+
+    Used in dev/test mode (in-process) and on the parent side as the
+    backend for inbound db_request messages from worker subprocesses.
+    """
+
+    def __init__(self, db_url: str):
+        self.db_url = db_url
+
+    def get_file_share_paths(self):
+        from fileglancer import database as db
+        with db.get_db_session(self.db_url) as session:
+            return db.get_file_share_paths(session)
+
+    def get_job(self, job_id: int, username: str):
+        from fileglancer import database as db
+        with db.get_db_session(self.db_url) as session:
+            j = db.get_job(session, job_id, username)
+            if j is None:
+                return None
+            return SimpleNamespace(**_job_db_to_dict(j))
+
+
+class RpcDbProxy:
+    """DbProxy that reverse-RPCs each call back to the parent over the socket."""
+
+    def __init__(self, sock: socket.socket):
+        self.sock = sock
+
+    def _call(self, method: str, **kwargs):
+        _send(self.sock, {"_kind": "db_request", "method": method, "kwargs": kwargs})
+        resp = _recv(self.sock)
+        if resp.get("_kind") != "db_response":
+            raise RuntimeError(f"Expected db_response, got: {resp!r}")
+        if not resp.get("ok"):
+            raise RuntimeError(resp.get("error", "DB request failed"))
+        return resp.get("result")
+
+    def get_file_share_paths(self):
+        from fileglancer.model import FileSharePath
+        rows = self._call("get_file_share_paths") or []
+        return [FileSharePath(**r) for r in rows]
+
+    def get_job(self, job_id: int, username: str):
+        result = self._call("get_job", job_id=job_id, username=username)
+        return SimpleNamespace(**result) if result else None
+
+
+# Whitelist of method names the parent will dispatch; used by worker_pool
+# when handling inbound db_request messages.
+DB_METHODS = frozenset({"get_file_share_paths", "get_job"})
+
+
+def serialize_db_result(method: str, value):
+    """Convert a LocalDbProxy result into a JSON-serializable form.
+
+    Called by the parent before sending a db_response back to the worker.
+    Keeps the wire format consistent regardless of which backend produced
+    the value.
+    """
+    if value is None:
+        return None
+    if method == "get_file_share_paths":
+        # value is a list of FileSharePath models
+        return [fsp.model_dump(mode="json") for fsp in value]
+    if method == "get_job":
+        # value is a SimpleNamespace; vars() gives the underlying dict
+        return vars(value)
+    raise ValueError(f"Unknown db method: {method}")
+
+
+# ---------------------------------------------------------------------------
 # Action handlers — file operations
 # ---------------------------------------------------------------------------
 
@@ -184,7 +291,7 @@ def _get_user_groups(username: str) -> list[str]:
     return names
 
 
-def _get_filestore(fsp_name: str, db_url: str):
+def _get_filestore(fsp_name: str, fsps: list):
     """Look up a FileSharePath and return a Filestore instance.
 
     Returns (filestore, None) on success, or (None, error_response) on failure
@@ -194,16 +301,14 @@ def _get_filestore(fsp_name: str, db_url: str):
     if cached is not None:
         return cached, None
 
-    from fileglancer import database as db
     from fileglancer.filestore import Filestore
 
-    with db.get_db_session(db_url) as session:
-        fsp = db.get_file_share_path(session, fsp_name)
-        if fsp is None:
-            return None, {
-                "error": f"File share path '{fsp_name}' not found",
-                "status_code": 404,
-            }
+    fsp = next((f for f in fsps if f.name == fsp_name), None)
+    if fsp is None:
+        return None, {
+            "error": f"File share path '{fsp_name}' not found",
+            "status_code": 404,
+        }
 
     filestore = Filestore(fsp)
     try:
@@ -221,56 +326,62 @@ def _get_filestore(fsp_name: str, db_url: str):
 def with_filestore(fn):
     """Resolve request["fsp_name"] to a Filestore and pass it as the third arg.
 
+    Also passes the freshly-fetched FSP list as the fourth arg, so handlers
+    that need it (for symlink resolution etc.) don't have to fetch again.
+
     Returns an error response if the filestore can't be resolved (404 for a
     missing fsp, 503 for an unmounted one) so the handler body never has to
     deal with the not-found case.
     """
     @functools.wraps(fn)
     def wrapper(request: dict, ctx: WorkerContext) -> dict:
-        filestore, error_response = _get_filestore(request["fsp_name"], ctx.db_url)
+        fsps = ctx.db.get_file_share_paths()
+        filestore, error_response = _get_filestore(request["fsp_name"], fsps)
         if filestore is None:
             return error_response
-        return fn(request, ctx, filestore)
+        return fn(request, ctx, filestore, fsps)
     return wrapper
+
+
+def _redirect_or_error(e, fsps):
+    """Build a redirect response for a RootCheckError, or fall through to 400."""
+    from fileglancer.database import find_fsp_in_paths
+    match = find_fsp_in_paths(fsps, e.full_path)
+    if match:
+        fsp, relative_subpath = match
+        return {"redirect": True, "fsp_name": fsp.name, "subpath": relative_subpath or ""}
+    return {"error": str(e), "status_code": 400}
 
 
 @action("list_dir")
 @with_filestore
-def _action_list_dir(request: dict, ctx: WorkerContext, filestore) -> dict:
+def _action_list_dir(request: dict, ctx: WorkerContext, filestore, fsps) -> dict:
     """List directory contents."""
     subpath = request.get("subpath", "")
     current_user = ctx.username
 
-    from fileglancer import database as db
     from fileglancer.filestore import RootCheckError
 
     try:
-        with db.get_db_session(ctx.db_url) as session:
-            file_info = filestore.get_file_info(subpath, current_user=current_user, session=session)
-            result = {"info": file_info.model_dump(mode="json")}
+        file_info = filestore.get_file_info(subpath, current_user=current_user, fsps=fsps)
+        result = {"info": file_info.model_dump(mode="json")}
 
-            if file_info.is_dir:
-                try:
-                    files = list(filestore.yield_file_infos(subpath, current_user=current_user, session=session))
-                    result["files"] = [f.model_dump(mode="json") for f in files]
-                except PermissionError:
-                    result["files"] = []
-                    result["error"] = "Permission denied when listing directory contents"
-                    result["status_code"] = 403
-                except FileNotFoundError:
-                    result["files"] = []
-                    result["error"] = "Directory contents not found"
-                    result["status_code"] = 404
+        if file_info.is_dir:
+            try:
+                files = list(filestore.yield_file_infos(subpath, current_user=current_user, fsps=fsps))
+                result["files"] = [f.model_dump(mode="json") for f in files]
+            except PermissionError:
+                result["files"] = []
+                result["error"] = "Permission denied when listing directory contents"
+                result["status_code"] = 403
+            except FileNotFoundError:
+                result["files"] = []
+                result["error"] = "Directory contents not found"
+                result["status_code"] = 404
 
         return result
     except RootCheckError as e:
-        # Path escapes root — check if it belongs to another file share
-        with db.get_db_session(ctx.db_url) as session:
-            match = db.find_fsp_from_absolute_path(session, e.full_path)
-        if match:
-            fsp, relative_subpath = match
-            return {"redirect": True, "fsp_name": fsp.name, "subpath": relative_subpath or ""}
-        return {"error": str(e), "status_code": 400}
+        return _redirect_or_error(e, fsps)
     except FileNotFoundError:
         return {"error": "File or directory not found", "status_code": 404}
     except PermissionError:
@@ -279,48 +390,41 @@ def _action_list_dir(request: dict, ctx: WorkerContext, filestore) -> dict:
 
 @action("list_dir_paged")
 @with_filestore
-def _action_list_dir_paged(request: dict, ctx: WorkerContext, filestore) -> dict:
+def _action_list_dir_paged(request: dict, ctx: WorkerContext, filestore, fsps) -> dict:
     """List directory contents with pagination."""
     subpath = request.get("subpath", "")
     current_user = ctx.username
     limit = request.get("limit", 200)
     cursor = request.get("cursor")
 
-    from fileglancer import database as db
     from fileglancer.filestore import RootCheckError
 
     try:
-        with db.get_db_session(ctx.db_url) as session:
-            file_info = filestore.get_file_info(subpath, current_user=current_user, session=session)
-            result = {"info": file_info.model_dump(mode="json")}
+        file_info = filestore.get_file_info(subpath, current_user=current_user, fsps=fsps)
+        result = {"info": file_info.model_dump(mode="json")}
 
-            if file_info.is_dir:
-                try:
-                    files, has_more, next_cursor, total_count = filestore.yield_file_infos_paginated(
-                        subpath, current_user=current_user, session=session,
-                        limit=limit, cursor=cursor
-                    )
-                    result["files"] = [f.model_dump(mode="json") for f in files]
-                    result["has_more"] = has_more
-                    result["next_cursor"] = next_cursor
-                    result["total_count"] = total_count
-                except PermissionError:
-                    result["files"] = []
-                    result["error"] = "Permission denied when listing directory contents"
-                    result["status_code"] = 403
-                except FileNotFoundError:
-                    result["files"] = []
-                    result["error"] = "Directory contents not found"
-                    result["status_code"] = 404
+        if file_info.is_dir:
+            try:
+                files, has_more, next_cursor, total_count = filestore.yield_file_infos_paginated(
+                    subpath, current_user=current_user, fsps=fsps,
+                    limit=limit, cursor=cursor
+                )
+                result["files"] = [f.model_dump(mode="json") for f in files]
+                result["has_more"] = has_more
+                result["next_cursor"] = next_cursor
+                result["total_count"] = total_count
+            except PermissionError:
+                result["files"] = []
+                result["error"] = "Permission denied when listing directory contents"
+                result["status_code"] = 403
+            except FileNotFoundError:
+                result["files"] = []
+                result["error"] = "Directory contents not found"
+                result["status_code"] = 404
 
         return result
     except RootCheckError as e:
-        with db.get_db_session(ctx.db_url) as session:
-            match = db.find_fsp_from_absolute_path(session, e.full_path)
-        if match:
-            fsp, relative_subpath = match
-            return {"redirect": True, "fsp_name": fsp.name, "subpath": relative_subpath or ""}
-        return {"error": str(e), "status_code": 400}
+        return _redirect_or_error(e, fsps)
     except FileNotFoundError:
         return {"error": "File or directory not found", "status_code": 404}
     except PermissionError:
@@ -329,16 +433,13 @@ def _action_list_dir_paged(request: dict, ctx: WorkerContext, filestore) -> dict
 
 @action("get_file_info")
 @with_filestore
-def _action_get_file_info(request: dict, ctx: WorkerContext, filestore) -> dict:
+def _action_get_file_info(request: dict, ctx: WorkerContext, filestore, fsps) -> dict:
     """Get metadata for a single file or directory."""
     subpath = request.get("subpath", "")
 
-    from fileglancer import database as db
-
     try:
-        with db.get_db_session(ctx.db_url) as session:
-            file_info = filestore.get_file_info(subpath, current_user=ctx.username, session=session)
-            return {"info": file_info.model_dump(mode="json")}
+        file_info = filestore.get_file_info(subpath, current_user=ctx.username, fsps=fsps)
+        return {"info": file_info.model_dump(mode="json")}
     except FileNotFoundError:
         return {"error": "File or directory not found", "status_code": 404}
     except PermissionError:
@@ -347,7 +448,7 @@ def _action_get_file_info(request: dict, ctx: WorkerContext, filestore) -> dict:
 
 @action("check_binary")
 @with_filestore
-def _action_check_binary(request: dict, ctx: WorkerContext, filestore) -> dict:
+def _action_check_binary(request: dict, ctx: WorkerContext, filestore, fsps) -> dict:
     """Check if a file is binary."""
     subpath = request.get("subpath", "")
 
@@ -362,7 +463,7 @@ def _action_check_binary(request: dict, ctx: WorkerContext, filestore) -> dict:
 
 @action("open_file")
 @with_filestore
-def _action_open_file(request: dict, ctx: WorkerContext, filestore) -> dict:
+def _action_open_file(request: dict, ctx: WorkerContext, filestore, fsps) -> dict:
     """Open a file and return its metadata + open file descriptor.
 
     The worker opens the file as the user and passes the fd back to the
@@ -395,13 +496,7 @@ def _action_open_file(request: dict, ctx: WorkerContext, filestore) -> dict:
             "_file_handle": file_handle,  # kept alive until fd is sent
         }
     except RootCheckError as e:
-        from fileglancer import database as db
-        with db.get_db_session(ctx.db_url) as session:
-            match = db.find_fsp_from_absolute_path(session, e.full_path)
-        if match:
-            fsp, relative_subpath = match
-            return {"redirect": True, "fsp_name": fsp.name, "subpath": relative_subpath or ""}
-        return {"error": str(e), "status_code": 400}
+        return _redirect_or_error(e, fsps)
     except FileNotFoundError:
         return {"error": f"File or directory not found: {fsp_name}/{subpath}", "status_code": 404}
     except PermissionError:
@@ -410,7 +505,7 @@ def _action_open_file(request: dict, ctx: WorkerContext, filestore) -> dict:
 
 @action("head_file")
 @with_filestore
-def _action_head_file(request: dict, ctx: WorkerContext, filestore) -> dict:
+def _action_head_file(request: dict, ctx: WorkerContext, filestore, fsps) -> dict:
     """Get file metadata and binary check for HEAD requests."""
     subpath = request.get("subpath", "")
 
@@ -429,13 +524,7 @@ def _action_head_file(request: dict, ctx: WorkerContext, filestore) -> dict:
             "is_binary": is_binary,
         }
     except RootCheckError as e:
-        from fileglancer import database as db
-        with db.get_db_session(ctx.db_url) as session:
-            match = db.find_fsp_from_absolute_path(session, e.full_path)
-        if match:
-            fsp, relative_subpath = match
-            return {"redirect": True, "fsp_name": fsp.name, "subpath": relative_subpath or ""}
-        return {"error": str(e), "status_code": 400}
+        return _redirect_or_error(e, fsps)
     except FileNotFoundError:
         return {"error": "File or directory not found", "status_code": 404}
     except PermissionError:
@@ -444,7 +533,7 @@ def _action_head_file(request: dict, ctx: WorkerContext, filestore) -> dict:
 
 @action("create_dir")
 @with_filestore
-def _action_create_dir(request: dict, ctx: WorkerContext, filestore) -> dict:
+def _action_create_dir(request: dict, ctx: WorkerContext, filestore, fsps) -> dict:
     """Create a directory."""
     subpath = request["subpath"]
 
@@ -459,7 +548,7 @@ def _action_create_dir(request: dict, ctx: WorkerContext, filestore) -> dict:
 
 @action("create_file")
 @with_filestore
-def _action_create_file(request: dict, ctx: WorkerContext, filestore) -> dict:
+def _action_create_file(request: dict, ctx: WorkerContext, filestore, fsps) -> dict:
     """Create an empty file."""
     subpath = request["subpath"]
 
@@ -474,7 +563,7 @@ def _action_create_file(request: dict, ctx: WorkerContext, filestore) -> dict:
 
 @action("rename")
 @with_filestore
-def _action_rename(request: dict, ctx: WorkerContext, filestore) -> dict:
+def _action_rename(request: dict, ctx: WorkerContext, filestore, fsps) -> dict:
     """Rename a file or directory."""
     old_path = request["old_path"]
     new_path = request["new_path"]
@@ -490,7 +579,7 @@ def _action_rename(request: dict, ctx: WorkerContext, filestore) -> dict:
 
 @action("delete")
 @with_filestore
-def _action_delete(request: dict, ctx: WorkerContext, filestore) -> dict:
+def _action_delete(request: dict, ctx: WorkerContext, filestore, fsps) -> dict:
     """Delete a file or directory."""
     subpath = request["subpath"]
 
@@ -505,7 +594,7 @@ def _action_delete(request: dict, ctx: WorkerContext, filestore) -> dict:
 
 @action("chmod")
 @with_filestore
-def _action_chmod(request: dict, ctx: WorkerContext, filestore) -> dict:
+def _action_chmod(request: dict, ctx: WorkerContext, filestore, fsps) -> dict:
     """Change file permissions."""
     subpath = request["subpath"]
     permissions = request["permissions"]
@@ -521,7 +610,7 @@ def _action_chmod(request: dict, ctx: WorkerContext, filestore) -> dict:
 
 @action("update_file")
 @with_filestore
-def _action_update_file(request: dict, ctx: WorkerContext, filestore) -> dict:
+def _action_update_file(request: dict, ctx: WorkerContext, filestore, fsps) -> dict:
     """Handle rename and/or permission change on a file."""
     subpath = request.get("subpath", "")
     new_path = request.get("new_path")
@@ -549,38 +638,33 @@ def _action_update_file(request: dict, ctx: WorkerContext, filestore) -> dict:
 def _action_validate_paths(request: dict, ctx: WorkerContext) -> dict:
     """Validate file/directory paths for app parameters."""
     from fileglancer.apps.core import validate_path_in_filestore
-    from fileglancer import database as db
 
     paths = request["paths"]
+    fsps = ctx.db.get_file_share_paths()
     errors = {}
-    with db.get_db_session(ctx.db_url) as session:
-        for param_key, path_value in paths.items():
-            error = validate_path_in_filestore(path_value, session)
-            if error:
-                errors[param_key] = error
+    for param_key, path_value in paths.items():
+        error = validate_path_in_filestore(path_value, fsps)
+        if error:
+            errors[param_key] = error
     return {"errors": errors}
 
 
 @action("get_profile")
 def _action_get_profile(request: dict, ctx: WorkerContext) -> dict:
     """Get user profile information."""
-    from fileglancer import database as db
-
     username = ctx.username
+    paths = ctx.db.get_file_share_paths()
 
-    with db.get_db_session(ctx.db_url) as session:
-        paths = db.get_file_share_paths(session)
+    home_fsp = next((fsp for fsp in paths if fsp.mount_path in ('~', '~/')), None)
+    if home_fsp:
+        home_directory_name = "."
+    else:
+        home_directory_path = os.path.expanduser(f"~{username}")
+        home_parent = os.path.dirname(home_directory_path)
+        home_fsp = next((fsp for fsp in paths if fsp.mount_path == home_parent), None)
+        home_directory_name = os.path.basename(home_directory_path)
 
-        home_fsp = next((fsp for fsp in paths if fsp.mount_path in ('~', '~/')), None)
-        if home_fsp:
-            home_directory_name = "."
-        else:
-            home_directory_path = os.path.expanduser(f"~{username}")
-            home_parent = os.path.dirname(home_directory_path)
-            home_fsp = next((fsp for fsp in paths if fsp.mount_path == home_parent), None)
-            home_directory_name = os.path.basename(home_directory_path)
-
-        home_fsp_name = home_fsp.name if home_fsp else None
+    home_fsp_name = home_fsp.name if home_fsp else None
 
     user_groups = []
     try:
@@ -637,10 +721,15 @@ def _action_generate_ssh_key(request: dict, ctx: WorkerContext) -> dict:
 @action("get_job_file")
 def _action_get_job_file(request: dict, ctx: WorkerContext) -> dict:
     """Read job file content (script, stdout, stderr)."""
-    from fileglancer.apps.core import get_job_file_content
+    from fileglancer.apps.core import read_job_file
     job_id = request["job_id"]
     file_type = request["file_type"]
-    content = get_job_file_content(job_id, ctx.username, file_type)
+
+    db_job = ctx.db.get_job(job_id, ctx.username)
+    if db_job is None:
+        return {"error": f"Job {job_id} not found", "status_code": 404}
+
+    content = read_job_file(db_job, file_type)
     if content is None:
         return {"content": None}
     return {"content": content}
@@ -650,15 +739,13 @@ def _action_get_job_file(request: dict, ctx: WorkerContext) -> dict:
 def _action_get_job_file_paths(request: dict, ctx: WorkerContext) -> dict:
     """Get job file path info."""
     from fileglancer.apps.core import get_job_file_paths
-    from fileglancer import database as db
 
     job_id = request["job_id"]
-
-    with db.get_db_session(ctx.db_url) as session:
-        db_job = db.get_job(session, job_id, ctx.username)
-        if db_job is None:
-            return {"error": f"Job {job_id} not found", "status_code": 404}
-        files = get_job_file_paths(db_job)
+    db_job = ctx.db.get_job(job_id, ctx.username)
+    if db_job is None:
+        return {"error": f"Job {job_id} not found", "status_code": 404}
+    fsps = ctx.db.get_file_share_paths()
+    files = get_job_file_paths(db_job, fsps)
     return {"files": files}
 
 
@@ -666,15 +753,12 @@ def _action_get_job_file_paths(request: dict, ctx: WorkerContext) -> dict:
 def _action_get_service_url(request: dict, ctx: WorkerContext) -> dict:
     """Read service URL from job work directory."""
     from fileglancer.apps.core import get_service_url
-    from fileglancer import database as db
 
     job_id = request["job_id"]
-
-    with db.get_db_session(ctx.db_url) as session:
-        db_job = db.get_job(session, job_id, ctx.username)
-        if db_job is None:
-            return {"error": f"Job {job_id} not found", "status_code": 404}
-        url = get_service_url(db_job)
+    db_job = ctx.db.get_job(job_id, ctx.username)
+    if db_job is None:
+        return {"error": f"Job {job_id} not found", "status_code": 404}
+    url = get_service_url(db_job)
     return {"service_url": url}
 
 
@@ -788,7 +872,7 @@ def _action_s3_open_object(request: dict, ctx: WorkerContext) -> dict:
 
 @action("validate_proxied_path")
 @with_filestore
-def _action_validate_proxied_path(request: dict, ctx: WorkerContext, filestore) -> dict:
+def _action_validate_proxied_path(request: dict, ctx: WorkerContext, filestore, fsps) -> dict:
     """Validate that the user can access a proxied path.
 
     Runs within the user's context (the worker IS the user), so
@@ -966,9 +1050,9 @@ def _action_read_manifest(request: dict, ctx: WorkerContext) -> dict:
 class WorkerContext:
     """Holds per-worker state."""
 
-    def __init__(self, username: str, db_url: str):
+    def __init__(self, username: str, db):
         self.username = username
-        self.db_url = db_url
+        self.db = db
 
 
 def main():
@@ -1005,8 +1089,9 @@ def main():
     except KeyError:
         username = str(uid)
 
-    db_url = os.environ.get("FGC_DB_URL", "")
-    ctx = WorkerContext(username=username, db_url=db_url)
+    # Worker subprocess never gets DB credentials; all DB access goes back
+    # through the parent over the same socket via RpcDbProxy.
+    ctx = WorkerContext(username=username, db=RpcDbProxy(sock))
 
     logger.info(
         f"Worker started for {username} "

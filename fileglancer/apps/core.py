@@ -501,12 +501,12 @@ def validate_path_for_shell(path_value: str) -> str | None:
     return None
 
 
-def validate_path_in_filestore(path_value: str, session) -> str | None:
+def validate_path_in_filestore(path_value: str, fsps: list) -> str | None:
     """Validate a path exists and is readable within an allowed file share.
 
-    Performs syntax checks, then resolves the path against known file share
-    mounts via the database. Returns an error message string if invalid,
-    or None if valid.
+    Performs syntax checks, then resolves the path against the given list of
+    file share paths. Returns an error message string if invalid, or None if
+    valid.
     """
     # Syntax check first
     error = validate_path_for_shell(path_value)
@@ -523,8 +523,8 @@ def validate_path_in_filestore(path_value: str, session) -> str | None:
     expanded = os.path.expanduser(normalized)
 
     # Resolve to a file share path
-    from fileglancer.database import find_fsp_from_absolute_path
-    result = find_fsp_from_absolute_path(session, expanded)
+    from fileglancer.database import find_fsp_in_paths
+    result = find_fsp_in_paths(fsps, expanded)
     if result is None:
         return "Path is not within an allowed file share"
 
@@ -599,7 +599,8 @@ def _validate_parameter_value(param: AppParameter, value, session=None) -> str:
             home = home.replace("\\", "/")
             str_val = home + str_val[1:]
         if session is not None:
-            error = validate_path_in_filestore(str_val, session)
+            fsps = db.get_file_share_paths(session)
+            error = validate_path_in_filestore(str_val, fsps)
         else:
             error = validate_path_for_shell(str_val)
         if error:
@@ -1474,19 +1475,27 @@ def _resolve_work_dir(db_job: db.JobDB) -> Path:
     return _build_work_dir(db_job.id, db_job.app_name, db_job.entry_point_id)
 
 
-def _resolve_browse_path(abs_path: str) -> tuple[str | None, str | None]:
-    """Resolve an absolute path to an FSP name and subpath for browse links."""
-    settings = get_settings()
-    with db.get_db_session(settings.db_url) as session:
-        result = db.find_fsp_from_absolute_path(session, abs_path)
+def _resolve_browse_path(abs_path: str, fsps: Optional[list] = None) -> tuple[str | None, str | None]:
+    """Resolve an absolute path to an FSP name and subpath for browse links.
+
+    If *fsps* is None, queries the database directly. Pass a pre-fetched list
+    to avoid the DB hit (used from the worker subprocess, which has no DB
+    access).
+    """
+    if fsps is None:
+        settings = get_settings()
+        with db.get_db_session(settings.db_url) as session:
+            result = db.find_fsp_from_absolute_path(session, abs_path)
+    else:
+        result = db.find_fsp_in_paths(fsps, abs_path)
     if result:
         return result[0].name, result[1]
     return None, None
 
 
-def _make_file_info(file_path: str, exists: bool) -> dict:
+def _make_file_info(file_path: str, exists: bool, fsps: Optional[list] = None) -> dict:
     """Create a file info dict with browse link resolution."""
-    fsp_name, subpath = _resolve_browse_path(file_path) if exists else (None, None)
+    fsp_name, subpath = _resolve_browse_path(file_path, fsps) if exists else (None, None)
     return {
         "path": file_path,
         "exists": exists,
@@ -1524,10 +1533,11 @@ def get_service_url(db_job: db.JobDB) -> Optional[str]:
     return url
 
 
-def get_job_file_paths(db_job: db.JobDB) -> dict[str, dict]:
+def get_job_file_paths(db_job: db.JobDB, fsps: Optional[list] = None) -> dict[str, dict]:
     """Return file path info for a job's files (script, stdout, stderr, service_url).
 
-    Returns a dict keyed by file type with path and existence info.
+    Returns a dict keyed by file type with path and existence info. Pass *fsps*
+    to skip the per-file DB lookup needed for browse-link resolution.
     """
     work_dir = _resolve_work_dir(db_job)
 
@@ -1539,21 +1549,21 @@ def get_job_file_paths(db_job: db.JobDB) -> dict[str, dict]:
     stderr_path = work_dir / "stderr.log"
 
     files = {
-        "script": _make_file_info(script_path, len(scripts) > 0),
-        "stdout": _make_file_info(str(stdout_path), stdout_path.is_file()),
-        "stderr": _make_file_info(str(stderr_path), stderr_path.is_file()),
+        "script": _make_file_info(script_path, len(scripts) > 0, fsps),
+        "stdout": _make_file_info(str(stdout_path), stdout_path.is_file(), fsps),
+        "stderr": _make_file_info(str(stderr_path), stderr_path.is_file(), fsps),
     }
 
     # Include service_url file info for service-type jobs
     if getattr(db_job, 'entry_point_type', 'job') == 'service':
         service_url_path = work_dir / "service_url"
-        files["service_url"] = _make_file_info(str(service_url_path), service_url_path.is_file())
+        files["service_url"] = _make_file_info(str(service_url_path), service_url_path.is_file(), fsps)
 
     return files
 
 
-def get_job_file_content(job_id: int, username: str, file_type: str) -> Optional[str]:
-    """Read the content of a job file (script, stdout, or stderr).
+def read_job_file(db_job, file_type: str) -> Optional[str]:
+    """Read the content of a job file given a loaded job record.
 
     All job files live in the job's work directory:
       - *.sh        — the generated script (written by cluster-api)
@@ -1562,14 +1572,6 @@ def get_job_file_content(job_id: int, username: str, file_type: str) -> Optional
 
     Returns the file content as a string, or None if the file doesn't exist.
     """
-    settings = get_settings()
-
-    with db.get_db_session(settings.db_url) as session:
-        db_job = db.get_job(session, job_id, username)
-        if db_job is None:
-            raise ValueError(f"Job {job_id} not found")
-        session.expunge(db_job)
-
     work_dir = _resolve_work_dir(db_job)
 
     if file_type == "script":
@@ -1588,3 +1590,16 @@ def get_job_file_content(job_id: int, username: str, file_type: str) -> Optional
     if path.is_file():
         return path.read_text()
     return None
+
+
+def get_job_file_content(job_id: int, username: str, file_type: str) -> Optional[str]:
+    """Read job file by id+username (does its own DB lookup)."""
+    settings = get_settings()
+
+    with db.get_db_session(settings.db_url) as session:
+        db_job = db.get_job(session, job_id, username)
+        if db_job is None:
+            raise ValueError(f"Job {job_id} not found")
+        session.expunge(db_job)
+
+    return read_job_file(db_job, file_type)

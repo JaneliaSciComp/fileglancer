@@ -248,16 +248,16 @@ def create_app(settings):
                 raise HTTPException(status_code=e.status_code, detail=str(e))
         else:
             # Dev/test mode: run action directly in-process
-            from fileglancer.user_worker import _ACTIONS, WorkerContext
+            from fileglancer.user_worker import _ACTIONS, WorkerContext, LocalDbProxy
             handler = _ACTIONS.get(action)
             if handler is None:
                 raise HTTPException(status_code=500, detail=f"Unknown action: {action}")
-            ctx = WorkerContext(username=username, db_url=settings.db_url)
+            ctx = WorkerContext(username=username, db=LocalDbProxy(settings.db_url))
             request = {"action": action, **kwargs}
             try:
                 result = handler(request, ctx)
             except Exception as e:
-                logger.error(f"Action handler error for {username} action={action}: {e}")
+                logger.exception(f"Action handler error for {username} action={action}: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
             # Strip the raw fd (not meaningful in-process), keep _file_handle
             result.pop("_fd", None)
