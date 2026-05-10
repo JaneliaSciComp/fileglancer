@@ -1,4 +1,3 @@
-import logging
 import os
 import re
 import sys
@@ -307,27 +306,6 @@ def create_app(settings):
         logger.remove()
         logger.add(sys.stderr, level=settings.log_level)
 
-        # Intercept stdlib logging (e.g. py-cluster-api) into loguru
-        class InterceptHandler(logging.Handler):
-            def emit(self, record):
-                # Get corresponding loguru level
-                try:
-                    level = logger.level(record.levelname).name
-                except ValueError:
-                    level = record.levelno
-                # Find caller from where the log call originated
-                frame, depth = logging.currentframe(), 0
-                while frame and frame.f_code.co_filename == logging.__file__:
-                    frame = frame.f_back
-                    depth += 1
-                logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
-
-        # Attach directly to cluster_api logger so uvicorn can't clobber it
-        cluster_logger = logging.getLogger("cluster_api")
-        cluster_logger.handlers = [InterceptHandler()]
-        cluster_logger.setLevel(logging.DEBUG)
-        cluster_logger.propagate = False
-
         def mask_password(url: str) -> str:
             """Mask password in database URL for logging"""
             import re
@@ -396,6 +374,11 @@ def create_app(settings):
         if worker_pool is not None:
             await worker_pool.start_eviction_loop()
             logger.info("Worker pool started")
+
+        # Wire the apps module to dispatch through the persistent worker
+        # pool (or in-process in dev mode) instead of spawning ephemeral
+        # subprocesses.
+        apps_module.set_worker_exec(_worker_exec)
 
         # Start cluster job monitor
         try:

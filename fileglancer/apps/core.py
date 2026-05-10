@@ -6,18 +6,14 @@ try:
 except ImportError:
     fcntl = None  # type: ignore[assignment]
 try:
-    import grp
     import pwd
 except ImportError:
-    grp = None  # type: ignore[assignment]
     pwd = None  # type: ignore[assignment]
-import json
 import os
 import re
 import shlex
 import shutil
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 from datetime import datetime, UTC
@@ -34,6 +30,26 @@ from fileglancer import database as db
 from fileglancer.apps.adapters import try_adapt
 from fileglancer.model import AppManifest, AppEntryPoint, AppParameter
 from fileglancer.settings import get_settings
+
+
+# Registered by server.py at startup. Dispatches an action to the per-user
+# persistent worker (or in-process in dev mode). Signature mirrors
+# server._worker_exec: (username, action, **kwargs) -> awaitable[dict].
+_worker_exec = None
+
+
+def set_worker_exec(fn):
+    """Register the persistent worker dispatcher. Called from server lifespan."""
+    global _worker_exec
+    _worker_exec = fn
+
+
+async def _dispatch(username: str, action: str, **kwargs) -> dict:
+    if _worker_exec is None:
+        raise RuntimeError(
+            "Worker dispatcher not registered — apps module used before server startup"
+        )
+    return await _worker_exec(username, action, **kwargs)
 
 
 _MANIFEST_FILENAME = "runnables.yaml"
@@ -157,17 +173,9 @@ async def _ensure_repo_cache(url: str, pull: bool = False,
         branch = await _resolve_default_branch(clone_url)
 
     if username:
-        logger.debug(
-            f"Delegating ensure_repo to worker for user={username} "
-            f"repo={owner}/{repo} ({branch}) pull={pull}"
-        )
         lock = _get_repo_lock(owner, repo, branch)
         async with lock:
-            result = await _run_as_user_async(username, {
-                "action": "ensure_repo",
-                "url": url,
-                "pull": pull,
-            })
+            result = await _dispatch(username, "ensure_repo", url=url, pull=pull)
             return Path(result["repo_dir"])
 
     # Running as the current user (worker subprocess or dev mode)
@@ -281,11 +289,7 @@ async def discover_app_manifests(url: str,
     running as the target user.
     """
     if username:
-        logger.debug(f"Delegating discover_manifests to worker for user={username} url={url}")
-        result = await _run_as_user_async(username, {
-            "action": "discover_manifests",
-            "url": url,
-        })
+        result = await _dispatch(username, "discover_manifests", url=url)
         return [
             (item["path"], AppManifest(**item["manifest"]))
             for item in result["manifests"]
@@ -305,12 +309,7 @@ async def fetch_app_manifest(url: str, manifest_path: str = "",
     running as the target user.
     """
     if username:
-        logger.debug(f"Delegating read_manifest to worker for user={username} url={url}")
-        result = await _run_as_user_async(username, {
-            "action": "read_manifest",
-            "url": url,
-            "manifest_path": manifest_path,
-        })
+        result = await _dispatch(username, "read_manifest", url=url, manifest_path=manifest_path)
         return AppManifest(**result["manifest"])
 
     repo_dir = await _ensure_repo_cache(url)
@@ -683,85 +682,14 @@ def build_command(entry_point: AppEntryPoint, parameters: dict, session=None) ->
     return (" \\\n  ").join(parts)
 
 
-def _run_as_user(username: str, request: dict) -> dict:
-    """Run a worker action as the given user in a subprocess.
-
-    Spawns a child process with the target user's identity using
-    Python 3.9+ ``user``/``group``/``extra_groups`` subprocess kwargs.
-    The child runs fileglancer.apps.worker, which creates a fresh
-    py-cluster-api executor and performs the requested action.
-
-    Returns the parsed JSON response from the worker.
-    Raises ValueError on worker failure.
-    """
-    pw = pwd.getpwnam(username)
-    action = request.get("action", "unknown")
-
-    # Only switch identity if running as root; otherwise we're already
-    # the target user (e.g. development mode).
-    identity_kwargs: dict = {}
-    if os.geteuid() == 0:
-        groups = [g.gr_gid for g in grp.getgrall() if username in g.gr_mem]
-        if pw.pw_gid not in groups:
-            groups.append(pw.pw_gid)
-        identity_kwargs = {
-            "user": pw.pw_uid,
-            "group": pw.pw_gid,
-            "extra_groups": groups,
-        }
-        logger.debug(
-            f"Spawning worker action={action} as user={username} "
-            f"uid={pw.pw_uid} gid={pw.pw_gid} HOME={pw.pw_dir}"
-        )
-    else:
-        logger.debug(
-            f"Spawning worker action={action} as current user "
-            f"(euid={os.geteuid()})"
-        )
-
-    result = subprocess.run(
-        [sys.executable, "-m", "fileglancer.apps.worker"],
-        input=json.dumps(request).encode(),
-        capture_output=True,
-        env={**os.environ, "HOME": pw.pw_dir, "FGC_LOG_LEVEL": get_settings().log_level},
-        **identity_kwargs,
-    )
-
-    # Forward worker stderr (contains cluster_api and worker logs)
-    if result.stderr:
-        for line in result.stderr.decode().rstrip().splitlines():
-            logger.debug(f"[worker:{action}] {line}")
-
-    if result.stdout:
-        try:
-            response = json.loads(result.stdout)
-        except json.JSONDecodeError:
-            raise ValueError(
-                f"Worker produced invalid JSON: {result.stdout.decode()[:500]}"
-            )
-    else:
-        response = {}
-
-    if result.returncode != 0:
-        error = response.get("error", result.stderr.decode()[:500])
-        raise ValueError(f"Worker failed: {error}")
-
-    return response
-
-
-async def _run_as_user_async(username: str, request: dict) -> dict:
-    """Async wrapper for _run_as_user that doesn't block the event loop."""
-    return await asyncio.to_thread(_run_as_user, username, request)
-
-
 # --- Job Monitoring ---
 #
 # The server process runs as root, which cannot execute LSF commands
 # (bjobs, bsub, bkill) due to HPC root-squash policy.  All LSF
-# operations go through worker subprocesses running as a real user.
+# operations go through the persistent per-user worker pool.
 #
-# The poll loop picks any user with active jobs and spawns a worker
-# that runs ``bjobs -u all`` to get statuses for ALL users' jobs.
+# The poll loop picks any user with active jobs and dispatches ``bjobs
+# -u all`` through that user's worker to get statuses for ALL users' jobs.
 
 _poll_task = None
 _POLL_LOCK_PATH = os.path.join(tempfile.gettempdir(), "fileglancer_poll.lock")
@@ -780,7 +708,7 @@ async def start_job_monitor():
     try:
         with open(_POLL_LOCK_PATH, "w") as f:
             fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            _reconnect_as_any_user(settings)
+            await _reconnect_as_any_user(settings)
             fcntl.flock(f, fcntl.LOCK_UN)
         logger.info("Job monitor started (reconnected existing jobs)")
     except OSError:
@@ -836,8 +764,8 @@ def _get_any_active_username(settings) -> str | None:
     return None
 
 
-def _reconnect_as_any_user(settings):
-    """Reconnect to existing cluster jobs via a worker subprocess.
+async def _reconnect_as_any_user(settings):
+    """Reconnect to existing cluster jobs via the persistent worker.
 
     Picks any user with active jobs to run bjobs as.  If no active jobs
     exist, reconnection is skipped (nothing to reconnect to).
@@ -849,11 +777,8 @@ def _reconnect_as_any_user(settings):
 
     cluster_config = settings.cluster.model_dump(exclude_none=True)
     try:
-        result = _run_as_user(username, {
-            "action": "reconnect",
-            "cluster_config": cluster_config,
-        })
-    except ValueError as e:
+        result = await _dispatch(username, "reconnect", cluster_config=cluster_config)
+    except Exception as e:
         logger.debug(f"Job reconnection skipped: {e}")
         return
 
@@ -880,7 +805,7 @@ def _reconnect_as_any_user(settings):
 
 
 async def _poll_loop(settings):
-    """Periodically poll cluster job statuses via a worker subprocess.
+    """Periodically poll cluster job statuses via the persistent worker.
 
     All uvicorn workers run this loop, but only the one that acquires
     the file lock actually polls.  The lock is held through both the
@@ -899,7 +824,7 @@ async def _poll_loop(settings):
             lock_fd = open(_POLL_LOCK_PATH, "w")
             fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             try:
-                has_jobs = _poll_jobs(settings)
+                has_jobs = await _poll_jobs(settings)
             except Exception:
                 logger.exception("Error in job poll loop")
                 has_jobs = True  # keep polling on error
@@ -920,7 +845,7 @@ async def _poll_loop(settings):
             await asyncio.sleep(settings.cluster.poll_interval)
 
 
-def _poll_jobs(settings):
+async def _poll_jobs(settings):
     """Run one poll cycle: query bjobs via worker, update DB.
 
     Returns True if there are active jobs to continue polling,
@@ -967,13 +892,13 @@ def _poll_jobs(settings):
 
         cluster_config = settings.cluster.model_dump(exclude_none=True)
         try:
-            result = _run_as_user(poll_username, {
-                "action": "poll",
-                "cluster_config": cluster_config,
-                "cluster_job_ids": list(job_statuses.keys()),
-                "job_statuses": job_statuses,
-            })
-        except ValueError as e:
+            result = await _dispatch(
+                poll_username, "poll",
+                cluster_config=cluster_config,
+                cluster_job_ids=list(job_statuses.keys()),
+                job_statuses=job_statuses,
+            )
+        except Exception as e:
             logger.warning(f"Poll failed: {e}")
             return True  # keep polling on error
 
@@ -1345,18 +1270,18 @@ async def submit_job(
     resource_spec.stdout_path = str(work_dir / "stdout.log")
     resource_spec.stderr_path = str(work_dir / "stderr.log")
 
-    # Submit to the cluster as the target user.  The worker subprocess
-    # creates the work directory, symlinks the repo, and calls
+    # Submit to the cluster as the target user via the persistent worker:
+    # it creates the work directory, symlinks the repo, and calls
     # executor.submit() — all with the user's identity.
     job_name = f"{manifest.name}-{entry_point.id}"
     cluster_config = settings.cluster.model_dump(exclude_none=True)
     try:
-        worker_result = _run_as_user(username, {
-            "action": "submit",
-            "cluster_config": cluster_config,
-            "command": full_command,
-            "job_name": job_name,
-            "resources": {
+        worker_result = await _dispatch(
+            username, "submit",
+            cluster_config=cluster_config,
+            command=full_command,
+            job_name=job_name,
+            resources={
                 "cpus": resource_spec.cpus,
                 "gpus": resource_spec.gpus,
                 "memory": resource_spec.memory,
@@ -1368,9 +1293,9 @@ async def submit_job(
                 "extra_directives": resource_spec.extra_directives,
                 "extra_args": resource_spec.extra_args,
             },
-            "work_dir": str(work_dir),
-            "cached_repo_dir": str(cached_repo_dir),
-        })
+            work_dir=str(work_dir),
+            cached_repo_dir=str(cached_repo_dir),
+        )
     except Exception:
         # Cluster submission failed — remove the PENDING DB record so
         # the job does not appear in the user's jobs list.
@@ -1450,11 +1375,11 @@ async def cancel_job(job_id: int, username: str) -> db.JobDB:
         # Cancel on cluster as the target user
         if db_job.cluster_job_id:
             cluster_config = settings.cluster.model_dump(exclude_none=True)
-            _run_as_user(username, {
-                "action": "cancel",
-                "cluster_config": cluster_config,
-                "job_id": db_job.cluster_job_id,
-            })
+            await _dispatch(
+                username, "cancel",
+                cluster_config=cluster_config,
+                job_id=db_job.cluster_job_id,
+            )
 
         # Update DB
         now = datetime.now(UTC)

@@ -935,6 +935,15 @@ def _action_submit(request: dict, ctx: WorkerContext) -> dict:
         resources=resource_spec,
     ))
 
+    # For LocalExecutor, persist the subprocess PID so the parent's poll
+    # loop can check liveness across calls. HPC executors don't have
+    # _processes and don't need this.
+    processes = getattr(executor, "_processes", None)
+    if processes is not None:
+        proc = processes.get(job.job_id)
+        if proc is not None:
+            (work_dir / "job.pid").write_text(str(proc.pid))
+
     return {"job_id": job.job_id, "script_path": job.script_path}
 
 

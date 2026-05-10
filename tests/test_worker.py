@@ -178,6 +178,7 @@ class TestUserWorkerIPC:
         # Create a fake Popen-like object
         class FakeProcess:
             returncode = None
+            pid = 12345
             def poll(self): return None
             def wait(self): pass
             def kill(self): pass
@@ -273,6 +274,7 @@ class TestUserWorkerExecute:
 
         class FakeProcess:
             returncode = None
+            pid = 12345
             def poll(self): return None
             def wait(self): pass
             def kill(self): pass
