@@ -37,30 +37,32 @@ class TestPaginatedListing:
 
     def test_first_page(self, pagination_store):
         """First page returns correct number of items with has_more=True."""
-        infos, has_more, next_cursor, total_count = (
+        infos, has_more, next_cursor, total_count, is_truncated = (
             pagination_store.yield_file_infos_paginated(None, limit=5)
         )
         assert len(infos) == 5
         assert has_more is True
         assert next_cursor is not None
         assert total_count == 13  # 3 dirs + 10 files
+        assert is_truncated is False
 
     def test_full_listing_no_pagination(self, pagination_store):
         """When limit >= total entries, has_more is False and next_cursor is None."""
-        infos, has_more, next_cursor, total_count = (
+        infos, has_more, next_cursor, total_count, is_truncated = (
             pagination_store.yield_file_infos_paginated(None, limit=100)
         )
         assert len(infos) == 13
         assert has_more is False
         assert next_cursor is None
         assert total_count == 13
+        assert is_truncated is False
 
     def test_cursor_continuation(self, pagination_store):
         """Cursor returns the next page starting after the cursor entry."""
-        infos1, _, cursor1, _ = pagination_store.yield_file_infos_paginated(
+        infos1, _, cursor1, _, _ = pagination_store.yield_file_infos_paginated(
             None, limit=5
         )
-        infos2, has_more2, cursor2, total2 = (
+        infos2, has_more2, cursor2, total2, is_truncated2 = (
             pagination_store.yield_file_infos_paginated(None, limit=5, cursor=cursor1)
         )
 
@@ -71,13 +73,14 @@ class TestPaginatedListing:
         assert len(infos2) == 5
         assert has_more2 is True
         assert total2 == 13
+        assert is_truncated2 is False
 
     def test_all_pages_cover_all_entries(self, pagination_store):
         """Iterating through all pages returns every entry exactly once."""
         all_names = []
         cursor = None
         while True:
-            infos, has_more, cursor, _ = (
+            infos, has_more, cursor, _, _ = (
                 pagination_store.yield_file_infos_paginated(None, limit=4, cursor=cursor)
             )
             all_names.extend(fi.name for fi in infos)
@@ -89,7 +92,7 @@ class TestPaginatedListing:
 
     def test_dirs_sorted_before_files(self, pagination_store):
         """Directories appear before files in the listing."""
-        infos, _, _, _ = pagination_store.yield_file_infos_paginated(
+        infos, _, _, _, _ = pagination_store.yield_file_infos_paginated(
             None, limit=100
         )
         dir_indices = [i for i, fi in enumerate(infos) if fi.is_dir]
@@ -98,7 +101,7 @@ class TestPaginatedListing:
 
     def test_alphabetical_within_type(self, pagination_store):
         """Names are sorted alphabetically within dirs and within files."""
-        infos, _, _, _ = pagination_store.yield_file_infos_paginated(
+        infos, _, _, _, _ = pagination_store.yield_file_infos_paginated(
             None, limit=100
         )
         dir_names = [fi.name for fi in infos if fi.is_dir]
@@ -108,7 +111,7 @@ class TestPaginatedListing:
 
     def test_deleted_cursor_fallback(self, pagination_dir, pagination_store):
         """When cursor entry no longer exists, listing starts from the beginning."""
-        infos, has_more, _, total = (
+        infos, has_more, _, total, is_truncated = (
             pagination_store.yield_file_infos_paginated(
                 None, limit=5, cursor="nonexistent_file"
             )
@@ -117,17 +120,18 @@ class TestPaginatedListing:
         assert len(infos) == 5
         assert has_more is True
         assert total == 13
+        assert is_truncated is False
         # First entry should be the first dir (sorted first)
         assert infos[0].name == "dir_00"
 
     def test_last_page_boundary(self, pagination_store):
         """Last page has has_more=False and next_cursor=None."""
         # Get first 10 entries
-        _, _, cursor, _ = pagination_store.yield_file_infos_paginated(
+        _, _, cursor, _, _ = pagination_store.yield_file_infos_paginated(
             None, limit=10
         )
         # Get remaining 3
-        infos, has_more, next_cursor, _ = (
+        infos, has_more, next_cursor, _, _ = (
             pagination_store.yield_file_infos_paginated(None, limit=10, cursor=cursor)
         )
         assert len(infos) == 3
@@ -137,10 +141,10 @@ class TestPaginatedListing:
     def test_exact_limit_boundary(self, pagination_store):
         """When entries remaining == limit, has_more is False."""
         # 13 total, get first 10, then exactly 3 remain
-        _, _, cursor, _ = pagination_store.yield_file_infos_paginated(
+        _, _, cursor, _, _ = pagination_store.yield_file_infos_paginated(
             None, limit=10
         )
-        infos, has_more, next_cursor, _ = (
+        infos, has_more, next_cursor, _, _ = (
             pagination_store.yield_file_infos_paginated(None, limit=3, cursor=cursor)
         )
         assert len(infos) == 3
@@ -149,13 +153,14 @@ class TestPaginatedListing:
 
     def test_limit_one(self, pagination_store):
         """Pagination works with limit=1."""
-        infos, has_more, cursor, total = (
+        infos, has_more, cursor, total, is_truncated = (
             pagination_store.yield_file_infos_paginated(None, limit=1)
         )
         assert len(infos) == 1
         assert has_more is True
         assert cursor == infos[0].name
         assert total == 13
+        assert is_truncated is False
 
     def test_empty_directory(self):
         """Paginated listing of an empty directory."""
@@ -163,13 +168,14 @@ class TestPaginatedListing:
         try:
             fsp = FileSharePath(zone="test", name="test", mount_path=temp_dir)
             store = Filestore(fsp)
-            infos, has_more, next_cursor, total = (
+            infos, has_more, next_cursor, total, is_truncated = (
                 store.yield_file_infos_paginated(None, limit=10)
             )
             assert infos == []
             assert has_more is False
             assert next_cursor is None
             assert total == 0
+            assert is_truncated is False
         finally:
             shutil.rmtree(temp_dir)
 
@@ -181,12 +187,25 @@ class TestPaginatedListing:
             with open(os.path.join(subdir, f"sub_{i}.txt"), "w") as f:
                 f.write(f"sub {i}")
 
-        infos, has_more, _, total = (
+        infos, has_more, _, total, is_truncated = (
             pagination_store.yield_file_infos_paginated("dir_00", limit=3)
         )
         assert len(infos) == 3
         assert has_more is True
         assert total == 5
+        assert is_truncated is False
+
+    def test_truncation(self, pagination_dir):
+        """is_truncated is True and entries are in filesystem order (not sorted) when truncated."""
+        fsp = FileSharePath(zone="test", name="test", mount_path=pagination_dir)
+        store = Filestore(fsp)
+        # max_count=5 on a 13-entry directory
+        infos, has_more, next_cursor, total_count, is_truncated = (
+            store.yield_file_infos_paginated(None, limit=10, max_count=5)
+        )
+        assert total_count == 5
+        assert is_truncated is True
+        assert len(infos) == 5  # limit=10 > max_count=5, so all 5 returned
 
     def test_chroot_escape_raises(self, pagination_store):
         """Attempting to escape root raises ValueError."""

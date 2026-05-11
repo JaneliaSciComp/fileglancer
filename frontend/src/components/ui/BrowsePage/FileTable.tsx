@@ -96,7 +96,7 @@ export default function Table({
       parent = parent.parentElement;
     }
   }, []);
-  const sortingEnabled = !hasNextPage;
+  const sortingEnabled = !hasNextPage && !fileQuery.data?.isTruncated;
 
   const selectedFileNames = useMemo(
     () => new Set(fileBrowserState.selectedFiles.map(file => file.name)),

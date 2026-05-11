@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     # Maximum size of the sharing key LRU cache
     sharing_key_cache_size: int = 1000
 
+    # Maximum number of directory entries reported in total_count for paginated listings.
+    # Prevents a full directory scan for the count in very large directories.
+    max_directory_count: int = 10000
+
     # OKTA OAuth/OIDC settings for authentication
     okta_domain: Optional[str] = None
     okta_client_id: Optional[str] = None
