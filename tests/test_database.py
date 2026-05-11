@@ -6,6 +6,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 import pandas as pd
+from conftest import requires_symlinks
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from fileglancer.database import *
@@ -268,7 +269,7 @@ def test_find_fsp_from_absolute_path_exact_match(db_session, temp_dir):
     result = find_fsp_from_absolute_path(db_session, nested_dir)
     assert result is not None
     assert result[0].name == "test_mount"
-    assert result[1] == os.path.join("subdir", "nested")
+    assert result[1] == "subdir/nested"
 
 
 def test_find_fsp_from_absolute_path_no_match(db_session, temp_dir):
@@ -385,6 +386,7 @@ def test_find_fsp_from_absolute_path_boundary_check(db_session, temp_dir):
     assert result is None or result[0].mount_path != temp_dir
 
 
+@requires_symlinks
 def test_find_fsp_from_absolute_path_with_symlink_resolution(db_session, temp_dir):
     """Test that find_fsp_from_absolute_path resolves symlinks correctly. 
     This addresses macOS symlink behavior. E.g., /var -> /private/var."""

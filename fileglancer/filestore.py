@@ -5,8 +5,12 @@ rooted at a specific directory.
 
 import os
 import stat
-import pwd
-import grp
+try:
+    import pwd
+    import grp
+except ImportError:
+    pwd = None  # type: ignore[assignment]
+    grp = None  # type: ignore[assignment]
 import shutil
 
 from pydantic import BaseModel
@@ -69,7 +73,12 @@ class FileInfo(BaseModel):
                 if not (parent_real == root_real or parent_real.startswith(root_real + os.sep)):
                     logger.warning(f"Refusing to read symlink outside root: {path}")
                     return None
-            return os.readlink(path)
+            result = os.readlink(path)
+            # Windows prefixes symlink targets with \\?\ (extended-length path).
+            # Strip it so path comparisons work uniformly.
+            if result.startswith("\\\\?\\"):
+                result = result[4:]
+            return result
         except OSError as e:
             logger.warning(f"Failed to read symlink target for {path}: {e}")
             return None
@@ -153,12 +162,12 @@ class FileInfo(BaseModel):
 
         try:
             owner = pwd.getpwuid(stat_result.st_uid).pw_name
-        except KeyError:
+        except (KeyError, AttributeError):
             owner = str(stat_result.st_uid)
 
         try:
             group = grp.getgrgid(stat_result.st_gid).gr_name
-        except KeyError:
+        except (KeyError, AttributeError):
             group = str(stat_result.st_gid)
 
         # Calculate read/write permissions for current user
@@ -194,13 +203,13 @@ class FileInfo(BaseModel):
             for g in grp.getgrall():
                 if username in g.gr_mem:
                     groups.add(g.gr_name)
-        except (KeyError, OSError):
+        except (KeyError, OSError, AttributeError):
             pass
         try:
             primary_gid = pwd.getpwnam(username).pw_gid
             primary_group = grp.getgrgid(primary_gid).gr_name
             groups.add(primary_group)
-        except (KeyError, OSError):
+        except (KeyError, OSError, AttributeError):
             pass
         return groups
 
