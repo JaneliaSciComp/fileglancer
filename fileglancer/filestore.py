@@ -535,8 +535,7 @@ class Filestore:
         if is_truncated:
             entries = entries[:max_count]
             total_count = max_count
-        else:
-            entries.sort(key=lambda e: (not e.is_dir(follow_symlinks=False), e.name))
+        entries.sort(key=lambda e: (not e.is_dir(follow_symlinks=False), e.name))
 
         # Apply cursor: skip past the cursor entry
         if cursor:
