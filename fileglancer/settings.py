@@ -100,6 +100,10 @@ class Settings(BaseSettings):
     # Useful for setting up scheduler env (e.g., /misc/lsf/conf/profile.lsf).
     env_source_script: Optional[str] = None
 
+    # Worker pool settings
+    worker_pool_max_workers: int = 50
+    worker_pool_idle_timeout: int = 300  # seconds
+
     # Cluster / Apps settings (mirrors py-cluster-api ClusterConfig)
     cluster: ClusterSettings = ClusterSettings()
 

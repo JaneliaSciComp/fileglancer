@@ -18,6 +18,7 @@ from fileglancer.apps.core import (  # noqa: F401
     stop_job_monitor,
     submit_job,
     merge_requirements,
+    set_worker_exec,
     validate_path_for_shell,
     validate_path_in_filestore,
     verify_requirements,
