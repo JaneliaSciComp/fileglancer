@@ -8,6 +8,7 @@ import {
   translateUnitToNeuroglancer,
   getResolvedScales
 } from '@/omezarr-helper';
+import FgLink from '@/components/designSystem/atoms/FgLink';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 
 type ZarrMetadataTableProps = {
@@ -100,10 +101,7 @@ export default function ZarrMetadataTable({
                   interactiveLabel={
                     <>
                       Heuristical layer type detection is disabled in{' '}
-                      <a className="underline" href="/fg/preferences">
-                        preferences
-                      </a>
-                      .
+                      <FgLink to="/preferences">preferences</FgLink>.
                     </>
                   }
                   isInteractive={true}

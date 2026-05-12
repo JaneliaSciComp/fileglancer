@@ -1,10 +1,11 @@
+import storybook from 'eslint-plugin-storybook';
+
 import js from '@eslint/js';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
-import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
-
-import react from 'eslint-plugin-react';
 import json from '@eslint/json';
+import react from 'eslint-plugin-react';
+import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 import reactHooks from 'eslint-plugin-react-hooks';
 import css from '@eslint/css';
 import { defineConfig, globalIgnores } from 'eslint/config';
@@ -117,5 +118,6 @@ export default defineConfig([
       'react/prop-types': 'off',
       'react/prefer-read-only-props': 'warn'
     }
-  }
+  },
+  ...storybook.configs['flat/recommended']
 ]);

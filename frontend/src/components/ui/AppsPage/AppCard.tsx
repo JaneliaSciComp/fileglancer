@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
-import { Button, Card, IconButton, Typography } from '@material-tailwind/react';
+import { Card, IconButton, Typography } from '@material-tailwind/react';
 import { buildLaunchPathFromApp } from '@/utils';
 import {
   HiOutlineInformationCircle,
@@ -10,8 +10,10 @@ import {
 } from 'react-icons/hi';
 
 import AppInfoDialog from '@/components/ui/AppsPage/AppInfoDialog';
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import type { UserApp } from '@/shared.types';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 
 interface AppCardProps {
   readonly app: UserApp;
@@ -52,7 +54,7 @@ export default function AppCard({
               size="sm"
               variant="ghost"
             >
-              <HiOutlineInformationCircle className="icon-default" />
+              <FgIcon icon={HiOutlineInformationCircle} />
             </IconButton>
           </FgTooltip>
           <FgTooltip label="Remove app">
@@ -68,7 +70,7 @@ export default function AppCard({
               size="sm"
               variant="ghost"
             >
-              <HiOutlineTrash className="icon-default" />
+              <FgIcon icon={HiOutlineTrash} />
             </IconButton>
           </FgTooltip>
         </div>
@@ -79,14 +81,14 @@ export default function AppCard({
         </Typography>
       ) : null}
 
-      <Button
-        className="!rounded-md self-start mt-auto"
+      <FgButton
+        className="self-start mt-auto"
+        icon={HiOutlinePlay}
         onClick={handleLaunch}
         size="sm"
       >
-        <HiOutlinePlay className="icon-small mr-1" />
         Launch
-      </Button>
+      </FgButton>
 
       <AppInfoDialog
         app={app}

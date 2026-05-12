@@ -7,6 +7,7 @@ import { LuBookOpenText } from 'react-icons/lu';
 import { HiExternalLink } from 'react-icons/hi';
 import { MdTour } from 'react-icons/md';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import useVersionQuery from '@/queries/versionQuery';
 import { buildUrl } from '@/utils';
 import StartTour from '@/components/tours/StartTour';
@@ -93,8 +94,12 @@ export default function Help() {
           as={StartTour}
           className="group min-h-44 p-8 md:p-12 flex flex-col gap-2 text-left w-full dark:border-surface-light hover:bg-surface-light dark:hover:bg-surface hover:border-surface"
         >
-          <div className="flex items-center justify-start gap-2 w-full">
-            <MdTour className="hidden md:block icon-default lg:icon-large text-primary" />
+          <div className="flex items-center justify-start md:gap-2 w-full">
+            <FgIcon
+              className="hidden md:block lg:icon-large"
+              color="primary"
+              icon={MdTour}
+            />
             <Typography className="text-base md:text-lg lg:text-xl text-primary font-semibold group-hover:underline">
               Take a Tutorial
             </Typography>
@@ -113,13 +118,22 @@ export default function Help() {
             target="_blank"
             to={url}
           >
-            <div className="flex items-center gap-2">
-              <Icon className="hidden md:block icon-default lg:icon-large text-primary" />
+            <div className="flex items-center md:gap-2">
+              <FgIcon
+                className="hidden md:block lg:icon-large"
+                color="primary"
+                icon={Icon}
+              />
               <div className="flex items-center gap-1 text-nowrap">
                 <Typography className="text-base md:text-lg lg:text-xl text-primary font-semibold group-hover:underline">
                   {title}
                 </Typography>
-                <HiExternalLink className="icon-xsmall md:icon-small text-primary" />
+                <FgIcon
+                  className="md:icon-small"
+                  color="primary"
+                  icon={HiExternalLink}
+                  size="xs"
+                />
               </div>
             </div>
             <Typography className="text-sm md:text-base text-foreground">

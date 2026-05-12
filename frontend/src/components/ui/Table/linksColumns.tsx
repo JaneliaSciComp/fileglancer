@@ -19,7 +19,7 @@ import useDataToolLinks from '@/hooks/useDataToolLinks';
 import type { ProxiedPath } from '@/contexts/ProxiedPathContext';
 import type { FileSharePath } from '@/shared.types';
 import type { MenuItem } from '@/components/ui/Menus/FgMenuItems';
-import { FgStyledLink } from '../widgets/FgLink';
+import FgLink from '@/components/designSystem/atoms/FgLink';
 import FgTooltip from '../widgets/FgTooltip';
 
 export type PathMap = {
@@ -109,7 +109,7 @@ function PathCell({
     >
       <FgTooltip label={displayPath} triggerClasses={TRIGGER_CLASSES}>
         <Typography
-          as={FgStyledLink}
+          as={FgLink}
           className="text-left truncate block"
           to={browseLink}
         >

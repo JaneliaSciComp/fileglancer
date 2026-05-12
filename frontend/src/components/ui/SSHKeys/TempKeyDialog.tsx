@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Typography } from '@material-tailwind/react';
+import { Typography } from '@material-tailwind/react';
 import {
   HiOutlineClipboardCopy,
   HiOutlineExclamation,
@@ -7,8 +7,10 @@ import {
 } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import type { TempKeyResult } from '@/queries/sshKeyQueries';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 
 type TempKeyDialogProps = {
   readonly tempKeyResult: TempKeyResult | null;
@@ -48,7 +50,11 @@ export default function TempKeyDialog({
   return (
     <FgDialog onClose={handleClose} open={true}>
       <div className="flex items-center gap-2 mb-4">
-        <HiOutlineExclamation className="text-warning h-6 w-6" />
+        <FgIcon
+          className="h-6 w-6"
+          color="warning"
+          icon={HiOutlineExclamation}
+        />
         <Typography className="text-foreground font-semibold text-lg">
           SSH Key Generated
         </Typography>
@@ -66,23 +72,14 @@ export default function TempKeyDialog({
             page).
           </Typography>
           <div className="flex justify-center mt-3">
-            <Button
+            <FgButton
               color={copied ? 'success' : 'primary'}
+              icon={copied ? HiOutlineCheck : HiOutlineClipboardCopy}
               onClick={handleCopy}
               size="sm"
             >
-              {copied ? (
-                <>
-                  <HiOutlineCheck className="icon-default mr-1" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <HiOutlineClipboardCopy className="icon-default mr-1" />
-                  Copy Private Key
-                </>
-              )}
-            </Button>
+              Copy Private Key
+            </FgButton>
           </div>
         </div>
 
@@ -107,9 +104,9 @@ export default function TempKeyDialog({
         </div>
 
         <div className="flex justify-start pt-2">
-          <Button onClick={handleClose} size="sm" variant="outline">
+          <FgButton onClick={handleClose} size="sm" variant="outline">
             Close
-          </Button>
+          </FgButton>
         </div>
       </div>
     </FgDialog>

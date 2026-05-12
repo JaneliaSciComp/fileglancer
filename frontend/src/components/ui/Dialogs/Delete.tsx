@@ -3,11 +3,11 @@ import toast from 'react-hot-toast';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import TextWithFilePath from '@/components/ui/Dialogs/TextWithFilePath';
-import DeleteBtn from '@/components/ui/buttons/DeleteBtn';
 import useDeleteDialog from '@/hooks/useDeleteDialog';
 import { getPreferredPathForDisplay } from '@/utils';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 
 type DeleteDialogProps = {
   readonly showDeleteDialog: boolean;
@@ -46,8 +46,11 @@ export default function DeleteDialog({
         path={displayPath}
         text="Are you sure you want to delete this item?"
       />
-      <DeleteBtn
+      <FgButton
+        color="error"
         disabled={mutations.delete.isPending}
+        loading={mutations.delete.isPending}
+        loadingText="Deleting..."
         onClick={async () => {
           try {
             await handleDelete(fileBrowserState.propertiesTarget!);
@@ -60,8 +63,9 @@ export default function DeleteDialog({
             setShowDeleteDialog(false);
           }
         }}
-        pending={mutations.delete.isPending}
-      />
+      >
+        Delete
+      </FgButton>
     </FgDialog>
   );
 }

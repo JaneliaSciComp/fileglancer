@@ -1,6 +1,6 @@
 import { Typography } from '@material-tailwind/react';
 
-import ExternalLink from '@/components/ui/Dialogs/dataLinkUsage/ExternalLink';
+import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 
 interface Prerequisite {
   readonly label: string;
@@ -24,7 +24,7 @@ export default function PrerequisitesBlock({
       <ul className="mt-1 list-disc pl-5 space-y-1">
         {prerequisites.map(({ label, href }) => (
           <li className="text-base" key={label}>
-            <ExternalLink href={href}>{label}</ExternalLink>
+            <FgExternalLink href={href}>{label}</FgExternalLink>
           </li>
         ))}
       </ul>

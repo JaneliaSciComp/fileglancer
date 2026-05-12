@@ -16,6 +16,7 @@ import {
   useFileMetadataQuery,
   useFileBinaryPreviewQuery
 } from '@/queries/fileContentQueries';
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import HexDump from './HexDump';
 import useDarkMode from '@/hooks/useDarkMode';
 
@@ -251,7 +252,10 @@ export default function FileViewer({ file }: FileViewerProps) {
           ) : null}
           {downloadUrl ? (
             <a download={file.name} href={downloadUrl} title="Download file">
-              <HiOutlineDownload className="text-foreground hover:text-primary text-xl" />
+              <FgIcon
+                className="text-foreground hover:text-primary text-xl"
+                icon={HiOutlineDownload}
+              />
             </a>
           ) : null}
         </div>

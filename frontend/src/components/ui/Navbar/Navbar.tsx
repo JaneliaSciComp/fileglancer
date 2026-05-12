@@ -26,6 +26,7 @@ import {
 import { TbBrandGithub } from 'react-icons/tb';
 import { FaRunning } from 'react-icons/fa';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import ProfileMenu from '@/components/ui/Navbar/ProfileMenu';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import useTheme from '@/hooks/useTheme';
@@ -122,7 +123,7 @@ function NavList() {
             to={href}
           >
             <List.ItemStart className="flex items-center mr-1.5">
-              <Icon className="stroke-2 icon-default short:icon-xsmall" />
+              <FgIcon className="stroke-2 short:icon-xsmall" icon={Icon} />
             </List.ItemStart>
             <Typography className="short:text-xs" type="small">
               {title}
@@ -212,7 +213,11 @@ export default function FileglancerNavbar() {
               to="https://github.com/JaneliaSciComp/fileglancer"
               variant="ghost"
             >
-              <TbBrandGithub className="icon-large short:icon-default" />
+              <FgIcon
+                className="short:icon-default"
+                icon={TbBrandGithub}
+                size="lg"
+              />
             </IconButton>
           </FgTooltip>
           <FgTooltip label="Toggle light/dark themes">
@@ -227,9 +232,17 @@ export default function FileglancerNavbar() {
               variant="ghost"
             >
               {isLightTheme ? (
-                <HiOutlineSun className="stroke-2 icon-large short:icon-default" />
+                <FgIcon
+                  className="stroke-2 short:icon-default"
+                  icon={HiOutlineSun}
+                  size="lg"
+                />
               ) : (
-                <HiOutlineMoon className="stroke-2 icon-large short:icon-default" />
+                <FgIcon
+                  className="stroke-2 short:icon-default"
+                  icon={HiOutlineMoon}
+                  size="lg"
+                />
               )}
             </IconButton>
           </FgTooltip>
@@ -249,9 +262,17 @@ export default function FileglancerNavbar() {
               variant="ghost"
             >
               {openNav ? (
-                <HiOutlineX className="stroke-2 icon-large short:icon-default" />
+                <FgIcon
+                  className="stroke-2 short:icon-default"
+                  icon={HiOutlineX}
+                  size="lg"
+                />
               ) : (
-                <HiOutlineMenu className="stroke-2 icon-large short:icon-default" />
+                <FgIcon
+                  className="stroke-2 short:icon-default"
+                  icon={HiOutlineMenu}
+                  size="lg"
+                />
               )}
             </IconButton>
           </FgTooltip>

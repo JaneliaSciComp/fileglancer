@@ -1,6 +1,5 @@
-import { Button, Typography } from '@material-tailwind/react';
+import { Typography } from '@material-tailwind/react';
 import {
-  HiExternalLink,
   HiOutlinePlay,
   HiOutlineRefresh,
   HiOutlineTrash
@@ -8,6 +7,8 @@ import {
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import type { UserApp } from '@/shared.types';
+import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 
 interface AppInfoDialogProps {
   readonly app: UserApp;
@@ -31,15 +32,9 @@ function AppInfoTable({ app }: { readonly app: UserApp }) {
         <tr>
           <td className={labelClass}>URL</td>
           <td className="py-1.5">
-            <a
-              className="inline-flex items-center gap-1 text-primary hover:underline break-all"
-              href={app.url}
-              rel="noopener noreferrer"
-              target="_blank"
-            >
+            <FgExternalLink className="break-all" href={app.url}>
               {app.url}
-              <HiExternalLink className="icon-xsmall flex-shrink-0" />
-            </a>
+            </FgExternalLink>
           </td>
         </tr>
         {app.branch ? (
@@ -92,30 +87,32 @@ export default function AppInfoDialog({
       <AppInfoTable app={app} />
 
       <div className="flex justify-between">
-        <Button className="!rounded-md" onClick={onLaunch}>
-          <HiOutlinePlay className="icon-small mr-2" />
+        <FgButton icon={HiOutlinePlay} onClick={onLaunch}>
           Launch
-        </Button>
+        </FgButton>
         <div className="flex gap-2">
-          <Button
-            className="!rounded-md"
+          <FgButton
             disabled={updating}
+            icon={HiOutlineRefresh}
+            loading={updating}
+            loadingText="Updating..."
             onClick={onUpdate}
             variant="outline"
           >
-            <HiOutlineRefresh className="icon-small mr-2" />
-            {updating ? 'Updating...' : 'Update'}
-          </Button>
-          <Button
+            Update
+          </FgButton>
+          <FgButton
             className="!rounded-md"
             color="error"
             disabled={removing}
+            icon={HiOutlineTrash}
+            loading={removing}
+            loadingText="Deleting..."
             onClick={onRemove}
             variant="outline"
           >
-            <HiOutlineTrash className="icon-small mr-2" />
             Delete
-          </Button>
+          </FgButton>
         </div>
       </div>
     </FgDialog>

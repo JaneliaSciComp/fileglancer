@@ -1,9 +1,9 @@
 import { useState } from 'react';
-
 import { Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 
 export default function JobOptions() {
   const {
@@ -66,14 +66,15 @@ export default function JobOptions() {
             type="text"
             value={localExtraArgs}
           />
-          <button
-            className="mt-2 block px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary-dark transition-colors disabled:opacity-50"
+          <FgButton
             disabled={!isExtraArgsDirty || savingExtraArgs}
+            loading={savingExtraArgs}
+            loadingText="Saving..."
             onClick={handleSaveExtraArgs}
             type="button"
           >
-            {savingExtraArgs ? 'Saving...' : 'Save'}
-          </button>
+            Save
+          </FgButton>
         </div>
 
         <div>
@@ -95,14 +96,14 @@ export default function JobOptions() {
             type="text"
             value={localCacheDir}
           />
-          <button
-            className="mt-2 block px-3 py-1 text-sm rounded bg-primary text-primary-foreground hover:bg-primary-dark transition-colors disabled:opacity-50"
+          <FgButton
             disabled={!isCacheDirDirty || savingCacheDir}
+            loading={savingCacheDir}
+            loadingText="Saving..."
             onClick={handleSaveCacheDir}
-            type="button"
           >
-            {savingCacheDir ? 'Saving...' : 'Save'}
-          </button>
+            Save
+          </FgButton>
         </div>
       </div>
     </div>
