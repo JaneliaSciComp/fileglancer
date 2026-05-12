@@ -68,9 +68,6 @@ export const Variants: Story = {
       <FgButton {...args} variant="ghost">
         Ghost
       </FgButton>
-      <FgButton {...args} variant="link">
-        Link
-      </FgButton>
     </div>
   )
 };
@@ -143,16 +140,7 @@ export const Disabled: Story = {
   }
 };
 
-export const LinkVariantWithIcon: Story = {
-  args: {
-    variant: 'link',
-    icon: HiOutlinePlus,
-    size: 'sm',
-    children: 'Add something'
-  }
-};
-
-export const AsLink: Story = {
+export const WithHref: Story = {
   args: {
     children: 'Open',
     href: 'https://example.com',
@@ -169,7 +157,7 @@ export const AsLink: Story = {
   }
 };
 
-export const DisabledLink: Story = {
+export const DisabledWithHref: Story = {
   args: {
     children: 'Open',
     href: 'https://example.com',
@@ -183,7 +171,7 @@ export const DisabledLink: Story = {
   }
 };
 
-export const LoadingLink: Story = {
+export const LoadingWithHref: Story = {
   args: {
     children: 'Open',
     href: 'https://example.com',
