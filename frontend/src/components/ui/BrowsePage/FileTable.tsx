@@ -23,6 +23,10 @@ import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import { FgStyledLink } from '@/components/ui/widgets/FgLink';
 import { SortIcons } from '@/components/ui/Table/TableCard';
 import {
+  NotificationItem,
+  getNotificationStyles
+} from '@/components/ui/Notifications/NotificationItem';
+import {
   typeColumn,
   lastModifiedColumn,
   sizeColumn
@@ -312,8 +316,26 @@ export default function Table({
     navigate(link);
   });
 
+  const isTruncated = fileQuery.data?.isTruncated ?? false;
+
   return (
     <div className="min-w-full bg-background select-none" ref={tableRef}>
+      {isTruncated ? (
+        <div
+          className={`${getNotificationStyles('warning').container} p-4 rounded-md mb-3`}
+        >
+          <NotificationItem
+            notification={{
+              id: 0,
+              type: 'warning',
+              title: 'Folder contents truncated',
+              message:
+                'Only showing the first 10,000 items in this folder. Reorganize contents into sub-folders to see more.'
+            }}
+            showDismissButton={false}
+          />
+        </div>
+      ) : null}
       <div className="bg-background border-b border-surface">
         {table.getHeaderGroups().map(headerGroup => (
           <div
