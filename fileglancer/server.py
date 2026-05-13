@@ -1407,6 +1407,7 @@ def create_app(settings):
                                 result["next_cursor"] = next_cursor
                                 result["total_count"] = total_count
                                 result["is_truncated"] = is_truncated
+                                result["max_count"] = settings.max_directory_count
                             else:
                                 files = list(filestore.yield_file_infos(subpath, current_user=username, session=session))
                                 result["files"] = [json.loads(f.model_dump_json()) for f in files]

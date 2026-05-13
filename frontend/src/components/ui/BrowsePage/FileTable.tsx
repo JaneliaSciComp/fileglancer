@@ -317,6 +317,9 @@ export default function Table({
   });
 
   const isTruncated = fileQuery.data?.isTruncated ?? false;
+  const maxCount = fileQuery.data?.maxCount ?? null;
+  const truncationLimit =
+    maxCount?.toLocaleString() ?? 'the configured limit of';
 
   return (
     <div className="min-w-full bg-background select-none" ref={tableRef}>
@@ -329,8 +332,7 @@ export default function Table({
               id: 0,
               type: 'warning',
               title: 'Folder contents truncated',
-              message:
-                'Only showing the first 10,000 items in this folder. Reorganize contents into sub-folders to see more.'
+              message: `This folder contains more than ${truncationLimit} items. Only ${truncationLimit} items are shown.`
             }}
             showDismissButton={false}
           />
