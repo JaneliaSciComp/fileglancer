@@ -1400,7 +1400,8 @@ def create_app(settings):
                             if limit is not None:
                                 files, has_more, next_cursor, total_count, is_truncated = filestore.yield_file_infos_paginated(
                                     subpath, current_user=username, session=session,
-                                    limit=limit, cursor=cursor
+                                    limit=limit, cursor=cursor,
+                                    max_count=settings.max_directory_count,
                                 )
                                 result["files"] = [json.loads(f.model_dump_json()) for f in files]
                                 result["has_more"] = has_more

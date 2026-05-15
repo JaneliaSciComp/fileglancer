@@ -19,7 +19,6 @@ from typing import Optional, Generator
 from loguru import logger
 
 from .database import find_fsp_from_absolute_path
-from .settings import get_settings
 from .model import FileSharePath
 
 # Default buffer size for streaming file contents
@@ -493,7 +492,7 @@ class Filestore:
     def yield_file_infos_paginated(self, path: Optional[str] = None, current_user: str = None,
                                     session = None, limit: int = 200,
                                     cursor: Optional[str] = None,
-                                    max_count: Optional[int] = None) -> tuple[list[FileInfo], bool, Optional[str], int, bool]:
+                                    *, max_count: int) -> tuple[list[FileInfo], bool, Optional[str], int, bool]:
         """
         Return a page of FileInfo objects for children of the given path.
 
@@ -509,18 +508,17 @@ class Filestore:
             cursor: Name of the last entry from the previous page. Entries after
                 this name (in sort order) are returned.
             max_count: Maximum number of directory entries to read and sort.
-                Defaults to Settings.max_directory_count. Directories with more
-                entries are truncated at this limit; files beyond max_count are
-                not accessible via pagination.
+                Directories with more entries are truncated at this limit;
+                files beyond max_count are not accessible via pagination.
+                Required keyword arg — callers must pass the configured limit
+                (e.g. Settings.max_directory_count) so the advertised and
+                actual limits cannot drift.
 
         Returns:
             Tuple of (file_infos, has_more, next_cursor, total_count, is_truncated).
             total_count is capped at max_count. is_truncated is True when the
             directory has more entries than max_count.
         """
-        if max_count is None:
-            max_count = get_settings().max_directory_count
-
         full_path = self._check_path_in_root(path)
 
         # Compute user groups once for the entire listing
