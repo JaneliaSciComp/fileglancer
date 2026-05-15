@@ -33,7 +33,7 @@ const FgRadio = forwardRef<HTMLInputElement, FgRadioProps>(
     const focusClasses =
       'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
 
-    const disabledClasses = 'disabled:cursor-not-allowed disabled:opacity-50';
+    const disabledClasses = 'disabled:cursor-not-allowed disabled:opacity-50 ';
 
     const inputClassName =
       `icon-small dark:brightness-90 dark:checked:brightness-100 ${colorClasses} ${focusClasses} ${disabledClasses} ${className}`.trim();

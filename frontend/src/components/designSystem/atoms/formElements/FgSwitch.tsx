@@ -16,7 +16,7 @@ type FgSwitchProps = FgSwitchOwnProps &
   Omit<ComponentPropsWithoutRef<'div'>, keyof FgSwitchOwnProps>;
 
 const switchClassName =
-  'before:bg-primary/50 after:border-primary/50 disabled:before:bg-surface disabled:before:border disabled:before:border-surface-dark disabled:after:border-surface-dark dark:disabled:before:bg-surface-light dark:disabled:before:border-surface-light dark:disabled:after:border-surface-light focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
+  'before:bg-primary/50 after:border-primary/50 disabled:before:bg-surface disabled:before:border disabled:before:border-surface-dark disabled:after:border-surface-dark dark:disabled:before:bg-surface-light dark:disabled:before:opacity-50 dark:disabled:before:border-surface-light dark:disabled:after:border-surface-light focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
 
 const FgSwitch = forwardRef<HTMLDivElement, FgSwitchProps>(
   (
