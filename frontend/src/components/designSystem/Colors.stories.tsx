@@ -65,7 +65,7 @@ function ColorSwatch({
       <div
         className={`h-12 w-12 rounded border border-surface-dark ${className}`}
       />
-      <span className="text-xs text-foreground dark:text-surface">{label}</span>
+      <span className="text-xs text-foreground">{label}</span>
     </div>
   );
 }
@@ -79,7 +79,7 @@ function ColorGroupRow({
 }) {
   return (
     <div className="flex items-start gap-6">
-      <span className="w-24 shrink-0 pt-3 text-sm font-semibold text-foreground dark:text-surface">
+      <span className="w-24 shrink-0 pt-3 text-sm font-semibold text-foreground">
         {name}
       </span>
       <div className="flex flex-wrap gap-4">
@@ -108,13 +108,11 @@ type Story = StoryObj<typeof meta>;
 export const Colors: Story = {
   render: () => (
     <div className="mx-auto max-w-5xl space-y-6 p-8">
-      <h1 className="text-2xl font-bold text-foreground dark:text-surface">
-        Colors
-      </h1>
+      <h1 className="text-2xl font-bold text-foreground ">Colors</h1>
 
       {/* Simple colors */}
       <div className="flex items-start gap-6">
-        <span className="w-24 shrink-0 pt-3 text-sm font-semibold text-foreground dark:text-surface">
+        <span className="w-24 shrink-0 pt-3 text-sm font-semibold text-foreground ">
           base
         </span>
         <div className="flex flex-wrap gap-4">
