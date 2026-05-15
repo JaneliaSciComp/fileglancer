@@ -100,7 +100,14 @@ export default function Table({
       parent = parent.parentElement;
     }
   }, []);
-  const sortingEnabled = !hasNextPage && !fileQuery.data?.isTruncated;
+  const sortingDisabledByTruncation = Boolean(fileQuery.data?.isTruncated);
+  const sortingDisabledByPagination =
+    !sortingDisabledByTruncation && Boolean(hasNextPage);
+  const sortingEnabled =
+    !sortingDisabledByTruncation && !sortingDisabledByPagination;
+  const sortingDisabledTooltip = sortingDisabledByTruncation
+    ? 'Sort unavailable: folder is too large and contents are truncated'
+    : 'Sort unavailable until all files are loaded';
 
   const selectedFileNames = useMemo(
     () => new Set(fileBrowserState.selectedFiles.map(file => file.name)),
@@ -373,7 +380,7 @@ export default function Table({
                       ) : (
                         <FgTooltip
                           icon={HiOutlineSwitchVertical}
-                          label="Sort unavailable until all files are loaded via infinite scroll"
+                          label={sortingDisabledTooltip}
                           triggerClasses="flex items-center opacity-40 cursor-not-allowed"
                         />
                       )
