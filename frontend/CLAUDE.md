@@ -461,7 +461,17 @@ export function useUpdateMyData() {
 - `.env` - Local environment configuration
 - Variables must be prefixed with `VITE_` to be exposed to frontend
 - Access via `import.meta.env.VITE_VAR_NAME`
-- `VITE_DESIGN_SYSTEM_PREVIEW` - When `true`, exposes `/design-system` and `/design-system/colors` routes for the design system preview.
+
+## Storybook
+
+Component documentation lives in Storybook, not in-app routes.
+
+```bash
+pixi run storybook              # Start dev server on port 6006
+pixi run storybook-build        # Build static site
+```
+
+Stories are co-located with components: `FgButton.stories.tsx` next to `FgButton.tsx`.
 
 ## Troubleshooting
 

@@ -310,7 +310,7 @@ function EnvVarRows({
         icon={HiOutlinePlus}
         onClick={() => setEnvVars(prev => [...prev, { key: '', value: '' }])}
         size="sm"
-        variant="link"
+        variant="ghost"
       >
         Add variable
       </FgButton>

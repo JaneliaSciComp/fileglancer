@@ -22,8 +22,6 @@ import Notifications from '@/components/Notifications';
 import SSHKeys from '@/components/SSHKeys';
 import ErrorFallback from '@/components/ErrorFallback';
 import { NGLinkProvider } from '@/contexts/NGLinkContext';
-import ColorsPage from '@/components/designSystem/previewRoutes/ColorsPage';
-import PreviewPage from '@/components/designSystem/previewRoutes/PreviewPage';
 
 function RequireAuth({ children }: { readonly children: ReactNode }) {
   const { loading, authStatus } = useAuthContext();
@@ -92,9 +90,6 @@ function RootRedirect() {
 const AppComponent = () => {
   const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
   const sshKeysEnabled = import.meta.env.VITE_ENABLE_SSH_KEYS === 'true';
-  const dsPreviewEnabled =
-    import.meta.env.VITE_DESIGN_SYSTEM_PREVIEW === 'true';
-
   return (
     <BrowserRouter>
       <Routes>
@@ -179,12 +174,6 @@ const AppComponent = () => {
               />
             ) : null}
             <Route element={<Help />} path="help" />
-            {dsPreviewEnabled ? (
-              <>
-                <Route element={<PreviewPage />} path="design-system" />
-                <Route element={<ColorsPage />} path="design-system/colors" />
-              </>
-            ) : null}
             <Route
               element={
                 <RequireAuth>

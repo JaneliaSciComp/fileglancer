@@ -151,3 +151,6 @@ notifications.yaml
 
 # Local VSCode settings
 .vscode/
+
+*storybook.log
+storybook-static

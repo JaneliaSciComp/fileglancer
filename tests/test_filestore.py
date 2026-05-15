@@ -1,5 +1,6 @@
 import os
 import stat
+import sys
 import pytest
 import tempfile
 import shutil
@@ -8,6 +9,7 @@ from contextlib import contextmanager
 from unittest.mock import Mock, MagicMock, patch
 from typing import List, Callable, Optional
 
+from conftest import requires_symlinks
 from fileglancer import database
 from fileglancer.filestore import Filestore, FileInfo
 from fileglancer.model import FileSharePath
@@ -148,7 +150,8 @@ def test_rename_file_or_dir_invalid_path(filestore):
 
 
 def test_rename_file_or_dir_invalid_new_path(filestore):
-    with pytest.raises(NotADirectoryError):
+    # Windows raises OSError (WinError 87) or FileNotFoundError; Linux/macOS raise NotADirectoryError
+    with pytest.raises((NotADirectoryError, FileNotFoundError, OSError)):
         filestore.rename_file_or_dir("test.txt", "test.txt/subdir")
 
 
@@ -194,10 +197,34 @@ def test_create_empty_file(filestore, test_dir):
     assert os.path.exists(os.path.join(test_dir, "newfile.txt"))
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows chmod does not support full Unix permission bits")
 def test_change_file_permissions(filestore, test_dir):
     filestore.change_file_permissions("test.txt", "-rw-r--r--")
     fullpath = os.path.join(test_dir, "test.txt")
     assert stat.S_IMODE(os.stat(fullpath).st_mode) == 0o644
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows chmod does not support full Unix permission bits")
+def test_change_file_permissions_with_execute(filestore, test_dir):
+    filestore.change_file_permissions("test.txt", "-rwxr-xr-x")
+    fullpath = os.path.join(test_dir, "test.txt")
+    assert stat.S_IMODE(os.stat(fullpath).st_mode) == 0o755
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows chmod does not support full Unix permission bits")
+def test_change_dir_permissions_with_sticky_bit(filestore, test_dir):
+    subdir = os.path.join(test_dir, "sticky_dir")
+    os.makedirs(subdir, exist_ok=True)
+    filestore.change_file_permissions("sticky_dir", "drwxrwxrwt")
+    assert stat.S_IMODE(os.stat(subdir).st_mode) == 0o1777
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows chmod does not support full Unix permission bits")
+def test_change_dir_permissions_sticky_without_execute(filestore, test_dir):
+    subdir = os.path.join(test_dir, "sticky_dir2")
+    os.makedirs(subdir, exist_ok=True)
+    filestore.change_file_permissions("sticky_dir2", "drwxrwxrwT")
+    assert stat.S_IMODE(os.stat(subdir).st_mode) == 0o1776
 
 
 def test_change_file_permissions_invalid_permissions(filestore):
@@ -212,6 +239,7 @@ def test_change_file_permissions_invalid_path(filestore):
 
 # Symlink tests
 
+@requires_symlinks
 def test_symlink_detection(test_dir):
     """Test that FileInfo correctly detects symlinks and their properties"""
     # Create a file and a symlink to it
@@ -230,6 +258,7 @@ def test_symlink_detection(test_dir):
     assert file_info.name == "link_to_target"
 
 
+@requires_symlinks
 def test_same_share_symlink_resolution_via_listing(filestore, test_dir):
     """Test symlink resolution when target is within the same file share via directory listing"""
     # Create target file
@@ -262,6 +291,7 @@ def test_same_share_symlink_resolution_via_listing(filestore, test_dir):
         assert symlink_info.symlink_target_fsp["subpath"] == "subdir/target_same_share.txt"
 
 
+@requires_symlinks
 def test_cross_share_symlink_resolution_via_listing(test_dir):
     """Test symlink resolution when target is in a different file share via directory listing"""
     # Create two file shares
@@ -304,6 +334,7 @@ def test_cross_share_symlink_resolution_via_listing(test_dir):
         assert symlink_info.symlink_target_fsp["subpath"] == "target.txt"
 
 
+@requires_symlinks
 def test_relative_symlink_resolution(test_dir):
     """Test that relative symlinks are resolved correctly"""
     # Create a fresh directory structure for this test
@@ -341,6 +372,7 @@ def test_relative_symlink_resolution(test_dir):
         assert symlink_info.symlink_target_fsp["subpath"] == "target.txt"
 
 
+@requires_symlinks
 def test_yield_file_infos_with_symlinks(filestore, test_dir):
     """Test that yield_file_infos correctly lists symlinks"""
     # Create file and symlink
@@ -364,6 +396,7 @@ def test_yield_file_infos_with_symlinks(filestore, test_dir):
         assert symlink_info.is_symlink is True
 
 
+@requires_symlinks
 def test_broken_symlink_is_listed(filestore, test_dir):
     """Test that broken symlinks are listed with is_symlink=True and symlink_target_fsp=None"""
     # Create a broken symlink
@@ -388,6 +421,7 @@ def test_broken_symlink_is_listed(filestore, test_dir):
     assert broken_link_info.symlink_target_fsp is None  # Target not resolvable
 
 
+@requires_symlinks
 def test_symlink_to_directory(filestore, test_dir):
     """Test symlink pointing to a directory is detected via listing"""
     # Create a directory
@@ -412,6 +446,7 @@ def test_symlink_to_directory(filestore, test_dir):
         assert symlink_info.symlink_target_fsp is not None
 
 
+@requires_symlinks
 def test_broken_symlink_detection(test_dir, filestore):
     """Test that broken symlinks are detected and returned with is_symlink=True"""
     # Create a broken symlink
@@ -429,6 +464,7 @@ def test_broken_symlink_detection(test_dir, filestore):
     assert broken_link_info.symlink_target_fsp is None, "Target should be None for broken symlink"
 
 
+@requires_symlinks
 def test_broken_symlink_within_share(test_dir):
     """Test that broken symlinks pointing to paths within a file share don't get symlink_target_fsp populated"""
     # Create a filestore
@@ -682,6 +718,7 @@ class TestFileInfoFromDirentry:
         assert info.is_dir
         assert info.size == 0
 
+    @requires_symlinks
     def test_symlink(self, direntry_dir, direntry_store):
         """DirEntry for a symlink is detected correctly."""
         target = os.path.join(direntry_dir, "file.txt")
@@ -694,6 +731,7 @@ class TestFileInfoFromDirentry:
         assert info.name == "link_to_file"
         assert info.is_symlink
 
+    @requires_symlinks
     def test_broken_symlink(self, direntry_dir, direntry_store):
         """DirEntry for a broken symlink is handled gracefully."""
         link = os.path.join(direntry_dir, "broken_link")

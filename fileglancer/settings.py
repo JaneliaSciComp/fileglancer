@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     # Maximum size of the sharing key LRU cache
     sharing_key_cache_size: int = 1000
 
+    # Maximum number of directory entries reported in total_count for paginated listings.
+    # Prevents a full directory scan for the count in very large directories.
+    max_directory_count: int = 10000
+
     # OKTA OAuth/OIDC settings for authentication
     okta_domain: Optional[str] = None
     okta_client_id: Optional[str] = None
@@ -126,6 +130,13 @@ class Settings(BaseSettings):
     def validate_external_proxy_url(cls, v):
         if v is None or (isinstance(v, str) and v.strip() == ''):
             raise ValueError("Add external_proxy_url to your config.yaml or FGC_EXTERNAL_PROXY_URL to your .env file")
+        return v
+
+    @field_validator('max_directory_count')
+    @classmethod
+    def validate_max_directory_count(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError('max_directory_count must be a positive integer')
         return v
   
     @classmethod

@@ -4,6 +4,7 @@ import os
 import subprocess
 import tempfile
 import pytest
+from conftest import requires_ssh_keygen
 from pydantic import SecretStr
 
 from fileglancer.sshkeys import (
@@ -230,6 +231,7 @@ class TestListSSHKeys:
             keys = list_ssh_keys(ssh_dir)
             assert keys == []
 
+    @requires_ssh_keygen
     def test_list_fileglancer_keys_from_authorized_keys(self):
         """Verify listing includes keys with fileglancer in comment."""
         with tempfile.TemporaryDirectory() as ssh_dir:
@@ -252,6 +254,7 @@ class TestListSSHKeys:
             assert len(keys) == 1
             assert "fileglancer" in keys[0].comment
 
+    @requires_ssh_keygen
     def test_list_excludes_non_fileglancer_keys(self):
         """Verify listing excludes keys without 'fileglancer' comment."""
         with tempfile.TemporaryDirectory() as ssh_dir:
@@ -275,6 +278,7 @@ class TestListSSHKeys:
 class TestGenerateTempKeyAndAuthorize:
     """Tests for generate_temp_key_and_authorize function."""
 
+    @requires_ssh_keygen
     @pytest.mark.asyncio
     async def test_generate_temp_key_basic(self):
         """Verify generating a temporary key."""
@@ -308,6 +312,7 @@ class TestGenerateTempKeyAndAuthorize:
                 content = f.read()
             assert "fileglancer" in content
 
+    @requires_ssh_keygen
     @pytest.mark.asyncio
     async def test_generate_temp_key_with_passphrase(self):
         """Verify generating a temp key with passphrase."""
@@ -352,6 +357,7 @@ class TestGenerateTempKeyAndAuthorize:
             finally:
                 os.unlink(temp_key_file)
 
+    @requires_ssh_keygen
     @pytest.mark.asyncio
     async def test_generate_temp_key_deletes_temp_files(self):
         """Verify temp files are deleted after streaming."""
@@ -406,6 +412,7 @@ class TestIsKeyInAuthorizedKeys:
             result = is_key_in_authorized_keys(ssh_dir, "SHA256:abcdef123456")
             assert result is False
 
+    @requires_ssh_keygen
     def test_key_in_authorized_keys(self):
         """Verify returns True when key is in authorized_keys with fileglancer comment."""
         with tempfile.TemporaryDirectory() as ssh_dir:
