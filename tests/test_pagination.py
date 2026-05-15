@@ -208,7 +208,7 @@ class TestPaginatedListing:
         assert is_truncated is False
 
     def test_truncation(self, pagination_dir):
-        """is_truncated is True and entries are in filesystem order (not sorted) when truncated."""
+        """is_truncated is True and the truncated subset is sorted (dirs first, then alpha)."""
         fsp = FileSharePath(zone="test", name="test", mount_path=pagination_dir)
         store = Filestore(fsp)
         # max_count=5 on a 13-entry directory
@@ -218,6 +218,15 @@ class TestPaginatedListing:
         assert total_count == 5
         assert is_truncated is True
         assert len(infos) == 5  # limit=10 > max_count=5, so all 5 returned
+        # Truncated subset must still be sorted: dirs first, then alphabetical.
+        # The fixture has 3 dirs (dir_00..dir_02) which all sort before any file,
+        # so a sorted truncated page of 5 starts with all 3 dirs.
+        names = [fi.name for fi in infos]
+        assert names[:3] == ["dir_00", "dir_01", "dir_02"]
+        dir_names = [fi.name for fi in infos if fi.is_dir]
+        file_names = [fi.name for fi in infos if not fi.is_dir]
+        assert dir_names == sorted(dir_names)
+        assert file_names == sorted(file_names)
 
     def test_chroot_escape_raises(self, pagination_store):
         """Attempting to escape root raises ValueError."""
