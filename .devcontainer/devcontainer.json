@@ -35,7 +35,7 @@
     "source=fileglancer-pixi,target=${containerWorkspaceFolder}/.pixi,type=volume"
   ],
   "remoteEnv": {
-    "NODE_OPTIONS": "--max-old-space-size=4096",
+    "NODE_OPTIONS": "--max-old-space-size=2048",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
     "CLAUDE_CODE_DISABLE_ANALYTICS": "1"
   },
