@@ -1398,14 +1398,17 @@ def create_app(settings):
                     if file_info.is_dir:
                         try:
                             if limit is not None:
-                                files, has_more, next_cursor, total_count = filestore.yield_file_infos_paginated(
+                                files, has_more, next_cursor, total_count, is_truncated = filestore.yield_file_infos_paginated(
                                     subpath, current_user=username, session=session,
-                                    limit=limit, cursor=cursor
+                                    limit=limit, cursor=cursor,
+                                    max_count=settings.max_directory_count,
                                 )
                                 result["files"] = [json.loads(f.model_dump_json()) for f in files]
                                 result["has_more"] = has_more
                                 result["next_cursor"] = next_cursor
                                 result["total_count"] = total_count
+                                result["is_truncated"] = is_truncated
+                                result["max_count"] = settings.max_directory_count
                             else:
                                 files = list(filestore.yield_file_infos(subpath, current_user=username, session=session))
                                 result["files"] = [json.loads(f.model_dump_json()) for f in files]

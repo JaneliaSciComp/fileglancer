@@ -24,6 +24,10 @@ import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgLink from '@/components/designSystem/atoms/FgLink';
 import { SortIcons } from '@/components/ui/Table/TableCard';
 import {
+  NotificationItem,
+  getNotificationStyles
+} from '@/components/ui/Notifications/NotificationItem';
+import {
   typeColumn,
   lastModifiedColumn,
   sizeColumn
@@ -97,7 +101,14 @@ export default function Table({
       parent = parent.parentElement;
     }
   }, []);
-  const sortingEnabled = !hasNextPage;
+  const sortingDisabledByTruncation = Boolean(fileQuery.data?.isTruncated);
+  const sortingDisabledByPagination =
+    !sortingDisabledByTruncation && Boolean(hasNextPage);
+  const sortingEnabled =
+    !sortingDisabledByTruncation && !sortingDisabledByPagination;
+  const sortingDisabledTooltip = sortingDisabledByTruncation
+    ? 'Sort unavailable: folder is too large and contents are truncated'
+    : 'Sort unavailable until all files are loaded';
 
   const selectedFileNames = useMemo(
     () => new Set(fileBrowserState.selectedFiles.map(file => file.name)),
@@ -330,8 +341,28 @@ export default function Table({
     navigate(link);
   });
 
+  const isTruncated = fileQuery.data?.isTruncated ?? false;
+  const maxCount = fileQuery.data?.maxCount ?? null;
+  const truncationLimit =
+    maxCount?.toLocaleString() ?? 'the configured limit of';
+
   return (
     <div className="min-w-full bg-background select-none" ref={tableRef}>
+      {isTruncated ? (
+        <div
+          className={`${getNotificationStyles('warning').container} p-4 rounded-md mb-3`}
+        >
+          <NotificationItem
+            notification={{
+              id: 0,
+              type: 'warning',
+              title: 'Folder contents truncated',
+              message: `This folder contains more than ${truncationLimit} items. Only ${truncationLimit} items are shown.`
+            }}
+            showDismissButton={false}
+          />
+        </div>
+      ) : null}
       <div className="bg-background border-b border-surface">
         {table.getHeaderGroups().map(headerGroup => (
           <div
@@ -367,7 +398,7 @@ export default function Table({
                       ) : (
                         <FgTooltip
                           icon={HiOutlineSwitchVertical}
-                          label="Sort unavailable until all files are loaded via infinite scroll"
+                          label={sortingDisabledTooltip}
                           triggerClasses="flex items-center opacity-40 cursor-not-allowed"
                         />
                       )
