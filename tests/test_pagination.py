@@ -208,7 +208,7 @@ class TestPaginatedListing:
         assert is_truncated is False
 
     def test_truncation(self, pagination_dir):
-        """is_truncated is True and the truncated subset is sorted (dirs first, then alpha)."""
+        """is_truncated is True, and the truncated subset is sorted so cursor pagination is stable."""
         fsp = FileSharePath(zone="test", name="test", mount_path=pagination_dir)
         store = Filestore(fsp)
         # max_count=5 on a 13-entry directory
@@ -218,15 +218,22 @@ class TestPaginatedListing:
         assert total_count == 5
         assert is_truncated is True
         assert len(infos) == 5  # limit=10 > max_count=5, so all 5 returned
-        # Truncated subset must still be sorted: dirs first, then alphabetical.
-        # The fixture has 3 dirs (dir_00..dir_02) which all sort before any file,
-        # so a sorted truncated page of 5 starts with all 3 dirs.
-        names = [fi.name for fi in infos]
-        assert names[:3] == ["dir_00", "dir_01", "dir_02"]
-        dir_names = [fi.name for fi in infos if fi.is_dir]
-        file_names = [fi.name for fi in infos if not fi.is_dir]
-        assert dir_names == sorted(dir_names)
-        assert file_names == sorted(file_names)
+
+        # The truncated subset is whatever max_count+1 entries os.scandir
+        # happened to return first — we cannot predict which entries those
+        # are because scandir order is filesystem-dependent. What we *can*
+        # guarantee is that the returned subset is sorted (dirs-first, then
+        # name), so cursor-based pagination is stable across calls.
+        sort_key = lambda fi: (not fi.is_dir, fi.name)
+        assert [fi.name for fi in infos] == [fi.name for fi in sorted(infos, key=sort_key)]
+
+        # Stability: a second call with the same arguments returns the same
+        # entries in the same order (the property the e368d2c3 sort was
+        # added to guarantee for cursor-based pagination).
+        infos2, _, _, _, _ = store.yield_file_infos_paginated(
+            None, limit=10, max_count=5
+        )
+        assert [fi.name for fi in infos2] == [fi.name for fi in infos]
 
     def test_chroot_escape_raises(self, pagination_store):
         """Attempting to escape root raises ValueError."""
