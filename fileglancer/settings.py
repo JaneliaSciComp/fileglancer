@@ -131,6 +131,13 @@ class Settings(BaseSettings):
         if v is None or (isinstance(v, str) and v.strip() == ''):
             raise ValueError("Add external_proxy_url to your config.yaml or FGC_EXTERNAL_PROXY_URL to your .env file")
         return v
+
+    @field_validator('max_directory_count')
+    @classmethod
+    def validate_max_directory_count(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError('max_directory_count must be a positive integer')
+        return v
   
     @classmethod
     def settings_customise_sources(  # noqa: PLR0913
