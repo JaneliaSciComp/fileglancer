@@ -30,8 +30,7 @@ const FgRadio = forwardRef<HTMLInputElement, FgRadioProps>(
         ? 'accent-primary'
         : 'accent-secondary-light dark:accent-secondary-dark';
 
-    const focusClasses =
-      'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
+    const focusClasses = `focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${color === 'primary' ? 'focus-visible:outline-primary' : 'focus-visible:outline-secondary'}`;
 
     const disabledClasses = 'disabled:cursor-not-allowed disabled:opacity-50 ';
 
