@@ -1,7 +1,20 @@
-import { cloneElement, isValidElement, useId } from 'react';
-import type { ReactNode, ReactElement } from 'react';
+import { createContext, useContext, useId } from 'react';
+import type { ReactNode } from 'react';
 
 import { Typography } from '@material-tailwind/react';
+
+type FgFormFieldContextValue = {
+  readonly id: string;
+  readonly describedBy: string | undefined;
+  readonly invalid: boolean;
+  readonly error: boolean;
+};
+
+const FgFormFieldContext = createContext<FgFormFieldContextValue | null>(null);
+
+export function useFgFormFieldContext(): FgFormFieldContextValue | null {
+  return useContext(FgFormFieldContext);
+}
 
 type FgFormFieldProps = {
   readonly label: string;
@@ -29,14 +42,12 @@ function FgFormField({
   const describedBy =
     [helperId, errorId].filter(Boolean).join(' ') || undefined;
 
-  const enhancedChildren = isValidElement(children)
-    ? cloneElement(children as ReactElement<Record<string, unknown>>, {
-        id: fieldId,
-        error: error ? true : undefined,
-        'aria-invalid': error ? true : undefined,
-        'aria-describedby': describedBy
-      })
-    : children;
+  const contextValue: FgFormFieldContextValue = {
+    id: fieldId,
+    describedBy,
+    invalid: Boolean(error),
+    error: Boolean(error)
+  };
 
   return (
     <div className={className}>
@@ -58,8 +69,10 @@ function FgFormField({
           {helperText}
         </Typography>
       ) : null}
-      {enhancedChildren}
-      <div className="min-h-[1.5rem]">
+      <FgFormFieldContext.Provider value={contextValue}>
+        {children}
+      </FgFormFieldContext.Provider>
+      <div aria-live="polite" className="min-h-[1.5rem]">
         {error ? (
           <Typography className="text-error" id={errorId} type="small">
             {error}
