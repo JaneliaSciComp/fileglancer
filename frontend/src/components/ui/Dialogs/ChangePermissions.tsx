@@ -192,36 +192,28 @@ export default function ChangePermissions({
           </table>
 
           {fileBrowserState.propertiesTarget.is_dir && localPermissions ? (
-            <>
-              <label className="flex items-start gap-2 my-4 text-sm text-foreground">
-                <input
-                  checked={
-                    localPermissions[6] === 's' || localPermissions[6] === 'S'
-                  }
-                  className="accent-secondary-light hover:cursor-pointer mt-0.5"
-                  name="s_6"
-                  onChange={event => handleLocalPermissionChange(event)}
-                  type="checkbox"
-                />
-                <span>
-                  New files created in this directory belong to group{' '}
-                  <em>{fileBrowserState.propertiesTarget.group}</em>, regardless
-                  of the file creator's primary group
-                </span>
-              </label>
-              <label className="flex items-center gap-2 my-4 text-sm text-foreground">
-                <input
-                  checked={
-                    localPermissions[9] === 't' || localPermissions[9] === 'T'
-                  }
-                  className="accent-secondary-light hover:cursor-pointer"
-                  name="t_9"
-                  onChange={event => handleLocalPermissionChange(event)}
-                  type="checkbox"
-                />
-                Only owner can delete and rename files in this directory
-              </label>
-            </>
+            <div className="flex flex-col gap-4 mb-4">
+              <FgCheckbox
+                checked={
+                  localPermissions[6] === 's' || localPermissions[6] === 'S'
+                }
+                color="secondary"
+                label={`New files created in this directory belong to group
+                  ${fileBrowserState.propertiesTarget.group}, regardless
+                  of the file creator's primary group`}
+                name="s_6"
+                onChange={event => handleLocalPermissionChange(event)}
+              />
+              <FgCheckbox
+                checked={
+                  localPermissions[9] === 't' || localPermissions[9] === 'T'
+                }
+                color="secondary"
+                label="Only owner can delete and rename files in this directory"
+                name="t_9"
+                onChange={event => handleLocalPermissionChange(event)}
+              />
+            </div>
           ) : null}
           <FgButton
             disabled={Boolean(
