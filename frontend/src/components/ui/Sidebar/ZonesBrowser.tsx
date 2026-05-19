@@ -12,6 +12,7 @@ import Zone from './Zone';
 import { SidebarItemSkeleton } from '@/components/ui/widgets/Loaders';
 import FgLink from '@/components/designSystem/atoms/FgLink';
 import FgSwitch from '@/components/designSystem/atoms/formElements/FgSwitch';
+import FgFormField from '@/components/designSystem/molecules/FgFormField';
 
 export default function ZonesBrowser({
   searchQuery,
@@ -77,14 +78,11 @@ export default function ZonesBrowser({
                   No zones match your filter &apos;{searchQuery}&apos;
                 </Typography>
                 {hasResultsOutsideGroups ? (
-                  <div className="mt-3 px-2 py-3 bg-surface rounded-md text-left">
-                    <Typography className="text-xs text-foreground/70">
+                  <div className="flex flex-col gap-3 mt-3 px-2 pt-4 bg-surface rounded-md text-left">
+                    <Typography className="text-sm text-foreground">
                       Results exist in Zones outside your groups.
                     </Typography>
-                    <Typography className="text-xs text-foreground mt-2">
-                      Change your zone display preferences to view:
-                    </Typography>
-                    <div className="flex items-center gap-2 mt-2">
+                    <FgFormField label="Turn off group filter to view">
                       <FgSwitch
                         checked={isFilteredByGroups}
                         id="sidebar_is_filtered_by_groups"
@@ -97,8 +95,9 @@ export default function ZonesBrowser({
                             toast.error(result.error);
                           }
                         }}
+                        showState={true}
                       />
-                    </div>
+                    </FgFormField>
                   </div>
                 ) : (
                   <Typography className="text-xs text-foreground/60 mt-1">
