@@ -44,10 +44,7 @@ const FgSwitch = forwardRef<HTMLDivElement, FgSwitchProps>(
     const stateText = checked ? 'On' : 'Off';
 
     return (
-      <div
-        className="flex items-center justify-between gap-2 max-w-md"
-        ref={ref}
-      >
+      <div className="flex items-center justify-between gap-2" ref={ref}>
         <div>
           <label
             className={`text-foreground text-sm block ${disabled ? 'cursor-default' : 'cursor-pointer'}`}
