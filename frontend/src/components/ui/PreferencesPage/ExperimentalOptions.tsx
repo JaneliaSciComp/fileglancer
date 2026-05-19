@@ -12,7 +12,6 @@ export default function ExperimentalOptions() {
       checked={showAppsAndJobsPages}
       id="show_apps_and_jobs_pages"
       label="Show Apps and Jobs pages"
-      showState
       onChange={async () => {
         const result = await toggleShowAppsAndJobsPages();
         if (result.success) {
@@ -25,6 +24,7 @@ export default function ExperimentalOptions() {
           toast.error(result.error);
         }
       }}
+      showState
     />
   );
 }

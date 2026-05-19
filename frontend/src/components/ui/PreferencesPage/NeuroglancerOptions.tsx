@@ -20,7 +20,6 @@ export default function NeuroglancerOptions() {
         checked={useLegacyMultichannelApproach ?? false}
         id="use_legacy_multichannel_approach"
         label="Generate multichannel state for Neuroglancer"
-        showState
         onChange={async () => {
           const result = await toggleUseLegacyMultichannelApproach();
           if (result.success) {
@@ -33,12 +32,12 @@ export default function NeuroglancerOptions() {
             toast.error(result.error);
           }
         }}
+        showState
       />
       <FgSwitch
         checked={disableNeuroglancerStateGeneration}
         id="disable_neuroglancer_state_generation"
         label="Disable Neuroglancer state generation"
-        showState
         onChange={async () => {
           const result = await toggleDisableNeuroglancerStateGeneration();
           if (result.success) {
@@ -51,6 +50,7 @@ export default function NeuroglancerOptions() {
             toast.error(result.error);
           }
         }}
+        showState
       />
       <FgSwitch
         checked={disableHeuristicalLayerTypeDetection ?? false}

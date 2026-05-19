@@ -20,7 +20,6 @@ export default function DisplayOptions() {
         checked={isFilteredByGroups}
         id="is_filtered_by_groups"
         label="Display Zones for your groups only"
-        showState
         onChange={async () => {
           const result = await toggleFilterByGroups();
           if (result.success) {
@@ -33,12 +32,12 @@ export default function DisplayOptions() {
             toast.error(result.error);
           }
         }}
+        showState
       />
       <FgSwitch
         checked={hideDotFiles}
         id="hide_dot_files"
         label='Hide dot files (files and folders starting with ".")'
-        showState
         onChange={async () => {
           const result = await toggleHideDotFiles();
           if (result.success) {
@@ -51,12 +50,12 @@ export default function DisplayOptions() {
             toast.error(result.error);
           }
         }}
+        showState
       />
       <FgSwitch
         checked={showTutorial}
         id="show_tutorial"
         label="Show tutorial welcome card on Browse page"
-        showState
         onChange={async () => {
           const result = await toggleShowTutorial();
           if (result.success) {
@@ -69,6 +68,7 @@ export default function DisplayOptions() {
             toast.error(result.error);
           }
         }}
+        showState
       />
     </FgFieldSet>
   );
