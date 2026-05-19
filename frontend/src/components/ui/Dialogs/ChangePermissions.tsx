@@ -96,16 +96,16 @@ export default function ChangePermissions({
                     />
                   </td>
                   <td className="p-3">
-                    <input
-                      aria-label="x_3"
+                    <FgCheckbox
                       checked={
                         localPermissions[3] === 'x' ||
                         localPermissions[3] === 's'
                       }
-                      className="accent-secondary-light hover:cursor-pointer"
+                      color="secondary"
+                      hideLabel
+                      label="Owner can execute"
                       name="x_3"
                       onChange={event => handleLocalPermissionChange(event)}
-                      type="checkbox"
                     />
                   </td>
                 </tr>
@@ -136,16 +136,16 @@ export default function ChangePermissions({
                     />
                   </td>
                   <td className="p-3">
-                    <input
-                      aria-label="x_6"
+                    <FgCheckbox
                       checked={
                         localPermissions[6] === 'x' ||
                         localPermissions[6] === 's'
                       }
-                      className="accent-secondary-light hover:cursor-pointer"
+                      color="secondary"
+                      hideLabel
+                      label="Group can execute"
                       name="x_6"
                       onChange={event => handleLocalPermissionChange(event)}
-                      type="checkbox"
                     />
                   </td>
                 </tr>
@@ -174,16 +174,16 @@ export default function ChangePermissions({
                     />
                   </td>
                   <td className="p-3">
-                    <input
-                      aria-label="x_9"
+                    <FgCheckbox
                       checked={
                         localPermissions[9] === 'x' ||
                         localPermissions[9] === 't'
                       }
-                      className="accent-secondary-light hover:cursor-pointer"
+                      color="secondary"
+                      hideLabel
+                      label="Everyone else can execute"
                       name="x_9"
                       onChange={event => handleLocalPermissionChange(event)}
-                      type="checkbox"
                     />
                   </td>
                 </tr>
@@ -195,7 +195,6 @@ export default function ChangePermissions({
             <>
               <label className="flex items-start gap-2 my-4 text-sm text-foreground">
                 <input
-                  aria-label="s_6"
                   checked={
                     localPermissions[6] === 's' || localPermissions[6] === 'S'
                   }
@@ -212,7 +211,6 @@ export default function ChangePermissions({
               </label>
               <label className="flex items-center gap-2 my-4 text-sm text-foreground">
                 <input
-                  aria-label="t_9"
                   checked={
                     localPermissions[9] === 't' || localPermissions[9] === 'T'
                   }
