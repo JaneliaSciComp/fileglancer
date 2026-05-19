@@ -8,13 +8,7 @@ type FileNameValidationResult = {
   errorMessage: string | undefined;
 };
 
-function getErrorMessage(
-  validation: FileNameValidation,
-  name: string
-): string | undefined {
-  if (!name.trim() || validation.isValid) {
-    return undefined;
-  }
+function getErrorMessage(validation: FileNameValidation): string | undefined {
   if (validation.hasSlashes) {
     return 'Cannot contain slashes.';
   }
@@ -27,14 +21,23 @@ function getErrorMessage(
   return undefined;
 }
 
+/**
+ * Validates a filename. Empty input is treated as valid here — callers that
+ * require a non-empty name should gate on `name.trim()` separately so the
+ * "required" UX (e.g. a disabled submit button) is decoupled from the
+ * character-content validation.
+ */
 export default function useFileNameValidation(
   name: string
 ): FileNameValidationResult {
   return useMemo(() => {
     const validation = validateFileName(name);
+    if (validation.isEmpty) {
+      return { isValid: true, errorMessage: undefined };
+    }
     return {
       isValid: validation.isValid,
-      errorMessage: getErrorMessage(validation, name)
+      errorMessage: getErrorMessage(validation)
     };
   }, [name]);
 }

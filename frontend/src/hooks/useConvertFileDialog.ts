@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react';
 import { useTicketContext } from '@/contexts/TicketsContext';
 import { createSuccess, handleError } from '@/utils/errorHandling';
 import { joinPaths } from '@/utils/pathHandling';
+import { validateFilePath } from '@/utils/validateFileName';
 import useFileNameValidation from '@/hooks/useFileNameValidation';
 import type { Result } from '@/shared.types';
 
@@ -11,18 +12,10 @@ export default function useConvertFileDialog() {
   const [outputFilename, setOutputFilename] = useState<string>('');
   const { createTicket, tasksEnabled } = useTicketContext();
 
-  // Validation for destination folder
-  const destinationValidation = useMemo(() => {
-    const trimmed = destinationFolder.trim();
-    const hasConsecutiveDots = /\.{2,}/.test(trimmed);
-    const isEmpty = trimmed.length === 0;
-
-    return {
-      isValid: !isEmpty && !hasConsecutiveDots,
-      isEmpty,
-      hasConsecutiveDots
-    };
-  }, [destinationFolder]);
+  const destinationValidation = useMemo(
+    () => validateFilePath(destinationFolder),
+    [destinationFolder]
+  );
 
   const filenameValidation = useFileNameValidation(outputFilename);
 
