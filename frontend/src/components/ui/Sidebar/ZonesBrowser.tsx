@@ -11,6 +11,7 @@ import useOpenZones from '@/hooks/useOpenZones';
 import Zone from './Zone';
 import { SidebarItemSkeleton } from '@/components/ui/widgets/Loaders';
 import FgLink from '@/components/designSystem/atoms/FgLink';
+import FgSwitch from '@/components/designSystem/atoms/formElements/FgSwitch';
 
 export default function ZonesBrowser({
   searchQuery,
@@ -84,10 +85,10 @@ export default function ZonesBrowser({
                       Change your zone display preferences to view:
                     </Typography>
                     <div className="flex items-center gap-2 mt-2">
-                      <input
+                      <FgSwitch
                         checked={isFilteredByGroups}
-                        className="icon-small checked:accent-secondary-light dark:checked:accent-secondary"
                         id="sidebar_is_filtered_by_groups"
+                        label="Display Zones for your groups only"
                         onChange={async () => {
                           const result = await toggleFilterByGroups();
                           if (result.success) {
@@ -96,15 +97,7 @@ export default function ZonesBrowser({
                             toast.error(result.error);
                           }
                         }}
-                        type="checkbox"
                       />
-                      <Typography
-                        as="label"
-                        className="text-xs text-foreground"
-                        htmlFor="sidebar_is_filtered_by_groups"
-                      >
-                        Display Zones for your groups only
-                      </Typography>
                     </div>
                   </div>
                 ) : (
