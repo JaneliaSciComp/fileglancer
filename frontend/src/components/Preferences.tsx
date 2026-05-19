@@ -20,7 +20,7 @@ export default function Preferences() {
             <Typography className="font-semibold mb-4" type="lead">
               File browser display
             </Typography>
-            <div className="flex flex-col gap-4 pl-4">
+            <div className="flex flex-col gap-4 pl-4 max-w-md">
               <PathFormatOptions />
               <DisplayOptions />
             </div>
@@ -30,7 +30,7 @@ export default function Preferences() {
             <Typography className="font-semibold mb-4" type="lead">
               Data links
             </Typography>
-            <div className="flex flex-col gap-4 pl-4">
+            <div className="flex flex-col gap-4 pl-4 max-w-md">
               <DataLinkOptions />
               <NeuroglancerOptions />
             </div>
@@ -40,7 +40,7 @@ export default function Preferences() {
             <Typography className="font-semibold mb-4" type="lead">
               Jobs
             </Typography>
-            <div className="pl-4">
+            <div className="pl-4 max-w-md">
               <JobOptions />
             </div>
           </div>
@@ -49,7 +49,7 @@ export default function Preferences() {
             <Typography className="font-semibold mb-4" type="lead">
               Experimental features
             </Typography>
-            <div className="pl-4">
+            <div className="pl-4 max-w-md">
               <ExperimentalOptions />
             </div>
           </div>
