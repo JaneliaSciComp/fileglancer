@@ -4,6 +4,8 @@ import toast from 'react-hot-toast';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import StartTour from '@/components/tours/StartTour';
 import DashboardCard from '@/components/ui/BrowsePage/Dashboard/FgDashboardCard';
+import FgSwitch from '@/components/designSystem/atoms/formElements/FgSwitch';
+import FgFormField from '@/components/designSystem/molecules/FgFormField';
 
 export default function WelcomeTutorialCard() {
   const { showTutorial, toggleShowTutorial } = usePreferencesContext();
@@ -30,23 +32,14 @@ export default function WelcomeTutorialCard() {
         <StartTour>Start Tour</StartTour>
       </div>
 
-      <div className="flex flex-col gap-1 pt-2 mx-6 border-t border-outline">
-        <div className="flex items-center gap-2 pb-4">
-          <input
-            checked={!showTutorial}
-            className="icon-small checked:accent-secondary-light"
-            id="hide_welcome_card"
-            onChange={handleToggle}
-            type="checkbox"
-          />
-          <Typography
-            as="label"
-            className="text-foreground text-sm cursor-pointer"
-            htmlFor="hide_welcome_card"
-          >
-            Hide this card - you can always access Tutorials from the Help page
-          </Typography>
-        </div>
+      <div className="flex pt-4 mx-6 border-t border-outline">
+        <FgSwitch
+          checked={showTutorial}
+          id="hide_welcome_card"
+          label="Show this card on startup"
+          onChange={handleToggle}
+          showState={true}
+        />
       </div>
     </DashboardCard>
   );
