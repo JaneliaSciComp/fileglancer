@@ -9,14 +9,16 @@ type FgFieldSetProps = {
 
 function FgFieldSet({ legend, inline, className, children }: FgFieldSetProps) {
   return (
-    <fieldset className={`border-none p-0 m-0 ${className ?? ''}`.trim()}>
-      <legend className="font-sans antialiased text-foreground text-sm font-semibold mb-1">
+    <fieldset
+      className={`flex flex-col gap-2 border-none p-0 m-0 ${className ?? ''}`.trim()}
+    >
+      <legend className="font-sans antialiased text-foreground text-sm font-semibold mb-2">
         {legend}
       </legend>
       {inline ? (
         <div className="flex items-center gap-4">{children}</div>
       ) : (
-        children
+        <div className="pl-4 flex flex-col gap-2">{children}</div>
       )}
     </fieldset>
   );

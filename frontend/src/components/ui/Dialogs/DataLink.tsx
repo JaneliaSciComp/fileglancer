@@ -275,7 +275,7 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               <Typography className="font-semibold text-foreground">
                 Don't ask me this again:
               </Typography>
-              <DataLinkOptions checkboxesOnly hideSubpathMode />
+              <DataLinkOptions hideSubpathMode />
             </div>
             <BtnContainer>
               <CreateLinkBtn

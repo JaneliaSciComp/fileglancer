@@ -94,7 +94,7 @@ describe('NGLinkDialog', () => {
       );
 
       const user = userEvent.setup();
-      await user.click(screen.getByLabelText('State Mode'));
+      await user.click(screen.getByLabelText('State'));
 
       expect(screen.getByLabelText('JSON State')).toHaveValue(
         JSON.stringify(testState, null, 2)
