@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
-import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
+import FgFormField from '@/components/designSystem/molecules/FgFormField';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
 
 export default function JobOptions() {
   const {
@@ -44,67 +45,56 @@ export default function JobOptions() {
   };
 
   return (
-    <div>
-      <Typography className="font-semibold">Jobs</Typography>
-      <div className="pl-4 mt-2 space-y-6">
-        <div>
-          <label
-            className="block text-foreground text-sm mb-1"
-            htmlFor="default-extra-args"
-          >
-            Default extra arguments
-          </label>
-          <Typography className="text-secondary mb-2" type="small">
-            Additional CLI arguments appended to every job submit command. Can
-            be overridden per job on the Cluster tab.
-          </Typography>
-          <input
-            className="max-w-md w-full p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary font-mono text-sm"
-            id="default-extra-args"
+    <div className="space-y-6">
+      <div>
+        <FgFormField
+          helperText="Additional CLI arguments appended to every job submit command. Can be overridden per job on the Cluster tab."
+          htmlFor="default-extra-args"
+          label="Default extra arguments"
+        >
+          <FgInput
+            className="max-w-md font-mono"
             onChange={e => setLocalExtraArgs(e.target.value)}
             placeholder="e.g. -P your_project"
+            size="sm"
             type="text"
             value={localExtraArgs}
           />
-          <FgButton
-            disabled={!isExtraArgsDirty || savingExtraArgs}
-            loading={savingExtraArgs}
-            loadingText="Saving..."
-            onClick={handleSaveExtraArgs}
-            type="button"
-          >
-            Save
-          </FgButton>
-        </div>
+        </FgFormField>
+        <FgButton
+          disabled={!isExtraArgsDirty || savingExtraArgs}
+          loading={savingExtraArgs}
+          loadingText="Saving..."
+          onClick={handleSaveExtraArgs}
+          type="button"
+        >
+          Save
+        </FgButton>
+      </div>
 
-        <div>
-          <label
-            className="block text-foreground text-sm mb-1"
-            htmlFor="apptainer-cache-dir"
-          >
-            Container cache directory
-          </label>
-          <Typography className="text-secondary mb-2" type="small">
-            Directory where Apptainer SIF images are cached. Defaults to{' '}
-            <code>~/.fileglancer/apptainer_cache</code> if not set.
-          </Typography>
-          <input
-            className="max-w-md w-full p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary font-mono text-sm"
-            id="apptainer-cache-dir"
+      <div>
+        <FgFormField
+          helperText="Directory where Apptainer SIF images are cached. Defaults to ~/.fileglancer/apptainer_cache if not set."
+          htmlFor="apptainer-cache-dir"
+          label="Container cache directory"
+        >
+          <FgInput
+            className="max-w-md font-mono"
             onChange={e => setLocalCacheDir(e.target.value)}
             placeholder="~/.fileglancer/apptainer_cache"
+            size="sm"
             type="text"
             value={localCacheDir}
           />
-          <FgButton
-            disabled={!isCacheDirDirty || savingCacheDir}
-            loading={savingCacheDir}
-            loadingText="Saving..."
-            onClick={handleSaveCacheDir}
-          >
-            Save
-          </FgButton>
-        </div>
+        </FgFormField>
+        <FgButton
+          disabled={!isCacheDirDirty || savingCacheDir}
+          loading={savingCacheDir}
+          loadingText="Saving..."
+          onClick={handleSaveCacheDir}
+        >
+          Save
+        </FgButton>
       </div>
     </div>
   );

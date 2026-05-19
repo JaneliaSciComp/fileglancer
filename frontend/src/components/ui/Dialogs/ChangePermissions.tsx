@@ -5,6 +5,7 @@ import TextWithFilePath from './TextWithFilePath';
 import usePermissionsDialog from '@/hooks/usePermissionsDialog';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgCheckbox from '@/components/designSystem/atoms/formElements/FgCheckbox';
 
 type ChangePermissionsProps = {
   readonly showPermissionsDialog: boolean;
@@ -75,35 +76,36 @@ export default function ChangePermissions({
                   </td>
                   {/* Owner read/write/execute */}
                   <td className="p-3">
-                    <input
-                      aria-label="r_1"
+                    <FgCheckbox
                       checked={localPermissions[1] === 'r'}
+                      color="secondary"
                       disabled
+                      hideLabel
+                      label="Owner can read, cannot be changed"
                       name="r_1"
-                      type="checkbox"
                     />
                   </td>
                   <td className="p-3">
-                    <input
-                      aria-label="w_2"
+                    <FgCheckbox
                       checked={localPermissions[2] === 'w'}
-                      className="accent-secondary-light hover:cursor-pointer"
+                      color="secondary"
+                      hideLabel
+                      label="Owner can write"
                       name="w_2"
                       onChange={event => handleLocalPermissionChange(event)}
-                      type="checkbox"
                     />
                   </td>
                   <td className="p-3">
-                    <input
-                      aria-label="x_3"
+                    <FgCheckbox
                       checked={
                         localPermissions[3] === 'x' ||
                         localPermissions[3] === 's'
                       }
-                      className="accent-secondary-light hover:cursor-pointer"
+                      color="secondary"
+                      hideLabel
+                      label="Owner can execute"
                       name="x_3"
                       onChange={event => handleLocalPermissionChange(event)}
-                      type="checkbox"
                     />
                   </td>
                 </tr>
@@ -114,36 +116,36 @@ export default function ChangePermissions({
                   </td>
                   {/* Group read/write/execute */}
                   <td className="p-3">
-                    <input
-                      aria-label="r_4"
+                    <FgCheckbox
                       checked={localPermissions[4] === 'r'}
-                      className="accent-secondary-light hover:cursor-pointer"
+                      color="secondary"
+                      hideLabel
+                      label="Group can read"
                       name="r_4"
                       onChange={event => handleLocalPermissionChange(event)}
-                      type="checkbox"
                     />
                   </td>
                   <td className="p-3">
-                    <input
-                      aria-label="w_5"
+                    <FgCheckbox
                       checked={localPermissions[5] === 'w'}
-                      className="accent-secondary-light hover:cursor-pointer"
+                      color="secondary"
+                      hideLabel
+                      label="Group can write"
                       name="w_5"
                       onChange={event => handleLocalPermissionChange(event)}
-                      type="checkbox"
                     />
                   </td>
                   <td className="p-3">
-                    <input
-                      aria-label="x_6"
+                    <FgCheckbox
                       checked={
                         localPermissions[6] === 'x' ||
                         localPermissions[6] === 's'
                       }
-                      className="accent-secondary-light hover:cursor-pointer"
+                      color="secondary"
+                      hideLabel
+                      label="Group can execute"
                       name="x_6"
                       onChange={event => handleLocalPermissionChange(event)}
-                      type="checkbox"
                     />
                   </td>
                 </tr>
@@ -152,36 +154,36 @@ export default function ChangePermissions({
                   <td className="p-3 font-medium">Everyone else</td>
                   {/* Everyone else read/write/execute */}
                   <td className="p-3">
-                    <input
-                      aria-label="r_7"
+                    <FgCheckbox
                       checked={localPermissions[7] === 'r'}
-                      className="accent-secondary-light hover:cursor-pointer"
+                      color="secondary"
+                      hideLabel
+                      label="Everyone else can read"
                       name="r_7"
                       onChange={event => handleLocalPermissionChange(event)}
-                      type="checkbox"
                     />
                   </td>
                   <td className="p-3">
-                    <input
-                      aria-label="w_8"
+                    <FgCheckbox
                       checked={localPermissions[8] === 'w'}
-                      className="accent-secondary-light hover:cursor-pointer"
+                      color="secondary"
+                      hideLabel
+                      label="Everyone else can write"
                       name="w_8"
                       onChange={event => handleLocalPermissionChange(event)}
-                      type="checkbox"
                     />
                   </td>
                   <td className="p-3">
-                    <input
-                      aria-label="x_9"
+                    <FgCheckbox
                       checked={
                         localPermissions[9] === 'x' ||
                         localPermissions[9] === 't'
                       }
-                      className="accent-secondary-light hover:cursor-pointer"
+                      color="secondary"
+                      hideLabel
+                      label="Everyone else can execute"
                       name="x_9"
                       onChange={event => handleLocalPermissionChange(event)}
-                      type="checkbox"
                     />
                   </td>
                 </tr>
@@ -190,38 +192,28 @@ export default function ChangePermissions({
           </table>
 
           {fileBrowserState.propertiesTarget.is_dir && localPermissions ? (
-            <>
-              <label className="flex items-start gap-2 my-4 text-sm text-foreground">
-                <input
-                  aria-label="s_6"
-                  checked={
-                    localPermissions[6] === 's' || localPermissions[6] === 'S'
-                  }
-                  className="accent-secondary-light hover:cursor-pointer mt-0.5"
-                  name="s_6"
-                  onChange={event => handleLocalPermissionChange(event)}
-                  type="checkbox"
-                />
-                <span>
-                  New files created in this directory belong to group{' '}
-                  <em>{fileBrowserState.propertiesTarget.group}</em>, regardless
-                  of the file creator's primary group
-                </span>
-              </label>
-              <label className="flex items-center gap-2 my-4 text-sm text-foreground">
-                <input
-                  aria-label="t_9"
-                  checked={
-                    localPermissions[9] === 't' || localPermissions[9] === 'T'
-                  }
-                  className="accent-secondary-light hover:cursor-pointer"
-                  name="t_9"
-                  onChange={event => handleLocalPermissionChange(event)}
-                  type="checkbox"
-                />
-                Only owner can delete and rename files in this directory
-              </label>
-            </>
+            <div className="flex flex-col gap-4 mb-4">
+              <FgCheckbox
+                checked={
+                  localPermissions[6] === 's' || localPermissions[6] === 'S'
+                }
+                color="secondary"
+                label={`New files created in this directory belong to group
+                  ${fileBrowserState.propertiesTarget.group}, regardless
+                  of the file creator's primary group`}
+                name="s_6"
+                onChange={event => handleLocalPermissionChange(event)}
+              />
+              <FgCheckbox
+                checked={
+                  localPermissions[9] === 't' || localPermissions[9] === 'T'
+                }
+                color="secondary"
+                label="Only owner can delete and rename files in this directory"
+                name="t_9"
+                onChange={event => handleLocalPermissionChange(event)}
+              />
+            </div>
           ) : null}
           <FgButton
             disabled={Boolean(

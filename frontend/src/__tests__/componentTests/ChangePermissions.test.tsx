@@ -73,7 +73,9 @@ describe('Change Permissions dialog', () => {
 
   it('should update local permissions when write input is checked', async () => {
     const user = userEvent.setup();
-    const checkbox = screen.getByRole('checkbox', { name: 'w_8' });
+    const checkbox = screen.getByRole('checkbox', {
+      name: 'Everyone else can write'
+    });
 
     expect(checkbox).not.toBeChecked();
     await user.click(checkbox);
@@ -86,7 +88,9 @@ describe('Change Permissions dialog', () => {
   it('should update local permissions when execute input is toggled', async () => {
     const user = userEvent.setup();
     // Owner execute is at position 3 - initial 'drwxrwxr-x' has 'x' at position 3
-    const checkbox = screen.getByRole('checkbox', { name: 'x_3' });
+    const checkbox = screen.getByRole('checkbox', {
+      name: 'Owner can execute'
+    });
 
     expect(checkbox).toBeChecked();
     await user.click(checkbox);
@@ -94,7 +98,9 @@ describe('Change Permissions dialog', () => {
   });
 
   it('should show sticky bit checkbox for directories', () => {
-    const stickyCheckbox = screen.getByRole('checkbox', { name: 't_9' });
+    const stickyCheckbox = screen.getByRole('checkbox', {
+      name: /only owner can delete/i
+    });
     expect(stickyCheckbox).toBeInTheDocument();
     // Initial 'drwxrwxr-x' does not have sticky bit
     expect(stickyCheckbox).not.toBeChecked();
@@ -102,8 +108,12 @@ describe('Change Permissions dialog', () => {
 
   it('should toggle sticky bit while preserving execute', async () => {
     const user = userEvent.setup();
-    const stickyCheckbox = screen.getByRole('checkbox', { name: 't_9' });
-    const executeCheckbox = screen.getByRole('checkbox', { name: 'x_9' });
+    const stickyCheckbox = screen.getByRole('checkbox', {
+      name: /only owner can delete/i
+    });
+    const executeCheckbox = screen.getByRole('checkbox', {
+      name: 'Everyone else can execute'
+    });
 
     // Initial 'drwxrwxr-x' has execute at position 9
     expect(executeCheckbox).toBeChecked();
@@ -116,7 +126,9 @@ describe('Change Permissions dialog', () => {
   });
 
   it('should show setgid checkbox for directories', () => {
-    const setgidCheckbox = screen.getByRole('checkbox', { name: 's_6' });
+    const setgidCheckbox = screen.getByRole('checkbox', {
+      name: /new files created in this directory/i
+    });
     expect(setgidCheckbox).toBeInTheDocument();
     // Initial 'drwxrwxr-x' does not have setgid
     expect(setgidCheckbox).not.toBeChecked();
@@ -124,8 +136,12 @@ describe('Change Permissions dialog', () => {
 
   it('should toggle setgid while preserving group execute', async () => {
     const user = userEvent.setup();
-    const setgidCheckbox = screen.getByRole('checkbox', { name: 's_6' });
-    const groupExecuteCheckbox = screen.getByRole('checkbox', { name: 'x_6' });
+    const setgidCheckbox = screen.getByRole('checkbox', {
+      name: /new files created in this directory/i
+    });
+    const groupExecuteCheckbox = screen.getByRole('checkbox', {
+      name: 'Group can execute'
+    });
 
     // Initial 'drwxrwxr-x' has group execute at position 6
     expect(groupExecuteCheckbox).toBeChecked();
@@ -139,7 +155,9 @@ describe('Change Permissions dialog', () => {
 
   it('calls toast.success for an ok HTTP response', async () => {
     const user = userEvent.setup();
-    const checkbox = screen.getByRole('checkbox', { name: 'w_8' });
+    const checkbox = screen.getByRole('checkbox', {
+      name: 'Everyone else can write'
+    });
     await user.click(checkbox);
     await user.click(
       screen.getByRole('button', { name: 'Change Permissions' })
@@ -164,7 +182,9 @@ describe('Change Permissions dialog', () => {
     );
 
     const user = userEvent.setup();
-    const checkbox = screen.getByRole('checkbox', { name: 'w_8' });
+    const checkbox = screen.getByRole('checkbox', {
+      name: 'Everyone else can write'
+    });
     await user.click(checkbox);
     await user.click(
       screen.getByRole('button', { name: 'Change Permissions' })

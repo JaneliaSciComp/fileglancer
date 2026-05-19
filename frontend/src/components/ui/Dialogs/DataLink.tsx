@@ -26,6 +26,8 @@ import DataLinkOptions, {
   SubpathModeOptions
 } from '@/components/ui/PreferencesPage/DataLinkOptions';
 import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
+import FgFormField from '@/components/designSystem/molecules/FgFormField';
 
 interface CommonDataLinkDialogProps {
   showDataLinkDialog: boolean;
@@ -110,6 +112,28 @@ function CancelBtn({
 
 function BtnContainer({ children }: { readonly children: ReactNode }) {
   return <div className="flex gap-4">{children}</div>;
+}
+
+function CustomSubpathInput({
+  value,
+  error,
+  onChange
+}: {
+  readonly value: string;
+  readonly error: string | null;
+  readonly onChange: (value: string) => void;
+}) {
+  return (
+    <FgFormField error={error ?? undefined} label="Data link name">
+      <FgInput
+        className="font-mono"
+        onChange={e => onChange(e.target.value)}
+        size="sm"
+        type="text"
+        value={value}
+      />
+    </FgFormField>
+  );
 }
 
 export default function DataLinkDialog(props: DataLinkDialogProps) {
@@ -210,20 +234,11 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
             <Typography className="text-foreground font-semibold">
               Set data link name
             </Typography>
-            <Typography className="text-foreground">
-              Enter the name for your data link:
-            </Typography>
-            <input
-              className={`w-full p-2 rounded border bg-surface text-foreground font-mono text-sm ${customSubpathError ? 'border-error' : 'border-outline'}`}
-              onChange={e => setCustomSubpath(e.target.value)}
-              type="text"
+            <CustomSubpathInput
+              error={customSubpathError}
+              onChange={setCustomSubpath}
               value={customSubpath}
             />
-            {customSubpathError ? (
-              <Typography className="text-error text-xs">
-                {customSubpathError}
-              </Typography>
-            ) : null}
             <Typography className="text-foreground text-sm font-mono break-all bg-surface/30 p-2 rounded">
               {dataLinkPreview}
             </Typography>
@@ -260,7 +275,7 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               <Typography className="font-semibold text-foreground">
                 Don't ask me this again:
               </Typography>
-              <DataLinkOptions checkboxesOnly hideSubpathMode />
+              <DataLinkOptions hideSubpathMode />
             </div>
             <BtnContainer>
               <CreateLinkBtn
@@ -301,19 +316,11 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
                 </Accordion.Item>
               </Accordion>
               {dataLinkSubpathMode === 'custom' ? (
-                <>
-                  <input
-                    className={`w-full p-2 rounded border bg-surface text-foreground font-mono text-sm ${customSubpathError ? 'border-error' : 'border-outline'}`}
-                    onChange={e => setCustomSubpath(e.target.value)}
-                    type="text"
-                    value={customSubpath}
-                  />
-                  {customSubpathError ? (
-                    <Typography className="text-error text-xs">
-                      {customSubpathError}
-                    </Typography>
-                  ) : null}
-                </>
+                <CustomSubpathInput
+                  error={customSubpathError}
+                  onChange={setCustomSubpath}
+                  value={customSubpath}
+                />
               ) : null}
               <Typography className="text-xs text-foreground">
                 You can always modify settings on the{' '}
