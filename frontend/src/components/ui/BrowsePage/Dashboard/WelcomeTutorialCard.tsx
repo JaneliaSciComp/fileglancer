@@ -5,7 +5,6 @@ import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import StartTour from '@/components/tours/StartTour';
 import DashboardCard from '@/components/ui/BrowsePage/Dashboard/FgDashboardCard';
 import FgSwitch from '@/components/designSystem/atoms/formElements/FgSwitch';
-import FgFormField from '@/components/designSystem/molecules/FgFormField';
 
 export default function WelcomeTutorialCard() {
   const { showTutorial, toggleShowTutorial } = usePreferencesContext();
