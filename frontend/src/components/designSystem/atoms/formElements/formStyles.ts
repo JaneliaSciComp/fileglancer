@@ -6,3 +6,7 @@ export const INPUT_FOCUS_CLASSES =
 export const INPUT_ERROR_CLASSES = 'border-error focus:border-error';
 export const INPUT_DISABLED_CLASSES =
   'disabled:cursor-not-allowed disabled:opacity-50';
+
+// Shared focus ring for control-style inputs (checkbox, radio).
+export const FORM_CONTROL_FOCUS_CLASSES =
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';

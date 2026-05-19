@@ -1,5 +1,7 @@
-import { forwardRef } from 'react';
+import { forwardRef, useId } from 'react';
 import type { ComponentPropsWithoutRef } from 'react';
+
+import { FORM_CONTROL_FOCUS_CLASSES } from '@/components/designSystem/atoms/formElements/formStyles';
 
 type FgCheckboxOwnProps = {
   readonly label: string;
@@ -25,36 +27,39 @@ const FgCheckbox = forwardRef<HTMLInputElement, FgCheckboxProps>(
     },
     ref
   ) => {
+    const generatedId = useId();
+    const inputId = id ?? generatedId;
+
     const colorClasses =
       color === 'secondary'
         ? 'accent-secondary-light dark:accent-secondary dark:checked:accent-secondary'
         : 'accent-primary';
 
-    const focusClasses =
-      'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
-
     const disabledClasses = 'disabled:cursor-not-allowed disabled:opacity-50';
 
     const inputClassName =
-      `h-4 w-4 dark:brightness-90 dark:checked:brightness-100 ${colorClasses} ${focusClasses} ${disabledClasses} ${className}`.trim();
+      `h-4 w-4 dark:brightness-90 dark:checked:brightness-100 ${colorClasses} ${FORM_CONTROL_FOCUS_CLASSES} ${disabledClasses} ${className}`.trim();
 
     return (
-      <label
-        className={`flex items-center gap-2 ${disabled ? 'cursor-default' : 'cursor-pointer'}`}
-      >
+      <div className="flex items-center gap-2">
         <input
           {...restProps}
           aria-label={hideLabel ? label : undefined}
           className={inputClassName}
           disabled={disabled}
-          id={id}
+          id={inputId}
           ref={ref}
           type="checkbox"
         />
         {hideLabel ? null : (
-          <span className="text-foreground text-sm">{label}</span>
+          <label
+            className={`text-foreground text-sm ${disabled ? 'cursor-default' : 'cursor-pointer'}`}
+            htmlFor={inputId}
+          >
+            {label}
+          </label>
         )}
-      </label>
+      </div>
     );
   }
 );

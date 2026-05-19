@@ -1,9 +1,9 @@
-import { forwardRef } from 'react';
+import { forwardRef, useId } from 'react';
 import type { ComponentPropsWithoutRef } from 'react';
 
 type FgRadioOwnProps = {
   readonly label: string;
-  readonly id: string;
+  readonly id?: string;
   readonly hideLabel?: boolean;
   readonly color?: 'primary' | 'secondary';
   readonly className?: string;
@@ -25,6 +25,9 @@ const FgRadio = forwardRef<HTMLInputElement, FgRadioProps>(
     },
     ref
   ) => {
+    const generatedId = useId();
+    const inputId = id ?? generatedId;
+
     const colorClasses =
       color === 'primary'
         ? 'accent-primary'
@@ -44,14 +47,14 @@ const FgRadio = forwardRef<HTMLInputElement, FgRadioProps>(
           aria-label={hideLabel ? label : undefined}
           className={inputClassName}
           disabled={disabled}
-          id={id}
+          id={inputId}
           ref={ref}
           type="radio"
         />
         {hideLabel ? null : (
           <label
             className={`text-foreground text-sm ${disabled ? 'cursor-default' : 'cursor-pointer'}`}
-            htmlFor={id}
+            htmlFor={inputId}
           >
             {label}
           </label>
