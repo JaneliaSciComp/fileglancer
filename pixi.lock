@@ -6314,7 +6314,7 @@ packages:
 - pypi: ./
   name: fileglancer
   version: 2.8.1
-  sha256: bf5bcaf863e3949f2de4e2fa144f5886df0f2500d9eda7af115f60ff414747b6
+  sha256: fd8d935a44b21ce68bc5e59f69b0d6a71bd9ac810b8fed5973214a856ff3be38
   requires_dist:
   - alembic>=1.17.0
   - atlassian-python-api>=4.0.7
