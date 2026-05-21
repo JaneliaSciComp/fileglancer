@@ -1,12 +1,13 @@
 # Dev Container Usage
 
-The devcontainer provides a complete development environment for Fileglancer with Python 3.14, Node.js, and pixi, configured to run Claude Code with network isolation.
+The devcontainer provides a complete development environment for Fileglancer with Python 3.14, Node.js, and pixi, configured to run Claude Code and Codex with network isolation.
 
 ## Prerequisites
 
 - Container runtime (see platform-specific setup below)
 - Pixi (provides Node.js for the devcontainer CLI)
 - Claude Code configuration at `~/.claude` (API keys and auth)
+- Codex configuration at `~/.codex` (config and auth)
 
 ### Linux (Docker)
 
@@ -76,6 +77,7 @@ disk: 60
 The container uses iptables to restrict outbound network access to allowed domains only:
 
 - **Anthropic**: api.anthropic.com, statsig.anthropic.com, sentry.io
+- **OpenAI**: api.openai.com
 - **GitHub**: All GitHub IP ranges (fetched from api.github.com/meta)
 - **npm**: registry.npmjs.org
 - **Python/Pixi/Conda**: pypi.org, files.pythonhosted.org, conda.anaconda.org, conda-mapping.prefix.dev, prefix.dev, repo.prefix.dev
@@ -100,6 +102,7 @@ The container sets environment variables to disable telemetry:
 
 The container mounts these directories from the host:
 - `~/.claude` - Claude Code API keys and authentication
+- `~/.codex` - Codex config and authentication
 
 ## Quick Start
 
@@ -112,6 +115,9 @@ pixi run container-shell
 
 # Or run Claude Code directly
 pixi run container-claude
+
+# Or run Codex directly
+pixi run container-codex
 ```
 
 ## Commands
@@ -123,6 +129,7 @@ All container commands are available as pixi tasks:
 | `pixi run container-rebuild` | Build/rebuild the container from scratch |
 | `pixi run container-shell` | Open a bash shell inside the container |
 | `pixi run container-claude` | Run Claude Code inside the container |
+| `pixi run container-codex` | Run Codex inside the container |
 
 ### Open a Shell and Start Development
 
@@ -142,6 +149,17 @@ pixi run container-claude
 # Or from inside a container shell
 pixi run container-shell
 pixi run claude --permission-mode auto
+```
+
+### Run Codex
+
+```bash
+# Run Codex directly in the container
+pixi run container-codex
+
+# Or from inside a container shell
+pixi run container-shell
+pixi run codex --full-auto
 ```
 
 ### Stop the Container
@@ -176,6 +194,7 @@ pixi run container-rebuild
 | `pixi run node-eslint-check` | Run ESLint |
 | `pixi run node-prettier-check` | Run Prettier check |
 | `claude` | Claude Code CLI |
+| `codex` | Codex CLI |
 
 ## VS Code / Cursor
 
@@ -183,7 +202,7 @@ You can also open the project in VS Code or Cursor and use the "Reopen in Contai
 
 ## Standalone CLI (without devcontainer)
 
-You can run Claude Code in a container without using the devcontainer CLI:
+You can run Claude Code or Codex in a container without using the devcontainer CLI:
 
 ```bash
 # Build the image (from repo root)
@@ -194,6 +213,7 @@ docker run \
   --cap-add=NET_ADMIN \
   --cap-add=NET_RAW \
   -v ~/.claude:/home/vscode/.claude \
+  -v ~/.codex:/home/vscode/.codex \
   -v "$(pwd)":/workspace \
   -w /workspace \
   -e NODE_OPTIONS="--max-old-space-size=4096" \
@@ -207,7 +227,9 @@ sudo /usr/local/bin/init-firewall.sh
 pixi install
 pixi run dev-install
 pixi run npm install -g @anthropic-ai/claude-code
+pixi run npm install -g @openai/codex
 pixi run claude --permission-mode auto
+pixi run codex --full-auto
 ```
 
 ## GPU Support (Linux only)

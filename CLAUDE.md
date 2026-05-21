@@ -98,6 +98,7 @@ View the app at http://localhost:7878
 | `pixi run container-rebuild` | Build/rebuild devcontainer |
 | `pixi run container-shell` | Open shell in container |
 | `pixi run container-claude` | Run Claude Code in container |
+| `pixi run container-codex` | Run Codex in container |
 
 ## Testing
 

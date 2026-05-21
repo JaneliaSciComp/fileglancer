@@ -30,6 +30,12 @@ fi
 echo "Initializing network firewall..."
 sudo /usr/local/bin/init-firewall.sh
 
+# Install Codex CLI globally via npm (provided by pixi)
+if ! command -v codex &> /dev/null; then
+    echo "Installing Codex CLI..."
+    pixi run npm install -g @openai/codex
+fi
+
 echo ""
 echo "=========================================="
 echo "Dev container setup complete!"
@@ -37,6 +43,7 @@ echo "=========================================="
 echo ""
 echo "Available commands:"
 echo "  claude --permission-mode auto          - Start Claude Code"
+echo "  codex --full-auto                      - Start Codex"
 echo "  pixi run dev-launch                    - Start dev server on port 7878"
 echo "  pixi run dev-watch                     - Watch frontend for changes"
 echo "  pixi run test-backend                  - Run Python tests"
