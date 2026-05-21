@@ -17,16 +17,18 @@ echo "Installing Playwright browsers..."
 pixi run node-install-ui-tests
 cd frontend/ui-tests && pixi run npx playwright install
 
+# Install Claude Code via the native installer (before firewall, since claude.ai
+# CDN isn't in the allowlist). Installs to ~/.local/bin/claude, matching the
+# "installMethod: native" recorded in the bind-mounted ~/.claude.json from the host.
+if ! [ -x "$HOME/.local/bin/claude" ]; then
+    echo "Installing Claude Code (native)..."
+    curl -fsSL https://claude.ai/install.sh | bash
+fi
+
 # Initialize network firewall (restricts outbound to allowed domains)
-# This must happen AFTER Playwright install since CDN IPs change dynamically
+# This must happen AFTER Playwright and Claude installs since their CDN IPs are dynamic
 echo "Initializing network firewall..."
 sudo /usr/local/bin/init-firewall.sh
-
-# Install Claude Code globally via npm (provided by pixi)
-if ! command -v claude &> /dev/null; then
-    echo "Installing Claude Code..."
-    pixi run npm install -g @anthropic-ai/claude-code
-fi
 
 echo ""
 echo "=========================================="
