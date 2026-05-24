@@ -688,8 +688,11 @@ def build_command(entry_point: AppEntryPoint, parameters: dict, session=None) ->
 # (bjobs, bsub, bkill) due to HPC root-squash policy.  All LSF
 # operations go through the persistent per-user worker pool.
 #
-# The poll loop picks any user with active jobs and dispatches ``bjobs
-# -u all`` through that user's worker to get statuses for ALL users' jobs.
+# The poll loop picks any user with active jobs and dispatches a ``poll``
+# action through that user's worker, passing the explicit list of
+# cluster_job_ids to query.  py-cluster-api's executor then runs ``bjobs``
+# for just those IDs.  LSF normally allows querying jobs by ID across
+# users, so one worker's call returns statuses for all users' jobs.
 
 _poll_task = None
 _POLL_LOCK_PATH = os.path.join(tempfile.gettempdir(), "fileglancer_poll.lock")
@@ -767,8 +770,10 @@ def _get_any_active_username(settings) -> str | None:
 async def _reconnect_as_any_user(settings):
     """Reconnect to existing cluster jobs via the persistent worker.
 
-    Picks any user with active jobs to run bjobs as.  If no active jobs
-    exist, reconnection is skipped (nothing to reconnect to).
+    Picks any user with active jobs in the DB and dispatches a ``reconnect``
+    action through their worker; py-cluster-api re-attaches to the jobs it
+    finds.  If no active jobs exist in the DB, reconnection is skipped
+    (nothing to reconnect to).
     """
     username = _get_any_active_username(settings)
     if not username:
@@ -881,7 +886,9 @@ async def _poll_jobs(settings):
         if settings.cluster.executor == "local":
             return _poll_local_jobs(session, jobs_to_poll)
 
-        # Pick any user to run bjobs as (bjobs -u all sees all users' jobs)
+        # Pick any user to run the poll through. py-cluster-api will query
+        # each cluster_job_id explicitly; LSF allows querying jobs by ID
+        # across users, so one worker's call covers everyone's jobs.
         poll_username = jobs_to_poll[0].username
         # Pass current known statuses so stubs are seeded correctly.
         # Without this, stubs default to PENDING and jobs whose status
