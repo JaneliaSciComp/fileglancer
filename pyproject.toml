@@ -41,7 +41,7 @@ dependencies = [
     "packaging >=24.0",
     "uvicorn >=0.38.0",
     "x2s3 >=1.2.0",
-    "py-cluster-api >=0.5.0"
+    "py-cluster-api >=0.6.0"
 ]
 
 [project.scripts]

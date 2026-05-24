@@ -576,6 +576,39 @@ def _find_best_fsp_match(
     return (best_fsp, subpath)
 
 
+def find_fsp_in_paths(
+    paths: list[FileSharePath], absolute_path: str
+) -> Optional[tuple[FileSharePath, str]]:
+    """Match *absolute_path* against an in-memory list of file share paths.
+
+    Pure function with no DB access — useful from contexts that already have
+    the path list (e.g. a worker subprocess that fetched it once and cached
+    it).
+
+    Args:
+        paths: All file share paths to search.
+        absolute_path: Absolute file path to match.
+
+    Returns:
+        ``(fsp, relative_subpath)`` for the longest match, or *None*.
+    """
+    normalized_path = os.path.realpath(absolute_path)
+
+    expanded_mounts: dict[str, str] = {}
+    for fsp in paths:
+        expanded = os.path.expanduser(fsp.mount_path)
+        expanded_mounts[fsp.name] = os.path.realpath(expanded)
+
+    def _expanded_mount(fsp: FileSharePath):
+        return [expanded_mounts[fsp.name]]
+
+    result = _find_best_fsp_match(paths, normalized_path, _expanded_mount, separator=os.sep)
+    if result is not None:
+        fsp, subpath = result
+        logger.trace(f"Found exact match for path: {absolute_path} in fsp: {fsp.name} with subpath: {subpath}")
+    return result
+
+
 def find_fsp_from_absolute_path(session: Session, absolute_path: str) -> Optional[tuple[FileSharePath, str]]:
     """
     Find the file share path that exactly matches the given absolute path.
@@ -590,26 +623,7 @@ def find_fsp_from_absolute_path(session: Session, absolute_path: str) -> Optiona
     Returns:
         Tuple of (FileSharePath, relative_subpath) if an exact match is found, None otherwise
     """
-    # Resolve symlinks in the input path (e.g., /var -> /private/var on macOS)
-    normalized_path = os.path.realpath(absolute_path)
-
-    # Get all file share paths
-    paths = get_file_share_paths(session)
-
-    # Pre-compute expanded mount paths so the helper can use them
-    expanded_mounts: dict[str, str] = {}
-    for fsp in paths:
-        expanded = os.path.expanduser(fsp.mount_path)
-        expanded_mounts[fsp.name] = os.path.realpath(expanded)
-
-    def _expanded_mount(fsp: FileSharePath):
-        return [expanded_mounts[fsp.name]]
-
-    result = _find_best_fsp_match(paths, normalized_path, _expanded_mount, separator=os.sep)
-    if result is not None:
-        fsp, subpath = result
-        logger.trace(f"Found exact match for path: {absolute_path} in fsp: {fsp.name} with subpath: {subpath}")
-    return result
+    return find_fsp_in_paths(get_file_share_paths(session), absolute_path)
 
 
 def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
