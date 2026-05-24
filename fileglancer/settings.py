@@ -55,7 +55,10 @@ class Settings(BaseSettings):
     db_pool_size: int = 5
     db_max_overflow: int = 0
 
-    # If true, use seteuid/setegid for file access
+    # If true, each per-user worker subprocess setuids to the target user
+    # before handling requests. Requires root + non-CLI mode (validated at
+    # app startup). When false, workers run as the parent process's user —
+    # useful for local debugging of the worker code path without root.
     use_access_flags: bool = False
 
     # Atlassian settings for accessing JIRA services

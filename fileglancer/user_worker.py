@@ -1,9 +1,10 @@
 """Persistent per-user worker subprocess.
 
 This module is the entry point for long-lived worker subprocesses spawned by
-WorkerPool.  Each worker runs as a single user (identity set at fork time)
-and handles all user-scoped operations: file I/O, cluster jobs, git ops,
-SSH key management, etc.
+WorkerPool. With use_access_flags=True (production, requires root), each
+worker setuids to the target user at fork time. Without use_access_flags
+the worker runs as the parent process's user. Either way the worker handles
+all user-scoped operations: file I/O, cluster jobs, git ops, SSH keys, etc.
 
 Protocol:
     - IPC over a Unix socketpair (fd passed via FGC_WORKER_FD env var)
@@ -14,9 +15,9 @@ Protocol:
 The worker runs a synchronous request/response loop.  Cluster operations
 that use py-cluster-api's async API are run via _run_async() per-request.
 
-In dev/test mode (use_access_flags=False), action handlers are called
-directly in-process from server.py, so _run_async() must handle being
-called from within an existing event loop.
+In CLI mode (settings.cli_mode=True), no worker subprocess is spawned;
+action handlers are called directly in-process from server.py, so
+_run_async() must handle being called from within an existing event loop.
 """
 
 from __future__ import annotations

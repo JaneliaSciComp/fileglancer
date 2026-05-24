@@ -217,15 +217,23 @@ def create_app(settings):
     # Define ui_dir for serving static files and SPA
     ui_dir = PathLib(__file__).parent / "ui"
 
-    # Per-user persistent worker pool (only used when use_access_flags=True)
-    worker_pool = WorkerPool(settings) if settings.use_access_flags else None
+    # Per-user persistent worker pool. Always used in server mode; in CLI mode
+    # actions run directly in-process since the local user is the only user.
+    # use_access_flags preconditions are validated in the lifespan handler
+    # below so failures surface as clean startup errors (not import-time
+    # tracebacks that confuse uvicorn's --reload watcher).
+    worker_pool = WorkerPool(settings) if not settings.cli_mode else None
 
     async def _worker_exec(username: str, action: str, **kwargs):
         """Dispatch an action to the per-user worker and return the result.
 
-        When use_access_flags=True, dispatches to the persistent worker pool.
-        When use_access_flags=False (dev/test mode), runs the action directly
-        in the current process since no identity switching is needed.
+        In server mode dispatches to the persistent worker pool. Workers
+        setuid to the target user iff use_access_flags=True (which requires
+        running as root). Without use_access_flags they run as the parent
+        process's user — useful for debugging the worker code path locally.
+
+        In CLI mode (settings.cli_mode=True) the action runs directly in the
+        current process, since CLI is single-user.
 
         If the worker opens a file and passes back a file descriptor (e.g.
         open_file, s3_open_object), the response dict will contain a
@@ -246,7 +254,7 @@ def create_app(settings):
                     logger.error(f"Worker error for {username} action={action}: {e}")
                 raise HTTPException(status_code=e.status_code, detail=str(e))
         else:
-            # Dev/test mode: run action directly in-process
+            # CLI mode: run action directly in-process (single-user, no setuid)
             from fileglancer.user_worker import _ACTIONS, WorkerContext, LocalDbProxy
             handler = _ACTIONS.get(action)
             if handler is None:
@@ -305,6 +313,30 @@ def create_app(settings):
         # Configure logging based on the log level in the settings
         logger.remove()
         logger.add(sys.stderr, level=settings.log_level)
+
+        # use_access_flags requires root + non-CLI mode. Workers themselves
+        # are used in any server mode (CLI mode runs in-process).
+        if settings.use_access_flags:
+            if settings.cli_mode:
+                msg = (
+                    "use_access_flags=True cannot be used with the `fileglancer` "
+                    "CLI (single-user mode).\n"
+                    "  Fix: remove use_access_flags from your config, or start "
+                    "the server directly with uvicorn."
+                )
+                print(f"\n❌ Configuration Error:\n  {msg}\n", file=sys.stderr)
+                raise RuntimeError(msg)
+            if os.geteuid() != 0:
+                msg = (
+                    f"use_access_flags=True requires running the server as root, "
+                    f"but the current user is uid={os.geteuid()}.\n"
+                    f"  Fix: either run as root (so per-user workers can setuid "
+                    f"for file access), or set use_access_flags=false (workers "
+                    f"will then run as the current user — fine for local "
+                    f"development but not for serving multiple users)."
+                )
+                print(f"\n❌ Configuration Error:\n  {msg}\n", file=sys.stderr)
+                raise RuntimeError(msg)
 
         def mask_password(url: str) -> str:
             """Mask password in database URL for logging"""

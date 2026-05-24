@@ -329,17 +329,24 @@ class WorkerPool:
 
     async def _spawn_worker(self, username: str) -> UserWorker:
         """Spawn a new persistent worker subprocess for the given user."""
-        pw = pwd.getpwnam(username)
-
-        # Build identity kwargs (only switch if running as root)
+        # Build identity kwargs. With use_access_flags the worker setuids to
+        # the target user (requires root; the precondition is enforced in
+        # create_app). Without use_access_flags the worker runs as the parent
+        # process's user — used for local debugging of the worker code path.
         identity_kwargs: dict = {}
-        if os.geteuid() == 0:
+        if self.settings.use_access_flags:
+            pw = pwd.getpwnam(username)
             groups = os.getgrouplist(username, pw.pw_gid)
             identity_kwargs = {
                 "user": pw.pw_uid,
                 "group": pw.pw_gid,
                 "extra_groups": groups,
             }
+            home_dir = pw.pw_dir
+            log_uid, log_gid = pw.pw_uid, pw.pw_gid
+        else:
+            home_dir = os.path.expanduser("~")
+            log_uid, log_gid = os.getuid(), os.getgid()
 
         # Create Unix socketpair for IPC
         parent_sock, child_sock = socket.socketpair()
@@ -350,7 +357,7 @@ class WorkerPool:
         # to the parent over the IPC socket instead.
         env = {
             **os.environ,
-            "HOME": pw.pw_dir,
+            "HOME": home_dir,
             "FGC_LOG_LEVEL": self.settings.log_level,
             "FGC_WORKER_FD": str(child_sock.fileno()),
         }
@@ -358,7 +365,7 @@ class WorkerPool:
 
         logger.info(
             f"Spawning persistent worker for {username} "
-            f"(uid={pw.pw_uid} gid={pw.pw_gid})"
+            f"(uid={log_uid} gid={log_gid})"
         )
 
         process = subprocess.Popen(
