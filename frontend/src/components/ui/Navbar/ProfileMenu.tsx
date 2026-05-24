@@ -8,6 +8,7 @@ import {
 import { HiOutlineAdjustmentsHorizontal } from 'react-icons/hi2';
 import { Link } from 'react-router-dom';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import { useProfileContext } from '@/contexts/ProfileContext';
 import { useAuthContext } from '@/contexts/AuthContext';
 
@@ -35,13 +36,17 @@ export default function ProfileMenu() {
         size="sm"
         variant="ghost"
       >
-        <HiOutlineUserCircle className="stroke-2 icon-large short:icon-default" />
+        <FgIcon
+          className="stroke-2 short:icon-default"
+          icon={HiOutlineUserCircle}
+          size="lg"
+        />
       </Menu.Trigger>
       <Menu.Content className="z-10">
         {isAuthenticated ? (
           <>
             <div className="w-full flex items-center py-1.5 px-2.5 rounded align-middle select-none outline-none bg-transparent">
-              <HiOutlineUserCircle className="mr-2 icon-default" />
+              <FgIcon className="mr-2" icon={HiOutlineUserCircle} />
               <Typography className="text-sm text-foreground font-sans font-semibold">
                 {profile ? profile.username : 'Loading...'}
               </Typography>
@@ -53,7 +58,7 @@ export default function ProfileMenu() {
               data-tour="preferences-link"
               to="/preferences"
             >
-              <HiOutlineAdjustmentsHorizontal className="mr-2 icon-default" />
+              <FgIcon className="mr-2" icon={HiOutlineAdjustmentsHorizontal} />
               Preferences
             </Menu.Item>
             <Menu.Item
@@ -61,7 +66,7 @@ export default function ProfileMenu() {
               className="text-foreground hover:!text-foreground focus:!text-foreground hover:bg-hover-gradient hover:dark:bg-hover-gradient-dark focus:bg-hover-gradient focus:dark:bg-hover-gradient-dark"
               to="/notifications"
             >
-              <HiOutlineBell className="mr-2 icon-default" />
+              <FgIcon className="mr-2" icon={HiOutlineBell} />
               Notifications
             </Menu.Item>
             {sshKeysEnabled ? (
@@ -70,7 +75,7 @@ export default function ProfileMenu() {
                 className="text-foreground hover:!text-foreground focus:!text-foreground hover:bg-hover-gradient hover:dark:bg-hover-gradient-dark focus:bg-hover-gradient focus:dark:bg-hover-gradient-dark"
                 to="/ssh-keys"
               >
-                <HiOutlineKey className="mr-2 icon-default" />
+                <FgIcon className="mr-2" icon={HiOutlineKey} />
                 SSH Keys
               </Menu.Item>
             ) : null}
@@ -78,13 +83,13 @@ export default function ProfileMenu() {
               className="text-error hover:bg-error/10 hover:!text-error focus:bg-error/10 focus:!text-error"
               onClick={handleLogout}
             >
-              <HiOutlineLogout className="mr-2 h-[18px] w-[18px]" /> Logout
+              <FgIcon className="mr-2" icon={HiOutlineLogout} /> Logout
             </Menu.Item>
           </>
         ) : (
           <>
             <div className="w-full flex items-center py-1.5 px-2.5 rounded align-middle select-none outline-none bg-transparent">
-              <HiOutlineUserCircle className="mr-2 icon-default" />
+              <FgIcon className="mr-2" icon={HiOutlineUserCircle} />
               <Typography className="text-sm text-foreground font-sans font-semibold">
                 Not logged in
               </Typography>
@@ -95,7 +100,7 @@ export default function ProfileMenu() {
               className="text-primary hover:!text-primary focus:!text-primary hover:bg-primary/10 focus:bg-primary/10"
               href={loginUrl}
             >
-              <HiOutlineLogout className="mr-2 h-[18px] w-[18px] rotate-180" />{' '}
+              <FgIcon className="mr-2 rotate-180" icon={HiOutlineLogout} />{' '}
               Login
             </Menu.Item>
           </>

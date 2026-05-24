@@ -6,7 +6,7 @@ import {
   useSearchParams
 } from 'react-router';
 
-import { Button, Card, Typography } from '@material-tailwind/react';
+import { Card, Typography } from '@material-tailwind/react';
 import {
   HiOutlineArrowLeft,
   HiOutlineDownload,
@@ -23,6 +23,7 @@ import {
 } from '@/queries/appsQueries';
 import { useSubmitJobMutation } from '@/queries/jobsQueries';
 import type { AppEntryPoint, AppResourceDefaults } from '@/shared.types';
+import FgButton from './designSystem/atoms/FgButton';
 
 export default function AppLaunch() {
   const { owner, repo, branch, entryPointId } = useParams<{
@@ -157,14 +158,14 @@ export default function AppLaunch() {
 
   return (
     <div>
-      <Button
-        className="!rounded-md mb-6"
+      <FgButton
+        className="mb-6"
+        icon={HiOutlineArrowLeft}
         onClick={() => navigate('/apps')}
         variant="outline"
       >
-        <HiOutlineArrowLeft className="icon-small mr-2" />
         Back to Apps
-      </Button>
+      </FgButton>
 
       {/* Not-installed banner */}
       {!appsQuery.isPending && !isInstalled ? (
@@ -173,15 +174,17 @@ export default function AppLaunch() {
             This app is not in your library. Install it for quick access from
             the Apps page.
           </Typography>
-          <Button
-            className="!rounded-md flex-shrink-0"
+          <FgButton
+            className="flex-shrink-0"
             disabled={addAppMutation.isPending}
+            icon={HiOutlineDownload}
+            loading={addAppMutation.isPending}
+            loadingText="Installing"
             onClick={handleInstall}
             size="sm"
           >
-            <HiOutlineDownload className="icon-small mr-1" />
-            {addAppMutation.isPending ? 'Installing...' : 'Install App'}
-          </Button>
+            Install App
+          </FgButton>
         </div>
       ) : null}
 
@@ -261,14 +264,14 @@ export default function AppLaunch() {
                     {ep.description}
                   </Typography>
                 ) : null}
-                <Button
+                <FgButton
                   className="!rounded-md flex-shrink-0 self-start"
+                  icon={HiOutlinePlay}
                   onClick={() => setSelectedEntryPoint(ep)}
                   size="sm"
                 >
-                  <HiOutlinePlay className="icon-small mr-1" />
                   Select
-                </Button>
+                </FgButton>
               </Card>
             ))}
           </div>

@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { useNavigate, Link } from 'react-router';
+import { useNavigate } from 'react-router';
 
 import { Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
+import FgLink from '@/components/designSystem/atoms/FgLink';
 import { TableCard } from '@/components/ui/Table/TableCard';
 import { createAppsJobsColumns } from '@/components/ui/Table/appsJobsColumns';
 import { buildRelaunchPath, parseGithubUrl } from '@/utils';
@@ -88,11 +89,7 @@ export default function AppJobs() {
       </Typography>
       <Typography className="mb-6 text-foreground">
         Jobs are runs of command-line tools on the compute cluster that are
-        launched from the{' '}
-        <Link className="text-primary underline" to="/fg/apps">
-          Apps page
-        </Link>
-        .
+        launched from the <FgLink to="/fg/apps">Apps page</FgLink>.
       </Typography>
 
       <TableCard

@@ -1,14 +1,10 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useNavigate } from 'react-router';
 import toast from 'react-hot-toast';
-import {
-  Button,
-  Dialog,
-  IconButton,
-  Typography
-} from '@material-tailwind/react';
+import { Dialog, IconButton, Typography } from '@material-tailwind/react';
 import { HiX } from 'react-icons/hi';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import {
   FolderFavorite,
   usePreferencesContext
@@ -18,6 +14,7 @@ import {
   makeBrowseLink,
   removeLastSegmentFromPath
 } from '@/utils';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 
 type MissingFolderFavoriteDialogProps = {
   readonly folderFavorite: FolderFavorite;
@@ -55,15 +52,14 @@ export default function MissingFolderFavoriteDialog({
             size="sm"
             variant="outline"
           >
-            <HiX className="icon-default" />
+            <FgIcon icon={HiX} />
           </IconButton>
           <Typography className="my-8 text-large">
             Folder <span className="font-semibold">{displayPath}</span> does not
             exist. Do you want to delete it from your favorites?
           </Typography>
           <div className="flex gap-2">
-            <Button
-              className="!rounded-md flex items-center gap-2"
+            <FgButton
               color="error"
               onClick={async () => {
                 const result = await handleFavoriteChange(
@@ -82,19 +78,17 @@ export default function MissingFolderFavoriteDialog({
                   toast.error(`Error deleting favorite: ${result.error}`);
                 }
               }}
-              variant="outline"
             >
               Delete
-            </Button>
-            <Button
-              className="!rounded-md flex items-center gap-2"
+            </FgButton>
+            <FgButton
               onClick={() => {
                 setShowMissingFolderFavoriteDialog(false);
               }}
-              variant="outline"
+              variant="ghost"
             >
               Cancel
-            </Button>
+            </FgButton>
           </div>
         </Dialog.Content>
       </Dialog.Overlay>

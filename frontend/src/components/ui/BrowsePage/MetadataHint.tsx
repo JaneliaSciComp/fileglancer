@@ -1,9 +1,8 @@
-import { HiExternalLink } from 'react-icons/hi';
-
 import {
   NotificationItem,
   getNotificationStyles
 } from '@/components/ui/Notifications/NotificationItem';
+import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 import logger from '@/logger';
 
 type MetadataHintVariant =
@@ -106,7 +105,6 @@ export default function MetadataHint({ variant }: MetadataHintProps) {
   const descriptionContent = (
     <span className="inline-flex items-center gap-1">
       <span className="group-hover:underline">{description}</span>
-      {href ? <HiExternalLink className="icon-xsmall flex-shrink-0" /> : null}
     </span>
   );
 
@@ -119,14 +117,13 @@ export default function MetadataHint({ variant }: MetadataHintProps) {
 
   if (href) {
     return (
-      <a
+      <FgExternalLink
         className={`${styles.container} group block p-4 rounded-md hover:brightness-95 dark:hover:brightness-125 transition-[filter]`}
         href={href}
-        rel="noopener noreferrer"
-        target="_blank"
+        showIcon={false}
       >
         {notification}
-      </a>
+      </FgExternalLink>
     );
   }
 

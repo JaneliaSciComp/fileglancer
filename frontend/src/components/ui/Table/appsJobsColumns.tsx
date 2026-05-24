@@ -1,5 +1,6 @@
 import type { ColumnDef } from '@tanstack/react-table';
 
+import FgLink from '@/components/designSystem/atoms/FgLink';
 import DataLinksActionsMenu from '@/components/ui/Menus/DataLinksActions';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import JobStatusBadge from '@/components/ui/AppsPage/JobStatusBadge';
@@ -85,13 +86,9 @@ export function createAppsJobsColumns(
               onContextMenu?.(e, { value });
             }}
           >
-            <button
-              className="truncate text-primary hover:underline cursor-pointer text-left"
-              onClick={() => callbacks.onViewDetail(jobId)}
-              type="button"
-            >
+            <FgLink className="truncate text-left" to={`/apps/jobs/${jobId}`}>
               {value}
-            </button>
+            </FgLink>
           </div>
         );
       },

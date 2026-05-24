@@ -98,6 +98,7 @@ platforms = ["osx-arm64", "osx-64", "linux-64", "linux-aarch64", "win-64"]
 test-pip-install = { cmd = "pip install -e .", default-environment = "test" }
 test-backend = { cmd = "pytest --cov=fileglancer --cov-report=html --cov-report=term", depends-on = ["test-pip-install"], default-environment = "test" }
 test-frontend = { cmd = "cd frontend && npm test", default-environment = "test" }
+test-storybook = { cmd = "cd frontend && npm run test:storybook", default-environment = "test" }
 
 [tool.pixi.feature.test.dependencies]
 coverage = ">=7.10.6,<8"
@@ -141,6 +142,8 @@ test-ui = { cmd = "npm --prefix frontend/ui-tests run test ", depends-on = ["nod
 test-launch = "pixi run uvicorn fileglancer.server:app --no-access-log --port 7879"
 dev-install = { depends-on = ["node-build", "pip-install"] }
 dev-watch = { cmd = "cd frontend && NODE_ENV=development npm run watch" }
+storybook = { cmd = "npm run storybook", cwd = "frontend" }
+storybook-build = { cmd = "npm run build-storybook", cwd = "frontend" }
 dev-vite = { cmd = "cd frontend && npx vite" }
 dev-vite-remote = { cmd = "cd frontend && SSL_KEYFILE=/opt/certs/cert.key SSL_CERTFILE=/opt/certs/cert.crt npx vite" }
 dev-launch = "pixi run uvicorn fileglancer.server:app --no-access-log --port 7878 --reload"

@@ -6313,8 +6313,8 @@ packages:
   timestamp: 1760972937564
 - pypi: ./
   name: fileglancer
-  version: 2.8.1
-  sha256: a41eaa22ff769b80dae43fb9f159a7ed90ac0c1839d67154056a8cabc1de6067
+  version: 2.8.2a0
+  sha256: 26d392ae1a606381f74d6d27c1e9d4eb95f476656105545294ca619694cded6e
   requires_dist:
   - alembic>=1.17.0
   - atlassian-python-api>=4.0.7

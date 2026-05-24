@@ -1379,7 +1379,8 @@ def create_app(settings):
         if limit is not None:
             result = await _worker_exec(username, "list_dir_paged",
                                         fsp_name=filestore_name, subpath=subpath,
-                                        limit=limit, cursor=cursor)
+                                        limit=limit, cursor=cursor,
+                                        max_count=settings.max_directory_count)
         else:
             result = await _worker_exec(username, "list_dir",
                                         fsp_name=filestore_name, subpath=subpath)

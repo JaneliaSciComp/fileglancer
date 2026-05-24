@@ -84,6 +84,13 @@ View the app at http://localhost:7878
 | `pixi run migrate` | Run database migrations |
 | `pixi run migrate-create` | Create new migration |
 
+### Storybook
+
+| Command | Description |
+|---------|-------------|
+| `pixi run storybook` | Start Storybook dev server on port 6006 |
+| `pixi run storybook-build` | Build static Storybook site |
+
 ### Container Development
 
 | Command | Description |

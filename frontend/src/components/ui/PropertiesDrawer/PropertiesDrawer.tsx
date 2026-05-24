@@ -1,24 +1,17 @@
 import { useEffect, useState } from 'react';
-import {
-  Button,
-  Card,
-  IconButton,
-  Typography,
-  Tabs
-} from '@material-tailwind/react';
+import { Card, IconButton, Typography, Tabs } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
-import {
-  HiExternalLink,
-  HiOutlineDocument,
-  HiOutlineDuplicate,
-  HiX
-} from 'react-icons/hi';
+import { HiOutlineDocument, HiOutlineDuplicate, HiX } from 'react-icons/hi';
 import { HiFolder } from 'react-icons/hi2';
 import { useLocation } from 'react-router';
+
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 
 import PermissionsTable from '@/components/ui/PropertiesDrawer/PermissionsTable';
 import OverviewTable from '@/components/ui/PropertiesDrawer/OverviewTable';
 import TicketDetails from '@/components/ui/PropertiesDrawer/TicketDetails';
+import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
 import DataLinkUsageDialog from '@/components/ui/Dialogs/dataLinkUsage/DataLinkUsageDialog';
@@ -84,7 +77,7 @@ function CopyPathButton({
         }}
         variant="ghost"
       >
-        <HiOutlineDuplicate className="icon-small" />
+        <FgIcon icon={HiOutlineDuplicate} size="sm" />
       </IconButton>
     </div>
   );
@@ -148,7 +141,7 @@ export default function PropertiesDrawer({
             size="sm"
             variant="ghost"
           >
-            <HiX className="icon-default" />
+            <FgIcon icon={HiX} />
           </IconButton>
         </div>
 
@@ -158,9 +151,9 @@ export default function PropertiesDrawer({
             {fileBrowserState.propertiesTarget.is_symlink ? (
               <>
                 {fileBrowserState.propertiesTarget.symlink_target_fsp ? (
-                  <TbLink className="icon-default" />
+                  <FgIcon icon={TbLink} />
                 ) : (
-                  <TbLinkOff className="icon-default text-error" />
+                  <FgIcon color="error" icon={TbLinkOff} />
                 )}
                 <div className="flex flex-col min-w-0 gap-1">
                   <FgTooltip
@@ -176,9 +169,9 @@ export default function PropertiesDrawer({
             ) : (
               <>
                 {fileBrowserState.propertiesTarget.is_dir ? (
-                  <HiFolder className="icon-default" />
+                  <FgIcon icon={HiFolder} />
                 ) : (
-                  <HiOutlineDocument className="icon-default" />
+                  <FgIcon icon={HiOutlineDocument} />
                 )}
                 <FgTooltip
                   label={fileBrowserState.propertiesTarget.name}
@@ -311,17 +304,12 @@ export default function PropertiesDrawer({
                     </Typography>
                     {!externalDataUrlQuery.data &&
                     !proxiedPathByFspAndPathQuery.data ? (
-                      <a
-                        className="flex items-center gap-1 text-primary hover:underline"
+                      <FgExternalLink
                         href="https://fileglancer-docs.janelia.org/features/data-sharing/"
-                        rel="noopener noreferrer"
-                        target="_blank"
+                        size="sm"
                       >
-                        <Typography type="small">
-                          Learn more about data links
-                        </Typography>
-                        <HiExternalLink className="icon-xsmall" />
-                      </a>
+                        Learn more about data links
+                      </FgExternalLink>
                     ) : null}
                   </div>
                   {(externalDataUrlQuery.data ??
@@ -366,8 +354,8 @@ export default function PropertiesDrawer({
               value="permissions"
             >
               <PermissionsTable file={fileBrowserState.propertiesTarget} />
-              <Button
-                className="!rounded-md !text-primary !text-nowrap !self-start"
+              <FgButton
+                className="!text-primary !text-nowrap !self-start"
                 disabled={fileBrowserState.propertiesTarget.hasWrite === false}
                 onClick={() => {
                   setShowPermissionsDialog(true);
@@ -375,7 +363,7 @@ export default function PropertiesDrawer({
                 variant="outline"
               >
                 Change Permissions
-              </Button>
+              </FgButton>
             </Tabs.Panel>
 
             {/*Task panel*/}
@@ -407,7 +395,7 @@ export default function PropertiesDrawer({
                       OME-Zarr format, suitable for viewing in external viewers
                       like Neuroglancer.
                     </Typography>
-                    <Button
+                    <FgButton
                       data-tour="open-conversion-request"
                       disabled={
                         fileBrowserState.propertiesTarget.hasRead === false
@@ -418,7 +406,7 @@ export default function PropertiesDrawer({
                       variant="outline"
                     >
                       Open conversion request
-                    </Button>
+                    </FgButton>
                   </>
                 )}
               </Tabs.Panel>

@@ -70,11 +70,7 @@ describe('Convert File dialog', () => {
       screen.getByLabelText('Output File or Folder Name'),
       'output_file.zarr'
     );
-    await user.click(
-      screen.getByText('Submit', {
-        selector: 'button[type="submit"]'
-      })
-    );
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith('Ticket created!');
     });
@@ -103,11 +99,7 @@ describe('Convert File dialog', () => {
       screen.getByLabelText('Output File or Folder Name'),
       'output_file.zarr'
     );
-    await user.click(
-      screen.getByText('Submit', {
-        selector: 'button[type="submit"]'
-      })
-    );
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
         `Error creating ticket: 500 Internal Server Error:

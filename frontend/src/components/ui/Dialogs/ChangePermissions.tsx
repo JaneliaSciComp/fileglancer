@@ -1,11 +1,10 @@
-import { Button } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
 import FgDialog from './FgDialog';
 import TextWithFilePath from './TextWithFilePath';
-import { Spinner } from '@/components/ui/widgets/Loaders';
 import usePermissionsDialog from '@/hooks/usePermissionsDialog';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 
 type ChangePermissionsProps = {
   readonly showPermissionsDialog: boolean;
@@ -224,23 +223,17 @@ export default function ChangePermissions({
               </label>
             </>
           ) : null}
-          <Button
-            className="!rounded-md"
+          <FgButton
             disabled={Boolean(
               mutations.changePermissions.isPending ||
               localPermissions === fileBrowserState.propertiesTarget.permissions
             )}
+            loading={mutations.changePermissions.isPending}
+            loadingText="Updating..."
             type="submit"
           >
-            {mutations.changePermissions.isPending ? (
-              <Spinner
-                customClasses="border-primary-foreground"
-                text="Updating..."
-              />
-            ) : (
-              'Change Permissions'
-            )}
-          </Button>
+            Change Permissions
+          </FgButton>
         </form>
       ) : null}
     </FgDialog>

@@ -7,6 +7,7 @@ import {
 import { HiChevronRight, HiOutlineStar, HiStar } from 'react-icons/hi';
 import { HiOutlineSquares2X2 } from 'react-icons/hi2';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FileSharePathComponent from './FileSharePath';
 import type { Zone } from '@/shared.types';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
@@ -37,7 +38,11 @@ export default function Zone({
         role="button"
       >
         <List.ItemStart>
-          <HiOutlineSquares2X2 className="icon-small short:icon-xsmall stroke-2" />
+          <FgIcon
+            className="short:icon-xsmall stroke-2"
+            icon={HiOutlineSquares2X2}
+            size="sm"
+          />
         </List.ItemStart>
         <div className="flex-1 min-w-0 flex items-center gap-1">
           <Typography className="truncate short:text-xs text-sm font-semibold">
@@ -60,16 +65,26 @@ export default function Zone({
               variant="ghost"
             >
               {isFavoriteZone ? (
-                <HiStar className="icon-small short:icon-xsmall mb-[2px]" />
+                <FgIcon
+                  className="short:icon-xsmall mb-[2px]"
+                  icon={HiStar}
+                  size="sm"
+                />
               ) : (
-                <HiOutlineStar className="icon-small short:icon-xsmall mb-[2px]" />
+                <FgIcon
+                  className="short:icon-xsmall mb-[2px]"
+                  icon={HiOutlineStar}
+                  size="sm"
+                />
               )}
             </IconButton>
           </div>
         </div>
         <List.ItemEnd>
-          <HiChevronRight
-            className={`icon-small short:icon-xsmall ${isOpen ? 'rotate-90' : ''}`}
+          <FgIcon
+            className={`short:icon-xsmall ${isOpen ? 'rotate-90' : ''}`}
+            icon={HiChevronRight}
+            size="sm"
           />
         </List.ItemEnd>
       </List.Item>

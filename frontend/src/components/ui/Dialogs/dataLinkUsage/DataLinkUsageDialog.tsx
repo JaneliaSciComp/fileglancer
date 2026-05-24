@@ -1,6 +1,7 @@
 import { Typography } from '@material-tailwind/react';
 import { HiOutlineClipboardCopy } from 'react-icons/hi';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import TabsSkeleton from '@/components/ui/Dialogs/dataLinkUsage/TabsSkeleton';
 import DataLinkTabs from '@/components/ui/Dialogs/dataLinkUsage/tabsContent/DataLinkTabs';
@@ -86,7 +87,10 @@ export default function DataLinkUsageDialog({
             textToCopy={dataLinkUrl}
             tooltipTriggerClasses={TOOLTIP_TRIGGER_CLASSES}
           >
-            <HiOutlineClipboardCopy className="icon-default text-foreground shrink-0" />
+            <FgIcon
+              className="text-foreground shrink-0"
+              icon={HiOutlineClipboardCopy}
+            />
           </CopyTooltip>
         </div>
         {isPending ? (

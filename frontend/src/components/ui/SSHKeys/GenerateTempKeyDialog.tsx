@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { Button, Input, Typography } from '@material-tailwind/react';
+import { Input, Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
-import { Spinner } from '@/components/ui/widgets/Loaders';
 import { useGenerateTempKeyMutation } from '@/queries/sshKeyQueries';
 import type { TempKeyResult } from '@/queries/sshKeyQueries';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 
 type GenerateTempKeyDialogProps = {
   readonly showDialog: boolean;
@@ -70,23 +70,18 @@ export default function GenerateTempKeyDialog({
       </div>
 
       <div className="flex gap-2 justify-start">
-        <Button
+        <FgButton
           disabled={generateMutation.isPending}
+          loading={generateMutation.isPending}
+          loadingText="Generating..."
           onClick={handleGenerate}
           type="button"
         >
-          {generateMutation.isPending ? (
-            <Spinner
-              customClasses="border-primary-foreground"
-              text="Generating..."
-            />
-          ) : (
-            'Generate Key'
-          )}
-        </Button>
-        <Button onClick={handleClose} type="button" variant="outline">
+          Generate Key
+        </FgButton>
+        <FgButton onClick={handleClose} type="button" variant="ghost">
           Cancel
-        </Button>
+        </FgButton>
       </div>
     </FgDialog>
   );

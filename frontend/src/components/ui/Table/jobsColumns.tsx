@@ -13,7 +13,7 @@ import {
   makeMapKey
 } from '@/utils';
 import { FileSharePath } from '@/shared.types';
-import { FgStyledLink } from '../widgets/FgLink';
+import FgLink from '@/components/designSystem/atoms/FgLink';
 import toast from 'react-hot-toast';
 
 function FilePathCell({
@@ -61,13 +61,13 @@ function FilePathCell({
         onContextMenu?.(e, { value: displayPath });
       }}
     >
-      <FgStyledLink
+      <FgLink
         className="truncate"
         onClick={handleClick}
         to={makeBrowseLink(item.fsp_name, item.path)}
       >
         {displayPath}
-      </FgStyledLink>
+      </FgLink>
     </div>
   );
 }

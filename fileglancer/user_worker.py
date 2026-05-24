@@ -396,6 +396,7 @@ def _action_list_dir_paged(request: dict, ctx: WorkerContext, filestore, fsps) -
     current_user = ctx.username
     limit = request.get("limit", 200)
     cursor = request.get("cursor")
+    max_count = request["max_count"]
 
     from fileglancer.filestore import RootCheckError
 
@@ -405,14 +406,17 @@ def _action_list_dir_paged(request: dict, ctx: WorkerContext, filestore, fsps) -
 
         if file_info.is_dir:
             try:
-                files, has_more, next_cursor, total_count = filestore.yield_file_infos_paginated(
+                files, has_more, next_cursor, total_count, is_truncated = filestore.yield_file_infos_paginated(
                     subpath, current_user=current_user, fsps=fsps,
-                    limit=limit, cursor=cursor
+                    limit=limit, cursor=cursor,
+                    max_count=max_count,
                 )
                 result["files"] = [f.model_dump(mode="json") for f in files]
                 result["has_more"] = has_more
                 result["next_cursor"] = next_cursor
                 result["total_count"] = total_count
+                result["is_truncated"] = is_truncated
+                result["max_count"] = max_count
             except PermissionError:
                 result["files"] = []
                 result["error"] = "Permission denied when listing directory contents"

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { Button, Typography } from '@material-tailwind/react';
+import { Typography } from '@material-tailwind/react';
 import { HiOutlinePlus } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
@@ -12,6 +12,7 @@ import {
   useUpdateAppMutation,
   useRemoveAppMutation
 } from '@/queries/appsQueries';
+import FgButton from './designSystem/atoms/FgButton';
 
 export default function Apps() {
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -73,10 +74,9 @@ export default function Apps() {
       </Typography>
 
       <div className="mb-6">
-        <Button className="!rounded-md" onClick={() => setShowAddDialog(true)}>
-          <HiOutlinePlus className="icon-default mr-2" />
+        <FgButton icon={HiOutlinePlus} onClick={() => setShowAddDialog(true)}>
           Add App
-        </Button>
+        </FgButton>
       </div>
 
       {appsQuery.isPending ? (

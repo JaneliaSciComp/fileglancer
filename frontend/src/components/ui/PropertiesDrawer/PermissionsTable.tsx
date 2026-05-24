@@ -1,5 +1,6 @@
 import { HiCheck, HiMinus } from 'react-icons/hi';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import { FileOrFolder } from '@/shared.types';
 import { parsePermissions } from '@/utils/index';
 
@@ -8,11 +9,7 @@ function PermissionIcon({
 }: {
   readonly hasPermission: boolean;
 }) {
-  return hasPermission ? (
-    <HiCheck className="icon-default" />
-  ) : (
-    <HiMinus className="icon-default" />
-  );
+  return hasPermission ? <FgIcon icon={HiCheck} /> : <FgIcon icon={HiMinus} />;
 }
 
 export default function PermissionsTable({

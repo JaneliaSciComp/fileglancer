@@ -2,6 +2,7 @@ import { Collapse, Typography, List } from '@material-tailwind/react';
 import { HiChevronRight } from 'react-icons/hi';
 import { HiStar } from 'react-icons/hi';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import ZoneComponent from './Zone';
 import FileSharePathComponent from './FileSharePath';
 import Folder from './Folder';
@@ -54,14 +55,18 @@ export default function FavoritesBrowser({
           tabIndex={0}
         >
           <List.ItemStart>
-            <HiStar className="icon-default short:icon-small text-surface-foreground" />
+            <FgIcon
+              className="short:icon-small text-surface-foreground"
+              icon={HiStar}
+            />
           </List.ItemStart>
           <Typography className="font-bold text-surface-foreground short:text-sm text-base">
             Favorites
           </Typography>
           <List.ItemEnd>
-            <HiChevronRight
-              className={`icon-default short:icon-small ${openFavorites['all'] ? 'rotate-90' : ''}`}
+            <FgIcon
+              className={`short:icon-small ${openFavorites['all'] ? 'rotate-90' : ''}`}
+              icon={HiChevronRight}
             />
           </List.ItemEnd>
         </List.Item>

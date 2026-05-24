@@ -340,15 +340,15 @@ export function useUpdateMyData() {
 
 ### Routing
 
-- **Base path**: `/fg/` (configured in `vite.config.ts`)
+- **Base path**: `/` (configured in `vite.config.ts`)
 - **Routes**:
-  - `/fg/` - Dashboard/Browse (default)
-  - `/fg/browse` - File browser
-  - `/fg/jobs` - Background jobs
-  - `/fg/links` - Data links management
-  - `/fg/help` - Help/support
-  - `/fg/preferences` - User preferences
-  - `/fg/notifications` - Notifications
+  - `/` - Dashboard/Browse (default)
+  - `/browse` - File browser
+  - `/jobs` - Background jobs
+  - `/links` - Data links management
+  - `/help` - Help/support
+  - `/preferences` - User preferences
+  - `/notifications` - Notifications
 - **Route definitions**: See `src/App.tsx`
 - **Navigation**: Use React Router's `useNavigate()`, `Link`, or `NavLink`
 
@@ -453,14 +453,25 @@ export function useUpdateMyData() {
 ## Build Output
 
 - **Development build**: Outputs to `../fileglancer/ui/`
-- **Served by**: FastAPI backend at `/fg/` path
-- **Static assets**: `/fg/assets/` (Vite asset hashing applied)
+- **Served by**: FastAPI backend at `/` path
+- **Static assets**: `/assets/` (Vite asset hashing applied)
 
 ## Environment Variables
 
 - `.env` - Local environment configuration
 - Variables must be prefixed with `VITE_` to be exposed to frontend
 - Access via `import.meta.env.VITE_VAR_NAME`
+
+## Storybook
+
+Component documentation lives in Storybook, not in-app routes.
+
+```bash
+pixi run storybook              # Start dev server on port 6006
+pixi run storybook-build        # Build static site
+```
+
+Stories are co-located with components: `FgButton.stories.tsx` next to `FgButton.tsx`.
 
 ## Troubleshooting
 

@@ -3,13 +3,14 @@ import { HiChevronRight } from 'react-icons/hi';
 import { HiSquares2X2 } from 'react-icons/hi2';
 import toast from 'react-hot-toast';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import { ZonesAndFileSharePathsMap } from '@/shared.types';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import useOpenZones from '@/hooks/useOpenZones';
 import Zone from './Zone';
 import { SidebarItemSkeleton } from '@/components/ui/widgets/Loaders';
-import { Link } from 'react-router';
+import FgLink from '@/components/designSystem/atoms/FgLink';
 
 export default function ZonesBrowser({
   searchQuery,
@@ -39,14 +40,18 @@ export default function ZonesBrowser({
           tabIndex={0}
         >
           <List.ItemStart>
-            <HiSquares2X2 className="icon-default short:icon-small text-surface-foreground" />
+            <FgIcon
+              className="short:icon-small text-surface-foreground"
+              icon={HiSquares2X2}
+            />
           </List.ItemStart>
           <Typography className="font-bold text-surface-foreground short:text-sm text-base">
             Zones
           </Typography>
           <List.ItemEnd>
-            <HiChevronRight
-              className={`icon-default short:icon-small ${openZones['all'] ? 'rotate-90' : ''}`}
+            <FgIcon
+              className={`short:icon-small ${openZones['all'] ? 'rotate-90' : ''}`}
+              icon={HiChevronRight}
             />
           </List.ItemEnd>
         </List.Item>
@@ -131,9 +136,9 @@ export default function ZonesBrowser({
                   </Typography>
                   <Typography className="text-xs text-foreground/60 mt-1">
                     Modify your{' '}
-                    <Link className="text-primary underline" to="/preferences">
+                    <FgLink size="xs" to="/preferences">
                       preferences
-                    </Link>{' '}
+                    </FgLink>{' '}
                     to see all Zones
                   </Typography>
                 </>
@@ -144,9 +149,9 @@ export default function ZonesBrowser({
                   </Typography>
                   <Typography className="text-xs text-foreground/60 mt-1">
                     Modify your{' '}
-                    <Link className="text-primary underline" to="/preferences">
+                    <FgLink size="xs" to="/preferences">
                       preferences
-                    </Link>{' '}
+                    </FgLink>{' '}
                     to see Zones for your groups only
                   </Typography>
                 </>

@@ -3,7 +3,7 @@
 
 import { useState, useMemo, SetStateAction } from 'react';
 import type { ReactNode, Dispatch } from 'react';
-import { Accordion, Button, Typography } from '@material-tailwind/react';
+import { Accordion, Typography } from '@material-tailwind/react';
 import { HiChevronDown } from 'react-icons/hi';
 import { Link } from 'react-router';
 
@@ -25,7 +25,7 @@ import TextWithFilePath from './TextWithFilePath';
 import DataLinkOptions, {
   SubpathModeOptions
 } from '@/components/ui/PreferencesPage/DataLinkOptions';
-import DeleteBtn from '@/components/ui/buttons/DeleteBtn';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 
 interface CommonDataLinkDialogProps {
   showDataLinkDialog: boolean;
@@ -67,17 +67,14 @@ function CreateLinkBtn({
   readonly disabled?: boolean;
 }) {
   return (
-    <Button
-      className="!rounded-md flex items-center gap-2"
-      color="error"
+    <FgButton
       disabled={disabled}
       onClick={async () => {
         await onConfirm();
       }}
-      variant="outline"
     >
       Create Data Link
-    </Button>
+    </FgButton>
   );
 }
 
@@ -91,8 +88,7 @@ function CancelBtn({
   readonly onCancel?: () => void;
 }) {
   return (
-    <Button
-      className="!rounded-md flex items-center gap-2"
+    <FgButton
       onClick={() => {
         if (onCancel) {
           onCancel();
@@ -105,10 +101,10 @@ function CancelBtn({
           }
         }
       }}
-      variant="outline"
+      variant="ghost"
     >
-      <Typography>Cancel</Typography>
-    </Button>
+      Cancel
+    </FgButton>
   );
 }
 
@@ -342,14 +338,18 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               link at any time.
             </Typography>
             <BtnContainer>
-              <DeleteBtn
+              <FgButton
+                color="error"
                 disabled={false}
+                loading={props.pending}
+                loadingText="Deleting..."
                 onClick={async () => {
                   await props.handleDeleteDataLink(props.proxiedPath);
                   props.setShowDataLinkDialog(false);
                 }}
-                pending={props.pending}
-              />
+              >
+                Delete
+              </FgButton>
               <CancelBtn setShowDataLinkDialog={props.setShowDataLinkDialog} />
             </BtnContainer>
           </>
