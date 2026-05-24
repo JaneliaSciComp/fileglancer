@@ -21,7 +21,8 @@ import {
 import {
   HiOutlineFolder,
   HiOutlineBriefcase,
-  HiOutlineRocketLaunch
+  HiOutlineRocketLaunch,
+  HiOutlineSquares2X2
 } from 'react-icons/hi2';
 import { TbBrandGithub } from 'react-icons/tb';
 import { FaRunning } from 'react-icons/fa';
@@ -84,6 +85,7 @@ function NavList() {
     { icon: HiOutlineShare, title: 'Data Links', href: '/links' },
     { icon: HiOutlineEye, title: 'NG Links', href: '/nglinks' },
     { icon: HiOutlineRocketLaunch, title: 'Apps', href: '/apps' },
+    { icon: HiOutlineSquares2X2, title: 'Catalog', href: '/catalog' },
     {
       icon: FaRunning,
       title: 'Jobs',
@@ -96,6 +98,9 @@ function NavList() {
 
   const filteredLinks = links.filter(link => {
     if (link.href === '/apps' && !showAppsAndJobsPages) {
+      return false;
+    }
+    if (link.href === '/catalog' && !showAppsAndJobsPages) {
       return false;
     }
     if (link.href === '/apps/jobs' && !showAppsAndJobsPages) {

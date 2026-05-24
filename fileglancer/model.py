@@ -547,6 +547,43 @@ class UserApp(BaseModel):
     added_at: datetime = Field(description="When the app was added")
     updated_at: Optional[datetime] = Field(description="When the app was last updated", default=None)
     manifest: Optional[AppManifest] = Field(description="Cached manifest data", default=None)
+    listing_id: Optional[int] = Field(
+        description="If this app is also shared by the user, the id of the catalog listing",
+        default=None,
+    )
+
+
+class AppListing(BaseModel):
+    """A shared app listing in the catalog"""
+    id: int = Field(description="Unique identifier for this listing")
+    owner_username: str = Field(description="The user who published this listing")
+    url: str = Field(description="Git URL of the app repo")
+    manifest_path: str = Field(description="Manifest path within the repo", default="")
+    branch: Optional[str] = Field(description="Git branch", default=None)
+    name: str = Field(description="Display name for the catalog")
+    description: Optional[str] = Field(description="Description for the catalog", default=None)
+    published_at: datetime = Field(description="When this listing was published")
+    updated_at: Optional[datetime] = Field(description="When this listing was last edited", default=None)
+
+
+class ShareAppRequest(BaseModel):
+    """Request to share (publish) one of the user's apps to the catalog"""
+    url: str = Field(description="URL of the user's app to share")
+    manifest_path: str = Field(description="Manifest path within the repo", default="")
+    name: Optional[str] = Field(
+        description="Override display name for the catalog (defaults to the app's name)",
+        default=None,
+    )
+    description: Optional[str] = Field(
+        description="Override description for the catalog (defaults to the app's description)",
+        default=None,
+    )
+
+
+class UpdateAppListingRequest(BaseModel):
+    """Request to update a listing's editable metadata"""
+    name: Optional[str] = Field(description="New display name", default=None)
+    description: Optional[str] = Field(description="New description", default=None)
 
 
 class ManifestFetchRequest(BaseModel):

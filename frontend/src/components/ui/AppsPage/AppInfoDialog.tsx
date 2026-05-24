@@ -2,6 +2,7 @@ import { Typography } from '@material-tailwind/react';
 import {
   HiOutlinePlay,
   HiOutlineRefresh,
+  HiOutlineShare,
   HiOutlineTrash
 } from 'react-icons/hi';
 
@@ -17,8 +18,11 @@ interface AppInfoDialogProps {
   readonly onLaunch: () => void;
   readonly onUpdate: () => void;
   readonly onRemove: () => void;
+  readonly onShare: () => void;
+  readonly onUnshare: () => void;
   readonly updating: boolean;
   readonly removing: boolean;
+  readonly unsharing: boolean;
 }
 
 function AppInfoTable({ app }: { readonly app: UserApp }) {
@@ -75,9 +79,14 @@ export default function AppInfoDialog({
   onLaunch,
   onUpdate,
   onRemove,
+  onShare,
+  onUnshare,
   updating,
-  removing
+  removing,
+  unsharing
 }: AppInfoDialogProps) {
+  const isShared = app.listing_id !== undefined && app.listing_id !== null;
+
   return (
     <FgDialog className="max-w-2xl" onClose={onClose} open={open}>
       <Typography className="text-foreground font-bold mb-4 pr-8" type="h6">
@@ -91,6 +100,22 @@ export default function AppInfoDialog({
           Launch
         </FgButton>
         <div className="flex gap-2">
+          {isShared ? (
+            <FgButton
+              disabled={unsharing}
+              icon={HiOutlineShare}
+              loading={unsharing}
+              loadingText="Unsharing..."
+              onClick={onUnshare}
+              variant="outline"
+            >
+              Unshare
+            </FgButton>
+          ) : (
+            <FgButton icon={HiOutlineShare} onClick={onShare} variant="outline">
+              Share to Catalog
+            </FgButton>
+          )}
           <FgButton
             disabled={updating}
             icon={HiOutlineRefresh}

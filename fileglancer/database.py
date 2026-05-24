@@ -185,6 +185,25 @@ class UserAppDB(Base):
     )
 
 
+class AppListingDB(Base):
+    """Database model for a shared app listing in the catalog."""
+    __tablename__ = 'app_listings'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    owner_username = Column(String, nullable=False, index=True)
+    url = Column(String, nullable=False)
+    manifest_path = Column(String, nullable=False, server_default="")
+    branch = Column(String, nullable=True)
+    name = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    published_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint('owner_username', 'url', 'manifest_path', name='uq_app_listing'),
+    )
+
+
 class SessionDB(Base):
     """Database model for storing user sessions"""
     __tablename__ = 'sessions'
@@ -1074,6 +1093,89 @@ def delete_user_app(session: Session, username: str, url: str,
         username=username,
         url=url,
         manifest_path=manifest_path,
+    ).delete()
+    session.commit()
+    return deleted > 0
+
+
+# --- App listing (catalog) database functions ---
+
+def list_app_listings(session: Session) -> List[AppListingDB]:
+    """Get all app listings in the catalog, newest first."""
+    return (
+        session.query(AppListingDB)
+        .order_by(AppListingDB.published_at.desc())
+        .all()
+    )
+
+
+def get_app_listing(session: Session, listing_id: int) -> Optional[AppListingDB]:
+    """Get a single app listing by id."""
+    return session.query(AppListingDB).filter_by(id=listing_id).first()
+
+
+def get_app_listings_by_owner(session: Session, owner_username: str) -> List[AppListingDB]:
+    """Get all app listings owned by a user."""
+    return session.query(AppListingDB).filter_by(owner_username=owner_username).all()
+
+
+def get_app_listing_for_app(session: Session, owner_username: str, url: str,
+                            manifest_path: str = "") -> Optional[AppListingDB]:
+    """Get the listing (if any) that this user has published for a given app."""
+    return session.query(AppListingDB).filter_by(
+        owner_username=owner_username,
+        url=url,
+        manifest_path=manifest_path,
+    ).first()
+
+
+def create_app_listing(session: Session, owner_username: str, url: str,
+                       manifest_path: str, name: str,
+                       description: Optional[str] = None,
+                       branch: Optional[str] = None) -> AppListingDB:
+    """Publish a new listing. Raises ValueError if a duplicate exists."""
+    existing = get_app_listing_for_app(session, owner_username, url, manifest_path)
+    if existing is not None:
+        raise ValueError("This app is already shared")
+    listing = AppListingDB(
+        owner_username=owner_username,
+        url=url,
+        manifest_path=manifest_path,
+        branch=branch,
+        name=name,
+        description=description,
+        published_at=datetime.now(UTC),
+    )
+    session.add(listing)
+    session.commit()
+    return listing
+
+
+def update_app_listing(session: Session, listing_id: int, owner_username: str, *,
+                       name: Optional[str] = None,
+                       description: Optional[str] = None) -> Optional[AppListingDB]:
+    """Update an existing listing's editable metadata. Returns the listing, or
+    None if it doesn't exist or isn't owned by owner_username."""
+    listing = session.query(AppListingDB).filter_by(
+        id=listing_id,
+        owner_username=owner_username,
+    ).first()
+    if listing is None:
+        return None
+    if name is not None:
+        listing.name = name
+    if description is not None:
+        listing.description = description
+    listing.updated_at = datetime.now(UTC)
+    session.commit()
+    return listing
+
+
+def delete_app_listing(session: Session, listing_id: int, owner_username: str) -> bool:
+    """Delete a listing. Returns True if a row was deleted."""
+    deleted = session.query(AppListingDB).filter_by(
+        id=listing_id,
+        owner_username=owner_username,
     ).delete()
     session.commit()
     return deleted > 0

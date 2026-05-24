@@ -143,6 +143,19 @@ type UserApp = {
   added_at: string;
   updated_at?: string;
   manifest?: AppManifest;
+  listing_id?: number;
+};
+
+type AppListing = {
+  id: number;
+  owner_username: string;
+  url: string;
+  manifest_path: string;
+  branch?: string;
+  name: string;
+  description?: string;
+  published_at: string;
+  updated_at?: string;
 };
 
 type JobFileInfo = {
@@ -193,6 +206,7 @@ type JobSubmitRequest = {
 
 export type {
   AppEntryPoint,
+  AppListing,
   AppManifest,
   AppParameter,
   AppParameterItem,

@@ -6,6 +6,7 @@ import { buildLaunchPathFromApp } from '@/utils';
 import {
   HiOutlineInformationCircle,
   HiOutlinePlay,
+  HiOutlineShare,
   HiOutlineTrash
 } from 'react-icons/hi';
 
@@ -19,19 +20,27 @@ interface AppCardProps {
   readonly app: UserApp;
   readonly onRemove: (params: { url: string; manifest_path: string }) => void;
   readonly onUpdate: (params: { url: string; manifest_path: string }) => void;
+  readonly onShare: () => void;
+  readonly onUnshare: () => void;
   readonly removing: boolean;
   readonly updating: boolean;
+  readonly unsharing: boolean;
 }
 
 export default function AppCard({
   app,
   onRemove,
   onUpdate,
+  onShare,
+  onUnshare,
   removing,
-  updating
+  updating,
+  unsharing
 }: AppCardProps) {
   const navigate = useNavigate();
   const [infoOpen, setInfoOpen] = useState(false);
+
+  const isShared = app.listing_id !== undefined && app.listing_id !== null;
 
   const handleLaunch = () => {
     navigate(buildLaunchPathFromApp(app.url, app.manifest_path));
@@ -57,6 +66,30 @@ export default function AppCard({
               <FgIcon icon={HiOutlineInformationCircle} />
             </IconButton>
           </FgTooltip>
+          {isShared ? (
+            <FgTooltip label="Unshare from catalog">
+              <IconButton
+                className="text-foreground hover:text-error"
+                disabled={unsharing}
+                onClick={onUnshare}
+                size="sm"
+                variant="ghost"
+              >
+                <FgIcon icon={HiOutlineShare} />
+              </IconButton>
+            </FgTooltip>
+          ) : (
+            <FgTooltip label="Share to catalog">
+              <IconButton
+                className="text-foreground hover:text-primary"
+                onClick={onShare}
+                size="sm"
+                variant="ghost"
+              >
+                <FgIcon icon={HiOutlineShare} />
+              </IconButton>
+            </FgTooltip>
+          )}
           <FgTooltip label="Remove app">
             <IconButton
               className="text-foreground hover:text-error"
@@ -75,6 +108,15 @@ export default function AppCard({
           </FgTooltip>
         </div>
       </div>
+
+      {isShared ? (
+        <div>
+          <span className="inline-block px-2 py-0.5 rounded-sm bg-success/10 text-success text-xs font-medium">
+            Shared
+          </span>
+        </div>
+      ) : null}
+
       {app.description ? (
         <Typography className="text-sm md:text-base text-foreground">
           {app.description}
@@ -101,11 +143,20 @@ export default function AppCard({
           setInfoOpen(false);
           onRemove({ url: app.url, manifest_path: app.manifest_path });
         }}
+        onShare={() => {
+          setInfoOpen(false);
+          onShare();
+        }}
+        onUnshare={() => {
+          setInfoOpen(false);
+          onUnshare();
+        }}
         onUpdate={() =>
           onUpdate({ url: app.url, manifest_path: app.manifest_path })
         }
         open={infoOpen}
         removing={removing}
+        unsharing={unsharing}
         updating={updating}
       />
     </Card>

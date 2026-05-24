@@ -6,13 +6,18 @@ import {
   getResponseJsonOrError,
   throwResponseNotOkError
 } from '@/queries/queryUtils';
-import type { AppManifest, UserApp } from '@/shared.types';
+import type { AppListing, AppManifest, UserApp } from '@/shared.types';
 
 // --- Query Keys ---
 
 export const appsQueryKeys = {
   all: ['apps'] as const,
   list: () => ['apps', 'list'] as const
+};
+
+export const catalogQueryKeys = {
+  all: ['catalog'] as const,
+  list: () => ['catalog', 'list'] as const
 };
 
 // --- Fetch Helpers ---
@@ -155,6 +160,130 @@ export function useRemoveAppMutation(): UseMutationResult<
         throwResponseNotOkError(response, data);
       }
       return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: appsQueryKeys.all });
+    }
+  });
+}
+
+// --- Catalog hooks ---
+
+export function useCatalogQuery(): UseQueryResult<AppListing[], Error> {
+  return useQuery({
+    queryKey: catalogQueryKeys.list(),
+    queryFn: async ({ signal }) => {
+      const response = await sendFetchRequest(
+        '/api/catalog',
+        'GET',
+        undefined,
+        { signal }
+      );
+      const data = await getResponseJsonOrError(response);
+      if (!response.ok) {
+        throwResponseNotOkError(response, data);
+      }
+      return data as AppListing[];
+    },
+    staleTime: 5 * 60 * 1000
+  });
+}
+
+export function useShareAppMutation(): UseMutationResult<
+  AppListing,
+  Error,
+  {
+    url: string;
+    manifest_path: string;
+    name?: string;
+    description?: string;
+  }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async payload => {
+      const response = await sendFetchRequest('/api/catalog', 'POST', payload);
+      const data = await getResponseJsonOrError(response);
+      if (!response.ok) {
+        throwResponseNotOkError(response, data);
+      }
+      return data as AppListing;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: catalogQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: appsQueryKeys.all });
+    }
+  });
+}
+
+export function useUpdateListingMutation(): UseMutationResult<
+  AppListing,
+  Error,
+  { listing_id: number; name?: string; description?: string }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ listing_id, name, description }) => {
+      const response = await sendFetchRequest(
+        `/api/catalog/${listing_id}`,
+        'PATCH',
+        { name, description }
+      );
+      const data = await getResponseJsonOrError(response);
+      if (!response.ok) {
+        throwResponseNotOkError(response, data);
+      }
+      return data as AppListing;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: catalogQueryKeys.all });
+    }
+  });
+}
+
+export function useUnshareListingMutation(): UseMutationResult<
+  unknown,
+  Error,
+  { listing_id: number }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ listing_id }) => {
+      const response = await sendFetchRequest(
+        `/api/catalog/${listing_id}`,
+        'DELETE'
+      );
+      const data = await getResponseJsonOrError(response);
+      if (!response.ok) {
+        throwResponseNotOkError(response, data);
+      }
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: catalogQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: appsQueryKeys.all });
+    }
+  });
+}
+
+export function useAddFromListingMutation(): UseMutationResult<
+  UserApp,
+  Error,
+  { listing_id: number }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ listing_id }) => {
+      const response = await sendFetchRequest(
+        `/api/catalog/${listing_id}/add`,
+        'POST',
+        {}
+      );
+      const data = await getResponseJsonOrError(response);
+      if (!response.ok) {
+        throwResponseNotOkError(response, data);
+      }
+      return data as UserApp;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appsQueryKeys.all });

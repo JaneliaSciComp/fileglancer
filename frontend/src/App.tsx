@@ -9,6 +9,7 @@ import { BrowsePageLayout } from './layouts/BrowseLayout';
 import { OtherPagesLayout } from './layouts/OtherPagesLayout';
 import Login from '@/components/Login';
 import Apps from '@/components/Apps';
+import Catalog from '@/components/Catalog';
 import AppJobs from '@/components/AppJobs';
 import AppLaunch from '@/components/AppLaunch';
 import JobDetail from '@/components/JobDetail';
@@ -122,6 +123,14 @@ const AppComponent = () => {
                 </RequireAuth>
               }
               path="apps"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <Catalog />
+                </RequireAuth>
+              }
+              path="catalog"
             />
             <Route
               element={
