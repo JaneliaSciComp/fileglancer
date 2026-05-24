@@ -1,0 +1,525 @@
+"""Tests for /api/apps endpoints backed by the user_apps table."""
+
+import os
+import shutil
+import tempfile
+from datetime import datetime, UTC, timedelta
+from unittest.mock import AsyncMock, patch
+
+import pytest
+from fastapi.testclient import TestClient
+
+from fileglancer.settings import Settings
+from fileglancer.server import create_app, get_current_user
+from fileglancer.database import (
+    Base,
+    UserAppDB,
+    UserPreferenceDB,
+    create_engine,
+    sessionmaker,
+    dispose_engine,
+    get_db_session,
+    list_user_apps,
+)
+from fileglancer.model import AppEntryPoint, AppManifest
+
+
+TEST_USERNAME = "testuser"
+
+
+def _make_manifest(name="Demo App", description="Demo"):
+    return AppManifest(
+        name=name,
+        description=description,
+        runnables=[AppEntryPoint(id="run", name="Run", command="echo hi")],
+    )
+
+
+@pytest.fixture
+def temp_dir():
+    d = tempfile.mkdtemp()
+    yield d
+    shutil.rmtree(d)
+
+
+@pytest.fixture
+def test_app(temp_dir):
+    db_path = os.path.join(temp_dir, "test.db")
+    db_url = f"sqlite:///{db_path}"
+    engine = create_engine(db_url)
+    Base.metadata.create_all(engine)
+
+    settings = Settings(db_url=db_url, file_share_mounts=[], cli_mode=True)
+
+    import fileglancer.settings
+    import fileglancer.database
+    import fileglancer.apps.core
+    original_get_settings = fileglancer.settings.get_settings
+    fileglancer.settings.get_settings = lambda: settings
+    fileglancer.database.get_settings = lambda: settings
+    fileglancer.apps.core.get_settings = lambda: settings
+    # Migrations are unneeded here since create_all built the schema.
+    fileglancer.database._migrations_run = True
+
+    app = create_app(settings)
+    yield app, db_url
+
+    engine.dispose()
+    dispose_engine(db_url)
+    fileglancer.settings.get_settings = original_get_settings
+    fileglancer.database.get_settings = original_get_settings
+    fileglancer.apps.core.get_settings = original_get_settings
+    fileglancer.database._migrations_run = False
+
+
+@pytest.fixture
+def test_client(test_app):
+    app, _ = test_app
+    app.dependency_overrides[get_current_user] = lambda: TEST_USERNAME
+    yield TestClient(app)
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def db_session(test_app):
+    _, db_url = test_app
+    session = get_db_session(db_url)
+    yield session
+    session.close()
+
+
+def _seed_app(db_session, *, url="https://github.com/owner/repo",
+              manifest_path="", manifest=None, name="Demo App",
+              description="Demo", branch="main",
+              added_at=None, updated_at=None):
+    row = UserAppDB(
+        username=TEST_USERNAME,
+        url=url,
+        manifest_path=manifest_path,
+        name=name,
+        description=description,
+        branch=branch,
+        manifest=manifest,
+        added_at=added_at or datetime.now(UTC),
+        updated_at=updated_at,
+    )
+    db_session.add(row)
+    db_session.commit()
+    return row
+
+
+def test_get_apps_empty(test_client):
+    response = test_client.get("/api/apps")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_get_apps_uses_db_cache(test_client, db_session):
+    manifest = _make_manifest()
+    _seed_app(db_session, manifest=manifest.model_dump(mode="json"))
+
+    with patch("fileglancer.apps.fetch_app_manifest",
+               new=AsyncMock()) as mock_fetch, \
+         patch("fileglancer.apps.get_app_branch",
+               new=AsyncMock()) as mock_branch:
+        response = test_client.get("/api/apps")
+
+    assert response.status_code == 200
+    assert mock_fetch.await_count == 0
+    assert mock_branch.await_count == 0
+
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["name"] == "Demo App"
+    assert body[0]["branch"] == "main"
+    assert body[0]["manifest"]["name"] == "Demo App"
+
+
+def test_get_apps_backfills_null_manifest(test_client, db_session):
+    _seed_app(db_session, manifest=None, branch=None, name="Stale Name")
+    manifest = _make_manifest(name="Fresh Name", description="Fresh")
+
+    # refresh_cached_manifest calls these directly inside apps/core.py, so
+    # patches must target the core namespace, not the apps re-export.
+    with patch("fileglancer.apps.core.fetch_app_manifest",
+               new=AsyncMock(return_value=manifest)) as mock_fetch, \
+         patch("fileglancer.apps.core.get_app_branch",
+               new=AsyncMock(return_value="dev")) as mock_branch:
+        response = test_client.get("/api/apps")
+
+    assert response.status_code == 200
+    assert mock_fetch.await_count == 1
+    assert mock_branch.await_count == 1
+
+    body = response.json()
+    assert body[0]["name"] == "Fresh Name"
+    assert body[0]["branch"] == "dev"
+    assert body[0]["manifest"]["name"] == "Fresh Name"
+
+    # Row is persisted; subsequent reads hit the cache.
+    rows = list_user_apps(db_session, TEST_USERNAME)
+    assert len(rows) == 1
+    assert rows[0].manifest is not None
+    assert rows[0].manifest["name"] == "Fresh Name"
+    assert rows[0].branch == "dev"
+    # Backfill should NOT bump updated_at (invisible refresh).
+    assert rows[0].updated_at is None
+
+
+def test_get_apps_handles_schema_drift(test_client, db_session):
+    # Manifest missing required field 'runnables' → ValidationError.
+    _seed_app(db_session, manifest={"name": "Broken"}, branch=None)
+    fresh = _make_manifest(name="Recovered")
+
+    with patch("fileglancer.apps.core.fetch_app_manifest",
+               new=AsyncMock(return_value=fresh)) as mock_fetch, \
+         patch("fileglancer.apps.core.get_app_branch",
+               new=AsyncMock(return_value="main")):
+        response = test_client.get("/api/apps")
+
+    assert response.status_code == 200
+    assert mock_fetch.await_count == 1
+
+    body = response.json()
+    assert body[0]["name"] == "Recovered"
+    assert body[0]["manifest"]["name"] == "Recovered"
+
+
+def test_get_apps_backfill_handles_fetch_failure(test_client, db_session):
+    _seed_app(db_session, manifest=None, branch=None, name="Cached Name")
+
+    with patch("fileglancer.apps.core.fetch_app_manifest",
+               new=AsyncMock(side_effect=RuntimeError("network down"))), \
+         patch("fileglancer.apps.core.get_app_branch",
+               new=AsyncMock(side_effect=RuntimeError("nope"))):
+        response = test_client.get("/api/apps")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    # Falls back to stored values; manifest stays unpopulated.
+    assert body[0]["name"] == "Cached Name"
+    assert body[0]["manifest"] is None
+
+
+def test_add_app_persists_manifest_and_branch(test_client, db_session):
+    manifest = _make_manifest(name="From Add")
+    with patch("fileglancer.apps.discover_app_manifests",
+               new=AsyncMock(return_value=[("", manifest)])), \
+         patch("fileglancer.apps.get_app_branch",
+               new=AsyncMock(return_value="main")):
+        response = test_client.post(
+            "/api/apps",
+            json={"url": "https://github.com/owner/repo"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["name"] == "From Add"
+    assert body[0]["branch"] == "main"
+    assert body[0]["manifest"]["name"] == "From Add"
+
+    rows = list_user_apps(db_session, TEST_USERNAME)
+    assert len(rows) == 1
+    assert rows[0].manifest["name"] == "From Add"
+    assert rows[0].branch == "main"
+
+
+def test_add_app_dedups(test_client, db_session):
+    """Adding the same repo twice returns 409 and inserts no new rows."""
+    manifest = _make_manifest()
+    _seed_app(db_session, url="https://github.com/owner/repo",
+              manifest=manifest.model_dump(mode="json"))
+
+    with patch("fileglancer.apps.discover_app_manifests",
+               new=AsyncMock(return_value=[("", manifest)])), \
+         patch("fileglancer.apps.get_app_branch",
+               new=AsyncMock(return_value="main")):
+        response = test_client.post(
+            "/api/apps",
+            json={"url": "https://github.com/owner/repo"},
+        )
+
+    assert response.status_code == 409
+    assert len(list_user_apps(db_session, TEST_USERNAME)) == 1
+
+
+def test_update_app_persists_manifest(test_client, db_session):
+    older = datetime.now(UTC) - timedelta(days=1)
+    _seed_app(db_session, manifest=None, name="Old", added_at=older)
+
+    fresh = _make_manifest(name="New", description="New")
+
+    with patch("fileglancer.apps.fetch_app_manifest",
+               new=AsyncMock(return_value=fresh)), \
+         patch("fileglancer.apps.get_app_branch",
+               new=AsyncMock(return_value="main")), \
+         patch("fileglancer.apps._ensure_repo_cache",
+               new=AsyncMock(return_value="/tmp/x")):
+        response = test_client.post(
+            "/api/apps/update",
+            json={"url": "https://github.com/owner/repo", "manifest_path": ""},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["name"] == "New"
+    assert body["updated_at"] is not None
+
+    rows = list_user_apps(db_session, TEST_USERNAME)
+    assert len(rows) == 1
+    assert rows[0].name == "New"
+    assert rows[0].manifest["name"] == "New"
+    assert rows[0].updated_at is not None
+    # added_at preserved across update.
+    assert rows[0].added_at.replace(tzinfo=None) == older.replace(tzinfo=None)
+
+
+def test_delete_app_removes_row(test_client, db_session):
+    _seed_app(db_session, manifest=_make_manifest().model_dump(mode="json"))
+    assert len(list_user_apps(db_session, TEST_USERNAME)) == 1
+
+    response = test_client.delete(
+        "/api/apps",
+        params={"url": "https://github.com/owner/repo", "manifest_path": ""},
+    )
+    assert response.status_code == 200
+    assert len(list_user_apps(db_session, TEST_USERNAME)) == 0
+
+    # Second delete → 404
+    response = test_client.delete(
+        "/api/apps",
+        params={"url": "https://github.com/owner/repo", "manifest_path": ""},
+    )
+    assert response.status_code == 404
+
+
+def test_fetch_manifest_uses_cache_for_installed_app(test_client, db_session):
+    """POST /api/apps/manifest returns cached manifest without disk read."""
+    cached = _make_manifest(name="Cached App")
+    _seed_app(db_session, manifest=cached.model_dump(mode="json"))
+
+    with patch("fileglancer.apps.core.fetch_app_manifest",
+               new=AsyncMock()) as mock_fetch:
+        response = test_client.post("/api/apps/manifest", json={
+            "url": "https://github.com/owner/repo",
+            "manifest_path": "",
+        })
+
+    assert response.status_code == 200
+    assert mock_fetch.await_count == 0
+    assert response.json()["name"] == "Cached App"
+
+
+def test_fetch_manifest_reads_disk_for_uninstalled(test_client, db_session):
+    """Preview of an uninstalled URL reads disk and does not create a row."""
+    fresh = _make_manifest(name="Preview Only")
+
+    with patch("fileglancer.apps.core.fetch_app_manifest",
+               new=AsyncMock(return_value=fresh)) as mock_fetch:
+        response = test_client.post("/api/apps/manifest", json={
+            "url": "https://github.com/new/repo",
+            "manifest_path": "",
+        })
+
+    assert response.status_code == 200
+    assert mock_fetch.await_count == 1
+    assert response.json()["name"] == "Preview Only"
+    # No row was created for the preview.
+    assert list_user_apps(db_session, TEST_USERNAME) == []
+
+
+def test_fetch_manifest_backfills_null_cache(test_client, db_session):
+    """If row exists with NULL manifest, endpoint reads disk and writes back."""
+    _seed_app(db_session, manifest=None, name="Stale", branch=None)
+    fresh = _make_manifest(name="Backfilled")
+
+    with patch("fileglancer.apps.core.fetch_app_manifest",
+               new=AsyncMock(return_value=fresh)) as mock_fetch, \
+         patch("fileglancer.apps.core.get_app_branch",
+               new=AsyncMock(return_value="main")):
+        response = test_client.post("/api/apps/manifest", json={
+            "url": "https://github.com/owner/repo",
+            "manifest_path": "",
+        })
+
+    assert response.status_code == 200
+    assert mock_fetch.await_count == 1
+    assert response.json()["name"] == "Backfilled"
+
+    # Row was updated silently (updated_at stays NULL).
+    rows = list_user_apps(db_session, TEST_USERNAME)
+    assert len(rows) == 1
+    assert rows[0].manifest["name"] == "Backfilled"
+    assert rows[0].updated_at is None
+
+
+@pytest.mark.asyncio
+async def test_get_or_load_manifest_cache_hit(test_app, db_session):
+    """Cache hit returns parsed manifest without any disk read."""
+    from fileglancer.apps import get_or_load_manifest
+
+    cached = _make_manifest(name="From Cache")
+    _seed_app(db_session, manifest=cached.model_dump(mode="json"))
+
+    with patch("fileglancer.apps.core.fetch_app_manifest",
+               new=AsyncMock()) as mock_fetch:
+        manifest = await get_or_load_manifest(
+            TEST_USERNAME, "https://github.com/owner/repo", "",
+        )
+
+    assert manifest.name == "From Cache"
+    assert mock_fetch.await_count == 0
+
+
+@pytest.mark.asyncio
+async def test_get_or_load_manifest_preview_no_row(test_app, db_session):
+    """Preview of uninstalled URL reads disk, no row created."""
+    from fileglancer.apps import get_or_load_manifest
+
+    fresh = _make_manifest(name="Preview")
+    with patch("fileglancer.apps.core.fetch_app_manifest",
+               new=AsyncMock(return_value=fresh)) as mock_fetch:
+        manifest = await get_or_load_manifest(
+            TEST_USERNAME, "https://github.com/x/y", "",
+        )
+
+    assert manifest.name == "Preview"
+    assert mock_fetch.await_count == 1
+    assert list_user_apps(db_session, TEST_USERNAME) == []
+
+
+@pytest.mark.asyncio
+async def test_refresh_cached_manifest_syncs_existing_row(test_app, db_session):
+    """refresh_cached_manifest updates an existing row from disk."""
+    from fileglancer.apps import refresh_cached_manifest
+
+    _seed_app(db_session, manifest=None, name="Stale")
+    fresh = _make_manifest(name="Synced")
+
+    with patch("fileglancer.apps.core.fetch_app_manifest",
+               new=AsyncMock(return_value=fresh)), \
+         patch("fileglancer.apps.core.get_app_branch",
+               new=AsyncMock(return_value="main")):
+        manifest, branch = await refresh_cached_manifest(
+            TEST_USERNAME, "https://github.com/owner/repo", "",
+        )
+
+    assert manifest.name == "Synced"
+    assert branch == "main"
+
+    rows = list_user_apps(db_session, TEST_USERNAME)
+    assert rows[0].manifest["name"] == "Synced"
+    assert rows[0].branch == "main"
+    # Silent refresh by default — updated_at stays NULL.
+    assert rows[0].updated_at is None
+
+
+@pytest.mark.asyncio
+async def test_refresh_cached_manifest_no_op_for_uninstalled(test_app, db_session):
+    """refresh_cached_manifest doesn't create rows for uninstalled apps."""
+    from fileglancer.apps import refresh_cached_manifest
+
+    fresh = _make_manifest()
+    with patch("fileglancer.apps.core.fetch_app_manifest",
+               new=AsyncMock(return_value=fresh)), \
+         patch("fileglancer.apps.core.get_app_branch",
+               new=AsyncMock(return_value="main")):
+        manifest, branch = await refresh_cached_manifest(
+            TEST_USERNAME, "https://github.com/new/repo", "",
+        )
+
+    assert manifest.name == "Demo App"
+    assert list_user_apps(db_session, TEST_USERNAME) == []
+
+
+@pytest.mark.asyncio
+async def test_refresh_cached_manifest_bumps_updated_at(test_app, db_session):
+    """bump_updated_at=True is the explicit-user-update path."""
+    from fileglancer.apps import refresh_cached_manifest
+
+    _seed_app(db_session, manifest=None, name="Old")
+    fresh = _make_manifest(name="Updated")
+
+    with patch("fileglancer.apps.core.fetch_app_manifest",
+               new=AsyncMock(return_value=fresh)), \
+         patch("fileglancer.apps.core.get_app_branch",
+               new=AsyncMock(return_value="main")):
+        await refresh_cached_manifest(
+            TEST_USERNAME, "https://github.com/owner/repo", "",
+            bump_updated_at=True,
+        )
+
+    rows = list_user_apps(db_session, TEST_USERNAME)
+    assert rows[0].updated_at is not None
+
+
+def test_alembic_migration_moves_legacy_apps(temp_dir, monkeypatch):
+    """The migration relocates user_preferences['apps'] into user_apps."""
+    from alembic.config import Config
+    from alembic import command
+
+    db_path = os.path.join(temp_dir, "legacy.db")
+    db_url = f"sqlite:///{db_path}"
+
+    # env.py forces the DB URL from FILEGLANCER_MIGRATION_DB_URL or settings,
+    # so set_main_option('sqlalchemy.url', ...) is not enough — use the env
+    # var that env.py actually reads.
+    monkeypatch.setenv("FILEGLANCER_MIGRATION_DB_URL", db_url)
+
+    pkg_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    alembic_ini = os.path.join(pkg_dir, "alembic.ini")
+    if not os.path.exists(alembic_ini):
+        alembic_ini = os.path.join(pkg_dir, "fileglancer", "alembic.ini")
+    assert os.path.exists(alembic_ini), f"alembic.ini not found near {pkg_dir}"
+
+    cfg = Config(alembic_ini)
+    cfg.set_main_option("sqlalchemy.url", db_url)
+
+    # 1) Upgrade to the revision just before ours.
+    command.upgrade(cfg, "20b763c28c4f")
+
+    # 2) Seed legacy apps preference.
+    engine = create_engine(db_url)
+    Session = sessionmaker(bind=engine)
+    s = Session()
+    s.add(UserPreferenceDB(
+        username=TEST_USERNAME,
+        key="apps",
+        value={"apps": [
+            {
+                "url": "https://github.com/owner/repo",
+                "manifest_path": "",
+                "name": "Legacy",
+                "description": "From prefs",
+                "added_at": "2025-01-01T00:00:00+00:00",
+            },
+            {
+                "url": "https://github.com/owner/repo",
+                "manifest_path": "sub",
+                "name": "Legacy Sub",
+                "added_at": "2025-01-02T00:00:00",
+            },
+        ]},
+    ))
+    s.commit()
+    s.close()
+
+    # 3) Run our migration.
+    command.upgrade(cfg, "c4e8a7d92b15")
+
+    # 4) Verify rows moved and preference is gone.
+    s = Session()
+    apps = s.query(UserAppDB).filter_by(username=TEST_USERNAME).order_by(UserAppDB.manifest_path).all()
+    assert len(apps) == 2
+    assert apps[0].name == "Legacy"
+    assert apps[0].manifest_path == ""
+    assert apps[0].manifest is None  # backfilled lazily
+    assert apps[0].branch is None
+    assert apps[1].manifest_path == "sub"
+
+    prefs = s.query(UserPreferenceDB).filter_by(username=TEST_USERNAME, key="apps").all()
+    assert prefs == []
+    s.close()
+    engine.dispose()

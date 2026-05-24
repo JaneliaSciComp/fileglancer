@@ -317,6 +317,86 @@ async def fetch_app_manifest(url: str, manifest_path: str = "",
     return _read_manifest_file(target_dir)
 
 
+async def get_or_load_manifest(username: str, url: str,
+                                manifest_path: str = "") -> AppManifest:
+    """Return the manifest for an app, preferring the DB cache.
+
+    Hot path: a single SELECT plus model_validate — no disk I/O,
+    no worker dispatch.
+
+    If the cached manifest is missing (NULL) or fails validation
+    (schema drift), falls back to reading from disk via
+    fetch_app_manifest and writes the fresh value back to the row.
+
+    If no row exists for (username, url, manifest_path), reads from
+    disk and returns the manifest without creating a row (preview
+    semantics for not-yet-installed apps).
+    """
+    from pydantic import ValidationError
+
+    settings = get_settings()
+
+    with db.get_db_session(settings.db_url) as session:
+        row = db.get_user_app(session, username, url, manifest_path)
+        stored = row.manifest if row else None
+        row_exists = row is not None
+
+    if stored is not None:
+        try:
+            return AppManifest(**stored)
+        except ValidationError as e:
+            logger.warning(f"Stored manifest schema mismatch for {url}: {e}")
+
+    manifest = await fetch_app_manifest(url, manifest_path, username=username)
+
+    if row_exists:
+        branch = await get_app_branch(url)
+        with db.get_db_session(settings.db_url) as session:
+            db.upsert_user_app(
+                session, username,
+                url=url, manifest_path=manifest_path,
+                name=manifest.name, description=manifest.description,
+                branch=branch,
+                manifest=manifest.model_dump(mode="json"),
+                bump_updated_at=False,
+            )
+
+    return manifest
+
+
+async def refresh_cached_manifest(username: str, url: str,
+                                   manifest_path: str = "",
+                                   bump_updated_at: bool = False
+                                   ) -> tuple[AppManifest, str]:
+    """Re-read the manifest from disk and sync the cache.
+
+    Call this after any operation that mutates the on-disk YAML
+    (clone or git pull) so the DB cache stays in lockstep with disk.
+
+    No-op on the DB if (username, url, manifest_path) has no row —
+    callers that need to insert a new row should use upsert_user_app
+    directly.
+
+    Returns (manifest, branch).
+    """
+    manifest = await fetch_app_manifest(url, manifest_path, username=username)
+    branch = await get_app_branch(url)
+
+    settings = get_settings()
+    with db.get_db_session(settings.db_url) as session:
+        if db.get_user_app(session, username, url, manifest_path) is not None:
+            db.upsert_user_app(
+                session, username,
+                url=url, manifest_path=manifest_path,
+                name=manifest.name, description=manifest.description,
+                branch=branch,
+                manifest=manifest.model_dump(mode="json"),
+                bump_updated_at=bump_updated_at,
+            )
+
+    return manifest, branch
+
+
 async def get_app_branch(url: str) -> str:
     """Return the branch name for a GitHub app URL.
 
@@ -1109,8 +1189,8 @@ async def submit_job(
     """
     settings = get_settings()
 
-    # Fetch and validate manifest (clones repo into user's cache)
-    manifest = await fetch_app_manifest(app_url, manifest_path, username=username)
+    # Read manifest from the cache when available; fall back to disk.
+    manifest = await get_or_load_manifest(username, app_url, manifest_path)
 
     # Find entry point
     entry_point = None
@@ -1190,14 +1270,23 @@ async def submit_job(
         session.commit()
 
     # Clone/pull repo into the user's cache (~username/.fileglancer/apps).
-    if manifest.repo_url:
+    if manifest.repo_url and manifest.repo_url != app_url:
         cached_repo_dir = await _ensure_repo_cache(manifest.repo_url, pull=pull_latest,
                                                    username=username)
         cd_suffix = "repo"
+        pulled_manifest_repo = False
     else:
         cached_repo_dir = await _ensure_repo_cache(app_url, pull=pull_latest,
                                                    username=username)
         cd_suffix = f"repo/{manifest_path}" if manifest_path else "repo"
+        pulled_manifest_repo = pull_latest
+
+    # If the pull just changed the YAML on disk, sync the cache.
+    if pulled_manifest_repo:
+        try:
+            await refresh_cached_manifest(username, app_url, manifest_path)
+        except Exception as e:
+            logger.warning(f"Failed to refresh cached manifest after pull: {e}")
 
     # Build environment variable export lines
     env_lines = ""

@@ -11,6 +11,8 @@ from fileglancer.apps.core import (  # noqa: F401
     discover_app_manifests,
     fetch_app_manifest,
     get_app_branch,
+    get_or_load_manifest,
+    refresh_cached_manifest,
     get_job_file_content,
     get_job_file_paths,
     get_service_url,

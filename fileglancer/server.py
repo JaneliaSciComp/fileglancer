@@ -21,7 +21,7 @@ except ImportError:
 
 import yaml
 from loguru import logger
-from pydantic import HttpUrl
+from pydantic import HttpUrl, ValidationError
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, Query, Path, Body, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -1521,9 +1521,9 @@ def create_app(settings):
                              username: str = Depends(get_current_user)):
         try:
             logger.info(f"Fetching manifest for URL: '{body.url}' path: '{body.manifest_path}'")
-            manifest = await apps_module.fetch_app_manifest(body.url, body.manifest_path,
-                                                                username=username)
-            return manifest
+            return await apps_module.get_or_load_manifest(
+                username, body.url, body.manifest_path,
+            )
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
@@ -1533,32 +1533,63 @@ def create_app(settings):
              description="Get the user's configured apps with their manifests")
     async def get_user_apps(username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
-            pref = db.get_user_preference(session, username, "apps")
+            rows = db.list_user_apps(session, username)
+            snapshots = [
+                {
+                    "url": row.url,
+                    "manifest_path": row.manifest_path,
+                    "name": row.name,
+                    "description": row.description,
+                    "branch": row.branch,
+                    "manifest": row.manifest,
+                    "added_at": row.added_at,
+                    "updated_at": row.updated_at,
+                }
+                for row in rows
+            ]
 
-        app_list = pref.get("apps", []) if pref else []
-        result = []
-        for app_entry in app_list:
-            user_app = UserApp(
-                url=app_entry["url"],
-                manifest_path=app_entry.get("manifest_path", ""),
-                name=app_entry.get("name", "Unknown"),
-                description=app_entry.get("description"),
-                added_at=app_entry.get("added_at", datetime.now(UTC).isoformat()),
-                updated_at=app_entry.get("updated_at"),
-            )
-            # Try to fetch manifest from local clone
+        result: list[UserApp] = []
+        needs_backfill: list[int] = []
+        for idx, snap in enumerate(snapshots):
+            manifest_obj: Optional[AppManifest] = None
+            stored = snap["manifest"]
+            if stored is not None:
+                try:
+                    manifest_obj = AppManifest(**stored)
+                except ValidationError as e:
+                    logger.warning(
+                        f"Stored manifest schema mismatch for {snap['url']}: {e}"
+                    )
+                    needs_backfill.append(idx)
+            else:
+                needs_backfill.append(idx)
+
+            result.append(UserApp(
+                url=snap["url"],
+                manifest_path=snap["manifest_path"],
+                name=snap["name"],
+                description=snap["description"],
+                branch=snap["branch"],
+                added_at=snap["added_at"],
+                updated_at=snap["updated_at"],
+                manifest=manifest_obj,
+            ))
+
+        for idx in needs_backfill:
+            snap = snapshots[idx]
             try:
-                user_app.manifest = await apps_module.fetch_app_manifest(
-                    app_entry["url"], app_entry.get("manifest_path", ""),
-                    username=username,
+                manifest, branch = await apps_module.refresh_cached_manifest(
+                    username, snap["url"], snap["manifest_path"],
                 )
-                # Update name/description from manifest
-                user_app.name = user_app.manifest.name
-                user_app.description = user_app.manifest.description
-                user_app.branch = await apps_module.get_app_branch(app_entry["url"])
             except Exception as e:
-                logger.warning(f"Failed to fetch manifest for {app_entry['url']}: {e}")
-            result.append(user_app)
+                logger.warning(f"Failed to fetch manifest for {snap['url']}: {e}")
+                continue
+
+            user_app = result[idx]
+            user_app.manifest = manifest
+            user_app.name = manifest.name
+            user_app.description = manifest.description
+            user_app.branch = branch
         return result
 
     @app.post("/api/apps", response_model=list[UserApp],
@@ -1582,48 +1613,36 @@ def create_app(settings):
                        f"Make sure a manifest exists in the repository.",
             )
 
-        now = datetime.now(UTC)
+        branch = await apps_module.get_app_branch(body.url)
+        new_apps: list[UserApp] = []
 
         with db.get_db_session(settings.db_url) as session:
-            pref = db.get_user_preference(session, username, "apps")
-            app_list = pref.get("apps", []) if pref else []
-
-            # Build set of existing (url, manifest_path) for dedup
-            existing_keys = {
-                (a["url"], a.get("manifest_path", "")) for a in app_list
-            }
-
-            branch = await apps_module.get_app_branch(body.url)
-            new_apps: list[UserApp] = []
             for manifest_path, manifest in discovered:
-                if (body.url, manifest_path) in existing_keys:
+                if db.get_user_app(session, username, body.url, manifest_path) is not None:
                     continue  # silently skip duplicates
-
-                new_entry = {
-                    "url": body.url,
-                    "manifest_path": manifest_path,
-                    "name": manifest.name,
-                    "description": manifest.description,
-                    "added_at": now.isoformat(),
-                }
-                app_list.append(new_entry)
-                new_apps.append(UserApp(
-                    url=body.url,
-                    manifest_path=manifest_path,
+                row = db.upsert_user_app(
+                    session, username,
+                    url=body.url, manifest_path=manifest_path,
+                    name=manifest.name, description=manifest.description,
                     branch=branch,
-                    name=manifest.name,
-                    description=manifest.description,
-                    added_at=now,
+                    manifest=manifest.model_dump(mode="json"),
+                )
+                new_apps.append(UserApp(
+                    url=row.url,
+                    manifest_path=row.manifest_path,
+                    branch=row.branch,
+                    name=row.name,
+                    description=row.description,
+                    added_at=row.added_at,
+                    updated_at=row.updated_at,
                     manifest=manifest,
                 ))
 
-            if not new_apps:
-                raise HTTPException(
-                    status_code=409,
-                    detail="All apps in this repository have already been added.",
-                )
-
-            db.set_user_preference(session, username, "apps", {"apps": app_list})
+        if not new_apps:
+            raise HTTPException(
+                status_code=409,
+                detail="All apps in this repository have already been added.",
+            )
 
         return new_apps
 
@@ -1633,18 +1652,8 @@ def create_app(settings):
                               manifest_path: str = Query("", description="Manifest path within the repo"),
                               username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
-            pref = db.get_user_preference(session, username, "apps")
-            app_list = pref.get("apps", []) if pref else []
-
-            new_list = [
-                a for a in app_list
-                if not (a["url"] == url and a.get("manifest_path", "") == manifest_path)
-            ]
-            if len(new_list) == len(app_list):
+            if not db.delete_user_app(session, username, url, manifest_path):
                 raise HTTPException(status_code=404, detail="App not found")
-
-            db.set_user_preference(session, username, "apps", {"apps": new_list})
-
         return {"message": "App removed"}
 
     @app.post("/api/apps/update", response_model=UserApp,
@@ -1664,33 +1673,26 @@ def create_app(settings):
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to read manifest after update: {str(e)}")
 
-        now = datetime.now(UTC)
-
-        # Update stored name/description/updated_at from refreshed manifest
-        with db.get_db_session(settings.db_url) as session:
-            pref = db.get_user_preference(session, username, "apps")
-            app_list = pref.get("apps", []) if pref else []
-            added_at = now  # fallback
-            for entry in app_list:
-                if entry["url"] == body.url and entry.get("manifest_path", "") == body.manifest_path:
-                    entry["name"] = manifest.name
-                    entry["description"] = manifest.description
-                    entry["updated_at"] = now.isoformat()
-                    added_at = entry.get("added_at", now.isoformat())
-                    break
-            db.set_user_preference(session, username, "apps", {"apps": app_list})
-
         branch = await apps_module.get_app_branch(body.url)
-        return UserApp(
-            url=body.url,
-            manifest_path=body.manifest_path,
-            branch=branch,
-            name=manifest.name,
-            description=manifest.description,
-            added_at=added_at,
-            updated_at=now,
-            manifest=manifest,
-        )
+
+        with db.get_db_session(settings.db_url) as session:
+            row = db.upsert_user_app(
+                session, username,
+                url=body.url, manifest_path=body.manifest_path,
+                name=manifest.name, description=manifest.description,
+                branch=branch,
+                manifest=manifest.model_dump(mode="json"),
+            )
+            return UserApp(
+                url=row.url,
+                manifest_path=row.manifest_path,
+                branch=row.branch,
+                name=row.name,
+                description=row.description,
+                added_at=row.added_at,
+                updated_at=row.updated_at,
+                manifest=manifest,
+            )
 
     @app.post("/api/apps/validate-paths", response_model=PathValidationResponse,
               description="Validate file/directory paths for app parameters")
