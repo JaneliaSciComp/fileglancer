@@ -18,7 +18,7 @@ import FgButton from '@/components/designSystem/atoms/FgButton';
 
 interface AppCardProps {
   readonly app: UserApp;
-  readonly onRemove: (params: { url: string; manifest_path: string }) => void;
+  readonly onRemove: () => void;
   readonly onUpdate: (params: { url: string; manifest_path: string }) => void;
   readonly onShare: () => void;
   readonly onUnshare: () => void;
@@ -94,12 +94,7 @@ export default function AppCard({
             <IconButton
               className="text-foreground hover:text-error"
               disabled={removing}
-              onClick={() =>
-                onRemove({
-                  url: app.url,
-                  manifest_path: app.manifest_path
-                })
-              }
+              onClick={onRemove}
               size="sm"
               variant="ghost"
             >
@@ -141,7 +136,7 @@ export default function AppCard({
         }}
         onRemove={() => {
           setInfoOpen(false);
-          onRemove({ url: app.url, manifest_path: app.manifest_path });
+          onRemove();
         }}
         onShare={() => {
           setInfoOpen(false);

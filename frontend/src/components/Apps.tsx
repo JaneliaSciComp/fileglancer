@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 
 import AppCard from '@/components/ui/AppsPage/AppCard';
 import AddAppDialog from '@/components/ui/AppsPage/AddAppDialog';
+import DeleteAppDialog from '@/components/ui/AppsPage/DeleteAppDialog';
 import ShareAppDialog from '@/components/ui/AppsPage/ShareAppDialog';
 import {
   useAppsQuery,
@@ -22,6 +23,7 @@ import type { UserApp } from '@/shared.types';
 export default function Apps() {
   const navigate = useNavigate();
   const [shareApp, setShareApp] = useState<UserApp | null>(null);
+  const [deleteApp, setDeleteApp] = useState<UserApp | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
 
   const appsQuery = useAppsQuery();
@@ -31,16 +33,21 @@ export default function Apps() {
   const shareAppMutation = useShareAppMutation();
   const unshareListingMutation = useUnshareListingMutation();
 
-  const handleRemoveApp = async ({
-    url,
-    manifest_path
-  }: {
-    url: string;
-    manifest_path: string;
-  }) => {
+  const handleRequestRemove = (app: UserApp) => {
+    setDeleteApp(app);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteApp) {
+      return;
+    }
     try {
-      await removeAppMutation.mutateAsync({ url, manifest_path });
+      await removeAppMutation.mutateAsync({
+        url: deleteApp.url,
+        manifest_path: deleteApp.manifest_path
+      });
       toast.success('App removed');
+      setDeleteApp(null);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to remove app';
@@ -138,7 +145,7 @@ export default function Apps() {
             <AppCard
               app={app}
               key={`${app.url}::${app.manifest_path}`}
-              onRemove={handleRemoveApp}
+              onRemove={() => handleRequestRemove(app)}
               onShare={() => setShareApp(app)}
               onUnshare={() =>
                 app.listing_id !== undefined
@@ -166,6 +173,13 @@ export default function Apps() {
         onAdd={handleAddFromUrl}
         onClose={() => setShowAddDialog(false)}
         open={showAddDialog}
+      />
+      <DeleteAppDialog
+        app={deleteApp}
+        onClose={() => setDeleteApp(null)}
+        onConfirm={handleConfirmDelete}
+        open={deleteApp !== null}
+        removing={removeAppMutation.isPending}
       />
       <ShareAppDialog
         app={shareApp}
