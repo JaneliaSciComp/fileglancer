@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
 
 import { Typography } from '@material-tailwind/react';
-import { HiOutlineLink, HiOutlineSquares2X2 } from 'react-icons/hi2';
+import { HiOutlineLink } from 'react-icons/hi2';
 import toast from 'react-hot-toast';
 
 import AppCard from '@/components/ui/AppsPage/AppCard';
@@ -21,7 +20,6 @@ import FgButton from './designSystem/atoms/FgButton';
 import type { UserApp } from '@/shared.types';
 
 export default function Apps() {
-  const navigate = useNavigate();
   const [shareApp, setShareApp] = useState<UserApp | null>(null);
   const [deleteApp, setDeleteApp] = useState<UserApp | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -107,21 +105,12 @@ export default function Apps() {
 
   return (
     <div>
-      <Typography className="mb-6 text-foreground font-bold" type="h5">
-        Apps
-      </Typography>
       <Typography className="mb-6 text-foreground">
-        Run command-line tools on the compute cluster. Browse the catalog to
+        Run command-line tools on the compute cluster. Browse the App Catalog to
         find shared apps, or add one from a GitHub URL.
       </Typography>
 
-      <div className="mb-6 flex gap-3">
-        <FgButton
-          icon={HiOutlineSquares2X2}
-          onClick={() => navigate('/catalog')}
-        >
-          Browse Catalog
-        </FgButton>
+      <div className="mb-6">
         <FgButton
           icon={HiOutlineLink}
           onClick={() => setShowAddDialog(true)}

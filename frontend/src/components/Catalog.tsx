@@ -1,11 +1,8 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router';
 import { Typography } from '@material-tailwind/react';
-import { HiOutlineArrowLeft } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
 import ListingCard from '@/components/ui/AppsPage/ListingCard';
-import FgButton from '@/components/designSystem/atoms/FgButton';
 import {
   useAppsQuery,
   useAddFromListingMutation,
@@ -16,7 +13,6 @@ import { useProfileContext } from '@/contexts/ProfileContext';
 import type { AppListing } from '@/shared.types';
 
 export default function Catalog() {
-  const navigate = useNavigate();
   const [search, setSearch] = useState('');
 
   const catalogQuery = useCatalogQuery();
@@ -71,17 +67,6 @@ export default function Catalog() {
 
   return (
     <div>
-      <FgButton
-        className="mb-6"
-        icon={HiOutlineArrowLeft}
-        onClick={() => navigate('/apps')}
-        variant="outline"
-      >
-        Back to Apps
-      </FgButton>
-      <Typography className="mb-2 text-foreground font-bold" type="h5">
-        App Catalog
-      </Typography>
       <Typography className="mb-6 text-foreground">
         Browse apps shared by other users. Click &quot;Add to my apps&quot; to
         get your own copy.
