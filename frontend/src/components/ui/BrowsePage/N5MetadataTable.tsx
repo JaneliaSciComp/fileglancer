@@ -1,5 +1,6 @@
 import { HiExclamationTriangle } from 'react-icons/hi2';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import { translateUnitToNeuroglancer } from '@/omezarr-helper';
 import type { N5Metadata } from '@/queries/n5Queries';
@@ -121,10 +122,9 @@ export default function N5MetadataTable({ metadata }: N5MetadataTableProps) {
             {hasNoDownsampling ? (
               <td className="px-3 py-3 flex items-center gap-1 text-warning">
                 Not specified
-                <FgTooltip
-                  icon={HiExclamationTriangle}
-                  label="No 'downsamplingFactors' or 'scales' found in attributes.json. Neuroglancer can also read 'downsamplingFactors' from individual sN/attributes.json files."
-                />
+                <FgTooltip label="No 'downsamplingFactors' or 'scales' found in attributes.json. Neuroglancer can also read 'downsamplingFactors' from individual sN/attributes.json files.">
+                  <FgIcon icon={HiExclamationTriangle} />
+                </FgTooltip>
               </td>
             ) : (
               <td className="px-3 py-2">
@@ -163,10 +163,9 @@ export default function N5MetadataTable({ metadata }: N5MetadataTableProps) {
                   <td className="px-3 py-3 text-right">
                     <span className="flex items-center justify-end gap-1 text-warning">
                       {axis.resolution}
-                      <FgTooltip
-                        icon={HiExclamationTriangle}
-                        label="No 'resolution' or 'pixelResolution.dimensions' found in attributes.json. Neuroglancer uses these to define the physical scale of each dimension."
-                      />
+                      <FgTooltip label="No 'resolution' or 'pixelResolution.dimensions' found in attributes.json. Neuroglancer uses these to define the physical scale of each dimension.">
+                        <FgIcon icon={HiExclamationTriangle} />
+                      </FgTooltip>
                     </span>
                   </td>
                 ) : (

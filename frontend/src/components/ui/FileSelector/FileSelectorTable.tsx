@@ -15,6 +15,7 @@ import {
 } from 'react-icons/hi2';
 import { TbFile } from 'react-icons/tb';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import type { FileOrFolder, FileSharePath, Zone } from '@/shared.types';
 import type { FileSelectorLocation } from '@/hooks/useFileSelector';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
@@ -80,12 +81,18 @@ export default function FileSelectorTable({
           if (currentLocation.type === 'zones') {
             // At zones level: show zone icon for all items
             icon = (
-              <HiOutlineSquares2X2 className="text-foreground icon-default flex-shrink-0" />
+              <FgIcon
+                className="text-foreground flex-shrink-0"
+                icon={HiOutlineSquares2X2}
+              />
             );
           } else if (currentLocation.type === 'zone') {
             // At zone level: show FSP icon and use preferred path format
             icon = (
-              <HiOutlineRectangleStack className="text-foreground icon-default flex-shrink-0" />
+              <FgIcon
+                className="text-foreground flex-shrink-0"
+                icon={HiOutlineRectangleStack}
+              />
             );
             // Get FSP from zonesData and display in preferred format
             const fspKey = makeMapKey('fsp', name);
@@ -96,9 +103,12 @@ export default function FileSelectorTable({
           } else {
             // At filesystem level: show folder or file icon
             icon = file.is_dir ? (
-              <HiFolder className="text-foreground icon-default flex-shrink-0" />
+              <FgIcon
+                className="text-foreground flex-shrink-0"
+                icon={HiFolder}
+              />
             ) : (
-              <TbFile className="text-foreground icon-default flex-shrink-0" />
+              <FgIcon className="text-foreground flex-shrink-0" icon={TbFile} />
             );
           }
 

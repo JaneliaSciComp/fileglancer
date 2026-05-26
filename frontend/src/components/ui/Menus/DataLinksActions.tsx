@@ -2,6 +2,7 @@ import type { MouseEvent } from 'react';
 import { Menu, IconButton } from '@material-tailwind/react';
 import { HiOutlineEllipsisHorizontalCircle } from 'react-icons/hi2';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgMenuItems from './FgMenuItems';
 import type { MenuItem } from './FgMenuItems';
 
@@ -22,7 +23,10 @@ export default function DataLinksActionsMenu<T>({
         onClick={(e: MouseEvent) => e.stopPropagation()}
         variant="ghost"
       >
-        <HiOutlineEllipsisHorizontalCircle className="icon-default text-foreground" />
+        <FgIcon
+          className="text-foreground"
+          icon={HiOutlineEllipsisHorizontalCircle}
+        />
       </Menu.Trigger>
       <Menu.Content>
         <FgMenuItems<T> actionProps={actionProps} menuItems={menuItems} />

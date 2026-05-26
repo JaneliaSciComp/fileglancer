@@ -4,6 +4,7 @@ import { Outlet } from 'react-router';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { PiDotsSixVerticalBold } from 'react-icons/pi';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import useLayoutPrefs from '@/hooks/useLayoutPrefs';
 import Sidebar from '@/components/ui/Sidebar/Sidebar';
@@ -67,7 +68,10 @@ export const BrowsePageLayout = () => {
                 <Sidebar />
               </Panel>
               <PanelResizeHandle className="group relative w-3 bg-surface border-r border-surface hover:border-secondary/60">
-                <PiDotsSixVerticalBold className="icon-default stroke-2 absolute -right-1 top-1/2 stroke-surface-foreground pointer-events-none" />
+                <FgIcon
+                  className="stroke-2 absolute -right-1 top-1/2 stroke-surface-foreground pointer-events-none"
+                  icon={PiDotsSixVerticalBold}
+                />
               </PanelResizeHandle>
             </>
           ) : null}
@@ -78,7 +82,10 @@ export const BrowsePageLayout = () => {
             <>
               {/* Need a little extra width on this handle to make up for the apparent extra width added by the sidebar grey inner border on the other handle */}
               <PanelResizeHandle className="group relative w-3.5 bg-surface border-l border-surface hover:border-secondary/60">
-                <PiDotsSixVerticalBold className="icon-default stroke-2 absolute -left-1 top-1/2 stroke-surface-foreground pointer-events-none" />
+                <FgIcon
+                  className="stroke-2 absolute -left-1 top-1/2 stroke-surface-foreground pointer-events-none"
+                  icon={PiDotsSixVerticalBold}
+                />
               </PanelResizeHandle>
               <Panel
                 className="bg-background"

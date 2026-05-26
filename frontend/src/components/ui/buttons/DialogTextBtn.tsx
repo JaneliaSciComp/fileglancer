@@ -1,11 +1,11 @@
 import { useState, type ReactNode, type MouseEvent } from 'react';
-import { Button } from '@material-tailwind/react';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 
 type TextDialogBtnProps = {
   readonly label: string;
-  readonly variant?: 'solid' | 'outline' | 'ghost' | 'gradient' | undefined;
+  readonly variant?: 'solid' | 'outline' | 'ghost' | 'link' | undefined;
   readonly className?: string;
   readonly disabled?: boolean;
   readonly children: ReactNode | ((closeDialog: () => void) => ReactNode);
@@ -13,8 +13,8 @@ type TextDialogBtnProps = {
 
 export default function TextDialogBtn({
   label,
-  variant = 'outline',
-  className = '!rounded-md w-fit',
+  variant = 'solid',
+  className = 'w-fit',
   disabled = false,
   children
 }: TextDialogBtnProps) {
@@ -24,17 +24,17 @@ export default function TextDialogBtn({
 
   return (
     <>
-      <Button
+      <FgButton
         className={className}
         disabled={disabled}
         onClick={(e: MouseEvent<HTMLButtonElement>) => {
           setShowDialog(true);
           e.currentTarget.blur();
         }}
-        variant={variant}
+        variant={variant ? variant : 'solid'}
       >
         {label}
-      </Button>
+      </FgButton>
       {showDialog ? (
         <FgDialog onClose={closeDialog} open={showDialog}>
           {typeof children === 'function' ? children(closeDialog) : children}

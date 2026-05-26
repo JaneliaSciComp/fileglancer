@@ -179,9 +179,8 @@ test.describe('Data Link Table Filtering', () => {
           .first()
       ).toBeVisible();
 
-      // Click on the Name sort icon to sort A-Z
-      const nameSortIcon = page.locator('div > .icon-default').first();
-      await nameSortIcon.click();
+      // Click on the Name column header to sort A-Z
+      await page.getByText('Name', { exact: true }).click();
 
       // Verify Mock Link 1 is now visible on Page 1
       await expect(

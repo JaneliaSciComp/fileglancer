@@ -5,6 +5,7 @@ import { HiOutlineClipboardCopy } from 'react-icons/hi';
 import { HiOutlineEllipsisHorizontalCircle } from 'react-icons/hi2';
 
 import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import DialogIconBtn from '@/components/ui/buttons/DialogIconBtn';
 import DataLinkUsageDialog from '@/components/ui/Dialogs/dataLinkUsage/DataLinkUsageDialog';
@@ -124,7 +125,7 @@ export default function DataToolLinks({
             openCondition={showCopiedTooltip ? true : undefined}
             triggerClasses={CIRCLE_CLASSES}
           >
-            <HiOutlineClipboardCopy className="icon-default text-foreground" />
+            <FgIcon className="text-foreground" icon={HiOutlineClipboardCopy} />
           </FgTooltip>
           <span className={LABEL_CLASSES}>Copy</span>
         </div>

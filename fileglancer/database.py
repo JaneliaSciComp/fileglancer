@@ -570,6 +570,8 @@ def _find_best_fsp_match(
     subpath = normalized_input[best_len:]
     if subpath.startswith(separator):
         subpath = subpath.lstrip(separator)
+    # Normalize to forward slashes so subpaths are portable (e.g. used in URLs)
+    subpath = subpath.replace("\\", "/")
 
     return (best_fsp, subpath)
 

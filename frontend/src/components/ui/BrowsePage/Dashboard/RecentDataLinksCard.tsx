@@ -4,6 +4,7 @@ import { PiLinkSimpleBold } from 'react-icons/pi';
 import type { FileSharePath } from '@/shared.types';
 import type { ProxiedPath } from '@/contexts/ProxiedPathContext';
 import { makeMapKey } from '@/utils';
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import DashboardCard from '@/components/ui/BrowsePage/Dashboard/FgDashboardCard';
 import Folder from '@/components/ui/Sidebar/Folder';
 import { SidebarItemSkeleton } from '@/components/ui/widgets/Loaders';
@@ -59,7 +60,11 @@ export default function RecentDataLinksCard() {
                 folderPath={item.path}
                 fsp={fsp}
                 icon={
-                  <PiLinkSimpleBold className="icon-small short:icon-xsmall stroke-2" />
+                  <FgIcon
+                    className="short:icon-xsmall stroke-2"
+                    icon={PiLinkSimpleBold}
+                    size="sm"
+                  />
                 }
                 isFavoritable={false}
                 key={item.sharing_key}

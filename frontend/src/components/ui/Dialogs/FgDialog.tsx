@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import { Dialog, IconButton } from '@material-tailwind/react';
 import { HiX } from 'react-icons/hi';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
+
 type FgDialogProps = {
   readonly open: boolean;
   readonly onClose: () => void;
@@ -26,7 +28,7 @@ export default function FgDialog({
             size="sm"
             variant="outline"
           >
-            <HiX className="icon-default" />
+            <FgIcon icon={HiX} />
           </IconButton>
           {children}
         </Dialog.Content>

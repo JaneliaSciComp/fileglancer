@@ -1,12 +1,12 @@
 import type { ChangeEvent } from 'react';
-import { Button, Typography } from '@material-tailwind/react';
+import { Typography } from '@material-tailwind/react';
 import { HiFolderAdd } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
 import DialogIconBtn from '@/components/ui/buttons/DialogIconBtn';
-import { Spinner } from '@/components/ui/widgets/Loaders';
 import useNewFolderDialog from '@/hooks/useNewFolderDialog';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 
 type NewFolderButtonProps = {
   readonly triggerClasses: string;
@@ -67,20 +67,14 @@ export default function NewFolderButton({
             />
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              className="!rounded-md"
+            <FgButton
               disabled={isSubmitDisabled}
+              loading={mutations.createFolder.isPending}
+              loadingText="Creating..."
               type="submit"
             >
-              {mutations.createFolder.isPending ? (
-                <Spinner
-                  customClasses="border-primary-foreground"
-                  text="Creating..."
-                />
-              ) : (
-                'Submit'
-              )}
-            </Button>
+              Submit
+            </FgButton>
             {!newName.trim() ? (
               <Typography className="text-sm text-foreground/60">
                 Please enter a folder name

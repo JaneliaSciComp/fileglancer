@@ -1,16 +1,16 @@
 import type { ChangeEvent } from 'react';
-import { Button, Typography } from '@material-tailwind/react';
+import { Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
 import FgDialog from './FgDialog';
 import TextWithFilePath from './TextWithFilePath';
-import { Spinner } from '@/components/ui/widgets/Loaders';
 import useConvertFileDialog from '@/hooks/useConvertFileDialog';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { useTicketContext } from '@/contexts/TicketsContext';
 import { getPreferredPathForDisplay } from '@/utils/pathHandling';
 import FileSelectorButton from '@/components/ui/FileSelector/FileSelectorButton';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 
 type ItemNamingDialogProps = {
   readonly showConvertFileDialog: boolean;
@@ -164,8 +164,7 @@ export default function ConvertFileDialog({
             </Typography>
           ) : null}
         </div>
-        <Button
-          className="!rounded-md"
+        <FgButton
           disabled={
             !destinationFolder ||
             !outputFilename ||
@@ -175,18 +174,12 @@ export default function ConvertFileDialog({
             createTicketMutation.isPending ||
             allTicketsQuery.isFetching
           }
+          loading={createTicketMutation.isPending || allTicketsQuery.isFetching}
+          loadingText="Processing..."
           type="submit"
         >
-          {createTicketMutation.isPending || allTicketsQuery.isFetching ? (
-            <Spinner
-              customClasses="border-primary-foreground"
-              text="Processing..."
-              textClasses="text-primary-foreground"
-            />
-          ) : (
-            'Submit'
-          )}
-        </Button>
+          Submit
+        </FgButton>
       </form>
     </FgDialog>
   );

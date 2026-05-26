@@ -1,11 +1,11 @@
 import type { ChangeEvent, Dispatch, SetStateAction } from 'react';
-import { Button, Typography } from '@material-tailwind/react';
+import { Typography } from '@material-tailwind/react';
 
 import useRenameDialog from '@/hooks/useRenameDialog';
 import FgDialog from './FgDialog';
-import { Spinner } from '@/components/ui/widgets/Loaders';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import toast from 'react-hot-toast';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 
 type ItemNamingDialogProps = {
   readonly showRenameDialog: boolean;
@@ -65,20 +65,14 @@ export default function RenameDialog({
             value={newName}
           />
         </div>
-        <Button
-          className="!rounded-md"
+        <FgButton
           disabled={mutations.rename.isPending}
+          loading={mutations.rename.isPending}
+          loadingText="Renaming..."
           type="submit"
         >
-          {mutations.rename.isPending ? (
-            <Spinner
-              customClasses="border-primary-foreground"
-              text="Renaming..."
-            />
-          ) : (
-            'Submit'
-          )}
-        </Button>
+          Submit
+        </FgButton>
       </form>
     </FgDialog>
   );

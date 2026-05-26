@@ -28,6 +28,8 @@ type FileBrowserPageResponse = {
   has_more?: boolean;
   next_cursor?: string | null;
   total_count?: number | null;
+  is_truncated?: boolean;
+  max_count?: number;
 };
 
 export type FileQueryData = {
@@ -37,6 +39,8 @@ export type FileQueryData = {
   errorMessage?: string;
   hasMore: boolean;
   totalCount: number | null;
+  isTruncated: boolean;
+  maxCount: number | null;
 };
 
 // Query key factory for hierarchical cache management
@@ -142,7 +146,9 @@ export default function useFileQuery(
       currentFileOrFolder,
       files: allFiles,
       hasMore: lastPage?.has_more ?? false,
-      totalCount
+      totalCount,
+      isTruncated: lastPage?.is_truncated ?? false,
+      maxCount: lastPage?.max_count ?? null
     };
   };
 

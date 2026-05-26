@@ -6,6 +6,8 @@ import { HiOutlineFolder } from 'react-icons/hi2';
 import { HiStar } from 'react-icons/hi';
 import { useQueryClient } from '@tanstack/react-query';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
+
 import {
   makeMapKey,
   getLastSegmentFromPath,
@@ -133,7 +135,11 @@ export default function Folder({
         >
           <div className="w-full flex gap-1 items-center">
             {icon || (
-              <HiOutlineFolder className="icon-small short:icon-xsmall stroke-2" />
+              <FgIcon
+                className="short:icon-xsmall stroke-2"
+                icon={HiOutlineFolder}
+                size="sm"
+              />
             )}
             <Typography className="w-[calc(100%-2rem)] truncate text-sm leading-4 short:text-xs font-semibold">
               {getLastSegmentFromPath(folderPath)}
@@ -173,7 +179,11 @@ export default function Folder({
               }}
               variant="ghost"
             >
-              <HiStar className="icon-small short:icon-xsmall mb-[2px]" />
+              <FgIcon
+                className="short:icon-xsmall mb-[2px]"
+                icon={HiStar}
+                size="sm"
+              />
             </IconButton>
           </div>
         ) : null}

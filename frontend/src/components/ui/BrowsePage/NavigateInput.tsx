@@ -1,10 +1,11 @@
-import { Button, Input, Typography } from '@material-tailwind/react';
+import { Input, Typography } from '@material-tailwind/react';
 import { HiChevronRight } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 import { useEffect, useRef } from 'react';
 
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import useNavigationInput from '@/hooks/useNavigationInput';
+import FgButton from '@/components/designSystem/atoms/FgButton';
 
 export default function NavigationInput({
   location,
@@ -74,10 +75,9 @@ export default function NavigationInput({
           type="text"
           value={inputValue}
         />
-        <Button className="max-h-full flex-1 gap-1" type="submit">
+        <FgButton className="max-h-full" icon={HiChevronRight} type="submit">
           Go
-          <HiChevronRight className="icon-small stroke-2" />
-        </Button>
+        </FgButton>
       </form>
     </div>
   );

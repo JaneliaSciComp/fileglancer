@@ -3,10 +3,15 @@ A module that provides a simple interface for interacting with a file system,
 rooted at a specific directory.
 """
 
+import itertools
 import os
 import stat
-import pwd
-import grp
+try:
+    import pwd
+    import grp
+except ImportError:
+    pwd = None  # type: ignore[assignment]
+    grp = None  # type: ignore[assignment]
 import shutil
 
 from pydantic import BaseModel
@@ -69,7 +74,12 @@ class FileInfo(BaseModel):
                 if not (parent_real == root_real or parent_real.startswith(root_real + os.sep)):
                     logger.warning(f"Refusing to read symlink outside root: {path}")
                     return None
-            return os.readlink(path)
+            result = os.readlink(path)
+            # Windows prefixes symlink targets with \\?\ (extended-length path).
+            # Strip it so path comparisons work uniformly.
+            if result.startswith("\\\\?\\"):
+                result = result[4:]
+            return result
         except OSError as e:
             logger.warning(f"Failed to read symlink target for {path}: {e}")
             return None
@@ -153,12 +163,12 @@ class FileInfo(BaseModel):
 
         try:
             owner = pwd.getpwuid(stat_result.st_uid).pw_name
-        except KeyError:
+        except (KeyError, AttributeError):
             owner = str(stat_result.st_uid)
 
         try:
             group = grp.getgrgid(stat_result.st_gid).gr_name
-        except KeyError:
+        except (KeyError, AttributeError):
             group = str(stat_result.st_gid)
 
         # Calculate read/write permissions for current user
@@ -194,13 +204,13 @@ class FileInfo(BaseModel):
             for g in grp.getgrall():
                 if username in g.gr_mem:
                     groups.add(g.gr_name)
-        except (KeyError, OSError):
+        except (KeyError, OSError, AttributeError):
             pass
         try:
             primary_gid = pwd.getpwnam(username).pw_gid
             primary_group = grp.getgrgid(primary_gid).gr_name
             groups.add(primary_group)
-        except (KeyError, OSError):
+        except (KeyError, OSError, AttributeError):
             pass
         return groups
 
@@ -481,7 +491,8 @@ class Filestore:
 
     def yield_file_infos_paginated(self, path: Optional[str] = None, current_user: str = None,
                                     session = None, limit: int = 200,
-                                    cursor: Optional[str] = None) -> tuple[list[FileInfo], bool, Optional[str], int]:
+                                    cursor: Optional[str] = None,
+                                    *, max_count: int) -> tuple[list[FileInfo], bool, Optional[str], int, bool]:
         """
         Return a page of FileInfo objects for children of the given path.
 
@@ -496,19 +507,33 @@ class Filestore:
             limit: Maximum number of entries to return.
             cursor: Name of the last entry from the previous page. Entries after
                 this name (in sort order) are returned.
+            max_count: Maximum number of directory entries to read and sort.
+                Directories with more entries are truncated at this limit;
+                files beyond max_count are not accessible via pagination.
+                Required keyword arg — callers must pass the configured limit
+                (e.g. Settings.max_directory_count) so the advertised and
+                actual limits cannot drift.
 
         Returns:
-            Tuple of (file_infos, has_more, next_cursor, total_count).
+            Tuple of (file_infos, has_more, next_cursor, total_count, is_truncated).
+            total_count is capped at max_count. is_truncated is True when the
+            directory has more entries than max_count.
         """
         full_path = self._check_path_in_root(path)
 
         # Compute user groups once for the entire listing
         user_groups = FileInfo._get_user_groups(current_user) if current_user else None
 
-        # Collect and sort all entries — scandir's is_dir() is free on Linux
-        entries = list(os.scandir(full_path))
-        entries.sort(key=lambda e: (not e.is_dir(follow_symlinks=False), e.name))
+        # Read max_count + 1 entries: the extra one detects truncation without
+        # reading the entire directory.
+        with os.scandir(full_path) as scanner:
+            entries = list(itertools.islice(scanner, max_count + 1))
         total_count = len(entries)
+        is_truncated = total_count > max_count
+        if is_truncated:
+            entries = entries[:max_count]
+            total_count = max_count
+        entries.sort(key=lambda e: (not e.is_dir(follow_symlinks=False), e.name))
 
         # Apply cursor: skip past the cursor entry
         if cursor:
@@ -539,7 +564,7 @@ class Filestore:
                 continue
 
         next_cursor = page_entries[-1].name if has_more and page_entries else None
-        return file_infos, has_more, next_cursor, total_count
+        return file_infos, has_more, next_cursor, total_count, is_truncated
 
     def yield_file_infos(self, path: Optional[str] = None, current_user: str = None, session = None) -> Generator[FileInfo, None, None]:
         """

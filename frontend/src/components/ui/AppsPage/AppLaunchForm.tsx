@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
-import { Accordion, Button, Tabs, Typography } from '@material-tailwind/react';
+import { Accordion, Tabs, Typography } from '@material-tailwind/react';
 import {
   HiChevronDown,
   HiOutlinePlus,
@@ -9,6 +9,8 @@ import {
   HiOutlineTrash
 } from 'react-icons/hi';
 
+import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FileSelectorButton from '@/components/ui/FileSelector/FileSelectorButton';
 import FgSwitch from '@/components/ui/widgets/FgSwitch';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
@@ -300,18 +302,18 @@ function EnvVarRows({
             title="Remove variable"
             type="button"
           >
-            <HiOutlineTrash className="h-4 w-4" />
+            <FgIcon icon={HiOutlineTrash} size="sm" />
           </button>
         </div>
       ))}
-      <button
-        className="flex items-center gap-1 text-sm text-primary hover:text-primary-dark transition-colors"
+      <FgButton
+        icon={HiOutlinePlus}
         onClick={() => setEnvVars(prev => [...prev, { key: '', value: '' }])}
-        type="button"
+        size="sm"
+        variant="ghost"
       >
-        <HiOutlinePlus className="h-4 w-4" />
         Add variable
-      </button>
+      </FgButton>
     </div>
   );
 }
@@ -548,10 +550,12 @@ function EnvironmentTabContent({
       <Accordion.Item value="environment">
         <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
           <div className="text-foreground font-bold text-sm">Environment</div>
-          <HiChevronDown
-            className={`h-4 w-4 text-foreground transition-transform ${
+          <FgIcon
+            className={`text-foreground transition-transform ${
               openEnvSections.includes('environment') ? 'rotate-180' : ''
             }`}
+            icon={HiChevronDown}
+            size="sm"
           />
         </Accordion.Trigger>
         <Accordion.Content className="pt-4 pb-2 pl-4">
@@ -570,10 +574,12 @@ function EnvironmentTabContent({
         <Accordion.Item value="apptainer">
           <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
             <div className="text-foreground font-bold text-sm">Container</div>
-            <HiChevronDown
-              className={`h-4 w-4 text-foreground transition-transform ${
+            <FgIcon
+              className={`text-foreground transition-transform ${
                 openEnvSections.includes('apptainer') ? 'rotate-180' : ''
               }`}
+              icon={HiChevronDown}
+              size="sm"
             />
           </Accordion.Trigger>
           <Accordion.Content className="pt-4 pb-2 pl-4">
@@ -639,10 +645,12 @@ function ClusterTabContent({
       <Accordion.Item value="resources">
         <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
           <div className="text-foreground font-bold text-sm">Resources</div>
-          <HiChevronDown
-            className={`h-4 w-4 text-foreground transition-transform ${
+          <FgIcon
+            className={`text-foreground transition-transform ${
               openClusterSections.includes('resources') ? 'rotate-180' : ''
             }`}
+            icon={HiChevronDown}
+            size="sm"
           />
         </Accordion.Trigger>
         <Accordion.Content className="pt-4 pb-2 pl-4">
@@ -658,10 +666,12 @@ function ClusterTabContent({
           <div className="text-foreground font-bold text-sm">
             Submit Options
           </div>
-          <HiChevronDown
-            className={`h-4 w-4 text-foreground transition-transform ${
+          <FgIcon
+            className={`text-foreground transition-transform ${
               openClusterSections.includes('submitOptions') ? 'rotate-180' : ''
             }`}
+            icon={HiChevronDown}
+            size="sm"
           />
         </Accordion.Trigger>
         <Accordion.Content className="pt-4 pb-2 pl-4">
@@ -1021,20 +1031,16 @@ export default function AppLaunchForm({
   const hasSections = visibleParameters.some(isParameterSection);
 
   const submitButton = (
-    <Button
+    <FgButton
       className="!rounded-md"
-      disabled={submitting || validating}
+      disabled={validating || submitting}
+      icon={HiOutlinePlay}
+      loading={validating || submitting}
+      loadingText={validating ? 'Validating...' : 'Submitting...'}
       onClick={handleSubmit}
     >
-      <HiOutlinePlay className="icon-small mr-2" />
-      {validating
-        ? 'Validating...'
-        : submitting
-          ? 'Submitting...'
-          : entryPoint.type === 'service'
-            ? 'Start Service'
-            : 'Submit Job'}
-    </Button>
+      {entryPoint.type === 'service' ? 'Start Service' : 'Submit Job'}
+    </FgButton>
   );
 
   return (
@@ -1127,12 +1133,14 @@ export default function AppLaunchForm({
                             </Typography>
                           ) : null}
                         </div>
-                        <HiChevronDown
-                          className={`h-4 w-4 text-foreground transition-transform ${
+                        <FgIcon
+                          className={`text-foreground transition-transform ${
                             openSections.includes(item.section)
                               ? 'rotate-180'
                               : ''
                           }`}
+                          icon={HiChevronDown}
+                          size="sm"
                         />
                       </Accordion.Trigger>
                       <Accordion.Content className="pt-4 pb-2 pl-4">
@@ -1211,12 +1219,14 @@ export default function AppLaunchForm({
                       <div className="text-foreground font-bold text-sm">
                         {item.section}
                       </div>
-                      <HiChevronDown
-                        className={`h-4 w-4 text-secondary transition-transform ${
+                      <FgIcon
+                        className={`text-secondary transition-transform ${
                           openEnvParamSections.includes(item.section)
                             ? 'rotate-180'
                             : ''
                         }`}
+                        icon={HiChevronDown}
+                        size="sm"
                       />
                     </Accordion.Trigger>
                     <Accordion.Content className="pt-4 pb-2 pl-4">

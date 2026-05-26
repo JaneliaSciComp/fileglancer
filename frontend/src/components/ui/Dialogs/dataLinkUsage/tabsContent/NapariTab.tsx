@@ -2,7 +2,7 @@ import { Fragment } from 'react/jsx-runtime';
 
 import CodeBlock from '@/components/ui/Dialogs/dataLinkUsage/CodeBlock';
 import InstructionBlock from '@/components/ui/Dialogs/dataLinkUsage/InstructionBlock';
-import ExternalLink from '@/components/ui/Dialogs/dataLinkUsage/ExternalLink';
+import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 import PrerequisitesBlock from '@/components/ui/Dialogs/dataLinkUsage/PrerequisitesBlock';
 
 type NapariTabProps = {
@@ -46,9 +46,9 @@ export default function NapariTab({
               language="bash"
               tooltipTriggerClasses={tooltipTriggerClasses}
             />
-            <ExternalLink href="https://napari.org/stable/tutorials/fundamentals/installation.html">
+            <FgExternalLink href="https://napari.org/stable/tutorials/fundamentals/installation.html">
               Napari documentation
-            </ExternalLink>
+            </FgExternalLink>
           </Fragment>,
           'In the pop-up, select the napari-ome-zarr plugin to open the image. Optionally, save this as the default choice for all files ending with .zarr.'
         ]}

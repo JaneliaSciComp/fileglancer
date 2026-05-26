@@ -1,9 +1,9 @@
 import { Fragment } from 'react';
-import { Timeline, Typography, Button } from '@material-tailwind/react';
+import { Timeline, Typography } from '@material-tailwind/react';
 import { HiExternalLink } from 'react-icons/hi';
 
+import FgButton from '@/components/designSystem/atoms/FgButton';
 import { formatDateString } from '@/utils';
-import { Link } from 'react-router';
 import type { Ticket } from '@/contexts/TicketsContext';
 
 /**
@@ -92,18 +92,18 @@ export default function TicketDetails({ ticket }: TicketDetailsProps) {
   return (
     <div className="mt-4 flex flex-col gap-6 min-w-max w-full">
       {ticket.link ? (
-        <Button
-          as={Link}
-          className="flex items-center justify-center gap-1 text-primary px-2 py-1 !self-start"
+        <FgButton
+          className="!self-start"
+          href={ticket.link}
+          icon={HiExternalLink}
+          iconPosition="right"
           rel="noopener noreferrer"
           size="sm"
           target="_blank"
-          to={ticket.link}
           variant="outline"
         >
           View ticket in JIRA
-          <HiExternalLink className="h-3.5 w-3.5" />
-        </Button>
+        </FgButton>
       ) : null}
       <div className="overflow-hidden rounded-lg border border-surface">
         <div className="p-2 border-b border-surface bg-surface-light text-sm text-foreground dark:bg-surface-dark font-semibold">

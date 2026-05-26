@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Typography } from '@material-tailwind/react';
+import { Typography } from '@material-tailwind/react';
 import { HiOutlinePlus } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
@@ -7,10 +7,10 @@ import { TableCard } from '@/components/ui/Table/TableCard';
 import { useNGLinksColumns } from '@/components/ui/Table/ngLinksColumns';
 import NGLinkDialog from '@/components/ui/Dialogs/NGLinkDialog';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
-import DeleteBtn from '@/components/ui/buttons/DeleteBtn';
 import { useNGLinkContext } from '@/contexts/NGLinkContext';
 import type { CreateNGLinkPayload, NGLink } from '@/queries/ngLinkQueries';
 import { copyToClipboard } from '@/utils/copyText';
+import FgButton from './designSystem/atoms/FgButton';
 
 export default function NGLinks() {
   const {
@@ -113,10 +113,13 @@ export default function NGLinks() {
           later if needed.
         </Typography>
         <div className="mb-4">
-          <Button data-tour="nglinks-new-button" onClick={handleOpenCreate}>
-            <HiOutlinePlus className="icon-default mr-2" />
+          <FgButton
+            data-tour="nglinks-new-button"
+            icon={HiOutlinePlus}
+            onClick={handleOpenCreate}
+          >
             New Link
-          </Button>
+          </FgButton>
         </div>
         <div data-tour="nglinks-table">
           <TableCard
@@ -152,18 +155,18 @@ export default function NGLinks() {
             {deleteItem.short_name || deleteItem.short_key}"?
           </Typography>
           <div className="flex gap-3">
-            <DeleteBtn
+            <FgButton
+              color="error"
               disabled={deleteNGLinkMutation.isPending}
+              loading={deleteNGLinkMutation.isPending}
+              loadingText="Deleting..."
               onClick={handleConfirmDelete}
-              pending={deleteNGLinkMutation.isPending}
-            />
-            <Button
-              className="!rounded-md"
-              onClick={handleCloseDelete}
-              variant="outline"
             >
+              Delete
+            </FgButton>
+            <FgButton onClick={handleCloseDelete} variant="ghost">
               Cancel
-            </Button>
+            </FgButton>
           </div>
         </FgDialog>
       ) : null}

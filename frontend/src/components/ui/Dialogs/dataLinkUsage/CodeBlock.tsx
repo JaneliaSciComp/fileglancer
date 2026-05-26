@@ -5,6 +5,7 @@ import {
 } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { HiOutlineClipboardCopy } from 'react-icons/hi';
 
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import useDarkMode from '@/hooks/useDarkMode';
 import CopyTooltip from '@/components/ui/widgets/CopyTooltip';
 
@@ -87,7 +88,7 @@ export default function CodeBlock({
             textToCopy={code}
             tooltipTriggerClasses={tooltipTriggerClasses}
           >
-            <HiOutlineClipboardCopy className="icon-default" />
+            <FgIcon icon={HiOutlineClipboardCopy} />
           </CopyTooltip>
         </div>
       ) : null}

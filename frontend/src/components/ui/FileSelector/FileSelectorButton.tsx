@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import type { MouseEvent } from 'react';
-import { Button, Input, Typography } from '@material-tailwind/react';
+import { Input, Typography } from '@material-tailwind/react';
 import { HiOutlineFolder, HiOutlineFunnel, HiXMark } from 'react-icons/hi2';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
+import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FileSelectorBreadcrumbs from './FileSelectorBreadcrumbs';
 import FileSelectorTable from './FileSelectorTable';
 import { Spinner } from '@/components/ui/widgets/Loaders';
@@ -103,19 +105,19 @@ export default function FileSelectorButton({
 
   return (
     <>
-      <Button
+      <FgButton
         className={triggerClasses}
+        icon={HiOutlineFolder}
         onClick={(e: MouseEvent<HTMLButtonElement>) => {
           setShowDialog(true);
           e.currentTarget.blur();
         }}
         size="sm"
         type="button"
-        variant="outline"
+        variant="ghost"
       >
-        <HiOutlineFolder className="icon-small mr-1" />
         {label}
-      </Button>
+      </FgButton>
       {showDialog ? (
         <FgDialog
           className="w-[800px] max-w-[90vw] max-h-max"
@@ -150,7 +152,7 @@ export default function FileSelectorButton({
               value={searchQuery}
             >
               <Input.Icon>
-                <HiOutlineFunnel className="h-full w-full" />
+                <FgIcon className="h-full w-full" icon={HiOutlineFunnel} />
               </Input.Icon>
             </Input>
             {searchQuery ? (
@@ -160,7 +162,7 @@ export default function FileSelectorButton({
                 onClick={clearSearch}
                 type="button"
               >
-                <HiXMark className="h-5 w-5 font-bold" />
+                <FgIcon className="font-bold" icon={HiXMark} />
               </button>
             ) : null}
           </div>
@@ -235,12 +237,12 @@ export default function FileSelectorButton({
 
           {/* Action buttons */}
           <div className="flex justify-end gap-2 mt-4">
-            <Button onClick={handleCancel} variant="outline">
+            <FgButton onClick={handleCancel} variant="ghost">
               Cancel
-            </Button>
-            <Button disabled={!state.selectedItem} onClick={handleSelect}>
+            </FgButton>
+            <FgButton disabled={!state.selectedItem} onClick={handleSelect}>
               {getSelectButtonText()}
-            </Button>
+            </FgButton>
           </div>
         </FgDialog>
       ) : null}
