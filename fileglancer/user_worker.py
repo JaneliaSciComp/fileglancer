@@ -1082,14 +1082,24 @@ def main():
     logger.remove()
     logger.add(sys.stderr, level=log_level)
 
-    # Configure cluster_api logging
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(logging.Formatter(
-        "%(levelname)s | %(name)s:%(funcName)s:%(lineno)d - %(message)s"
-    ))
-    cluster_logger = logging.getLogger("cluster_api")
-    cluster_logger.addHandler(handler)
-    cluster_logger.setLevel(log_level)
+    # Route stdlib logging (used by cluster_api) into loguru so a 
+    # single configuration controls levels and formatting, and
+    # loguru-only levels like TRACE/SUCCESS work without translation.
+    class _InterceptHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            try:
+                level = logger.level(record.levelname).name
+            except ValueError:
+                level = record.levelno
+            frame, depth = logging.currentframe(), 2
+            while frame and frame.f_code.co_filename == logging.__file__:
+                frame = frame.f_back
+                depth += 1
+            logger.opt(depth=depth, exception=record.exc_info).log(
+                level, record.getMessage()
+            )
+
+    logging.basicConfig(handlers=[_InterceptHandler()], level=0, force=True)
 
     # Get the socket fd from environment
     fd = int(os.environ["FGC_WORKER_FD"])
