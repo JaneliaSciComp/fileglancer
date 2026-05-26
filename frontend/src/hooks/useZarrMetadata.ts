@@ -119,11 +119,16 @@ export default function useZarrMetadata() {
           (a, b) => parseFloat(b) - parseFloat(a)
         )[0],
         axes: metadata.multiscale?.axes as OmeZarrMetadata['axes'],
+        bioformats2raw_layout: metadata.bioformats2raw_layout,
         multiscales: metadata.multiscale
           ? ([metadata.multiscale] as OmeZarrMetadata['multiscales'])
           : undefined,
         omero: metadata.omero as OmeZarrMetadata['omero'],
-        labels: metadata.labels
+        labels: metadata.labels,
+        plate: metadata.plate,
+        well: metadata.well,
+        compressor: metadata.compressor,
+        codecs: metadata.codecs
       };
 
       compatibleViewers = getViewersCompatibleWithImage(omeZarrMetadata);

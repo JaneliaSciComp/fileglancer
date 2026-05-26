@@ -44,6 +44,9 @@ type ZarrV3Attrs = {
       version?: string;
       multiscales?: unknown;
       labels?: string[];
+      'bioformats2raw.layout'?: number;
+      plate?: Metadata['plate'];
+      well?: Metadata['well'];
     };
   };
 };
@@ -52,6 +55,19 @@ type ZarrV3Attrs = {
 type ZarrV2Attrs = {
   multiscales?: unknown;
   labels?: string[];
+  'bioformats2raw.layout'?: number;
+  plate?: Metadata['plate'];
+  well?: Metadata['well'];
+};
+
+// Subset of the Zarr v3 array metadata we read for codec inspection
+type ZarrV3ArrayMetadata = {
+  codecs?: { name: string; configuration?: Record<string, unknown> }[];
+};
+
+// Subset of the Zarr v2 .zarray we read for compressor inspection
+type ZarrV2ArrayMetadata = {
+  compressor?: { id: string; [k: string]: unknown } | null;
 };
 
 /**
@@ -211,6 +227,35 @@ async function fetchZarrMetadata({
         } catch {
           // Labels directory doesn't exist - that's fine
         }
+
+        // Populate group-level OME attributes used by viewer capability checks
+        const ome = attrs.attributes?.ome;
+        if (ome) {
+          const layout = ome['bioformats2raw.layout'];
+          if (layout !== undefined) {
+            metadata.bioformats2raw_layout = Boolean(layout);
+          }
+          metadata.plate = ome.plate;
+          metadata.well = ome.well;
+        }
+
+        // Fetch the first dataset's array-level metadata to extract codecs
+        const datasetPath = metadata.multiscale?.datasets?.[0]?.path;
+        if (datasetPath) {
+          try {
+            const arrayMeta = (await fetchFileAsJson(
+              fspName,
+              `${currentFileOrFolder.path}/${datasetPath}/zarr.json`
+            )) as ZarrV3ArrayMetadata;
+            metadata.codecs = arrayMeta.codecs;
+          } catch (error) {
+            log.trace(
+              'Could not fetch v3 dataset array metadata for codecs:',
+              error
+            );
+          }
+        }
+
         primaryMetadata = {
           metadata,
           omeZarrUrl: imageUrl,
@@ -267,6 +312,32 @@ async function fetchZarrMetadata({
         } catch (error) {
           log.trace('Could not fetch labels attrs: ', error);
         }
+
+        // Populate group-level OME attributes used by viewer capability checks
+        const layout = attrs['bioformats2raw.layout'];
+        if (layout !== undefined) {
+          metadata.bioformats2raw_layout = Boolean(layout);
+        }
+        metadata.plate = attrs.plate;
+        metadata.well = attrs.well;
+
+        // Fetch the first dataset's .zarray to extract compressor
+        const datasetPath = metadata.multiscale?.datasets?.[0]?.path;
+        if (datasetPath) {
+          try {
+            const arrayMeta = (await fetchFileAsJson(
+              fspName,
+              `${currentFileOrFolder.path}/${datasetPath}/.zarray`
+            )) as ZarrV2ArrayMetadata;
+            metadata.compressor = arrayMeta.compressor;
+          } catch (error) {
+            log.trace(
+              'Could not fetch v2 dataset .zarray for compressor:',
+              error
+            );
+          }
+        }
+
         primaryMetadata = {
           metadata,
           omeZarrUrl: imageUrl,
