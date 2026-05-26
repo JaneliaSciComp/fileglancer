@@ -12,6 +12,19 @@ export type Metadata = {
   omero: omezarr.Omero | undefined;
   labels: string[] | undefined;
   zarrVersion: 2 | 3;
+  bioformats2raw_layout?: boolean;
+  plate?: {
+    columns: { name: string }[];
+    rows: { name: string }[];
+    wells: { path: string; rowIndex: number; columnIndex: number }[];
+    acquisitions?: { id: number; [k: string]: unknown }[];
+    field_count?: number;
+    name?: string;
+    version?: string;
+  };
+  well?: { images: { path: string; acquisition?: number }[]; version?: string };
+  compressor?: { id: string; [k: string]: unknown } | null;
+  codecs?: { name: string; configuration?: Record<string, unknown> }[];
 };
 
 type OmeZarrChannel = {
