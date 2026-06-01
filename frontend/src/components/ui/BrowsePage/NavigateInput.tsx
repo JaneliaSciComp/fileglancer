@@ -75,7 +75,12 @@ export default function NavigationInput({
           type="text"
           value={inputValue}
         />
-        <FgButton className="max-h-full" icon={HiChevronRight} type="submit">
+        <FgButton
+          className="max-h-full"
+          icon={HiChevronRight}
+          iconPosition="right"
+          type="submit"
+        >
           Go
         </FgButton>
       </form>
