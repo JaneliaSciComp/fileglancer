@@ -61,7 +61,7 @@ def test_app(temp_dir):
     test_proxied_path = os.path.join(temp_dir, "new_test_proxied_path")
     os.makedirs(test_proxied_path, exist_ok=True)
 
-    settings = Settings(db_url=db_url, file_share_mounts=[])
+    settings = Settings(db_url=db_url, file_share_mounts=[], cli_mode=True)
 
     # Monkey-patch get_settings to return our test settings
     import fileglancer.settings
@@ -84,6 +84,12 @@ def test_app(temp_dir):
     # Dispose the cached engine from the database module
     from fileglancer.database import dispose_engine
     dispose_engine(db_url)
+
+    # Clear the per-process filestore cache so subsequent tests don't see
+    # stale Filestore instances pointing at this test's temp directory
+    from fileglancer.user_worker import _filestore_cache, _user_groups_cache
+    _filestore_cache.clear()
+    _user_groups_cache.clear()
 
     # Restore original get_settings and clear cache
     fileglancer.settings.get_settings = original_get_settings
