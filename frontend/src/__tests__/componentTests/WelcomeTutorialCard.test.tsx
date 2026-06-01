@@ -28,15 +28,12 @@ describe('WelcomeTutorialCard', () => {
     });
   });
 
-  it('displays checkbox with correct label and helper text', async () => {
+  it('displays checkbox with correct label', async () => {
     render(<WelcomeTutorialCard />, { initialEntries: ['/browse'] });
 
     await waitFor(() => {
       expect(
-        screen.getByLabelText(/hide this card.*help page/i)
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(/you can always access tutorials from the help page/i)
+        screen.getByLabelText(/show this card on startup/i)
       ).toBeInTheDocument();
     });
   });
@@ -44,17 +41,17 @@ describe('WelcomeTutorialCard', () => {
   it('checkbox reflects showTutorial preference state', async () => {
     render(<WelcomeTutorialCard />, { initialEntries: ['/browse'] });
 
-    const checkbox = await screen.findByLabelText(/hide this card.*help page/i);
+    const checkbox = await screen.findByLabelText(/show this card on startup/i);
 
-    // showTutorial is true by default, so checkbox should be unchecked (inverse)
-    expect(checkbox).not.toBeChecked();
+    // showTutorial is true by default, so checkbox should be checked
+    expect(checkbox).toBeChecked();
   });
 
   it('toggles preference when checkbox is clicked and shows success toast', async () => {
     render(<WelcomeTutorialCard />, { initialEntries: ['/browse'] });
 
     const user = userEvent.setup();
-    const checkbox = await screen.findByLabelText(/hide this card.*help page/i);
+    const checkbox = await screen.findByLabelText(/show this card on startup/i);
 
     await user.click(checkbox);
 
@@ -78,7 +75,7 @@ describe('WelcomeTutorialCard', () => {
     render(<WelcomeTutorialCard />, { initialEntries: ['/browse'] });
 
     const user = userEvent.setup();
-    const checkbox = await screen.findByLabelText(/hide this card.*help page/i);
+    const checkbox = await screen.findByLabelText(/show this card on startup/i);
 
     await user.click(checkbox);
 

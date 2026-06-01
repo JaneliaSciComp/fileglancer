@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { joinPaths, removeLastSegmentFromPath } from '@/utils';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { handleError, createSuccess } from '@/utils/errorHandling';
+import useFileNameValidation from '@/hooks/useFileNameValidation';
 import type { Result } from '@/shared.types';
 
 export default function useRenameDialog() {
@@ -11,6 +12,8 @@ export default function useRenameDialog() {
     fileBrowserState.propertiesTarget?.name || ''
   );
   const currentFileSharePath = fileQuery.data?.currentFileSharePath;
+
+  const nameValidation = useFileNameValidation(newName);
 
   async function handleRenameSubmit(path: string): Promise<Result<void>> {
     try {
@@ -35,6 +38,7 @@ export default function useRenameDialog() {
   return {
     handleRenameSubmit,
     newName,
-    setNewName
+    setNewName,
+    nameValidation
   };
 }

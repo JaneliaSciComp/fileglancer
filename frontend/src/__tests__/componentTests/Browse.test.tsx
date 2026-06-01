@@ -49,8 +49,8 @@ describe('Browse - WelcomeTutorialCard visibility', () => {
     });
 
     const user = userEvent.setup();
-    const checkbox = screen.getByRole('checkbox', { name: /hide this card/i });
-    expect(checkbox).not.toBeChecked();
+    const checkbox = screen.getByRole('checkbox', { name: /show this card/i });
+    expect(checkbox).toBeChecked();
     await user.click(checkbox);
 
     await waitFor(() => {

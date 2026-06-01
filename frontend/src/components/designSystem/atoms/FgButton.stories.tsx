@@ -1,5 +1,5 @@
 import { expect, fn, userEvent, within } from 'storybook/test';
-import { HiDownload, HiOutlinePlus, HiSearch } from 'react-icons/hi';
+import { HiDownload, HiSearch } from 'react-icons/hi';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import FgButton from './FgButton';
