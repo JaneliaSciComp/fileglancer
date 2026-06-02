@@ -28,7 +28,7 @@ dependencies = [
     "cachetools >=6.2.1",
     "click >=8.0",
     "fastapi >=0.119.1",
-    "httpx >=0.28.1,<0.29",
+    "httpx2 >=2.2.0,<3",
     "itsdangerous >=2.2.0",
     "loguru >=0.7.3",
     "pandas >=2.3.3",
@@ -184,6 +184,7 @@ cryptography = ">=41.0.0"
 sqlalchemy = ">=2.0.44,<3"
 packaging = ">=24.0"
 uvicorn = ">=0.38.0"
+httpx2 = ">=2.2.0,<3"
 
 [tool.pixi.pypi-dependencies]
 fileglancer = { path = ".", editable = true }
