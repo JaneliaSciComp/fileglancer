@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import react from '@vitejs/plugin-react';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
+import { playwright } from '@vitest/browser-playwright';
 
 // https://vite.dev/config/
 import { fileURLToPath } from 'node:url';
@@ -73,7 +74,7 @@ export default defineConfig({
         '**/ui-tests/**'
       ]
     },
-    workspace: [
+    projects: [
       {
         extends: true,
         test: {
@@ -104,7 +105,7 @@ export default defineConfig({
           browser: {
             enabled: true,
             headless: true,
-            provider: 'playwright',
+            provider: playwright(),
             instances: [
               {
                 browser: 'chromium'
