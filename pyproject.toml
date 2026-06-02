@@ -173,8 +173,7 @@ atlassian-python-api = ">=4.0.7,<5"
 authlib = ">=1.6.5,<2"
 cachetools = ">=6.2.1,<7"
 click = ">=8.0"
-fastapi = ">=0.119.1,<0.120"
-httpx = ">=0.28.1,<0.29"
+fastapi = ">=0.119.1"
 itsdangerous = ">=2.2.0,<3"
 loguru = ">=0.7.3,<0.8"
 pandas = ">=2.3.3,<3"
@@ -184,7 +183,7 @@ python-jose = ">=3.5.0,<4"
 cryptography = ">=41.0.0"
 sqlalchemy = ">=2.0.44,<3"
 packaging = ">=24.0"
-uvicorn = ">=0.38.0,<0.39"
+uvicorn = ">=0.38.0"
 
 [tool.pixi.pypi-dependencies]
 fileglancer = { path = ".", editable = true }
