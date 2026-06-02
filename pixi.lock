@@ -6735,7 +6735,7 @@ packages:
 - pypi: ./
   name: fileglancer
   version: 2.8.2a0
-  sha256: eeefae4fe991f02a79f43698e2906d6053cb8e2c1dd778d2bb4378ac8a65692d
+  sha256: bae9825daa1effc319e8af45d051e8ce11b95535e2d0c829a2d892087dca9aee
   requires_dist:
   - alembic>=1.17.0,<2
   - atlassian-python-api>=4.0.7,<5
@@ -6744,7 +6744,6 @@ packages:
   - click>=8.0,<9
   - cryptography>=41.0.0
   - fastapi>=0.136.3,<0.137
-  - httpx>=0.28.1,<0.29
   - itsdangerous>=2.2.0,<3
   - loguru>=0.7.3,<0.8
   - packaging>=24.0
