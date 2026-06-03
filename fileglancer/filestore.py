@@ -6,12 +6,6 @@ rooted at a specific directory.
 import itertools
 import os
 import stat
-try:
-    import pwd
-    import grp
-except ImportError:
-    pwd = None  # type: ignore[assignment]
-    grp = None  # type: ignore[assignment]
 import shutil
 
 from pydantic import BaseModel
@@ -20,6 +14,10 @@ from loguru import logger
 
 from .database import find_fsp_in_paths
 from .model import FileSharePath
+from .platform_compat import optional_module
+
+pwd = optional_module("pwd")
+grp = optional_module("grp")
 
 # Default buffer size for streaming file contents
 DEFAULT_BUFFER_SIZE = 8192

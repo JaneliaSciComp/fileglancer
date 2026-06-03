@@ -5,10 +5,10 @@ import os
 from functools import lru_cache
 
 from sqlalchemy import create_engine, Column, String, Integer, Boolean, DateTime, JSON, UniqueConstraint
-from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from sqlalchemy.orm import Session, DeclarativeBase, Mapped, mapped_column, sessionmaker
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.pool import StaticPool
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
 from loguru import logger
 from cachetools import LRUCache
 
@@ -37,7 +37,10 @@ def _get_sharing_key_cache():
         _sharing_key_cache = LRUCache(maxsize=settings.sharing_key_cache_size)
     return _sharing_key_cache
 
-Base = declarative_base()
+class Base(DeclarativeBase):
+    pass
+
+
 class FileSharePathDB(Base):
     """Database model for storing file share paths"""
     __tablename__ = 'file_share_paths'
@@ -141,45 +144,45 @@ class JobDB(Base):
     """Database model for storing cluster jobs"""
     __tablename__ = 'jobs'
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String, nullable=False, index=True)
-    cluster_job_id = Column(String, nullable=True, index=True)
-    app_url = Column(String, nullable=False)
-    app_name = Column(String, nullable=False)
-    manifest_path = Column(String, nullable=False, server_default="")
-    entry_point_id = Column(String, nullable=False)
-    entry_point_name = Column(String, nullable=False)
-    entry_point_type = Column(String, nullable=False, server_default="job")
-    parameters = Column(JSON, nullable=False)
-    status = Column(String, nullable=False, default="PENDING")
-    exit_code = Column(Integer, nullable=True)
-    resources = Column(JSON, nullable=True)
-    env = Column(JSON, nullable=True)
-    pre_run = Column(String, nullable=True)
-    post_run = Column(String, nullable=True)
-    container = Column(String, nullable=True)
-    container_args = Column(String, nullable=True)
-    work_dir = Column(String, nullable=True)
-    pull_latest = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
-    started_at = Column(DateTime, nullable=True)
-    finished_at = Column(DateTime, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    cluster_job_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
+    app_url: Mapped[str] = mapped_column(String, nullable=False)
+    app_name: Mapped[str] = mapped_column(String, nullable=False)
+    manifest_path: Mapped[str] = mapped_column(String, nullable=False, server_default="")
+    entry_point_id: Mapped[str] = mapped_column(String, nullable=False)
+    entry_point_name: Mapped[str] = mapped_column(String, nullable=False)
+    entry_point_type: Mapped[str] = mapped_column(String, nullable=False, server_default="job")
+    parameters: Mapped[Any] = mapped_column(JSON, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="PENDING")
+    exit_code: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    resources: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    env: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    pre_run: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    post_run: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    container: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    container_args: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    work_dir: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    pull_latest: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
 class UserAppDB(Base):
     """Database model for a user's installed apps with cached manifests."""
     __tablename__ = 'user_apps'
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String, nullable=False, index=True)
-    url = Column(String, nullable=False)
-    manifest_path = Column(String, nullable=False, server_default="")
-    name = Column(String, nullable=False)
-    description = Column(String, nullable=True)
-    branch = Column(String, nullable=True)
-    manifest = Column(JSON, nullable=True)
-    added_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    url: Mapped[str] = mapped_column(String, nullable=False)
+    manifest_path: Mapped[str] = mapped_column(String, nullable=False, server_default="")
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    branch: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    manifest: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     __table_args__ = (
         UniqueConstraint('username', 'url', 'manifest_path', name='uq_user_app'),

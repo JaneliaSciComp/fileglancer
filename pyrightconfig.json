@@ -1,0 +1,15 @@
+{
+  "include": ["fileglancer"],
+  "exclude": [
+    "**/__pycache__",
+    ".pixi",
+    ".venv",
+    "frontend",
+    "htmlcov"
+  ],
+  "venvPath": ".pixi/envs",
+  "venv": "default",
+  "pythonVersion": "3.12",
+  "pythonPlatform": "All",
+  "typeCheckingMode": "standard"
+}

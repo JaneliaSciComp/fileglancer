@@ -1,12 +1,6 @@
 import os
 import re
 import sys
-try:
-    import pwd
-    import grp
-except ImportError:
-    pwd = None  # type: ignore[assignment]
-    grp = None  # type: ignore[assignment]
 import json
 import secrets
 from datetime import datetime, timedelta, timezone, UTC
@@ -40,6 +34,7 @@ from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, dele
 from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header
 from fileglancer.filestore import Filestore, RootCheckError
 from fileglancer.log import AccessLogMiddleware
+from fileglancer.platform_compat import effective_uid
 from fileglancer.worker_pool import WorkerPool, WorkerError, WorkerDead
 from fileglancer import sshkeys
 
@@ -326,10 +321,11 @@ def create_app(settings):
                 )
                 print(f"\n❌ Configuration Error:\n  {msg}\n", file=sys.stderr)
                 raise RuntimeError(msg)
-            if os.geteuid() != 0:
+            euid = effective_uid()
+            if euid != 0:
                 msg = (
                     f"use_access_flags=True requires running the server as root, "
-                    f"but the current user is uid={os.geteuid()}.\n"
+                    f"but the current user is uid={euid}.\n"
                     f"  Fix: either run as root (so per-user workers can setuid "
                     f"for file access), or set use_access_flags=false (workers "
                     f"will then run as the current user — fine for local "

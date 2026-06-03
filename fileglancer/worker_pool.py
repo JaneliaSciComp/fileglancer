@@ -27,10 +27,6 @@ import array
 import asyncio
 import json
 import os
-try:
-    import pwd
-except ImportError:
-    pwd = None  # type: ignore[assignment]
 import socket
 import struct
 import subprocess
@@ -40,7 +36,15 @@ from typing import Any, Optional
 
 from loguru import logger
 
+from fileglancer.platform_compat import (
+    current_gid,
+    current_uid,
+    group_ids_for_user,
+    optional_module,
+)
 from fileglancer.settings import Settings
+
+pwd = optional_module("pwd")
 
 
 # Length-prefix format: 4-byte big-endian unsigned int
@@ -335,8 +339,16 @@ class WorkerPool:
         # process's user — used for local debugging of the worker code path.
         identity_kwargs: dict = {}
         if self.settings.use_access_flags:
+            if os.name != "posix" or pwd is None:
+                raise WorkerError(
+                    "Running workers as another user requires POSIX pwd/getgrouplist support",
+                    status_code=500,
+                )
             pw = pwd.getpwnam(username)
-            groups = os.getgrouplist(username, pw.pw_gid)
+            try:
+                groups = group_ids_for_user(username, pw.pw_gid)
+            except RuntimeError as e:
+                raise WorkerError(str(e), status_code=500) from e
             identity_kwargs = {
                 "user": pw.pw_uid,
                 "group": pw.pw_gid,
@@ -346,7 +358,7 @@ class WorkerPool:
             log_uid, log_gid = pw.pw_uid, pw.pw_gid
         else:
             home_dir = os.path.expanduser("~")
-            log_uid, log_gid = os.getuid(), os.getgid()
+            log_uid, log_gid = current_uid(), current_gid()
 
         # Create Unix socketpair for IPC
         parent_sock, child_sock = socket.socketpair()

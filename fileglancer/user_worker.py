@@ -26,13 +26,10 @@ import asyncio
 import ctypes
 import ctypes.util
 import functools
+import getpass
 import json
 import logging
 import os
-try:
-    import pwd
-except ImportError:
-    pwd = None  # type: ignore[assignment]
 import socket
 import struct
 import sys
@@ -41,6 +38,15 @@ from typing import Any, Optional
 
 from loguru import logger
 
+from fileglancer.platform_compat import (
+    current_uid,
+    effective_uid,
+    group_ids_for_user,
+    optional_module,
+    username_for_uid,
+)
+
+pwd = optional_module("pwd")
 
 # Length-prefix format: 4-byte big-endian unsigned int
 _HEADER_FMT = "!I"
@@ -279,9 +285,21 @@ def _get_user_groups(username: str) -> list[str]:
     if cached is not None:
         return cached
 
-    import grp as _grp
+    if os.name != "posix" or pwd is None:
+        _user_groups_cache[username] = []
+        return []
+
+    _grp = optional_module("grp")
+    if _grp is None:
+        _user_groups_cache[username] = []
+        return []
+
     pw = pwd.getpwnam(username)
-    gids = os.getgrouplist(username, pw.pw_gid)
+    try:
+        gids = group_ids_for_user(username, pw.pw_gid)
+    except RuntimeError:
+        _user_groups_cache[username] = []
+        return []
     names = []
     for gid in gids:
         try:
@@ -1107,11 +1125,9 @@ def main():
     os.close(fd)  # close the original fd, we have a dup now
 
     # Determine username
-    uid = os.getuid()
-    try:
-        username = pwd.getpwuid(uid).pw_name
-    except KeyError:
-        username = str(uid)
+    uid = current_uid()
+    username = username_for_uid(uid) if uid is not None else getpass.getuser()
+    euid = effective_uid()
 
     # Worker subprocess never gets DB credentials; all DB access goes back
     # through the parent over the same socket via RpcDbProxy.
@@ -1119,7 +1135,7 @@ def main():
 
     logger.info(
         f"Worker started for {username} "
-        f"(uid={uid} euid={os.geteuid()} pid={os.getpid()})"
+        f"(uid={uid} euid={euid} pid={os.getpid()})"
     )
 
     # Main request/response loop

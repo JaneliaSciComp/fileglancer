@@ -1,8 +1,6 @@
 """Tests for the job poll loop: file-lock election and status-update logic."""
 
 import asyncio
-import pytest
-fcntl = pytest.importorskip("fcntl", reason="fcntl is not available on Windows")
 import multiprocessing
 import subprocess
 import time
@@ -12,6 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import patch, MagicMock, AsyncMock, call
 
 from fileglancer.apps.core import _poll_jobs, _poll_local_jobs, _POLL_LOCK_PATH
+from fileglancer.platform_compat import FileLock, FileLockUnavailable
 
 
 # ---------------------------------------------------------------------------
@@ -147,17 +146,13 @@ def _try_poll_with_lock(counter, sync_barrier):
     """Attempt to acquire the poll lock and increment a shared counter."""
     sync_barrier.wait()
     try:
-        with open(_POLL_LOCK_PATH, "w") as f:
-            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            try:
-                with counter.get_lock():
-                    counter.value += 1
-                # Hold lock long enough for the other process to attempt
-                # acquisition and fail with LOCK_NB
-                time.sleep(0.5)
-            finally:
-                fcntl.flock(f, fcntl.LOCK_UN)
-    except OSError:
+        with FileLock(_POLL_LOCK_PATH):
+            with counter.get_lock():
+                counter.value += 1
+            # Hold lock long enough for the other process to attempt
+            # acquisition and fail with the non-blocking lock
+            time.sleep(0.5)
+    except FileLockUnavailable:
         pass
 
 
@@ -180,30 +175,20 @@ class TestPollLockElection:
             poll_called = True
 
         # Hold the lock from this thread
-        lock_file = open(_POLL_LOCK_PATH, "w")
-        fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-
-        try:
+        with FileLock(_POLL_LOCK_PATH):
             # Run one iteration of the poll loop with a short sleep
             # The loop should fail to acquire the lock and skip
             async def run_one_iteration():
                 with patch("fileglancer.apps.core._poll_jobs", fake_poll_jobs):
                     # Run the poll loop body once (not the infinite loop)
                     try:
-                        with open(_POLL_LOCK_PATH, "w") as f:
-                            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                            try:
-                                fake_poll_jobs(settings)
-                            finally:
-                                fcntl.flock(f, fcntl.LOCK_UN)
-                    except OSError:
+                        with FileLock(_POLL_LOCK_PATH):
+                            fake_poll_jobs(settings)
+                    except FileLockUnavailable:
                         pass  # Lock held — should skip
 
             asyncio.run(run_one_iteration())
             assert not poll_called, "_poll_jobs should not run when lock is held"
-        finally:
-            fcntl.flock(lock_file, fcntl.LOCK_UN)
-            lock_file.close()
 
     def test_poll_runs_when_lock_available(self):
         """When no one holds the lock, _poll_jobs should execute."""
@@ -217,13 +202,9 @@ class TestPollLockElection:
         # Ensure lock file is not held
         async def run_one_iteration():
             try:
-                with open(_POLL_LOCK_PATH, "w") as f:
-                    fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    try:
-                        fake_poll_jobs(settings)
-                    finally:
-                        fcntl.flock(f, fcntl.LOCK_UN)
-            except OSError:
+                with FileLock(_POLL_LOCK_PATH):
+                    fake_poll_jobs(settings)
+            except FileLockUnavailable:
                 pass
 
         asyncio.run(run_one_iteration())
@@ -232,11 +213,13 @@ class TestPollLockElection:
     def test_concurrent_processes_only_one_wins(self):
         """Simulate two worker processes racing for the lock — only one should poll.
 
-        fcntl.flock is per-process (not per-thread), so we must use
-        multiprocessing to test real mutual exclusion — matching how
-        uvicorn workers are separate OS processes.
+        The lock is held by separate OS processes, matching how uvicorn
+        workers contend for poll-loop ownership.
         """
-        ctx = multiprocessing.get_context("fork")
+        start_method = (
+            "fork" if "fork" in multiprocessing.get_all_start_methods() else "spawn"
+        )
+        ctx = multiprocessing.get_context(start_method)
         won_count = ctx.Value("i", 0)
         barrier = ctx.Barrier(2, timeout=5)
 

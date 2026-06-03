@@ -6,10 +6,6 @@ that are stored in the user's authorized_keys file.
 
 import gc
 import os
-try:
-    import pwd
-except ImportError:
-    pwd = None  # type: ignore[assignment]
 import shutil
 import subprocess
 import tempfile
@@ -18,6 +14,8 @@ from typing import Dict, List, Optional
 from fastapi.responses import Response
 from loguru import logger
 from pydantic import BaseModel, Field, SecretStr
+
+from fileglancer.platform_compat import effective_user_home
 
 # Constants
 AUTHORIZED_KEYS_FILENAME = "authorized_keys"
@@ -131,11 +129,7 @@ def get_ssh_directory() -> str:
     Returns:
         The absolute path to ~/.ssh
     """
-    try:
-        home = pwd.getpwuid(os.geteuid()).pw_dir
-    except (AttributeError, KeyError):
-        home = os.path.expanduser("~")
-    return os.path.join(home, ".ssh")
+    return os.path.join(effective_user_home(), ".ssh")
 
 
 def ensure_ssh_directory_exists(ssh_dir: str) -> None:

@@ -1,36 +1,33 @@
 """Apps module for fetching manifests, building commands, and managing cluster jobs."""
 
 import asyncio
-try:
-    import fcntl
-except ImportError:
-    fcntl = None  # type: ignore[assignment]
-try:
-    import pwd
-except ImportError:
-    pwd = None  # type: ignore[assignment]
 import os
 import re
 import shlex
 import shutil
 import subprocess
 import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, UTC
-from typing import Optional
+from typing import Any, Optional
 
 import yaml
+from cluster_api import ResourceSpec
 from loguru import logger
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
-from cluster_api import ResourceSpec
-
 from fileglancer import database as db
 from fileglancer.apps.adapters import try_adapt
-from fileglancer.model import AppManifest, AppEntryPoint, AppParameter
+from fileglancer.model import AppEntryPoint, AppManifest, AppParameter
+from fileglancer.platform_compat import (
+    FileLock,
+    FileLockUnavailable,
+    effective_uid,
+    effective_user_home,
+    user_home,
+)
 from fileglancer.settings import get_settings
-
 
 # Registered by server.py at startup. Dispatches an action to the per-user
 # persistent worker (or in-process in dev mode). Signature mirrors
@@ -54,13 +51,12 @@ async def _dispatch(username: str, action: str, **kwargs) -> dict:
 
 _MANIFEST_FILENAME = "runnables.yaml"
 
+
 def _repo_cache_base(username: str | None = None) -> Path:
     """Return the repo cache base directory, optionally for a specific user."""
-    if username:
-        home = os.path.expanduser(f"~{username}")
-    else:
-        home = os.path.expanduser("~")
-    return Path(home) / ".fileglancer" / "apps"
+    return Path(user_home(username)) / ".fileglancer" / "apps"
+
+
 _repo_locks: dict[str, asyncio.Lock] = {}
 
 
@@ -135,7 +131,11 @@ async def _resolve_default_branch(clone_url: str) -> str:
     try:
         proc = await asyncio.wait_for(
             asyncio.create_subprocess_exec(
-                "git", "ls-remote", "--symref", clone_url, "HEAD",
+                "git",
+                "ls-remote",
+                "--symref",
+                clone_url,
+                "HEAD",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
@@ -154,8 +154,9 @@ async def _resolve_default_branch(clone_url: str) -> str:
     return "main"
 
 
-async def _ensure_repo_cache(url: str, pull: bool = False,
-                             username: str | None = None) -> Path:
+async def _ensure_repo_cache(
+    url: str, pull: bool = False, username: str | None = None
+) -> Path:
     """Clone or update the GitHub repo in per-user cache. Returns repo path.
 
     Cache is keyed by owner/repo/branch to avoid checkout races between branches.
@@ -179,7 +180,7 @@ async def _ensure_repo_cache(url: str, pull: bool = False,
             return Path(result["repo_dir"])
 
     # Running as the current user (worker subprocess or dev mode)
-    logger.debug(f"ensure_repo running in-process as euid={os.geteuid()}")
+    logger.debug(f"ensure_repo running in-process as euid={effective_uid()}")
     cache_base = _repo_cache_base()
     repo_dir = (cache_base / owner / repo / branch).resolve()
     repo_dir.relative_to(cache_base.resolve())
@@ -191,7 +192,9 @@ async def _ensure_repo_cache(url: str, pull: bool = False,
             if pull:
                 logger.info(f"Pulling latest for {owner}/{repo} ({branch})")
                 await _run_git(["git", "-C", str(repo_dir), "fetch", "origin", branch])
-                await _run_git(["git", "-C", str(repo_dir), "reset", "--hard", f"origin/{branch}"])
+                await _run_git(
+                    ["git", "-C", str(repo_dir), "reset", "--hard", f"origin/{branch}"]
+                )
         else:
             logger.info(f"Cloning {owner}/{repo} ({branch}) into {repo_dir}")
             repo_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -203,7 +206,7 @@ async def _ensure_repo_cache(url: str, pull: bool = False,
     return repo_dir
 
 
-_SKIP_DIRS = {'.git', 'node_modules', '__pycache__', '.pixi', '.venv', 'venv'}
+_SKIP_DIRS = {".git", "node_modules", "__pycache__", ".pixi", ".venv", "venv"}
 
 
 def _read_manifest_file(manifest_dir: Path) -> AppManifest:
@@ -278,8 +281,9 @@ def _find_manifests_in_repo(repo_dir: Path) -> list[tuple[str, AppManifest]]:
 MANIFEST_FILENAME = _MANIFEST_FILENAME
 
 
-async def discover_app_manifests(url: str,
-                                 username: str | None = None) -> list[tuple[str, AppManifest]]:
+async def discover_app_manifests(
+    url: str, username: str | None = None
+) -> list[tuple[str, AppManifest]]:
     """Clone/pull a GitHub repo and discover all manifest files.
 
     Returns a list of (relative_dir_path, AppManifest) tuples.
@@ -299,8 +303,9 @@ async def discover_app_manifests(url: str,
     return _find_manifests_in_repo(repo_dir)
 
 
-async def fetch_app_manifest(url: str, manifest_path: str = "",
-                             username: str | None = None) -> AppManifest:
+async def fetch_app_manifest(
+    url: str, manifest_path: str = "", username: str | None = None
+) -> AppManifest:
     """Fetch and validate an app manifest from a cloned repo.
 
     Clones the repo if needed, then reads the manifest from disk.
@@ -309,7 +314,9 @@ async def fetch_app_manifest(url: str, manifest_path: str = "",
     running as the target user.
     """
     if username:
-        result = await _dispatch(username, "read_manifest", url=url, manifest_path=manifest_path)
+        result = await _dispatch(
+            username, "read_manifest", url=url, manifest_path=manifest_path
+        )
         return AppManifest(**result["manifest"])
 
     repo_dir = await _ensure_repo_cache(url)
@@ -317,8 +324,9 @@ async def fetch_app_manifest(url: str, manifest_path: str = "",
     return _read_manifest_file(target_dir)
 
 
-async def get_or_load_manifest(username: str, url: str,
-                                manifest_path: str = "") -> AppManifest:
+async def get_or_load_manifest(
+    username: str, url: str, manifest_path: str = ""
+) -> AppManifest:
     """Return the manifest for an app, preferring the DB cache.
 
     Hot path: a single SELECT plus model_validate — no disk I/O,
@@ -353,9 +361,12 @@ async def get_or_load_manifest(username: str, url: str,
         branch = await get_app_branch(url)
         with db.get_db_session(settings.db_url) as session:
             db.upsert_user_app(
-                session, username,
-                url=url, manifest_path=manifest_path,
-                name=manifest.name, description=manifest.description,
+                session,
+                username,
+                url=url,
+                manifest_path=manifest_path,
+                name=manifest.name,
+                description=manifest.description,
                 branch=branch,
                 manifest=manifest.model_dump(mode="json"),
                 bump_updated_at=False,
@@ -364,10 +375,9 @@ async def get_or_load_manifest(username: str, url: str,
     return manifest
 
 
-async def refresh_cached_manifest(username: str, url: str,
-                                   manifest_path: str = "",
-                                   bump_updated_at: bool = False
-                                   ) -> tuple[AppManifest, str]:
+async def refresh_cached_manifest(
+    username: str, url: str, manifest_path: str = "", bump_updated_at: bool = False
+) -> tuple[AppManifest, str]:
     """Re-read the manifest from disk and sync the cache.
 
     Call this after any operation that mutates the on-disk YAML
@@ -386,9 +396,12 @@ async def refresh_cached_manifest(username: str, url: str,
     with db.get_db_session(settings.db_url) as session:
         if db.get_user_app(session, username, url, manifest_path) is not None:
             db.upsert_user_app(
-                session, username,
-                url=url, manifest_path=manifest_path,
-                name=manifest.name, description=manifest.description,
+                session,
+                username,
+                url=url,
+                manifest_path=manifest_path,
+                name=manifest.name,
+                description=manifest.description,
                 branch=branch,
                 manifest=manifest.model_dump(mode="json"),
                 bump_updated_at=bump_updated_at,
@@ -471,8 +484,10 @@ def merge_requirements(
 
     # Keep manifest requirements that aren't overridden by entry-point
     merged = [
-        req for req in manifest_requirements
-        if _REQ_PATTERN.match(req.strip()) and _REQ_PATTERN.match(req.strip()).group(1) not in ep_tools
+        req
+        for req in manifest_requirements
+        if (m := _REQ_PATTERN.match(req.strip())) is not None
+        and m.group(1) not in ep_tools
     ]
     merged.extend(entry_point_requirements)
     return merged
@@ -515,13 +530,17 @@ def verify_requirements(requirements: list[str]):
         if version_spec:
             registry_entry = _TOOL_REGISTRY.get(tool)
             if not registry_entry:
-                errors.append(f"Cannot check version for '{tool}': no version command configured")
+                errors.append(
+                    f"Cannot check version for '{tool}': no version command configured"
+                )
                 continue
 
             try:
                 result = subprocess.run(
                     registry_entry["version_args"],
-                    capture_output=True, text=True, timeout=10,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
                     env=env,
                 )
                 output = result.stdout.strip() or result.stderr.strip()
@@ -550,8 +569,8 @@ def verify_requirements(requirements: list[str]):
 # --- Path Validation ---
 
 # Characters that are dangerous in shell commands
-_SHELL_METACHAR_PATTERN = re.compile(r'[;&|`$(){}!<>\n\r]')
-_WINDOWS_DRIVE_PATTERN = re.compile(r'^[a-zA-Z]:/')
+_SHELL_METACHAR_PATTERN = re.compile(r"[;&|`$(){}!<>\n\r]")
+_WINDOWS_DRIVE_PATTERN = re.compile(r"^[a-zA-Z]:/")
 
 
 def validate_path_for_shell(path_value: str) -> str | None:
@@ -573,8 +592,12 @@ def validate_path_for_shell(path_value: str) -> str | None:
     if ".." in normalized:
         return "Path must not contain '..'"
 
-    if not (normalized.startswith("/") or normalized.startswith("~") or normalized.startswith("./")
-            or _WINDOWS_DRIVE_PATTERN.match(normalized)):
+    if not (
+        normalized.startswith("/")
+        or normalized.startswith("~")
+        or normalized.startswith("./")
+        or _WINDOWS_DRIVE_PATTERN.match(normalized)
+    ):
         return "Must be an absolute or relative path (starting with /, ~, or ./)"
 
     return None
@@ -596,13 +619,16 @@ def validate_path_in_filestore(path_value: str, fsps: list) -> str | None:
 
     # Relative paths and cloud storage URIs are not local filesystem paths;
     # skip filestore validation.
-    if normalized.startswith("./") or normalized.startswith(("s3://", "gs://", "https://")):
+    if normalized.startswith("./") or normalized.startswith(
+        ("s3://", "gs://", "https://")
+    ):
         return None
 
     expanded = os.path.expanduser(normalized)
 
     # Resolve to a file share path
     from fileglancer.database import find_fsp_in_paths
+
     result = find_fsp_in_paths(fsps, expanded)
     if result is None:
         return "Path is not within an allowed file share"
@@ -610,6 +636,7 @@ def validate_path_in_filestore(path_value: str, fsps: list) -> str | None:
     fsp, subpath = result
 
     from fileglancer.filestore import Filestore
+
     filestore = Filestore(fsp)
     return filestore.validate_path(subpath)
 
@@ -617,7 +644,7 @@ def validate_path_in_filestore(path_value: str, fsps: list) -> str | None:
 # --- Command Building ---
 
 # Valid environment variable name
-_ENV_VAR_NAME_PATTERN = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
+_ENV_VAR_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _validate_parameter_value(param: AppParameter, value, session=None) -> str:
@@ -671,10 +698,7 @@ def _validate_parameter_value(param: AppParameter, value, session=None) -> str:
         # where the shell would not perform tilde expansion.
         # Use euid so this works when the server runs as root with seteuid.
         if str_val.startswith("~/") or str_val == "~":
-            try:
-                home = pwd.getpwuid(os.geteuid()).pw_dir
-            except (AttributeError, KeyError):
-                home = os.path.expanduser("~")
+            home = effective_user_home()
             home = home.replace("\\", "/")
             str_val = home + str_val[1:]
         if session is not None:
@@ -687,7 +711,9 @@ def _validate_parameter_value(param: AppParameter, value, session=None) -> str:
 
     if param.type == "string" and param.pattern:
         if not re.fullmatch(param.pattern, str_val):
-            raise ValueError(f"Parameter '{param.name}' does not match required pattern")
+            raise ValueError(
+                f"Parameter '{param.name}' does not match required pattern"
+            )
 
     return str_val
 
@@ -718,7 +744,7 @@ def build_command(entry_point: AppEntryPoint, parameters: dict, session=None) ->
             raise ValueError(f"Unknown parameter '{param_key}'")
 
     # Compute effective values: user-provided merged with defaults
-    effective: dict[str, tuple[AppParameter, any]] = {}
+    effective: dict[str, tuple[AppParameter, Any]] = {}
     for param in flat_params:
         if param.key in parameters:
             effective[param.key] = (param, parameters[param.key])
@@ -738,7 +764,7 @@ def build_command(entry_point: AppEntryPoint, parameters: dict, session=None) ->
         validated = _validate_parameter_value(p, value, session=session)
         if p.type == "boolean":
             if value is True:
-                parts.append(p.flag)
+                parts.append(param.flag)
         else:
             parts.append(f"{p.flag} {shlex.quote(validated)}")
 
@@ -789,12 +815,10 @@ async def start_job_monitor():
 
     # Only one worker should reconnect at startup — use the same lock.
     try:
-        with open(_POLL_LOCK_PATH, "w") as f:
-            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        with FileLock(_POLL_LOCK_PATH):
             await _reconnect_as_any_user(settings)
-            fcntl.flock(f, fcntl.LOCK_UN)
         logger.info("Job monitor started (reconnected existing jobs)")
-    except OSError:
+    except FileLockUnavailable:
         logger.info("Job monitor started (reconnect handled by another worker)")
 
     # Only start the poll loop if there are already active jobs
@@ -880,9 +904,13 @@ async def _reconnect_as_any_user(settings):
             new_status = info["status"].upper()
             if new_status != db_job.status:
                 is_terminal = new_status in ("DONE", "FAILED", "KILLED")
-                finished_at = _parse_iso_dt(info.get("finish_time")) if is_terminal else None
+                finished_at = (
+                    _parse_iso_dt(info.get("finish_time")) if is_terminal else None
+                )
                 db.update_job_status(
-                    session, db_job.id, new_status,
+                    session,
+                    db_job.id,
+                    new_status,
                     exit_code=info.get("exit_code"),
                     started_at=_parse_iso_dt(info.get("start_time")),
                     finished_at=finished_at,
@@ -904,29 +932,23 @@ async def _poll_loop(settings):
     global _poll_task
 
     while True:
-        lock_fd = None
         try:
-            lock_fd = open(_POLL_LOCK_PATH, "w")
-            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            try:
-                has_jobs = await _poll_jobs(settings)
-            except Exception:
-                logger.exception("Error in job poll loop")
-                has_jobs = True  # keep polling on error
-            # Hold lock through the sleep so no other worker polls
-            # until this interval is over
-            await asyncio.sleep(settings.cluster.poll_interval)
-            fcntl.flock(lock_fd, fcntl.LOCK_UN)
-            lock_fd.close()
+            with FileLock(_POLL_LOCK_PATH):
+                try:
+                    has_jobs = await _poll_jobs(settings)
+                except Exception:
+                    logger.exception("Error in job poll loop")
+                    has_jobs = True  # keep polling on error
+                # Hold lock through the sleep so no other worker polls
+                # until this interval is over
+                await asyncio.sleep(settings.cluster.poll_interval)
 
             if not has_jobs:
                 logger.info("No active jobs — poll loop stopping")
                 _poll_task = None
                 return
-        except OSError:
+        except FileLockUnavailable:
             # Another worker is polling this cycle — skip and retry
-            if lock_fd:
-                lock_fd.close()
             await asyncio.sleep(settings.cluster.poll_interval)
 
 
@@ -946,10 +968,18 @@ async def _poll_jobs(settings):
         jobs_to_poll = []
         for db_job in active_jobs:
             if not db_job.cluster_job_id:
-                created = db_job.created_at.replace(tzinfo=None) if db_job.created_at.tzinfo else db_job.created_at
-                age_minutes = (datetime.now(UTC).replace(tzinfo=None) - created).total_seconds() / 60
+                created = (
+                    db_job.created_at.replace(tzinfo=None)
+                    if db_job.created_at.tzinfo
+                    else db_job.created_at
+                )
+                age_minutes = (
+                    datetime.now(UTC).replace(tzinfo=None) - created
+                ).total_seconds() / 60
                 if age_minutes > settings.cluster.zombie_timeout_minutes:
-                    db.update_job_status(session, db_job.id, "FAILED", finished_at=datetime.now(UTC))
+                    db.update_job_status(
+                        session, db_job.id, "FAILED", finished_at=datetime.now(UTC)
+                    )
                     logger.warning(
                         f"Job {db_job.id} has no cluster_job_id after "
                         f"{age_minutes:.0f} minutes, marked FAILED"
@@ -973,14 +1003,13 @@ async def _poll_jobs(settings):
         # Pass current known statuses so stubs are seeded correctly.
         # Without this, stubs default to PENDING and jobs whose status
         # bjobs doesn't return would revert to PENDING in the DB.
-        job_statuses = {
-            j.cluster_job_id: j.status for j in jobs_to_poll
-        }
+        job_statuses = {j.cluster_job_id: j.status for j in jobs_to_poll}
 
         cluster_config = settings.cluster.model_dump(exclude_none=True)
         try:
             result = await _dispatch(
-                poll_username, "poll",
+                poll_username,
+                "poll",
                 cluster_config=cluster_config,
                 cluster_job_ids=list(job_statuses.keys()),
                 job_statuses=job_statuses,
@@ -1001,9 +1030,13 @@ async def _poll_jobs(settings):
             if new_status == old_status:
                 continue
             is_terminal = new_status in ("DONE", "FAILED", "KILLED")
-            finished_at = _parse_iso_dt(info.get("finish_time")) if is_terminal else None
+            finished_at = (
+                _parse_iso_dt(info.get("finish_time")) if is_terminal else None
+            )
             db.update_job_status(
-                session, db_job.id, new_status,
+                session,
+                db_job.id,
+                new_status,
                 exit_code=info.get("exit_code") if is_terminal else None,
                 started_at=_parse_iso_dt(info.get("start_time")),
                 finished_at=finished_at,
@@ -1048,7 +1081,9 @@ def _poll_local_jobs(session, jobs_to_poll: list) -> bool:
             still_active = True
             if old_status == "PENDING":
                 db.update_job_status(
-                    session, db_job.id, "RUNNING",
+                    session,
+                    db_job.id,
+                    "RUNNING",
                     started_at=datetime.now(UTC),
                 )
                 logger.info(f"Job {db_job.id} status updated: PENDING -> RUNNING")
@@ -1058,7 +1093,9 @@ def _poll_local_jobs(session, jobs_to_poll: list) -> bool:
             new_status = "DONE" if exit_code == 0 else "FAILED"
             now = datetime.now(UTC)
             db.update_job_status(
-                session, db_job.id, new_status,
+                session,
+                db_job.id,
+                new_status,
                 exit_code=exit_code,
                 finished_at=now,
                 started_at=now if old_status == "PENDING" else None,
@@ -1069,7 +1106,9 @@ def _poll_local_jobs(session, jobs_to_poll: list) -> bool:
             still_active = True
             if old_status == "PENDING":
                 db.update_job_status(
-                    session, db_job.id, "RUNNING",
+                    session,
+                    db_job.id,
+                    "RUNNING",
                     started_at=datetime.now(UTC),
                 )
                 logger.info(f"Job {db_job.id} status updated: PENDING -> RUNNING")
@@ -1100,18 +1139,19 @@ def _parse_iso_dt(s: str | None) -> datetime | None:
 
 # --- Job Submission ---
 
+
 def _sanitize_for_path(s: str) -> str:
     """Sanitize a string for use in a directory name."""
-    return re.sub(r'[^a-zA-Z0-9._-]', '_', s)
+    return re.sub(r"[^a-zA-Z0-9._-]", "_", s)
 
 
-_CONTAINER_SIF_SAFE = re.compile(r'[^a-zA-Z0-9._-]')
+_CONTAINER_SIF_SAFE = re.compile(r"[^a-zA-Z0-9._-]")
 
 
 def _container_sif_name(container_url: str) -> str:
     """Derive a safe SIF filename from a container URL."""
     url = container_url.removeprefix("docker://")
-    return _CONTAINER_SIF_SAFE.sub('_', url) + ".sif"
+    return _CONTAINER_SIF_SAFE.sub("_", url) + ".sif"
 
 
 _DEFAULT_CONTAINER_CACHE_DIR = "$HOME/.fileglancer/apptainer_cache"
@@ -1127,7 +1167,11 @@ def _build_container_script(
 ) -> str:
     """Build shell script for running a command inside an Apptainer container."""
     sif_name = _container_sif_name(container_url)
-    docker_url = container_url if container_url.startswith("docker://") else f"docker://{container_url}"
+    docker_url = (
+        container_url
+        if container_url.startswith("docker://")
+        else f"docker://{container_url}"
+    )
 
     # Deduplicate and sort bind paths
     all_binds = sorted(set([work_dir] + bind_paths))
@@ -1139,21 +1183,25 @@ def _build_container_script(
 
     lines = [
         "# Apptainer container setup",
-        f'APPTAINER_CACHE_DIR={resolved_dir}',
+        f"APPTAINER_CACHE_DIR={resolved_dir}",
         'mkdir -p "$APPTAINER_CACHE_DIR"',
         f'SIF_PATH="$APPTAINER_CACHE_DIR/{sif_name}"',
         'if [ ! -f "$SIF_PATH" ]; then',
         f'  apptainer pull "$SIF_PATH" {shlex.quote(docker_url)}',
-        'fi',
+        "fi",
         f'apptainer exec {bind_flags}{extra} "$SIF_PATH" \\',
-        f'  {command}',
+        f"  {command}",
     ]
     return "\n".join(lines)
 
 
-def _build_work_dir(job_id: int, app_name: str, entry_point_id: str,
-                    job_name_prefix: Optional[str] = None,
-                    username: Optional[str] = None) -> Path:
+def _build_work_dir(
+    job_id: int,
+    app_name: str,
+    entry_point_id: str,
+    job_name_prefix: Optional[str] = None,
+    username: Optional[str] = None,
+) -> Path:
     """Build a working directory path under ~/.fileglancer/jobs/.
 
     When username is provided, expands ~username to the user's home directory
@@ -1221,10 +1269,20 @@ async def submit_job(
     merged_env = dict(entry_point.env or {})
     if env:
         merged_env.update(env)
-    effective_pre_run = pre_run if pre_run is not None else (entry_point.pre_run or None)
-    effective_post_run = post_run if post_run is not None else (entry_point.post_run or None)
-    effective_container = container if container is not None else (entry_point.container or None)
-    effective_container_args = container_args if container_args is not None else (entry_point.container_args or None)
+    effective_pre_run = (
+        pre_run if pre_run is not None else (entry_point.pre_run or None)
+    )
+    effective_post_run = (
+        post_run if post_run is not None else (entry_point.post_run or None)
+    )
+    effective_container = (
+        container if container is not None else (entry_point.container or None)
+    )
+    effective_container_args = (
+        container_args
+        if container_args is not None
+        else (entry_point.container_args or None)
+    )
 
     # Create DB record first to get job ID for the work directory
     resources_dict = None
@@ -1234,7 +1292,9 @@ async def submit_job(
             "memory": resource_spec.memory,
             "walltime": resource_spec.walltime,
             "queue": resource_spec.queue,
-            "extra_args": " ".join(resource_spec.extra_args) if resource_spec.extra_args else None,
+            "extra_args": " ".join(resource_spec.extra_args)
+            if resource_spec.extra_args
+            else None,
         }
 
     with db.get_db_session(settings.db_url) as session:
@@ -1263,21 +1323,27 @@ async def submit_job(
         job_id = db_job.id
 
         # Compute and persist work_dir now that we have the job ID
-        work_dir = _build_work_dir(job_id, manifest.name, entry_point.id,
-                                   job_name_prefix=settings.cluster.job_name_prefix,
-                                   username=username)
+        work_dir = _build_work_dir(
+            job_id,
+            manifest.name,
+            entry_point.id,
+            job_name_prefix=settings.cluster.job_name_prefix,
+            username=username,
+        )
         db_job.work_dir = str(work_dir)
         session.commit()
 
     # Clone/pull repo into the user's cache (~username/.fileglancer/apps).
     if manifest.repo_url and manifest.repo_url != app_url:
-        cached_repo_dir = await _ensure_repo_cache(manifest.repo_url, pull=pull_latest,
-                                                   username=username)
+        cached_repo_dir = await _ensure_repo_cache(
+            manifest.repo_url, pull=pull_latest, username=username
+        )
         cd_suffix = "repo"
         pulled_manifest_repo = False
     else:
-        cached_repo_dir = await _ensure_repo_cache(app_url, pull=pull_latest,
-                                                   username=username)
+        cached_repo_dir = await _ensure_repo_cache(
+            app_url, pull=pull_latest, username=username
+        )
         cd_suffix = f"repo/{manifest_path}" if manifest_path else "repo"
         pulled_manifest_repo = pull_latest
 
@@ -1310,9 +1376,7 @@ async def submit_job(
     # For local executor, trap EXIT to write the exit code to a file so
     # PID-based polling can determine the final status after the process exits.
     if settings.cluster.executor == "local":
-        preamble_lines.append(
-            'trap \'echo $? > "$FG_WORK_DIR/exit_code"\' EXIT'
-        )
+        preamble_lines.append("trap 'echo $? > \"$FG_WORK_DIR/exit_code\"' EXIT")
     if settings.apps.extra_paths:
         path_suffix = os.pathsep.join(shlex.quote(p) for p in settings.apps.extra_paths)
         preamble_lines.append(f"export PATH=$PATH:{path_suffix}")
@@ -1325,7 +1389,7 @@ async def submit_job(
     if entry_point.conda_env:
         conda_activation = (
             'eval "$(conda shell.bash hook)"\n'
-            f'conda activate {shlex.quote(entry_point.conda_env)}'
+            f"conda activate {shlex.quote(entry_point.conda_env)}"
         )
         script_parts.append(conda_activation)
 
@@ -1373,7 +1437,8 @@ async def submit_job(
     cluster_config = settings.cluster.model_dump(exclude_none=True)
     try:
         worker_result = await _dispatch(
-            username, "submit",
+            username,
+            "submit",
             cluster_config=cluster_config,
             command=full_command,
             job_name=job_name,
@@ -1404,10 +1469,14 @@ async def submit_job(
     # Update DB with cluster job ID — the poll loop will track status from here
     with db.get_db_session(settings.db_url) as session:
         db.update_job_status(
-            session, job_id, "PENDING",
+            session,
+            job_id,
+            "PENDING",
             cluster_job_id=cluster_job_id,
         )
         db_job = db.get_job(session, job_id, username)
+        if db_job is None:
+            raise RuntimeError(f"Job {job_id} not found after submission")
         session.expunge(db_job)
 
     ensure_poll_loop()
@@ -1415,7 +1484,9 @@ async def submit_job(
     return db_job
 
 
-def _build_resource_spec(entry_point: AppEntryPoint, overrides: Optional[dict], settings) -> ResourceSpec:
+def _build_resource_spec(
+    entry_point: AppEntryPoint, overrides: Optional[dict], settings
+) -> ResourceSpec:
     """Build a ResourceSpec from entry point defaults, user overrides, and global defaults."""
     cpus = settings.cluster.cpus
     memory = settings.cluster.memory
@@ -1435,7 +1506,9 @@ def _build_resource_spec(entry_point: AppEntryPoint, overrides: Optional[dict], 
 
     # Apply user overrides
     # extra_args default to config values; user overrides replace them entirely
-    extra_args = list(settings.cluster.extra_args) if settings.cluster.extra_args else None
+    extra_args = (
+        list(settings.cluster.extra_args) if settings.cluster.extra_args else None
+    )
     if overrides:
         if overrides.get("cpus") is not None:
             cpus = overrides["cpus"]
@@ -1466,13 +1539,16 @@ async def cancel_job(job_id: int, username: str) -> db.JobDB:
         if db_job is None:
             raise ValueError(f"Job {job_id} not found")
         if db_job.status not in ("PENDING", "RUNNING"):
-            raise ValueError(f"Job {job_id} is not cancellable (status: {db_job.status})")
+            raise ValueError(
+                f"Job {job_id} is not cancellable (status: {db_job.status})"
+            )
 
         # Cancel on cluster as the target user
         if db_job.cluster_job_id:
             cluster_config = settings.cluster.model_dump(exclude_none=True)
             await _dispatch(
-                username, "cancel",
+                username,
+                "cancel",
                 cluster_config=cluster_config,
                 job_id=db_job.cluster_job_id,
             )
@@ -1481,6 +1557,8 @@ async def cancel_job(job_id: int, username: str) -> db.JobDB:
         now = datetime.now(UTC)
         db.update_job_status(session, db_job.id, "KILLED", finished_at=now)
         db_job = db.get_job(session, db_job.id, username)
+        if db_job is None:
+            raise RuntimeError(f"Job {job_id} not found after cancellation")
         session.expunge(db_job)
 
     logger.info(f"Job {job_id} cancelled by user {username}")
@@ -1489,6 +1567,7 @@ async def cancel_job(job_id: int, username: str) -> db.JobDB:
 
 # --- Job File Access ---
 
+
 def _resolve_work_dir(db_job: db.JobDB) -> Path:
     """Resolve a job's work directory to an absolute path."""
     if db_job.work_dir:
@@ -1496,7 +1575,9 @@ def _resolve_work_dir(db_job: db.JobDB) -> Path:
     return _build_work_dir(db_job.id, db_job.app_name, db_job.entry_point_id)
 
 
-def _resolve_browse_path(abs_path: str, fsps: Optional[list] = None) -> tuple[str | None, str | None]:
+def _resolve_browse_path(
+    abs_path: str, fsps: Optional[list] = None
+) -> tuple[str | None, str | None]:
     """Resolve an absolute path to an FSP name and subpath for browse links.
 
     If *fsps* is None, queries the database directly. Pass a pre-fetched list
@@ -1516,7 +1597,9 @@ def _resolve_browse_path(abs_path: str, fsps: Optional[list] = None) -> tuple[st
 
 def _make_file_info(file_path: str, exists: bool, fsps: Optional[list] = None) -> dict:
     """Create a file info dict with browse link resolution."""
-    fsp_name, subpath = _resolve_browse_path(file_path, fsps) if exists else (None, None)
+    fsp_name, subpath = (
+        _resolve_browse_path(file_path, fsps) if exists else (None, None)
+    )
     return {
         "path": file_path,
         "exists": exists,
@@ -1532,9 +1615,9 @@ def get_service_url(db_job: db.JobDB) -> Optional[str]:
     The service writes its URL to a plain text file named 'service_url' in the
     job's work directory.
     """
-    if getattr(db_job, 'entry_point_type', 'job') != 'service':
+    if getattr(db_job, "entry_point_type", "job") != "service":
         return None
-    if db_job.status != 'RUNNING':
+    if db_job.status != "RUNNING":
         return None
 
     work_dir = _resolve_work_dir(db_job)
@@ -1554,7 +1637,9 @@ def get_service_url(db_job: db.JobDB) -> Optional[str]:
     return url
 
 
-def get_job_file_paths(db_job: db.JobDB, fsps: Optional[list] = None) -> dict[str, dict]:
+def get_job_file_paths(
+    db_job: db.JobDB, fsps: Optional[list] = None
+) -> dict[str, dict]:
     """Return file path info for a job's files (script, stdout, stderr, service_url).
 
     Returns a dict keyed by file type with path and existence info. Pass *fsps*
@@ -1576,9 +1661,11 @@ def get_job_file_paths(db_job: db.JobDB, fsps: Optional[list] = None) -> dict[st
     }
 
     # Include service_url file info for service-type jobs
-    if getattr(db_job, 'entry_point_type', 'job') == 'service':
+    if getattr(db_job, "entry_point_type", "job") == "service":
         service_url_path = work_dir / "service_url"
-        files["service_url"] = _make_file_info(str(service_url_path), service_url_path.is_file(), fsps)
+        files["service_url"] = _make_file_info(
+            str(service_url_path), service_url_path.is_file(), fsps
+        )
 
     return files
 
