@@ -6,12 +6,6 @@ rooted at a specific directory.
 import itertools
 import os
 import stat
-try:
-    import pwd
-    import grp
-except ImportError:
-    pwd = None  # type: ignore[assignment]
-    grp = None  # type: ignore[assignment]
 import shutil
 
 from pydantic import BaseModel
@@ -20,6 +14,11 @@ from loguru import logger
 
 from .database import find_fsp_in_paths
 from .model import FileSharePath
+from .platform_compat import (
+    group_names_for_user,
+    groupname_for_gid,
+    username_for_uid,
+)
 
 # Default buffer size for streaming file contents
 DEFAULT_BUFFER_SIZE = 8192
@@ -134,7 +133,7 @@ class FileInfo(BaseModel):
     @classmethod
     def from_stat(cls, path: str, absolute_path: str,
                   lstat_result: os.stat_result, stat_result: os.stat_result,
-                  current_user: str = None, fsps: Optional[list] = None,
+                  current_user: Optional[str] = None, fsps: Optional[list] = None,
                   root_path: Optional[str] = None,
                   user_groups: Optional[set[str]] = None):
         """
@@ -161,15 +160,8 @@ class FileInfo(BaseModel):
         permissions = stat.filemode(stat_result.st_mode)
         last_modified = stat_result.st_mtime
 
-        try:
-            owner = pwd.getpwuid(stat_result.st_uid).pw_name
-        except (KeyError, AttributeError):
-            owner = str(stat_result.st_uid)
-
-        try:
-            group = grp.getgrgid(stat_result.st_gid).gr_name
-        except (KeyError, AttributeError):
-            group = str(stat_result.st_gid)
+        owner = username_for_uid(stat_result.st_uid)
+        group = groupname_for_gid(stat_result.st_gid)
 
         # Calculate read/write permissions for current user
         hasRead = None
@@ -199,20 +191,7 @@ class FileInfo(BaseModel):
     @staticmethod
     def _get_user_groups(username: str) -> set[str]:
         """Compute all groups a user belongs to. Call once per listing, not per file."""
-        groups: set[str] = set()
-        try:
-            for g in grp.getgrall():
-                if username in g.gr_mem:
-                    groups.add(g.gr_name)
-        except (KeyError, OSError, AttributeError):
-            pass
-        try:
-            primary_gid = pwd.getpwnam(username).pw_gid
-            primary_group = grp.getgrgid(primary_gid).gr_name
-            groups.add(primary_group)
-        except (KeyError, OSError, AttributeError):
-            pass
-        return groups
+        return group_names_for_user(username)
 
     @staticmethod
     def _check_permissions(stat_result: os.stat_result, current_user: str,
@@ -281,7 +260,7 @@ class Filestore:
         return full_path
 
 
-    def _get_file_info_from_path(self, full_path: str, current_user: str = None,
+    def _get_file_info_from_path(self, full_path: str, current_user: Optional[str] = None,
                                     fsps: Optional[list] = None,
                                     user_groups: Optional[set[str]] = None) -> FileInfo:
         """
@@ -356,7 +335,7 @@ class Filestore:
         )
 
 
-    def _file_info_from_direntry(self, entry: os.DirEntry, current_user: str = None,
+    def _file_info_from_direntry(self, entry: os.DirEntry, current_user: Optional[str] = None,
                                     fsps: Optional[list] = None,
                                     user_groups: Optional[set[str]] = None) -> FileInfo:
         """Build a FileInfo from a DirEntry, using entry.stat() instead of os.lstat/os.stat.
@@ -433,7 +412,7 @@ class Filestore:
         return os.path.abspath(os.path.join(self.root_path, relative_path))
 
 
-    def get_file_info(self, path: Optional[str] = None, current_user: str = None,
+    def get_file_info(self, path: Optional[str] = None, current_user: Optional[str] = None,
                       fsps: Optional[list] = None) -> FileInfo:
         """
         Get the FileInfo for a file or directory at the given path.
@@ -492,7 +471,7 @@ class Filestore:
             return True
 
 
-    def yield_file_infos_paginated(self, path: Optional[str] = None, current_user: str = None,
+    def yield_file_infos_paginated(self, path: Optional[str] = None, current_user: Optional[str] = None,
                                     fsps: Optional[list] = None, limit: int = 200,
                                     cursor: Optional[str] = None,
                                     *, max_count: int) -> tuple[list[FileInfo], bool, Optional[str], int, bool]:
@@ -569,7 +548,7 @@ class Filestore:
         next_cursor = page_entries[-1].name if has_more and page_entries else None
         return file_infos, has_more, next_cursor, total_count, is_truncated
 
-    def yield_file_infos(self, path: Optional[str] = None, current_user: str = None,
+    def yield_file_infos(self, path: Optional[str] = None, current_user: Optional[str] = None,
                           fsps: Optional[list] = None) -> Generator[FileInfo, None, None]:
         """
         Yield a FileInfo object for each child of the given path.
@@ -604,7 +583,7 @@ class Filestore:
                 continue
 
 
-    def stream_file_contents(self, path: str = None, buffer_size: int = DEFAULT_BUFFER_SIZE, file_handle = None) -> Generator[bytes, None, None]:
+    def stream_file_contents(self, path: Optional[str] = None, buffer_size: int = DEFAULT_BUFFER_SIZE, file_handle = None) -> Generator[bytes, None, None]:
         """
         Stream the contents of a file at the given path or from an open file handle.
 
@@ -640,7 +619,7 @@ class Filestore:
                         break
                     yield chunk
 
-    def stream_file_range(self, path: str = None, start: int = 0, end: int = 0, buffer_size: int = DEFAULT_BUFFER_SIZE, file_handle = None) -> Generator[bytes, None, None]:
+    def stream_file_range(self, path: Optional[str] = None, start: int = 0, end: int = 0, buffer_size: int = DEFAULT_BUFFER_SIZE, file_handle = None) -> Generator[bytes, None, None]:
         """
         Stream a specific byte range of a file at the given path or from an open file handle.
 

@@ -165,8 +165,8 @@ class Settings(BaseSettings):
     
     @model_validator(mode='after')
     def set_jira_browse_url(self):
-        if self.jira_browse_url is None:
-            self.jira_browse_url = f"{self.atlassian_url}/browse"
+        if self.jira_browse_url is None and self.atlassian_url is not None:
+            object.__setattr__(self, "jira_browse_url", HttpUrl(f"{self.atlassian_url}/browse"))
         return self
 
 

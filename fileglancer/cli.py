@@ -33,7 +33,7 @@ def run_server_with_interrupt_handler(config, url, cleanup_callback=None):
     def run_server():
         """Run server in thread - this disables signal handlers in the thread"""
         # Disable signal handlers in this thread - they'll be handled in main thread
-        server.install_signal_handlers = lambda: None
+        server.install_signal_handlers = lambda: None  # type: ignore[method-assign]
         server.run()
 
     def handle_interrupt(signum, frame):
@@ -173,7 +173,6 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
 
     # Find available port if auto_port is enabled
     if auto_port:
-        import socket
         original_port = port
         max_attempts = 100
         for attempt in range(max_attempts):

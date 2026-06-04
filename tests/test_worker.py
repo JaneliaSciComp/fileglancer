@@ -472,7 +472,9 @@ class TestWorkerMainLoop:
         def target():
             # Simulate what main() does, but with our socket
             sock = child_sock
-            uid = os.getuid()
+            from fileglancer.platform_compat import current_uid
+
+            uid = current_uid()
             try:
                 username = os.environ.get("USER", str(uid))
             except KeyError:
