@@ -4,26 +4,43 @@ on:
   workflow_dispatch:
   push:
     branches: main
-  pull_request:
+  # pull_request_target runs in the context of the base repository, so the
+  # CHROMATIC_PROJECT_TOKEN secret is available even for pull requests opened
+  # from forks (a plain `pull_request` event withholds secrets from forks,
+  # which makes Chromatic fail). The job below checks out the PR head commit
+  # explicitly and is gated so untrusted fork code never runs with the secret.
+  pull_request_target:
     branches: "*"
 
 jobs:
   chromatic:
     name: Run Chromatic
     runs-on: ubuntu-latest
+    # Run for pushes/manual dispatch and for same-repository PRs. For PRs from a
+    # fork, only run when the author is a trusted collaborator (OWNER, MEMBER, or
+    # COLLABORATOR) so the secret is exposed only to users who already have write
+    # access. PRs from unauthorized forks fall through this condition and the job
+    # is skipped (neutral) rather than failing.
+    if: >-
+      github.event_name != 'pull_request_target' ||
+      github.event.pull_request.head.repo.full_name == github.repository ||
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association)
     defaults:
       run:
         working-directory: ./frontend
+    env:
+      CHROMATIC_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      CHROMATIC_SLUG: ${{ github.repository }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.ref }}
-        env:
-          CHROMATIC_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
-          CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.ref }}
-          CHROMATIC_SLUG: ${{ github.repository }}
+          # For fork PRs, check out the contributor's head commit from their fork.
+          # Falls back to the base repository for pushes and same-repo PRs.
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v6
         with:
           node-version: 24.14.0
