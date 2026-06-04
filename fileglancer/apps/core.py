@@ -764,7 +764,7 @@ def build_command(entry_point: AppEntryPoint, parameters: dict, session=None) ->
         validated = _validate_parameter_value(p, value, session=session)
         if p.type == "boolean":
             if value is True:
-                parts.append(param.flag)
+                parts.append(p.flag)
         else:
             parts.append(f"{p.flag} {shlex.quote(validated)}")
 
