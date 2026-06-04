@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import sys
 from collections.abc import Callable
 from pathlib import Path
 from types import TracebackType
@@ -157,6 +158,42 @@ def username_for_uid(uid: int) -> str:
             except KeyError:
                 pass
     return str(uid)
+
+
+def process_is_alive(pid: int) -> bool:
+    """Return whether a process with *pid* is currently running.
+
+    A process owned by another user counts as alive.  Used by the local
+    executor to decide whether a recorded job PID has finished.
+
+    This avoids ``os.kill(pid, 0)`` as a liveness probe: on Windows that
+    call routes through ``TerminateProcess`` and would kill the target
+    rather than inspect it.
+    """
+    if sys.platform == "win32":
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        SYNCHRONIZE = 0x00100000
+        WAIT_TIMEOUT = 0x00000102
+        handle = kernel32.OpenProcess(SYNCHRONIZE, False, pid)
+        if not handle:
+            return False
+        try:
+            # Signaled (WAIT_OBJECT_0) means the process has exited;
+            # WAIT_TIMEOUT means it is still running.
+            return kernel32.WaitForSingleObject(handle, 0) == WAIT_TIMEOUT
+        finally:
+            kernel32.CloseHandle(handle)
+
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # Process exists but is owned by another user.
+        return True
+    return True
 
 
 def groupname_for_gid(gid: int) -> str:

@@ -25,6 +25,7 @@ from fileglancer.platform_compat import (
     FileLockUnavailable,
     effective_uid,
     effective_user_home,
+    process_is_alive,
     user_home,
 )
 from fileglancer.settings import get_settings
@@ -1077,9 +1078,7 @@ def _poll_local_jobs(session, jobs_to_poll: list) -> bool:
             continue
 
         old_status = db_job.status
-        try:
-            os.kill(pid, 0)
-            # Process is still alive
+        if process_is_alive(pid):
             still_active = True
             if old_status == "PENDING":
                 db.update_job_status(
@@ -1089,7 +1088,7 @@ def _poll_local_jobs(session, jobs_to_poll: list) -> bool:
                     started_at=datetime.now(UTC),
                 )
                 logger.info(f"Job {db_job.id} status updated: PENDING -> RUNNING")
-        except ProcessLookupError:
+        else:
             # Process has exited — read exit code from the trap file
             exit_code = _read_exit_code(work_dir)
             new_status = "DONE" if exit_code == 0 else "FAILED"
@@ -1103,17 +1102,6 @@ def _poll_local_jobs(session, jobs_to_poll: list) -> bool:
                 started_at=now if old_status == "PENDING" else None,
             )
             logger.info(f"Job {db_job.id} status updated: {old_status} -> {new_status}")
-        except PermissionError:
-            # Process exists but owned by another user — still running
-            still_active = True
-            if old_status == "PENDING":
-                db.update_job_status(
-                    session,
-                    db_job.id,
-                    "RUNNING",
-                    started_at=datetime.now(UTC),
-                )
-                logger.info(f"Job {db_job.id} status updated: PENDING -> RUNNING")
 
     return still_active
 
