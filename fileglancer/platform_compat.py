@@ -157,3 +157,47 @@ def username_for_uid(uid: int) -> str:
             except KeyError:
                 pass
     return str(uid)
+
+
+def groupname_for_gid(gid: int) -> str:
+    """Return a group name for *gid*, or the gid string when unavailable."""
+    if os.name == "posix":
+        grp = optional_module("grp")
+        if grp is not None:
+            try:
+                return str(grp.getgrgid(gid).gr_name)
+            except KeyError:
+                pass
+    return str(gid)
+
+
+def group_names_for_user(username: str) -> set[str]:
+    """Return the set of group names *username* belongs to, including the
+    primary group.
+
+    Returns an empty set on platforms without the POSIX group database.
+    """
+    groups: set[str] = set()
+    if os.name != "posix":
+        return groups
+
+    grp = optional_module("grp")
+    pwd = optional_module("pwd")
+    if grp is None:
+        return groups
+
+    try:
+        for g in grp.getgrall():
+            if username in g.gr_mem:
+                groups.add(g.gr_name)
+    except (KeyError, OSError):
+        pass
+
+    if pwd is not None:
+        try:
+            primary_gid = pwd.getpwnam(username).pw_gid
+            groups.add(grp.getgrgid(primary_gid).gr_name)
+        except (KeyError, OSError):
+            pass
+
+    return groups

@@ -552,10 +552,19 @@ class TestCheckPermissions:
 
 class TestGetUserGroups:
 
-    @patch("fileglancer.filestore.pwd")
-    @patch("fileglancer.filestore.grp")
-    def test_includes_supplementary_groups(self, mock_grp, mock_pwd):
+    @staticmethod
+    def _patch_modules(mock_grp, mock_pwd):
+        """Route platform_compat.optional_module to the supplied mocks."""
+        modules = {"grp": mock_grp, "pwd": mock_pwd}
+        return patch(
+            "fileglancer.platform_compat.optional_module",
+            side_effect=lambda name: modules.get(name),
+        )
+
+    def test_includes_supplementary_groups(self):
         """Returns groups where the user appears in gr_mem."""
+        mock_grp = MagicMock()
+        mock_pwd = MagicMock()
         mock_grp.getgrall.return_value = [
             MagicMock(gr_name="staff", gr_mem=["alice", "bob"]),
             MagicMock(gr_name="dev", gr_mem=["alice"]),
@@ -564,41 +573,45 @@ class TestGetUserGroups:
         mock_pwd.getpwnam.return_value = MagicMock(pw_gid=100)
         mock_grp.getgrgid.return_value = MagicMock(gr_name="primary")
 
-        groups = FileInfo._get_user_groups("alice")
+        with self._patch_modules(mock_grp, mock_pwd):
+            groups = FileInfo._get_user_groups("alice")
         assert "staff" in groups
         assert "dev" in groups
         assert "ops" not in groups
 
-    @patch("fileglancer.filestore.pwd")
-    @patch("fileglancer.filestore.grp")
-    def test_includes_primary_group(self, mock_grp, mock_pwd):
+    def test_includes_primary_group(self):
         """Returns the user's primary group even if not in gr_mem."""
+        mock_grp = MagicMock()
+        mock_pwd = MagicMock()
         mock_grp.getgrall.return_value = []
         mock_pwd.getpwnam.return_value = MagicMock(pw_gid=100)
         mock_grp.getgrgid.return_value = MagicMock(gr_name="primary")
 
-        groups = FileInfo._get_user_groups("alice")
+        with self._patch_modules(mock_grp, mock_pwd):
+            groups = FileInfo._get_user_groups("alice")
         assert "primary" in groups
 
-    @patch("fileglancer.filestore.pwd")
-    @patch("fileglancer.filestore.grp")
-    def test_handles_unknown_user(self, mock_grp, mock_pwd):
+    def test_handles_unknown_user(self):
         """Returns empty set if user doesn't exist."""
+        mock_grp = MagicMock()
+        mock_pwd = MagicMock()
         mock_grp.getgrall.return_value = []
         mock_pwd.getpwnam.side_effect = KeyError("no such user")
 
-        groups = FileInfo._get_user_groups("nonexistent")
+        with self._patch_modules(mock_grp, mock_pwd):
+            groups = FileInfo._get_user_groups("nonexistent")
         assert groups == set()
 
-    @patch("fileglancer.filestore.pwd")
-    @patch("fileglancer.filestore.grp")
-    def test_handles_getgrall_failure(self, mock_grp, mock_pwd):
+    def test_handles_getgrall_failure(self):
         """Gracefully handles grp.getgrall() failure."""
+        mock_grp = MagicMock()
+        mock_pwd = MagicMock()
         mock_grp.getgrall.side_effect = OSError("nss failure")
         mock_pwd.getpwnam.return_value = MagicMock(pw_gid=100)
         mock_grp.getgrgid.return_value = MagicMock(gr_name="primary")
 
-        groups = FileInfo._get_user_groups("alice")
+        with self._patch_modules(mock_grp, mock_pwd):
+            groups = FileInfo._get_user_groups("alice")
         # Still gets primary group despite getgrall failure
         assert "primary" in groups
 

@@ -14,10 +14,11 @@ from loguru import logger
 
 from .database import find_fsp_in_paths
 from .model import FileSharePath
-from .platform_compat import optional_module
-
-pwd = optional_module("pwd")
-grp = optional_module("grp")
+from .platform_compat import (
+    group_names_for_user,
+    groupname_for_gid,
+    username_for_uid,
+)
 
 # Default buffer size for streaming file contents
 DEFAULT_BUFFER_SIZE = 8192
@@ -159,15 +160,8 @@ class FileInfo(BaseModel):
         permissions = stat.filemode(stat_result.st_mode)
         last_modified = stat_result.st_mtime
 
-        try:
-            owner = pwd.getpwuid(stat_result.st_uid).pw_name
-        except (KeyError, AttributeError):
-            owner = str(stat_result.st_uid)
-
-        try:
-            group = grp.getgrgid(stat_result.st_gid).gr_name
-        except (KeyError, AttributeError):
-            group = str(stat_result.st_gid)
+        owner = username_for_uid(stat_result.st_uid)
+        group = groupname_for_gid(stat_result.st_gid)
 
         # Calculate read/write permissions for current user
         hasRead = None
@@ -197,20 +191,7 @@ class FileInfo(BaseModel):
     @staticmethod
     def _get_user_groups(username: str) -> set[str]:
         """Compute all groups a user belongs to. Call once per listing, not per file."""
-        groups: set[str] = set()
-        try:
-            for g in grp.getgrall():
-                if username in g.gr_mem:
-                    groups.add(g.gr_name)
-        except (KeyError, OSError, AttributeError):
-            pass
-        try:
-            primary_gid = pwd.getpwnam(username).pw_gid
-            primary_group = grp.getgrgid(primary_gid).gr_name
-            groups.add(primary_group)
-        except (KeyError, OSError, AttributeError):
-            pass
-        return groups
+        return group_names_for_user(username)
 
     @staticmethod
     def _check_permissions(stat_result: os.stat_result, current_user: str,
