@@ -212,12 +212,10 @@ def group_names_for_user(username: str) -> set[str]:
     """Return the set of group names *username* belongs to, including the
     primary group.
 
-    Returns an empty set on platforms without the POSIX group database.
+    Returns an empty set on platforms without the POSIX group database
+    (i.e. where the ``grp`` module cannot be imported).
     """
     groups: set[str] = set()
-    if os.name != "posix":
-        return groups
-
     grp = optional_module("grp")
     pwd = optional_module("pwd")
     if grp is None:
