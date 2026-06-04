@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, UTC
 import os
 from functools import lru_cache
 
-from sqlalchemy import create_engine, Column, String, Integer, Boolean, DateTime, JSON, UniqueConstraint
+from sqlalchemy import create_engine, Column, String, Integer, DateTime, JSON, UniqueConstraint
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.pool import StaticPool
@@ -160,7 +160,6 @@ class JobDB(Base):
     container = Column(String, nullable=True)
     container_args = Column(String, nullable=True)
     work_dir = Column(String, nullable=True)
-    pull_latest = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
@@ -914,7 +913,7 @@ def create_job(session: Session, username: str, app_url: str, app_name: str,
                resources: Optional[Dict] = None, manifest_path: str = "",
                entry_point_type: str = "job",
                env: Optional[Dict] = None, pre_run: Optional[str] = None,
-               post_run: Optional[str] = None, pull_latest: bool = False,
+               post_run: Optional[str] = None,
                container: Optional[str] = None,
                container_args: Optional[str] = None) -> JobDB:
     """Create a new job record"""
@@ -934,7 +933,6 @@ def create_job(session: Session, username: str, app_url: str, app_name: str,
         post_run=post_run,
         container=container,
         container_args=container_args,
-        pull_latest=pull_latest,
         status="PENDING",
         created_at=now
     )

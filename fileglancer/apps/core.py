@@ -1173,7 +1173,6 @@ async def submit_job(
     parameters: dict,
     resources: Optional[dict] = None,
     extra_args: Optional[str] = None,
-    pull_latest: bool = False,
     manifest_path: str = "",
     env: Optional[dict] = None,
     pre_run: Optional[str] = None,
@@ -1256,7 +1255,6 @@ async def submit_job(
             env=merged_env or None,
             pre_run=effective_pre_run,
             post_run=effective_post_run,
-            pull_latest=pull_latest,
             container=effective_container,
             container_args=effective_container_args,
         )
@@ -1269,24 +1267,19 @@ async def submit_job(
         db_job.work_dir = str(work_dir)
         session.commit()
 
-    # Clone/pull repo into the user's cache (~username/.fileglancer/apps).
+    # Ensure the repo is cached in the user's cache (~username/.fileglancer/apps).
+    # Pulling is never done here; updates are an explicit user action via the
+    # "Update" app endpoint. The manifest read above already reflects the cache.
     if manifest.repo_url and manifest.repo_url != app_url:
-        cached_repo_dir = await _ensure_repo_cache(manifest.repo_url, pull=pull_latest,
-                                                   username=username)
+        # Manifest and tool code live in separate repos: cache the code repo
+        # and run from its root.
+        cached_repo_dir = await _ensure_repo_cache(manifest.repo_url, username=username)
         cd_suffix = "repo"
-        pulled_manifest_repo = False
     else:
-        cached_repo_dir = await _ensure_repo_cache(app_url, pull=pull_latest,
-                                                   username=username)
+        # Manifest and tool code share one repo: cache it and run from the
+        # subdirectory that contains the manifest.
+        cached_repo_dir = await _ensure_repo_cache(app_url, username=username)
         cd_suffix = f"repo/{manifest_path}" if manifest_path else "repo"
-        pulled_manifest_repo = pull_latest
-
-    # If the pull just changed the YAML on disk, sync the cache.
-    if pulled_manifest_repo:
-        try:
-            await refresh_cached_manifest(username, app_url, manifest_path)
-        except Exception as e:
-            logger.warning(f"Failed to refresh cached manifest after pull: {e}")
 
     # Build environment variable export lines
     env_lines = ""
