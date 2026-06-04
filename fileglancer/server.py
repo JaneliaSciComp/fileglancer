@@ -20,9 +20,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, Query, Path, Body, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response, JSONResponse, PlainTextResponse, StreamingResponse, FileResponse
-from fastapi.exceptions import RequestValidationError, StarletteHTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from urllib.parse import quote, unquote
 
 from fileglancer import database as db
@@ -94,7 +95,8 @@ def _convert_external_bucket(db_bucket: db.ExternalBucketDB) -> ExternalBucket:
 def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optional[HttpUrl]) -> ProxiedPath:
     """Convert a database ProxiedPathDB model to a Pydantic ProxiedPath model"""
     if external_proxy_url:
-        url = f"{external_proxy_url}/{db_path.sharing_key}/{quote(db_path.url_prefix, safe='/')}"
+        base_url = str(external_proxy_url).rstrip("/")
+        url = HttpUrl(f"{base_url}/{db_path.sharing_key}/{quote(db_path.url_prefix, safe='/')}")
     else:
         logger.warning(f"No external proxy URL was provided, proxy links will not be available.")
         url = None
@@ -651,7 +653,7 @@ def create_app(settings):
 
     @app.get("/api/file-share-paths", response_model=FileSharePathResponse,
              description="Get all file share paths from the database")
-    async def get_file_share_paths() -> List[FileSharePath]:
+    async def get_file_share_paths() -> FileSharePathResponse:
         with db.get_db_session(settings.db_url) as session:
             paths = db.get_file_share_paths(session)
             return FileSharePathResponse(paths=paths)
@@ -667,7 +669,7 @@ def create_app(settings):
 
     @app.get("/api/external-buckets/{fsp_name}", response_model=ExternalBucketResponse,
              description="Get the external buckets for a given FSP name")
-    async def get_external_buckets(fsp_name: str) -> ExternalBucket:
+    async def get_external_buckets_by_fsp(fsp_name: str) -> ExternalBucketResponse:
         with db.get_db_session(settings.db_url) as session:
             buckets = [_convert_external_bucket(bucket) for bucket in db.get_external_buckets(session, fsp_name)]
             return ExternalBucketResponse(buckets=buckets)
@@ -741,6 +743,12 @@ def create_app(settings):
         issue_type = body.get("issue_type")
         summary = body.get("summary")
         description = body.get("description")
+        if not isinstance(fsp_name, str) or not isinstance(path, str):
+            raise HTTPException(status_code=400, detail="fsp_name and path are required")
+        if not isinstance(project_key, str) or not isinstance(issue_type, str):
+            raise HTTPException(status_code=400, detail="project_key and issue_type are required")
+        if not isinstance(summary, str) or not isinstance(description, str):
+            raise HTTPException(status_code=400, detail="summary and description are required")
         try:
             # Create ticket in JIRA
             jira_ticket = create_jira_ticket(
@@ -750,7 +758,8 @@ def create_app(settings):
                 description=description
             )
             logger.info(f"Created JIRA ticket: {jira_ticket}")
-            if not jira_ticket or 'key' not in jira_ticket:
+            ticket_key = jira_ticket.get("key")
+            if not isinstance(ticket_key, str):
                 raise HTTPException(status_code=500, detail="Failed to create JIRA ticket")
 
             # Save reference to the ticket in the database
@@ -760,13 +769,13 @@ def create_app(settings):
                     username=username,
                     fsp_name=fsp_name,
                     path=path,
-                    ticket_key=jira_ticket['key']
+                    ticket_key=ticket_key
                 )
                 if db_ticket is None:
                     raise HTTPException(status_code=500, detail="Failed to create ticket entry in database")
 
                 # Get the full ticket details from JIRA
-                ticket_details = get_jira_ticket_details(jira_ticket['key'])
+                ticket_details = get_jira_ticket_details(ticket_key)
 
                 # Return DTO with details from both JIRA and database
                 ticket = _convert_ticket(db_ticket)
@@ -1826,7 +1835,14 @@ def create_app(settings):
             return dt.replace(tzinfo=UTC)
         return dt
 
-    def _convert_job(db_job: db.JobDB, service_url: str = None, files: dict = None) -> Job:
+    def _ensure_utc_required(dt: datetime) -> datetime:
+        """Re-attach UTC timezone to a non-null datetime from the DB."""
+        result = _ensure_utc(dt)
+        assert result is not None
+        return result
+
+    def _convert_job(db_job: db.JobDB, service_url: Optional[str] = None,
+                     files: Optional[Dict[str, JobFileInfo]] = None) -> Job:
         """Convert a database JobDB to a Pydantic Job model.
 
         File-reading fields (service_url, files) must be passed in pre-computed
@@ -1852,7 +1868,7 @@ def create_app(settings):
             pull_latest=db_job.pull_latest,
             cluster_job_id=db_job.cluster_job_id,
             service_url=service_url,
-            created_at=_ensure_utc(db_job.created_at),
+            created_at=_ensure_utc_required(db_job.created_at),
             started_at=_ensure_utc(db_job.started_at),
             finished_at=_ensure_utc(db_job.finished_at),
             files=files,

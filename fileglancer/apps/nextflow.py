@@ -11,6 +11,7 @@ from fileglancer.model import (
     AppEntryPoint,
     AppManifest,
     AppParameter,
+    AppParameterItem,
     AppParameterSection,
 )
 
@@ -106,7 +107,7 @@ class NextflowAdapter:
         if not ordered_def_keys:
             ordered_def_keys = list(definitions.keys())
 
-        parameters = []
+        parameters: list[AppParameterItem] = []
         for def_key in ordered_def_keys:
             defn = definitions.get(def_key)
             if not defn:
@@ -137,7 +138,7 @@ class NextflowAdapter:
             )
             parameters.append(section)
 
-        env_parameters = [
+        env_parameters: list[AppParameterItem] = [
             AppParameterSection(
                 section="Nextflow",
                 parameters=[

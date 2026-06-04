@@ -52,6 +52,7 @@ def verify_id_token(id_token: str, settings: Settings) -> dict:
         # But we decode to extract claims
         decoded = jwt.decode(
             id_token,
+            key="",
             options={"verify_signature": False}  # authlib already verified it
         )
         return decoded
@@ -87,6 +88,10 @@ def get_session_from_cookie(request: Request, settings: Settings) -> Optional[db
 
         # Check if session secret key has changed (if hash is stored)
         if user_session.session_secret_key_hash:
+            if settings.session_secret_key is None:
+                logger.warning(f"Missing session secret key, revoking session for user {user_session.username}")
+                db.delete_session(session, session_id)
+                return None
             current_key_hash = _hash_session_secret_key(settings.session_secret_key)
             if user_session.session_secret_key_hash != current_key_hash:
                 logger.warning(f"Session secret key changed, revoking session for user {user_session.username}")

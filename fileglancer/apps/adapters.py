@@ -9,8 +9,8 @@ To add a new adapter:
   3. Register it by adding an instance to the MANIFEST_ADAPTERS list below
 """
 
-from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Protocol
 
 from fileglancer.model import AppManifest
 
@@ -18,19 +18,19 @@ from fileglancer.apps.nextflow import NextflowAdapter
 from fileglancer.apps.pixi import PixiAdapter
 
 
-class ManifestAdapter(ABC):
+class ManifestAdapter(Protocol):
     """Base class for converting project-specific config files into an AppManifest."""
 
-    @abstractmethod
     def can_handle(self, directory: Path) -> bool:
         """Return True if this adapter can generate a manifest for the given directory."""
+        ...
 
-    @abstractmethod
     def convert(self, directory: Path) -> AppManifest:
         """Convert the project config in the given directory to an AppManifest.
 
         Only called when can_handle() returned True.
         """
+        ...
 
 
 # ---------------------------------------------------------------------------

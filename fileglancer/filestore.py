@@ -132,7 +132,7 @@ class FileInfo(BaseModel):
     @classmethod
     def from_stat(cls, path: str, absolute_path: str,
                   lstat_result: os.stat_result, stat_result: os.stat_result,
-                  current_user: str = None, fsps: Optional[list] = None,
+                  current_user: Optional[str] = None, fsps: Optional[list] = None,
                   root_path: Optional[str] = None,
                   user_groups: Optional[set[str]] = None):
         """
@@ -279,7 +279,7 @@ class Filestore:
         return full_path
 
 
-    def _get_file_info_from_path(self, full_path: str, current_user: str = None,
+    def _get_file_info_from_path(self, full_path: str, current_user: Optional[str] = None,
                                     fsps: Optional[list] = None,
                                     user_groups: Optional[set[str]] = None) -> FileInfo:
         """
@@ -354,7 +354,7 @@ class Filestore:
         )
 
 
-    def _file_info_from_direntry(self, entry: os.DirEntry, current_user: str = None,
+    def _file_info_from_direntry(self, entry: os.DirEntry, current_user: Optional[str] = None,
                                     fsps: Optional[list] = None,
                                     user_groups: Optional[set[str]] = None) -> FileInfo:
         """Build a FileInfo from a DirEntry, using entry.stat() instead of os.lstat/os.stat.
@@ -431,7 +431,7 @@ class Filestore:
         return os.path.abspath(os.path.join(self.root_path, relative_path))
 
 
-    def get_file_info(self, path: Optional[str] = None, current_user: str = None,
+    def get_file_info(self, path: Optional[str] = None, current_user: Optional[str] = None,
                       fsps: Optional[list] = None) -> FileInfo:
         """
         Get the FileInfo for a file or directory at the given path.
@@ -490,7 +490,7 @@ class Filestore:
             return True
 
 
-    def yield_file_infos_paginated(self, path: Optional[str] = None, current_user: str = None,
+    def yield_file_infos_paginated(self, path: Optional[str] = None, current_user: Optional[str] = None,
                                     fsps: Optional[list] = None, limit: int = 200,
                                     cursor: Optional[str] = None,
                                     *, max_count: int) -> tuple[list[FileInfo], bool, Optional[str], int, bool]:
@@ -567,7 +567,7 @@ class Filestore:
         next_cursor = page_entries[-1].name if has_more and page_entries else None
         return file_infos, has_more, next_cursor, total_count, is_truncated
 
-    def yield_file_infos(self, path: Optional[str] = None, current_user: str = None,
+    def yield_file_infos(self, path: Optional[str] = None, current_user: Optional[str] = None,
                           fsps: Optional[list] = None) -> Generator[FileInfo, None, None]:
         """
         Yield a FileInfo object for each child of the given path.
@@ -602,7 +602,7 @@ class Filestore:
                 continue
 
 
-    def stream_file_contents(self, path: str = None, buffer_size: int = DEFAULT_BUFFER_SIZE, file_handle = None) -> Generator[bytes, None, None]:
+    def stream_file_contents(self, path: Optional[str] = None, buffer_size: int = DEFAULT_BUFFER_SIZE, file_handle = None) -> Generator[bytes, None, None]:
         """
         Stream the contents of a file at the given path or from an open file handle.
 
@@ -638,7 +638,7 @@ class Filestore:
                         break
                     yield chunk
 
-    def stream_file_range(self, path: str = None, start: int = 0, end: int = 0, buffer_size: int = DEFAULT_BUFFER_SIZE, file_handle = None) -> Generator[bytes, None, None]:
+    def stream_file_range(self, path: Optional[str] = None, start: int = 0, end: int = 0, buffer_size: int = DEFAULT_BUFFER_SIZE, file_handle = None) -> Generator[bytes, None, None]:
         """
         Stream a specific byte range of a file at the given path or from an open file handle.
 

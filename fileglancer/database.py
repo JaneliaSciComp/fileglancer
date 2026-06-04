@@ -4,11 +4,11 @@ from datetime import datetime, timedelta, UTC
 import os
 from functools import lru_cache
 
-from sqlalchemy import create_engine, Column, String, Integer, Boolean, DateTime, JSON, UniqueConstraint
+from sqlalchemy import create_engine, String, Integer, Boolean, DateTime, JSON, UniqueConstraint
 from sqlalchemy.orm import Session, DeclarativeBase, Mapped, mapped_column, sessionmaker
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.pool import StaticPool
-from typing import Optional, Dict, List, Any
+from typing import Callable, Optional, Dict, List, Any, Sequence
 from loguru import logger
 from cachetools import LRUCache
 
@@ -44,44 +44,47 @@ class Base(DeclarativeBase):
 class FileSharePathDB(Base):
     """Database model for storing file share paths"""
     __tablename__ = 'file_share_paths'
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, index=True, unique=True)
-    zone = Column(String)
-    group = Column(String)
-    storage = Column(String)
-    mount_path = Column(String)
-    mac_path = Column(String)
-    windows_path = Column(String)
-    linux_path = Column(String)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String, index=True, unique=True)
+    zone: Mapped[str] = mapped_column(String)
+    group: Mapped[Optional[str]] = mapped_column(String)
+    storage: Mapped[Optional[str]] = mapped_column(String)
+    mount_path: Mapped[str] = mapped_column(String)
+    mac_path: Mapped[Optional[str]] = mapped_column(String)
+    windows_path: Mapped[Optional[str]] = mapped_column(String)
+    linux_path: Mapped[Optional[str]] = mapped_column(String)
 
 
 class ExternalBucketDB(Base):
     """Database model for storing external buckets"""
     __tablename__ = 'external_buckets'
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    full_path = Column(String)
-    external_url = Column(String)
-    fsp_name = Column(String, nullable=False)
-    relative_path = Column(String)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    full_path: Mapped[str] = mapped_column(String)
+    external_url: Mapped[str] = mapped_column(String)
+    fsp_name: Mapped[str] = mapped_column(String, nullable=False)
+    relative_path: Mapped[Optional[str]] = mapped_column(String)
 
 
 class LastRefreshDB(Base):
     """Database model for storing the last refresh time of tables"""
     __tablename__ = 'last_refresh'
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    table_name = Column(String, nullable=False, index=True)
-    source_last_updated = Column(DateTime, nullable=False)
-    db_last_updated = Column(DateTime, nullable=False)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    table_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    source_last_updated: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    db_last_updated: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
 class UserPreferenceDB(Base):
     """Database model for storing user preferences"""
     __tablename__ = 'user_preferences'
 
-    id = Column(Integer, primary_key=True)
-    username = Column(String, nullable=False)
-    key = Column(String, nullable=False)
-    value = Column(JSON, nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String, nullable=False)
+    key: Mapped[str] = mapped_column(String, nullable=False)
+    value: Mapped[Dict] = mapped_column(JSON, nullable=False)
 
     __table_args__ = (
         UniqueConstraint('username', 'key', name='uq_user_pref'),
@@ -92,15 +95,15 @@ class ProxiedPathDB(Base):
     """Database model for storing proxied paths"""
     __tablename__ = 'proxied_paths'
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String, nullable=False)
-    sharing_key = Column(String, nullable=False, unique=True)
-    sharing_name = Column(String, nullable=False)
-    fsp_name = Column(String, nullable=False)
-    path = Column(String, nullable=False)
-    url_prefix = Column(String, nullable=False, server_default="")
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String, nullable=False)
+    sharing_key: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    sharing_name: Mapped[str] = mapped_column(String, nullable=False)
+    fsp_name: Mapped[str] = mapped_column(String, nullable=False)
+    path: Mapped[str] = mapped_column(String, nullable=False)
+    url_prefix: Mapped[str] = mapped_column(String, nullable=False, server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
     __table_args__ = (
         UniqueConstraint('username', 'fsp_name', 'path', name='uq_proxied_path'),
@@ -111,27 +114,27 @@ class NeuroglancerStateDB(Base):
     """Database model for storing Neuroglancer states"""
     __tablename__ = 'neuroglancer_states'
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    short_key = Column(String, nullable=False, unique=True, index=True)
-    short_name = Column(String, nullable=True)
-    username = Column(String, nullable=False)
-    url_base = Column(String, nullable=False)
-    state = Column(JSON, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    short_key: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    short_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    username: Mapped[str] = mapped_column(String, nullable=False)
+    url_base: Mapped[str] = mapped_column(String, nullable=False)
+    state: Mapped[Dict] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
 
 class TicketDB(Base):
     """Database model for storing proxied paths"""
     __tablename__ = 'tickets'
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String, nullable=False)
-    fsp_name = Column(String, nullable=False)
-    path = Column(String, nullable=False)
-    ticket_key = Column(String, nullable=False, unique=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String, nullable=False)
+    fsp_name: Mapped[str] = mapped_column(String, nullable=False)
+    path: Mapped[str] = mapped_column(String, nullable=False)
+    ticket_key: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
     # TODO: Do we want to only allow one ticket per path?
     # Commented out now for testing purposes
@@ -193,16 +196,16 @@ class SessionDB(Base):
     """Database model for storing user sessions"""
     __tablename__ = 'sessions'
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    session_id = Column(String, nullable=False, unique=True, index=True)
-    username = Column(String, nullable=False, index=True)
-    email = Column(String, nullable=True)
-    okta_access_token = Column(String, nullable=True)
-    okta_id_token = Column(String, nullable=True)
-    session_secret_key_hash = Column(String, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
-    expires_at = Column(DateTime, nullable=False)
-    last_accessed_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    username: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    email: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    okta_access_token: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    okta_id_token: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    session_secret_key_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    last_accessed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
 
 
 def run_alembic_upgrade(db_url):
@@ -498,7 +501,7 @@ def get_all_user_preferences(session: Session, username: str) -> Dict[str, Dict]
     return {pref.key: pref.value for pref in prefs}
 
 
-def get_proxied_paths(session: Session, username: str, fsp_name: str = None, path: str = None) -> List[ProxiedPathDB]:
+def get_proxied_paths(session: Session, username: str, fsp_name: Optional[str] = None, path: Optional[str] = None) -> List[ProxiedPathDB]:
     """Get proxied paths for a user, optionally filtered by fsp_name and path"""
     logger.info(f"Getting proxied paths for {username} with fsp_name={fsp_name} and path={path}")
     query = session.query(ProxiedPathDB).filter_by(username=username)
@@ -553,7 +556,7 @@ def _clear_sharing_key_cache():
 def _find_best_fsp_match(
     fsps: list[FileSharePath],
     normalized_input: str,
-    get_candidates: callable,
+    get_candidates: Callable[[FileSharePath], Sequence[str | None]],
     separator: str = "/",
 ) -> Optional[tuple[FileSharePath, str]]:
     """Find the FSP whose candidate path is the longest prefix of *normalized_input*.
@@ -821,7 +824,7 @@ def delete_neuroglancer_state(session: Session, username: str, short_key: str) -
     return deleted
 
 
-def get_tickets(session: Session, username: str, fsp_name: str = None, path: str = None) -> List[TicketDB]:
+def get_tickets(session: Session, username: str, fsp_name: Optional[str] = None, path: Optional[str] = None) -> List[TicketDB]:
     """Get tickets for a user, optionally filtered by fsp_name and path"""
     logger.info(f"Getting tickets for {username} with fsp_name={fsp_name} and path={path}")
     query = session.query(TicketDB).filter_by(username=username)

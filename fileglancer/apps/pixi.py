@@ -6,6 +6,7 @@ converting pixi tasks into runnables.
 
 import subprocess
 from pathlib import Path
+from typing import Any
 
 try:
     import tomllib
@@ -16,13 +17,14 @@ from fileglancer.model import (
     AppEntryPoint,
     AppManifest,
     AppParameter,
+    AppParameterItem,
 )
 
 _PIXI_TOML = "pixi.toml"
 _PYPROJECT_TOML = "pyproject.toml"
 
 
-def _read_pixi_config(directory: Path) -> dict | None:
+def _read_pixi_config(directory: Path) -> dict[str, Any] | None:
     """Read pixi configuration from pixi.toml or pyproject.toml.
 
     Returns the pixi config dict (equivalent to the [tool.pixi] section),
@@ -41,15 +43,18 @@ def _read_pixi_config(directory: Path) -> dict | None:
     pyproject_path = directory / _PYPROJECT_TOML
     if pyproject_path.is_file():
         data = tomllib.loads(pyproject_path.read_text())
-        pixi_config = data.get("tool", {}).get("pixi")
-        if pixi_config and "tasks" in pixi_config:
+        tool_config = data.get("tool", {})
+        pixi_config = tool_config.get("pixi") if isinstance(tool_config, dict) else None
+        if isinstance(pixi_config, dict) and "tasks" in pixi_config:
             # Merge top-level [project] metadata into pixi config.
             # [tool.pixi.project] may only have channels/platforms,
             # so fill in missing fields (name, description, version)
             # from the top-level [project] section.
             top_project = data.get("project", {})
-            if top_project:
+            if isinstance(top_project, dict) and top_project:
                 pixi_project = pixi_config.get("project", {})
+                if not isinstance(pixi_project, dict):
+                    pixi_project = {}
                 for key in ("name", "description", "version"):
                     if key not in pixi_project and key in top_project:
                         pixi_project[key] = top_project[key]
@@ -60,27 +65,37 @@ def _read_pixi_config(directory: Path) -> dict | None:
     return None
 
 
-def _collect_tasks(config: dict) -> dict[str, dict]:
+def _collect_tasks(config: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Collect all tasks from a pixi config, including feature tasks.
 
     Returns a dict of task_name -> task_definition (normalized to dict form).
     """
-    tasks: dict[str, dict] = {}
+    tasks: dict[str, dict[str, Any]] = {}
 
     # Top-level tasks
-    for name, defn in config.get("tasks", {}).items():
-        tasks[name] = _normalize_task(defn)
+    task_config = config.get("tasks", {})
+    if isinstance(task_config, dict):
+        for name, defn in task_config.items():
+            tasks[str(name)] = _normalize_task(defn)
 
     # Feature tasks (e.g. [tool.pixi.feature.test.tasks])
-    for feature_name, feature in config.get("feature", {}).items():
-        for name, defn in feature.get("tasks", {}).items():
-            if name not in tasks:
-                tasks[name] = _normalize_task(defn)
+    feature_config = config.get("feature", {})
+    if isinstance(feature_config, dict):
+        for feature in feature_config.values():
+            if not isinstance(feature, dict):
+                continue
+            feature_tasks = feature.get("tasks", {})
+            if not isinstance(feature_tasks, dict):
+                continue
+            for name, defn in feature_tasks.items():
+                task_name = str(name)
+                if task_name not in tasks:
+                    tasks[task_name] = _normalize_task(defn)
 
     return tasks
 
 
-def _normalize_task(defn) -> dict:
+def _normalize_task(defn: Any) -> dict[str, Any]:
     """Normalize a task definition to dict form.
 
     Tasks can be defined as:
@@ -89,10 +104,12 @@ def _normalize_task(defn) -> dict:
     """
     if isinstance(defn, str):
         return {"cmd": defn}
-    return dict(defn)
+    if isinstance(defn, dict):
+        return dict(defn)
+    return {}
 
 
-def _convert_task_arg(arg) -> AppParameter:
+def _convert_task_arg(arg: Any) -> AppParameter:
     """Convert a pixi task argument to an AppParameter."""
     if isinstance(arg, str):
         # Simple required argument
@@ -103,7 +120,7 @@ def _convert_task_arg(arg) -> AppParameter:
         )
 
     # Dict form with optional default and choices
-    arg_name = arg["arg"]
+    arg_name = str(arg["arg"])
     param_type = "enum" if "choices" in arg else "string"
     kwargs: dict = {
         "name": arg_name.replace("_", " ").title(),
@@ -118,7 +135,7 @@ def _convert_task_arg(arg) -> AppParameter:
     return AppParameter(**kwargs)
 
 
-def _task_to_entry_point(name: str, task: dict) -> AppEntryPoint | None:
+def _task_to_entry_point(name: str, task: dict[str, Any]) -> AppEntryPoint | None:
     """Convert a pixi task dict to an AppEntryPoint.
 
     Returns None for tasks without a command (dependency-only tasks with no
@@ -144,7 +161,7 @@ def _task_to_entry_point(name: str, task: dict) -> AppEntryPoint | None:
     description = task.get("description")
 
     # Convert task arguments to parameters
-    parameters = []
+    parameters: list[AppParameterItem] = []
     args = task.get("args")
     if args:
         for arg in args:
@@ -211,9 +228,12 @@ class PixiAdapter:
 
     def convert(self, directory: Path) -> AppManifest:
         config = _read_pixi_config(directory)
+        if config is None:
+            raise ValueError("No pixi configuration found")
 
         # Extract project metadata
-        project = config.get("project", config.get("workspace", {}))
+        project_config = config.get("project") or config.get("workspace") or {}
+        project = project_config if isinstance(project_config, dict) else {}
         description = project.get("description")
         version = project.get("version")
 

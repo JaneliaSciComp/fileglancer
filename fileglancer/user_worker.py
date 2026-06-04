@@ -73,6 +73,18 @@ def _run_async(coro):
             return future.result()
 
 
+def _response_body_text(response: Any) -> str:
+    """Decode a FastAPI/Starlette response body regardless of bytes-like type."""
+    body = getattr(response, "body", b"")
+    if isinstance(body, memoryview):
+        body = body.tobytes()
+    if isinstance(body, bytearray):
+        body = bytes(body)
+    if isinstance(body, bytes):
+        return body.decode()
+    return str(body)
+
+
 def _set_pdeathsig():
     """Ask the kernel to send SIGTERM when our parent process dies.
 
@@ -357,7 +369,7 @@ def with_filestore(fn):
         fsps = ctx.db.get_file_share_paths()
         filestore, error_response = _get_filestore(request["fsp_name"], fsps)
         if filestore is None:
-            return error_response
+            return error_response or {"error": "Unable to resolve filestore", "status_code": 500}
         return fn(request, ctx, filestore, fsps)
     return wrapper
 
@@ -729,7 +741,7 @@ def _action_generate_ssh_key(request: dict, ctx: WorkerContext) -> dict:
         result = sshkeys.generate_temp_key_and_authorize(ssh_dir, passphrase)
         # TempKeyResponse is a Response object; extract the data we need
         return {
-            "private_key": result.body.decode() if hasattr(result, 'body') else str(result),
+            "private_key": _response_body_text(result) if hasattr(result, 'body') else str(result),
             "fingerprint": result.headers.get("X-SSH-Key-Fingerprint", "") if hasattr(result, 'headers') else "",
             "comment": result.headers.get("X-SSH-Key-Comment", "") if hasattr(result, 'headers') else "",
         }
@@ -804,18 +816,23 @@ def _action_s3_list_objects(request: dict, ctx: WorkerContext) -> dict:
         buffer_size=buffer_size,
     )
 
+    list_kwargs: dict[str, Any] = {"max_keys": request.get("max_keys", 1000)}
+    for key in (
+        "continuation_token",
+        "delimiter",
+        "encoding_type",
+        "fetch_owner",
+        "prefix",
+        "start_after",
+    ):
+        value = request.get(key)
+        if value is not None:
+            list_kwargs[key] = value
+
     # list_objects_v2 is async def but does only sync I/O
-    result = _run_async(client.list_objects_v2(
-        continuation_token=request.get("continuation_token"),
-        delimiter=request.get("delimiter"),
-        encoding_type=request.get("encoding_type"),
-        fetch_owner=request.get("fetch_owner"),
-        max_keys=request.get("max_keys", 1000),
-        prefix=request.get("prefix"),
-        start_after=request.get("start_after"),
-    ))
+    result = _run_async(client.list_objects_v2(**list_kwargs))
     # Result is a fastapi Response object
-    return {"body": result.body.decode(), "media_type": result.media_type, "status_code": result.status_code}
+    return {"body": _response_body_text(result), "media_type": result.media_type, "status_code": result.status_code}
 
 
 @action("s3_head_object")
@@ -858,7 +875,10 @@ def _action_s3_open_object(request: dict, ctx: WorkerContext) -> dict:
         buffer_size=request.get("buffer_size", 256 * 1024),
     )
 
-    result = _run_async(client.open_object(path, range_header))
+    if range_header is None:
+        result = _run_async(client.open_object(path))
+    else:
+        result = _run_async(client.open_object(path, range_header))
 
     if isinstance(result, FileObjectHandle):
         # Keep the file handle alive and pass the fd
@@ -883,7 +903,7 @@ def _action_s3_open_object(request: dict, ctx: WorkerContext) -> dict:
         # Error response
         return {
             "type": "error_response",
-            "body": result.body.decode() if hasattr(result, 'body') else "",
+            "body": _response_body_text(result) if hasattr(result, 'body') else "",
             "status_code": result.status_code,
             "headers": dict(result.headers) if hasattr(result, 'headers') else {},
         }
@@ -1151,6 +1171,10 @@ def main():
         if action == "shutdown":
             logger.info(f"Shutdown requested, exiting")
             break
+
+        if not isinstance(action, str):
+            _send(sock, {"error": f"Invalid action: {action}"})
+            continue
 
         handler = _ACTIONS.get(action)
         if handler is None:

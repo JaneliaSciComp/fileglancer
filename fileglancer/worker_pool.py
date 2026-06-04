@@ -408,10 +408,14 @@ class WorkerPool:
         block the worker on its next write — so failures here are logged
         loudly rather than swallowed.
         """
+        stderr = process.stderr
+        if stderr is None:
+            logger.warning(f"worker {username} has no stderr pipe to forward")
+            return
         try:
             loop = asyncio.get_event_loop()
             while True:
-                line = await loop.run_in_executor(None, process.stderr.readline)
+                line = await loop.run_in_executor(None, stderr.readline)
                 if not line:
                     break
                 logger.debug(f"[worker:{username}] {line.decode().rstrip()}")

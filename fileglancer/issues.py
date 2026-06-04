@@ -1,6 +1,7 @@
 
 import json
 from datetime import datetime
+from typing import Any
 
 from loguru import logger
 from atlassian import Jira
@@ -23,7 +24,7 @@ def get_jira_client() -> Jira:
     return Jira(url=jira_server, username=jira_username, password=jira_token, cloud=True)
 
 
-def create_jira_ticket(summary: str, description: str, project_key: str, issue_type: str) -> str:
+def create_jira_ticket(summary: str, description: str, project_key: str, issue_type: str) -> dict[str, Any]:
     """
     Creates a new JIRA ticket using the Atlassian Python API
     
@@ -48,7 +49,12 @@ def create_jira_ticket(summary: str, description: str, project_key: str, issue_t
     
     # Create the issue
     new_issue = jira.issue_create(fields=issue_dict)
-    logger.debug(f"JIRA ticket created: {new_issue['key']}")
+    if not isinstance(new_issue, dict):
+        raise RuntimeError("JIRA did not return a ticket object")
+    ticket_key = new_issue.get("key")
+    if not isinstance(ticket_key, str):
+        raise RuntimeError("JIRA did not return a ticket key")
+    logger.debug(f"JIRA ticket created: {ticket_key}")
     return new_issue
 
 
@@ -59,7 +65,7 @@ def parse_datetime(datetime_str: str) -> datetime:
     return datetime.fromisoformat(datetime_str.replace('Z', '+00:00'))
 
 
-def get_jira_ticket_details(ticket_key: str) -> dict:
+def get_jira_ticket_details(ticket_key: str) -> dict[str, Any]:
     """
     Get the status of a JIRA ticket
     
@@ -70,7 +76,12 @@ def get_jira_ticket_details(ticket_key: str) -> dict:
         str: The status of the ticket
     """
     jira = get_jira_client()
-    issue = jira.issue(ticket_key)['fields']
+    issue_response = jira.issue(ticket_key)
+    if not isinstance(issue_response, dict):
+        raise RuntimeError(f"JIRA did not return ticket details for {ticket_key}")
+    issue = issue_response.get("fields")
+    if not isinstance(issue, dict):
+        raise RuntimeError(f"JIRA ticket details for {ticket_key} did not include fields")
     
     if DEBUG:
         print(json.dumps(issue, indent=4))
@@ -99,12 +110,18 @@ def get_jira_ticket_details(ticket_key: str) -> dict:
     comments_data = issue.get('comment', {}).get('comments', [])
     for c in comments_data:
         try:
+            if not isinstance(c, dict):
+                continue
+            created_raw = c.get('created')
+            updated_raw = c.get('updated')
+            if not isinstance(created_raw, str) or not isinstance(updated_raw, str):
+                continue
             comment = TicketComment(
                 author_name=c.get('author', {}).get('name', 'Unknown'),
                 author_display_name=c.get('author', {}).get('displayName', 'Unknown'),
                 body=c.get('body', ''),
-                created=parse_datetime(c['created']) if 'created' in c else None,
-                updated=parse_datetime(c['updated']) if 'updated' in c else None
+                created=parse_datetime(created_raw),
+                updated=parse_datetime(updated_raw)
             )
             issue_details['comments'].append(comment)
         except Exception as e:
