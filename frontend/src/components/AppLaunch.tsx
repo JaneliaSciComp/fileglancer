@@ -52,7 +52,6 @@ export default function AppLaunch() {
         env?: Record<string, string>;
         pre_run?: string;
         post_run?: string;
-        pull_latest?: boolean;
         container?: string;
         container_args?: string;
       } | null)
@@ -68,7 +67,6 @@ export default function AppLaunch() {
   const relaunchEnv = relaunchState?.env;
   const relaunchPreRun = relaunchState?.pre_run;
   const relaunchPostRun = relaunchState?.post_run;
-  const relaunchPullLatest = relaunchState?.pull_latest;
   const relaunchContainer = relaunchState?.container;
   const relaunchContainerArgs = relaunchState?.container_args;
 
@@ -109,7 +107,6 @@ export default function AppLaunch() {
     parameters: Record<string, unknown>,
     resources?: AppResourceDefaults,
     extraArgs?: string,
-    pullLatest?: boolean,
     env?: Record<string, string>,
     preRun?: string,
     postRun?: string,
@@ -128,7 +125,6 @@ export default function AppLaunch() {
         parameters,
         resources,
         extra_args: extraArgs,
-        pull_latest: pullLatest,
         env,
         pre_run: preRun,
         post_run: postRun,
@@ -226,7 +222,6 @@ export default function AppLaunch() {
           initialExtraArgs={relaunchExtraArgs}
           initialPostRun={relaunchPostRun}
           initialPreRun={relaunchPreRun}
-          initialPullLatest={relaunchPullLatest}
           initialResources={relaunchResources}
           initialValues={relaunchParameters}
           manifest={manifest}

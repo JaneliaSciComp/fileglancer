@@ -37,7 +37,6 @@ interface AppLaunchFormProps {
     parameters: Record<string, unknown>,
     resources?: AppResourceDefaults,
     extraArgs?: string,
-    pullLatest?: boolean,
     env?: Record<string, string>,
     preRun?: string,
     postRun?: string,
@@ -52,7 +51,6 @@ interface AppLaunchFormProps {
   readonly initialEnv?: Record<string, string>;
   readonly initialPreRun?: string;
   readonly initialPostRun?: string;
-  readonly initialPullLatest?: boolean;
   readonly initialContainer?: string;
   readonly initialContainerArgs?: string;
 }
@@ -699,7 +697,6 @@ export default function AppLaunchForm({
   initialEnv,
   initialPreRun,
   initialPostRun,
-  initialPullLatest,
   initialContainer,
   initialContainerArgs
 }: AppLaunchFormProps) {
@@ -735,7 +732,6 @@ export default function AppLaunchForm({
   const [values, setValues] = useState<Record<string, unknown>>(startingValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState('parameters');
-  const [pullLatest, setPullLatest] = useState(initialPullLatest ?? false);
   const [openSections, setOpenSections] =
     useState<string[]>(initialOpenSections);
   const [resources, setResources] = useState<AppResourceDefaults>(
@@ -993,7 +989,6 @@ export default function AppLaunchForm({
       params,
       hasResourceOverrides ? resources : undefined,
       extraArgs.trim() || undefined,
-      pullLatest,
       hasEnv ? envRecord : undefined,
       preRun.trim() || undefined,
       postRun.trim() || undefined,
@@ -1180,25 +1175,6 @@ export default function AppLaunchForm({
         </Tabs.Panel>
 
         <Tabs.Panel className="pt-4 max-w-2xl" value="environment">
-          {/* Pull latest toggle */}
-          <div className="mb-6">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                checked={pullLatest}
-                className="h-4 w-4 accent-primary"
-                onChange={e => setPullLatest(e.target.checked)}
-                type="checkbox"
-              />
-              <span className="text-foreground text-sm font-semibold">
-                Pull latest code before running
-              </span>
-            </label>
-            <Typography className="text-foreground mt-1" type="small">
-              When enabled, runs git pull to fetch the latest code from GitHub
-              before starting the job.
-            </Typography>
-          </div>
-
           {(entryPoint.env_parameters ?? []).length > 0 ? (
             <Accordion
               onValueChange={

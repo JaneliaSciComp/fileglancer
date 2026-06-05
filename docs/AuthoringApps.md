@@ -537,7 +537,8 @@ runnables:
 When `repo_url` is set:
 - The discovery repo (containing `runnables.yaml`) is used only for manifest metadata
 - The tool repo (`repo_url`) is cloned separately and used as the working directory for the job
-- The user can opt to "pull latest" before each run to get the newest code from both repos
+
+Repos are cloned into a per-user cache on first use and reused across runs; jobs never pull automatically. To get the newest code, use the **Update** action for the app in the Fileglancer UI, which pulls the latest code and re-reads the manifest.
 
 ## Job Execution
 
