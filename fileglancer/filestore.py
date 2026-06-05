@@ -330,11 +330,19 @@ class Filestore:
                     full_path,
                 )
 
-        full_real = os.path.realpath(full_path)
-        if full_real == root_real:
+        # Use the resolved parent plus the basename rather than realpath(full_path)
+        # so a symlink is reported at its own location relative to root, not its
+        # target. Resolving the final component of a broken symlink follows it to a
+        # nonexistent target; on Windows an absolute target like "/nonexistent/path"
+        # resolves onto another drive and os.path.relpath then raises ValueError.
+        if full_path == root_real:
             rel_path = '.'
         else:
-            rel_path = os.path.relpath(full_real, root_real)
+            full_real = os.path.join(parent_real, os.path.basename(full_path))
+            if full_real == root_real:
+                rel_path = '.'
+            else:
+                rel_path = os.path.relpath(full_real, root_real)
 
         # Perform all filesystem stat calls here, after validation.
         lstat_result = os.lstat(full_path)
@@ -382,7 +390,14 @@ class Filestore:
         else:
             stat_result = lstat_result
 
-        full_real = os.path.realpath(full_path)
+        # Resolve the parent directory but not the entry itself, so a symlink is
+        # reported at its own location relative to root rather than at its target.
+        # Following the final component would resolve a broken symlink to its
+        # (possibly nonexistent) target; on Windows an absolute target like
+        # "/nonexistent/path" resolves onto another drive and os.path.relpath
+        # then raises ValueError ("path is on mount 'D:', start on mount 'C:'").
+        parent_real = os.path.realpath(os.path.dirname(full_path))
+        full_real = os.path.join(parent_real, entry.name)
         if full_real == root_real:
             rel_path = '.'
         else:

@@ -187,6 +187,24 @@ def test_set_preference(test_client):
     assert response.json() == pref_data
 
 
+def test_set_preference_requires_json_content_type(test_client):
+    """FastAPI >=0.132 enables strict Content-Type checking by default: a JSON
+    body sent without an `application/json` Content-Type is rejected rather than
+    silently parsed (the pre-0.132 lenient behavior would have returned 200)."""
+    # The normal json= path sets Content-Type: application/json and succeeds.
+    assert test_client.put("/api/preference/ct_key", json={"a": 1}).status_code == 200
+
+    # The identical body bytes with a non-JSON Content-Type are not parsed as
+    # JSON, so body validation fails. FastAPI raises RequestValidationError
+    # (normally 422); this app's validation_exception_handler maps that to 400.
+    response = test_client.put(
+        "/api/preference/ct_key",
+        content='{"a": 1}',
+        headers={"Content-Type": "text/plain"},
+    )
+    assert response.status_code == 400
+
+
 def test_delete_preference(test_client):
     """Test deleting user preference"""
     pref_data = {"test": "value"}

@@ -27,8 +27,7 @@ dependencies = [
     "authlib >=1.6.5,<2",
     "cachetools >=6.2.1,<7",
     "click >=8.0,<9",
-    "fastapi >=0.119.1,<0.120",
-    "httpx >=0.28.1,<0.29",
+    "fastapi >=0.136.3,<0.137",
     "itsdangerous >=2.2.0,<3",
     "loguru >=0.7.3,<0.8",
     "pandas >=2.3.3,<3",
@@ -54,7 +53,8 @@ test = [
     "pytest-asyncio",
     "pytest-cov",
     "pytest-html",
-    "requests-mock"
+    "requests-mock",
+    "httpx2 >=2.2.0,<3"
 ]
 release = [
     "twine",
@@ -108,6 +108,7 @@ pytest-cov = ">=7.0.0,<8"
 pytest-jupyter = ">=0.10.1,<0.11"
 requests-mock = ">=1.12.1,<2"
 pytest-jupyter-server = ">=0.6.0"
+httpx2 = ">=2.2.0,<3"
 
 [tool.pixi.feature.release.tasks]
 version = "hatch version"
@@ -173,8 +174,7 @@ atlassian-python-api = ">=4.0.7,<5"
 authlib = ">=1.6.5,<2"
 cachetools = ">=6.2.1,<7"
 click = ">=8.0,<9"
-fastapi = ">=0.119.1,<0.120"
-httpx = ">=0.28.1,<0.29"
+fastapi = ">=0.136.3,<0.137"
 itsdangerous = ">=2.2.0,<3"
 loguru = ">=0.7.3,<0.8"
 pandas = ">=2.3.3,<3"
