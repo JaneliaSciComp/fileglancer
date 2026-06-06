@@ -460,11 +460,15 @@ def create_app(settings):
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        # Use allow_origin_regex instead of allow_origins=["*"] so Starlette
+        # reflects the specific request origin rather than returning "*".
+        # This is required because allow_credentials=True + "Access-Control-Allow-Origin: *"
+        # causes browsers to block responses even for non-credentialed requests.
+        allow_origin_regex=r".*",
         allow_credentials=True,
         allow_methods=["GET","HEAD","POST","PUT","PATCH","DELETE"],
         allow_headers=["*"],
-        expose_headers=["Range", "Content-Range"],
+        expose_headers=["Range", "Content-Range", "Accept-Ranges", "Content-Length"],
     )
 
 
