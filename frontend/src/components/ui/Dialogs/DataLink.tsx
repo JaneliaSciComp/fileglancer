@@ -165,13 +165,24 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
   }
   const displayPath = getDisplayPath();
 
+  // Filestore returns the FSP root as ".", but that gets collapsed by URL
+  // normalization at the recipient. Treat it as empty so previews and the
+  // submitted url_prefix fall back to the FSP name (which the create flow
+  // does too — see useDataToolLinks.handleCreateDataLink).
+  const normalizedFilePath = filePath === '.' ? '' : filePath;
+  const fspNameForFallback = pathFsp?.name ?? '';
   // Generate preview components
-  const folderNameOnly = filePath ? filePath.split('/').pop() || filePath : '';
+  const folderNameOnly = normalizedFilePath
+    ? normalizedFilePath.split('/').pop() || normalizedFilePath
+    : fspNameForFallback;
   const linuxPath = pathFsp?.linux_path;
-  const transparentPath =
-    linuxPath && filePath
-      ? normalizePosixStylePath(joinPaths(linuxPath, filePath))
-      : filePath || '';
+  const transparentPath = linuxPath
+    ? normalizePosixStylePath(
+        normalizedFilePath
+          ? joinPaths(linuxPath, normalizedFilePath)
+          : linuxPath
+      )
+    : normalizedFilePath || fspNameForFallback;
 
   // Custom subpath local state (only used in this dialog, not persisted)
   const [customSubpath, setCustomSubpath] = useState(folderNameOnly);
