@@ -12,6 +12,7 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import {
   escapePathForUrl,
   joinPaths,
+  normalizeFspRootPath,
   normalizePosixStylePath
 } from '@/utils/pathHandling';
 import useCopyTooltip from './useCopyTooltip';
@@ -109,7 +110,7 @@ export default function useDataToolLinks(
     // Filestore returns the FSP root as ".", but a literal "." in the share
     // URL gets collapsed by URL normalization at the recipient, producing
     // path mismatch / NoSuchBucket errors. Send "" to the backend instead.
-    const path = rawPath === '.' ? '' : rawPath;
+    const path = normalizeFspRootPath(rawPath);
     const fspName = fileQuery.data.currentFileSharePath.name;
 
     try {

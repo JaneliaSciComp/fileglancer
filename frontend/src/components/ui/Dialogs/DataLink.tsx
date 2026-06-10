@@ -16,6 +16,7 @@ import { makeMapKey } from '@/utils';
 import {
   getPreferredPathForDisplay,
   joinPaths,
+  normalizeFspRootPath,
   normalizePosixStylePath
 } from '@/utils/pathHandling';
 import type { FileSharePath } from '@/shared.types';
@@ -169,7 +170,7 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
   // normalization at the recipient. Treat it as empty so previews and the
   // submitted url_prefix fall back to the FSP name (which the create flow
   // does too — see useDataToolLinks.handleCreateDataLink).
-  const normalizedFilePath = filePath === '.' ? '' : filePath;
+  const normalizedFilePath = normalizeFspRootPath(filePath);
   const fspNameForFallback = pathFsp?.name ?? '';
   // Generate preview components
   const folderNameOnly = normalizedFilePath
