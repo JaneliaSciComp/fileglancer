@@ -16,9 +16,9 @@ export default function Links() {
         Data Links
       </Typography>
       <Typography className="mb-6 text-foreground">
-        Data links can be created for any Zarr folder in the file browser. They
-        are used to open files in external viewers like Neuroglancer. You can
-        share data links with internal collaborators.
+        Data links can be created for any file or folder in the file browser.
+        They are used to open files in external viewers like Neuroglancer. You
+        can share data links with internal collaborators.
       </Typography>
       <TableCard
         columns={linksColumns}

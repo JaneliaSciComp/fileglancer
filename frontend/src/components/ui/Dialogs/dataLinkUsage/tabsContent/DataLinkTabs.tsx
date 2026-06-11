@@ -6,6 +6,11 @@ import JavaTab from '@/components/ui/Dialogs/dataLinkUsage/tabsContent/javaTab/J
 import NapariTab from '@/components/ui/Dialogs/dataLinkUsage/tabsContent/NapariTab';
 import PythonTab from '@/components/ui/Dialogs/dataLinkUsage/tabsContent/PythonTab';
 import VvdViewerTab from '@/components/ui/Dialogs/dataLinkUsage/tabsContent/VvdViewerTab';
+import {
+  FileBrowserTab,
+  FileDownloadTab,
+  FilePythonTab
+} from '@/components/ui/Dialogs/dataLinkUsage/tabsContent/FileTab';
 
 import type {
   DataLinkType,
@@ -18,6 +23,41 @@ function getTabsForDataType(
   tooltipTriggerClasses: string,
   zarrVersion?: ZarrVersion
 ) {
+  if (dataType === 'file') {
+    return [
+      {
+        id: 'browser',
+        label: 'Browser',
+        content: (
+          <FileBrowserTab
+            dataLinkUrl={dataLinkUrl}
+            tooltipTriggerClasses={tooltipTriggerClasses}
+          />
+        )
+      },
+      {
+        id: 'download',
+        label: 'Download',
+        content: (
+          <FileDownloadTab
+            dataLinkUrl={dataLinkUrl}
+            tooltipTriggerClasses={tooltipTriggerClasses}
+          />
+        )
+      },
+      {
+        id: 'python',
+        label: 'Python',
+        content: (
+          <FilePythonTab
+            dataLinkUrl={dataLinkUrl}
+            tooltipTriggerClasses={tooltipTriggerClasses}
+          />
+        )
+      }
+    ];
+  }
+
   if (dataType === 'directory') {
     return [
       {
