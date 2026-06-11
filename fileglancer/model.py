@@ -334,7 +334,7 @@ class AppParameter(BaseModel):
     description: Optional[str] = Field(description="Description of the parameter", default=None)
     required: bool = Field(description="Whether the parameter is required", default=False)
     default: Optional[Any] = Field(description="Default value for the parameter", default=None)
-    options: Optional[List[Any]] = Field(description="Allowed values for enum type", default=None)
+    options: Optional[List[str|int|float]] = Field(description="Allowed values for enum type", default=None)
     min: Optional[float] = Field(description="Minimum value for numeric types", default=None)
     max: Optional[float] = Field(description="Maximum value for numeric types", default=None)
     pattern: Optional[str] = Field(description="Regex validation pattern for string types", default=None)
