@@ -237,7 +237,7 @@ const createTransformPreferences = (
         (rawData.dataLinkSubpathMode?.value as
           | 'name'
           | 'full_path'
-          | 'custom') ?? 'name',
+          | 'custom') ?? 'full_path',
       disableNeuroglancerStateGeneration:
         rawData.disableNeuroglancerStateGeneration?.value || false,
       disableHeuristicalLayerTypeDetection:

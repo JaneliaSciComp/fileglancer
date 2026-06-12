@@ -551,7 +551,8 @@ export const PreferencesProvider = ({
     hideDotFiles: preferencesQuery.data?.hideDotFiles || false,
     areDataLinksAutomatic:
       preferencesQuery.data?.areDataLinksAutomatic ?? false,
-    dataLinkSubpathMode: preferencesQuery.data?.dataLinkSubpathMode ?? 'name',
+    dataLinkSubpathMode:
+      preferencesQuery.data?.dataLinkSubpathMode ?? 'full_path',
     disableNeuroglancerStateGeneration:
       preferencesQuery.data?.disableNeuroglancerStateGeneration || false,
     disableHeuristicalLayerTypeDetection:
