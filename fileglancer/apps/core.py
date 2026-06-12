@@ -270,7 +270,8 @@ def _find_manifests_in_repo(repo_dir: Path) -> list[tuple[str, AppManifest]]:
             if adapter.can_handle(repo_dir):
                 results.append(("", adapter.convert(repo_dir)))
         except Exception as e:
-            logger.warning(f"Adapter {type(adapter).__name__} failed: {e}")
+            raise ValueError(f"Adapter {type(adapter).__name__} failed: {e}")
+
 
     return results
 
