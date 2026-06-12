@@ -21,6 +21,23 @@ const navigateToZarrDir = async (
   await page.waitForSelector('text=zarr.json', { timeout: 10000 });
 };
 
+const createLinkWithDirectoryNameOnlyFormat = async (page: any) => {
+  // Change data link format to "Directory name only" in the dialog
+  const advancedSettingsAccordion = page.getByRole('button', {
+    name: /advanced settings/i
+  });
+  await advancedSettingsAccordion.click();
+  const nameOnlyInput = page.getByLabel('Directory name only');
+  await nameOnlyInput.click();
+  await expect(nameOnlyInput).toBeChecked();
+  // Confirm in dialog
+  const confirmButton = page.getByRole('button', {
+    name: /confirm|create|yes/i
+  });
+  await expect(confirmButton).toBeVisible({ timeout: 5000 });
+  await confirmButton.click();
+};
+
 test.describe('Data Link Operations', () => {
   // These tests involve multiple full-page navigations with API calls
   test.setTimeout(60_000);
@@ -54,16 +71,31 @@ test.describe('Data Link Operations', () => {
       name: /delete/i
     });
 
-    await test.step('Turn on automatic data links via the data link dialog', async () => {
+    await test.step('Data link format defaults to transparent path', async () => {
       const neuroglancerLink = page.getByRole('link', {
         name: 'Neuroglancer logo'
       });
       await neuroglancerLink.click();
 
       // Confirm the data link creation in the dialog
-      await expect(confirmButton).toBeVisible({ timeout: 5000 });
+      await expect(confirmButton).toBeVisible();
 
-      // Enable automatic data links
+      // Check that the data link format is set to "Transparent path" in the dialog
+      const advancedSettingsAccordion = page.getByRole('button', {
+        name: /advanced settings/i
+      });
+      await advancedSettingsAccordion.click();
+      const fullPathInput = page.getByLabel('Full path');
+      await expect(fullPathInput).toBeChecked();
+    });
+
+    await test.step('Change data link format to directory name only', async () => {
+      const nameOnlyInput = page.getByLabel('Directory name only');
+      await nameOnlyInput.click();
+      await expect(nameOnlyInput).toBeChecked();
+    });
+
+    await test.step('Turn on automatic data links via the data link dialog', async () => {
       const autoLinkCheckbox = page.getByRole('checkbox', {
         name: 'Enable automatic data link creation'
       });
@@ -182,12 +214,7 @@ test.describe('Data Link Operations', () => {
     // Click the toggle to create a data link
     await dataLinkToggle.click();
 
-    // Confirm in dialog
-    const confirmButton = page.getByRole('button', {
-      name: /confirm|create|yes/i
-    });
-    await expect(confirmButton).toBeVisible({ timeout: 5000 });
-    await confirmButton.click();
+    await createLinkWithDirectoryNameOnlyFormat(page);
 
     await expect(
       page.getByText('Data link created successfully')
@@ -236,12 +263,7 @@ test.describe('Data Link Operations', () => {
     });
     await neuroglancerLink.click();
 
-    // Confirm in dialog
-    const confirmButton = page.getByRole('button', {
-      name: /confirm|create|yes/i
-    });
-    await expect(confirmButton).toBeVisible({ timeout: 5000 });
-    await confirmButton.click();
+    await createLinkWithDirectoryNameOnlyFormat(page);
 
     await expect(
       page.getByText('Data link created successfully')
