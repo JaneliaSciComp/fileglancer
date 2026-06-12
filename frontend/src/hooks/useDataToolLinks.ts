@@ -98,7 +98,7 @@ export default function useDataToolLinks(
       return false;
     }
     if (!path) {
-      toast.error('No folder selected');
+      toast.error('No file or folder selected');
       return false;
     }
 
