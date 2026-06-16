@@ -192,7 +192,7 @@ async function fetchZarrMetadata({
         metadata: {
           arr,
           shapes,
-          multiscale: undefined,
+          multiscales: undefined,
           scales: undefined,
           omero: undefined,
           labels: undefined,
@@ -217,6 +217,9 @@ async function fetchZarrMetadata({
           effectiveVersion
         );
         const metadata = await getOmeZarrMetadata(imageUrl);
+        // Stamp the OME-NGFF spec version from the group attrs so the metadata
+        // is self-describing for downstream capability checks.
+        metadata.version = ngffVersion;
         // Check for labels (optional - may not exist)
         try {
           const labelsAttrs = (await fetchFileAsJson(
@@ -240,7 +243,7 @@ async function fetchZarrMetadata({
         }
 
         // Fetch the first dataset's array-level metadata to extract codecs
-        const datasetPath = metadata.multiscale?.datasets?.[0]?.path;
+        const datasetPath = metadata.multiscales?.[0]?.datasets?.[0]?.path;
         if (datasetPath) {
           try {
             const arrayMeta = (await fetchFileAsJson(
@@ -299,6 +302,9 @@ async function fetchZarrMetadata({
           2
         );
         const metadata = await getOmeZarrMetadata(imageUrl);
+        // Stamp the OME-NGFF spec version from the .zattrs so the metadata is
+        // self-describing for downstream capability checks.
+        metadata.version = ngffVersion;
         // Check for labels
         try {
           const labelsAttrs = (await fetchFileAsJson(
@@ -322,7 +328,7 @@ async function fetchZarrMetadata({
         metadata.well = attrs.well;
 
         // Fetch the first dataset's .zarray to extract compressor
-        const datasetPath = metadata.multiscale?.datasets?.[0]?.path;
+        const datasetPath = metadata.multiscales?.[0]?.datasets?.[0]?.path;
         if (datasetPath) {
           try {
             const arrayMeta = (await fetchFileAsJson(
@@ -365,7 +371,7 @@ async function fetchZarrMetadata({
         metadata: {
           arr,
           shapes,
-          multiscale: undefined,
+          multiscales: undefined,
           scales: undefined,
           omero: undefined,
           labels: undefined,

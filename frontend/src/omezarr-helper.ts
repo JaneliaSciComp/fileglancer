@@ -1,30 +1,25 @@
 import { default as log } from '@/logger';
 import * as zarr from 'zarrita';
 import * as omezarr from 'ome-zarr.js';
+import type {
+  OmeZarrMetadata,
+  MultiscaleMetadata,
+  OmeroMetadata,
+  CoordinateTransformation
+} from '@bioimagetools/capability-manifest';
 
 export type LayerType = 'auto' | 'image' | 'segmentation';
 
-export type Metadata = {
+/**
+ * Parsed OME-Zarr metadata plus the runtime handles fileglancer needs for
+ * thumbnail and Neuroglancer-state generation (live zarrita array + derived
+ * shapes/scales/storage version).
+ */
+export type Metadata = OmeZarrMetadata & {
   arr: zarr.Array<any>;
   shapes: number[][] | undefined;
   scales: number[][] | undefined;
-  multiscale: omezarr.Multiscale | undefined;
-  omero: omezarr.Omero | undefined;
-  labels: string[] | undefined;
   zarrVersion: 2 | 3;
-  bioformats2raw_layout?: boolean;
-  plate?: {
-    columns: { name: string }[];
-    rows: { name: string }[];
-    wells: { path: string; rowIndex: number; columnIndex: number }[];
-    acquisitions?: { id: number; [k: string]: unknown }[];
-    field_count?: number;
-    name?: string;
-    version?: string;
-  };
-  well?: { images: { path: string; acquisition?: number }[]; version?: string };
-  compressor?: { id: string; [k: string]: unknown } | null;
-  codecs?: { name: string; configuration?: Record<string, unknown> }[];
 };
 
 type OmeZarrChannel = {
@@ -79,8 +74,10 @@ function translateUnitToNeuroglancer(unit: string): string {
  * @param coordinateTransformations - List of coordinate transformations
  * @returns The first transform with type "scale", or undefined if no scale transform is found
  */
-function getScaleTransform(coordinateTransformations: any[]) {
-  return coordinateTransformations?.find((ct: any) => ct.type === 'scale') as {
+function getScaleTransform(
+  coordinateTransformations: CoordinateTransformation[] | undefined
+) {
+  return coordinateTransformations?.find(ct => ct.type === 'scale') as {
     scale: number[];
   };
 }
@@ -91,9 +88,9 @@ function getScaleTransform(coordinateTransformations: any[]) {
  * @param scales - Array of full scale dataset scale values
  * @returns Array of resolved scale values
  */
-function getResolvedScales(multiscale: omezarr.Multiscale): number[] {
+function getResolvedScales(multiscale: MultiscaleMetadata): number[] {
   // Get the root transform
-  const rct = getScaleTransform(multiscale.coordinateTransformations as any[]);
+  const rct = getScaleTransform(multiscale.coordinateTransformations);
   const rootScales = rct?.scale || [];
 
   // Get the transform for the full scale dataset
@@ -167,7 +164,7 @@ function getMinMaxValues(arr: zarr.Array<any>): { min: number; max: number } {
 /**
  * Get a map of axes names to their details.
  */
-function getAxesMap(multiscale: omezarr.Multiscale): Record<string, any> {
+function getAxesMap(multiscale: MultiscaleMetadata): Record<string, any> {
   const axesMap: Record<string, any> = {};
   const axes = multiscale.axes;
   if (axes) {
@@ -258,7 +255,7 @@ function generateSimpleNeuroglancerStateForOmeZarr(
   dataUrl: string,
   zarrVersion: 2 | 3,
   layerType: LayerType,
-  multiscale: omezarr.Multiscale,
+  multiscale: MultiscaleMetadata,
   arr: zarr.Array<any>
 ): string {
   log.debug('Generating simple Neuroglancer state for OME-Zarr:', dataUrl);
@@ -310,10 +307,10 @@ function generateFullNeuroglancerStateForOmeZarr(
   dataUrl: string,
   zarrVersion: 2 | 3,
   layerType: LayerType,
-  multiscale: omezarr.Multiscale,
+  multiscale: MultiscaleMetadata,
   arr: zarr.Array<any>,
   labels: string[] | undefined,
-  omero?: omezarr.Omero | undefined
+  omero?: OmeroMetadata | undefined
 ): string | null {
   if (!multiscale || !arr) {
     throw new Error(
@@ -547,10 +544,10 @@ function generateNeuroglancerStateForOmeZarr(
   dataUrl: string,
   zarrVersion: 2 | 3,
   layerType: LayerType,
-  multiscale: omezarr.Multiscale,
+  multiscale: MultiscaleMetadata,
   arr: zarr.Array<any>,
   labels: string[] | undefined,
-  omero?: omezarr.Omero | undefined,
+  omero?: OmeroMetadata | undefined,
   useLegacyMultichannelApproach: boolean = false
 ): string | null {
   // If there are labels or user requested legacy multichannel approach, use the complex version
@@ -599,8 +596,16 @@ async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
   });
   const { arr, shapes, multiscale, omero, scales, zarr_version } =
     await omezarr.getMultiscaleWithArray(store, 0);
-  // Normalize omero to undefined if it is null
-  const omero2 = omero ?? undefined;
+
+  // ome-zarr.js returns a single `multiscale` with its own, looser types.
+  // Normalize it once here, at the ingestion boundary, into the canonical
+  // OmeZarrMetadata shape (multiscales array + top-level axes) so downstream
+  // code can use `Metadata` as an `OmeZarrMetadata` without ever recasting.
+  const normalizedMultiscale = multiscale
+    ? (multiscale as unknown as MultiscaleMetadata)
+    : undefined;
+  const omero2 = (omero ?? undefined) as OmeroMetadata | undefined;
+
   log.debug(
     'Zarr version: ',
     zarr_version,
@@ -609,7 +614,7 @@ async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
     '\nShapes: ',
     shapes,
     '\nMultiscale: ',
-    multiscale,
+    normalizedMultiscale,
     '\nOmero: ',
     omero2,
     '\nScales: ',
@@ -619,10 +624,11 @@ async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
     arr,
     shapes,
     scales,
-    multiscale,
+    zarrVersion: zarr_version,
+    multiscales: normalizedMultiscale ? [normalizedMultiscale] : undefined,
+    axes: normalizedMultiscale?.axes,
     omero: omero2,
-    labels: undefined,
-    zarrVersion: zarr_version
+    labels: undefined
   };
 
   return metadata;

@@ -5,7 +5,6 @@ import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
 import { useExternalBucketContext } from '@/contexts/ExternalBucketContext';
 import { useViewersContext } from '@/contexts/ViewersContext';
-import type { OmeZarrMetadata } from '@bioimagetools/capability-manifest';
 import {
   useZarrMetadataQuery,
   useOmeZarrThumbnailQuery,
@@ -111,27 +110,12 @@ export default function useZarrMetadata() {
     // Get compatible viewers for this dataset
     let compatibleViewers = validViewers;
 
-    // If we have multiscales metadata (OME-Zarr), use capability checking to filter
-    if (metadata?.multiscale) {
-      // Convert our metadata to OmeZarrMetadata format for capability checking
-      const omeZarrMetadata: OmeZarrMetadata = {
-        version: zarrMetadataQuery.data?.availableOmeZarrVersions.sort(
-          (a, b) => parseFloat(b) - parseFloat(a)
-        )[0],
-        axes: metadata.multiscale?.axes as OmeZarrMetadata['axes'],
-        bioformats2raw_layout: metadata.bioformats2raw_layout,
-        multiscales: metadata.multiscale
-          ? ([metadata.multiscale] as OmeZarrMetadata['multiscales'])
-          : undefined,
-        omero: metadata.omero as OmeZarrMetadata['omero'],
-        labels: metadata.labels,
-        plate: metadata.plate,
-        well: metadata.well,
-        compressor: metadata.compressor,
-        codecs: metadata.codecs
-      };
-
-      compatibleViewers = getViewersCompatibleWithImage(omeZarrMetadata);
+    // If we have multiscales metadata (OME-Zarr), use capability checking to
+    // filter. `metadata` is already an OmeZarrMetadata (plus fileglancer's
+    // runtime handles), so it is passed straight to the capability check.
+    const primaryMultiscale = metadata.multiscales?.[0];
+    if (primaryMultiscale) {
+      compatibleViewers = getViewersCompatibleWithImage(metadata);
 
       // Create a Set for lookup of compatible viewer keys
       // Needed to mark incompatible but valid (as defined by the viewer config) viewers as null in openWithToolUrls
@@ -170,7 +154,7 @@ export default function useZarrMetadata() {
                   url,
                   effectiveZarrVersion,
                   layerType,
-                  metadata.multiscale,
+                  primaryMultiscale,
                   metadata.arr,
                   metadata.labels,
                   metadata.omero,
@@ -247,7 +231,6 @@ export default function useZarrMetadata() {
     useLegacyMultichannelApproach,
     layerType,
     effectiveZarrVersion,
-    zarrMetadataQuery.data?.availableOmeZarrVersions,
     validViewers,
     viewersInitialized,
     getViewersCompatibleWithImage
