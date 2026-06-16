@@ -125,7 +125,7 @@ requirements:
 
 **Supported version operators:** `>=`, `<=`, `!=`, `==`, `>`, `<`
 
-Compound or comma-separated version constraints such as `"pixi>=0.40,<0.60"` are not supported. Use at most one comparison per tool.
+Compound, comma-separated, or chained version constraints such as `"pixi>=0.40,<0.60"` or `"pixi>=0.40<0.60"` are not supported. Use at most one comparison per tool.
 
 If a requirement is not met (tool missing or version too old), the job fails early with a descriptive error message in stderr. Only requirements relevant to the selected entry point are checked — unmet requirements for other entry points do not block submission. If `requirements` is omitted or empty at both levels, no checks are performed.
 

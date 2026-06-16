@@ -502,8 +502,9 @@ class AppEntryPoint(BaseModel):
 
 
 SUPPORTED_TOOLS = {"pixi", "npm", "maven", "miniforge", "apptainer", "nextflow"}
+_REQUIREMENT_OPERATOR_PATTERN = re.compile(r">=|<=|!=|==|>|<")
 _REQUIREMENT_PATTERN = re.compile(
-    r"^([a-zA-Z][a-zA-Z0-9_-]*)(?:\s*(>=|<=|!=|==|>|<)\s*([^,\s]+))?$"
+    r"^([a-zA-Z][a-zA-Z0-9_-]*)(?:\s*(>=|<=|!=|==|>|<)\s*([^,\s><=!]+))?$"
 )
 
 _SHELL_METACHAR_PATTERN = re.compile(r'[;&|`$(){}!<>\n\r]')
@@ -516,7 +517,10 @@ def _validate_requirements(requirements: List[str]) -> List[str]:
         stripped = req.strip()
         match = _REQUIREMENT_PATTERN.match(stripped)
         if not match:
-            if "," in stripped:
+            if (
+                "," in stripped
+                or len(_REQUIREMENT_OPERATOR_PATTERN.findall(stripped)) > 1
+            ):
                 raise ValueError(
                     "Compound requirement specs are not supported; use at most "
                     "one version comparison per tool, e.g. 'pixi>=0.40'."

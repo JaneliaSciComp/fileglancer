@@ -439,7 +439,7 @@ _TOOL_REGISTRY = {
     },
 }
 
-_REQ_PATTERN = re.compile(r"^([a-zA-Z][a-zA-Z0-9_-]*)\s*((?:>=|<=|!=|==|>|<)\s*[^,\s]+)?$")
+_REQ_PATTERN = re.compile(r"^([a-zA-Z][a-zA-Z0-9_-]*)\s*((?:>=|<=|!=|==|>|<)\s*[^,\s><=!]+)?$")
 
 
 def _augmented_path(extra_paths: list[str]) -> str:
@@ -582,7 +582,7 @@ __fg_check_version() {
   return 0
 }"""
 
-_REQ_OP_PATTERN = re.compile(r"(>=|<=|!=|==|>|<)\s*(\S+)")
+_REQ_OP_PATTERN = re.compile(r"(>=|<=|!=|==|>|<)\s*([^,\s><=!]+)")
 
 
 def build_requirements_check(requirements: list[str]) -> str:

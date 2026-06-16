@@ -218,6 +218,11 @@ class TestBuildRequirementsCheck:
         assert rc == 1
         assert "Invalid requirement format" in stderr
 
+    def test_chained_version_spec_is_invalid(self):
+        rc, stderr = _run_check(["pixi>=0.40<0.60"])
+        assert rc == 1
+        assert "Invalid requirement format" in stderr
+
     def test_unparseable_version_reports_error_under_pipefail(self, tmp_path):
         _make_fake_tool(tmp_path, "pixi", "version unavailable")
         rc, stderr = _run_check(
@@ -297,6 +302,13 @@ class TestEntryPointRequirementsValidation:
                 requirements=["pixi>=0.40,<0.60"],
             )
 
+    def test_rejects_chained_version_spec(self):
+        with pytest.raises(ValidationError, match="Compound requirement specs"):
+            AppEntryPoint(
+                id="t", name="T", command="echo",
+                requirements=["pixi>=0.40<0.60"],
+            )
+
 
 class TestManifestRequirementsValidation:
     def test_rejects_compound_version_spec(self):
@@ -304,6 +316,16 @@ class TestManifestRequirementsValidation:
             AppManifest(
                 name="T",
                 requirements=["pixi>=0.40,<0.60"],
+                runnables=[
+                    AppEntryPoint(id="t", name="T", command="echo"),
+                ],
+            )
+
+    def test_rejects_chained_version_spec(self):
+        with pytest.raises(ValidationError, match="Compound requirement specs"):
+            AppManifest(
+                name="T",
+                requirements=["pixi>=0.40<0.60"],
                 runnables=[
                     AppEntryPoint(id="t", name="T", command="echo"),
                 ],
