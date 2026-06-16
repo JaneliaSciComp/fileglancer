@@ -3,6 +3,7 @@ import { Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
 import ListingCard from '@/components/ui/AppsPage/ListingCard';
+import FgCheckbox from '@/components/designSystem/atoms/formElements/FgCheckbox';
 import {
   useAppsQuery,
   useAddFromListingMutation,
@@ -14,6 +15,7 @@ import type { AppListing } from '@/shared.types';
 
 export default function Catalog() {
   const [search, setSearch] = useState('');
+  const [hideInstalled, setHideInstalled] = useState(false);
 
   const catalogQuery = useCatalogQuery();
   const appsQuery = useAppsQuery();
@@ -33,17 +35,20 @@ export default function Catalog() {
   const filteredListings = useMemo(() => {
     const term = search.trim().toLowerCase();
     const listings = catalogQuery.data ?? [];
-    if (!term) {
-      return listings;
-    }
     return listings.filter(l => {
+      if (hideInstalled && myAppKeys.has(`${l.url}::${l.manifest_path}`)) {
+        return false;
+      }
+      if (!term) {
+        return true;
+      }
       return (
         l.name.toLowerCase().includes(term) ||
         (l.description ?? '').toLowerCase().includes(term) ||
         l.owner_username.toLowerCase().includes(term)
       );
     });
-  }, [catalogQuery.data, search]);
+  }, [catalogQuery.data, search, hideInstalled, myAppKeys]);
 
   const handleAddFromListing = async (listing: AppListing) => {
     try {
@@ -72,13 +77,18 @@ export default function Catalog() {
         get your own copy.
       </Typography>
 
-      <div className="mb-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <input
           className="w-full sm:max-w-sm p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary"
           onChange={e => setSearch(e.target.value)}
           placeholder="Search by name, description, or sharer"
           type="text"
           value={search}
+        />
+        <FgCheckbox
+          checked={hideInstalled}
+          label="Hide already installed apps"
+          onChange={e => setHideInstalled(e.target.checked)}
         />
       </div>
 
@@ -101,7 +111,9 @@ export default function Catalog() {
       ) : filteredListings.length === 0 ? (
         <div className="mb-8 p-6 border border-dashed border-primary-light rounded-lg text-center">
           <Typography className="text-foreground" type="small">
-            No listings match &quot;{search}&quot;.
+            {search.trim()
+              ? `No listings match "${search}".`
+              : 'All shared apps are already in your apps.'}
           </Typography>
         </div>
       ) : (
