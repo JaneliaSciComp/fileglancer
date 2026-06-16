@@ -584,6 +584,15 @@ class AppListing(BaseModel):
     updated_at: Optional[datetime] = Field(description="When this listing was last edited", default=None)
 
 
+def _validate_catalog_listing_name(name: Optional[str]) -> Optional[str]:
+    if name is None:
+        return None
+    stripped = name.strip()
+    if not stripped:
+        raise ValueError("Catalog listing name must not be empty")
+    return stripped
+
+
 class ShareAppRequest(BaseModel):
     """Request to share (publish) one of the user's apps to the catalog"""
     url: str = Field(description="URL of the user's app to share")
@@ -597,11 +606,21 @@ class ShareAppRequest(BaseModel):
         default=None,
     )
 
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v):
+        return _validate_catalog_listing_name(v)
+
 
 class UpdateAppListingRequest(BaseModel):
     """Request to update a listing's editable metadata"""
     name: Optional[str] = Field(description="New display name", default=None)
     description: Optional[str] = Field(description="New description", default=None)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v):
+        return _validate_catalog_listing_name(v)
 
 
 class ManifestFetchRequest(BaseModel):

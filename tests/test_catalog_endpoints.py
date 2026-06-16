@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from fileglancer.settings import Settings
 from fileglancer.server import create_app, get_current_user
@@ -22,7 +23,12 @@ from fileglancer.database import (
     get_app_listings_by_owner,
     list_user_apps,
 )
-from fileglancer.model import AppEntryPoint, AppManifest
+from fileglancer.model import (
+    AppEntryPoint,
+    AppManifest,
+    ShareAppRequest,
+    UpdateAppListingRequest,
+)
 
 
 OWNER = "alice"
@@ -35,6 +41,34 @@ def _make_manifest(name="Demo App", description="Demo"):
         description=description,
         runnables=[AppEntryPoint(id="run", name="Run", command="echo hi")],
     )
+
+
+def test_share_app_request_trims_name():
+    request = ShareAppRequest(
+        url="https://github.com/owner/repo",
+        manifest_path="",
+        name="  Catalog Name  ",
+    )
+    assert request.name == "Catalog Name"
+
+
+def test_share_app_request_rejects_blank_name():
+    with pytest.raises(ValidationError, match="Catalog listing name"):
+        ShareAppRequest(
+            url="https://github.com/owner/repo",
+            manifest_path="",
+            name="   ",
+        )
+
+
+def test_update_listing_request_trims_name():
+    request = UpdateAppListingRequest(name="  Catalog Name  ")
+    assert request.name == "Catalog Name"
+
+
+def test_update_listing_request_rejects_blank_name():
+    with pytest.raises(ValidationError, match="Catalog listing name"):
+        UpdateAppListingRequest(name="   ")
 
 
 @pytest.fixture
