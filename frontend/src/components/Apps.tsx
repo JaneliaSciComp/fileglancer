@@ -80,7 +80,7 @@ export default function Apps() {
       url: params.url,
       manifest_path: params.manifest_path,
       name: params.name,
-      description: params.description || undefined
+      description: params.description
     });
     toast.success('Shared to catalog');
   };
