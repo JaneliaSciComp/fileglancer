@@ -38,9 +38,8 @@ vi.mock('react-hot-toast', () => {
 // still override this mock (see DataToolLinks.test.tsx). Other exports keep
 // their real implementations.
 vi.mock('@bioimagetools/capability-manifest', async importOriginal => {
-  const actual = await importOriginal<
-    typeof import('@bioimagetools/capability-manifest')
-  >();
+  const actual =
+    await importOriginal<typeof import('@bioimagetools/capability-manifest')>();
   return {
     ...actual,
     loadManifestsFromUrls: vi.fn().mockResolvedValue(new Map())
