@@ -1,5 +1,6 @@
 import { Typography } from '@material-tailwind/react';
-import { HiOutlinePlus, HiOutlineTrash } from 'react-icons/hi';
+import { HiOutlinePlus } from 'react-icons/hi';
+import { FaUsersSlash } from 'react-icons/fa6';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import type { AppListing } from '@/shared.types';
@@ -97,7 +98,7 @@ export default function ListingInfoDialog({
               className="!rounded-md"
               color="error"
               disabled={unsharing}
-              icon={HiOutlineTrash}
+              icon={FaUsersSlash}
               loading={unsharing}
               loadingText="Unsharing..."
               onClick={onUnshare}

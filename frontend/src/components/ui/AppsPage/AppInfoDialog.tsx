@@ -2,9 +2,9 @@ import { Typography } from '@material-tailwind/react';
 import {
   HiOutlinePlay,
   HiOutlineRefresh,
-  HiOutlineShare,
   HiOutlineTrash
 } from 'react-icons/hi';
+import { FaUsers, FaUsersSlash } from 'react-icons/fa6';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import type { UserApp } from '@/shared.types';
@@ -103,7 +103,7 @@ export default function AppInfoDialog({
           {isShared ? (
             <FgButton
               disabled={unsharing}
-              icon={HiOutlineShare}
+              icon={FaUsersSlash}
               loading={unsharing}
               loadingText="Unsharing..."
               onClick={onUnshare}
@@ -112,7 +112,7 @@ export default function AppInfoDialog({
               Unshare
             </FgButton>
           ) : (
-            <FgButton icon={HiOutlineShare} onClick={onShare} variant="outline">
+            <FgButton icon={FaUsers} onClick={onShare} variant="outline">
               Share to Catalog
             </FgButton>
           )}
