@@ -68,8 +68,8 @@ export default function Catalog() {
   return (
     <div>
       <Typography className="mb-6 text-foreground">
-        Browse apps shared by other users. Click &quot;Add to my apps&quot; to
-        get your own copy.
+        Browse shared apps. Click &quot;Add to my apps&quot; to get your own
+        copy, or manage listings you have shared.
       </Typography>
 
       <div className="mb-6">
