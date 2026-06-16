@@ -6,7 +6,6 @@ import { buildLaunchPathFromApp } from '@/utils';
 import {
   HiOutlineInformationCircle,
   HiOutlinePlay,
-  HiOutlineShare,
   HiOutlineTrash
 } from 'react-icons/hi';
 
@@ -66,30 +65,6 @@ export default function AppCard({
               <FgIcon icon={HiOutlineInformationCircle} />
             </IconButton>
           </FgTooltip>
-          {isShared ? (
-            <FgTooltip label="Unshare from catalog">
-              <IconButton
-                className="text-foreground hover:text-error"
-                disabled={unsharing}
-                onClick={onUnshare}
-                size="sm"
-                variant="ghost"
-              >
-                <FgIcon icon={HiOutlineShare} />
-              </IconButton>
-            </FgTooltip>
-          ) : (
-            <FgTooltip label="Share to catalog">
-              <IconButton
-                className="text-foreground hover:text-primary"
-                onClick={onShare}
-                size="sm"
-                variant="ghost"
-              >
-                <FgIcon icon={HiOutlineShare} />
-              </IconButton>
-            </FgTooltip>
-          )}
           <FgTooltip label="Remove app">
             <IconButton
               className="text-foreground hover:text-error"
