@@ -2,20 +2,22 @@ import { Typography } from '@material-tailwind/react';
 
 function Spinner({
   customClasses,
+  sizeClasses = 'w-5 h-5 border-4',
   text,
   textClasses
 }: {
   readonly customClasses?: string;
+  readonly sizeClasses?: string;
   readonly text?: string;
   readonly textClasses?: string;
 }) {
   return (
     <div className="flex items-center gap-2">
       <div
-        className={`w-5 h-5 border-4 border-surface-foreground border-t-transparent rounded-full animate-spin ${customClasses}`}
+        className={`${sizeClasses} border-surface-foreground border-t-transparent rounded-full animate-spin ${customClasses}`}
         title="Loading spinner"
       />
-      <Typography className={textClasses}>{text}</Typography>
+      {text ? <Typography className={textClasses}>{text}</Typography> : null}
     </div>
   );
 }

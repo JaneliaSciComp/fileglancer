@@ -61,17 +61,30 @@ const FgButton = forwardRef<HTMLButtonElement, FgButtonProps>(
 
     const iconElement = icon ? <FgIcon icon={icon} size="sm" /> : null;
 
-    const content = loading ? (
-      <Spinner
-        customClasses="border-current border-t-transparent"
-        text={loadingText}
-        textClasses="text-current"
-      />
-    ) : (
-      <span className="inline-flex items-center gap-2">
-        {iconPosition === 'left' ? iconElement : null}
-        {children}
-        {iconPosition === 'right' ? iconElement : null}
+    // Keep the label in normal flow so the button's size and vertical centering
+    // are unchanged by the loading state. While loading, the label is hidden in
+    // place (preserving the button's footprint) and a spinner is overlaid.
+    const content = (
+      <span className="relative inline-flex items-center justify-center">
+        <span
+          className={`inline-flex items-center gap-2 ${loading ? 'invisible' : ''}`}
+        >
+          {iconPosition === 'left' ? iconElement : null}
+          {children}
+          {iconPosition === 'right' ? iconElement : null}
+        </span>
+        {loading ? (
+          <span
+            aria-label={loadingText ?? 'Loading'}
+            className="absolute inset-0 flex items-center justify-center"
+            role="status"
+          >
+            <Spinner
+              customClasses="border-current border-t-transparent"
+              sizeClasses="w-4 h-4 border-2"
+            />
+          </span>
+        ) : null}
       </span>
     );
 
