@@ -82,12 +82,12 @@ The following directories are skipped during discovery: `.git`, `node_modules`, 
 | `description` | string | no | Short description of the app |
 | `version` | string | no | Version string (for display only) |
 | `repo_url` | string | no | GitHub URL of a separate repository containing the tool code (see [Separate Tool Repo](#separate-tool-repo)) |
-| `requirements` | list of strings | no | Tools that must be available on the server (see [Requirements](#requirements)) |
+| `requirements` | list of strings | no | Tools that must be available in the job execution environment (see [Requirements](#requirements)) |
 | `runnables` | list of objects | yes | One or more runnable definitions (see [Runnables](#runnables)) |
 
 ### Requirements
 
-The `requirements` field lists tools that must be installed on the server. Requirements can be specified at two levels:
+The `requirements` field lists tools that must be installed in the job execution environment. Requirements can be specified at two levels:
 
 - **Manifest-level** (`requirements` on the top-level manifest): Apply to all runnables by default. Use this for tools needed by every entry point.
 - **Entry-point-level** (`requirements` on a runnable): Additional requirements specific to that runnable. These are **merged** with manifest-level requirements when submitting a job. If the same tool appears at both levels, the entry-point version spec takes precedence.
@@ -111,7 +111,7 @@ runnables:
     # effective requirements: [pixi>=0.40, apptainer]
 ```
 
-Each entry is a tool name with an optional version constraint:
+Each entry is a tool name with an optional single version constraint:
 
 ```yaml
 requirements:
@@ -125,7 +125,9 @@ requirements:
 
 **Supported version operators:** `>=`, `<=`, `!=`, `==`, `>`, `<`
 
-If a requirement is not met (tool missing or version too old), job submission fails with a descriptive error message. Only requirements relevant to the selected entry point are checked — unmet requirements for other entry points do not block submission. If `requirements` is omitted or empty at both levels, no checks are performed.
+Compound or comma-separated version constraints such as `"pixi>=0.40,<0.60"` are not supported. Use at most one comparison per tool.
+
+If a requirement is not met (tool missing or version too old), the job fails early with a descriptive error message in stderr. Only requirements relevant to the selected entry point are checked — unmet requirements for other entry points do not block submission. If `requirements` is omitted or empty at both levels, no checks are performed.
 
 ### Runnables
 

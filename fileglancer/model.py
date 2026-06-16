@@ -424,11 +424,7 @@ class AppEntryPoint(BaseModel):
     @field_validator("requirements")
     @classmethod
     def validate_entry_point_requirements(cls, v):
-        for req in v:
-            tool = re.split(r"[><=!]", req)[0].strip()
-            if tool not in SUPPORTED_TOOLS:
-                raise ValueError(f"Unsupported tool: '{tool}'. Supported: {SUPPORTED_TOOLS}")
-        return v
+        return _validate_requirements(v)
 
     @field_validator("conda_env")
     @classmethod
@@ -506,10 +502,36 @@ class AppEntryPoint(BaseModel):
 
 
 SUPPORTED_TOOLS = {"pixi", "npm", "maven", "miniforge", "apptainer", "nextflow"}
+_REQUIREMENT_PATTERN = re.compile(
+    r"^([a-zA-Z][a-zA-Z0-9_-]*)(?:\s*(>=|<=|!=|==|>|<)\s*([^,\s]+))?$"
+)
 
 _SHELL_METACHAR_PATTERN = re.compile(r'[;&|`$(){}!<>\n\r]')
 _CONDA_ENV_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9_.-]+$')
 _CONDA_ENV_PATH_FORBIDDEN = re.compile(r'[;&|`$(){}!<>\n\r]')
+
+
+def _validate_requirements(requirements: List[str]) -> List[str]:
+    for req in requirements:
+        stripped = req.strip()
+        match = _REQUIREMENT_PATTERN.match(stripped)
+        if not match:
+            if "," in stripped:
+                raise ValueError(
+                    "Compound requirement specs are not supported; use at most "
+                    "one version comparison per tool, e.g. 'pixi>=0.40'."
+                )
+            raise ValueError(
+                f"Invalid requirement format: {req!r}. Expected a tool name "
+                "with an optional single version comparison, e.g. 'pixi>=0.40'."
+            )
+
+        tool = match.group(1)
+        if tool not in SUPPORTED_TOOLS:
+            raise ValueError(
+                f"Unsupported tool: '{tool}'. Supported: {SUPPORTED_TOOLS}"
+            )
+    return requirements
 
 
 class AppManifest(BaseModel):
@@ -530,11 +552,7 @@ class AppManifest(BaseModel):
     @field_validator("requirements")
     @classmethod
     def validate_requirements(cls, v):
-        for req in v:
-            tool = re.split(r"[><=!]", req)[0].strip()
-            if tool not in SUPPORTED_TOOLS:
-                raise ValueError(f"Unsupported tool: '{tool}'. Supported: {SUPPORTED_TOOLS}")
-        return v
+        return _validate_requirements(v)
 
 
 class UserApp(BaseModel):

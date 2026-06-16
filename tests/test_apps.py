@@ -7,7 +7,12 @@ from unittest.mock import patch, MagicMock
 import pytest
 from pydantic import ValidationError
 
-from fileglancer.model import SUPPORTED_TOOLS, AppEntryPoint, JobSubmitRequest
+from fileglancer.model import (
+    SUPPORTED_TOOLS,
+    AppEntryPoint,
+    AppManifest,
+    JobSubmitRequest,
+)
 from fileglancer.apps import (
     _TOOL_REGISTRY,
     merge_requirements,
@@ -208,6 +213,11 @@ class TestBuildRequirementsCheck:
         assert rc == 1
         assert "no version command configured" in stderr
 
+    def test_compound_version_spec_is_invalid(self):
+        rc, stderr = _run_check(["pixi>=0.40,<0.60"])
+        assert rc == 1
+        assert "Invalid requirement format" in stderr
+
     def test_robust_under_set_euo_pipefail(self):
         rc, stderr = _run_check(["zzz_missing_333"], prefix="set -euo pipefail\n")
         assert rc == 1
@@ -268,6 +278,25 @@ class TestEntryPointRequirementsValidation:
             AppEntryPoint(
                 id="t", name="T", command="echo",
                 requirements=["docker"],
+            )
+
+    def test_rejects_compound_version_spec(self):
+        with pytest.raises(ValidationError, match="Compound requirement specs"):
+            AppEntryPoint(
+                id="t", name="T", command="echo",
+                requirements=["pixi>=0.40,<0.60"],
+            )
+
+
+class TestManifestRequirementsValidation:
+    def test_rejects_compound_version_spec(self):
+        with pytest.raises(ValidationError, match="Compound requirement specs"):
+            AppManifest(
+                name="T",
+                requirements=["pixi>=0.40,<0.60"],
+                runnables=[
+                    AppEntryPoint(id="t", name="T", command="echo"),
+                ],
             )
 
 
@@ -640,5 +669,4 @@ class TestBuildCommandTildeExpansion:
     def test_absolute_path_unchanged(self, entry_point):
         cmd = build_command(entry_point, {"output_dir": "/data/output"})
         assert "/data/output" in cmd
-
 
