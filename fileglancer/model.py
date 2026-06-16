@@ -588,13 +588,24 @@ class AppListing(BaseModel):
     updated_at: Optional[datetime] = Field(description="When this listing was last edited", default=None)
 
 
-def _validate_catalog_listing_name(name: Optional[str]) -> Optional[str]:
+def validate_catalog_listing_name(name: Optional[str]) -> Optional[str]:
     if name is None:
         return None
     stripped = name.strip()
     if not stripped:
         raise ValueError("Catalog listing name must not be empty")
     return stripped
+
+
+def resolve_catalog_listing_name(
+    requested_name: Optional[str], fallback_name: str
+) -> str:
+    resolved = validate_catalog_listing_name(
+        requested_name if requested_name is not None else fallback_name
+    )
+    if resolved is None:
+        raise ValueError("Catalog listing name must not be empty")
+    return resolved
 
 
 class ShareAppRequest(BaseModel):
@@ -613,7 +624,7 @@ class ShareAppRequest(BaseModel):
     @field_validator("name")
     @classmethod
     def validate_name(cls, v):
-        return _validate_catalog_listing_name(v)
+        return validate_catalog_listing_name(v)
 
 
 class UpdateAppListingRequest(BaseModel):
@@ -624,7 +635,7 @@ class UpdateAppListingRequest(BaseModel):
     @field_validator("name")
     @classmethod
     def validate_name(cls, v):
-        return _validate_catalog_listing_name(v)
+        return validate_catalog_listing_name(v)
 
 
 class ManifestFetchRequest(BaseModel):

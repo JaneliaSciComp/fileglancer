@@ -28,6 +28,7 @@ from fileglancer.model import (
     AppManifest,
     ShareAppRequest,
     UpdateAppListingRequest,
+    resolve_catalog_listing_name,
 )
 
 
@@ -69,6 +70,11 @@ def test_update_listing_request_trims_name():
 def test_update_listing_request_rejects_blank_name():
     with pytest.raises(ValidationError, match="Catalog listing name"):
         UpdateAppListingRequest(name="   ")
+
+
+def test_resolve_catalog_listing_name_rejects_blank_fallback():
+    with pytest.raises(ValueError, match="Catalog listing name"):
+        resolve_catalog_listing_name(None, "   ")
 
 
 @pytest.fixture

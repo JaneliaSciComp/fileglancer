@@ -1740,7 +1740,10 @@ def create_app(settings):
                     status_code=404,
                     detail="You can only share apps that you have added.",
                 )
-            name = body.name if body.name is not None else user_app.name
+            try:
+                name = resolve_catalog_listing_name(body.name, user_app.name)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
             description = body.description if body.description is not None else user_app.description
             try:
                 listing = db.create_app_listing(
