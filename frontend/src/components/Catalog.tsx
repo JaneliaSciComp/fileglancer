@@ -112,16 +112,22 @@ export default function Catalog() {
             const isOwner =
               profile?.username !== undefined &&
               profile.username === listing.owner_username;
+            const isAdding =
+              addFromListingMutation.isPending &&
+              addFromListingMutation.variables?.listing_id === listing.id;
+            const isUnsharing =
+              unshareListingMutation.isPending &&
+              unshareListingMutation.variables?.listing_id === listing.id;
             return (
               <ListingCard
-                adding={addFromListingMutation.isPending}
+                adding={isAdding}
                 canAdd={!alreadyAdded}
                 canManage={isOwner}
                 key={listing.id}
                 listing={listing}
                 onAdd={handleAddFromListing}
                 onUnshare={handleUnshare}
-                unsharing={unshareListingMutation.isPending}
+                unsharing={isUnsharing}
               />
             );
           })}
