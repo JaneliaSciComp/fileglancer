@@ -287,6 +287,7 @@ export function useAddFromListingMutation(): UseMutationResult<
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appsQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: catalogQueryKeys.all });
     }
   });
 }
