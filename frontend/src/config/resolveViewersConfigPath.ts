@@ -7,12 +7,19 @@ import path from 'path';
  * precedence over the committed default in src/config/.
  *
  * @param frontendDir - Absolute path to the frontend/ directory.
+ * @param fileExists - Existence check, injectable for testing. Defaults to
+ *   fs.existsSync. Mocking fs directly is unreliable here because
+ *   vite-plugin-node-polyfills rewrites the bare `fs` import, so injection is
+ *   used instead.
  */
-export function resolveViewersConfigPath(frontendDir: string): string {
+export function resolveViewersConfigPath(
+  frontendDir: string,
+  fileExists: (filePath: string) => boolean = existsSync
+): string {
   const overridePath = path.resolve(frontendDir, 'viewers.config.yaml');
   const defaultPath = path.resolve(
     frontendDir,
     'src/config/viewers.config.yaml'
   );
-  return existsSync(overridePath) ? overridePath : defaultPath;
+  return fileExists(overridePath) ? overridePath : defaultPath;
 }
