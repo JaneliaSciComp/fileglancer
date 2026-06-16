@@ -138,7 +138,7 @@ export default function AppInfoDialog({
           </Typography>
           <Typography className="mb-4 text-foreground text-sm">
             Publish this app so other users can add it to their own collection.
-            You can edit the name and description shown in the catalog without
+            You can customize the name and description before sharing without
             affecting your own copy.
           </Typography>
 
