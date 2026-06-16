@@ -218,6 +218,16 @@ class TestBuildRequirementsCheck:
         assert rc == 1
         assert "Invalid requirement format" in stderr
 
+    def test_unparseable_version_reports_error_under_pipefail(self, tmp_path):
+        _make_fake_tool(tmp_path, "pixi", "version unavailable")
+        rc, stderr = _run_check(
+            ["pixi>=0.40"],
+            extra_path=str(tmp_path),
+            prefix="set -euo pipefail\n",
+        )
+        assert rc == 1
+        assert "Could not determine version for 'pixi'" in stderr
+
     def test_robust_under_set_euo_pipefail(self):
         rc, stderr = _run_check(["zzz_missing_333"], prefix="set -euo pipefail\n")
         assert rc == 1
@@ -669,4 +679,3 @@ class TestBuildCommandTildeExpansion:
     def test_absolute_path_unchanged(self, entry_point):
         cmd = build_command(entry_point, {"output_dir": "/data/output"})
         assert "/data/output" in cmd
-

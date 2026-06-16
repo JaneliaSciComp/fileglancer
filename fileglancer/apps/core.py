@@ -557,7 +557,7 @@ __fg_check_tool() {
   __fg_errors+=("Required tool '$1' is not installed or not on PATH")
   return 1
 }
-__fg_extract_version() { grep -oE '[0-9]+([.][0-9]+)*' | head -n1; }
+__fg_extract_version() { grep -oE '[0-9]+([.][0-9]+)*' | head -n1 || true; }
 __fg_ver_le() {
   # returns 0 if $1 <= $2 (version order)
   [ "$1" = "$2" ] && return 0
