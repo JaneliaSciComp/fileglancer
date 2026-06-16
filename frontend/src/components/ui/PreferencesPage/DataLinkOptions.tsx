@@ -1,11 +1,11 @@
 import toast from 'react-hot-toast';
-import { Typography } from '@material-tailwind/react';
 
+import FgRadio from '@/components/designSystem/atoms/formElements/FgRadio';
+import FgSwitch from '@/components/designSystem/atoms/formElements/FgSwitch';
+import FgFieldSet from '@/components/designSystem/molecules/FgFieldSet';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
-import OptionsSection from '@/components/ui/PreferencesPage/OptionsSection';
 
 type DataLinkOptionsProps = {
-  readonly checkboxesOnly?: boolean;
   readonly hideSubpathMode?: boolean;
 };
 
@@ -15,11 +15,7 @@ const SUBPATH_MODES = [
   { value: 'custom' as const, label: 'Custom' }
 ];
 
-export function SubpathModeOptions({
-  indented = false
-}: {
-  readonly indented?: boolean;
-}) {
+export function SubpathModeOptions() {
   const { dataLinkSubpathMode, setDataLinkSubpathMode } =
     usePreferencesContext();
 
@@ -36,35 +32,24 @@ export function SubpathModeOptions({
   };
 
   return (
-    <div className={indented ? 'pl-4' : ''}>
-      <Typography className={`text-foreground ${indented ? 'mt-2' : ''} mb-1`}>
-        Link name format:
-      </Typography>
+    <FgFieldSet legend="Link name format">
       {SUBPATH_MODES.map(mode => (
-        <div className="flex items-center gap-2" key={mode.value}>
-          <input
-            checked={dataLinkSubpathMode === mode.value}
-            className="icon-small accent-secondary-light dark:accent-secondary"
-            id={`subpath_mode_${mode.value}`}
-            name="subpath_mode"
-            onChange={() => handleSubpathModeChange(mode.value)}
-            type="radio"
-          />
-          <Typography
-            as="label"
-            className="text-foreground"
-            htmlFor={`subpath_mode_${mode.value}`}
-          >
-            {mode.label}
-          </Typography>
-        </div>
+        <FgRadio
+          checked={dataLinkSubpathMode === mode.value}
+          color="primary"
+          id={`subpath_mode_${mode.value}`}
+          key={mode.value}
+          label={mode.label}
+          name="subpath_mode"
+          onChange={() => handleSubpathModeChange(mode.value)}
+          value={mode.value}
+        />
       ))}
-    </div>
+    </FgFieldSet>
   );
 }
 
 export default function DataLinkOptions({
-  checkboxesOnly = false,
   hideSubpathMode = false
 }: DataLinkOptionsProps) {
   const { areDataLinksAutomatic, toggleAutomaticDataLinks } =
@@ -90,14 +75,14 @@ export default function DataLinkOptions({
 
   return (
     <>
-      <OptionsSection
-        checkboxesOnly={checkboxesOnly}
-        header="Data Links"
-        options={[automaticOption]}
+      <FgSwitch
+        checked={automaticOption.checked}
+        id={automaticOption.id}
+        label={automaticOption.label}
+        onChange={automaticOption.onChange}
+        showState
       />
-      {hideSubpathMode ? null : (
-        <SubpathModeOptions indented={!checkboxesOnly} />
-      )}
+      {hideSubpathMode ? null : <SubpathModeOptions />}
     </>
   );
 }

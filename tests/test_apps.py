@@ -499,9 +499,7 @@ class TestValidatePathInFilestore:
 
     def test_path_outside_any_share(self):
         """Path not in any file share returns an error."""
-        mock_session = MagicMock()
-        with patch("fileglancer.database.find_fsp_from_absolute_path", return_value=None):
-            error = validate_path_in_filestore("/nowhere/file.txt", mock_session)
+        error = validate_path_in_filestore("/nowhere/file.txt", [])
         assert error is not None
         assert "not within an allowed file share" in error
 
@@ -513,17 +511,12 @@ class TestValidatePathInFilestore:
 
         from fileglancer.model import FileSharePath
         fsp = FileSharePath(zone="test", name="test", mount_path=str(tmp_path))
-
-        mock_session = MagicMock()
-        with patch("fileglancer.database.find_fsp_from_absolute_path",
-                   return_value=(fsp, "data.txt")):
-            error = validate_path_in_filestore(str(test_file), mock_session)
+        error = validate_path_in_filestore(str(test_file), [fsp])
         assert error is None
 
     def test_syntax_error_short_circuits(self):
-        """Metachar in path returns error before DB lookup."""
-        mock_session = MagicMock()
-        error = validate_path_in_filestore("/data;bad", mock_session)
+        """Metachar in path returns error before path lookup."""
+        error = validate_path_in_filestore("/data;bad", [])
         assert error is not None
         assert "invalid characters" in error
 

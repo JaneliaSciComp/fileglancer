@@ -169,7 +169,6 @@ type Job = {
   post_run?: string;
   container?: string;
   container_args?: string;
-  pull_latest: boolean;
   cluster_job_id?: string;
   service_url?: string;
   created_at: string;
@@ -185,7 +184,6 @@ type JobSubmitRequest = {
   parameters: Record<string, unknown>;
   resources?: AppResourceDefaults;
   extra_args?: string;
-  pull_latest?: boolean;
   env?: Record<string, string>;
   pre_run?: string;
   post_run?: string;

@@ -9,7 +9,7 @@ import time
 from datetime import datetime, UTC
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock, AsyncMock, call
 
 from fileglancer.apps.core import _poll_jobs, _poll_local_jobs, _POLL_LOCK_PATH
 
@@ -56,9 +56,9 @@ class TestPollSkipsSameStatus:
     _poll_jobs must NOT call update_job_status.  This was the bug that
     caused 'RUNNING -> RUNNING' log spam with multiple workers."""
 
-    @patch("fileglancer.apps.core._run_as_user")
+    @patch("fileglancer.apps.core._dispatch", new_callable=AsyncMock)
     @patch("fileglancer.apps.core.db")
-    def test_same_status_not_written(self, mock_db, mock_run):
+    def test_same_status_not_written(self, mock_db, mock_dispatch):
         settings = _make_settings()
 
         job = _make_db_job(1, "1001", "RUNNING")
@@ -68,7 +68,7 @@ class TestPollSkipsSameStatus:
         mock_db.get_active_jobs.return_value = [job]
 
         # Worker returns RUNNING (lowercase from cluster_api) — same as DB
-        mock_run.return_value = {
+        mock_dispatch.return_value = {
             "jobs": {
                 "1001": {
                     "status": "running",
@@ -80,13 +80,13 @@ class TestPollSkipsSameStatus:
             },
         }
 
-        _poll_jobs(settings)
+        asyncio.run(_poll_jobs(settings))
 
         mock_db.update_job_status.assert_not_called()
 
-    @patch("fileglancer.apps.core._run_as_user")
+    @patch("fileglancer.apps.core._dispatch", new_callable=AsyncMock)
     @patch("fileglancer.apps.core.db")
-    def test_changed_status_is_written(self, mock_db, mock_run):
+    def test_changed_status_is_written(self, mock_db, mock_dispatch):
         settings = _make_settings()
 
         job = _make_db_job(1, "1001", "RUNNING")
@@ -96,7 +96,7 @@ class TestPollSkipsSameStatus:
         mock_db.get_active_jobs.return_value = [job]
 
         # Worker returns DONE — different from DB's RUNNING
-        mock_run.return_value = {
+        mock_dispatch.return_value = {
             "jobs": {
                 "1001": {
                     "status": "done",
@@ -108,15 +108,15 @@ class TestPollSkipsSameStatus:
             },
         }
 
-        _poll_jobs(settings)
+        asyncio.run(_poll_jobs(settings))
 
         mock_db.update_job_status.assert_called_once()
         args, kwargs = mock_db.update_job_status.call_args
         assert args == (mock_session, 1, "DONE")
 
-    @patch("fileglancer.apps.core._run_as_user")
+    @patch("fileglancer.apps.core._dispatch", new_callable=AsyncMock)
     @patch("fileglancer.apps.core.db")
-    def test_job_statuses_passed_to_worker(self, mock_db, mock_run):
+    def test_job_statuses_passed_to_worker(self, mock_db, mock_dispatch):
         """The poll request must include job_statuses so the worker seeds
         stubs with the correct status instead of defaulting to PENDING."""
         settings = _make_settings()
@@ -130,12 +130,13 @@ class TestPollSkipsSameStatus:
         mock_db.get_db_session.return_value.__exit__ = MagicMock(return_value=False)
         mock_db.get_active_jobs.return_value = jobs
 
-        mock_run.return_value = {"jobs": {}}
+        mock_dispatch.return_value = {"jobs": {}}
 
-        _poll_jobs(settings)
+        asyncio.run(_poll_jobs(settings))
 
-        request = mock_run.call_args[0][1]
-        assert request["job_statuses"] == {"1001": "RUNNING", "1002": "PENDING"}
+        # _dispatch is called as (username, action, **kwargs)
+        kwargs = mock_dispatch.call_args.kwargs
+        assert kwargs["job_statuses"] == {"1001": "RUNNING", "1002": "PENDING"}
 
 
 # ---------------------------------------------------------------------------
@@ -365,10 +366,10 @@ class TestPollLocalJobs:
                 mock_db.get_db_session.return_value.__exit__ = MagicMock(return_value=False)
                 mock_db.get_active_jobs.return_value = [job]
 
-                result = _poll_jobs(settings)
+                result = asyncio.run(_poll_jobs(settings))
 
             assert result is True
-            # Should NOT have called _run_as_user (cluster-based polling)
+            # Should NOT have dispatched a cluster poll
             mock_db.update_job_status.assert_called_once()
         finally:
             proc.terminate()

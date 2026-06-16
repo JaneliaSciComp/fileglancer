@@ -32,6 +32,10 @@ def template_app(template_settings):
     """Create a FastAPI app using the template settings"""
     import fileglancer.database
 
+    # Run actions in-process — spawning real per-user workers would require
+    # a long-lived event loop and real users in /etc/passwd.
+    template_settings.cli_mode = True
+
     # Dispose of any cached engines for this database URL
     fileglancer.database.dispose_engine(template_settings.db_url)
 

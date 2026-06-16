@@ -1,11 +1,12 @@
 import type { ChangeEvent, Dispatch, SetStateAction } from 'react';
-import { Typography } from '@material-tailwind/react';
+import toast from 'react-hot-toast';
 
 import useRenameDialog from '@/hooks/useRenameDialog';
 import FgDialog from './FgDialog';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-import toast from 'react-hot-toast';
 import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgFormField from '@/components/designSystem/molecules/FgFormField';
+import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
 
 type ItemNamingDialogProps = {
   readonly showRenameDialog: boolean;
@@ -17,7 +18,8 @@ export default function RenameDialog({
   setShowRenameDialog
 }: ItemNamingDialogProps) {
   const { fileBrowserState, mutations } = useFileBrowserContext();
-  const { handleRenameSubmit, newName, setNewName } = useRenameDialog();
+  const { handleRenameSubmit, newName, setNewName, nameValidation } =
+    useRenameDialog();
 
   const submitForm = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -46,27 +48,30 @@ export default function RenameDialog({
     >
       <form onSubmit={submitForm}>
         <div className="mt-8 flex flex-col gap-2">
-          <Typography
-            as="label"
-            className="text-foreground font-semibold"
+          <FgFormField
+            error={nameValidation.errorMessage}
             htmlFor="new_name"
+            label="Rename Item"
           >
-            Rename Item
-          </Typography>
-          <input
-            autoFocus
-            className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background"
-            id="new_name"
-            onChange={(event: ChangeEvent<HTMLInputElement>) => {
-              setNewName(event.target.value);
-            }}
-            placeholder="Enter name"
-            type="text"
-            value={newName}
-          />
+            <FgInput
+              autoFocus
+              id="new_name"
+              onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                setNewName(event.target.value);
+              }}
+              placeholder="Enter name"
+              size="lg"
+              type="text"
+              value={newName}
+            />
+          </FgFormField>
         </div>
         <FgButton
-          disabled={mutations.rename.isPending}
+          disabled={
+            !newName.trim() ||
+            !nameValidation.isValid ||
+            mutations.rename.isPending
+          }
           loading={mutations.rename.isPending}
           loadingText="Renaming..."
           type="submit"

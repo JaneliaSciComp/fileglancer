@@ -11,6 +11,8 @@ import { useTicketContext } from '@/contexts/TicketsContext';
 import { getPreferredPathForDisplay } from '@/utils/pathHandling';
 import FileSelectorButton from '@/components/ui/FileSelector/FileSelectorButton';
 import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgFormField from '@/components/designSystem/molecules/FgFormField';
+import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
 
 type ItemNamingDialogProps = {
   readonly showConvertFileDialog: boolean;
@@ -92,24 +94,28 @@ export default function ConvertFileDialog({
         }}
       >
         <TextWithFilePath path={displayPath} text="Source Folder" />
-        <div className="flex flex-col gap-2 my-4">
-          <Typography
-            as="label"
-            className="text-foreground font-semibold"
-            htmlFor="destination_folder"
-          >
-            Destination Folder
-          </Typography>
+        <FgFormField
+          error={
+            !tasksEnabled
+              ? 'This functionality is disabled. If you think this is an error, contact the app administrator.'
+              : destinationFolder && !destinationValidation.isValid
+                ? 'Destination folder cannot contain consecutive dots (..).'
+                : undefined
+          }
+          htmlFor="destination_folder"
+          label="Destination Folder"
+        >
           <div className="flex gap-2 items-center">
-            <input
+            <FgInput
               autoFocus
-              className="flex-1 p-2 text-foreground dark:placeholder:text-surface-light text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1"
               disabled={!tasksEnabled}
               id="destination_folder"
               onChange={(event: ChangeEvent<HTMLInputElement>) => {
                 setDestinationFolder(event.target.value);
               }}
               placeholder={placeholderText}
+              size="lg"
               type="text"
               value={destinationFolder}
             />
@@ -118,52 +124,24 @@ export default function ConvertFileDialog({
               onSelect={path => setDestinationFolder(path)}
             />
           </div>
-          {!tasksEnabled ? (
-            <Typography className="text-error" type="small">
-              This functionality is disabled. If you think this is an error,
-              contact the app administrator.
-            </Typography>
-          ) : null}
-          {tasksEnabled &&
-          destinationFolder &&
-          !destinationValidation.isValid ? (
-            <Typography className="text-error" type="small">
-              {destinationValidation.hasConsecutiveDots
-                ? 'Destination folder cannot contain consecutive dots (..).'
-                : null}
-            </Typography>
-          ) : null}
-        </div>
-        <div className="flex flex-col gap-2 my-4">
-          <Typography
-            as="label"
-            className="text-foreground font-semibold"
-            htmlFor="output_filename"
-          >
-            Output File or Folder Name
-          </Typography>
-          <input
-            className="p-2 text-foreground dark:placeholder:text-surface-light text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background disabled:cursor-not-allowed disabled:opacity-50"
+        </FgFormField>
+        <FgFormField
+          error={tasksEnabled ? filenameValidation.errorMessage : undefined}
+          htmlFor="output_filename"
+          label="Output File or Folder Name"
+        >
+          <FgInput
             disabled={!tasksEnabled}
             id="output_filename"
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
               setOutputFilename(event.target.value);
             }}
             placeholder="converted_data.zarr"
+            size="lg"
             type="text"
             value={outputFilename}
           />
-          {tasksEnabled && outputFilename && !filenameValidation.isValid ? (
-            <Typography className="text-error" type="small">
-              {filenameValidation.hasSlashes
-                ? 'Output name cannot contain slashes. '
-                : null}
-              {filenameValidation.hasConsecutiveDots
-                ? 'Output name cannot contain consecutive dots (..). '
-                : null}
-            </Typography>
-          ) : null}
-        </div>
+        </FgFormField>
         <FgButton
           disabled={
             !destinationFolder ||

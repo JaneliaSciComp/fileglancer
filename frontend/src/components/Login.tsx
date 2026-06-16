@@ -4,9 +4,11 @@ import { HiQuestionMarkCircle, HiLogin } from 'react-icons/hi';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgFormField from '@/components/designSystem/molecules/FgFormField';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useSimpleLoginMutation } from '@/queries/authQueries';
 import { useEffect } from 'react';
+import FgInput from './designSystem/atoms/formElements/FgInput';
 
 export default function Login() {
   const { authStatus, loading } = useAuthContext();
@@ -85,28 +87,12 @@ export default function Login() {
               Enter your username to access your files
             </p>
             <form className="space-y-4 " onSubmit={handleLogin}>
-              <div>
-                <label
-                  className="block text-sm font-medium text-foreground mb-2"
-                  htmlFor="username"
-                >
-                  Username
-                </label>
-                <input
-                  autoFocus
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
-                  disabled={simpleLoginMutation.isPending}
-                  id="username"
-                  name="username"
-                  required
-                  type="text"
-                />
-              </div>
-              {simpleLoginMutation.error ? (
-                <div className="text-sm text-error">
-                  {simpleLoginMutation.error.message}
-                </div>
-              ) : null}
+              <FgFormField
+                error={simpleLoginMutation.error?.message}
+                label="Username"
+              >
+                <FgInput name="username" />
+              </FgFormField>
               <FgButton
                 className="w-full"
                 loading={simpleLoginMutation.isPending}

@@ -14,6 +14,11 @@ import {
   constructNeuroglancerUrl
 } from '@/utils';
 import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgFormField from '@/components/designSystem/molecules/FgFormField';
+import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
+import FgRadio from '@/components/designSystem/atoms/formElements/FgRadio';
+import FgTextarea from '@/components/designSystem/atoms/formElements/FgTextarea';
+import FgFieldSet from '@/components/designSystem/molecules/FgFieldSet';
 
 type NGLinkDialogProps = {
   readonly open: boolean;
@@ -178,21 +183,14 @@ export default function NGLinkDialog({
 
     // Check for short_name validation error
     if (shortNameError) {
-      setError('Please fix the errors before submitting.');
       return;
     }
 
     if (inputMode === 'url') {
       // URL Mode validation
-      if (!neuroglancerUrl.trim()) {
-        setError('Please provide a Neuroglancer URL.');
-        return;
-      }
-
       const urlError = validateUrlInput(neuroglancerUrl);
       if (urlError) {
         setUrlValidationError(urlError);
-        setError(urlError);
         return;
       }
 
@@ -211,20 +209,14 @@ export default function NGLinkDialog({
       }
     } else {
       // State Mode validation
-      if (!stateJson.trim()) {
-        setError('Please provide JSON state.');
+      const stateError = validateStateInput(stateJson);
+      if (stateError) {
+        setStateValidationError(stateError);
         return;
       }
 
       if (!baseUrl.trim()) {
         setError('Please provide a base URL.');
-        return;
-      }
-
-      const stateError = validateStateInput(stateJson);
-      if (stateError) {
-        setStateValidationError(stateError);
-        setError(stateError);
         return;
       }
 
@@ -272,169 +264,116 @@ export default function NGLinkDialog({
 
       <div className="flex flex-col gap-2">
         {/* Mode Selector */}
-        <div className="mb-4 flex gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              checked={inputMode === 'url'}
-              className="cursor-pointer"
-              name="input-mode"
-              onChange={() => handleModeChange('url')}
-              type="radio"
-              value="url"
-            />
-            <Typography className="text-foreground font-semibold">
-              URL Mode
-            </Typography>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              checked={inputMode === 'state'}
-              className="cursor-pointer"
-              name="input-mode"
-              onChange={() => handleModeChange('state')}
-              type="radio"
-              value="state"
-            />
-            <Typography className="text-foreground font-semibold">
-              State Mode
-            </Typography>
-          </label>
-        </div>
+        <FgFieldSet className="mb-4" inline legend="Input mode">
+          <FgRadio
+            checked={inputMode === 'url'}
+            id="mode-url"
+            label="URL"
+            name="input-mode"
+            onChange={() => handleModeChange('url')}
+            value="url"
+          />
+          <FgRadio
+            checked={inputMode === 'state'}
+            id="mode-state"
+            label="State"
+            name="input-mode"
+            onChange={() => handleModeChange('state')}
+            value="state"
+          />
+        </FgFieldSet>
 
         {/* URL Mode Fields */}
         {inputMode === 'url' ? (
-          <>
-            <Typography
-              as="label"
-              className="text-foreground font-semibold"
-              htmlFor="neuroglancer-url"
-            >
-              Neuroglancer URL
-            </Typography>
-            <input
+          <FgFormField
+            error={urlValidationError ?? undefined}
+            htmlFor="neuroglancer-url"
+            label="Neuroglancer URL"
+          >
+            <FgInput
               autoFocus
-              className={`mb-1 p-2 text-foreground text-lg border rounded-sm focus:outline-none bg-background ${
-                urlValidationError
-                  ? 'border-error focus:border-error'
-                  : 'border-primary-light focus:border-primary'
-              }`}
               id="neuroglancer-url"
               onChange={handleUrlChange}
               placeholder="https://neuroglancer-demo.appspot.com/#!{...}"
               ref={urlInputRef}
+              size="lg"
               type="text"
               value={neuroglancerUrl}
             />
-            {urlValidationError ? (
-              <Typography className="text-error mb-4" type="small">
-                {urlValidationError}
-              </Typography>
-            ) : (
-              <div className="mb-4" />
-            )}
-          </>
+          </FgFormField>
         ) : null}
 
         {/* State Mode Fields */}
         {inputMode === 'state' ? (
           <>
-            <Typography
-              as="label"
-              className="text-foreground font-semibold"
+            <FgFormField
+              error={stateValidationError ?? undefined}
               htmlFor="state-json"
+              label="JSON State"
             >
-              JSON State
-            </Typography>
-            <textarea
-              autoFocus
-              className={`mb-1 p-2 text-foreground text-lg border rounded-sm focus:outline-none bg-background font-mono ${
-                stateValidationError
-                  ? 'border-error focus:border-error'
-                  : 'border-primary-light focus:border-primary'
-              }`}
-              id="state-json"
-              onChange={handleStateChange}
-              placeholder='{"layers": [...], "position": [...]}'
-              rows={6}
-              value={stateJson}
-            />
-            {stateValidationError ? (
-              <Typography className="text-error mb-4" type="small">
-                {stateValidationError}
-              </Typography>
-            ) : (
-              <div className="mb-4" />
-            )}
+              <FgTextarea
+                autoFocus
+                className="font-mono"
+                id="state-json"
+                onChange={handleStateChange}
+                placeholder='{"layers": [...], "position": [...]}'
+                rows={6}
+                value={stateJson}
+              />
+            </FgFormField>
 
-            <Typography
-              as="label"
-              className="text-foreground font-semibold"
-              htmlFor="base-url"
-            >
-              Neuroglancer Base URL
-            </Typography>
-            <input
-              className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background"
-              id="base-url"
-              onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                setBaseUrl(e.target.value)
-              }
-              placeholder="https://neuroglancer-demo.appspot.com/"
-              type="text"
-              value={baseUrl}
-            />
+            <FgFormField htmlFor="base-url" label="Neuroglancer Base URL">
+              <FgInput
+                id="base-url"
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  setBaseUrl(e.target.value)
+                }
+                placeholder="https://neuroglancer-demo.appspot.com/"
+                size="lg"
+                type="text"
+                value={baseUrl}
+              />
+            </FgFormField>
           </>
         ) : null}
 
         {/* Title Field (shown in both modes) */}
-        <Typography
-          as="label"
-          className="text-foreground font-semibold"
+        <FgFormField
+          helperText="Appears in tab name"
           htmlFor="title"
+          label="Title"
+          optional
         >
-          Title (optional, appears in tab name)
-        </Typography>
-        <input
-          className="mb-4 p-2 text-foreground text-lg border border-primary-light rounded-sm focus:outline-none focus:border-primary bg-background"
-          id="title"
-          onChange={(e: ChangeEvent<HTMLInputElement>) =>
-            setTitle(e.target.value)
-          }
-          placeholder="Example: Hemibrain EM"
-          type="text"
-          value={title}
-        />
+          <FgInput
+            id="title"
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setTitle(e.target.value)
+            }
+            placeholder="Example: Hemibrain EM"
+            size="lg"
+            type="text"
+            value={title}
+          />
+        </FgFormField>
 
         {/* Short Name Field (only in create mode) */}
         {!isEditMode ? (
-          <>
-            <Typography
-              as="label"
-              className="text-foreground font-semibold"
-              htmlFor="short-name"
-            >
-              Name (optional, used in shortened link)
-            </Typography>
-            <input
-              className={`mb-1 p-2 text-foreground text-lg border rounded-sm focus:outline-none bg-background ${
-                shortNameError
-                  ? 'border-error focus:border-error'
-                  : 'border-primary-light focus:border-primary'
-              }`}
+          <FgFormField
+            error={shortNameError ?? undefined}
+            helperText="Used in shortened link"
+            htmlFor="short-name"
+            label="Name"
+            optional
+          >
+            <FgInput
               id="short-name"
               onChange={handleShortNameChange}
               placeholder="Example: hemibrain-em-1"
+              size="lg"
               type="text"
               value={shortName}
             />
-            {shortNameError ? (
-              <Typography className="text-error mb-4" type="small">
-                {shortNameError}
-              </Typography>
-            ) : (
-              <div className="mb-4" />
-            )}
-          </>
+          </FgFormField>
         ) : null}
 
         {/* General Error Display */}

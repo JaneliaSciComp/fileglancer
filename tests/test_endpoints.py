@@ -61,7 +61,7 @@ def test_app(temp_dir):
     test_proxied_path = os.path.join(temp_dir, "new_test_proxied_path")
     os.makedirs(test_proxied_path, exist_ok=True)
 
-    settings = Settings(db_url=db_url, file_share_mounts=[])
+    settings = Settings(db_url=db_url, file_share_mounts=[], cli_mode=True)
 
     # Monkey-patch get_settings to return our test settings
     import fileglancer.settings
@@ -84,6 +84,12 @@ def test_app(temp_dir):
     # Dispose the cached engine from the database module
     from fileglancer.database import dispose_engine
     dispose_engine(db_url)
+
+    # Clear the per-process filestore cache so subsequent tests don't see
+    # stale Filestore instances pointing at this test's temp directory
+    from fileglancer.user_worker import _filestore_cache, _user_groups_cache
+    _filestore_cache.clear()
+    _user_groups_cache.clear()
 
     # Restore original get_settings and clear cache
     fileglancer.settings.get_settings = original_get_settings
@@ -179,6 +185,24 @@ def test_set_preference(test_client):
     response = test_client.get("/api/preference/test_key")
     assert response.status_code == 200
     assert response.json() == pref_data
+
+
+def test_set_preference_requires_json_content_type(test_client):
+    """FastAPI >=0.132 enables strict Content-Type checking by default: a JSON
+    body sent without an `application/json` Content-Type is rejected rather than
+    silently parsed (the pre-0.132 lenient behavior would have returned 200)."""
+    # The normal json= path sets Content-Type: application/json and succeeds.
+    assert test_client.put("/api/preference/ct_key", json={"a": 1}).status_code == 200
+
+    # The identical body bytes with a non-JSON Content-Type are not parsed as
+    # JSON, so body validation fails. FastAPI raises RequestValidationError
+    # (normally 422); this app's validation_exception_handler maps that to 400.
+    response = test_client.put(
+        "/api/preference/ct_key",
+        content='{"a": 1}',
+        headers={"Content-Type": "text/plain"},
+    )
+    assert response.status_code == 400
 
 
 def test_delete_preference(test_client):

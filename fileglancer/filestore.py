@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from typing import Optional, Generator
 from loguru import logger
 
-from .database import find_fsp_from_absolute_path
+from .database import find_fsp_in_paths
 from .model import FileSharePath
 
 # Default buffer size for streaming file contents
@@ -85,15 +85,15 @@ class FileInfo(BaseModel):
             return None
 
     @classmethod
-    def _get_symlink_target_fsp(cls, absolute_path: str, is_symlink: bool, session,
-                                root_path: Optional[str]) -> Optional[dict]:
+    def _get_symlink_target_fsp(cls, absolute_path: str, is_symlink: bool,
+                                fsps: Optional[list], root_path: Optional[str]) -> Optional[dict]:
         """
         Resolve a symlink target to a file share path.
 
         Returns a dict with fsp_name and subpath if the target is in a known file share,
         or None if not a symlink, target not found, or target not in any file share.
         """
-        if not is_symlink or session is None:
+        if not is_symlink or not fsps:
             return None
 
         # Read the symlink target safely
@@ -108,7 +108,7 @@ class FileInfo(BaseModel):
 
         # Try to find which file share contains this target
         try:
-            match = find_fsp_from_absolute_path(session, target)
+            match = find_fsp_in_paths(fsps, target)
             if match:
                 fsp, subpath = match
 
@@ -134,7 +134,7 @@ class FileInfo(BaseModel):
     @classmethod
     def from_stat(cls, path: str, absolute_path: str,
                   lstat_result: os.stat_result, stat_result: os.stat_result,
-                  current_user: str = None, session = None,
+                  current_user: str = None, fsps: Optional[list] = None,
                   root_path: Optional[str] = None,
                   user_groups: Optional[set[str]] = None):
         """
@@ -146,7 +146,7 @@ class FileInfo(BaseModel):
             lstat_result: Result of os.lstat() on the path (detects symlinks).
             stat_result: Result of os.stat() or lstat for broken symlinks.
             current_user: Username for permission checking (optional).
-            session: Database session for symlink resolution (optional).
+            fsps: List of FileSharePath objects for symlink target resolution (optional).
             root_path: Filestore root for defense-in-depth validation in symlink reading (optional).
             user_groups: Pre-computed user group set to avoid per-file getgrall() (optional).
         """
@@ -178,7 +178,7 @@ class FileInfo(BaseModel):
             hasRead, hasWrite = cls._check_permissions(stat_result, current_user, owner, group, user_groups)
 
         # Resolve symlink target to file share path if applicable
-        symlink_target_fsp = cls._get_symlink_target_fsp(absolute_path, is_symlink, session, root_path)
+        symlink_target_fsp = cls._get_symlink_target_fsp(absolute_path, is_symlink, fsps, root_path)
 
         return cls(
             name=name,
@@ -281,7 +281,8 @@ class Filestore:
         return full_path
 
 
-    def _get_file_info_from_path(self, full_path: str, current_user: str = None, session = None,
+    def _get_file_info_from_path(self, full_path: str, current_user: str = None,
+                                    fsps: Optional[list] = None,
                                     user_groups: Optional[set[str]] = None) -> FileInfo:
         """
         Get the FileInfo for a file or directory at the given path.
@@ -329,11 +330,19 @@ class Filestore:
                     full_path,
                 )
 
-        full_real = os.path.realpath(full_path)
-        if full_real == root_real:
+        # Use the resolved parent plus the basename rather than realpath(full_path)
+        # so a symlink is reported at its own location relative to root, not its
+        # target. Resolving the final component of a broken symlink follows it to a
+        # nonexistent target; on Windows an absolute target like "/nonexistent/path"
+        # resolves onto another drive and os.path.relpath then raises ValueError.
+        if full_path == root_real:
             rel_path = '.'
         else:
-            rel_path = os.path.relpath(full_real, root_real)
+            full_real = os.path.join(parent_real, os.path.basename(full_path))
+            if full_real == root_real:
+                rel_path = '.'
+            else:
+                rel_path = os.path.relpath(full_real, root_real)
 
         # Perform all filesystem stat calls here, after validation.
         lstat_result = os.lstat(full_path)
@@ -349,13 +358,14 @@ class Filestore:
 
         return FileInfo.from_stat(
             rel_path, full_path, lstat_result, stat_result,
-            current_user=current_user, session=session,
+            current_user=current_user, fsps=fsps,
             root_path=self.root_path,
             user_groups=user_groups,
         )
 
 
-    def _file_info_from_direntry(self, entry: os.DirEntry, current_user: str = None, session = None,
+    def _file_info_from_direntry(self, entry: os.DirEntry, current_user: str = None,
+                                    fsps: Optional[list] = None,
                                     user_groups: Optional[set[str]] = None) -> FileInfo:
         """Build a FileInfo from a DirEntry, using entry.stat() instead of os.lstat/os.stat.
 
@@ -380,7 +390,14 @@ class Filestore:
         else:
             stat_result = lstat_result
 
-        full_real = os.path.realpath(full_path)
+        # Resolve the parent directory but not the entry itself, so a symlink is
+        # reported at its own location relative to root rather than at its target.
+        # Following the final component would resolve a broken symlink to its
+        # (possibly nonexistent) target; on Windows an absolute target like
+        # "/nonexistent/path" resolves onto another drive and os.path.relpath
+        # then raises ValueError ("path is on mount 'D:', start on mount 'C:'").
+        parent_real = os.path.realpath(os.path.dirname(full_path))
+        full_real = os.path.join(parent_real, entry.name)
         if full_real == root_real:
             rel_path = '.'
         else:
@@ -388,7 +405,7 @@ class Filestore:
 
         return FileInfo.from_stat(
             rel_path, full_path, lstat_result, stat_result,
-            current_user=current_user, session=session,
+            current_user=current_user, fsps=fsps,
             root_path=self.root_path,
             user_groups=user_groups,
         )
@@ -431,7 +448,8 @@ class Filestore:
         return os.path.abspath(os.path.join(self.root_path, relative_path))
 
 
-    def get_file_info(self, path: Optional[str] = None, current_user: str = None, session = None) -> FileInfo:
+    def get_file_info(self, path: Optional[str] = None, current_user: str = None,
+                      fsps: Optional[list] = None) -> FileInfo:
         """
         Get the FileInfo for a file or directory at the given path.
 
@@ -440,7 +458,7 @@ class Filestore:
                 May be None, in which case the root directory is used.
             current_user (str): The username of the current user for permission checking.
                 May be None, in which case hasRead and hasWrite will be None.
-            session: Database session for symlink resolution.
+            fsps: List of FileSharePath objects for symlink target resolution.
                 May be None, in which case symlink_target_fsp will be None.
 
         Raises:
@@ -450,7 +468,7 @@ class Filestore:
             full_path = self.root_path
         else:
             full_path = os.path.join(self.root_path, path)
-        return self._get_file_info_from_path(full_path, current_user, session)
+        return self._get_file_info_from_path(full_path, current_user, fsps)
 
 
     def check_is_binary(self, path: Optional[str] = None, sample_size: int = 4096) -> bool:
@@ -490,7 +508,7 @@ class Filestore:
 
 
     def yield_file_infos_paginated(self, path: Optional[str] = None, current_user: str = None,
-                                    session = None, limit: int = 200,
+                                    fsps: Optional[list] = None, limit: int = 200,
                                     cursor: Optional[str] = None,
                                     *, max_count: int) -> tuple[list[FileInfo], bool, Optional[str], int, bool]:
         """
@@ -503,7 +521,7 @@ class Filestore:
         Args:
             path: Relative path to the directory to list.
             current_user: Username for permission checking.
-            session: Database session for symlink resolution.
+            fsps: List of FileSharePath objects for symlink target resolution.
             limit: Maximum number of entries to return.
             cursor: Name of the last entry from the previous page. Entries after
                 this name (in sort order) are returned.
@@ -557,7 +575,7 @@ class Filestore:
         for entry in page_entries:
             try:
                 file_infos.append(
-                    self._file_info_from_direntry(entry, current_user, session, user_groups)
+                    self._file_info_from_direntry(entry, current_user, fsps, user_groups)
                 )
             except PermissionError as e:
                 logger.error(f"Permission denied accessing entry: {entry.path}: {e}")
@@ -566,7 +584,8 @@ class Filestore:
         next_cursor = page_entries[-1].name if has_more and page_entries else None
         return file_infos, has_more, next_cursor, total_count, is_truncated
 
-    def yield_file_infos(self, path: Optional[str] = None, current_user: str = None, session = None) -> Generator[FileInfo, None, None]:
+    def yield_file_infos(self, path: Optional[str] = None, current_user: str = None,
+                          fsps: Optional[list] = None) -> Generator[FileInfo, None, None]:
         """
         Yield a FileInfo object for each child of the given path.
 
@@ -575,7 +594,7 @@ class Filestore:
                 May be None, in which case the root directory is listed.
             current_user (str): The username of the current user for permission checking.
                 May be None, in which case hasRead and hasWrite will be None.
-            session: Database session for symlink resolution.
+            fsps: List of FileSharePath objects for symlink target resolution.
                 May be None, in which case symlink_target_fsp will be None for symlinks.
 
         Raises:
@@ -593,7 +612,7 @@ class Filestore:
         entries.sort(key=lambda e: (not e.is_dir(follow_symlinks=False), e.name))
         for entry in entries:
             try:
-                yield self._file_info_from_direntry(entry, current_user, session, user_groups)
+                yield self._file_info_from_direntry(entry, current_user, fsps, user_groups)
             except PermissionError as e:
                 # Skip files we don't have permission to access
                 logger.error(f"Permission denied accessing entry: {entry.path}: {e}")
@@ -682,6 +701,35 @@ class Filestore:
             if should_close_handle:
                 file_handle.close()
 
+
+    @staticmethod
+    def _stream_contents(file_handle, buffer_size: int = DEFAULT_BUFFER_SIZE) -> Generator[bytes, None, None]:
+        """Stream from an open file handle. Handle is closed when done."""
+        try:
+            while True:
+                chunk = file_handle.read(buffer_size)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            file_handle.close()
+
+    @staticmethod
+    def _stream_range(start: int, end: int, content_length: int,
+                      file_handle, buffer_size: int = DEFAULT_BUFFER_SIZE) -> Generator[bytes, None, None]:
+        """Stream a byte range from an open file handle. Handle is closed when done."""
+        try:
+            file_handle.seek(start)
+            remaining = content_length
+            while remaining > 0:
+                chunk_size = min(buffer_size, remaining)
+                chunk = file_handle.read(chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+                remaining -= len(chunk)
+        finally:
+            file_handle.close()
 
     def rename_file_or_dir(self, old_path: str, new_path: str):
         """

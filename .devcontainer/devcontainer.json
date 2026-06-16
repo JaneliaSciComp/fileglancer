@@ -32,6 +32,7 @@
   },
   "mounts": [
     "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind",
+    "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,readonly",
     "source=fileglancer-pixi,target=${containerWorkspaceFolder}/.pixi,type=volume"
   ],
   "remoteEnv": {

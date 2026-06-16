@@ -2,8 +2,9 @@ import { useState, useMemo } from 'react';
 
 import { joinPaths } from '@/utils';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
-import type { Result } from '@/shared.types';
 import { createSuccess, handleError } from '@/utils/errorHandling';
+import useFileNameValidation from '@/hooks/useFileNameValidation';
+import type { Result } from '@/shared.types';
 
 export default function useNewFolderDialog() {
   const [newName, setNewName] = useState<string>('');
@@ -19,6 +20,8 @@ export default function useNewFolderDialog() {
       file => file.name.toLowerCase() === newName.trim().toLowerCase()
     );
   }, [newName, fileQuery.data?.files]);
+
+  const nameValidation = useFileNameValidation(newName);
 
   async function handleNewFolderSubmit(): Promise<Result<void>> {
     if (!currentFileSharePath) {
@@ -43,6 +46,7 @@ export default function useNewFolderDialog() {
     handleNewFolderSubmit,
     newName,
     setNewName,
-    isDuplicateName
+    isDuplicateName,
+    nameValidation
   };
 }

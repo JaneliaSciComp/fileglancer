@@ -55,7 +55,10 @@ class Settings(BaseSettings):
     db_pool_size: int = 5
     db_max_overflow: int = 0
 
-    # If true, use seteuid/setegid for file access
+    # If true, each per-user worker subprocess setuids to the target user
+    # before handling requests. Requires root + non-CLI mode (validated at
+    # app startup). When false, workers run as the parent process's user —
+    # useful for local debugging of the worker code path without root.
     use_access_flags: bool = False
 
     # Atlassian settings for accessing JIRA services
@@ -103,6 +106,10 @@ class Settings(BaseSettings):
     # Shell script sourced at startup to import environment variables.
     # Useful for setting up scheduler env (e.g., /misc/lsf/conf/profile.lsf).
     env_source_script: Optional[str] = None
+
+    # Worker pool settings
+    worker_pool_max_workers: int = 50
+    worker_pool_idle_timeout: int = 300  # seconds
 
     # Cluster / Apps settings (mirrors py-cluster-api ClusterConfig)
     cluster: ClusterSettings = ClusterSettings()

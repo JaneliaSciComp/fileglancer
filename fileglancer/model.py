@@ -334,7 +334,7 @@ class AppParameter(BaseModel):
     description: Optional[str] = Field(description="Description of the parameter", default=None)
     required: bool = Field(description="Whether the parameter is required", default=False)
     default: Optional[Any] = Field(description="Default value for the parameter", default=None)
-    options: Optional[List[str]] = Field(description="Allowed values for enum type", default=None)
+    options: Optional[List[str|int|float]] = Field(description="Allowed values for enum type", default=None)
     min: Optional[float] = Field(description="Minimum value for numeric types", default=None)
     max: Optional[float] = Field(description="Maximum value for numeric types", default=None)
     pattern: Optional[str] = Field(description="Regex validation pattern for string types", default=None)
@@ -591,7 +591,6 @@ class Job(BaseModel):
     post_run: Optional[str] = Field(description="Script run after the main command", default=None)
     container: Optional[str] = Field(description="Container image URL used for this job", default=None)
     container_args: Optional[str] = Field(description="Extra arguments for container exec (e.g. '--nv' for GPU)", default=None)
-    pull_latest: bool = Field(description="Whether pull latest was enabled", default=False)
     cluster_job_id: Optional[str] = Field(description="Cluster-assigned job ID", default=None)
     service_url: Optional[str] = Field(description="URL of the running service (for service-type jobs)", default=None)
     created_at: datetime = Field(description="When the job was created")
@@ -608,10 +607,6 @@ class JobSubmitRequest(BaseModel):
     parameters: Dict = Field(description="Parameter values keyed by parameter key")
     resources: Optional[AppResourceDefaults] = Field(description="Resource overrides", default=None)
     extra_args: Optional[str] = Field(description="Extra CLI args for the submit command (replaces config defaults)", default=None)
-    pull_latest: bool = Field(
-        description="Pull latest code from GitHub before running",
-        default=False,
-    )
     env: Optional[Dict[str, str]] = Field(description="Environment variables to export", default=None)
     pre_run: Optional[str] = Field(description="Script to run before the main command", default=None)
     post_run: Optional[str] = Field(description="Script to run after the main command", default=None)

@@ -25,6 +25,14 @@ const preview: Preview = {
     // Wrap all stories in MemoryRouter so FgLink (react-router <Link>) works
     Story => createElement(MemoryRouter, null, createElement(Story)),
 
+    // Apply the app's themed background so the canvas matches light/dark mode
+    Story =>
+      createElement(
+        'div',
+        { className: 'bg-background text-foreground min-h-screen p-4' },
+        createElement(Story)
+      ),
+
     // Dark mode toggle in the Storybook toolbar
     withThemeByClassName({
       themes: {

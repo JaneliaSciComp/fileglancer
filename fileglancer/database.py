@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, UTC
 import os
 from functools import lru_cache
 
-from sqlalchemy import create_engine, Column, String, Integer, Boolean, DateTime, JSON, UniqueConstraint
+from sqlalchemy import create_engine, Column, String, Integer, DateTime, JSON, UniqueConstraint
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.pool import StaticPool
@@ -160,10 +160,29 @@ class JobDB(Base):
     container = Column(String, nullable=True)
     container_args = Column(String, nullable=True)
     work_dir = Column(String, nullable=True)
-    pull_latest = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
+
+
+class UserAppDB(Base):
+    """Database model for a user's installed apps with cached manifests."""
+    __tablename__ = 'user_apps'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String, nullable=False, index=True)
+    url = Column(String, nullable=False)
+    manifest_path = Column(String, nullable=False, server_default="")
+    name = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    branch = Column(String, nullable=True)
+    manifest = Column(JSON, nullable=True)
+    added_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint('username', 'url', 'manifest_path', name='uq_user_app'),
+    )
 
 
 class SessionDB(Base):
@@ -576,6 +595,39 @@ def _find_best_fsp_match(
     return (best_fsp, subpath)
 
 
+def find_fsp_in_paths(
+    paths: list[FileSharePath], absolute_path: str
+) -> Optional[tuple[FileSharePath, str]]:
+    """Match *absolute_path* against an in-memory list of file share paths.
+
+    Pure function with no DB access — useful from contexts that already have
+    the path list (e.g. a worker subprocess that fetched it once and cached
+    it).
+
+    Args:
+        paths: All file share paths to search.
+        absolute_path: Absolute file path to match.
+
+    Returns:
+        ``(fsp, relative_subpath)`` for the longest match, or *None*.
+    """
+    normalized_path = os.path.realpath(absolute_path)
+
+    expanded_mounts: dict[str, str] = {}
+    for fsp in paths:
+        expanded = os.path.expanduser(fsp.mount_path)
+        expanded_mounts[fsp.name] = os.path.realpath(expanded)
+
+    def _expanded_mount(fsp: FileSharePath):
+        return [expanded_mounts[fsp.name]]
+
+    result = _find_best_fsp_match(paths, normalized_path, _expanded_mount, separator=os.sep)
+    if result is not None:
+        fsp, subpath = result
+        logger.trace(f"Found exact match for path: {absolute_path} in fsp: {fsp.name} with subpath: {subpath}")
+    return result
+
+
 def find_fsp_from_absolute_path(session: Session, absolute_path: str) -> Optional[tuple[FileSharePath, str]]:
     """
     Find the file share path that exactly matches the given absolute path.
@@ -590,26 +642,7 @@ def find_fsp_from_absolute_path(session: Session, absolute_path: str) -> Optiona
     Returns:
         Tuple of (FileSharePath, relative_subpath) if an exact match is found, None otherwise
     """
-    # Resolve symlinks in the input path (e.g., /var -> /private/var on macOS)
-    normalized_path = os.path.realpath(absolute_path)
-
-    # Get all file share paths
-    paths = get_file_share_paths(session)
-
-    # Pre-compute expanded mount paths so the helper can use them
-    expanded_mounts: dict[str, str] = {}
-    for fsp in paths:
-        expanded = os.path.expanduser(fsp.mount_path)
-        expanded_mounts[fsp.name] = os.path.realpath(expanded)
-
-    def _expanded_mount(fsp: FileSharePath):
-        return [expanded_mounts[fsp.name]]
-
-    result = _find_best_fsp_match(paths, normalized_path, _expanded_mount, separator=os.sep)
-    if result is not None:
-        fsp, subpath = result
-        logger.trace(f"Found exact match for path: {absolute_path} in fsp: {fsp.name} with subpath: {subpath}")
-    return result
+    return find_fsp_in_paths(get_file_share_paths(session), absolute_path)
 
 
 def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
@@ -880,7 +913,7 @@ def create_job(session: Session, username: str, app_url: str, app_name: str,
                resources: Optional[Dict] = None, manifest_path: str = "",
                entry_point_type: str = "job",
                env: Optional[Dict] = None, pre_run: Optional[str] = None,
-               post_run: Optional[str] = None, pull_latest: bool = False,
+               post_run: Optional[str] = None,
                container: Optional[str] = None,
                container_args: Optional[str] = None) -> JobDB:
     """Create a new job record"""
@@ -900,7 +933,6 @@ def create_job(session: Session, username: str, app_url: str, app_name: str,
         post_run=post_run,
         container=container,
         container_args=container_args,
-        pull_latest=pull_latest,
         status="PENDING",
         created_at=now
     )
@@ -972,3 +1004,76 @@ def delete_old_jobs(session: Session, days: int = 30) -> int:
     ).delete(synchronize_session='fetch')
     session.commit()
     return deleted
+
+
+# --- User app database functions ---
+
+def list_user_apps(session: Session, username: str) -> List[UserAppDB]:
+    """Get all apps installed by a user, oldest first."""
+    return (
+        session.query(UserAppDB)
+        .filter_by(username=username)
+        .order_by(UserAppDB.added_at.asc())
+        .all()
+    )
+
+
+def get_user_app(session: Session, username: str, url: str,
+                 manifest_path: str = "") -> Optional[UserAppDB]:
+    """Get a single user app by (username, url, manifest_path)."""
+    return session.query(UserAppDB).filter_by(
+        username=username,
+        url=url,
+        manifest_path=manifest_path,
+    ).first()
+
+
+def upsert_user_app(session: Session, username: str, url: str,
+                    manifest_path: str = "", *,
+                    name: str,
+                    description: Optional[str] = None,
+                    branch: Optional[str] = None,
+                    manifest: Optional[Dict] = None,
+                    bump_updated_at: bool = True) -> UserAppDB:
+    """Insert or update a user app row.
+
+    On insert, added_at is set to now and updated_at stays NULL.
+    On update, added_at is preserved. updated_at is bumped only when
+    bump_updated_at is True (the default) — set False for invisible
+    refreshes like a lazy manifest backfill.
+    """
+    now = datetime.now(UTC)
+    row = get_user_app(session, username, url, manifest_path)
+    if row is None:
+        row = UserAppDB(
+            username=username,
+            url=url,
+            manifest_path=manifest_path,
+            name=name,
+            description=description,
+            branch=branch,
+            manifest=manifest,
+            added_at=now,
+        )
+        session.add(row)
+    else:
+        row.name = name
+        row.description = description
+        row.branch = branch
+        row.manifest = manifest
+        if bump_updated_at:
+            row.updated_at = now
+    session.commit()
+    return row
+
+
+def delete_user_app(session: Session, username: str, url: str,
+                    manifest_path: str = "") -> bool:
+    """Delete a user app row. Returns True if a row was deleted."""
+    deleted = session.query(UserAppDB).filter_by(
+        username=username,
+        url=url,
+        manifest_path=manifest_path,
+    ).delete()
+    session.commit()
+    return deleted > 0

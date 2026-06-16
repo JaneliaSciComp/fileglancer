@@ -3,6 +3,8 @@ import { Typography } from '@material-tailwind/react';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgFormField from '@/components/designSystem/molecules/FgFormField';
+import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
 
 const GITHUB_URL_PATTERN = /^https?:\/\/github\.com\/[^/]+\/[^/]+\/?$/;
 
@@ -83,16 +85,17 @@ export default function AddAppDialog({
         manifest.
       </Typography>
 
-      <div className="mb-3">
-        <label className="block text-foreground text-sm font-medium mb-1">
-          GitHub Repository URL
-        </label>
-        <input
+      <FgFormField
+        error={urlError || undefined}
+        htmlFor="repo-url"
+        label="GitHub Repository URL"
+      >
+        <FgInput
           autoFocus
-          className="w-full p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary"
           onChange={e => {
-            setRepoUrl(e.target.value);
-            setUrlError('');
+            const value = e.target.value;
+            setRepoUrl(value);
+            validateUrl(value);
           }}
           onKeyDown={e => {
             if (e.key === 'Enter') {
@@ -103,20 +106,10 @@ export default function AddAppDialog({
           type="text"
           value={repoUrl}
         />
-        {urlError ? (
-          <Typography className="text-error mt-1" type="small">
-            {urlError}
-          </Typography>
-        ) : null}
-      </div>
+      </FgFormField>
 
-      <div className="mb-4">
-        <label className="block text-foreground text-sm font-medium mb-1">
-          Branch
-          <span className="text-foreground font-normal ml-1">(optional)</span>
-        </label>
-        <input
-          className="w-full p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary"
+      <FgFormField htmlFor="branch" label="Branch" optional>
+        <FgInput
           onChange={e => {
             setBranch(e.target.value);
           }}
@@ -129,7 +122,7 @@ export default function AddAppDialog({
           type="text"
           value={branch}
         />
-      </div>
+      </FgFormField>
 
       <div className="flex gap-3">
         <FgButton
