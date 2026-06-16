@@ -20,10 +20,10 @@
 #   - label: Custom tooltip text (defaults to "View in {Name}")
 
 viewers:
-  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/neuroglancer.yaml'
+  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/neuroglancer.yaml'
 
-  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/avivator.yaml'
+  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/avivator.yaml'
 
-  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/validator.yaml'
+  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/validator.yaml'
 
-  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/vole.yaml'
+  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/vole.yaml'
