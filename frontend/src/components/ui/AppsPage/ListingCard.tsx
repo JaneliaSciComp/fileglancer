@@ -106,10 +106,7 @@ export default function ListingCard({
           onAdd(listing);
         }}
         onClose={() => setInfoOpen(false)}
-        onUnshare={() => {
-          setInfoOpen(false);
-          onUnshare(listing);
-        }}
+        onUnshare={() => onUnshare(listing)}
         open={infoOpen}
         unsharing={unsharing}
       />

@@ -19,10 +19,16 @@ interface AppCardProps {
   readonly app: UserApp;
   readonly onRemove: () => void;
   readonly onUpdate: (params: { url: string; manifest_path: string }) => void;
-  readonly onShare: () => void;
+  readonly onShare: (params: {
+    url: string;
+    manifest_path: string;
+    name: string;
+    description: string;
+  }) => Promise<void>;
   readonly onUnshare: () => void;
   readonly removing: boolean;
   readonly updating: boolean;
+  readonly sharing: boolean;
   readonly unsharing: boolean;
 }
 
@@ -34,6 +40,7 @@ export default function AppCard({
   onUnshare,
   removing,
   updating,
+  sharing,
   unsharing
 }: AppCardProps) {
   const navigate = useNavigate();
@@ -113,19 +120,14 @@ export default function AppCard({
           setInfoOpen(false);
           onRemove();
         }}
-        onShare={() => {
-          setInfoOpen(false);
-          onShare();
-        }}
-        onUnshare={() => {
-          setInfoOpen(false);
-          onUnshare();
-        }}
+        onShare={onShare}
+        onUnshare={onUnshare}
         onUpdate={() =>
           onUpdate({ url: app.url, manifest_path: app.manifest_path })
         }
         open={infoOpen}
         removing={removing}
+        sharing={sharing}
         unsharing={unsharing}
         updating={updating}
       />
