@@ -7,7 +7,6 @@ import toast from 'react-hot-toast';
 import AppCard from '@/components/ui/AppsPage/AppCard';
 import AddAppDialog from '@/components/ui/AppsPage/AddAppDialog';
 import DeleteAppDialog from '@/components/ui/AppsPage/DeleteAppDialog';
-import ShareAppDialog from '@/components/ui/AppsPage/ShareAppDialog';
 import {
   useAppsQuery,
   useAddAppMutation,
@@ -20,7 +19,6 @@ import FgButton from './designSystem/atoms/FgButton';
 import type { UserApp } from '@/shared.types';
 
 export default function Apps() {
-  const [shareApp, setShareApp] = useState<UserApp | null>(null);
   const [deleteApp, setDeleteApp] = useState<UserApp | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
 
@@ -135,7 +133,7 @@ export default function Apps() {
               app={app}
               key={`${app.url}::${app.manifest_path}`}
               onRemove={() => handleRequestRemove(app)}
-              onShare={() => setShareApp(app)}
+              onShare={handleShare}
               onUnshare={() =>
                 app.listing_id !== undefined
                   ? handleUnshare(app.listing_id)
@@ -143,6 +141,7 @@ export default function Apps() {
               }
               onUpdate={handleUpdateApp}
               removing={removeAppMutation.isPending}
+              sharing={shareAppMutation.isPending}
               unsharing={unshareListingMutation.isPending}
               updating={updateAppMutation.isPending}
             />
@@ -169,13 +168,6 @@ export default function Apps() {
         onConfirm={handleConfirmDelete}
         open={deleteApp !== null}
         removing={removeAppMutation.isPending}
-      />
-      <ShareAppDialog
-        app={shareApp}
-        onClose={() => setShareApp(null)}
-        onShare={handleShare}
-        open={shareApp !== null}
-        sharing={shareAppMutation.isPending}
       />
     </div>
   );

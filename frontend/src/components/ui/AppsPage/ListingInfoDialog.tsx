@@ -1,10 +1,12 @@
 import { Typography } from '@material-tailwind/react';
-import { HiOutlinePlus, HiOutlineTrash } from 'react-icons/hi';
+import { HiOutlinePlus } from 'react-icons/hi';
+import { FaUsersSlash } from 'react-icons/fa6';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import type { AppListing } from '@/shared.types';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
+import FgTooltip from '@/components/ui/widgets/FgTooltip';
 
 interface ListingInfoDialogProps {
   readonly listing: AppListing;
@@ -80,9 +82,11 @@ export default function ListingInfoDialog({
 
       <div className="flex justify-between">
         {canAdd ? (
-          <FgButton icon={HiOutlinePlus} loading={adding} onClick={onAdd}>
-            Add to my apps
-          </FgButton>
+          <FgTooltip label="Add to my apps">
+            <FgButton icon={HiOutlinePlus} loading={adding} onClick={onAdd}>
+              Add to my apps
+            </FgButton>
+          </FgTooltip>
         ) : (
           <Typography
             className="text-foreground text-sm italic self-center"
@@ -93,18 +97,20 @@ export default function ListingInfoDialog({
         )}
         <div className="flex gap-2">
           {canManage ? (
-            <FgButton
-              className="!rounded-md"
-              color="error"
-              disabled={unsharing}
-              icon={HiOutlineTrash}
-              loading={unsharing}
-              loadingText="Unsharing..."
-              onClick={onUnshare}
-              variant="outline"
-            >
-              Unshare
-            </FgButton>
+            <FgTooltip label="Unshare from catalog">
+              <FgButton
+                className="!rounded-md"
+                color="error"
+                disabled={unsharing}
+                icon={FaUsersSlash}
+                loading={unsharing}
+                loadingText="Unsharing..."
+                onClick={onUnshare}
+                variant="outline"
+              >
+                Unshare
+              </FgButton>
+            </FgTooltip>
           ) : null}
         </div>
       </div>

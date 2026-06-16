@@ -128,7 +128,6 @@ type AppEntryPoint = {
 type AppManifest = {
   name: string;
   description?: string;
-  version?: string;
   repo_url?: string;
   requirements?: string[];
   runnables: AppEntryPoint[];

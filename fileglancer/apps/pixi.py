@@ -45,12 +45,12 @@ def _read_pixi_config(directory: Path) -> dict | None:
         if pixi_config and "tasks" in pixi_config:
             # Merge top-level [project] metadata into pixi config.
             # [tool.pixi.project] may only have channels/platforms,
-            # so fill in missing fields (name, description, version)
+            # so fill in missing fields (name, description)
             # from the top-level [project] section.
             top_project = data.get("project", {})
             if top_project:
                 pixi_project = pixi_config.get("project", {})
-                for key in ("name", "description", "version"):
+                for key in ("name", "description"):
                     if key not in pixi_project and key in top_project:
                         pixi_project[key] = top_project[key]
                 pixi_config["project"] = pixi_project
@@ -215,7 +215,6 @@ class PixiAdapter:
         # Extract project metadata
         project = config.get("project", config.get("workspace", {}))
         description = project.get("description")
-        version = project.get("version")
 
         # Use repo_name/branch as the app name if in a git repo
         git_info = _get_git_repo_and_branch(directory)
@@ -239,7 +238,6 @@ class PixiAdapter:
         return AppManifest(
             name=name,
             description=description,
-            version=version,
             requirements=["pixi"],
             runnables=runnables,
         )

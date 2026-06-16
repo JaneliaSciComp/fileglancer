@@ -1,10 +1,7 @@
 import { useState } from 'react';
 import { Card, IconButton, Typography } from '@material-tailwind/react';
-import {
-  HiOutlineInformationCircle,
-  HiOutlinePlus,
-  HiOutlineTrash
-} from 'react-icons/hi';
+import { HiOutlineInformationCircle, HiOutlinePlus } from 'react-icons/hi';
+import { FaUsersSlash } from 'react-icons/fa6';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgButton from '@/components/designSystem/atoms/FgButton';
@@ -63,7 +60,7 @@ export default function ListingCard({
                 size="sm"
                 variant="ghost"
               >
-                <FgIcon icon={HiOutlineTrash} />
+                <FgIcon icon={FaUsersSlash} />
               </IconButton>
             </FgTooltip>
           ) : null}
@@ -109,10 +106,7 @@ export default function ListingCard({
           onAdd(listing);
         }}
         onClose={() => setInfoOpen(false)}
-        onUnshare={() => {
-          setInfoOpen(false);
-          onUnshare(listing);
-        }}
+        onUnshare={() => onUnshare(listing)}
         open={infoOpen}
         unsharing={unsharing}
       />

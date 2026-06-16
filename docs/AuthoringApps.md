@@ -33,7 +33,7 @@ If a directory does not contain a `runnables.yaml` but does contain a `nextflow_
 - Converts JSON Schema parameter definitions to Fileglancer parameters, preserving types, defaults, descriptions, required flags, enum options, and `hidden` status
 - Groups parameters into sections based on the schema's `definitions` and `allOf` ordering
 - Sections with required parameters start expanded; others start collapsed
-- Reads `name` and `version` from `nextflow.config`'s `manifest` block if available, falling back to the schema's `title` and `description`
+- Reads `name` from `nextflow.config`'s `manifest` block if available, falling back to the schema's `title` and `description`
 - Adds an **Environment tab** with Nextflow-specific options:
   - **Profiles** — comma-separated list of Nextflow profiles (e.g. `standard,docker`)
   - **Extra Arguments** — additional Nextflow CLI arguments (e.g. `-resume`, `-with-tower`), appended to the command without shell quoting
@@ -50,7 +50,7 @@ If a directory does not contain a `runnables.yaml` but does contain a `pixi.toml
 - Preserves task `description` fields
 - Exposes task `env` variables as hidden parameters for visibility
 - Skips hidden tasks (names starting with `_`) and dependency-only tasks (no `cmd`)
-- Reads project `name`, `description`, and `version` from the project metadata
+- Reads project `name` and `description` from the project metadata
 - Collects tasks from both top-level and feature-specific task sections
 
 ### Multi-App Repositories
@@ -80,7 +80,6 @@ The following directories are skipped during discovery: `.git`, `node_modules`, 
 |-------|------|----------|-------------|
 | `name` | string | yes | Display name shown in the Fileglancer UI |
 | `description` | string | no | Short description of the app |
-| `version` | string | no | Version string (for display only) |
 | `repo_url` | string | no | GitHub URL of a separate repository containing the tool code (see [Separate Tool Repo](#separate-tool-repo)) |
 | `requirements` | list of strings | no | Tools that must be available in the job execution environment (see [Requirements](#requirements)) |
 | `runnables` | list of objects | yes | One or more runnable definitions (see [Runnables](#runnables)) |
@@ -624,7 +623,6 @@ The URL must start with `http://` or `https://`. Fileglancer validates this befo
 ```yaml
 name: My Viewer
 description: Interactive data viewer
-version: "1.0"
 
 runnables:
   - id: view
@@ -688,7 +686,6 @@ See the [config.yaml.template](config.yaml.template) for all available cluster s
 ```yaml
 name: OME-Zarr Converter
 description: Convert Bio-Formats-compatible images to OME-Zarr using bioformats2raw
-version: "1.0"
 
 runnables:
   - id: convert

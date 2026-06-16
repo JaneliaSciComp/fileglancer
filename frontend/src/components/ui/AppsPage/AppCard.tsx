@@ -6,7 +6,6 @@ import { buildLaunchPathFromApp } from '@/utils';
 import {
   HiOutlineInformationCircle,
   HiOutlinePlay,
-  HiOutlineShare,
   HiOutlineTrash
 } from 'react-icons/hi';
 
@@ -20,10 +19,16 @@ interface AppCardProps {
   readonly app: UserApp;
   readonly onRemove: () => void;
   readonly onUpdate: (params: { url: string; manifest_path: string }) => void;
-  readonly onShare: () => void;
+  readonly onShare: (params: {
+    url: string;
+    manifest_path: string;
+    name: string;
+    description: string;
+  }) => Promise<void>;
   readonly onUnshare: () => void;
   readonly removing: boolean;
   readonly updating: boolean;
+  readonly sharing: boolean;
   readonly unsharing: boolean;
 }
 
@@ -35,6 +40,7 @@ export default function AppCard({
   onUnshare,
   removing,
   updating,
+  sharing,
   unsharing
 }: AppCardProps) {
   const navigate = useNavigate();
@@ -66,30 +72,6 @@ export default function AppCard({
               <FgIcon icon={HiOutlineInformationCircle} />
             </IconButton>
           </FgTooltip>
-          {isShared ? (
-            <FgTooltip label="Unshare from catalog">
-              <IconButton
-                className="text-foreground hover:text-error"
-                disabled={unsharing}
-                onClick={onUnshare}
-                size="sm"
-                variant="ghost"
-              >
-                <FgIcon icon={HiOutlineShare} />
-              </IconButton>
-            </FgTooltip>
-          ) : (
-            <FgTooltip label="Share to catalog">
-              <IconButton
-                className="text-foreground hover:text-primary"
-                onClick={onShare}
-                size="sm"
-                variant="ghost"
-              >
-                <FgIcon icon={HiOutlineShare} />
-              </IconButton>
-            </FgTooltip>
-          )}
           <FgTooltip label="Remove app">
             <IconButton
               className="text-foreground hover:text-error"
@@ -138,19 +120,14 @@ export default function AppCard({
           setInfoOpen(false);
           onRemove();
         }}
-        onShare={() => {
-          setInfoOpen(false);
-          onShare();
-        }}
-        onUnshare={() => {
-          setInfoOpen(false);
-          onUnshare();
-        }}
+        onShare={onShare}
+        onUnshare={onUnshare}
         onUpdate={() =>
           onUpdate({ url: app.url, manifest_path: app.manifest_path })
         }
         open={infoOpen}
         removing={removing}
+        sharing={sharing}
         unsharing={unsharing}
         updating={updating}
       />
