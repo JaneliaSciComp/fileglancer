@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { Card, IconButton, Typography } from '@material-tailwind/react';
 import {
-  HiOutlineExternalLink,
+  HiOutlineInformationCircle,
   HiOutlinePlus,
   HiOutlineTrash
 } from 'react-icons/hi';
@@ -8,27 +9,8 @@ import {
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
+import ListingInfoDialog from '@/components/ui/AppsPage/ListingInfoDialog';
 import type { AppListing } from '@/shared.types';
-
-function buildSourceUrl(listing: AppListing): string {
-  const repo = listing.url.replace(/\/+$/, '');
-  const isGitHub = /^https?:\/\/(www\.)?github\.com\//i.test(repo);
-  if (!isGitHub) {
-    return repo;
-  }
-  const branch = listing.branch?.trim();
-  const path = listing.manifest_path?.trim();
-  if (branch && path) {
-    return `${repo}/tree/${branch}/${path}`;
-  }
-  if (branch) {
-    return `${repo}/tree/${branch}`;
-  }
-  if (path) {
-    return `${repo}/tree/HEAD/${path}`;
-  }
-  return repo;
-}
 
 interface ListingCardProps {
   readonly listing: AppListing;
@@ -49,7 +31,7 @@ export default function ListingCard({
   onAdd,
   onUnshare
 }: ListingCardProps) {
-  const sourceUrl = buildSourceUrl(listing);
+  const [infoOpen, setInfoOpen] = useState(false);
   const publishedAt = new Date(listing.published_at).toLocaleDateString();
 
   return (
@@ -61,19 +43,31 @@ export default function ListingCard({
         >
           {listing.name}
         </Typography>
-        {canManage ? (
-          <FgTooltip label="Unshare from catalog">
+        <div className="flex flex-shrink-0">
+          <FgTooltip label="App info">
             <IconButton
-              className="text-foreground hover:text-error flex-shrink-0"
-              disabled={unsharing}
-              onClick={() => onUnshare(listing)}
+              className="text-foreground hover:text-primary"
+              onClick={() => setInfoOpen(true)}
               size="sm"
               variant="ghost"
             >
-              <FgIcon icon={HiOutlineTrash} />
+              <FgIcon icon={HiOutlineInformationCircle} />
             </IconButton>
           </FgTooltip>
-        ) : null}
+          {canManage ? (
+            <FgTooltip label="Unshare from catalog">
+              <IconButton
+                className="text-foreground hover:text-error"
+                disabled={unsharing}
+                onClick={() => onUnshare(listing)}
+                size="sm"
+                variant="ghost"
+              >
+                <FgIcon icon={HiOutlineTrash} />
+              </IconButton>
+            </FgTooltip>
+          ) : null}
+        </div>
       </div>
 
       <Typography className="text-foreground text-xs" type="small">
@@ -85,20 +79,6 @@ export default function ListingCard({
           {listing.description}
         </Typography>
       ) : null}
-
-      <a
-        className="text-primary hover:underline text-xs inline-flex items-center gap-1 break-all"
-        href={sourceUrl}
-        rel="noopener noreferrer"
-        target="_blank"
-      >
-        <FgIcon icon={HiOutlineExternalLink} size="xs" />
-        <span>
-          {listing.url.replace(/^https?:\/\//, '')}
-          {listing.manifest_path ? ` / ${listing.manifest_path}` : ''}
-          {listing.branch ? ` @ ${listing.branch}` : ''}
-        </span>
-      </a>
 
       <div className="mt-auto">
         {canAdd ? (
@@ -118,6 +98,24 @@ export default function ListingCard({
           </Typography>
         )}
       </div>
+
+      <ListingInfoDialog
+        adding={adding}
+        canAdd={canAdd}
+        canManage={canManage}
+        listing={listing}
+        onAdd={() => {
+          setInfoOpen(false);
+          onAdd(listing);
+        }}
+        onClose={() => setInfoOpen(false)}
+        onUnshare={() => {
+          setInfoOpen(false);
+          onUnshare(listing);
+        }}
+        open={infoOpen}
+        unsharing={unsharing}
+      />
     </Card>
   );
 }
