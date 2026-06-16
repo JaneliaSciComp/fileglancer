@@ -1,5 +1,6 @@
 """Tests for apps module: miniforge/apptainer requirements, conda_env, and container support."""
 
+import os
 import subprocess
 from unittest.mock import patch, MagicMock
 
@@ -11,6 +12,7 @@ from fileglancer.apps import (
     _TOOL_REGISTRY,
     merge_requirements,
     verify_requirements,
+    build_requirements_check,
     _container_sif_name,
     _build_container_script,
     build_command,
@@ -131,6 +133,85 @@ class TestVerifyRequirementsMiniforge:
         )
         with pytest.raises(ValueError, match="does not satisfy"):
             verify_requirements(["miniforge>=24.0"])
+
+
+# --- build_requirements_check tests ---
+
+def _make_fake_tool(directory, name, version_output):
+    """Create an executable shim in `directory` that prints `version_output`."""
+    path = directory / name
+    path.write_text(f'#!/bin/bash\necho {version_output!r}\n')
+    path.chmod(0o755)
+
+
+def _run_check(reqs, extra_path=None, prefix=""):
+    """Generate the runtime check snippet and execute it with bash.
+
+    Returns (returncode, stderr).
+    """
+    snippet = prefix + build_requirements_check(reqs)
+    env = dict(os.environ)
+    if extra_path:
+        env["PATH"] = f"{extra_path}{os.pathsep}{env['PATH']}"
+    proc = subprocess.run(
+        ["bash", "-c", snippet], capture_output=True, text=True, env=env
+    )
+    return proc.returncode, proc.stderr.strip()
+
+
+class TestBuildRequirementsCheck:
+    def test_empty_returns_empty_string(self):
+        assert build_requirements_check([]) == ""
+
+    def test_present_tool_passes(self):
+        # bash is always present in the test environment
+        rc, _ = _run_check(["bash"])
+        assert rc == 0
+
+    def test_missing_tool_fails(self):
+        rc, stderr = _run_check(["zzz_no_such_tool_999"])
+        assert rc == 1
+        assert "not installed or not on PATH" in stderr
+        assert "zzz_no_such_tool_999" in stderr
+
+    def test_multiple_errors_aggregated(self):
+        rc, stderr = _run_check(["aaa_missing_111", "bbb_missing_222"])
+        assert rc == 1
+        assert "aaa_missing_111" in stderr
+        assert "bbb_missing_222" in stderr
+
+    def test_version_satisfied(self, tmp_path):
+        _make_fake_tool(tmp_path, "pixi", "pixi 0.50.1")
+        rc, _ = _run_check(["pixi>=0.40"], extra_path=str(tmp_path))
+        assert rc == 0
+
+    def test_version_too_old(self, tmp_path):
+        _make_fake_tool(tmp_path, "pixi", "pixi 0.30.0")
+        rc, stderr = _run_check(["pixi>=0.40"], extra_path=str(tmp_path))
+        assert rc == 1
+        assert "does not satisfy >=0.40" in stderr
+
+    def test_version_exact_match(self, tmp_path):
+        _make_fake_tool(tmp_path, "pixi", "pixi 0.50.1")
+        rc, _ = _run_check(["pixi==0.50.1"], extra_path=str(tmp_path))
+        assert rc == 0
+
+    def test_miniforge_checks_conda_binary(self, tmp_path):
+        # miniforge's binary is 'conda'; the snippet must look for conda
+        _make_fake_tool(tmp_path, "conda", "conda 24.7.1")
+        rc, _ = _run_check(["miniforge>=24.0"], extra_path=str(tmp_path))
+        assert rc == 0
+
+    def test_unknown_tool_with_version_cannot_be_checked(self):
+        # bash exists but has no registry entry, so version cannot be verified
+        rc, stderr = _run_check(["bash>=1.0"])
+        assert rc == 1
+        assert "no version command configured" in stderr
+
+    def test_robust_under_set_euo_pipefail(self):
+        rc, stderr = _run_check(["zzz_missing_333"], prefix="set -euo pipefail\n")
+        assert rc == 1
+        assert "zzz_missing_333" in stderr
 
 
 # --- merge_requirements tests ---

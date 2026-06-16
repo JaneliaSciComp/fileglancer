@@ -547,6 +547,113 @@ def verify_requirements(requirements: list[str]):
         raise ValueError("Unmet requirements:\n  - " + "\n  - ".join(errors))
 
 
+# Shared bash helpers emitted once at the top of a requirements-check snippet.
+# Kept as a module constant so it is easy to read and test.
+_REQ_CHECK_PREAMBLE = r"""__fg_errors=()
+__fg_check_tool() {
+  # $1 = tool name (for messages), $2 = binary to look for on PATH
+  if command -v "$2" >/dev/null 2>&1; then return 0; fi
+  __fg_errors+=("Required tool '$1' is not installed or not on PATH")
+  return 1
+}
+__fg_extract_version() { grep -oE '[0-9]+([.][0-9]+)*' | head -n1; }
+__fg_ver_le() {
+  # returns 0 if $1 <= $2 (version order)
+  [ "$1" = "$2" ] && return 0
+  [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" = "$1" ]
+}
+__fg_check_version() {
+  # $1=tool $2=installed $3=op $4=required
+  local tool="$1" v="$2" op="$3" req="$4" ok=1
+  if [ -z "$v" ]; then
+    __fg_errors+=("Could not determine version for '$tool' to check $op$req")
+    return 0
+  fi
+  case "$op" in
+    ">=") __fg_ver_le "$req" "$v" && ok=0 ;;
+    "<=") __fg_ver_le "$v" "$req" && ok=0 ;;
+    ">")  { __fg_ver_le "$req" "$v" && [ "$v" != "$req" ]; } && ok=0 ;;
+    "<")  { __fg_ver_le "$v" "$req" && [ "$v" != "$req" ]; } && ok=0 ;;
+    "==") [ "$v" = "$req" ] && ok=0 ;;
+    "!=") [ "$v" != "$req" ] && ok=0 ;;
+  esac
+  [ "$ok" -ne 0 ] && __fg_errors+=("'$tool' version $v does not satisfy $op$req")
+  return 0
+}"""
+
+_REQ_OP_PATTERN = re.compile(r"(>=|<=|!=|==|>|<)\s*(\S+)")
+
+
+def build_requirements_check(requirements: list[str]) -> str:
+    """Build a bash snippet that verifies required tools at job runtime.
+
+    Unlike :func:`verify_requirements` (which inspects the *server's* PATH at
+    submit time), this snippet runs inside the job on the compute node, as the
+    user, after conda/env activation. It therefore reflects the actual
+    execution environment. On any unmet requirement it prints all errors to
+    stderr and exits 1, which marks the job FAILED and surfaces the message in
+    the job's stderr log.
+
+    Returns an empty string when there are no requirements.
+    """
+    if not requirements:
+        return ""
+
+    checks = []
+    for req in requirements:
+        req = req.strip()
+        match = _REQ_PATTERN.match(req)
+        if not match:
+            checks.append(f"__fg_errors+=({shlex.quote(f'Invalid requirement format: {req!r}')})")
+            continue
+
+        tool = match.group(1)
+        version_spec = match.group(2)
+        registry_entry = _TOOL_REGISTRY.get(tool)
+        binary = registry_entry["version_args"][0] if registry_entry else tool
+
+        if not version_spec:
+            checks.append(f"__fg_check_tool {shlex.quote(tool)} {shlex.quote(binary)} || true")
+            continue
+
+        op_match = _REQ_OP_PATTERN.match(version_spec.strip())
+        op = op_match.group(1)
+        required = op_match.group(2)
+
+        if not registry_entry:
+            # Tool exists check still runs; version cannot be verified.
+            msg = f"Cannot check version for '{tool}': no version command configured"
+            checks.append(
+                f"if __fg_check_tool {shlex.quote(tool)} {shlex.quote(binary)}; then\n"
+                f"  __fg_errors+=({shlex.quote(msg)})\n"
+                f"fi"
+            )
+            continue
+
+        version_cmd = " ".join(shlex.quote(a) for a in registry_entry["version_args"])
+        checks.append(
+            f"if __fg_check_tool {shlex.quote(tool)} {shlex.quote(binary)}; then\n"
+            f"  __fg_v=\"$({version_cmd} 2>&1 | __fg_extract_version)\"\n"
+            f"  __fg_check_version {shlex.quote(tool)} \"$__fg_v\" {shlex.quote(op)} {shlex.quote(required)}\n"
+            f"fi"
+        )
+
+    finalizer = (
+        'if [ "${#__fg_errors[@]}" -gt 0 ]; then\n'
+        '  echo "ERROR: This app\'s requirements are not met in the execution environment:" >&2\n'
+        '  for __fg_e in "${__fg_errors[@]}"; do echo "  - $__fg_e" >&2; done\n'
+        "  exit 1\n"
+        "fi"
+    )
+
+    return "\n".join([
+        "# Verify required tools are available in this environment (Fileglancer)",
+        _REQ_CHECK_PREAMBLE,
+        *checks,
+        finalizer,
+    ])
+
+
 # --- Path Validation ---
 
 # Characters that are dangerous in shell commands
@@ -1200,11 +1307,13 @@ async def submit_job(
     if entry_point is None:
         raise ValueError(f"Entry point '{entry_point_id}' not found in manifest")
 
-    # Verify requirements: merge manifest-level with entry-point-level
+    # Merge manifest-level with entry-point-level requirements. These are
+    # verified at job runtime (see build_requirements_check below) rather than
+    # here on the server, because the job runs on the compute node as the user
+    # with a potentially different environment.
     effective_requirements = merge_requirements(
         manifest.requirements, entry_point.requirements
     )
-    verify_requirements(effective_requirements)
 
     # Build command (with DB session for path validation against file shares)
     with db.get_db_session(settings.db_url) as session:
@@ -1347,6 +1456,12 @@ async def submit_job(
 
     if env_lines:
         script_parts.append(env_lines.rstrip())
+    # Verify required tools now that PATH, conda, and env vars are set up, but
+    # before pre_run/command do any real work. Fails the job with a readable
+    # message in stderr if a requirement is unmet.
+    req_check = build_requirements_check(effective_requirements)
+    if req_check:
+        script_parts.append(req_check)
     if effective_pre_run:
         script_parts.append(effective_pre_run.rstrip())
     script_parts.append(command)

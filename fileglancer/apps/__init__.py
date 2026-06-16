@@ -7,6 +7,7 @@ from fileglancer.apps.core import (  # noqa: F401
     _container_sif_name,
     _ensure_repo_cache,
     build_command,
+    build_requirements_check,
     cancel_job,
     discover_app_manifests,
     fetch_app_manifest,
