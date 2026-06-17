@@ -14,7 +14,7 @@ import {
 } from '@/queries/zarrQueries';
 import { detectN5 } from '@/queries/n5Queries';
 
-export type DataLinkType = 'directory' | 'ome-zarr' | 'zarr' | 'n5';
+export type DataLinkType = 'directory' | 'file' | 'ome-zarr' | 'zarr' | 'n5';
 export type ZarrVersion = 2 | 3;
 
 const TOOLTIP_TRIGGER_CLASSES =
@@ -36,17 +36,21 @@ export default function DataLinkUsageDialog({
   onClose
 }: DataLinkUsageDialogProps) {
   const targetFileQuery = useFileQuery(fspName, path);
+  const currentFileOrFolder = targetFileQuery.data?.currentFileOrFolder;
+  const isFile =
+    !targetFileQuery.isPending && currentFileOrFolder?.is_dir === false;
   const files = targetFileQuery.data?.files ?? [];
 
   const isZarr = areZarrMetadataFilesPresent(files);
   const isN5 = detectN5(files);
 
   // Reuse the zarr metadata query — TanStack Query caches by key,
-  // so this is a no-op when the browse page already fetched it
+  // so this is a no-op when the browse page already fetched it.
+  // Skip for files: we don't need zarr metadata for a single file.
   const zarrMetadataQuery = useZarrMetadataQuery({
     fspName,
-    currentFileOrFolder: targetFileQuery.data?.currentFileOrFolder,
-    files
+    currentFileOrFolder: isFile ? undefined : currentFileOrFolder,
+    files: isFile ? [] : files
   });
 
   const zarrVersion: ZarrVersion | undefined =
@@ -56,9 +60,12 @@ export default function DataLinkUsageDialog({
         )
       : undefined;
 
-  // Determine data type: for zarr, wait for metadata query to distinguish OME vs plain
+  // Determine data type: file check takes precedence over Zarr/N5 detection.
+  // For zarr, wait for metadata query to distinguish OME vs plain.
   let dataType: DataLinkType;
-  if (isZarr) {
+  if (isFile) {
+    dataType = 'file';
+  } else if (isZarr) {
     dataType = zarrMetadataQuery.data?.isOmeZarr ? 'ome-zarr' : 'zarr';
   } else if (isN5) {
     dataType = 'n5';
@@ -67,7 +74,8 @@ export default function DataLinkUsageDialog({
   }
 
   const isPending =
-    targetFileQuery.isPending || (isZarr && zarrMetadataQuery.isPending);
+    targetFileQuery.isPending ||
+    (!isFile && isZarr && zarrMetadataQuery.isPending);
 
   return (
     <FgDialog

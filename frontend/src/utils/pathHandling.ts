@@ -71,6 +71,21 @@ function joinPaths(...paths: string[]): string {
 }
 
 /**
+ * Normalizes the Filestore FSP-root path (".") to an empty string.
+ *
+ * Filestore returns the FSP root as ".", but a literal "." in a share URL gets
+ * collapsed by URL normalization at the recipient, producing path mismatch /
+ * NoSuchBucket errors. Callers building data links should send "" to the
+ * backend instead and fall back to the FSP name for the URL's trailing segment.
+ * Example:
+ * normalizeFspRootPath('.'); // Returns ''
+ * normalizeFspRootPath('my_folder/my_zarr'); // Returns 'my_folder/my_zarr'
+ */
+function normalizeFspRootPath(filePath: string | null | undefined): string {
+  return !filePath || filePath === '.' ? '' : filePath;
+}
+
+/**
  * Constructs a sharable URL to access file contents from the browser with the Fileglancer API.
  * If no filePath is provided, it returns the endpoint URL with the FSP path appended - this is the base URL.
  * If filePath is provided, this is appended to the base URL with proper URL escaping.
@@ -266,6 +281,7 @@ export {
   joinPaths,
   makeBrowseLink,
   makePathSegmentArray,
+  normalizeFspRootPath,
   normalizePosixStylePath,
   removeLastSegmentFromPath,
   removeTrailingSlashes,

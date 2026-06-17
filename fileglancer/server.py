@@ -134,6 +134,24 @@ def _validate_url_prefix(url_prefix: str) -> None:
         raise HTTPException(status_code=400, detail="Data link name must not start or end with /")
     if '//' in url_prefix:
         raise HTTPException(status_code=400, detail="Data link name must not contain consecutive slashes")
+    # `.` and `..` get collapsed by URL normalization at the recipient,
+    # which breaks key/path resolution when the link is opened.
+    if any(seg in (".", "..") for seg in url_prefix.split('/')):
+        raise HTTPException(status_code=400, detail="Data link name must not contain '.' or '..' segments")
+
+
+def _normalize_proxied_path(path: str) -> str:
+    """Normalize an FSP-relative path for a proxied path record.
+
+    The file browser surfaces the FSP root as "." (Filestore returns that as
+    rel_path). Strip a leading "./" and treat "." as "" so FSP-root data links
+    don't embed a literal "." in their share URL.
+    """
+    if path == "." or path == "./":
+        return ""
+    if path.startswith("./"):
+        return path[2:]
+    return path
 
 
 def _convert_ticket(db_ticket: db.TicketDB) -> Ticket:
@@ -276,6 +294,10 @@ def create_app(settings):
         Returns (info_dict, subpath) on success, or (error_response, "") on failure.
         """
         def try_strip_prefix(captured: str, prefix: str) -> str | None:
+            # Empty prefix (e.g. legacy records or FSP-root links): the entire
+            # captured path is the subpath.
+            if not prefix:
+                return captured
             if captured == prefix:
                 return ""
             if captured.startswith(prefix + "/"):
@@ -288,9 +310,14 @@ def create_app(settings):
             if not proxied_path:
                 return get_nosuchbucket_response(captured_path), ""
 
-            subpath = try_strip_prefix(captured_path, proxied_path.url_prefix)
+            # Treat legacy "." (FSP-root sentinel) as empty so old records that
+            # were created before _normalize_proxied_path still resolve.
+            stored_path = "" if proxied_path.path == "." else proxied_path.path
+            stored_prefix = "" if proxied_path.url_prefix == "." else proxied_path.url_prefix
+
+            subpath = try_strip_prefix(captured_path, stored_prefix)
             if subpath is None:
-                subpath = try_strip_prefix(captured_path, unquote(proxied_path.url_prefix))
+                subpath = try_strip_prefix(captured_path, unquote(stored_prefix))
             if subpath is None:
                 return get_error_response(404, "NoSuchKey", f"Path mismatch for sharing key {sharing_key}", captured_path), ""
 
@@ -298,8 +325,10 @@ def create_app(settings):
             if not fsp:
                 return get_error_response(400, "InvalidArgument", f"File share path {proxied_path.fsp_name} not found", captured_path), ""
             expanded_mount_path = os.path.expanduser(fsp.mount_path)
-            mount_path = f"{expanded_mount_path}/{proxied_path.path}"
-            target_name = captured_path.rsplit('/', 1)[-1] if captured_path else os.path.basename(proxied_path.path)
+            # For FSP-root links (empty path) use the mount path directly to
+            # avoid a stray trailing slash in mount_path.
+            mount_path = f"{expanded_mount_path}/{stored_path}" if stored_path else expanded_mount_path
+            target_name = captured_path.rsplit('/', 1)[-1] if captured_path else (os.path.basename(stored_path) or fsp.name)
             return {
                 "mount_path": mount_path,
                 "target_name": target_name,
@@ -996,8 +1025,17 @@ def create_app(settings):
                                   url_prefix: Optional[str] = Query(None, description="The URL path prefix after the sharing key. Defaults to basename of path."),
                                   username: str = Depends(get_current_user)):
 
+        # Normalize the FSP-relative path: the file browser surfaces the FSP
+        # root as "." (Filestore returns that as rel_path), but using "." in a
+        # share URL gets collapsed by URL normalization at the recipient,
+        # producing path mismatch / NoSuchBucket errors when the link is opened.
+        path = _normalize_proxied_path(path)
+
         if url_prefix is None:
-            url_prefix = quote(os.path.basename(path), safe='/')
+            # basename("") is "", which would fail validation, so fall back to
+            # the FSP name for FSP-root links.
+            default_prefix = os.path.basename(path) or fsp_name
+            url_prefix = quote(default_prefix, safe='/')
         elif not _VALID_URL_PREFIX_RE.match(url_prefix):
             url_prefix = quote(url_prefix, safe='/')
         _validate_url_prefix(url_prefix)
@@ -1022,6 +1060,13 @@ def create_app(settings):
     async def get_proxied_paths(fsp_name: str = Query(None, description="The name of the file share path that this proxied path is associated with"),
                                 path: str = Query(None, description="The path being proxied"),
                                 username: str = Depends(get_current_user)):
+
+        # The file browser surfaces the FSP root as ".", but we normalize "."
+        # to "" on write — apply the same normalization on lookup so the
+        # sidebar's "is there a link for the current folder?" query matches
+        # the stored row.
+        if path is not None:
+            path = _normalize_proxied_path(path)
 
         with db.get_db_session(settings.db_url) as session:
             db_proxied_paths = db.get_proxied_paths(session, username, fsp_name, path)
@@ -1049,6 +1094,8 @@ def create_app(settings):
                                   path: Optional[str] = Query(default=None, description="The path relative to the file share path mount point"),
                                   sharing_name: Optional[str] = Query(default=None, description="The sharing path of the proxied path"),
                                   username: str = Depends(get_current_user)):
+        if path is not None:
+            path = _normalize_proxied_path(path)
         # If path or fsp_name is changing, validate access via worker
         if path is not None or fsp_name is not None:
             with db.get_db_session(settings.db_url) as session:

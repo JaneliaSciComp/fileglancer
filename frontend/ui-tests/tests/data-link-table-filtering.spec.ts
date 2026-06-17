@@ -137,7 +137,7 @@ test.describe('Data Link Table Filtering', () => {
       await expect(page.getByRole('heading', { name: /links/i })).toBeVisible();
 
       // Check for the real link (zarr_v3_ome.zarr should be in the table)
-      await expect(page.getByText(zarrDirName, { exact: true })).toBeVisible();
+      await expect(page.getByText(global.testTempDir)).toBeVisible();
     });
 
     await test.step('Verify Mock Link 1 is now on Page 2 of the table', async () => {
@@ -204,7 +204,7 @@ test.describe('Data Link Table Filtering', () => {
       await searchInput.fill(zarrDirName);
 
       // Verify only the real data link is visible
-      await expect(page.getByText(zarrDirName, { exact: true })).toBeVisible();
+      await expect(page.getByText(global.testTempDir)).toBeVisible();
       await expect(
         page.getByText('Mock Link 1', { exact: true })
       ).not.toBeVisible();
@@ -222,7 +222,7 @@ test.describe('Data Link Table Filtering', () => {
       ).toBeVisible();
 
       // Verify the filter is still active (only real link visible)
-      await expect(page.getByText(zarrDirName, { exact: true })).toBeVisible();
+      await expect(page.getByText(global.testTempDir)).toBeVisible();
       await expect(page.getByText('Mock Link 1')).not.toBeVisible();
     });
 
@@ -237,7 +237,7 @@ test.describe('Data Link Table Filtering', () => {
       await page.waitForTimeout(500);
 
       // Verify the filter is still active (only real link visible)
-      await expect(page.getByText(zarrDirName, { exact: true })).toBeVisible();
+      await expect(page.getByText(global.testTempDir)).toBeVisible();
       await expect(page.getByText('Mock Link 1')).not.toBeVisible();
     });
 
@@ -249,7 +249,7 @@ test.describe('Data Link Table Filtering', () => {
       // Click on the file path link
       const filePathLink = page
         .getByRole('link')
-        .filter({ hasText: zarrDirName });
+        .filter({ hasText: global.testTempDir });
       await filePathLink.click();
 
       // Wait for navigation to complete
