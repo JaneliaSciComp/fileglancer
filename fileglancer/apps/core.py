@@ -12,8 +12,6 @@ except ImportError:
 import os
 import re
 import shlex
-import shutil
-import subprocess
 import tempfile
 from pathlib import Path
 from datetime import datetime, UTC
@@ -21,8 +19,6 @@ from typing import Optional
 
 import yaml
 from loguru import logger
-from packaging.specifiers import SpecifierSet
-from packaging.version import Version
 
 from cluster_api import ResourceSpec
 
@@ -442,13 +438,6 @@ _TOOL_REGISTRY = {
 _REQ_PATTERN = re.compile(r"^([a-zA-Z][a-zA-Z0-9_-]*)\s*((?:>=|<=|!=|==|>|<)\s*[^,\s><=!]+)?$")
 
 
-def _augmented_path(extra_paths: list[str]) -> str:
-    """Build a PATH string with extra_paths appended (user's PATH takes precedence)."""
-    if not extra_paths:
-        return os.environ.get("PATH", "")
-    return os.environ.get("PATH", "") + os.pathsep + os.pathsep.join(extra_paths)
-
-
 def merge_requirements(
     manifest_requirements: list[str], entry_point_requirements: list[str]
 ) -> list[str]:
@@ -477,75 +466,6 @@ def merge_requirements(
     ]
     merged.extend(entry_point_requirements)
     return merged
-
-
-def verify_requirements(requirements: list[str]):
-    """Verify that all required tools are available and meet version constraints.
-
-    Raises ValueError with a message listing all unmet requirements.
-    """
-    if not requirements:
-        return
-
-    settings = get_settings()
-    search_path = _augmented_path(settings.apps.extra_paths)
-    env = {**os.environ, "PATH": search_path} if settings.apps.extra_paths else None
-
-    errors = []
-
-    for req in requirements:
-        match = _REQ_PATTERN.match(req.strip())
-        if not match:
-            errors.append(f"Invalid requirement format: '{req}'")
-            continue
-
-        tool = match.group(1)
-        version_spec = match.group(2)
-
-        # Check tool exists on PATH
-        if shutil.which(tool, path=search_path) is None:
-            # For maven, the binary is 'mvn' not 'maven'
-            registry_entry = _TOOL_REGISTRY.get(tool)
-            binary = registry_entry["version_args"][0] if registry_entry else tool
-            if binary != tool and shutil.which(binary, path=search_path) is not None:
-                pass  # binary found under alternate name
-            else:
-                errors.append(f"Required tool '{tool}' is not installed or not on PATH")
-                continue
-
-        if version_spec:
-            registry_entry = _TOOL_REGISTRY.get(tool)
-            if not registry_entry:
-                errors.append(f"Cannot check version for '{tool}': no version command configured")
-                continue
-
-            try:
-                result = subprocess.run(
-                    registry_entry["version_args"],
-                    capture_output=True, text=True, timeout=10,
-                    env=env,
-                )
-                output = result.stdout.strip() or result.stderr.strip()
-                ver_match = re.search(registry_entry["version_pattern"], output)
-                if not ver_match:
-                    errors.append(
-                        f"Could not parse version for '{tool}' from output: {output!r}"
-                    )
-                    continue
-
-                installed = Version(ver_match.group(1))
-                specifier = SpecifierSet(version_spec.strip())
-                if not specifier.contains(installed):
-                    errors.append(
-                        f"'{tool}' version {installed} does not satisfy {version_spec.strip()}"
-                    )
-            except FileNotFoundError:
-                errors.append(f"Required tool '{tool}' is not installed or not on PATH")
-            except subprocess.TimeoutExpired:
-                errors.append(f"Timed out checking version for '{tool}'")
-
-    if errors:
-        raise ValueError("Unmet requirements:\n  - " + "\n  - ".join(errors))
 
 
 # Shared bash helpers emitted once at the top of a requirements-check snippet.
@@ -588,10 +508,10 @@ _REQ_OP_PATTERN = re.compile(r"(>=|<=|!=|==|>|<)\s*([^,\s><=!]+)")
 def build_requirements_check(requirements: list[str]) -> str:
     """Build a bash snippet that verifies required tools at job runtime.
 
-    Unlike :func:`verify_requirements` (which inspects the *server's* PATH at
-    submit time), this snippet runs inside the job on the compute node, as the
-    user, after conda/env activation. It therefore reflects the actual
-    execution environment. On any unmet requirement it prints all errors to
+    This snippet runs inside the job on the compute node, as the user, after
+    conda/env activation, so it reflects the actual execution environment
+    rather than the server's PATH at submit time. On any unmet requirement it
+    prints all errors to
     stderr and exits 1, which marks the job FAILED and surfaces the message in
     the job's stderr log.
 

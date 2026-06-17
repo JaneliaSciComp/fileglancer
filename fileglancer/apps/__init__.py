@@ -24,5 +24,4 @@ from fileglancer.apps.core import (  # noqa: F401
     set_worker_exec,
     validate_path_for_shell,
     validate_path_in_filestore,
-    verify_requirements,
 )

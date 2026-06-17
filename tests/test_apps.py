@@ -2,7 +2,6 @@
 
 import os
 import subprocess
-from unittest.mock import patch, MagicMock
 
 import pytest
 from pydantic import ValidationError
@@ -16,7 +15,6 @@ from fileglancer.model import (
 from fileglancer.apps import (
     _TOOL_REGISTRY,
     merge_requirements,
-    verify_requirements,
     build_requirements_check,
     _container_sif_name,
     _build_container_script,
@@ -81,63 +79,6 @@ class TestCondaEnvValidation:
     def test_rejects_path_with_pipe(self):
         with pytest.raises(ValidationError, match="forbidden characters"):
             AppEntryPoint(id="t", name="T", command="echo", conda_env="/opt/env|bad")
-
-
-# --- verify_requirements tests ---
-
-class TestVerifyRequirementsMiniforge:
-    @patch("fileglancer.apps.core.shutil.which")
-    def test_miniforge_found_via_conda(self, mock_which):
-        """miniforge binary doesn't exist, but conda does — should pass."""
-        def which_side_effect(name, **kwargs):
-            if name == "miniforge":
-                return None
-            if name == "conda":
-                return "/usr/bin/conda"
-            return None
-        mock_which.side_effect = which_side_effect
-
-        # No version constraint, so just checking binary existence
-        verify_requirements(["miniforge"])
-
-    @patch("fileglancer.apps.core.shutil.which")
-    def test_miniforge_not_found(self, mock_which):
-        mock_which.return_value = None
-        with pytest.raises(ValueError, match="not installed or not on PATH"):
-            verify_requirements(["miniforge"])
-
-    @patch("fileglancer.apps.core.subprocess.run")
-    @patch("fileglancer.apps.core.shutil.which")
-    def test_miniforge_version_check(self, mock_which, mock_run):
-        def which_side_effect(name, **kwargs):
-            if name == "miniforge":
-                return None
-            if name == "conda":
-                return "/usr/bin/conda"
-            return None
-        mock_which.side_effect = which_side_effect
-
-        mock_run.return_value = MagicMock(
-            stdout="conda 24.7.1", stderr="", returncode=0
-        )
-        verify_requirements(["miniforge>=24.0"])
-
-    @patch("fileglancer.apps.core.subprocess.run")
-    @patch("fileglancer.apps.core.shutil.which")
-    def test_miniforge_version_too_old(self, mock_which, mock_run):
-        def which_side_effect(name, **kwargs):
-            if name == "miniforge":
-                return None
-            if name == "conda":
-                return "/usr/bin/conda"
-            return None
-        mock_which.side_effect = which_side_effect
-
-        mock_run.return_value = MagicMock(
-            stdout="conda 23.1.0", stderr="", returncode=0
-        )
-        with pytest.raises(ValueError, match="does not satisfy"):
-            verify_requirements(["miniforge>=24.0"])
 
 
 # --- build_requirements_check tests ---
