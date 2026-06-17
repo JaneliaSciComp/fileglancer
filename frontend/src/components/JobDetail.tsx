@@ -158,9 +158,26 @@ export default function JobDetail() {
   const id = jobId ? parseInt(jobId) : 0;
   const jobQuery = useJobQuery(id);
   const jobStatus = jobQuery.data?.status;
-  const scriptQuery = useJobFileQuery(id, 'script');
-  const stdoutQuery = useJobFileQuery(id, 'stdout', jobStatus);
-  const stderrQuery = useJobFileQuery(id, 'stderr', jobStatus);
+  // Lazily fetch each file's content only when its tab is active, so the first
+  // load of a job doesn't block on fetching all three log files at once.
+  const scriptQuery = useJobFileQuery(
+    id,
+    'script',
+    undefined,
+    activeTab === 'script'
+  );
+  const stdoutQuery = useJobFileQuery(
+    id,
+    'stdout',
+    jobStatus,
+    activeTab === 'stdout'
+  );
+  const stderrQuery = useJobFileQuery(
+    id,
+    'stderr',
+    jobStatus,
+    activeTab === 'stderr'
+  );
   const cancelMutation = useCancelJobMutation();
 
   const isService = jobQuery.data?.entry_point_type === 'service';

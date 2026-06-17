@@ -141,12 +141,16 @@ export function useJobQuery(jobId: number): UseQueryResult<Job, Error> {
 export function useJobFileQuery(
   jobId: number,
   fileType: string,
-  jobStatus?: string
+  jobStatus?: string,
+  enabled: boolean = true
 ): UseQueryResult<string | null, Error> {
   const isActive = jobStatus === 'PENDING' || jobStatus === 'RUNNING';
   return useQuery({
     queryKey: [...jobsQueryKeys.detail(jobId), 'file', fileType],
     queryFn: ({ signal }) => fetchJobFile(jobId, fileType, signal),
+    // Defer fetching the file content until its tab is viewed, so opening a
+    // job doesn't load all three log files up front.
+    enabled,
     refetchInterval: () => {
       // Auto-refresh while job is active, or if file doesn't exist yet
       return isActive ? 5000 : false;
