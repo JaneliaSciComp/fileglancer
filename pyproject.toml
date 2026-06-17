@@ -28,6 +28,7 @@ dependencies = [
     "cachetools >=6.2.1,<7",
     "click >=8.0,<9",
     "fastapi >=0.136.3,<0.137",
+    "httpx >=0.28.1,<0.29",
     "itsdangerous >=2.2.0,<3",
     "loguru >=0.7.3,<0.8",
     "pandas >=2.3.3,<3",
@@ -178,6 +179,7 @@ authlib = ">=1.6.5,<2"
 cachetools = ">=6.2.1,<7"
 click = ">=8.0,<9"
 fastapi = ">=0.136.3,<0.137"
+httpx = ">=0.28.1,<0.29"
 itsdangerous = ">=2.2.0,<3"
 loguru = ">=0.7.3,<0.8"
 pandas = ">=2.3.3,<3"
