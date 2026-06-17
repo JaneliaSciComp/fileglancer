@@ -486,16 +486,18 @@ def merge_requirements(
     return merged
 
 
-# Shared bash helpers emitted once at the top of a requirements-check snippet.
-# Kept as a module constant so it is easy to read and test.
-_REQ_CHECK_PREAMBLE = r"""__fg_errors=()
-__fg_check_tool() {
+# Shared bash helpers for a requirements-check snippet. Each is emitted only
+# when the generated checks actually call it (see build_requirements_check).
+# Kept as module constants so they are easy to read and test.
+_HELPER_CHECK_TOOL = r"""__fg_check_tool() {
   # $1 = tool name (for messages), $2 = binary to look for on PATH
   if command -v "$2" >/dev/null 2>&1; then return 0; fi
   __fg_errors+=("Required tool '$1' is not installed or not on PATH")
   return 1
-}
-__fg_extract_version() { grep -oE '[0-9]+([.][0-9]+)*' | head -n1 || true; }
+}"""
+
+# Emitted together since __fg_check_version depends on the other two.
+_HELPER_CHECK_VERSION = r"""__fg_extract_version() { grep -oE '[0-9]+([.][0-9]+)*' | head -n1 || true; }
 __fg_ver_le() {
   # returns 0 if $1 <= $2 (version order)
   [ "$1" = "$2" ] && return 0
@@ -537,6 +539,8 @@ def build_requirements_check(requirements: list[str]) -> str:
         return ""
 
     checks = []
+    needs_check_tool = False
+    needs_check_version = False
     for req in requirements:
         req = req.strip()
         match = _REQUIREMENT_PATTERN.match(req)
@@ -551,11 +555,13 @@ def build_requirements_check(requirements: list[str]) -> str:
         binary = registry_entry["version_args"][0] if registry_entry else tool
 
         if op is None:
+            needs_check_tool = True
             checks.append(f"__fg_check_tool {shlex.quote(tool)} {shlex.quote(binary)} || true")
             continue
 
         if not registry_entry:
             # Tool exists check still runs; version cannot be verified.
+            needs_check_tool = True
             msg = f"Cannot check version for '{tool}': no version command configured"
             checks.append(
                 f"if __fg_check_tool {shlex.quote(tool)} {shlex.quote(binary)}; then\n"
@@ -564,6 +570,8 @@ def build_requirements_check(requirements: list[str]) -> str:
             )
             continue
 
+        needs_check_tool = True
+        needs_check_version = True
         version_cmd = " ".join(shlex.quote(a) for a in registry_entry["version_args"])
         checks.append(
             f"if __fg_check_tool {shlex.quote(tool)} {shlex.quote(binary)}; then\n"
@@ -580,9 +588,16 @@ def build_requirements_check(requirements: list[str]) -> str:
         "fi"
     )
 
+    # Emit only the helper functions the generated checks actually call.
+    preamble = ["__fg_errors=()"]
+    if needs_check_tool:
+        preamble.append(_HELPER_CHECK_TOOL)
+    if needs_check_version:
+        preamble.append(_HELPER_CHECK_VERSION)
+
     return "\n".join([
         "# Verify required tools are available in this environment (Fileglancer)",
-        _REQ_CHECK_PREAMBLE,
+        *preamble,
         *checks,
         finalizer,
     ])
