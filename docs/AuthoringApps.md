@@ -546,12 +546,11 @@ Repos are cloned into a per-user cache on first use and reused across runs; jobs
 When a user submits a job:
 
 1. The manifest is re-fetched from the cached clone
-2. Requirements are verified on the server
-3. The command is built with validated parameters
-4. A working directory is created at `~/.fileglancer/jobs/{id}-{app}-{runnable}/`
-5. The repository is symlinked into the working directory
-6. The command runs on the cluster with `stdout.log` and `stderr.log` captured
-7. Job status is monitored and updated in real time (PENDING → RUNNING → DONE/FAILED/KILLED)
+2. The command is built with validated parameters, with a requirement check prepended to the job script
+3. A working directory is created at `~/.fileglancer/jobs/{id}-{app}-{runnable}/`
+4. The repository is symlinked into the working directory
+5. The command runs on the cluster with `stdout.log` and `stderr.log` captured. Requirements are verified at runtime in the job's execution environment (after `$PATH`, conda, and env setup); if any are unmet the job fails early with a descriptive message in stderr
+6. Job status is monitored and updated in real time (PENDING → RUNNING → DONE/FAILED/KILLED)
 
 Users can view logs, relaunch with the same parameters, or cancel running jobs from the Fileglancer UI.
 
@@ -673,7 +672,7 @@ apps:
 These paths are:
 
 1. **Appended to `$PATH` in every generated job script** — the user's own `$PATH` entries take precedence
-2. **Used when verifying tool requirements** — so `requirements: [nextflow]` can find `/opt/nextflow/bin/nextflow` even if it's not on the server process's default `$PATH`
+2. **Visible to the runtime requirement check** — so `requirements: [nextflow]` can find `/opt/nextflow/bin/nextflow` even if it's not on the user's default `$PATH`
 
 ### Container Cache Directory
 
