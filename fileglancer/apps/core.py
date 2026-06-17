@@ -260,14 +260,29 @@ def _find_manifests_in_repo(repo_dir: Path) -> list[tuple[str, AppManifest]]:
     if results:
         return results
 
-    # No runnables.yaml found — check each adapter against the repo root
+    # No runnables.yaml found — check each adapter against the repo root.
+    # Collect any conversion errors rather than raising on the first one, so a
+    # single adapter's failure doesn't prevent a later adapter from handling the
+    # repo. Errors are only surfaced if no adapter ultimately produced a manifest.
+    adapter_errors: list[str] = []
     for adapter in MANIFEST_ADAPTERS:
         try:
             if adapter.can_handle(repo_dir):
                 results.append(("", adapter.convert(repo_dir)))
         except Exception as e:
-            raise ValueError(f"Adapter {type(adapter).__name__} failed: {e}")
+            adapter_errors.append(f"{type(adapter).__name__}: {e}")
 
+    if results:
+        # At least one adapter succeeded; log the rest so failures aren't silent.
+        for err in adapter_errors:
+            logger.warning(f"Adapter failed but another handled the repo — {err}")
+        return results
+
+    if adapter_errors:
+        raise ValueError(
+            "Failed to build a manifest from the repository:\n  - "
+            + "\n  - ".join(adapter_errors)
+        )
 
     return results
 

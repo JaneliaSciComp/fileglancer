@@ -642,3 +642,83 @@ class TestBuildCommandTildeExpansion:
     def test_absolute_path_unchanged(self, entry_point):
         cmd = build_command(entry_point, {"output_dir": "/data/output"})
         assert "/data/output" in cmd
+
+
+# --- _find_manifests_in_repo adapter fallback tests ---
+
+import fileglancer.apps.adapters as adapters_module
+from fileglancer.apps.core import _find_manifests_in_repo
+
+
+class _StubAdapter:
+    """Minimal manifest adapter for exercising the fallback loop."""
+
+    def __init__(self, *, handles, manifest=None, error=None):
+        self._handles = handles
+        self._manifest = manifest
+        self._error = error
+
+    def can_handle(self, directory):
+        return self._handles
+
+    def convert(self, directory):
+        if self._error is not None:
+            raise self._error
+        return self._manifest
+
+
+# Distinct subclasses so aggregated error messages can be told apart by name.
+class _NextStub(_StubAdapter):
+    pass
+
+
+class _PixiStub(_StubAdapter):
+    pass
+
+
+class TestFindManifestsAdapterFallback:
+    """The adapter fallback runs only when no runnables.yaml is found, so an
+    empty tmp_path exercises it directly."""
+
+    def test_other_adapter_handles_when_one_fails(self, tmp_path, monkeypatch):
+        manifest = AppManifest(name="From Pixi", runnables=[])
+        monkeypatch.setattr(
+            adapters_module,
+            "MANIFEST_ADAPTERS",
+            [
+                _NextStub(handles=True, error=ValueError("boom")),
+                _PixiStub(handles=True, manifest=manifest),
+            ],
+        )
+
+        # The failing adapter must not prevent the later one from handling it.
+        assert _find_manifests_in_repo(tmp_path) == [("", manifest)]
+
+    def test_all_adapters_fail_aggregates_errors(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            adapters_module,
+            "MANIFEST_ADAPTERS",
+            [
+                _NextStub(handles=True, error=ValueError("nextflow boom")),
+                _PixiStub(handles=True, error=ValueError("pixi boom")),
+            ],
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            _find_manifests_in_repo(tmp_path)
+
+        # All failures are surfaced together, not just the first.
+        msg = str(exc_info.value)
+        assert "nextflow boom" in msg
+        assert "pixi boom" in msg
+        assert "_NextStub" in msg
+        assert "_PixiStub" in msg
+
+    def test_no_adapter_handles_returns_empty(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            adapters_module,
+            "MANIFEST_ADAPTERS",
+            [_NextStub(handles=False), _PixiStub(handles=False)],
+        )
+
+        assert _find_manifests_in_repo(tmp_path) == []
