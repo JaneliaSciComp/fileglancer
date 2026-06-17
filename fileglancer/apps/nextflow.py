@@ -74,7 +74,10 @@ def _convert_property(name: str, prop: dict, is_required: bool) -> AppParameter:
     if prop.get("hidden"):
         kwargs["hidden"] = True
 
-    return AppParameter(**kwargs)
+    try:
+        return AppParameter(**kwargs)
+    except Exception as e:
+        raise ValueError(f"Error validating {name}: {e}")
 
 
 class NextflowAdapter:

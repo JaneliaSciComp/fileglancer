@@ -12,6 +12,7 @@ import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import {
   escapePathForUrl,
   joinPaths,
+  normalizeFspRootPath,
   normalizePosixStylePath
 } from '@/utils/pathHandling';
 import useCopyTooltip from './useCopyTooltip';
@@ -34,6 +35,11 @@ export function validateUrlPrefix(value: string): string | null {
   }
   if (value.includes('//')) {
     return 'Data link name must not contain consecutive slashes';
+  }
+  // `.` and `..` get collapsed by URL normalization at the recipient,
+  // which breaks key/path resolution when the link is opened.
+  if (value.split('/').some(seg => seg === '.' || seg === '..')) {
+    return "Data link name must not contain '.' or '..' segments";
   }
   return null;
 }
@@ -92,15 +98,20 @@ export default function useDataToolLinks(
     pathOverride?: string,
     urlPrefixOverride?: string
   ): Promise<boolean> => {
-    const path = pathOverride || fileBrowserState.dataLinkPath;
+    const rawPath = pathOverride ?? fileBrowserState.dataLinkPath;
     if (!fileQuery.data?.currentFileSharePath) {
       toast.error('No file share path selected');
       return false;
     }
-    if (!path) {
+    if (rawPath === null || rawPath === undefined) {
       toast.error('No file or folder selected');
       return false;
     }
+    // Filestore returns the FSP root as ".", but a literal "." in the share
+    // URL gets collapsed by URL normalization at the recipient, producing
+    // path mismatch / NoSuchBucket errors. Send "" to the backend instead.
+    const path = normalizeFspRootPath(rawPath);
+    const fspName = fileQuery.data.currentFileSharePath.name;
 
     try {
       let urlPrefix: string;
@@ -112,16 +123,18 @@ export default function useDataToolLinks(
           case 'full_path':
             urlPrefix = escapePathForUrl(
               normalizePosixStylePath(
-                linuxPath ? joinPaths(linuxPath, path) : path
+                linuxPath ? joinPaths(linuxPath, path) : path || fspName
               )
             );
             break;
           case 'custom':
-            urlPrefix = path.split('/').pop() || path;
+            urlPrefix = path.split('/').pop() || fspName;
             break;
           case 'name':
           default:
-            urlPrefix = escapePathForUrl(path.split('/').pop() || path);
+            // basename of "" is "" — fall back to the FSP name for FSP-root
+            // links so the URL still has a meaningful trailing segment.
+            urlPrefix = escapePathForUrl(path.split('/').pop() || fspName);
             break;
         }
       }
@@ -133,7 +146,7 @@ export default function useDataToolLinks(
       }
 
       await createProxiedPathMutation.mutateAsync({
-        fsp_name: fileQuery.data.currentFileSharePath.name,
+        fsp_name: fspName,
         path,
         url_prefix: urlPrefix
       });
