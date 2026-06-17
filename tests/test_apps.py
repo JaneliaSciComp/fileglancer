@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import sys
 
 import pytest
 from pydantic import ValidationError
@@ -105,6 +106,10 @@ def _run_check(reqs, extra_path=None, prefix=""):
     return proc.returncode, proc.stderr.strip()
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="requirement-check snippet is POSIX bash; it only runs on Linux compute nodes",
+)
 class TestBuildRequirementsCheck:
     def test_empty_returns_empty_string(self):
         assert build_requirements_check([]) == ""
