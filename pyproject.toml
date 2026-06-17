@@ -119,6 +119,9 @@ pypi-upload = "twine upload dist/*"
 twine = ">=6.2.0,<7"
 hatch = ">=1.14.1,<2"
 
+[tool.pixi.feature.release.pypi-dependencies]
+hatch-nodejs-version = ">=0.3.2,<0.4"
+
 [tool.pixi.feature.py312.dependencies]
 python = "3.12.*"
 

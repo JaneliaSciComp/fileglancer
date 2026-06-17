@@ -1040,6 +1040,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/e3/37/0c0c90361c8a1b9e6c75222ca24ae12996a298c0e18822a72ab229c37207/botocore-1.42.84-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b2/30/f169e1d8b2071beaf8b97088787e30662b1d8fb82f8c0941d14678c0cbf1/build-1.4.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/6a/bd/d91c5e39f490a49df14320f4e8c80161cfcce09f1e2cde1edd16a551abb3/frozenlist-1.8.0-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/b7/fe/b23e9bca77cafecd1a10450066a1a4ca329149ad36aa86cdf8e67c2d2fa5/hatch_nodejs_version-0.3.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/f3/8d/5e5be3ced1d12966fefb5c4ea3b2a5b480afcea36406559442c6e31d4a48/multidict-6.7.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/46/4b/3aae6835b8e5f44ea6a68348ad90f78134047b503765087be2f9912140ea/propcache-0.4.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/d8/96/9e5625a7c52e7c41fc8c1f89f40d8b4b29577016fa3c645fbfb42433fe83/py_cluster_api-0.6.0-py3-none-any.whl
@@ -1250,6 +1251,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/e3/37/0c0c90361c8a1b9e6c75222ca24ae12996a298c0e18822a72ab229c37207/botocore-1.42.84-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b2/30/f169e1d8b2071beaf8b97088787e30662b1d8fb82f8c0941d14678c0cbf1/build-1.4.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/8f/83/f61505a05109ef3293dfb1ff594d13d64a2324ac3482be2cedc2be818256/frozenlist-1.8.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl
+      - pypi: https://files.pythonhosted.org/packages/b7/fe/b23e9bca77cafecd1a10450066a1a4ca329149ad36aa86cdf8e67c2d2fa5/hatch_nodejs_version-0.3.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fd/80/c959c5933adedb9ac15152e4067c702a808ea183a8b64cf8f31af8ad3155/multidict-6.7.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl
       - pypi: https://files.pythonhosted.org/packages/9e/d3/6c7ee328b39a81ee877c962469f1e795f9db87f925251efeb0545e0020d0/propcache-0.4.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl
       - pypi: https://files.pythonhosted.org/packages/d8/96/9e5625a7c52e7c41fc8c1f89f40d8b4b29577016fa3c645fbfb42433fe83/py_cluster_api-0.6.0-py3-none-any.whl
@@ -1451,6 +1453,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/e3/37/0c0c90361c8a1b9e6c75222ca24ae12996a298c0e18822a72ab229c37207/botocore-1.42.84-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b2/30/f169e1d8b2071beaf8b97088787e30662b1d8fb82f8c0941d14678c0cbf1/build-1.4.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/64/80/4f6e318ee2a7c0750ed724fa33a4bdf1eacdc5a39a7a24e818a773cd91af/frozenlist-1.8.0-cp312-cp312-macosx_10_13_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/b7/fe/b23e9bca77cafecd1a10450066a1a4ca329149ad36aa86cdf8e67c2d2fa5/hatch_nodejs_version-0.3.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fe/cf/18ef143a81610136d3da8193da9d80bfe1cb548a1e2d1c775f26b23d024a/multidict-6.7.1-cp312-cp312-macosx_10_13_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/76/47/8ccf75935f51448ba9a16a71b783eb7ef6b9ee60f5d14c7f8a8a79fbeed7/propcache-0.4.1-cp312-cp312-macosx_10_13_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/d8/96/9e5625a7c52e7c41fc8c1f89f40d8b4b29577016fa3c645fbfb42433fe83/py_cluster_api-0.6.0-py3-none-any.whl
@@ -1652,6 +1655,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/e3/37/0c0c90361c8a1b9e6c75222ca24ae12996a298c0e18822a72ab229c37207/botocore-1.42.84-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b2/30/f169e1d8b2071beaf8b97088787e30662b1d8fb82f8c0941d14678c0cbf1/build-1.4.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2b/94/5c8a2b50a496b11dd519f4a24cb5496cf125681dd99e94c604ccdea9419a/frozenlist-1.8.0-cp312-cp312-macosx_11_0_arm64.whl
+      - pypi: https://files.pythonhosted.org/packages/b7/fe/b23e9bca77cafecd1a10450066a1a4ca329149ad36aa86cdf8e67c2d2fa5/hatch_nodejs_version-0.3.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a9/65/1caac9d4cd32e8433908683446eebc953e82d22b03d10d41a5f0fefe991b/multidict-6.7.1-cp312-cp312-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/0a/b6/5c9a0e42df4d00bfb4a3cbbe5cf9f54260300c88a0e9af1f47ca5ce17ac0/propcache-0.4.1-cp312-cp312-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/d8/96/9e5625a7c52e7c41fc8c1f89f40d8b4b29577016fa3c645fbfb42433fe83/py_cluster_api-0.6.0-py3-none-any.whl
@@ -1852,6 +1856,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/e3/37/0c0c90361c8a1b9e6c75222ca24ae12996a298c0e18822a72ab229c37207/botocore-1.42.84-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b2/30/f169e1d8b2071beaf8b97088787e30662b1d8fb82f8c0941d14678c0cbf1/build-1.4.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b8/af/38e51a553dd66eb064cdf193841f16f077585d4d28394c2fa6235cb41765/frozenlist-1.8.0-cp312-cp312-win_amd64.whl
+      - pypi: https://files.pythonhosted.org/packages/b7/fe/b23e9bca77cafecd1a10450066a1a4ca329149ad36aa86cdf8e67c2d2fa5/hatch_nodejs_version-0.3.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/80/31/0b2517913687895f5904325c2069d6a3b78f66cc641a86a2baf75a05dcbb/multidict-6.7.1-cp312-cp312-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/54/09/d19cff2a5aaac632ec8fc03737b223597b1e347416934c1b3a7df079784c/propcache-0.4.1-cp312-cp312-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/d8/96/9e5625a7c52e7c41fc8c1f89f40d8b4b29577016fa3c645fbfb42433fe83/py_cluster_api-0.6.0-py3-none-any.whl
@@ -6298,7 +6303,7 @@ packages:
 - pypi: ./
   name: fileglancer
   version: 2.8.2a0
-  sha256: e3a8f2c7c42d292f2325acf1ee269d3e4d382fd66d7baee4b60e5135c28fa5a1
+  sha256: 3198b2125db515f63c245f3b405e7c790feee357cebea55996cf5ea9420308d9
   requires_dist:
   - alembic>=1.17.0,<2
   - atlassian-python-api>=4.0.7,<5
@@ -6719,6 +6724,13 @@ packages:
   - pkg:pypi/hatch?source=hash-mapping
   size: 208420
   timestamp: 1772806610433
+- pypi: https://files.pythonhosted.org/packages/b7/fe/b23e9bca77cafecd1a10450066a1a4ca329149ad36aa86cdf8e67c2d2fa5/hatch_nodejs_version-0.3.2-py3-none-any.whl
+  name: hatch-nodejs-version
+  version: 0.3.2
+  sha256: d73e728f1a262d214afe9c0a40e161013ef0b7a6c78ff843293880f6a46ede79
+  requires_dist:
+  - hatchling>=0.21.0
+  requires_python: '>=3.7'
 - conda: https://conda.anaconda.org/conda-forge/noarch/hatchling-1.29.0-pyhcf101f3_0.conda
   sha256: bb86ff4ca54a2a0f63714766c7653a772c13d34c9e7cfb7be653db2fb806f961
   md5: 9d67ecd4cd5e6a9be36522be95951785
