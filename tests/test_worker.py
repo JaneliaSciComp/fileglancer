@@ -73,13 +73,18 @@ class TestIPCProtocol:
 
     def test_send_recv_large_message(self):
         """Messages larger than a single recv buffer work."""
+        import threading
+
         a, b = socket.socketpair()
         try:
-            # Create a message larger than typical socket buffer
+            # Larger than the default AF_UNIX socketpair buffer on macOS (~8KB),
+            # so the send must run concurrently with the recv to avoid deadlock.
             big_value = "x" * 100_000
             msg = {"data": big_value}
-            _send(a, msg)
+            t = threading.Thread(target=_send, args=(a, msg))
+            t.start()
             result = _recv(b)
+            t.join()
             assert result["data"] == big_value
         finally:
             a.close()
