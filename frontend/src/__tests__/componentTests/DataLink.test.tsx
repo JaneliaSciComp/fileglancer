@@ -86,3 +86,76 @@ Could not create data link`
     });
   });
 });
+
+describe('Data Link dialog at FSP root', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+
+    // Render at the FSP root (no subpath). Filestore surfaces this as ".",
+    // which the create flow normalizes to "" before falling back to the FSP
+    // name for the URL's trailing segment.
+    render(<TestDataLinkComponent />, {
+      initialEntries: ['/browse/test_fsp']
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Are you sure you want to create a data link?')
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('previews the FSP name as the url_prefix fallback', async () => {
+    const user = userEvent.setup();
+
+    // The preview lives inside the collapsed "Advanced settings" accordion.
+    await user.click(screen.getByText('Advanced settings'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText((content: string) =>
+          content.includes('https://.../<key>/test_fsp')
+        )
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('submits the FSP name as the url_prefix for an FSP-root link', async () => {
+    const { server } = await import('@/__tests__/mocks/node');
+    const { http, HttpResponse } = await import('msw');
+
+    let capturedUrlPrefix: string | null = null;
+    let capturedPath: string | null = null;
+    server.use(
+      http.post('/api/proxied-path', ({ request }) => {
+        const url = new URL(request.url);
+        capturedUrlPrefix = url.searchParams.get('url_prefix');
+        capturedPath = url.searchParams.get('path');
+        return HttpResponse.json({
+          username: 'testuser',
+          sharing_key: 'testkey',
+          sharing_name: 'test_fsp',
+          path: capturedPath ?? '',
+          fsp_name: 'test_fsp',
+          created_at: '2025-07-08T15:56:42.588942',
+          updated_at: '2025-07-08T15:56:42.588942',
+          url: 'http://127.0.0.1:7878/files/testkey/' + capturedUrlPrefix,
+          url_prefix: capturedUrlPrefix
+        });
+      })
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByText('Create Data Link'));
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        'Data link created successfully'
+      );
+    });
+    // "." is normalized to "" for the backend, and the basename of "" falls
+    // back to the FSP name so the share URL keeps a meaningful trailing segment.
+    expect(capturedPath).toBe('');
+    expect(capturedUrlPrefix).toBe('test_fsp');
+  });
+});
