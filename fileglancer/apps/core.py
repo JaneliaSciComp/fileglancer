@@ -24,7 +24,12 @@ from cluster_api import ResourceSpec
 
 from fileglancer import database as db
 from fileglancer.apps.adapters import try_adapt
-from fileglancer.model import AppManifest, AppEntryPoint, AppParameter
+from fileglancer.model import (
+    AppManifest,
+    AppEntryPoint,
+    AppParameter,
+    _REQUIREMENT_PATTERN,
+)
 from fileglancer.settings import get_settings
 
 
@@ -450,9 +455,6 @@ _TOOL_REGISTRY = {
     },
 }
 
-_REQ_PATTERN = re.compile(r"^([a-zA-Z][a-zA-Z0-9_-]*)\s*((?:>=|<=|!=|==|>|<)\s*[^,\s><=!]+)?$")
-
-
 def merge_requirements(
     manifest_requirements: list[str], entry_point_requirements: list[str]
 ) -> list[str]:
@@ -470,15 +472,16 @@ def merge_requirements(
     # Parse tool names from entry-point requirements
     ep_tools = set()
     for req in entry_point_requirements:
-        tool = _REQ_PATTERN.match(req.strip())
-        if tool:
-            ep_tools.add(tool.group(1))
+        match = _REQUIREMENT_PATTERN.match(req.strip())
+        if match:
+            ep_tools.add(match.group(1))
 
     # Keep manifest requirements that aren't overridden by entry-point
-    merged = [
-        req for req in manifest_requirements
-        if _REQ_PATTERN.match(req.strip()) and _REQ_PATTERN.match(req.strip()).group(1) not in ep_tools
-    ]
+    merged = []
+    for req in manifest_requirements:
+        match = _REQUIREMENT_PATTERN.match(req.strip())
+        if match and match.group(1) not in ep_tools:
+            merged.append(req)
     merged.extend(entry_point_requirements)
     return merged
 
@@ -517,8 +520,6 @@ __fg_check_version() {
   return 0
 }"""
 
-_REQ_OP_PATTERN = re.compile(r"(>=|<=|!=|==|>|<)\s*([^,\s><=!]+)")
-
 
 def build_requirements_check(requirements: list[str]) -> str:
     """Build a bash snippet that verifies required tools at job runtime.
@@ -538,23 +539,20 @@ def build_requirements_check(requirements: list[str]) -> str:
     checks = []
     for req in requirements:
         req = req.strip()
-        match = _REQ_PATTERN.match(req)
+        match = _REQUIREMENT_PATTERN.match(req)
         if not match:
             checks.append(f"__fg_errors+=({shlex.quote(f'Invalid requirement format: {req!r}')})")
             continue
 
         tool = match.group(1)
-        version_spec = match.group(2)
+        op = match.group(2)
+        required = match.group(3)
         registry_entry = _TOOL_REGISTRY.get(tool)
         binary = registry_entry["version_args"][0] if registry_entry else tool
 
-        if not version_spec:
+        if op is None:
             checks.append(f"__fg_check_tool {shlex.quote(tool)} {shlex.quote(binary)} || true")
             continue
-
-        op_match = _REQ_OP_PATTERN.match(version_spec.strip())
-        op = op_match.group(1)
-        required = op_match.group(2)
 
         if not registry_entry:
             # Tool exists check still runs; version cannot be verified.
