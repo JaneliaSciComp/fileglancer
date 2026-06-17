@@ -7,6 +7,7 @@ import type { AppListing } from '@/shared.types';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
+import { formatDateString } from '@/utils';
 
 interface ListingInfoDialogProps {
   readonly listing: AppListing;
@@ -25,7 +26,7 @@ function ListingInfoTable({ listing }: { readonly listing: AppListing }) {
     'text-foreground font-medium pr-4 py-1.5 align-top whitespace-nowrap';
   const valueClass = 'text-foreground py-1.5';
 
-  const publishedAt = new Date(listing.published_at).toLocaleDateString();
+  const publishedAt = formatDateString(listing.published_at);
 
   return (
     <table className="w-full text-sm mb-6">

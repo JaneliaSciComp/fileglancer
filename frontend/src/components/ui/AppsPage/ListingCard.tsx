@@ -7,6 +7,7 @@ import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import ListingInfoDialog from '@/components/ui/AppsPage/ListingInfoDialog';
+import { formatDateString } from '@/utils';
 import type { AppListing } from '@/shared.types';
 
 interface ListingCardProps {
@@ -29,7 +30,7 @@ export default function ListingCard({
   onUnshare
 }: ListingCardProps) {
   const [infoOpen, setInfoOpen] = useState(false);
-  const publishedAt = new Date(listing.published_at).toLocaleDateString();
+  const publishedAt = formatDateString(listing.published_at);
 
   return (
     <Card className="p-4 flex flex-col gap-3 text-left w-full dark:border-surface-light">
