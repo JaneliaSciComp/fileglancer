@@ -232,14 +232,13 @@ export default function PropertiesDrawer({
                 path={fullPath}
               />
               <OverviewTable file={fileBrowserState.propertiesTarget} />
-              {fileBrowserState.propertiesTarget.is_dir &&
-              (proxiedPathByFspAndPathQuery.isPending ||
-                externalDataUrlQuery.isPending) ? (
+              {/* Show data link controls for any path (directories, files, and symlinks) */}
+              {proxiedPathByFspAndPathQuery.isPending ||
+              externalDataUrlQuery.isPending ? (
                 <Typography className="text-foreground pt-2">
                   Loading data link information...
                 </Typography>
-              ) : fileBrowserState.propertiesTarget.is_dir &&
-                proxiedPathByFspAndPathQuery.isError ? (
+              ) : proxiedPathByFspAndPathQuery.isError ? (
                 <>
                   <Typography className="text-error pt-2">
                     Error loading data link information
@@ -249,8 +248,7 @@ export default function PropertiesDrawer({
                       'An unknown error occurred'}
                   </Typography>
                 </>
-              ) : fileBrowserState.propertiesTarget.is_dir &&
-                externalDataUrlQuery.isError ? (
+              ) : externalDataUrlQuery.isError ? (
                 <>
                   <Typography className="text-error pt-2">
                     Error loading external data link information
@@ -260,7 +258,7 @@ export default function PropertiesDrawer({
                       'An unknown error occurred'}
                   </Typography>
                 </>
-              ) : fileBrowserState.propertiesTarget.is_dir ? (
+              ) : (
                 <>
                   <div className="flex flex-col gap-2 min-w-[175px] max-w-full pt-2">
                     <FgSwitch
@@ -345,7 +343,7 @@ export default function PropertiesDrawer({
                     </>
                   ) : null}
                 </>
-              ) : null}
+              )}
             </Tabs.Panel>
 
             {/*Permissions panel*/}

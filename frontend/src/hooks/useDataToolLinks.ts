@@ -104,7 +104,7 @@ export default function useDataToolLinks(
       return false;
     }
     if (rawPath === null || rawPath === undefined) {
-      toast.error('No folder selected');
+      toast.error('No file or folder selected');
       return false;
     }
     // Filestore returns the FSP root as ".", but a literal "." in the share

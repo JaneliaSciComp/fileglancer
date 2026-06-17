@@ -657,11 +657,14 @@ def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
 
     # Validate path exists and is accessible
     absolute_path = os.path.join(expanded_mount_path, path.lstrip('/'))
-    try:
-        os.listdir(absolute_path)
-    except FileNotFoundError:
+    if not os.path.exists(absolute_path):
         raise ValueError(f"Path {path} does not exist relative to {fsp_name}")
-    except PermissionError:
+    if os.path.isdir(absolute_path):
+        try:
+            os.listdir(absolute_path)
+        except PermissionError:
+            raise ValueError(f"Path {path} is not accessible relative to {fsp_name}")
+    elif not os.access(absolute_path, os.R_OK):
         raise ValueError(f"Path {path} is not accessible relative to {fsp_name}")
 
 
