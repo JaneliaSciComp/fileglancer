@@ -92,8 +92,8 @@ describe('Data Link dialog at FSP root', () => {
     vi.clearAllMocks();
 
     // Render at the FSP root (no subpath). Filestore surfaces this as ".",
-    // which the create flow normalizes to "" before falling back to the FSP
-    // name for the URL's trailing segment.
+    // which the create flow normalizes to "" for the backend path. The default
+    // subpath mode is "full_path", so the url_prefix is the FSP's linux path.
     render(<TestDataLinkComponent />, {
       initialEntries: ['/browse/test_fsp']
     });
@@ -105,7 +105,7 @@ describe('Data Link dialog at FSP root', () => {
     });
   });
 
-  it('previews the FSP name as the url_prefix fallback', async () => {
+  it('previews the FSP linux path as the url_prefix', async () => {
     const user = userEvent.setup();
 
     // The preview lives inside the collapsed "Advanced settings" accordion.
@@ -114,13 +114,13 @@ describe('Data Link dialog at FSP root', () => {
     await waitFor(() => {
       expect(
         screen.getByText((content: string) =>
-          content.includes('https://.../<key>/test_fsp')
+          content.includes('https://.../<key>/test/fsp')
         )
       ).toBeInTheDocument();
     });
   });
 
-  it('submits the FSP name as the url_prefix for an FSP-root link', async () => {
+  it('submits the FSP linux path as the url_prefix for an FSP-root link', async () => {
     const { server } = await import('@/__tests__/mocks/node');
     const { http, HttpResponse } = await import('msw');
 
@@ -153,9 +153,9 @@ describe('Data Link dialog at FSP root', () => {
         'Data link created successfully'
       );
     });
-    // "." is normalized to "" for the backend, and the basename of "" falls
-    // back to the FSP name so the share URL keeps a meaningful trailing segment.
+    // "." is normalized to "" for the backend path, while the default
+    // "full_path" mode derives the url_prefix from the FSP's linux path.
     expect(capturedPath).toBe('');
-    expect(capturedUrlPrefix).toBe('test_fsp');
+    expect(capturedUrlPrefix).toBe('test/fsp');
   });
 });

@@ -1,6 +1,7 @@
 import * as zarr from 'zarrita';
-import { Axis } from 'ome-zarr.js';
+import type { AxisMetadata } from '@bioimagetools/capability-manifest';
 import { HiQuestionMarkCircle } from 'react-icons/hi';
+import { default as log } from '@/logger';
 
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import {
@@ -14,7 +15,7 @@ import FgTooltip from '@/components/ui/widgets/FgTooltip';
 type ZarrMetadataTableProps = {
   readonly metadata: Metadata;
   readonly layerType: 'auto' | 'image' | 'segmentation' | null;
-  readonly availableVersions?: ('v2' | 'v3')[];
+  readonly availableZarrVersions?: number[];
 };
 
 function getSizeString(shapes: number[][] | undefined) {
@@ -31,14 +32,15 @@ function getChunkSizeString(arr: zarr.Array<any>) {
  * @returns Array of axis data with name, shape, chunk size, scale, and unit
  */
 function getAxisData(metadata: Metadata) {
-  const { multiscale, shapes, arr } = metadata;
+  const { shapes, arr } = metadata;
+  const multiscale = metadata.multiscales?.[0];
   if (!multiscale?.axes || !shapes?.[0] || !arr) {
     return [];
   }
   try {
     const resolvedScales = getResolvedScales(multiscale);
 
-    return multiscale.axes.map((axis: Axis, index: number) => {
+    return multiscale.axes.map((axis: AxisMetadata, index: number) => {
       const shape = shapes[0][index] || 'Unknown';
       const chunkSize = arr.chunks[index] || 'Unknown';
 
@@ -59,7 +61,7 @@ function getAxisData(metadata: Metadata) {
       };
     });
   } catch (error) {
-    console.error('Error getting axis data: ', error);
+    log.error('Error getting axis data: ', error);
     return [];
   }
 }
@@ -67,10 +69,11 @@ function getAxisData(metadata: Metadata) {
 export default function ZarrMetadataTable({
   metadata,
   layerType,
-  availableVersions
+  availableZarrVersions
 }: ZarrMetadataTableProps) {
   const { disableHeuristicalLayerTypeDetection } = usePreferencesContext();
-  const { zarrVersion, multiscale, shapes } = metadata;
+  const { zarrVersion, shapes } = metadata;
+  const multiscale = metadata.multiscales?.[0];
   const axisData = getAxisData(metadata);
 
   return (
@@ -86,8 +89,8 @@ export default function ZarrMetadataTable({
           <tr className="h-11 border-y border-surface-dark">
             <td className="px-3 py-2 font-semibold">Zarr Version</td>
             <td className="px-3 py-2">
-              {availableVersions && availableVersions.length > 1
-                ? availableVersions.join(', ')
+              {availableZarrVersions && availableZarrVersions.length > 0
+                ? availableZarrVersions.join(', ')
                 : zarrVersion}
             </td>
           </tr>
@@ -118,19 +121,19 @@ export default function ZarrMetadataTable({
               <td className="px-3 py-2">{metadata.arr.dtype}</td>
             </tr>
           ) : null}
-          {!metadata.multiscale && shapes ? (
+          {!multiscale && shapes ? (
             <tr className="h-11 border-b border-surface-dark">
               <td className="px-3 py-2 font-semibold">Shape</td>
               <td className="px-3 py-2">{getSizeString(shapes)}</td>
             </tr>
           ) : null}
-          {!metadata.multiscale && metadata.arr ? (
+          {!multiscale && metadata.arr ? (
             <tr className="h-11 border-b border-surface-dark">
               <td className="px-3 py-2 font-semibold">Chunk Size</td>
               <td className="px-3 py-2">{getChunkSizeString(metadata.arr)}</td>
             </tr>
           ) : null}
-          {metadata.multiscale && shapes ? (
+          {multiscale && shapes ? (
             <tr className="h-11 border-b border-surface-dark">
               <td className="px-3 py-2 font-semibold">Multiscale Levels</td>
               <td className="px-3 py-2">{shapes.length}</td>

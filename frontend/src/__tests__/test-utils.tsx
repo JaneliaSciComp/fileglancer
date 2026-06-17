@@ -15,6 +15,7 @@ import { TicketProvider } from '@/contexts/TicketsContext';
 import { ProfileContextProvider } from '@/contexts/ProfileContext';
 import { ExternalBucketProvider } from '@/contexts/ExternalBucketContext';
 import { ServerHealthProvider } from '@/contexts/ServerHealthContext';
+import { ViewersProvider } from '@/contexts/ViewersContext';
 import ErrorFallback from '@/components/ErrorFallback';
 
 interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
@@ -40,13 +41,15 @@ const Browse = ({ children }: { children: ReactNode }) => {
         <OpenFavoritesProvider>
           <FileBrowserTestingWrapper>
             <PreferencesProvider>
-              <ExternalBucketProvider>
-                <ProxiedPathProvider>
-                  <ProfileContextProvider>
-                    <TicketProvider>{children}</TicketProvider>
-                  </ProfileContextProvider>
-                </ProxiedPathProvider>
-              </ExternalBucketProvider>
+              <ViewersProvider>
+                <ExternalBucketProvider>
+                  <ProxiedPathProvider>
+                    <ProfileContextProvider>
+                      <TicketProvider>{children}</TicketProvider>
+                    </ProfileContextProvider>
+                  </ProxiedPathProvider>
+                </ExternalBucketProvider>
+              </ViewersProvider>
             </PreferencesProvider>
           </FileBrowserTestingWrapper>
         </OpenFavoritesProvider>

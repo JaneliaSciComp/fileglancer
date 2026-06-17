@@ -31,6 +31,21 @@ vi.mock('react-hot-toast', () => {
   };
 });
 
+// Stub manifest loading globally so ViewersProvider (used throughout
+// test-utils) never makes real network requests to the manifest host.
+// Real network calls leak past MSW and get aborted on test teardown,
+// producing "ECANCELED"/AbortError unhandled errors. Individual tests can
+// still override this mock (see DataToolLinks.test.tsx). Other exports keep
+// their real implementations.
+vi.mock('@bioimagetools/capability-manifest', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@bioimagetools/capability-manifest')>();
+  return {
+    ...actual,
+    loadManifestsFromUrls: vi.fn().mockResolvedValue(new Map())
+  };
+});
+
 // Workaround for error: "element.animate" is not a function, caused by ripple animation on btn
 // https://github.com/jsdom/jsdom/issues/3429#issuecomment-1936128876
 Element.prototype.animate = vi

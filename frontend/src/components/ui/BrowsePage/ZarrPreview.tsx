@@ -20,7 +20,7 @@ type ZarrPreviewProps = {
   readonly mainPanelWidth: number;
   readonly openWithToolUrls: OpenWithToolUrls | null;
   readonly path: string;
-  readonly availableVersions: ('v2' | 'v3')[];
+  readonly availableZarrVersions: number[];
   readonly thumbnailQuery: UseQueryResult<string, Error>;
   readonly zarrMetadataQuery: UseQueryResult<{
     metadata: ZarrMetadata;
@@ -29,7 +29,7 @@ type ZarrPreviewProps = {
 };
 
 export default function ZarrPreview({
-  availableVersions,
+  availableZarrVersions,
   fspName,
   layerType,
   mainPanelWidth,
@@ -125,7 +125,7 @@ export default function ZarrPreview({
             className={`flex ${mainPanelWidth > 1000 ? 'gap-6' : 'flex-col gap-4'} h-fit`}
           >
             <ZarrMetadataTable
-              availableVersions={availableVersions}
+              availableZarrVersions={availableZarrVersions}
               layerType={layerType}
               metadata={zarrMetadataQuery.data.metadata as Metadata}
             />

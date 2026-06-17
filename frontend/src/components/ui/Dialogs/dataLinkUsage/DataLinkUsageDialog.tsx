@@ -8,7 +8,8 @@ import DataLinkTabs from '@/components/ui/Dialogs/dataLinkUsage/tabsContent/Data
 import CopyTooltip from '@/components/ui/widgets/CopyTooltip';
 import useFileQuery from '@/queries/fileQueries';
 import {
-  detectZarrVersions,
+  areZarrMetadataFilesPresent,
+  getEffectiveZarrStorageVersion,
   useZarrMetadataQuery
 } from '@/queries/zarrQueries';
 import { detectN5 } from '@/queries/n5Queries';
@@ -40,9 +41,8 @@ export default function DataLinkUsageDialog({
     !targetFileQuery.isPending && currentFileOrFolder?.is_dir === false;
   const files = targetFileQuery.data?.files ?? [];
 
-  const zarrVersions = detectZarrVersions(files);
-  const isZarr = !isFile && zarrVersions.length > 0;
-  const isN5 = !isFile && detectN5(files);
+  const isZarr = areZarrMetadataFilesPresent(files);
+  const isN5 = detectN5(files);
 
   // Reuse the zarr metadata query — TanStack Query caches by key,
   // so this is a no-op when the browse page already fetched it.
@@ -53,11 +53,12 @@ export default function DataLinkUsageDialog({
     files: isFile ? [] : files
   });
 
-  const zarrVersion: ZarrVersion | undefined = isZarr
-    ? zarrVersions.includes('v3')
-      ? 3
-      : 2
-    : undefined;
+  const zarrVersion: ZarrVersion | undefined =
+    isZarr && zarrMetadataQuery.data
+      ? getEffectiveZarrStorageVersion(
+          zarrMetadataQuery.data.availableZarrVersions
+        )
+      : undefined;
 
   // Determine data type: file check takes precedence over Zarr/N5 detection.
   // For zarr, wait for metadata query to distinguish OME vs plain.

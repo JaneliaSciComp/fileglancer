@@ -5,6 +5,8 @@ const navigateToScratchFsp = async (page: Page) => {
   const localZone = page
     .getByLabel('List of file share paths')
     .getByRole('button', { name: 'Local' });
+  // Wait for the Local zone to be visible before clicking
+  await expect(localZone).toBeVisible();
   // Click specifically on the text to avoid clicking the favorite button
   await localZone.getByText('Local').click();
 
@@ -14,7 +16,7 @@ const navigateToScratchFsp = async (page: Page) => {
     .filter({ hasNotText: 'zarr' })
     .nth(0);
 
-  await expect(scratchFsp).toBeVisible({ timeout: 10000 });
+  await expect(scratchFsp).toBeVisible();
 
   // Wait for file directory to load by waiting for the API response
   await Promise.all([

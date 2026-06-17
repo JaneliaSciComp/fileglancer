@@ -5,14 +5,18 @@ import path from 'path';
 import react from '@vitejs/plugin-react';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { playwright } from '@vitest/browser-playwright';
-
-// https://vite.dev/config/
+import { resolveViewersConfigPath } from './src/config/resolveViewersConfigPath';
 import { fileURLToPath } from 'node:url';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
+
+// https://vite.dev/config/
+// ESM-safe __dirname: undefined when this config is loaded as an ES module
 const dirname =
   typeof __dirname !== 'undefined'
     ? __dirname
     : path.dirname(fileURLToPath(import.meta.url));
+
+const viewersConfigPath = resolveViewersConfigPath(dirname);
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
@@ -24,9 +28,13 @@ export default defineConfig({
     })
   ],
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src')
-    }
+    alias: [
+      {
+        find: /^@\/config\/viewers\.config\.yaml(\?.*)?$/,
+        replacement: viewersConfigPath + '$1'
+      },
+      { find: '@', replacement: path.resolve(dirname, './src') }
+    ]
   },
   css: {
     lightningcss: {
