@@ -43,6 +43,17 @@ import {
 } from '@/queries/jobsQueries';
 import FgExternalLink from './designSystem/atoms/FgExternalLink';
 
+/** Drop null/undefined values so they aren't shown or persisted as parameters. */
+function omitNullValues(
+  record: Record<string, unknown>
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(record).filter(
+      ([, value]) => value !== null && value !== undefined
+    )
+  );
+}
+
 function FilePreview({
   content,
   language,
@@ -208,8 +219,9 @@ export default function JobDetail() {
       return;
     }
     const params: AppLaunchParamsFile = {};
-    if (Object.keys(job.parameters).length > 0) {
-      params.parameters = job.parameters;
+    const parameters = omitNullValues(job.parameters);
+    if (Object.keys(parameters).length > 0) {
+      params.parameters = parameters;
     }
     if (job.resources && Object.keys(job.resources).length > 0) {
       params.resources = job.resources as AppResourceDefaults;
@@ -456,27 +468,78 @@ export default function JobDetail() {
                   onClick={handleDownloadParams}
                   size="sm"
                 >
-                  Download params
+                  Download
                 </FgButton>
               </div>
-              {Object.keys(job.parameters).length > 0 ? (
-                <Card className="p-3 dark:border-surface-light">
-                  {Object.entries(job.parameters).map(([key, value]) => (
-                    <div className="flex gap-2 py-1" key={key}>
-                      <Typography className="text-foreground font-semibold">
-                        {key}:
-                      </Typography>
-                      <Typography className="text-foreground">
-                        {String(value)}
-                      </Typography>
-                    </div>
-                  ))}
-                </Card>
-              ) : (
-                <Typography className="text-foreground italic">
-                  No parameters
-                </Typography>
-              )}
+              {(() => {
+                const sections: {
+                  title: string;
+                  entries: [string, unknown][];
+                }[] = [];
+                const parameters = omitNullValues(job.parameters);
+                if (Object.keys(parameters).length > 0) {
+                  sections.push({
+                    title: 'Parameters',
+                    entries: Object.entries(parameters)
+                  });
+                }
+                if (job.resources && Object.keys(job.resources).length > 0) {
+                  sections.push({
+                    title: 'Cluster',
+                    entries: Object.entries(job.resources)
+                  });
+                }
+                if (job.env && Object.keys(job.env).length > 0) {
+                  sections.push({
+                    title: 'Environment',
+                    entries: Object.entries(job.env)
+                  });
+                }
+                const other: [string, unknown][] = [];
+                if (job.pre_run) {
+                  other.push(['pre_run', job.pre_run]);
+                }
+                if (job.post_run) {
+                  other.push(['post_run', job.post_run]);
+                }
+                if (job.container) {
+                  other.push(['container', job.container]);
+                }
+                if (job.container_args) {
+                  other.push(['container_args', job.container_args]);
+                }
+                if (other.length > 0) {
+                  sections.push({ title: 'Other', entries: other });
+                }
+
+                return sections.length > 0 ? (
+                  <div className="flex flex-col gap-4">
+                    {sections.map(section => (
+                      <div key={section.title}>
+                        <Typography className="text-foreground font-bold mb-1">
+                          {section.title}
+                        </Typography>
+                        <Card className="p-3 dark:border-surface-light">
+                          {section.entries.map(([key, value]) => (
+                            <div className="flex gap-2 py-1" key={key}>
+                              <Typography className="text-foreground font-semibold shrink-0">
+                                {key}:
+                              </Typography>
+                              <Typography className="text-foreground whitespace-pre-wrap break-all">
+                                {String(value)}
+                              </Typography>
+                            </div>
+                          ))}
+                        </Card>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <Typography className="text-foreground italic">
+                    No parameters
+                  </Typography>
+                );
+              })()}
             </Tabs.Panel>
 
             <Tabs.Panel className="pt-4" value="script">

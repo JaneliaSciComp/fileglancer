@@ -440,6 +440,10 @@ async def submit_job(
     """
     settings = get_settings()
 
+    # A null parameter value means "not provided"; drop these so they are
+    # neither used when building the command nor stored on the job record.
+    parameters = {k: v for k, v in parameters.items() if v is not None}
+
     # Read manifest from the cache when available; fall back to disk.
     manifest = await get_or_load_manifest(username, app_url, manifest_path)
 
