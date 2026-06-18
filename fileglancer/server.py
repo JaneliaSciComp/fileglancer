@@ -1895,8 +1895,10 @@ def create_app(settings):
             db_job = db.get_job(session, job_id, username)
             if db_job is None:
                 raise HTTPException(status_code=404, detail="Job not found")
-            # Read file paths and service URL via worker
-            files_result = await _worker_exec(username, "get_job_file_paths", job_id=job_id)
+            # File path info is derived from the DB record (work_dir + stored
+            # script_path) with no filesystem access, so resolve it in-process
+            # rather than paying a worker roundtrip + NFS glob/stat.
+            files = apps_module.get_job_file_paths(db_job)
             service_url = None
             if getattr(db_job, 'entry_point_type', 'job') == 'service' and db_job.status == 'RUNNING':
                 try:
@@ -1904,7 +1906,7 @@ def create_app(settings):
                     service_url = svc_result.get("service_url")
                 except Exception:
                     pass
-            return _convert_job(db_job, service_url=service_url, files=files_result.get("files"))
+            return _convert_job(db_job, service_url=service_url, files=files)
 
     @app.post("/api/jobs/{job_id}/cancel",
               description="Cancel a running job")

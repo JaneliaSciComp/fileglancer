@@ -185,6 +185,79 @@ class TestBuildRequirementsCheck:
         assert "zzz_missing_333" in stderr
 
 
+# --- job file path tests ---
+
+from types import SimpleNamespace
+
+from fileglancer.apps.core import get_job_file_paths, read_job_file
+
+
+def _fake_job(**overrides):
+    """Build a minimal job-like object for file-path tests."""
+    base = dict(
+        id=1,
+        app_name="myapp",
+        entry_point_id="run",
+        entry_point_type="job",
+        status="DONE",
+        work_dir="/share/jobs/1",
+        script_path="/share/jobs/1/myapp-run.1.sh",
+        started_at=object(),  # truthy "has started" marker
+    )
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+class TestGetJobFilePaths:
+    def test_uses_stored_script_path_without_globbing(self):
+        # work_dir intentionally does not exist on disk; the function must not
+        # touch the filesystem and must use the stored script_path verbatim.
+        files = get_job_file_paths(_fake_job(), fsps=[])
+        assert files["script"]["path"] == "/share/jobs/1/myapp-run.1.sh"
+        assert files["script"]["exists"] is True
+        assert files["stdout"]["path"] == "/share/jobs/1/stdout.log"
+        assert files["stderr"]["path"] == "/share/jobs/1/stderr.log"
+
+    def test_logs_exist_only_after_start(self):
+        pending = get_job_file_paths(
+            _fake_job(status="PENDING", started_at=None), fsps=[]
+        )
+        assert pending["stdout"]["exists"] is False
+        assert pending["stderr"]["exists"] is False
+        # script still exists once submitted (script_path recorded)
+        assert pending["script"]["exists"] is True
+
+    def test_legacy_job_without_script_path(self):
+        files = get_job_file_paths(_fake_job(script_path=None), fsps=[])
+        # Falls back to a default path and reports the script as not resolvable
+        assert files["script"]["path"] == "/share/jobs/1/script.sh"
+        assert files["script"]["exists"] is False
+
+    def test_service_url_only_when_running(self):
+        running = get_job_file_paths(
+            _fake_job(entry_point_type="service", status="RUNNING"), fsps=[]
+        )
+        assert running["service_url"]["exists"] is True
+        done = get_job_file_paths(
+            _fake_job(entry_point_type="service", status="DONE"), fsps=[]
+        )
+        assert done["service_url"]["exists"] is False
+
+
+class TestReadJobFile:
+    def test_reads_stored_script_path(self, tmp_path):
+        script = tmp_path / "myapp-run.1.sh"
+        script.write_text("#!/bin/bash\necho hi\n")
+        job = _fake_job(work_dir=str(tmp_path), script_path=str(script))
+        assert read_job_file(job, "script") == "#!/bin/bash\necho hi\n"
+
+    def test_missing_stored_script_returns_none(self, tmp_path):
+        job = _fake_job(
+            work_dir=str(tmp_path), script_path=str(tmp_path / "gone.sh")
+        )
+        assert read_job_file(job, "script") is None
+
+
 # --- merge_requirements tests ---
 
 class TestMergeRequirements:

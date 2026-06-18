@@ -167,8 +167,8 @@ def _job_db_to_dict(j) -> dict:
     """Serialize a JobDB row to a JSON-safe dict for transport to the worker.
 
     Only includes fields used by worker-side handlers (read_job_file,
-    get_job_file_paths, get_service_url) — keep this list minimal so the
-    worker sees as little of the DB row as possible.
+    get_service_url) — keep this list minimal so the worker sees as little of
+    the DB row as possible.
     """
     return {
         "id": j.id,
@@ -177,6 +177,7 @@ def _job_db_to_dict(j) -> dict:
         "entry_point_type": getattr(j, "entry_point_type", "job"),
         "status": j.status,
         "work_dir": j.work_dir,
+        "script_path": getattr(j, "script_path", None),
     }
 
 
@@ -738,20 +739,6 @@ def _action_get_job_file(request: dict, ctx: WorkerContext) -> dict:
     if content is None:
         return {"content": None}
     return {"content": content}
-
-
-@action("get_job_file_paths")
-def _action_get_job_file_paths(request: dict, ctx: WorkerContext) -> dict:
-    """Get job file path info."""
-    from fileglancer.apps.core import get_job_file_paths
-
-    job_id = request["job_id"]
-    db_job = ctx.db.get_job(job_id, ctx.username)
-    if db_job is None:
-        return {"error": f"Job {job_id} not found", "status_code": 404}
-    fsps = ctx.db.get_file_share_paths()
-    files = get_job_file_paths(db_job, fsps)
-    return {"files": files}
 
 
 @action("get_service_url")
