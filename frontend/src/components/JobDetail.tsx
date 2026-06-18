@@ -223,8 +223,9 @@ export default function JobDetail() {
     if (Object.keys(parameters).length > 0) {
       params.parameters = parameters;
     }
-    if (job.resources && Object.keys(job.resources).length > 0) {
-      params.resources = job.resources as AppResourceDefaults;
+    const resources = job.resources ? omitNullValues(job.resources) : {};
+    if (Object.keys(resources).length > 0) {
+      params.resources = resources as AppResourceDefaults;
     }
     if (job.env && Object.keys(job.env).length > 0) {
       params.env = job.env;
@@ -483,10 +484,13 @@ export default function JobDetail() {
                     entries: Object.entries(parameters)
                   });
                 }
-                if (job.resources && Object.keys(job.resources).length > 0) {
+                const resources = job.resources
+                  ? omitNullValues(job.resources)
+                  : {};
+                if (Object.keys(resources).length > 0) {
                   sections.push({
                     title: 'Cluster',
-                    entries: Object.entries(job.resources)
+                    entries: Object.entries(resources)
                   });
                 }
                 if (job.env && Object.keys(job.env).length > 0) {
