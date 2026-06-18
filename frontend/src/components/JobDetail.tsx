@@ -159,6 +159,14 @@ function FilePathLink({
   );
 }
 
+/** The file's real name on disk, falling back to a generated name. */
+function jobFileName(
+  fileInfo: JobFileInfo | undefined,
+  fallback: string
+): string {
+  return fileInfo?.subpath?.split('/').pop() || fallback;
+}
+
 /** Right-aligned plain download icon, matching the file browser's download control. */
 function FileDownloadButton({
   content,
@@ -579,7 +587,10 @@ export default function JobDetail() {
                 {scriptQuery.data !== undefined && scriptQuery.data !== null ? (
                   <FileDownloadButton
                     content={scriptQuery.data}
-                    filename={`job-${id}-script.sh`}
+                    filename={jobFileName(
+                      job.files?.script,
+                      `job-${id}-script.sh`
+                    )}
                   />
                 ) : null}
               </div>
@@ -602,7 +613,10 @@ export default function JobDetail() {
                 {stdoutQuery.data !== undefined && stdoutQuery.data !== null ? (
                   <FileDownloadButton
                     content={stdoutQuery.data}
-                    filename={`job-${id}-stdout.log`}
+                    filename={jobFileName(
+                      job.files?.stdout,
+                      `job-${id}-stdout.log`
+                    )}
                   />
                 ) : null}
               </div>
@@ -625,7 +639,10 @@ export default function JobDetail() {
                 {stderrQuery.data !== undefined && stderrQuery.data !== null ? (
                   <FileDownloadButton
                     content={stderrQuery.data}
-                    filename={`job-${id}-stderr.log`}
+                    filename={jobFileName(
+                      job.files?.stderr,
+                      `job-${id}-stderr.log`
+                    )}
                   />
                 ) : null}
               </div>
