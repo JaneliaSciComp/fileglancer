@@ -37,9 +37,7 @@ describe('parseAppLaunchParamsFile', () => {
   });
 
   it('throws on a JSON array', () => {
-    expect(() => parseAppLaunchParamsFile('[1, 2, 3]')).toThrow(
-      /JSON object/i
-    );
+    expect(() => parseAppLaunchParamsFile('[1, 2, 3]')).toThrow(/JSON object/i);
   });
 
   it('throws on a JSON primitive', () => {
