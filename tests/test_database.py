@@ -203,44 +203,55 @@ def test_create_proxied_path_for_file(db_session, fsp):
     assert proxied_path.path == "testfile.txt"
 
 
-def test_validate_proxied_path_rejects_nonexistent(db_session, fsp):
-    """_validate_proxied_path should raise ValueError for a path that doesn't exist."""
+def test_validate_proxied_path_rejects_unknown_fsp(db_session, fsp):
+    """_validate_proxied_path should raise ValueError for an unknown file share path."""
     from fileglancer.database import _validate_proxied_path
     with pytest.raises(ValueError, match="does not exist"):
-        _validate_proxied_path(db_session, fsp.name, "no_such_file_or_dir.txt")
+        _validate_proxied_path(db_session, "no_such_fsp", "some/path")
 
 
-def test_validate_proxied_path_accepts_readable_file(db_session, fsp):
-    """_validate_proxied_path should accept a readable file without raising."""
+def test_validate_proxied_path_does_not_check_filesystem(db_session, fsp):
+    """_validate_proxied_path must NOT touch the filesystem.
+
+    Per-user filesystem access is validated by the user worker (running as the
+    real user), not here in the server process. So validation must succeed even
+    for a path that does not exist from the server's point of view; otherwise
+    the server's identity (which may lack the user's group memberships) would
+    wrongly reject paths the user can legitimately access.
+    """
     from fileglancer.database import _validate_proxied_path
-    file_path = os.path.join(fsp.mount_path, "readable.txt")
-    with open(file_path, "w") as f:
-        f.write("data")
-    # Should not raise
-    _validate_proxied_path(db_session, fsp.name, "readable.txt")
+    # Path does not exist on disk, but validation only checks the FSP exists.
+    _validate_proxied_path(db_session, fsp.name, "no_such_file_or_dir.txt")
 
 
-@requires_symlinks
-def test_validate_proxied_path_accepts_symlink(db_session, fsp):
-    """_validate_proxied_path should accept a symlink whose target is valid."""
-    from fileglancer.database import _validate_proxied_path
-    target_path = os.path.join(fsp.mount_path, "target.txt")
-    with open(target_path, "w") as f:
-        f.write("data")
-    symlink_path = os.path.join(fsp.mount_path, "link.txt")
-    os.symlink(target_path, symlink_path)
-    # Should not raise: symlinks (to files or directories) are valid data link targets.
-    _validate_proxied_path(db_session, fsp.name, "link.txt")
+@pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0,
+    reason="root bypasses directory read permissions, so the check cannot be exercised",
+)
+def test_create_proxied_path_for_unreadable_directory(db_session, fsp):
+    """Regression: create a data link for a directory the server process cannot read.
 
+    Reproduces the production bug where creating a link to a group-readable but
+    not world-readable directory failed with "is not accessible" because the
+    server process ran ``os.listdir`` under its own identity. With the
+    filesystem check removed from the DB layer, creation must succeed; access is
+    validated by the user worker as the real user.
 
-@requires_symlinks
-def test_validate_proxied_path_rejects_broken_symlink(db_session, fsp):
-    """A broken symlink resolves to a missing target, so it is rejected as nonexistent."""
-    from fileglancer.database import _validate_proxied_path
-    symlink_path = os.path.join(fsp.mount_path, "broken_link.txt")
-    os.symlink(os.path.join(fsp.mount_path, "no_such_target.txt"), symlink_path)
-    with pytest.raises(ValueError, match="does not exist"):
-        _validate_proxied_path(db_session, fsp.name, "broken_link.txt")
+    Here we use a 0o000 directory to make the running (non-root) process unable
+    to ``listdir`` it -- the same failure mode the old code raised on.
+    """
+    unreadable = os.path.join(fsp.mount_path, "unreadable_dir")
+    os.makedirs(unreadable, exist_ok=True)
+    os.chmod(unreadable, 0o000)
+    try:
+        proxied_path = create_proxied_path(
+            db_session, "testuser", "unreadable_link", fsp.name, "unreadable_dir"
+        )
+        assert proxied_path.path == "unreadable_dir"
+        assert proxied_path.sharing_key is not None
+    finally:
+        # Restore permissions so the temp dir can be cleaned up.
+        os.chmod(unreadable, 0o755)
 
 
 @requires_symlinks

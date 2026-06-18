@@ -646,26 +646,21 @@ def find_fsp_from_absolute_path(session: Session, absolute_path: str) -> Optiona
 
 
 def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
-    """Validate a proxied path exists and is accessible"""
-    # Get mount path - check database first using existing session, then check local mounts
+    """Validate that the file share path for a proxied path exists.
+
+    Note: the filesystem existence and accessibility of *path* are deliberately
+    NOT checked here. This function runs in the main server process, whose
+    identity (uid/group memberships) differs from the requesting user's. A
+    filesystem permission check here would therefore use the wrong identity and
+    reject paths the user can legitimately access -- e.g. a directory that is
+    group-readable but not world-readable, where the user is a group member but
+    the server account is not. Per-user filesystem access is validated by the
+    user worker (see ``_action_validate_proxied_path``), which executes as the
+    real user before this function is called.
+    """
     fsp = get_file_share_path(session, fsp_name)
     if not fsp:
         raise ValueError(f"File share path {fsp_name} does not exist")
-
-    # Expand ~ to user's home directory before validation
-    expanded_mount_path = os.path.expanduser(fsp.mount_path)
-
-    # Validate path exists and is accessible
-    absolute_path = os.path.join(expanded_mount_path, path.lstrip('/'))
-    if not os.path.exists(absolute_path):
-        raise ValueError(f"Path {path} does not exist relative to {fsp_name}")
-    if os.path.isdir(absolute_path):
-        try:
-            os.listdir(absolute_path)
-        except PermissionError:
-            raise ValueError(f"Path {path} is not accessible relative to {fsp_name}")
-    elif not os.access(absolute_path, os.R_OK):
-        raise ValueError(f"Path {path} is not accessible relative to {fsp_name}")
 
 
 def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_name: str, path: str, url_prefix: str = "") -> ProxiedPathDB:
