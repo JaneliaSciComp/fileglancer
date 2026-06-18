@@ -16,6 +16,7 @@ import {
 
 import AnsiText from '@/components/ui/AppsPage/AnsiText';
 import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import type {
   JobFileInfo,
@@ -145,14 +146,39 @@ function FilePathLink({
     : fileInfo.path;
 
   const browseUrl = makeBrowseLink(fileInfo.fsp_name, fileInfo.subpath);
+  const fileName = fileInfo.subpath.split('/').pop() || displayPath;
 
   return (
     <Link
       className="text-primary-dark text-sm font-mono hover:underline"
+      title={displayPath}
       to={browseUrl}
     >
-      {displayPath}
+      {fileName}
     </Link>
+  );
+}
+
+/** Right-aligned plain download icon, matching the file browser's download control. */
+function FileDownloadButton({
+  content,
+  filename
+}: {
+  readonly content: string;
+  readonly filename: string;
+}) {
+  return (
+    <button
+      className="ml-auto cursor-pointer"
+      onClick={() => downloadTextFile(content, filename, 'text/plain')}
+      title="Download file"
+      type="button"
+    >
+      <FgIcon
+        className="text-foreground hover:text-primary text-xl"
+        icon={HiOutlineDownload}
+      />
+    </button>
   );
 }
 
@@ -207,10 +233,6 @@ export default function JobDetail() {
   }, []);
 
   const job = jobQuery.data;
-
-  const handleDownload = (content: string, filename: string) => {
-    downloadTextFile(content, filename, 'text/plain');
-  };
 
   // Download the full set of parameters used for this job (all three tabs of
   // the launch form) as a JSON file that can be re-uploaded to relaunch.
@@ -318,13 +340,23 @@ export default function JobDetail() {
               <Typography className="font-bold mb-1" type="h5">
                 {job.app_name} &mdash; {job.entry_point_name}
               </Typography>
-              <FgButton
-                icon={HiOutlineRefresh}
-                onClick={handleRelaunch}
-                variant="outline"
-              >
-                Relaunch
-              </FgButton>
+              <div className="flex items-center gap-2">
+                <FgButton
+                  className="!rounded-md whitespace-nowrap"
+                  icon={HiOutlineDownload}
+                  onClick={handleDownloadParams}
+                  variant="outline"
+                >
+                  Export params
+                </FgButton>
+                <FgButton
+                  icon={HiOutlineRefresh}
+                  onClick={handleRelaunch}
+                  variant="outline"
+                >
+                  Relaunch
+                </FgButton>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-4 mt-2">
               <JobStatusBadge status={job.status} />
@@ -463,15 +495,6 @@ export default function JobDetail() {
             </Tabs.List>
 
             <Tabs.Panel className="pt-4" value="parameters">
-              <div className="flex items-center justify-end mb-2">
-                <FgButton
-                  icon={HiOutlineDownload}
-                  onClick={handleDownloadParams}
-                  size="sm"
-                >
-                  Download
-                </FgButton>
-              </div>
               {(() => {
                 const sections: {
                   title: string;
@@ -554,15 +577,10 @@ export default function JobDetail() {
                   zonesAndFspMap={zonesAndFspQuery.data || {}}
                 />
                 {scriptQuery.data !== undefined && scriptQuery.data !== null ? (
-                  <FgButton
-                    icon={HiOutlineDownload}
-                    onClick={() =>
-                      handleDownload(scriptQuery.data!, `job-${id}-script.sh`)
-                    }
-                    size="sm"
-                  >
-                    Download
-                  </FgButton>
+                  <FileDownloadButton
+                    content={scriptQuery.data}
+                    filename={`job-${id}-script.sh`}
+                  />
                 ) : null}
               </div>
               <FilePreview
@@ -582,15 +600,10 @@ export default function JobDetail() {
                   zonesAndFspMap={zonesAndFspQuery.data || {}}
                 />
                 {stdoutQuery.data !== undefined && stdoutQuery.data !== null ? (
-                  <FgButton
-                    icon={HiOutlineDownload}
-                    onClick={() =>
-                      handleDownload(stdoutQuery.data!, `job-${id}-stdout.log`)
-                    }
-                    size="sm"
-                  >
-                    Download
-                  </FgButton>
+                  <FileDownloadButton
+                    content={stdoutQuery.data}
+                    filename={`job-${id}-stdout.log`}
+                  />
                 ) : null}
               </div>
               <FilePreview
@@ -610,15 +623,10 @@ export default function JobDetail() {
                   zonesAndFspMap={zonesAndFspQuery.data || {}}
                 />
                 {stderrQuery.data !== undefined && stderrQuery.data !== null ? (
-                  <FgButton
-                    icon={HiOutlineDownload}
-                    onClick={() =>
-                      handleDownload(stderrQuery.data!, `job-${id}-stderr.log`)
-                    }
-                    size="sm"
-                  >
-                    Download
-                  </FgButton>
+                  <FileDownloadButton
+                    content={stderrQuery.data}
+                    filename={`job-${id}-stderr.log`}
+                  />
                 ) : null}
               </div>
               <FilePreview
