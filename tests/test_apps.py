@@ -189,7 +189,7 @@ class TestBuildRequirementsCheck:
 
 from types import SimpleNamespace
 
-from fileglancer.apps.core import get_job_file_paths, read_job_file
+from fileglancer.apps.jobfiles import get_job_file_paths, read_job_file
 
 
 def _fake_job(**overrides):
@@ -739,7 +739,7 @@ class TestBuildCommandTildeExpansion:
 # --- _find_manifests_in_repo adapter fallback tests ---
 
 import fileglancer.apps.adapters as adapters_module
-from fileglancer.apps.core import _find_manifests_in_repo
+from fileglancer.apps.manifest import _find_manifests_in_repo
 
 
 class _StubAdapter:

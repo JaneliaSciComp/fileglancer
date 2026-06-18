@@ -502,7 +502,7 @@ class AppEntryPoint(BaseModel):
 
 
 SUPPORTED_TOOLS = {"pixi", "npm", "maven", "miniforge", "apptainer", "nextflow"}
-# Canonical parser for a single requirement spec, shared with fileglancer.apps.core
+# Canonical parser for a single requirement spec, shared with fileglancer.apps.command
 # (imported there) so manifest validation and the runtime requirement check stay
 # in sync. Groups: 1=tool name, 2=operator (or None), 3=version (or None).
 _REQUIREMENT_OPERATOR_PATTERN = re.compile(r">=|<=|!=|==|>|<")
