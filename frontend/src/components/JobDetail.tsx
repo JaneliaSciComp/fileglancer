@@ -486,6 +486,17 @@ export default function JobDetail() {
                   pathPreference={pathPreference}
                   zonesAndFspMap={zonesAndFspQuery.data || {}}
                 />
+                {scriptQuery.data !== undefined && scriptQuery.data !== null ? (
+                  <FgButton
+                    icon={HiOutlineDownload}
+                    onClick={() =>
+                      handleDownload(scriptQuery.data!, `job-${id}-script.sh`)
+                    }
+                    size="sm"
+                  >
+                    Download
+                  </FgButton>
+                ) : null}
               </div>
               <FilePreview
                 content={
