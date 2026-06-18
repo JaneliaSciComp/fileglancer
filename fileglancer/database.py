@@ -164,6 +164,11 @@ class JobDB(Base):
     # Stored so file path info can be served from the DB without globbing the
     # work directory on every read.
     script_path = Column(String, nullable=True)
+    # Browse-link base for the work directory (file-share-path name + subpath),
+    # resolved once in the user-context worker at submit time. Lets the job
+    # detail endpoint build browse links without realpath'ing mounts per read.
+    work_dir_fsp_name = Column(String, nullable=True)
+    work_dir_subpath = Column(String, nullable=True)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
@@ -994,7 +999,9 @@ def update_job_status(session: Session, job_id: int, status: str,
                       cluster_job_id: Optional[str] = None,
                       started_at: Optional[datetime] = None,
                       finished_at: Optional[datetime] = None,
-                      script_path: Optional[str] = None) -> Optional[JobDB]:
+                      script_path: Optional[str] = None,
+                      work_dir_fsp_name: Optional[str] = None,
+                      work_dir_subpath: Optional[str] = None) -> Optional[JobDB]:
     """Update a job's status and related fields"""
     job = session.query(JobDB).filter_by(id=job_id).first()
     if not job:
@@ -1010,6 +1017,10 @@ def update_job_status(session: Session, job_id: int, status: str,
         job.finished_at = finished_at
     if script_path is not None:
         job.script_path = script_path
+    if work_dir_fsp_name is not None:
+        job.work_dir_fsp_name = work_dir_fsp_name
+    if work_dir_subpath is not None:
+        job.work_dir_subpath = work_dir_subpath
     session.commit()
     return job
 

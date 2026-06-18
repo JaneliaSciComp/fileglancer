@@ -202,6 +202,8 @@ def _fake_job(**overrides):
         status="DONE",
         work_dir="/share/jobs/1",
         script_path="/share/jobs/1/myapp-run.1.sh",
+        work_dir_fsp_name="myshare",
+        work_dir_subpath=".fileglancer/jobs/1",
         started_at=object(),  # truthy "has started" marker
     )
     base.update(overrides)
@@ -209,37 +211,49 @@ def _fake_job(**overrides):
 
 
 class TestGetJobFilePaths:
-    def test_uses_stored_script_path_without_globbing(self):
+    def test_uses_stored_paths_without_filesystem(self):
         # work_dir intentionally does not exist on disk; the function must not
-        # touch the filesystem and must use the stored script_path verbatim.
-        files = get_job_file_paths(_fake_job(), fsps=[])
+        # touch the filesystem and must use the stored values verbatim.
+        files = get_job_file_paths(_fake_job())
         assert files["script"]["path"] == "/share/jobs/1/myapp-run.1.sh"
         assert files["script"]["exists"] is True
         assert files["stdout"]["path"] == "/share/jobs/1/stdout.log"
         assert files["stderr"]["path"] == "/share/jobs/1/stderr.log"
 
-    def test_logs_exist_only_after_start(self):
-        pending = get_job_file_paths(
-            _fake_job(status="PENDING", started_at=None), fsps=[]
+    def test_browse_link_built_from_stored_base(self):
+        files = get_job_file_paths(_fake_job())
+        # subpath = work dir subpath + file name; fsp from the stored base
+        assert files["script"]["fsp_name"] == "myshare"
+        assert files["script"]["subpath"] == ".fileglancer/jobs/1/myapp-run.1.sh"
+        assert files["stdout"]["subpath"] == ".fileglancer/jobs/1/stdout.log"
+
+    def test_no_browse_link_when_base_unresolved(self):
+        files = get_job_file_paths(
+            _fake_job(work_dir_fsp_name=None, work_dir_subpath=None)
         )
+        assert files["script"]["fsp_name"] is None
+        assert files["script"]["subpath"] is None
+
+    def test_logs_exist_only_after_start(self):
+        pending = get_job_file_paths(_fake_job(status="PENDING", started_at=None))
         assert pending["stdout"]["exists"] is False
         assert pending["stderr"]["exists"] is False
         # script still exists once submitted (script_path recorded)
         assert pending["script"]["exists"] is True
 
     def test_legacy_job_without_script_path(self):
-        files = get_job_file_paths(_fake_job(script_path=None), fsps=[])
+        files = get_job_file_paths(_fake_job(script_path=None))
         # Falls back to a default path and reports the script as not resolvable
         assert files["script"]["path"] == "/share/jobs/1/script.sh"
         assert files["script"]["exists"] is False
 
     def test_service_url_only_when_running(self):
         running = get_job_file_paths(
-            _fake_job(entry_point_type="service", status="RUNNING"), fsps=[]
+            _fake_job(entry_point_type="service", status="RUNNING")
         )
         assert running["service_url"]["exists"] is True
         done = get_job_file_paths(
-            _fake_job(entry_point_type="service", status="DONE"), fsps=[]
+            _fake_job(entry_point_type="service", status="DONE")
         )
         assert done["service_url"]["exists"] is False
 

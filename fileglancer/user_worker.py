@@ -936,7 +936,26 @@ def _action_submit(request: dict, ctx: WorkerContext) -> dict:
         if proc is not None:
             (work_dir / "job.pid").write_text(str(proc.pid))
 
-    return {"job_id": job.job_id, "script_path": job.script_path}
+    # Resolve the work dir's browse-link base now, in user context where the
+    # mounts are warm, so the job-detail endpoint can build browse links from
+    # the DB without realpath'ing every mount on each read.
+    work_dir_fsp_name = None
+    work_dir_subpath = None
+    try:
+        from fileglancer.database import find_fsp_in_paths
+        match = find_fsp_in_paths(ctx.db.get_file_share_paths(), str(work_dir))
+        if match:
+            work_dir_fsp_name = match[0].name
+            work_dir_subpath = match[1]
+    except Exception:
+        pass
+
+    return {
+        "job_id": job.job_id,
+        "script_path": job.script_path,
+        "work_dir_fsp_name": work_dir_fsp_name,
+        "work_dir_subpath": work_dir_subpath,
+    }
 
 
 @action("cancel")

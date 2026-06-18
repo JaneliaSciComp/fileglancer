@@ -1457,9 +1457,12 @@ async def submit_job(
         raise
 
     cluster_job_id = worker_result["job_id"]
-    # cluster-api tells us the exact script filename it generated; persist it
-    # so file path info can be served from the DB without globbing the work dir.
+    # cluster-api tells us the exact script filename it generated, and the
+    # worker resolved the work dir's browse-link base; persist both so file
+    # path info can be served from the DB with no filesystem access.
     script_path = worker_result.get("script_path")
+    work_dir_fsp_name = worker_result.get("work_dir_fsp_name")
+    work_dir_subpath = worker_result.get("work_dir_subpath")
 
     # Update DB with cluster job ID — the poll loop will track status from here
     with db.get_db_session(settings.db_url) as session:
@@ -1467,6 +1470,8 @@ async def submit_job(
             session, job_id, "PENDING",
             cluster_job_id=cluster_job_id,
             script_path=script_path,
+            work_dir_fsp_name=work_dir_fsp_name,
+            work_dir_subpath=work_dir_subpath,
         )
         db_job = db.get_job(session, job_id, username)
         session.expunge(db_job)
@@ -1557,27 +1562,20 @@ def _resolve_work_dir(db_job: db.JobDB) -> Path:
     return _build_work_dir(db_job.id, db_job.app_name, db_job.entry_point_id)
 
 
-def _resolve_browse_path(abs_path: str, fsps: Optional[list] = None) -> tuple[str | None, str | None]:
-    """Resolve an absolute path to an FSP name and subpath for browse links.
-
-    If *fsps* is None, queries the database directly. Pass a pre-fetched list
-    to avoid the DB hit (used from the worker subprocess, which has no DB
-    access).
+def _make_file_info(file_path: str, exists: bool,
+                    work_fsp_name: Optional[str],
+                    work_subpath: Optional[str]) -> dict:
+    """Create a file info dict, deriving the browse link from the work dir's
+    stored browse-link base. All job files live directly in the work dir, so a
+    file's browse subpath is the work dir's subpath plus the file name — no
+    filesystem resolution needed.
     """
-    if fsps is None:
-        settings = get_settings()
-        with db.get_db_session(settings.db_url) as session:
-            result = db.find_fsp_from_absolute_path(session, abs_path)
-    else:
-        result = db.find_fsp_in_paths(fsps, abs_path)
-    if result:
-        return result[0].name, result[1]
-    return None, None
-
-
-def _make_file_info(file_path: str, exists: bool, fsps: Optional[list] = None) -> dict:
-    """Create a file info dict with browse link resolution."""
-    fsp_name, subpath = _resolve_browse_path(file_path, fsps) if exists else (None, None)
+    fsp_name = None
+    subpath = None
+    if exists and work_fsp_name:
+        fsp_name = work_fsp_name
+        filename = os.path.basename(file_path)
+        subpath = f"{work_subpath}/{filename}" if work_subpath else filename
     return {
         "path": file_path,
         "exists": exists,
@@ -1615,23 +1613,19 @@ def get_service_url(db_job: db.JobDB) -> Optional[str]:
     return url
 
 
-def get_job_file_paths(db_job: db.JobDB, fsps: Optional[list] = None) -> dict[str, dict]:
+def get_job_file_paths(db_job: db.JobDB) -> dict[str, dict]:
     """Return file path info for a job's files (script, stdout, stderr, service_url).
 
-    Returns a dict keyed by file type with path and existence info. Derived
-    entirely from the DB record (work_dir + stored script_path) and job state —
-    no filesystem access — so it is fast and works from the parent process.
-    Existence is inferred rather than stat'd: the script exists once submitted
-    (script_path is set), and the log files exist once the job has started.
-    Pass *fsps* to reuse a pre-fetched file-share-path list for browse-link
-    resolution; otherwise it is looked up from the DB once for all files.
+    Returns a dict keyed by file type with path and browse-link info. Derived
+    entirely from the DB record (work_dir, stored script_path, and the work
+    dir's stored browse-link base) and job state — no filesystem access — so it
+    is fast and safe to call from the parent process. Existence is inferred
+    rather than stat'd: the script exists once submitted (script_path is set),
+    and the log files exist once the job has started.
     """
-    if fsps is None:
-        settings = get_settings()
-        with db.get_db_session(settings.db_url) as session:
-            fsps = db.get_file_share_paths(session)
-
     work_dir = _resolve_work_dir(db_job)
+    work_fsp_name = getattr(db_job, 'work_dir_fsp_name', None)
+    work_subpath = getattr(db_job, 'work_dir_subpath', None)
 
     # cluster-api recorded the generated script name at submit time.
     script_path = getattr(db_job, 'script_path', None)
@@ -1645,16 +1639,16 @@ def get_job_file_paths(db_job: db.JobDB, fsps: Optional[list] = None) -> dict[st
     stderr_path = work_dir / "stderr.log"
 
     files = {
-        "script": _make_file_info(script_path, script_exists, fsps),
-        "stdout": _make_file_info(str(stdout_path), logs_exist, fsps),
-        "stderr": _make_file_info(str(stderr_path), logs_exist, fsps),
+        "script": _make_file_info(script_path, script_exists, work_fsp_name, work_subpath),
+        "stdout": _make_file_info(str(stdout_path), logs_exist, work_fsp_name, work_subpath),
+        "stderr": _make_file_info(str(stderr_path), logs_exist, work_fsp_name, work_subpath),
     }
 
     # Include service_url file info for running service-type jobs.
     if getattr(db_job, 'entry_point_type', 'job') == 'service':
         service_url_path = work_dir / "service_url"
         files["service_url"] = _make_file_info(
-            str(service_url_path), db_job.status == 'RUNNING', fsps)
+            str(service_url_path), db_job.status == 'RUNNING', work_fsp_name, work_subpath)
 
     return files
 
