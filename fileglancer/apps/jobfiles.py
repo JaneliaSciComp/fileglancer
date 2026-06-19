@@ -141,6 +141,15 @@ def get_job_file_paths(db_job: db.JobDB) -> dict[str, dict]:
     stderr_path = _join_stored_path(work_dir, "stderr.log")
 
     files = {
+        # The work dir itself: its browse-link base is the stored fsp/subpath,
+        # so build the entry directly rather than via _make_file_info (which
+        # would append a file name to the subpath).
+        "work_dir": {
+            "path": work_dir,
+            "exists": bool(work_fsp_name),
+            "fsp_name": work_fsp_name,
+            "subpath": work_subpath,
+        },
         "script": _make_file_info(script_path, script_exists, work_fsp_name, work_subpath),
         "stdout": _make_file_info(stdout_path, logs_exist, work_fsp_name, work_subpath),
         "stderr": _make_file_info(stderr_path, logs_exist, work_fsp_name, work_subpath),

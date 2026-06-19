@@ -181,6 +181,10 @@ type Job = {
   post_run?: string;
   container?: string;
   container_args?: string;
+  command?: string;
+  conda_env?: string;
+  requirements?: string[];
+  work_dir?: string;
   cluster_job_id?: string;
   service_url?: string;
   created_at: string;

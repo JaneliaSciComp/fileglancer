@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import { Card, Tabs, Typography } from '@material-tailwind/react';
@@ -18,6 +19,7 @@ import AnsiText from '@/components/ui/AppsPage/AnsiText';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
+import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import type {
   JobFileInfo,
   FileSharePath,
@@ -29,8 +31,14 @@ import {
   formatDateString,
   buildRelaunchPath,
   parseGithubUrl,
-  downloadTextFile
+  buildGithubUrl,
+  downloadTextFile,
+  formatDuration,
+  stripLsfFooter,
+  tailLines,
+  exitCodeMeaning
 } from '@/utils';
+import type { Job } from '@/shared.types';
 import {
   getPreferredPathForDisplay,
   makeBrowseLink
@@ -149,13 +157,14 @@ function FilePathLink({
   const fileName = fileInfo.subpath.split('/').pop() || displayPath;
 
   return (
-    <Link
-      className="text-primary-dark text-sm font-mono hover:underline"
-      title={displayPath}
-      to={browseUrl}
-    >
-      {fileName}
-    </Link>
+    <FgTooltip label={displayPath} triggerClasses="inline-flex max-w-full">
+      <Link
+        className="text-primary-dark text-sm font-mono hover:underline truncate"
+        to={browseUrl}
+      >
+        {fileName}
+      </Link>
+    </FgTooltip>
   );
 }
 
@@ -190,11 +199,294 @@ function FileDownloadButton({
   );
 }
 
+/** A titled card holding a small set of label/value rows. */
+function InfoCard({
+  title,
+  children
+}: {
+  readonly title: string;
+  readonly children: ReactNode;
+}) {
+  return (
+    <div>
+      <Typography className="text-foreground font-bold mb-1">
+        {title}
+      </Typography>
+      <Card className="p-3 dark:border-surface-light">{children}</Card>
+    </div>
+  );
+}
+
+/** A label/value row; renders nothing when the value is empty. */
+function InfoRow({
+  label,
+  value
+}: {
+  readonly label: string;
+  readonly value: ReactNode;
+}) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  return (
+    <div className="flex gap-2 py-1 items-baseline">
+      <Typography className="text-foreground text-sm font-semibold shrink-0">
+        {label}:
+      </Typography>
+      <Typography className="text-foreground whitespace-pre-wrap break-all">
+        {value}
+      </Typography>
+    </div>
+  );
+}
+
+/** A file/directory row: browse link when available, plain path otherwise. */
+function WhereRow({
+  label,
+  fileInfo,
+  pathPreference,
+  zonesAndFspMap
+}: {
+  readonly label: string;
+  readonly fileInfo: JobFileInfo | undefined;
+  readonly pathPreference: ['linux_path' | 'windows_path' | 'mac_path'];
+  readonly zonesAndFspMap: Record<string, unknown>;
+}) {
+  if (!fileInfo?.path) {
+    return null;
+  }
+  const hasBrowseLink = Boolean(fileInfo.fsp_name && fileInfo.subpath);
+  return (
+    <div className="flex gap-2 py-1 items-baseline">
+      <Typography className="text-foreground text-sm font-semibold shrink-0">
+        {label}:
+      </Typography>
+      {hasBrowseLink ? (
+        <FilePathLink
+          fileInfo={fileInfo}
+          pathPreference={pathPreference}
+          zonesAndFspMap={zonesAndFspMap}
+        />
+      ) : (
+        <Typography className="text-foreground font-mono text-sm break-all">
+          {fileInfo.path}
+        </Typography>
+      )}
+    </div>
+  );
+}
+
+/** Best-effort GitHub repo link for an app manifest URL; null if not parseable. */
+function appRepoUrl(appUrl: string): string | null {
+  try {
+    const { owner, repo, branch } = parseGithubUrl(appUrl);
+    return buildGithubUrl(owner, repo, branch);
+  } catch {
+    return null;
+  }
+}
+
+const RECENT_OUTPUT_LINES = 20;
+
+/** The job Overview tab: status, timeline, environment, files, recent output. */
+function JobOverview({
+  job,
+  stdoutContent,
+  stderrContent,
+  stdoutPending,
+  pathPreference,
+  zonesAndFspMap,
+  isDarkMode,
+  onViewStdout,
+  onViewStderr
+}: {
+  readonly job: Job;
+  readonly stdoutContent: string | null | undefined;
+  readonly stderrContent: string | null | undefined;
+  readonly stdoutPending: boolean;
+  readonly pathPreference: ['linux_path' | 'windows_path' | 'mac_path'];
+  readonly zonesAndFspMap: Record<string, unknown>;
+  readonly isDarkMode: boolean;
+  readonly onViewStdout: () => void;
+  readonly onViewStderr: () => void;
+}) {
+  const isActive = job.status === 'PENDING' || job.status === 'RUNNING';
+  const runtime = formatDuration(job.started_at, job.finished_at);
+  const queueWait = job.started_at
+    ? formatDuration(job.created_at, job.started_at)
+    : null;
+  const exitMeaning = exitCodeMeaning(job.exit_code);
+  const repoUrl = appRepoUrl(job.app_url);
+
+  const hasEnvironment = Boolean(
+    (job.requirements && job.requirements.length > 0) ||
+    job.command ||
+    job.container ||
+    job.conda_env
+  );
+
+  const stdoutTail =
+    stdoutContent !== null && stdoutContent !== undefined
+      ? tailLines(stripLsfFooter(stdoutContent), RECENT_OUTPUT_LINES)
+      : null;
+  const stderrTail =
+    stderrContent !== null && stderrContent !== undefined
+      ? tailLines(stripLsfFooter(stderrContent), RECENT_OUTPUT_LINES)
+      : null;
+  const hasStderr = Boolean(stderrTail && stderrTail.trim());
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <InfoCard title="Status">
+          <div className="flex items-center gap-3 py-1">
+            <JobStatusBadge status={job.status} />
+            {job.exit_code !== null && job.exit_code !== undefined ? (
+              <Typography className="text-foreground">
+                Exit code: {job.exit_code}
+                {exitMeaning ? ` (${exitMeaning})` : ''}
+              </Typography>
+            ) : null}
+          </div>
+          <InfoRow label={isActive ? 'Elapsed' : 'Runtime'} value={runtime} />
+          <InfoRow label="Queue wait" value={queueWait} />
+        </InfoCard>
+
+        <InfoCard title="Timeline">
+          <InfoRow label="Submitted" value={formatDateString(job.created_at)} />
+          <InfoRow
+            label="Started"
+            value={job.started_at ? formatDateString(job.started_at) : null}
+          />
+          <InfoRow
+            label="Finished"
+            value={job.finished_at ? formatDateString(job.finished_at) : null}
+          />
+        </InfoCard>
+
+        <InfoCard title="What ran">
+          <InfoRow
+            label="App"
+            value={
+              repoUrl ? (
+                <FgExternalLink href={repoUrl}>{job.app_name}</FgExternalLink>
+              ) : (
+                job.app_name
+              )
+            }
+          />
+          <InfoRow label="Entry point" value={job.entry_point_name} />
+          <InfoRow
+            label="Type"
+            value={job.entry_point_type === 'service' ? 'Service' : 'Batch job'}
+          />
+          <InfoRow label="Cluster job" value={job.cluster_job_id} />
+        </InfoCard>
+
+        <InfoCard title="Files">
+          <WhereRow
+            fileInfo={job.files?.work_dir}
+            label="Run directory"
+            pathPreference={pathPreference}
+            zonesAndFspMap={zonesAndFspMap}
+          />
+          <WhereRow
+            fileInfo={job.files?.script}
+            label="Script"
+            pathPreference={pathPreference}
+            zonesAndFspMap={zonesAndFspMap}
+          />
+          <WhereRow
+            fileInfo={job.files?.stdout}
+            label="Output log"
+            pathPreference={pathPreference}
+            zonesAndFspMap={zonesAndFspMap}
+          />
+          <WhereRow
+            fileInfo={job.files?.stderr}
+            label="Error log"
+            pathPreference={pathPreference}
+            zonesAndFspMap={zonesAndFspMap}
+          />
+        </InfoCard>
+
+        {hasEnvironment ? (
+          <InfoCard title="Environment">
+            {job.requirements && job.requirements.length > 0 ? (
+              <div className="flex gap-2 py-1 items-center flex-wrap">
+                <Typography className="text-foreground text-sm font-semibold shrink-0">
+                  Runtime:
+                </Typography>
+                {job.requirements.map(req => (
+                  <span
+                    className="px-2 py-0.5 rounded bg-surface-light text-foreground text-xs font-mono"
+                    key={req}
+                  >
+                    {req}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            <InfoRow label="Command" value={job.command} />
+            <InfoRow label="Container" value={job.container} />
+            <InfoRow label="Container args" value={job.container_args} />
+            <InfoRow label="Conda env" value={job.conda_env} />
+          </InfoCard>
+        ) : null}
+      </div>
+
+      {job.started_at ? (
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <Typography className="text-foreground font-bold">
+              Recent output
+            </Typography>
+            <button
+              className="text-primary-dark text-sm hover:underline cursor-pointer"
+              onClick={onViewStdout}
+              type="button"
+            >
+              Full log &rarr;
+            </button>
+          </div>
+          <FilePreview
+            content={stdoutPending ? undefined : (stdoutTail ?? null)}
+            isDarkMode={isDarkMode}
+            language="text"
+          />
+        </div>
+      ) : null}
+
+      {hasStderr ? (
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <Typography className="text-error font-bold">
+              Recent errors
+            </Typography>
+            <button
+              className="text-primary-dark text-sm hover:underline cursor-pointer"
+              onClick={onViewStderr}
+              type="button"
+            >
+              Full error log &rarr;
+            </button>
+          </div>
+          <FilePreview
+            content={stderrTail}
+            isDarkMode={isDarkMode}
+            language="text"
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function JobDetail() {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [activeTab, setActiveTab] = useState('parameters');
+  const [activeTab, setActiveTab] = useState('overview');
   const [showStopConfirm, setShowStopConfirm] = useState(false);
 
   const { pathPreference } = usePreferencesContext();
@@ -204,7 +496,9 @@ export default function JobDetail() {
   const jobQuery = useJobQuery(id);
   const jobStatus = jobQuery.data?.status;
   // Lazily fetch each file's content only when its tab is active, so the first
-  // load of a job doesn't block on fetching all three log files at once.
+  // load of a job doesn't block on fetching all three log files at once. The
+  // Overview tab also shows tails of stdout/stderr, so fetch those when it's
+  // active (shared query keys keep this cached when switching to the log tabs).
   const scriptQuery = useJobFileQuery(
     id,
     'script',
@@ -215,13 +509,13 @@ export default function JobDetail() {
     id,
     'stdout',
     jobStatus,
-    activeTab === 'stdout'
+    activeTab === 'stdout' || activeTab === 'overview'
   );
   const stderrQuery = useJobFileQuery(
     id,
     'stderr',
     jobStatus,
-    activeTab === 'stderr'
+    activeTab === 'stderr' || activeTab === 'overview'
   );
   const cancelMutation = useCancelJobMutation();
 
@@ -344,10 +638,13 @@ export default function JobDetail() {
         <div>
           {/* Job Info Header */}
           <div className="mb-6">
-            <div className="flex items-center justify-between">
-              <Typography className="font-bold mb-1" type="h5">
-                {job.app_name} &mdash; {job.entry_point_name}
-              </Typography>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <Typography className="font-bold truncate" type="h5">
+                  {job.app_name} &mdash; {job.entry_point_name}
+                </Typography>
+                <JobStatusBadge status={job.status} />
+              </div>
               <div className="flex items-center gap-2">
                 <FgButton
                   className="!rounded-md whitespace-nowrap"
@@ -365,27 +662,6 @@ export default function JobDetail() {
                   Relaunch
                 </FgButton>
               </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-4 mt-2">
-              <JobStatusBadge status={job.status} />
-              <Typography className="text-foreground">
-                Submitted: {formatDateString(job.created_at)}
-              </Typography>
-              {job.started_at ? (
-                <Typography className="text-foreground">
-                  Started: {formatDateString(job.started_at)}
-                </Typography>
-              ) : null}
-              {job.finished_at ? (
-                <Typography className="text-foreground">
-                  Finished: {formatDateString(job.finished_at)}
-                </Typography>
-              ) : null}
-              {job.exit_code !== null && job.exit_code !== undefined ? (
-                <Typography className="text-foreground">
-                  Exit code: {job.exit_code}
-                </Typography>
-              ) : null}
             </div>
           </div>
 
@@ -486,6 +762,12 @@ export default function JobDetail() {
             <Tabs.List className="justify-start items-stretch shrink-0 min-w-fit w-full py-2 bg-surface dark:bg-surface-light">
               <Tabs.Trigger
                 className="!text-foreground h-full"
+                value="overview"
+              >
+                Overview
+              </Tabs.Trigger>
+              <Tabs.Trigger
+                className="!text-foreground h-full"
                 value="parameters"
               >
                 Parameters
@@ -501,6 +783,20 @@ export default function JobDetail() {
               </Tabs.Trigger>
               <Tabs.TriggerIndicator className="h-full" />
             </Tabs.List>
+
+            <Tabs.Panel className="pt-4" value="overview">
+              <JobOverview
+                isDarkMode={isDarkMode}
+                job={job}
+                onViewStderr={() => setActiveTab('stderr')}
+                onViewStdout={() => setActiveTab('stdout')}
+                pathPreference={pathPreference}
+                stderrContent={stderrQuery.data}
+                stdoutContent={stdoutQuery.data}
+                stdoutPending={stdoutQuery.isPending}
+                zonesAndFspMap={zonesAndFspQuery.data || {}}
+              />
+            </Tabs.Panel>
 
             <Tabs.Panel className="pt-4" value="parameters">
               {(() => {

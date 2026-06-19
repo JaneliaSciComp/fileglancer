@@ -521,6 +521,9 @@ async def submit_job(
             post_run=effective_post_run,
             container=effective_container,
             container_args=effective_container_args,
+            command=entry_point.command,
+            conda_env=entry_point.conda_env,
+            requirements=effective_requirements,
         )
         job_id = db_job.id
 
