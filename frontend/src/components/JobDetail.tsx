@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 
 import { Card, Tabs, Typography } from '@material-tailwind/react';
 import {
+  HiExternalLink,
   HiOutlineArrowLeft,
   HiOutlineDownload,
   HiOutlineRefresh,
@@ -590,10 +591,13 @@ export default function JobDetail() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-success" />
                 </span>
-                <Typography className="text-foreground flex-1">
-                  Service is running at{' '}
+                <Typography
+                  as="div"
+                  className="text-foreground flex-1 min-w-0 flex items-center gap-1"
+                >
+                  <span className="shrink-0">Service is running at</span>
                   <a
-                    className="text-primary-dark hover:underline font-mono"
+                    className="text-primary-dark hover:underline font-mono truncate min-w-0"
                     href={job.service_url}
                     rel="noopener noreferrer"
                     target="_blank"
@@ -612,9 +616,16 @@ export default function JobDetail() {
                 >
                   Stop Service
                 </FgButton>
-                <FgExternalLink href={job.service_url}>
+                <FgButton
+                  href={job.service_url}
+                  icon={HiExternalLink}
+                  iconPosition="right"
+                  rel="noopener noreferrer"
+                  size="sm"
+                  target="_blank"
+                >
                   Open Service
-                </FgExternalLink>
+                </FgButton>
               </div>
             ) : (
               <div className="mb-4 p-3 flex items-center gap-3 border border-warning rounded-lg bg-warning/10">
