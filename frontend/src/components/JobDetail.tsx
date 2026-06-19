@@ -240,42 +240,6 @@ function InfoRow({
   );
 }
 
-/** A file/directory row: browse link when available, plain path otherwise. */
-function WhereRow({
-  label,
-  fileInfo,
-  pathPreference,
-  zonesAndFspMap
-}: {
-  readonly label: string;
-  readonly fileInfo: JobFileInfo | undefined;
-  readonly pathPreference: ['linux_path' | 'windows_path' | 'mac_path'];
-  readonly zonesAndFspMap: Record<string, unknown>;
-}) {
-  if (!fileInfo?.path) {
-    return null;
-  }
-  const hasBrowseLink = Boolean(fileInfo.fsp_name && fileInfo.subpath);
-  return (
-    <div className="flex gap-2 py-1 items-baseline">
-      <Typography className="text-foreground text-sm font-semibold shrink-0">
-        {label}:
-      </Typography>
-      {hasBrowseLink ? (
-        <FilePathLink
-          fileInfo={fileInfo}
-          pathPreference={pathPreference}
-          zonesAndFspMap={zonesAndFspMap}
-        />
-      ) : (
-        <Typography className="text-foreground font-mono text-sm break-all">
-          {fileInfo.path}
-        </Typography>
-      )}
-    </div>
-  );
-}
-
 /** Best-effort GitHub repo link for an app manifest URL; null if not parseable. */
 function appRepoUrl(appUrl: string): string | null {
   try {
@@ -288,14 +252,12 @@ function appRepoUrl(appUrl: string): string | null {
 
 const RECENT_OUTPUT_LINES = 20;
 
-/** The job Overview tab: status, timeline, environment, files, recent output. */
+/** The job Overview tab: status, execution details, recent output. */
 function JobOverview({
   job,
   stdoutContent,
   stderrContent,
   stdoutPending,
-  pathPreference,
-  zonesAndFspMap,
   isDarkMode,
   onViewStdout,
   onViewStderr
@@ -304,8 +266,6 @@ function JobOverview({
   readonly stdoutContent: string | null | undefined;
   readonly stderrContent: string | null | undefined;
   readonly stdoutPending: boolean;
-  readonly pathPreference: ['linux_path' | 'windows_path' | 'mac_path'];
-  readonly zonesAndFspMap: Record<string, unknown>;
   readonly isDarkMode: boolean;
   readonly onViewStdout: () => void;
   readonly onViewStderr: () => void;
@@ -317,13 +277,6 @@ function JobOverview({
     : null;
   const exitMeaning = exitCodeMeaning(job.exit_code);
   const repoUrl = appRepoUrl(job.app_url);
-
-  const hasEnvironment = Boolean(
-    (job.requirements && job.requirements.length > 0) ||
-    job.command ||
-    job.container ||
-    job.conda_env
-  );
 
   const stdoutTail =
     stdoutContent !== null && stdoutContent !== undefined
@@ -339,20 +292,8 @@ function JobOverview({
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <InfoCard title="Status">
-          <div className="flex items-center gap-3 py-1">
-            <JobStatusBadge status={job.status} />
-            {job.exit_code !== null && job.exit_code !== undefined ? (
-              <Typography className="text-foreground">
-                Exit code: {job.exit_code}
-                {exitMeaning ? ` (${exitMeaning})` : ''}
-              </Typography>
-            ) : null}
-          </div>
           <InfoRow label={isActive ? 'Elapsed' : 'Runtime'} value={runtime} />
           <InfoRow label="Queue wait" value={queueWait} />
-        </InfoCard>
-
-        <InfoCard title="Timeline">
           <InfoRow label="Submitted" value={formatDateString(job.created_at)} />
           <InfoRow
             label="Started"
@@ -362,9 +303,17 @@ function JobOverview({
             label="Finished"
             value={job.finished_at ? formatDateString(job.finished_at) : null}
           />
+          <InfoRow
+            label="Exit code"
+            value={
+              job.exit_code !== null && job.exit_code !== undefined
+                ? `${job.exit_code}${exitMeaning ? ` (${exitMeaning})` : ''}`
+                : null
+            }
+          />
         </InfoCard>
 
-        <InfoCard title="What ran">
+        <InfoCard title="Execution">
           <InfoRow
             label="App"
             value={
@@ -380,59 +329,27 @@ function JobOverview({
             label="Type"
             value={job.entry_point_type === 'service' ? 'Service' : 'Batch job'}
           />
+          {job.requirements && job.requirements.length > 0 ? (
+            <div className="flex gap-2 py-1 items-baseline flex-wrap">
+              <Typography className="text-foreground text-sm font-semibold shrink-0">
+                Runtime:
+              </Typography>
+              {job.requirements.map(req => (
+                <span
+                  className="px-2 py-0.5 rounded bg-surface-light text-foreground text-xs font-mono"
+                  key={req}
+                >
+                  {req}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <InfoRow label="Command" value={job.command} />
+          <InfoRow label="Container" value={job.container} />
+          <InfoRow label="Container args" value={job.container_args} />
+          <InfoRow label="Conda env" value={job.conda_env} />
           <InfoRow label="Cluster job" value={job.cluster_job_id} />
         </InfoCard>
-
-        <InfoCard title="Files">
-          <WhereRow
-            fileInfo={job.files?.work_dir}
-            label="Run directory"
-            pathPreference={pathPreference}
-            zonesAndFspMap={zonesAndFspMap}
-          />
-          <WhereRow
-            fileInfo={job.files?.script}
-            label="Script"
-            pathPreference={pathPreference}
-            zonesAndFspMap={zonesAndFspMap}
-          />
-          <WhereRow
-            fileInfo={job.files?.stdout}
-            label="Output log"
-            pathPreference={pathPreference}
-            zonesAndFspMap={zonesAndFspMap}
-          />
-          <WhereRow
-            fileInfo={job.files?.stderr}
-            label="Error log"
-            pathPreference={pathPreference}
-            zonesAndFspMap={zonesAndFspMap}
-          />
-        </InfoCard>
-
-        {hasEnvironment ? (
-          <InfoCard title="Environment">
-            {job.requirements && job.requirements.length > 0 ? (
-              <div className="flex gap-2 py-1 items-center flex-wrap">
-                <Typography className="text-foreground text-sm font-semibold shrink-0">
-                  Runtime:
-                </Typography>
-                {job.requirements.map(req => (
-                  <span
-                    className="px-2 py-0.5 rounded bg-surface-light text-foreground text-xs font-mono"
-                    key={req}
-                  >
-                    {req}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-            <InfoRow label="Command" value={job.command} />
-            <InfoRow label="Container" value={job.container} />
-            <InfoRow label="Container args" value={job.container_args} />
-            <InfoRow label="Conda env" value={job.conda_env} />
-          </InfoCard>
-        ) : null}
       </div>
 
       {job.started_at ? (
@@ -790,11 +707,9 @@ export default function JobDetail() {
                 job={job}
                 onViewStderr={() => setActiveTab('stderr')}
                 onViewStdout={() => setActiveTab('stdout')}
-                pathPreference={pathPreference}
                 stderrContent={stderrQuery.data}
                 stdoutContent={stdoutQuery.data}
                 stdoutPending={stdoutQuery.isPending}
-                zonesAndFspMap={zonesAndFspQuery.data || {}}
               />
             </Tabs.Panel>
 
