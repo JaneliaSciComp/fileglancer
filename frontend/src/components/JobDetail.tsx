@@ -209,11 +209,11 @@ function InfoCard({
   readonly children: ReactNode;
 }) {
   return (
-    <div>
+    <div className="flex flex-col h-full">
       <Typography className="text-foreground font-bold mb-1">
         {title}
       </Typography>
-      <Card className="p-3 dark:border-surface-light">{children}</Card>
+      <Card className="p-3 dark:border-surface-light grow">{children}</Card>
     </div>
   );
 }
