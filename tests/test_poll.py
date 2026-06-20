@@ -11,7 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch, MagicMock, AsyncMock, call
 
-from fileglancer.apps.core import _poll_jobs, _poll_local_jobs, _POLL_LOCK_PATH
+from fileglancer.apps.jobs import _poll_jobs, _poll_local_jobs, _POLL_LOCK_PATH
 
 
 # ---------------------------------------------------------------------------
@@ -56,8 +56,8 @@ class TestPollSkipsSameStatus:
     _poll_jobs must NOT call update_job_status.  This was the bug that
     caused 'RUNNING -> RUNNING' log spam with multiple workers."""
 
-    @patch("fileglancer.apps.core._dispatch", new_callable=AsyncMock)
-    @patch("fileglancer.apps.core.db")
+    @patch("fileglancer.apps.jobs._dispatch", new_callable=AsyncMock)
+    @patch("fileglancer.apps.jobs.db")
     def test_same_status_not_written(self, mock_db, mock_dispatch):
         settings = _make_settings()
 
@@ -84,8 +84,8 @@ class TestPollSkipsSameStatus:
 
         mock_db.update_job_status.assert_not_called()
 
-    @patch("fileglancer.apps.core._dispatch", new_callable=AsyncMock)
-    @patch("fileglancer.apps.core.db")
+    @patch("fileglancer.apps.jobs._dispatch", new_callable=AsyncMock)
+    @patch("fileglancer.apps.jobs.db")
     def test_changed_status_is_written(self, mock_db, mock_dispatch):
         settings = _make_settings()
 
@@ -114,8 +114,8 @@ class TestPollSkipsSameStatus:
         args, kwargs = mock_db.update_job_status.call_args
         assert args == (mock_session, 1, "DONE")
 
-    @patch("fileglancer.apps.core._dispatch", new_callable=AsyncMock)
-    @patch("fileglancer.apps.core.db")
+    @patch("fileglancer.apps.jobs._dispatch", new_callable=AsyncMock)
+    @patch("fileglancer.apps.jobs.db")
     def test_job_statuses_passed_to_worker(self, mock_db, mock_dispatch):
         """The poll request must include job_statuses so the worker seeds
         stubs with the correct status instead of defaulting to PENDING."""
@@ -187,7 +187,7 @@ class TestPollLockElection:
             # Run one iteration of the poll loop with a short sleep
             # The loop should fail to acquire the lock and skip
             async def run_one_iteration():
-                with patch("fileglancer.apps.core._poll_jobs", fake_poll_jobs):
+                with patch("fileglancer.apps.jobs._poll_jobs", fake_poll_jobs):
                     # Run the poll loop body once (not the infinite loop)
                     try:
                         with open(_POLL_LOCK_PATH, "w") as f:
@@ -270,7 +270,7 @@ class TestPollLocalJobs:
             job = _make_db_job(1, "1", "PENDING", work_dir=str(tmp_path))
             mock_session = MagicMock()
 
-            with patch("fileglancer.apps.core.db") as mock_db:
+            with patch("fileglancer.apps.jobs.db") as mock_db:
                 result = _poll_local_jobs(mock_session, [job])
 
             assert result is True  # still active
@@ -293,7 +293,7 @@ class TestPollLocalJobs:
         job = _make_db_job(1, "1", "RUNNING", work_dir=str(tmp_path))
         mock_session = MagicMock()
 
-        with patch("fileglancer.apps.core.db") as mock_db:
+        with patch("fileglancer.apps.jobs.db") as mock_db:
             result = _poll_local_jobs(mock_session, [job])
 
         assert result is False  # no more active jobs
@@ -313,7 +313,7 @@ class TestPollLocalJobs:
         job = _make_db_job(1, "1", "RUNNING", work_dir=str(tmp_path))
         mock_session = MagicMock()
 
-        with patch("fileglancer.apps.core.db") as mock_db:
+        with patch("fileglancer.apps.jobs.db") as mock_db:
             result = _poll_local_jobs(mock_session, [job])
 
         assert result is False
@@ -330,7 +330,7 @@ class TestPollLocalJobs:
             job = _make_db_job(1, "1", "RUNNING", work_dir=str(tmp_path))
             mock_session = MagicMock()
 
-            with patch("fileglancer.apps.core.db") as mock_db:
+            with patch("fileglancer.apps.jobs.db") as mock_db:
                 _poll_local_jobs(mock_session, [job])
 
             mock_db.update_job_status.assert_not_called()
@@ -343,7 +343,7 @@ class TestPollLocalJobs:
         job = _make_db_job(1, "1", "PENDING", work_dir=str(tmp_path))
         mock_session = MagicMock()
 
-        with patch("fileglancer.apps.core.db") as mock_db:
+        with patch("fileglancer.apps.jobs.db") as mock_db:
             result = _poll_local_jobs(mock_session, [job])
 
         assert result is True
@@ -361,7 +361,7 @@ class TestPollLocalJobs:
             job = _make_db_job(1, "1", "PENDING", work_dir=str(tmp_path))
             mock_session = MagicMock()
 
-            with patch("fileglancer.apps.core.db") as mock_db:
+            with patch("fileglancer.apps.jobs.db") as mock_db:
                 mock_db.get_db_session.return_value.__enter__ = lambda _: mock_session
                 mock_db.get_db_session.return_value.__exit__ = MagicMock(return_value=False)
                 mock_db.get_active_jobs.return_value = [job]

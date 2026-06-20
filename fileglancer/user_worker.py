@@ -643,7 +643,7 @@ def _action_update_file(request: dict, ctx: WorkerContext, filestore, fsps) -> d
 @action("validate_paths")
 def _action_validate_paths(request: dict, ctx: WorkerContext) -> dict:
     """Validate file/directory paths for app parameters."""
-    from fileglancer.apps.core import validate_path_in_filestore
+    from fileglancer.apps.command import validate_path_in_filestore
 
     paths = request["paths"]
     fsps = ctx.db.get_file_share_paths()
@@ -727,7 +727,7 @@ def _action_generate_ssh_key(request: dict, ctx: WorkerContext) -> dict:
 @action("get_job_file")
 def _action_get_job_file(request: dict, ctx: WorkerContext) -> dict:
     """Read job file content (script, stdout, stderr)."""
-    from fileglancer.apps.core import read_job_file
+    from fileglancer.apps.jobfiles import read_job_file
     job_id = request["job_id"]
     file_type = request["file_type"]
 
@@ -744,7 +744,7 @@ def _action_get_job_file(request: dict, ctx: WorkerContext) -> dict:
 @action("get_service_url")
 def _action_get_service_url(request: dict, ctx: WorkerContext) -> dict:
     """Read service URL from job work directory."""
-    from fileglancer.apps.core import get_service_url
+    from fileglancer.apps.jobfiles import get_service_url
 
     job_id = request["job_id"]
     db_job = ctx.db.get_job(job_id, ctx.username)
@@ -1025,7 +1025,7 @@ def _action_reconnect(request: dict, ctx: WorkerContext) -> dict:
 @action("ensure_repo")
 def _action_ensure_repo(request: dict, ctx: WorkerContext) -> dict:
     """Clone or update a GitHub repo in the current user's cache."""
-    from fileglancer.apps.core import _ensure_repo_cache
+    from fileglancer.apps.manifest import _ensure_repo_cache
     repo_dir = _run_async(_ensure_repo_cache(
         url=request["url"],
         pull=request.get("pull", False),
@@ -1036,7 +1036,7 @@ def _action_ensure_repo(request: dict, ctx: WorkerContext) -> dict:
 @action("discover_manifests")
 def _action_discover_manifests(request: dict, ctx: WorkerContext) -> dict:
     """Clone/pull repo and discover all manifests."""
-    from fileglancer.apps.core import _ensure_repo_cache, _find_manifests_in_repo
+    from fileglancer.apps.manifest import _ensure_repo_cache, _find_manifests_in_repo
     repo_dir = _run_async(_ensure_repo_cache(
         url=request["url"],
         pull=True,
@@ -1053,7 +1053,7 @@ def _action_discover_manifests(request: dict, ctx: WorkerContext) -> dict:
 @action("read_manifest")
 def _action_read_manifest(request: dict, ctx: WorkerContext) -> dict:
     """Fetch and read a single manifest from a cached repo."""
-    from fileglancer.apps.core import _ensure_repo_cache, _read_manifest_file
+    from fileglancer.apps.manifest import _ensure_repo_cache, _read_manifest_file
     repo_dir = _run_async(_ensure_repo_cache(
         url=request["url"],
         pull=request.get("pull", False),

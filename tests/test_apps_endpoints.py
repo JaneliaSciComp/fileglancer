@@ -53,11 +53,15 @@ def test_app(temp_dir):
 
     import fileglancer.settings
     import fileglancer.database
-    import fileglancer.apps.core
+    import fileglancer.apps.manifest
+    import fileglancer.apps.jobs
+    import fileglancer.apps.jobfiles
     original_get_settings = fileglancer.settings.get_settings
     fileglancer.settings.get_settings = lambda: settings
     fileglancer.database.get_settings = lambda: settings
-    fileglancer.apps.core.get_settings = lambda: settings
+    fileglancer.apps.manifest.get_settings = lambda: settings
+    fileglancer.apps.jobs.get_settings = lambda: settings
+    fileglancer.apps.jobfiles.get_settings = lambda: settings
     # Migrations are unneeded here since create_all built the schema.
     fileglancer.database._migrations_run = True
 
@@ -68,7 +72,9 @@ def test_app(temp_dir):
     dispose_engine(db_url)
     fileglancer.settings.get_settings = original_get_settings
     fileglancer.database.get_settings = original_get_settings
-    fileglancer.apps.core.get_settings = original_get_settings
+    fileglancer.apps.manifest.get_settings = original_get_settings
+    fileglancer.apps.jobs.get_settings = original_get_settings
+    fileglancer.apps.jobfiles.get_settings = original_get_settings
     fileglancer.database._migrations_run = False
 
 
@@ -141,9 +147,9 @@ def test_get_apps_backfills_null_manifest(test_client, db_session):
 
     # refresh_cached_manifest calls these directly inside apps/core.py, so
     # patches must target the core namespace, not the apps re-export.
-    with patch("fileglancer.apps.core.fetch_app_manifest",
+    with patch("fileglancer.apps.manifest.fetch_app_manifest",
                new=AsyncMock(return_value=manifest)) as mock_fetch, \
-         patch("fileglancer.apps.core.get_app_branch",
+         patch("fileglancer.apps.manifest.get_app_branch",
                new=AsyncMock(return_value="dev")) as mock_branch:
         response = test_client.get("/api/apps")
 
@@ -171,9 +177,9 @@ def test_get_apps_handles_schema_drift(test_client, db_session):
     _seed_app(db_session, manifest={"name": "Broken"}, branch=None)
     fresh = _make_manifest(name="Recovered")
 
-    with patch("fileglancer.apps.core.fetch_app_manifest",
+    with patch("fileglancer.apps.manifest.fetch_app_manifest",
                new=AsyncMock(return_value=fresh)) as mock_fetch, \
-         patch("fileglancer.apps.core.get_app_branch",
+         patch("fileglancer.apps.manifest.get_app_branch",
                new=AsyncMock(return_value="main")):
         response = test_client.get("/api/apps")
 
@@ -188,9 +194,9 @@ def test_get_apps_handles_schema_drift(test_client, db_session):
 def test_get_apps_backfill_handles_fetch_failure(test_client, db_session):
     _seed_app(db_session, manifest=None, branch=None, name="Cached Name")
 
-    with patch("fileglancer.apps.core.fetch_app_manifest",
+    with patch("fileglancer.apps.manifest.fetch_app_manifest",
                new=AsyncMock(side_effect=RuntimeError("network down"))), \
-         patch("fileglancer.apps.core.get_app_branch",
+         patch("fileglancer.apps.manifest.get_app_branch",
                new=AsyncMock(side_effect=RuntimeError("nope"))):
         response = test_client.get("/api/apps")
 
@@ -300,7 +306,7 @@ def test_fetch_manifest_uses_cache_for_installed_app(test_client, db_session):
     cached = _make_manifest(name="Cached App")
     _seed_app(db_session, manifest=cached.model_dump(mode="json"))
 
-    with patch("fileglancer.apps.core.fetch_app_manifest",
+    with patch("fileglancer.apps.manifest.fetch_app_manifest",
                new=AsyncMock()) as mock_fetch:
         response = test_client.post("/api/apps/manifest", json={
             "url": "https://github.com/owner/repo",
@@ -316,7 +322,7 @@ def test_fetch_manifest_reads_disk_for_uninstalled(test_client, db_session):
     """Preview of an uninstalled URL reads disk and does not create a row."""
     fresh = _make_manifest(name="Preview Only")
 
-    with patch("fileglancer.apps.core.fetch_app_manifest",
+    with patch("fileglancer.apps.manifest.fetch_app_manifest",
                new=AsyncMock(return_value=fresh)) as mock_fetch:
         response = test_client.post("/api/apps/manifest", json={
             "url": "https://github.com/new/repo",
@@ -335,9 +341,9 @@ def test_fetch_manifest_backfills_null_cache(test_client, db_session):
     _seed_app(db_session, manifest=None, name="Stale", branch=None)
     fresh = _make_manifest(name="Backfilled")
 
-    with patch("fileglancer.apps.core.fetch_app_manifest",
+    with patch("fileglancer.apps.manifest.fetch_app_manifest",
                new=AsyncMock(return_value=fresh)) as mock_fetch, \
-         patch("fileglancer.apps.core.get_app_branch",
+         patch("fileglancer.apps.manifest.get_app_branch",
                new=AsyncMock(return_value="main")):
         response = test_client.post("/api/apps/manifest", json={
             "url": "https://github.com/owner/repo",
@@ -363,7 +369,7 @@ async def test_get_or_load_manifest_cache_hit(test_app, db_session):
     cached = _make_manifest(name="From Cache")
     _seed_app(db_session, manifest=cached.model_dump(mode="json"))
 
-    with patch("fileglancer.apps.core.fetch_app_manifest",
+    with patch("fileglancer.apps.manifest.fetch_app_manifest",
                new=AsyncMock()) as mock_fetch:
         manifest = await get_or_load_manifest(
             TEST_USERNAME, "https://github.com/owner/repo", "",
@@ -379,7 +385,7 @@ async def test_get_or_load_manifest_preview_no_row(test_app, db_session):
     from fileglancer.apps import get_or_load_manifest
 
     fresh = _make_manifest(name="Preview")
-    with patch("fileglancer.apps.core.fetch_app_manifest",
+    with patch("fileglancer.apps.manifest.fetch_app_manifest",
                new=AsyncMock(return_value=fresh)) as mock_fetch:
         manifest = await get_or_load_manifest(
             TEST_USERNAME, "https://github.com/x/y", "",
@@ -398,9 +404,9 @@ async def test_refresh_cached_manifest_syncs_existing_row(test_app, db_session):
     _seed_app(db_session, manifest=None, name="Stale")
     fresh = _make_manifest(name="Synced")
 
-    with patch("fileglancer.apps.core.fetch_app_manifest",
+    with patch("fileglancer.apps.manifest.fetch_app_manifest",
                new=AsyncMock(return_value=fresh)), \
-         patch("fileglancer.apps.core.get_app_branch",
+         patch("fileglancer.apps.manifest.get_app_branch",
                new=AsyncMock(return_value="main")):
         manifest, branch = await refresh_cached_manifest(
             TEST_USERNAME, "https://github.com/owner/repo", "",
@@ -422,9 +428,9 @@ async def test_refresh_cached_manifest_no_op_for_uninstalled(test_app, db_sessio
     from fileglancer.apps import refresh_cached_manifest
 
     fresh = _make_manifest()
-    with patch("fileglancer.apps.core.fetch_app_manifest",
+    with patch("fileglancer.apps.manifest.fetch_app_manifest",
                new=AsyncMock(return_value=fresh)), \
-         patch("fileglancer.apps.core.get_app_branch",
+         patch("fileglancer.apps.manifest.get_app_branch",
                new=AsyncMock(return_value="main")):
         manifest, branch = await refresh_cached_manifest(
             TEST_USERNAME, "https://github.com/new/repo", "",
@@ -442,9 +448,9 @@ async def test_refresh_cached_manifest_bumps_updated_at(test_app, db_session):
     _seed_app(db_session, manifest=None, name="Old")
     fresh = _make_manifest(name="Updated")
 
-    with patch("fileglancer.apps.core.fetch_app_manifest",
+    with patch("fileglancer.apps.manifest.fetch_app_manifest",
                new=AsyncMock(return_value=fresh)), \
-         patch("fileglancer.apps.core.get_app_branch",
+         patch("fileglancer.apps.manifest.get_app_branch",
                new=AsyncMock(return_value="main")):
         await refresh_cached_manifest(
             TEST_USERNAME, "https://github.com/owner/repo", "",

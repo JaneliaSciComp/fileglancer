@@ -95,11 +95,15 @@ def test_app(temp_dir):
 
     import fileglancer.settings
     import fileglancer.database
-    import fileglancer.apps.core
+    import fileglancer.apps.manifest
+    import fileglancer.apps.jobs
+    import fileglancer.apps.jobfiles
     original_get_settings = fileglancer.settings.get_settings
     fileglancer.settings.get_settings = lambda: settings
     fileglancer.database.get_settings = lambda: settings
-    fileglancer.apps.core.get_settings = lambda: settings
+    fileglancer.apps.manifest.get_settings = lambda: settings
+    fileglancer.apps.jobs.get_settings = lambda: settings
+    fileglancer.apps.jobfiles.get_settings = lambda: settings
     fileglancer.database._migrations_run = True
 
     app = create_app(settings)
@@ -109,7 +113,9 @@ def test_app(temp_dir):
     dispose_engine(db_url)
     fileglancer.settings.get_settings = original_get_settings
     fileglancer.database.get_settings = original_get_settings
-    fileglancer.apps.core.get_settings = original_get_settings
+    fileglancer.apps.manifest.get_settings = original_get_settings
+    fileglancer.apps.jobs.get_settings = original_get_settings
+    fileglancer.apps.jobfiles.get_settings = original_get_settings
     fileglancer.database._migrations_run = False
 
 
