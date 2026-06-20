@@ -334,7 +334,7 @@ class AppParameter(BaseModel):
     description: Optional[str] = Field(description="Description of the parameter", default=None)
     required: bool = Field(description="Whether the parameter is required", default=False)
     default: Optional[Any] = Field(description="Default value for the parameter", default=None)
-    options: Optional[List[str|int|float]] = Field(description="Allowed values for enum type", default=None)
+    options: Optional[List[str]] = Field(description="Allowed values for enum type", default=None)
     min: Optional[float] = Field(description="Minimum value for numeric types", default=None)
     max: Optional[float] = Field(description="Maximum value for numeric types", default=None)
     pattern: Optional[str] = Field(description="Regex validation pattern for string types", default=None)
@@ -351,6 +351,17 @@ class AppParameter(BaseModel):
             if not stripped:
                 raise ValueError("Flag must have content after dashes")
         return v
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def stringify_options(cls, v):
+        # Enum options may be authored as numbers (e.g. a Nextflow schema with
+        # "enum": [1, 2]). The UI <select> stringifies values and backend
+        # validation compares str(value), so normalize options to strings here
+        # so numeric enums round-trip instead of failing validation.
+        if v is None:
+            return v
+        return [str(item) for item in v]
 
 
 class AppParameterSection(BaseModel):

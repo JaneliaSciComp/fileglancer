@@ -1344,7 +1344,15 @@ export default function AppLaunchForm({
                       />
                     </Accordion.Content>
                   </Accordion.Item>
-                ) : null
+                ) : (
+                  <ParameterFieldRow
+                    error={errors[item.key]}
+                    key={item.key}
+                    onChange={val => handleChange(item.key, val)}
+                    param={item}
+                    value={values[item.key]}
+                  />
+                )
               )}
             </Accordion>
           ) : null}

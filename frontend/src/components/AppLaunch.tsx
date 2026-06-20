@@ -77,11 +77,14 @@ export default function AppLaunch() {
 
   useEffect(() => {
     if (appUrl) {
+      // The manifest identity is (url, manifest_path); reset the selection so
+      // a stale entry point from the previous app isn't carried over.
+      setSelectedEntryPoint(null);
       manifestMutation.mutate({ url: appUrl, manifest_path: manifestPath });
     }
-    // Only fetch on mount
+    // Re-fetch when the app identity (url or manifest path) changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appUrl]);
+  }, [appUrl, manifestPath]);
 
   const manifest = manifestMutation.data;
 

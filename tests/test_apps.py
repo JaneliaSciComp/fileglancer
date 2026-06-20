@@ -12,6 +12,7 @@ from fileglancer.model import (
     SUPPORTED_TOOLS,
     AppEntryPoint,
     AppManifest,
+    AppParameter,
     JobSubmitRequest,
 )
 from fileglancer.apps import (
@@ -915,3 +916,75 @@ class TestSafeRepoSubdir:
         (repo / "link").symlink_to(outside)
         with pytest.raises(ValueError):
             _safe_repo_subdir(repo, "link")
+
+
+class TestEnumOptionsNormalization:
+    """Enum options may be authored as numbers (e.g. a Nextflow schema enum).
+    They must normalize to strings so the stringifying UI/API round-trips."""
+
+    def test_numeric_options_become_strings(self):
+        param = AppParameter(name="N", type="enum", options=[1, 2, 3])
+        assert param.options == ["1", "2", "3"]
+
+    def test_string_options_unchanged(self):
+        param = AppParameter(name="Mode", type="enum", options=["a", "b"])
+        assert param.options == ["a", "b"]
+
+    def test_none_options_stay_none(self):
+        param = AppParameter(name="S", type="string")
+        assert param.options is None
+
+    def test_numeric_enum_value_validates(self):
+        # The UI submits the selected option as a string; build_command must
+        # accept it against numeric-authored options.
+        ep = AppEntryPoint(
+            id="run",
+            name="run",
+            command="tool",
+            parameters=[
+                AppParameter(flag="--n", name="N", type="enum", options=[1, 2, 3]),
+            ],
+        )
+        cmd = build_command(ep, {"n": "2"})
+        assert "--n 2" in cmd
+
+    def test_invalid_enum_value_rejected(self):
+        ep = AppEntryPoint(
+            id="run",
+            name="run",
+            command="tool",
+            parameters=[
+                AppParameter(flag="--n", name="N", type="enum", options=[1, 2, 3]),
+            ],
+        )
+        with pytest.raises(ValueError):
+            build_command(ep, {"n": "4"})
+
+
+from fileglancer.apps.pixi import _task_to_entry_point
+
+
+class TestPixiTaskEnv:
+    """Pixi task env vars must be exposed as entry-point env defaults, not as
+    bogus `--env:VAR` CLI flags that `pixi run` rejects."""
+
+    def test_env_mapped_to_entry_point_env(self):
+        ep = _task_to_entry_point(
+            "build", {"cmd": "make", "env": {"FOO": "bar", "N": 3}}
+        )
+        assert ep.env == {"FOO": "bar", "N": "3"}
+
+    def test_env_not_emitted_as_flags(self):
+        ep = _task_to_entry_point(
+            "build", {"cmd": "make", "env": {"FOO": "bar"}}
+        )
+        # No parameter should carry an --env: flag anymore.
+        assert all(
+            p.flag is None or not p.flag.startswith("--env:")
+            for p in ep.flat_parameters()
+        )
+        assert "--env:" not in build_command(ep, {})
+
+    def test_no_env_leaves_env_none(self):
+        ep = _task_to_entry_point("build", {"cmd": "make"})
+        assert ep.env is None
