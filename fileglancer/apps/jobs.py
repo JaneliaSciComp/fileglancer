@@ -440,6 +440,10 @@ async def submit_job(
     """
     settings = get_settings()
 
+    # A null parameter value means "not provided"; drop these so they are
+    # neither used when building the command nor stored on the job record.
+    parameters = {k: v for k, v in parameters.items() if v is not None}
+
     # Read manifest from the cache when available; fall back to disk.
     manifest = await get_or_load_manifest(username, app_url, manifest_path)
 
@@ -482,12 +486,18 @@ async def submit_job(
     # Create DB record first to get job ID for the work directory
     resources_dict = None
     if resource_spec:
+        # Drop null values so they aren't stored on the job record; a missing
+        # value means "use the cluster default".
         resources_dict = {
-            "cpus": resource_spec.cpus,
-            "memory": resource_spec.memory,
-            "walltime": resource_spec.walltime,
-            "queue": resource_spec.queue,
-            "extra_args": " ".join(resource_spec.extra_args) if resource_spec.extra_args else None,
+            k: v
+            for k, v in {
+                "cpus": resource_spec.cpus,
+                "memory": resource_spec.memory,
+                "walltime": resource_spec.walltime,
+                "queue": resource_spec.queue,
+                "extra_args": " ".join(resource_spec.extra_args) if resource_spec.extra_args else None,
+            }.items()
+            if v is not None
         }
 
     with db.get_db_session(settings.db_url) as session:
@@ -511,6 +521,9 @@ async def submit_job(
             post_run=effective_post_run,
             container=effective_container,
             container_args=effective_container_args,
+            command=entry_point.command,
+            conda_env=entry_point.conda_env,
+            requirements=effective_requirements,
         )
         job_id = db_job.id
 

@@ -247,6 +247,22 @@ class TestGetJobFilePaths:
         assert files["script"]["path"] == "/share/jobs/1/script.sh"
         assert files["script"]["exists"] is False
 
+    def test_work_dir_entry_uses_stored_browse_base(self):
+        files = get_job_file_paths(_fake_job())
+        # The work dir's browse link is the stored base itself (no file name
+        # appended), so it can be browsed directly.
+        assert files["work_dir"]["path"] == "/share/jobs/1"
+        assert files["work_dir"]["fsp_name"] == "myshare"
+        assert files["work_dir"]["subpath"] == ".fileglancer/jobs/1"
+        assert files["work_dir"]["exists"] is True
+
+    def test_work_dir_entry_has_no_browse_link_when_base_unresolved(self):
+        files = get_job_file_paths(
+            _fake_job(work_dir_fsp_name=None, work_dir_subpath=None)
+        )
+        assert files["work_dir"]["fsp_name"] is None
+        assert files["work_dir"]["exists"] is False
+
     def test_service_url_only_when_running(self):
         running = get_job_file_paths(
             _fake_job(entry_point_type="service", status="RUNNING")

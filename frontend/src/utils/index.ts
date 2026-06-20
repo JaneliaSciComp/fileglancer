@@ -415,3 +415,11 @@ export type {
 // Re-export filename validation utility
 export { validateFileName } from './validateFileName';
 export type { FileNameValidation } from './validateFileName';
+
+// Re-export job display utilities
+export {
+  formatDuration,
+  stripLsfFooter,
+  tailLines,
+  exitCodeMeaning
+} from './jobDisplay';
