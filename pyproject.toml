@@ -155,6 +155,7 @@ dev-launch = "pixi run uvicorn fileglancer.server:app --no-access-log --port 787
 dev-launch-remote = "pixi run uvicorn fileglancer.server:app --host 0.0.0.0 --port 7878 --reload --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
 prod-launch-remote = "pixi run uvicorn fileglancer.server:app --workers 10 --host 0.0.0.0 --port 7878 --ssl-keyfile /opt/certs/cert.key --ssl-certfile /opt/certs/cert.crt"
 dev-launch-secure = "python fileglancer/dev_launch.py"
+bump-deps = "python scripts/bump_deps.py"
 migrate = "alembic -c fileglancer/alembic.ini upgrade head"
 migrate-create = "alembic -c fileglancer/alembic.ini revision --autogenerate"
 stamp-db = "python -m fileglancer.stamp_db"
