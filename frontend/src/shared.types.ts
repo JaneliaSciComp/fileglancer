@@ -78,6 +78,7 @@ type AppParameter = {
   max?: number;
   pattern?: string;
   hidden?: boolean;
+  raw?: boolean;
 };
 
 type AppParameterSection = {
@@ -122,7 +123,9 @@ type AppEntryPoint = {
   post_run?: string;
   conda_env?: string;
   container?: string;
+  bind_paths?: string[];
   container_args?: string;
+  requirements?: string[];
 };
 
 type AppManifest = {
