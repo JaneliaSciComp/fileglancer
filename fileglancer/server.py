@@ -1923,9 +1923,15 @@ def create_app(settings):
     async def delete_job(job_id: int,
                          username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
-            deleted = db.delete_job(session, job_id, username)
-            if not deleted:
+            db_job = db.get_job(session, job_id, username)
+            if db_job is None:
                 raise HTTPException(status_code=404, detail="Job not found")
+            if db_job.status in ("PENDING", "RUNNING"):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Job is active; cancel or stop it before deleting.",
+                )
+            db.delete_job(session, job_id, username)
         return {"message": "Job deleted"}
 
     @app.get("/api/jobs/{job_id}/files/{file_type}",

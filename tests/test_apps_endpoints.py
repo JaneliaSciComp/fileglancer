@@ -19,6 +19,9 @@ from fileglancer.database import (
     sessionmaker,
     dispose_engine,
     get_db_session,
+    create_job,
+    get_job,
+    update_job_status,
     list_user_apps,
 )
 from fileglancer.model import AppEntryPoint, AppManifest
@@ -112,6 +115,22 @@ def _seed_app(db_session, *, url="https://github.com/owner/repo",
     db_session.add(row)
     db_session.commit()
     return row
+
+
+def _seed_job(db_session, *, status="DONE"):
+    job = create_job(
+        session=db_session,
+        username=TEST_USERNAME,
+        app_url="https://github.com/owner/repo",
+        app_name="Demo App",
+        entry_point_id="run",
+        entry_point_name="Run",
+        parameters={},
+    )
+    if status != "PENDING":
+        update_job_status(db_session, job.id, status)
+    db_session.refresh(job)
+    return job
 
 
 def test_get_apps_empty(test_client):
@@ -299,6 +318,30 @@ def test_delete_app_removes_row(test_client, db_session):
         params={"url": "https://github.com/owner/repo", "manifest_path": ""},
     )
     assert response.status_code == 404
+
+
+@pytest.mark.parametrize("status", ["PENDING", "RUNNING"])
+def test_delete_active_job_is_rejected(test_client, db_session, status):
+    job = _seed_job(db_session, status=status)
+    job_id = job.id
+
+    response = test_client.delete(f"/api/jobs/{job_id}")
+
+    assert response.status_code == 409
+    assert "cancel or stop" in response.json()["error"]
+    db_session.expire_all()
+    assert get_job(db_session, job_id, TEST_USERNAME) is not None
+
+
+def test_delete_finished_job_removes_row(test_client, db_session):
+    job = _seed_job(db_session, status="DONE")
+    job_id = job.id
+
+    response = test_client.delete(f"/api/jobs/{job_id}")
+
+    assert response.status_code == 200
+    db_session.expire_all()
+    assert get_job(db_session, job_id, TEST_USERNAME) is None
 
 
 def test_fetch_manifest_uses_cache_for_installed_app(test_client, db_session):

@@ -166,7 +166,8 @@ export function createAppsJobsColumns(
           {
             name: 'Delete',
             color: 'text-error',
-            action: props => props.onDelete(props.job.id)
+            action: props => props.onDelete(props.job.id),
+            shouldShow: !canCancel
           }
         ];
 
