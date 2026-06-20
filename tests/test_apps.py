@@ -961,6 +961,45 @@ class TestEnumOptionsNormalization:
             build_command(ep, {"n": "4"})
 
 
+import json
+
+from fileglancer.apps.nextflow import NextflowAdapter
+
+
+class TestNextflowRunsFromWorkDir:
+    """Auto-detected Nextflow apps must run from the job work dir (against the
+    `repo` symlink), not from inside the shared repo clone, so Nextflow's
+    .nextflow.log / .nextflow/ / work/ artifacts don't pollute the cache."""
+
+    def _make_schema(self, tmp_path):
+        (tmp_path / "nextflow_schema.json").write_text(json.dumps({
+            "description": "Test pipeline",
+            "$defs": {
+                "input": {
+                    "title": "Input",
+                    "properties": {"input_dir": {"type": "string"}},
+                }
+            },
+            "allOf": [{"$ref": "#/$defs/input"}],
+        }))
+
+    def test_command_cds_to_work_dir_and_runs_repo(self, tmp_path):
+        self._make_schema(tmp_path)
+        manifest = NextflowAdapter().convert(tmp_path)
+        cmd = manifest.runnables[0].command
+        assert cmd == 'cd "$FG_WORK_DIR" && nextflow run repo -ansi-log false'
+        # Must not run from the current (repo) directory.
+        assert "nextflow run ." not in cmd
+
+    def test_full_command_keeps_profile_before_pipeline_params(self, tmp_path):
+        self._make_schema(tmp_path)
+        manifest = NextflowAdapter().convert(tmp_path)
+        ep = manifest.runnables[0]
+        cmd = build_command(ep, {"profile": "janeliaLSF", "input_dir": "/data/in"})
+        assert cmd.startswith('cd "$FG_WORK_DIR" && nextflow run repo -ansi-log false')
+        assert cmd.index("-profile") < cmd.index("--input_dir")
+
+
 from fileglancer.apps.pixi import _task_to_entry_point
 
 

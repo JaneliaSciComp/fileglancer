@@ -160,11 +160,18 @@ class NextflowAdapter:
             ),
         ]
 
+        # Run from the job's work dir rather than the repo clone. `repo` is a
+        # symlink to the clone inside the work dir, so Nextflow resolves the
+        # pipeline from there (the directory form lets it find the main script
+        # via main.nf or the manifest's mainScript). Launching from the work
+        # dir keeps Nextflow's launch-directory artifacts — .nextflow.log,
+        # the .nextflow/ cache/history, and work/ — out of the shared repo
+        # cache, where concurrent jobs would otherwise collide.
         entry_point = AppEntryPoint(
             id="run",
             name="Run pipeline",
             description=description,
-            command="nextflow run . -ansi-log false",
+            command='cd "$FG_WORK_DIR" && nextflow run repo -ansi-log false',
             parameters=parameters,
             env_parameters=env_parameters,
         )
