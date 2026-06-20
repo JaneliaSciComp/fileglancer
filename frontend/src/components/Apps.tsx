@@ -16,6 +16,8 @@ import {
   useUnshareListingMutation
 } from '@/queries/appsQueries';
 import FgButton from './designSystem/atoms/FgButton';
+import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
+import { DOCS_BASE_URL } from '@/constants/docs';
 import type { UserApp } from '@/shared.types';
 
 export default function Apps() {
@@ -105,7 +107,12 @@ export default function Apps() {
     <div>
       <Typography className="mb-6 text-foreground">
         Run command-line tools on the compute cluster. Browse the App Catalog to
-        find shared apps, or add one from a GitHub URL.
+        find shared apps, or add one from a GitHub URL. If you want to create
+        your own app, see the{' '}
+        <FgExternalLink href={`${DOCS_BASE_URL}/authoring/overview/`}>
+          authoring guide
+        </FgExternalLink>
+        .
       </Typography>
 
       <div className="mb-6">

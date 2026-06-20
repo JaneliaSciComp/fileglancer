@@ -10,6 +10,7 @@ import { MdTour } from 'react-icons/md';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import useVersionQuery from '@/queries/versionQuery';
 import { buildUrl } from '@/utils';
+import { DOCS_BASE_URL } from '@/constants/docs';
 import StartTour from '@/components/tours/StartTour';
 
 type HelpLink = {
@@ -33,7 +34,7 @@ function getHelpLinks(version: string | undefined): HelpLink[] {
       title: 'User Manual',
       description:
         'Comprehensive guide to Fileglancer features and functionality',
-      url: 'https://fileglancer-docs.janelia.org'
+      url: DOCS_BASE_URL
     },
     {
       icon: TbBrandGithub,
