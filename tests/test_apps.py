@@ -849,3 +849,69 @@ class TestRunGitTimeout:
             )
 
         assert time.monotonic() - start < 1.0
+
+
+from fileglancer.apps.manifest import validate_manifest_path, _safe_repo_subdir
+
+
+class TestValidateManifestPath:
+    """manifest_path comes from API bodies/query params, so it must be rejected
+    when it could escape the repo clone or inject shell content into the job
+    script."""
+
+    def test_empty_is_root(self):
+        assert validate_manifest_path("") == ""
+
+    def test_simple_relative_paths_pass(self):
+        assert validate_manifest_path("subdir") == "subdir"
+        assert validate_manifest_path("a/b/c") == "a/b/c"
+
+    def test_normalizes_dot_and_redundant_separators(self):
+        assert validate_manifest_path("./a") == "a"
+        assert validate_manifest_path("a//b") == "a/b"
+        assert validate_manifest_path("a/./b") == "a/b"
+
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            "..",
+            "../escape",
+            "a/../../etc/passwd",
+            "/etc/passwd",
+            "/abs/path",
+            "a\\b",
+            "a\x00b",
+        ],
+    )
+    def test_unsafe_paths_rejected(self, bad):
+        with pytest.raises(ValueError):
+            validate_manifest_path(bad)
+
+    def test_shell_metacharacters_allowed_but_contained(self):
+        # Shell metacharacters in a directory name are not a traversal risk and
+        # are neutralized by shlex.quote when used in the job script, so the
+        # validator accepts them (they remain a single path segment).
+        assert validate_manifest_path('weird;$(rm -rf)') == 'weird;$(rm -rf)'
+
+
+class TestSafeRepoSubdir:
+    def test_resolves_within_repo(self, tmp_path):
+        (tmp_path / "sub").mkdir()
+        assert _safe_repo_subdir(tmp_path, "sub") == (tmp_path / "sub").resolve()
+
+    def test_root_when_empty(self, tmp_path):
+        assert _safe_repo_subdir(tmp_path, "") == tmp_path.resolve()
+
+    def test_traversal_rejected(self, tmp_path):
+        with pytest.raises(ValueError):
+            _safe_repo_subdir(tmp_path, "../outside")
+
+    def test_symlink_escaping_repo_rejected(self, tmp_path):
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        # A symlink inside the repo that points out of it must not be accepted.
+        (repo / "link").symlink_to(outside)
+        with pytest.raises(ValueError):
+            _safe_repo_subdir(repo, "link")

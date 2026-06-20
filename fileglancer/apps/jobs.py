@@ -22,6 +22,7 @@ from fileglancer.apps.manifest import (
     _dispatch,
     _ensure_repo_cache,
     get_or_load_manifest,
+    validate_manifest_path,
 )
 from fileglancer.apps.command import (
     build_command,
@@ -440,6 +441,11 @@ async def submit_job(
     """
     settings = get_settings()
 
+    # Reject traversal/unsafe manifest paths before they reach disk reads or
+    # the generated job script. get_or_load_manifest may serve a cached row
+    # without hitting fetch_app_manifest, so validate here too.
+    validate_manifest_path(manifest_path)
+
     # A null parameter value means "not provided"; drop these so they are
     # neither used when building the command nor stored on the job record.
     parameters = {k: v for k, v in parameters.items() if v is not None}
@@ -578,7 +584,10 @@ async def submit_job(
         preamble_lines.append(f"export PATH=$PATH:{path_suffix}")
     if entry_point.type == "service":
         preamble_lines.append('export SERVICE_URL_PATH="$FG_WORK_DIR/service_url"')
-    preamble_lines.append(f'cd "$FG_WORK_DIR/{cd_suffix}"')
+    # cd_suffix may include a Git-derived directory name (manifest_path), so
+    # shell-escape it. FG_WORK_DIR stays in its own double-quoted segment so it
+    # still expands; the relative suffix is quoted separately.
+    preamble_lines.append(f'cd "$FG_WORK_DIR"/{shlex.quote(cd_suffix)}')
     script_parts = ["\n".join(preamble_lines)]
 
     # Conda environment activation

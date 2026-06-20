@@ -4,7 +4,7 @@ import asyncio
 import os
 import re
 from contextlib import suppress
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import yaml
 from loguru import logger
@@ -82,6 +82,57 @@ def _parse_github_url(url: str) -> tuple[str, str, str | None]:
         )
 
     return owner, repo, branch
+
+
+def validate_manifest_path(manifest_path: str) -> str:
+    """Validate and normalize a user-supplied manifest path.
+
+    A manifest path is a directory path, relative to the repository root, that
+    locates a runnables.yaml (or auto-detected project). It originates from API
+    request bodies and query params, so it must never escape the cloned repo
+    (path traversal) nor carry shell-significant content into the generated job
+    script.
+
+    Returns the normalized relative POSIX path ("" for the repo root). Raises
+    ValueError for NUL bytes, backslashes, absolute paths, or '..' segments.
+    """
+    if not manifest_path:
+        return ""
+    if "\x00" in manifest_path:
+        raise ValueError("manifest_path must not contain NUL bytes")
+    if "\\" in manifest_path:
+        raise ValueError(
+            f"manifest_path must use '/' separators, not '\\': '{manifest_path}'"
+        )
+    pure = PurePosixPath(manifest_path)
+    if pure.is_absolute():
+        raise ValueError(
+            f"manifest_path must be relative, not absolute: '{manifest_path}'"
+        )
+    safe_parts: list[str] = []
+    for part in pure.parts:
+        # PurePosixPath already drops empty and '.' segments.
+        if part == "..":
+            raise ValueError(
+                f"manifest_path must not contain '..' segments: '{manifest_path}'"
+            )
+        safe_parts.append(part)
+    return "/".join(safe_parts)
+
+
+def _safe_repo_subdir(repo_dir: Path, manifest_path: str) -> Path:
+    """Resolve manifest_path under repo_dir, guaranteeing it stays inside.
+
+    Validates the path, joins it with the repo root, resolves symlinks, and
+    asserts the result is contained within the repo (defends against symlinks
+    that resolve outward). Raises ValueError otherwise.
+    """
+    safe = validate_manifest_path(manifest_path)
+    repo_root = repo_dir.resolve()
+    target = (repo_root / safe).resolve() if safe else repo_root
+    # Raises ValueError if target escaped the repo root.
+    target.relative_to(repo_root)
+    return target
 
 
 async def _run_git(args: list[str], timeout: int = 60) -> tuple[bytes, bytes]:
@@ -317,12 +368,15 @@ async def fetch_app_manifest(url: str, manifest_path: str = "",
     When username is provided, the work is delegated to a worker subprocess
     running as the target user.
     """
+    # Reject traversal/unsafe input early, before any worker round-trip.
+    validate_manifest_path(manifest_path)
+
     if username:
         result = await _dispatch(username, "read_manifest", url=url, manifest_path=manifest_path)
         return AppManifest(**result["manifest"])
 
     repo_dir = await _ensure_repo_cache(url)
-    target_dir = repo_dir / manifest_path if manifest_path else repo_dir
+    target_dir = _safe_repo_subdir(repo_dir, manifest_path)
     return _read_manifest_file(target_dir)
 
 
