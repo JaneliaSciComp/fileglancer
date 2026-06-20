@@ -24,7 +24,6 @@ import {
   HiOutlineRocketLaunch
 } from 'react-icons/hi2';
 import { TbBrandGithub } from 'react-icons/tb';
-import { FaRunning } from 'react-icons/fa';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import ProfileMenu from '@/components/ui/Navbar/ProfileMenu';
@@ -83,11 +82,10 @@ function NavList() {
     { icon: HiOutlineFolder, title: 'Browse Files', href: '/browse' },
     { icon: HiOutlineShare, title: 'Data Links', href: '/links' },
     { icon: HiOutlineEye, title: 'NG Links', href: '/nglinks' },
-    { icon: HiOutlineRocketLaunch, title: 'Apps', href: '/apps' },
     {
-      icon: FaRunning,
-      title: 'Jobs',
-      href: '/apps/jobs',
+      icon: HiOutlineRocketLaunch,
+      title: 'Apps',
+      href: '/apps',
       badge: activeJobCount
     },
     { icon: HiOutlineBriefcase, title: 'Tasks', href: '/jobs' },
@@ -96,9 +94,6 @@ function NavList() {
 
   const filteredLinks = links.filter(link => {
     if (link.href === '/apps' && !showAppsAndJobsPages) {
-      return false;
-    }
-    if (link.href === '/apps/jobs' && !showAppsAndJobsPages) {
       return false;
     }
     if (link.href === '/jobs' && !tasksEnabled) {

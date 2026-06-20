@@ -1,16 +1,22 @@
 """Tests for apps module: miniforge/apptainer requirements, conda_env, and container support."""
 
+import os
 import subprocess
-from unittest.mock import patch, MagicMock
+import sys
 
 import pytest
 from pydantic import ValidationError
 
-from fileglancer.model import SUPPORTED_TOOLS, AppEntryPoint, JobSubmitRequest
+from fileglancer.model import (
+    SUPPORTED_TOOLS,
+    AppEntryPoint,
+    AppManifest,
+    JobSubmitRequest,
+)
 from fileglancer.apps import (
     _TOOL_REGISTRY,
     merge_requirements,
-    verify_requirements,
+    build_requirements_check,
     _container_sif_name,
     _build_container_script,
     build_command,
@@ -76,61 +82,194 @@ class TestCondaEnvValidation:
             AppEntryPoint(id="t", name="T", command="echo", conda_env="/opt/env|bad")
 
 
-# --- verify_requirements tests ---
+# --- build_requirements_check tests ---
 
-class TestVerifyRequirementsMiniforge:
-    @patch("fileglancer.apps.core.shutil.which")
-    def test_miniforge_found_via_conda(self, mock_which):
-        """miniforge binary doesn't exist, but conda does — should pass."""
-        def which_side_effect(name, **kwargs):
-            if name == "miniforge":
-                return None
-            if name == "conda":
-                return "/usr/bin/conda"
-            return None
-        mock_which.side_effect = which_side_effect
+def _make_fake_tool(directory, name, version_output):
+    """Create an executable shim in `directory` that prints `version_output`."""
+    path = directory / name
+    path.write_text(f'#!/bin/bash\necho {version_output!r}\n')
+    path.chmod(0o755)
 
-        # No version constraint, so just checking binary existence
-        verify_requirements(["miniforge"])
 
-    @patch("fileglancer.apps.core.shutil.which")
-    def test_miniforge_not_found(self, mock_which):
-        mock_which.return_value = None
-        with pytest.raises(ValueError, match="not installed or not on PATH"):
-            verify_requirements(["miniforge"])
+def _run_check(reqs, extra_path=None, prefix=""):
+    """Generate the runtime check snippet and execute it with bash.
 
-    @patch("fileglancer.apps.core.subprocess.run")
-    @patch("fileglancer.apps.core.shutil.which")
-    def test_miniforge_version_check(self, mock_which, mock_run):
-        def which_side_effect(name, **kwargs):
-            if name == "miniforge":
-                return None
-            if name == "conda":
-                return "/usr/bin/conda"
-            return None
-        mock_which.side_effect = which_side_effect
+    Returns (returncode, stderr).
+    """
+    snippet = prefix + build_requirements_check(reqs)
+    env = dict(os.environ)
+    if extra_path:
+        env["PATH"] = f"{extra_path}{os.pathsep}{env['PATH']}"
+    proc = subprocess.run(
+        ["bash", "-c", snippet], capture_output=True, text=True, env=env
+    )
+    return proc.returncode, proc.stderr.strip()
 
-        mock_run.return_value = MagicMock(
-            stdout="conda 24.7.1", stderr="", returncode=0
+
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="requirement-check snippet is POSIX bash; it only runs on Linux compute nodes",
+)
+class TestBuildRequirementsCheck:
+    def test_empty_returns_empty_string(self):
+        assert build_requirements_check([]) == ""
+
+    def test_present_tool_passes(self):
+        # bash is always present in the test environment
+        rc, _ = _run_check(["bash"])
+        assert rc == 0
+
+    def test_missing_tool_fails(self):
+        rc, stderr = _run_check(["zzz_no_such_tool_999"])
+        assert rc == 1
+        assert "not installed or not on PATH" in stderr
+        assert "zzz_no_such_tool_999" in stderr
+
+    def test_multiple_errors_aggregated(self):
+        rc, stderr = _run_check(["aaa_missing_111", "bbb_missing_222"])
+        assert rc == 1
+        assert "aaa_missing_111" in stderr
+        assert "bbb_missing_222" in stderr
+
+    def test_version_satisfied(self, tmp_path):
+        _make_fake_tool(tmp_path, "pixi", "pixi 0.50.1")
+        rc, _ = _run_check(["pixi>=0.40"], extra_path=str(tmp_path))
+        assert rc == 0
+
+    def test_version_too_old(self, tmp_path):
+        _make_fake_tool(tmp_path, "pixi", "pixi 0.30.0")
+        rc, stderr = _run_check(["pixi>=0.40"], extra_path=str(tmp_path))
+        assert rc == 1
+        assert "does not satisfy >=0.40" in stderr
+
+    def test_version_exact_match(self, tmp_path):
+        _make_fake_tool(tmp_path, "pixi", "pixi 0.50.1")
+        rc, _ = _run_check(["pixi==0.50.1"], extra_path=str(tmp_path))
+        assert rc == 0
+
+    def test_miniforge_checks_conda_binary(self, tmp_path):
+        # miniforge's binary is 'conda'; the snippet must look for conda
+        _make_fake_tool(tmp_path, "conda", "conda 24.7.1")
+        rc, _ = _run_check(["miniforge>=24.0"], extra_path=str(tmp_path))
+        assert rc == 0
+
+    def test_unknown_tool_with_version_cannot_be_checked(self):
+        # bash exists but has no registry entry, so version cannot be verified
+        rc, stderr = _run_check(["bash>=1.0"])
+        assert rc == 1
+        assert "no version command configured" in stderr
+
+    def test_compound_version_spec_is_invalid(self):
+        rc, stderr = _run_check(["pixi>=0.40,<0.60"])
+        assert rc == 1
+        assert "Invalid requirement format" in stderr
+
+    def test_chained_version_spec_is_invalid(self):
+        rc, stderr = _run_check(["pixi>=0.40<0.60"])
+        assert rc == 1
+        assert "Invalid requirement format" in stderr
+
+    def test_unparseable_version_reports_error_under_pipefail(self, tmp_path):
+        _make_fake_tool(tmp_path, "pixi", "version unavailable")
+        rc, stderr = _run_check(
+            ["pixi>=0.40"],
+            extra_path=str(tmp_path),
+            prefix="set -euo pipefail\n",
         )
-        verify_requirements(["miniforge>=24.0"])
+        assert rc == 1
+        assert "Could not determine version for 'pixi'" in stderr
 
-    @patch("fileglancer.apps.core.subprocess.run")
-    @patch("fileglancer.apps.core.shutil.which")
-    def test_miniforge_version_too_old(self, mock_which, mock_run):
-        def which_side_effect(name, **kwargs):
-            if name == "miniforge":
-                return None
-            if name == "conda":
-                return "/usr/bin/conda"
-            return None
-        mock_which.side_effect = which_side_effect
+    def test_robust_under_set_euo_pipefail(self):
+        rc, stderr = _run_check(["zzz_missing_333"], prefix="set -euo pipefail\n")
+        assert rc == 1
+        assert "zzz_missing_333" in stderr
 
-        mock_run.return_value = MagicMock(
-            stdout="conda 23.1.0", stderr="", returncode=0
+
+# --- job file path tests ---
+
+from types import SimpleNamespace
+
+from fileglancer.apps.core import get_job_file_paths, read_job_file
+
+
+def _fake_job(**overrides):
+    """Build a minimal job-like object for file-path tests."""
+    base = dict(
+        id=1,
+        app_name="myapp",
+        entry_point_id="run",
+        entry_point_type="job",
+        status="DONE",
+        work_dir="/share/jobs/1",
+        script_path="/share/jobs/1/myapp-run.1.sh",
+        work_dir_fsp_name="myshare",
+        work_dir_subpath=".fileglancer/jobs/1",
+        started_at=object(),  # truthy "has started" marker
+    )
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+class TestGetJobFilePaths:
+    def test_uses_stored_paths_without_filesystem(self):
+        # work_dir intentionally does not exist on disk; the function must not
+        # touch the filesystem and must use the stored values verbatim.
+        files = get_job_file_paths(_fake_job())
+        assert files["script"]["path"] == "/share/jobs/1/myapp-run.1.sh"
+        assert files["script"]["exists"] is True
+        assert files["stdout"]["path"] == "/share/jobs/1/stdout.log"
+        assert files["stderr"]["path"] == "/share/jobs/1/stderr.log"
+
+    def test_browse_link_built_from_stored_base(self):
+        files = get_job_file_paths(_fake_job())
+        # subpath = work dir subpath + file name; fsp from the stored base
+        assert files["script"]["fsp_name"] == "myshare"
+        assert files["script"]["subpath"] == ".fileglancer/jobs/1/myapp-run.1.sh"
+        assert files["stdout"]["subpath"] == ".fileglancer/jobs/1/stdout.log"
+
+    def test_no_browse_link_when_base_unresolved(self):
+        files = get_job_file_paths(
+            _fake_job(work_dir_fsp_name=None, work_dir_subpath=None)
         )
-        with pytest.raises(ValueError, match="does not satisfy"):
-            verify_requirements(["miniforge>=24.0"])
+        assert files["script"]["fsp_name"] is None
+        assert files["script"]["subpath"] is None
+
+    def test_logs_exist_only_after_start(self):
+        pending = get_job_file_paths(_fake_job(status="PENDING", started_at=None))
+        assert pending["stdout"]["exists"] is False
+        assert pending["stderr"]["exists"] is False
+        # script still exists once submitted (script_path recorded)
+        assert pending["script"]["exists"] is True
+
+    def test_legacy_job_without_script_path(self):
+        files = get_job_file_paths(_fake_job(script_path=None))
+        # Falls back to a default path and reports the script as not resolvable
+        assert files["script"]["path"] == "/share/jobs/1/script.sh"
+        assert files["script"]["exists"] is False
+
+    def test_service_url_only_when_running(self):
+        running = get_job_file_paths(
+            _fake_job(entry_point_type="service", status="RUNNING")
+        )
+        assert running["service_url"]["exists"] is True
+        done = get_job_file_paths(
+            _fake_job(entry_point_type="service", status="DONE")
+        )
+        assert done["service_url"]["exists"] is False
+
+
+class TestReadJobFile:
+    def test_reads_stored_script_path(self, tmp_path):
+        script = tmp_path / "myapp-run.1.sh"
+        script.write_text("#!/bin/bash\necho hi\n")
+        job = _fake_job(work_dir=str(tmp_path), script_path=str(script))
+        assert read_job_file(job, "script") == "#!/bin/bash\necho hi\n"
+
+    def test_missing_stored_script_returns_none(self, tmp_path):
+        job = _fake_job(
+            work_dir=str(tmp_path), script_path=str(tmp_path / "gone.sh")
+        )
+        assert read_job_file(job, "script") is None
 
 
 # --- merge_requirements tests ---
@@ -187,6 +326,42 @@ class TestEntryPointRequirementsValidation:
             AppEntryPoint(
                 id="t", name="T", command="echo",
                 requirements=["docker"],
+            )
+
+    def test_rejects_compound_version_spec(self):
+        with pytest.raises(ValidationError, match="Compound requirement specs"):
+            AppEntryPoint(
+                id="t", name="T", command="echo",
+                requirements=["pixi>=0.40,<0.60"],
+            )
+
+    def test_rejects_chained_version_spec(self):
+        with pytest.raises(ValidationError, match="Compound requirement specs"):
+            AppEntryPoint(
+                id="t", name="T", command="echo",
+                requirements=["pixi>=0.40<0.60"],
+            )
+
+
+class TestManifestRequirementsValidation:
+    def test_rejects_compound_version_spec(self):
+        with pytest.raises(ValidationError, match="Compound requirement specs"):
+            AppManifest(
+                name="T",
+                requirements=["pixi>=0.40,<0.60"],
+                runnables=[
+                    AppEntryPoint(id="t", name="T", command="echo"),
+                ],
+            )
+
+    def test_rejects_chained_version_spec(self):
+        with pytest.raises(ValidationError, match="Compound requirement specs"):
+            AppManifest(
+                name="T",
+                requirements=["pixi>=0.40<0.60"],
+                runnables=[
+                    AppEntryPoint(id="t", name="T", command="echo"),
+                ],
             )
 
 
@@ -561,3 +736,81 @@ class TestBuildCommandTildeExpansion:
         assert "/data/output" in cmd
 
 
+# --- _find_manifests_in_repo adapter fallback tests ---
+
+import fileglancer.apps.adapters as adapters_module
+from fileglancer.apps.core import _find_manifests_in_repo
+
+
+class _StubAdapter:
+    """Minimal manifest adapter for exercising the fallback loop."""
+
+    def __init__(self, *, handles, manifest=None, error=None):
+        self._handles = handles
+        self._manifest = manifest
+        self._error = error
+
+    def can_handle(self, directory):
+        return self._handles
+
+    def convert(self, directory):
+        if self._error is not None:
+            raise self._error
+        return self._manifest
+
+
+# Distinct subclasses so aggregated error messages can be told apart by name.
+class _NextStub(_StubAdapter):
+    pass
+
+
+class _PixiStub(_StubAdapter):
+    pass
+
+
+class TestFindManifestsAdapterFallback:
+    """The adapter fallback runs only when no runnables.yaml is found, so an
+    empty tmp_path exercises it directly."""
+
+    def test_other_adapter_handles_when_one_fails(self, tmp_path, monkeypatch):
+        manifest = AppManifest(name="From Pixi", runnables=[])
+        monkeypatch.setattr(
+            adapters_module,
+            "MANIFEST_ADAPTERS",
+            [
+                _NextStub(handles=True, error=ValueError("boom")),
+                _PixiStub(handles=True, manifest=manifest),
+            ],
+        )
+
+        # The failing adapter must not prevent the later one from handling it.
+        assert _find_manifests_in_repo(tmp_path) == [("", manifest)]
+
+    def test_all_adapters_fail_aggregates_errors(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            adapters_module,
+            "MANIFEST_ADAPTERS",
+            [
+                _NextStub(handles=True, error=ValueError("nextflow boom")),
+                _PixiStub(handles=True, error=ValueError("pixi boom")),
+            ],
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            _find_manifests_in_repo(tmp_path)
+
+        # All failures are surfaced together, not just the first.
+        msg = str(exc_info.value)
+        assert "nextflow boom" in msg
+        assert "pixi boom" in msg
+        assert "_NextStub" in msg
+        assert "_PixiStub" in msg
+
+    def test_no_adapter_handles_returns_empty(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            adapters_module,
+            "MANIFEST_ADAPTERS",
+            [_NextStub(handles=False), _PixiStub(handles=False)],
+        )
+
+        assert _find_manifests_in_repo(tmp_path) == []

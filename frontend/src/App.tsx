@@ -7,8 +7,10 @@ import { AuthContextProvider, useAuthContext } from '@/contexts/AuthContext';
 import { MainLayout } from './layouts/MainLayout';
 import { BrowsePageLayout } from './layouts/BrowseLayout';
 import { OtherPagesLayout } from './layouts/OtherPagesLayout';
+import AppsLayout from './layouts/AppsLayout';
 import Login from '@/components/Login';
 import Apps from '@/components/Apps';
+import Catalog from '@/components/Catalog';
 import AppJobs from '@/components/AppJobs';
 import AppLaunch from '@/components/AppLaunch';
 import JobDetail from '@/components/JobDetail';
@@ -118,19 +120,15 @@ const AppComponent = () => {
             <Route
               element={
                 <RequireAuth>
-                  <Apps />
+                  <AppsLayout />
                 </RequireAuth>
               }
               path="apps"
-            />
-            <Route
-              element={
-                <RequireAuth>
-                  <AppJobs />
-                </RequireAuth>
-              }
-              path="apps/jobs"
-            />
+            >
+              <Route element={<Apps />} index />
+              <Route element={<Catalog />} path="catalog" />
+              <Route element={<AppJobs />} path="jobs" />
+            </Route>
             <Route
               element={
                 <RequireAuth>

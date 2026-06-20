@@ -128,7 +128,6 @@ type AppEntryPoint = {
 type AppManifest = {
   name: string;
   description?: string;
-  version?: string;
   repo_url?: string;
   requirements?: string[];
   runnables: AppEntryPoint[];
@@ -143,6 +142,19 @@ type UserApp = {
   added_at: string;
   updated_at?: string;
   manifest?: AppManifest;
+  listing_id?: number;
+};
+
+type AppListing = {
+  id: number;
+  owner_username: string;
+  url: string;
+  manifest_path: string;
+  branch?: string;
+  name: string;
+  description?: string;
+  published_at: string;
+  updated_at?: string;
 };
 
 type JobFileInfo = {
@@ -191,8 +203,44 @@ type JobSubmitRequest = {
   container_args?: string;
 };
 
+/**
+ * Serializable snapshot of an app-launch form, covering all three tabs
+ * (Parameters, Environment, Cluster). Mirrors the user-supplied fields of
+ * JobSubmitRequest minus the identity fields (app_url, manifest_path,
+ * entry_point_id). All fields are optional so a file may populate any subset.
+ */
+type AppLaunchParamsFile = {
+  parameters?: Record<string, unknown>;
+  resources?: AppResourceDefaults;
+  extra_args?: string;
+  env?: Record<string, string>;
+  pre_run?: string;
+  post_run?: string;
+  container?: string;
+  container_args?: string;
+};
+
+/**
+ * Parse and validate the text of an uploaded app-launch params file. Throws a
+ * descriptive Error if the text is not valid JSON or is not a plain object.
+ */
+function parseAppLaunchParamsFile(text: string): AppLaunchParamsFile {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error('File is not valid JSON');
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error('Expected a JSON object of parameters');
+  }
+  return parsed as AppLaunchParamsFile;
+}
+
 export type {
   AppEntryPoint,
+  AppLaunchParamsFile,
+  AppListing,
   AppManifest,
   AppParameter,
   AppParameterItem,
@@ -213,4 +261,4 @@ export type {
   ZonesAndFileSharePathsMap
 };
 
-export { flattenParameters, isParameterSection };
+export { flattenParameters, isParameterSection, parseAppLaunchParamsFile };

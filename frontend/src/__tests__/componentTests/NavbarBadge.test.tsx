@@ -67,7 +67,7 @@ describe('Navbar badge', () => {
     renderNavbar();
 
     expect(screen.queryByText('0')).not.toBeInTheDocument();
-    expect(screen.getByText('Jobs')).toBeInTheDocument();
+    expect(screen.getByText('Apps')).toBeInTheDocument();
   });
 
   test('badge shows correct count when active jobs exist', () => {
@@ -86,7 +86,7 @@ describe('Navbar badge', () => {
     expect(screen.getByText('9+')).toBeInTheDocument();
   });
 
-  test('badge is not visible when Jobs link is hidden', () => {
+  test('badge is not visible when Apps link is hidden', () => {
     mockedUseActiveJobCount.mockReturnValue(5);
     mockedUsePreferencesContext.mockReturnValue({
       showAppsAndJobsPages: false
@@ -94,7 +94,7 @@ describe('Navbar badge', () => {
 
     renderNavbar();
 
-    expect(screen.queryByText('Jobs')).not.toBeInTheDocument();
+    expect(screen.queryByText('Apps')).not.toBeInTheDocument();
     expect(screen.queryByText('5')).not.toBeInTheDocument();
   });
 });

@@ -83,12 +83,9 @@ export default function AppJobs() {
 
   return (
     <div>
-      <Typography className="mb-4 text-foreground font-bold" type="h5">
-        Jobs
-      </Typography>
       <Typography className="mb-6 text-foreground">
         Jobs are runs of command-line tools on the compute cluster that are
-        launched from the <FgLink to="/fg/apps">Apps page</FgLink>.
+        launched from the <FgLink to="/apps">My Apps</FgLink> tab.
       </Typography>
 
       <TableCard

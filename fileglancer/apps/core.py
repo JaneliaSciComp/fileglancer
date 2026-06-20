@@ -1,6 +1,8 @@
 """Apps module for fetching manifests, building commands, and managing cluster jobs."""
 
 import asyncio
+import ntpath
+import posixpath
 try:
     import fcntl
 except ImportError:
@@ -12,8 +14,6 @@ except ImportError:
 import os
 import re
 import shlex
-import shutil
-import subprocess
 import tempfile
 from pathlib import Path
 from datetime import datetime, UTC
@@ -21,14 +21,17 @@ from typing import Optional
 
 import yaml
 from loguru import logger
-from packaging.specifiers import SpecifierSet
-from packaging.version import Version
 
 from cluster_api import ResourceSpec
 
 from fileglancer import database as db
 from fileglancer.apps.adapters import try_adapt
-from fileglancer.model import AppManifest, AppEntryPoint, AppParameter
+from fileglancer.model import (
+    AppManifest,
+    AppEntryPoint,
+    AppParameter,
+    _REQUIREMENT_PATTERN,
+)
 from fileglancer.settings import get_settings
 
 
@@ -264,14 +267,29 @@ def _find_manifests_in_repo(repo_dir: Path) -> list[tuple[str, AppManifest]]:
     if results:
         return results
 
-    # No runnables.yaml found — check each adapter against the repo root
+    # No runnables.yaml found — check each adapter against the repo root.
+    # Collect any conversion errors rather than raising on the first one, so a
+    # single adapter's failure doesn't prevent a later adapter from handling the
+    # repo. Errors are only surfaced if no adapter ultimately produced a manifest.
+    adapter_errors: list[str] = []
     for adapter in MANIFEST_ADAPTERS:
         try:
             if adapter.can_handle(repo_dir):
                 results.append(("", adapter.convert(repo_dir)))
         except Exception as e:
-            raise ValueError(f"Adapter {type(adapter).__name__} failed: {e}")
+            adapter_errors.append(f"{type(adapter).__name__}: {e}")
 
+    if results:
+        # At least one adapter succeeded; log the rest so failures aren't silent.
+        for err in adapter_errors:
+            logger.warning(f"Adapter failed but another handled the repo — {err}")
+        return results
+
+    if adapter_errors:
+        raise ValueError(
+            "Failed to build a manifest from the repository:\n  - "
+            + "\n  - ".join(adapter_errors)
+        )
 
     return results
 
@@ -439,16 +457,6 @@ _TOOL_REGISTRY = {
     },
 }
 
-_REQ_PATTERN = re.compile(r"^([a-zA-Z][a-zA-Z0-9_-]*)\s*((?:>=|<=|!=|==|>|<)\s*\S+)?$")
-
-
-def _augmented_path(extra_paths: list[str]) -> str:
-    """Build a PATH string with extra_paths appended (user's PATH takes precedence)."""
-    if not extra_paths:
-        return os.environ.get("PATH", "")
-    return os.environ.get("PATH", "") + os.pathsep + os.pathsep.join(extra_paths)
-
-
 def merge_requirements(
     manifest_requirements: list[str], entry_point_requirements: list[str]
 ) -> list[str]:
@@ -466,86 +474,135 @@ def merge_requirements(
     # Parse tool names from entry-point requirements
     ep_tools = set()
     for req in entry_point_requirements:
-        tool = _REQ_PATTERN.match(req.strip())
-        if tool:
-            ep_tools.add(tool.group(1))
+        match = _REQUIREMENT_PATTERN.match(req.strip())
+        if match:
+            ep_tools.add(match.group(1))
 
     # Keep manifest requirements that aren't overridden by entry-point
-    merged = [
-        req for req in manifest_requirements
-        if _REQ_PATTERN.match(req.strip()) and _REQ_PATTERN.match(req.strip()).group(1) not in ep_tools
-    ]
+    merged = []
+    for req in manifest_requirements:
+        match = _REQUIREMENT_PATTERN.match(req.strip())
+        if match and match.group(1) not in ep_tools:
+            merged.append(req)
     merged.extend(entry_point_requirements)
     return merged
 
 
-def verify_requirements(requirements: list[str]):
-    """Verify that all required tools are available and meet version constraints.
+# Shared bash helpers for a requirements-check snippet. Each is emitted only
+# when the generated checks actually call it (see build_requirements_check).
+# Kept as module constants so they are easy to read and test.
+_HELPER_CHECK_TOOL = r"""__fg_check_tool() {
+  # $1 = tool name (for messages), $2 = binary to look for on PATH
+  if command -v "$2" >/dev/null 2>&1; then return 0; fi
+  __fg_errors+=("Required tool '$1' is not installed or not on PATH")
+  return 1
+}"""
 
-    Raises ValueError with a message listing all unmet requirements.
+# Emitted together since __fg_check_version depends on the other two.
+_HELPER_CHECK_VERSION = r"""__fg_extract_version() { grep -oE '[0-9]+([.][0-9]+)*' | head -n1 || true; }
+__fg_ver_le() {
+  # returns 0 if $1 <= $2 (version order)
+  [ "$1" = "$2" ] && return 0
+  [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" = "$1" ]
+}
+__fg_check_version() {
+  # $1=tool $2=installed $3=op $4=required
+  local tool="$1" v="$2" op="$3" req="$4" ok=1
+  if [ -z "$v" ]; then
+    __fg_errors+=("Could not determine version for '$tool' to check $op$req")
+    return 0
+  fi
+  case "$op" in
+    ">=") __fg_ver_le "$req" "$v" && ok=0 ;;
+    "<=") __fg_ver_le "$v" "$req" && ok=0 ;;
+    ">")  { __fg_ver_le "$req" "$v" && [ "$v" != "$req" ]; } && ok=0 ;;
+    "<")  { __fg_ver_le "$v" "$req" && [ "$v" != "$req" ]; } && ok=0 ;;
+    "==") [ "$v" = "$req" ] && ok=0 ;;
+    "!=") [ "$v" != "$req" ] && ok=0 ;;
+  esac
+  [ "$ok" -ne 0 ] && __fg_errors+=("'$tool' version $v does not satisfy $op$req")
+  return 0
+}"""
+
+
+def build_requirements_check(requirements: list[str]) -> str:
+    """Build a bash snippet that verifies required tools at job runtime.
+
+    This snippet runs inside the job on the compute node, as the user, after
+    conda/env activation, so it reflects the actual execution environment
+    rather than the server's PATH at submit time. On any unmet requirement it
+    prints all errors to
+    stderr and exits 1, which marks the job FAILED and surfaces the message in
+    the job's stderr log.
+
+    Returns an empty string when there are no requirements.
     """
     if not requirements:
-        return
+        return ""
 
-    settings = get_settings()
-    search_path = _augmented_path(settings.apps.extra_paths)
-    env = {**os.environ, "PATH": search_path} if settings.apps.extra_paths else None
-
-    errors = []
-
+    checks = []
+    needs_check_tool = False
+    needs_check_version = False
     for req in requirements:
-        match = _REQ_PATTERN.match(req.strip())
+        req = req.strip()
+        match = _REQUIREMENT_PATTERN.match(req)
         if not match:
-            errors.append(f"Invalid requirement format: '{req}'")
+            checks.append(f"__fg_errors+=({shlex.quote(f'Invalid requirement format: {req!r}')})")
             continue
 
         tool = match.group(1)
-        version_spec = match.group(2)
+        op = match.group(2)
+        required = match.group(3)
+        registry_entry = _TOOL_REGISTRY.get(tool)
+        binary = registry_entry["version_args"][0] if registry_entry else tool
 
-        # Check tool exists on PATH
-        if shutil.which(tool, path=search_path) is None:
-            # For maven, the binary is 'mvn' not 'maven'
-            registry_entry = _TOOL_REGISTRY.get(tool)
-            binary = registry_entry["version_args"][0] if registry_entry else tool
-            if binary != tool and shutil.which(binary, path=search_path) is not None:
-                pass  # binary found under alternate name
-            else:
-                errors.append(f"Required tool '{tool}' is not installed or not on PATH")
-                continue
+        if op is None:
+            needs_check_tool = True
+            checks.append(f"__fg_check_tool {shlex.quote(tool)} {shlex.quote(binary)} || true")
+            continue
 
-        if version_spec:
-            registry_entry = _TOOL_REGISTRY.get(tool)
-            if not registry_entry:
-                errors.append(f"Cannot check version for '{tool}': no version command configured")
-                continue
+        if not registry_entry:
+            # Tool exists check still runs; version cannot be verified.
+            needs_check_tool = True
+            msg = f"Cannot check version for '{tool}': no version command configured"
+            checks.append(
+                f"if __fg_check_tool {shlex.quote(tool)} {shlex.quote(binary)}; then\n"
+                f"  __fg_errors+=({shlex.quote(msg)})\n"
+                f"fi"
+            )
+            continue
 
-            try:
-                result = subprocess.run(
-                    registry_entry["version_args"],
-                    capture_output=True, text=True, timeout=10,
-                    env=env,
-                )
-                output = result.stdout.strip() or result.stderr.strip()
-                ver_match = re.search(registry_entry["version_pattern"], output)
-                if not ver_match:
-                    errors.append(
-                        f"Could not parse version for '{tool}' from output: {output!r}"
-                    )
-                    continue
+        needs_check_tool = True
+        needs_check_version = True
+        version_cmd = " ".join(shlex.quote(a) for a in registry_entry["version_args"])
+        checks.append(
+            f"if __fg_check_tool {shlex.quote(tool)} {shlex.quote(binary)}; then\n"
+            f"  __fg_v=\"$({version_cmd} 2>&1 | __fg_extract_version)\"\n"
+            f"  __fg_check_version {shlex.quote(tool)} \"$__fg_v\" {shlex.quote(op)} {shlex.quote(required)}\n"
+            f"fi"
+        )
 
-                installed = Version(ver_match.group(1))
-                specifier = SpecifierSet(version_spec.strip())
-                if not specifier.contains(installed):
-                    errors.append(
-                        f"'{tool}' version {installed} does not satisfy {version_spec.strip()}"
-                    )
-            except FileNotFoundError:
-                errors.append(f"Required tool '{tool}' is not installed or not on PATH")
-            except subprocess.TimeoutExpired:
-                errors.append(f"Timed out checking version for '{tool}'")
+    finalizer = (
+        'if [ "${#__fg_errors[@]}" -gt 0 ]; then\n'
+        '  echo "ERROR: This app\'s requirements are not met in the execution environment:" >&2\n'
+        '  for __fg_e in "${__fg_errors[@]}"; do echo "  - $__fg_e" >&2; done\n'
+        "  exit 1\n"
+        "fi"
+    )
 
-    if errors:
-        raise ValueError("Unmet requirements:\n  - " + "\n  - ".join(errors))
+    # Emit only the helper functions the generated checks actually call.
+    preamble = ["__fg_errors=()"]
+    if needs_check_tool:
+        preamble.append(_HELPER_CHECK_TOOL)
+    if needs_check_version:
+        preamble.append(_HELPER_CHECK_VERSION)
+
+    return "\n".join([
+        "# Verify required tools are available in this environment (Fileglancer)",
+        *preamble,
+        *checks,
+        finalizer,
+    ])
 
 
 # --- Path Validation ---
@@ -1201,11 +1258,13 @@ async def submit_job(
     if entry_point is None:
         raise ValueError(f"Entry point '{entry_point_id}' not found in manifest")
 
-    # Verify requirements: merge manifest-level with entry-point-level
+    # Merge manifest-level with entry-point-level requirements. These are
+    # verified at job runtime (see build_requirements_check below) rather than
+    # here on the server, because the job runs on the compute node as the user
+    # with a potentially different environment.
     effective_requirements = merge_requirements(
         manifest.requirements, entry_point.requirements
     )
-    verify_requirements(effective_requirements)
 
     # Build command (with DB session for path validation against file shares)
     with db.get_db_session(settings.db_url) as session:
@@ -1348,6 +1407,12 @@ async def submit_job(
 
     if env_lines:
         script_parts.append(env_lines.rstrip())
+    # Verify required tools now that PATH, conda, and env vars are set up, but
+    # before pre_run/command do any real work. Fails the job with a readable
+    # message in stderr if a requirement is unmet.
+    req_check = build_requirements_check(effective_requirements)
+    if req_check:
+        script_parts.append(req_check)
     if effective_pre_run:
         script_parts.append(effective_pre_run.rstrip())
     script_parts.append(command)
@@ -1394,12 +1459,21 @@ async def submit_job(
         raise
 
     cluster_job_id = worker_result["job_id"]
+    # cluster-api tells us the exact script filename it generated, and the
+    # worker resolved the work dir's browse-link base; persist both so file
+    # path info can be served from the DB with no filesystem access.
+    script_path = worker_result.get("script_path")
+    work_dir_fsp_name = worker_result.get("work_dir_fsp_name")
+    work_dir_subpath = worker_result.get("work_dir_subpath")
 
     # Update DB with cluster job ID — the poll loop will track status from here
     with db.get_db_session(settings.db_url) as session:
         db.update_job_status(
             session, job_id, "PENDING",
             cluster_job_id=cluster_job_id,
+            script_path=script_path,
+            work_dir_fsp_name=work_dir_fsp_name,
+            work_dir_subpath=work_dir_subpath,
         )
         db_job = db.get_job(session, job_id, username)
         session.expunge(db_job)
@@ -1490,27 +1564,44 @@ def _resolve_work_dir(db_job: db.JobDB) -> Path:
     return _build_work_dir(db_job.id, db_job.app_name, db_job.entry_point_id)
 
 
-def _resolve_browse_path(abs_path: str, fsps: Optional[list] = None) -> tuple[str | None, str | None]:
-    """Resolve an absolute path to an FSP name and subpath for browse links.
+def _stored_work_dir_path(db_job: db.JobDB) -> str:
+    """Return the job's work_dir as a stored path string.
 
-    If *fsps* is None, queries the database directly. Pass a pre-fetched list
-    to avoid the DB hit (used from the worker subprocess, which has no DB
-    access).
+    Job records often contain POSIX cluster paths even when the API process is
+    inspected or tested on Windows.  Keep stored paths as strings for metadata
+    responses so pathlib does not rewrite separators to the local OS style.
     """
-    if fsps is None:
-        settings = get_settings()
-        with db.get_db_session(settings.db_url) as session:
-            result = db.find_fsp_from_absolute_path(session, abs_path)
-    else:
-        result = db.find_fsp_in_paths(fsps, abs_path)
-    if result:
-        return result[0].name, result[1]
-    return None, None
+    if db_job.work_dir:
+        return str(db_job.work_dir)
+    return str(_build_work_dir(db_job.id, db_job.app_name, db_job.entry_point_id))
 
 
-def _make_file_info(file_path: str, exists: bool, fsps: Optional[list] = None) -> dict:
-    """Create a file info dict with browse link resolution."""
-    fsp_name, subpath = _resolve_browse_path(file_path, fsps) if exists else (None, None)
+def _join_stored_path(directory: str, filename: str) -> str:
+    """Join a filename to a stored job path without OS-specific normalization."""
+    if "\\" in directory and "/" not in directory:
+        return ntpath.join(directory, filename)
+    return posixpath.join(directory, filename)
+
+
+def _stored_path_basename(file_path: str) -> str:
+    """Return the final path component for either POSIX or Windows separators."""
+    return file_path.rstrip("/\\").replace("\\", "/").rsplit("/", 1)[-1]
+
+
+def _make_file_info(file_path: str, exists: bool,
+                    work_fsp_name: Optional[str],
+                    work_subpath: Optional[str]) -> dict:
+    """Create a file info dict, deriving the browse link from the work dir's
+    stored browse-link base. All job files live directly in the work dir, so a
+    file's browse subpath is the work dir's subpath plus the file name — no
+    filesystem resolution needed.
+    """
+    fsp_name = None
+    subpath = None
+    if exists and work_fsp_name:
+        fsp_name = work_fsp_name
+        filename = _stored_path_basename(file_path)
+        subpath = f"{work_subpath}/{filename}" if work_subpath else filename
     return {
         "path": file_path,
         "exists": exists,
@@ -1548,31 +1639,42 @@ def get_service_url(db_job: db.JobDB) -> Optional[str]:
     return url
 
 
-def get_job_file_paths(db_job: db.JobDB, fsps: Optional[list] = None) -> dict[str, dict]:
+def get_job_file_paths(db_job: db.JobDB) -> dict[str, dict]:
     """Return file path info for a job's files (script, stdout, stderr, service_url).
 
-    Returns a dict keyed by file type with path and existence info. Pass *fsps*
-    to skip the per-file DB lookup needed for browse-link resolution.
+    Returns a dict keyed by file type with path and browse-link info. Derived
+    entirely from the DB record (work_dir, stored script_path, and the work
+    dir's stored browse-link base) and job state — no filesystem access — so it
+    is fast and safe to call from the parent process. Existence is inferred
+    rather than stat'd: the script exists once submitted (script_path is set),
+    and the log files exist once the job has started.
     """
-    work_dir = _resolve_work_dir(db_job)
+    work_dir = _stored_work_dir_path(db_job)
+    work_fsp_name = getattr(db_job, 'work_dir_fsp_name', None)
+    work_subpath = getattr(db_job, 'work_dir_subpath', None)
 
-    # Find script file
-    scripts = sorted(work_dir.glob("*.sh")) if work_dir.exists() else []
-    script_path = str(scripts[0]) if scripts else str(work_dir / "script.sh")
+    # cluster-api recorded the generated script name at submit time.
+    script_path = getattr(db_job, 'script_path', None)
+    script_exists = bool(script_path)
+    if not script_path:
+        script_path = _join_stored_path(work_dir, "script.sh")
 
-    stdout_path = work_dir / "stdout.log"
-    stderr_path = work_dir / "stderr.log"
+    # Log files are written by the job once it begins running.
+    logs_exist = db_job.started_at is not None
+    stdout_path = _join_stored_path(work_dir, "stdout.log")
+    stderr_path = _join_stored_path(work_dir, "stderr.log")
 
     files = {
-        "script": _make_file_info(script_path, len(scripts) > 0, fsps),
-        "stdout": _make_file_info(str(stdout_path), stdout_path.is_file(), fsps),
-        "stderr": _make_file_info(str(stderr_path), stderr_path.is_file(), fsps),
+        "script": _make_file_info(script_path, script_exists, work_fsp_name, work_subpath),
+        "stdout": _make_file_info(stdout_path, logs_exist, work_fsp_name, work_subpath),
+        "stderr": _make_file_info(stderr_path, logs_exist, work_fsp_name, work_subpath),
     }
 
-    # Include service_url file info for service-type jobs
+    # Include service_url file info for running service-type jobs.
     if getattr(db_job, 'entry_point_type', 'job') == 'service':
-        service_url_path = work_dir / "service_url"
-        files["service_url"] = _make_file_info(str(service_url_path), service_url_path.is_file(), fsps)
+        service_url_path = _join_stored_path(work_dir, "service_url")
+        files["service_url"] = _make_file_info(
+            service_url_path, db_job.status == 'RUNNING', work_fsp_name, work_subpath)
 
     return files
 
@@ -1590,7 +1692,12 @@ def read_job_file(db_job, file_type: str) -> Optional[str]:
     work_dir = _resolve_work_dir(db_job)
 
     if file_type == "script":
-        # Find the script generated by cluster-api (e.g. jobname.1.sh)
+        # Use the script path recorded at submit time; fall back to globbing the
+        # work dir for legacy jobs created before script_path was stored.
+        script_path = getattr(db_job, 'script_path', None)
+        if script_path:
+            path = Path(script_path)
+            return path.read_text() if path.is_file() else None
         scripts = sorted(work_dir.glob("*.sh"))
         if scripts:
             return scripts[0].read_text()

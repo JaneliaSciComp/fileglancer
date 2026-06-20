@@ -106,7 +106,11 @@ export const Loading: Story = {
     const canvas = within(canvasElement);
 
     await expect(canvas.getByTitle('Loading spinner')).toBeInTheDocument();
-    await expect(canvas.getByText('Saving...')).toBeInTheDocument();
+    // The loading text is exposed as the spinner's accessible name (aria-label),
+    // not as visible text, so the button keeps its size while loading.
+    await expect(
+      canvas.getByRole('status', { name: 'Saving...' })
+    ).toBeInTheDocument();
 
     const button = canvas.getByRole('button');
     await userEvent.click(button);
@@ -184,6 +188,8 @@ export const LoadingWithHref: Story = {
 
     await expect(anchor).not.toHaveAttribute('href');
     await expect(anchor).toHaveAttribute('aria-disabled', 'true');
-    await expect(canvas.getByText('Loading...')).toBeInTheDocument();
+    await expect(
+      canvas.getByRole('status', { name: 'Loading...' })
+    ).toBeInTheDocument();
   }
 };

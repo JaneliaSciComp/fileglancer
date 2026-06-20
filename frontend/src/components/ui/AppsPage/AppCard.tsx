@@ -17,21 +17,36 @@ import FgButton from '@/components/designSystem/atoms/FgButton';
 
 interface AppCardProps {
   readonly app: UserApp;
-  readonly onRemove: (params: { url: string; manifest_path: string }) => void;
+  readonly onRemove: () => void;
   readonly onUpdate: (params: { url: string; manifest_path: string }) => void;
+  readonly onShare: (params: {
+    url: string;
+    manifest_path: string;
+    name: string;
+    description: string;
+  }) => Promise<void>;
+  readonly onUnshare: () => void;
   readonly removing: boolean;
   readonly updating: boolean;
+  readonly sharing: boolean;
+  readonly unsharing: boolean;
 }
 
 export default function AppCard({
   app,
   onRemove,
   onUpdate,
+  onShare,
+  onUnshare,
   removing,
-  updating
+  updating,
+  sharing,
+  unsharing
 }: AppCardProps) {
   const navigate = useNavigate();
   const [infoOpen, setInfoOpen] = useState(false);
+
+  const isShared = app.listing_id !== undefined && app.listing_id !== null;
 
   const handleLaunch = () => {
     navigate(buildLaunchPathFromApp(app.url, app.manifest_path));
@@ -61,12 +76,7 @@ export default function AppCard({
             <IconButton
               className="text-foreground hover:text-error"
               disabled={removing}
-              onClick={() =>
-                onRemove({
-                  url: app.url,
-                  manifest_path: app.manifest_path
-                })
-              }
+              onClick={onRemove}
               size="sm"
               variant="ghost"
             >
@@ -75,6 +85,15 @@ export default function AppCard({
           </FgTooltip>
         </div>
       </div>
+
+      {isShared ? (
+        <div>
+          <span className="inline-block px-2 py-0.5 rounded-sm bg-success/10 text-success text-xs font-medium">
+            Shared
+          </span>
+        </div>
+      ) : null}
+
       {app.description ? (
         <Typography className="text-sm md:text-base text-foreground">
           {app.description}
@@ -99,13 +118,17 @@ export default function AppCard({
         }}
         onRemove={() => {
           setInfoOpen(false);
-          onRemove({ url: app.url, manifest_path: app.manifest_path });
+          onRemove();
         }}
+        onShare={onShare}
+        onUnshare={onUnshare}
         onUpdate={() =>
           onUpdate({ url: app.url, manifest_path: app.manifest_path })
         }
         open={infoOpen}
         removing={removing}
+        sharing={sharing}
+        unsharing={unsharing}
         updating={updating}
       />
     </Card>

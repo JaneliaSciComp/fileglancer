@@ -1597,6 +1597,10 @@ def create_app(settings):
     async def get_user_apps(username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
             rows = db.list_user_apps(session, username)
+            listings_by_key = {
+                (lst.url, lst.manifest_path): lst.id
+                for lst in db.get_app_listings_by_owner(session, username)
+            }
             snapshots = [
                 {
                     "url": row.url,
@@ -1607,6 +1611,7 @@ def create_app(settings):
                     "manifest": row.manifest,
                     "added_at": row.added_at,
                     "updated_at": row.updated_at,
+                    "listing_id": listings_by_key.get((row.url, row.manifest_path)),
                 }
                 for row in rows
             ]
@@ -1636,6 +1641,7 @@ def create_app(settings):
                 added_at=snap["added_at"],
                 updated_at=snap["updated_at"],
                 manifest=manifest_obj,
+                listing_id=snap["listing_id"],
             ))
 
         for idx in needs_backfill:
@@ -1764,6 +1770,130 @@ def create_app(settings):
         result = await _worker_exec(username, "validate_paths", paths=body.paths)
         return PathValidationResponse(errors=result.get("errors", {}))
 
+    # --- Catalog (shared apps) API ---
+
+    def _listing_to_model(row) -> AppListing:
+        return AppListing(
+            id=row.id,
+            owner_username=row.owner_username,
+            url=row.url,
+            manifest_path=row.manifest_path,
+            branch=row.branch,
+            name=row.name,
+            description=row.description,
+            published_at=row.published_at,
+            updated_at=row.updated_at,
+        )
+
+    @app.get("/api/catalog", response_model=list[AppListing],
+             description="List all shared app listings in the catalog")
+    async def list_catalog(username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            rows = db.list_app_listings(session)
+            return [_listing_to_model(r) for r in rows]
+
+    @app.post("/api/catalog", response_model=AppListing,
+              description="Share one of the user's apps to the catalog")
+    async def share_app(body: ShareAppRequest,
+                        username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            user_app = db.get_user_app(session, username, body.url, body.manifest_path)
+            if user_app is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="You can only share apps that you have added.",
+                )
+            try:
+                name = resolve_catalog_listing_name(body.name, user_app.name)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            description = body.description if body.description is not None else user_app.description
+            try:
+                listing = db.create_app_listing(
+                    session,
+                    owner_username=username,
+                    url=user_app.url,
+                    manifest_path=user_app.manifest_path,
+                    name=name,
+                    description=description,
+                    branch=user_app.branch,
+                )
+            except ValueError as e:
+                raise HTTPException(status_code=409, detail=str(e))
+            return _listing_to_model(listing)
+
+    @app.patch("/api/catalog/{listing_id}", response_model=AppListing,
+               description="Update the editable metadata on a listing you own")
+    async def update_catalog_listing(listing_id: int,
+                                     body: UpdateAppListingRequest,
+                                     username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            listing = db.update_app_listing(
+                session, listing_id, username,
+                name=body.name, description=body.description,
+            )
+            if listing is None:
+                raise HTTPException(status_code=404, detail="Listing not found")
+            return _listing_to_model(listing)
+
+    @app.delete("/api/catalog/{listing_id}",
+                description="Unshare (delete) one of your catalog listings")
+    async def delete_catalog_listing(listing_id: int,
+                                     username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            if not db.delete_app_listing(session, listing_id, username):
+                raise HTTPException(status_code=404, detail="Listing not found")
+        return {"message": "Listing removed"}
+
+    @app.post("/api/catalog/{listing_id}/add", response_model=UserApp,
+              description="Add a catalog listing's app to the current user's apps")
+    async def add_from_catalog(listing_id: int,
+                               username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            listing = db.get_app_listing(session, listing_id)
+            if listing is None:
+                raise HTTPException(status_code=404, detail="Listing not found")
+            if db.get_user_app(session, username, listing.url, listing.manifest_path) is not None:
+                raise HTTPException(
+                    status_code=409,
+                    detail="You already have this app.",
+                )
+            listing_url = listing.url
+            listing_manifest_path = listing.manifest_path
+
+        try:
+            manifest = await apps_module.fetch_app_manifest(
+                listing_url, listing_manifest_path, username=username,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to fetch manifest: {str(e)}")
+
+        try:
+            branch = await apps_module.get_app_branch(listing_url)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to resolve branch: {str(e)}")
+
+        with db.get_db_session(settings.db_url) as session:
+            row = db.upsert_user_app(
+                session, username,
+                url=listing_url, manifest_path=listing_manifest_path,
+                name=manifest.name, description=manifest.description,
+                branch=branch,
+                manifest=manifest.model_dump(mode="json"),
+            )
+            return UserApp(
+                url=row.url,
+                manifest_path=row.manifest_path,
+                branch=row.branch,
+                name=row.name,
+                description=row.description,
+                added_at=row.added_at,
+                updated_at=row.updated_at,
+                manifest=manifest,
+            )
+
     @app.get("/api/cluster-defaults",
              description="Get cluster configuration defaults")
     async def get_cluster_defaults():
@@ -1828,8 +1958,10 @@ def create_app(settings):
             db_job = db.get_job(session, job_id, username)
             if db_job is None:
                 raise HTTPException(status_code=404, detail="Job not found")
-            # Read file paths and service URL via worker
-            files_result = await _worker_exec(username, "get_job_file_paths", job_id=job_id)
+            # File path info is derived from the DB record (work_dir + stored
+            # script_path) with no filesystem access, so resolve it in-process
+            # rather than paying a worker roundtrip + NFS glob/stat.
+            files = apps_module.get_job_file_paths(db_job)
             service_url = None
             if getattr(db_job, 'entry_point_type', 'job') == 'service' and db_job.status == 'RUNNING':
                 try:
@@ -1837,7 +1969,7 @@ def create_app(settings):
                     service_url = svc_result.get("service_url")
                 except Exception:
                     pass
-            return _convert_job(db_job, service_url=service_url, files=files_result.get("files"))
+            return _convert_job(db_job, service_url=service_url, files=files)
 
     @app.post("/api/jobs/{job_id}/cancel",
               description="Cancel a running job")

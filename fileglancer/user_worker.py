@@ -167,8 +167,8 @@ def _job_db_to_dict(j) -> dict:
     """Serialize a JobDB row to a JSON-safe dict for transport to the worker.
 
     Only includes fields used by worker-side handlers (read_job_file,
-    get_job_file_paths, get_service_url) — keep this list minimal so the
-    worker sees as little of the DB row as possible.
+    get_service_url) — keep this list minimal so the worker sees as little of
+    the DB row as possible.
     """
     return {
         "id": j.id,
@@ -177,6 +177,7 @@ def _job_db_to_dict(j) -> dict:
         "entry_point_type": getattr(j, "entry_point_type", "job"),
         "status": j.status,
         "work_dir": j.work_dir,
+        "script_path": getattr(j, "script_path", None),
     }
 
 
@@ -740,20 +741,6 @@ def _action_get_job_file(request: dict, ctx: WorkerContext) -> dict:
     return {"content": content}
 
 
-@action("get_job_file_paths")
-def _action_get_job_file_paths(request: dict, ctx: WorkerContext) -> dict:
-    """Get job file path info."""
-    from fileglancer.apps.core import get_job_file_paths
-
-    job_id = request["job_id"]
-    db_job = ctx.db.get_job(job_id, ctx.username)
-    if db_job is None:
-        return {"error": f"Job {job_id} not found", "status_code": 404}
-    fsps = ctx.db.get_file_share_paths()
-    files = get_job_file_paths(db_job, fsps)
-    return {"files": files}
-
-
 @action("get_service_url")
 def _action_get_service_url(request: dict, ctx: WorkerContext) -> dict:
     """Read service URL from job work directory."""
@@ -950,7 +937,26 @@ def _action_submit(request: dict, ctx: WorkerContext) -> dict:
         if proc is not None:
             (work_dir / "job.pid").write_text(str(proc.pid))
 
-    return {"job_id": job.job_id, "script_path": job.script_path}
+    # Resolve the work dir's browse-link base now, in user context where the
+    # mounts are warm, so the job-detail endpoint can build browse links from
+    # the DB without realpath'ing every mount on each read.
+    work_dir_fsp_name = None
+    work_dir_subpath = None
+    try:
+        from fileglancer.database import find_fsp_in_paths
+        match = find_fsp_in_paths(ctx.db.get_file_share_paths(), str(work_dir))
+        if match:
+            work_dir_fsp_name = match[0].name
+            work_dir_subpath = match[1]
+    except Exception:
+        pass
+
+    return {
+        "job_id": job.job_id,
+        "script_path": job.script_path,
+        "work_dir_fsp_name": work_dir_fsp_name,
+        "work_dir_subpath": work_dir_subpath,
+    }
 
 
 @action("cancel")

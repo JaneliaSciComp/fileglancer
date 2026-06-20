@@ -17,9 +17,19 @@ import {
 import AnsiText from '@/components/ui/AppsPage/AnsiText';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
-import type { JobFileInfo, FileSharePath } from '@/shared.types';
+import type {
+  JobFileInfo,
+  FileSharePath,
+  AppLaunchParamsFile,
+  AppResourceDefaults
+} from '@/shared.types';
 import JobStatusBadge from '@/components/ui/AppsPage/JobStatusBadge';
-import { formatDateString, buildRelaunchPath, parseGithubUrl } from '@/utils';
+import {
+  formatDateString,
+  buildRelaunchPath,
+  parseGithubUrl,
+  downloadTextFile
+} from '@/utils';
 import {
   getPreferredPathForDisplay,
   makeBrowseLink
@@ -148,9 +158,26 @@ export default function JobDetail() {
   const id = jobId ? parseInt(jobId) : 0;
   const jobQuery = useJobQuery(id);
   const jobStatus = jobQuery.data?.status;
-  const scriptQuery = useJobFileQuery(id, 'script');
-  const stdoutQuery = useJobFileQuery(id, 'stdout', jobStatus);
-  const stderrQuery = useJobFileQuery(id, 'stderr', jobStatus);
+  // Lazily fetch each file's content only when its tab is active, so the first
+  // load of a job doesn't block on fetching all three log files at once.
+  const scriptQuery = useJobFileQuery(
+    id,
+    'script',
+    undefined,
+    activeTab === 'script'
+  );
+  const stdoutQuery = useJobFileQuery(
+    id,
+    'stdout',
+    jobStatus,
+    activeTab === 'stdout'
+  );
+  const stderrQuery = useJobFileQuery(
+    id,
+    'stderr',
+    jobStatus,
+    activeTab === 'stderr'
+  );
   const cancelMutation = useCancelJobMutation();
 
   const isService = jobQuery.data?.entry_point_type === 'service';
@@ -171,13 +198,38 @@ export default function JobDetail() {
   const job = jobQuery.data;
 
   const handleDownload = (content: string, filename: string) => {
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadTextFile(content, filename, 'text/plain');
+  };
+
+  // Download the full set of parameters used for this job (all three tabs of
+  // the launch form) as a JSON file that can be re-uploaded to relaunch.
+  const handleDownloadParams = () => {
+    if (!job) {
+      return;
+    }
+    const params: AppLaunchParamsFile = {};
+    if (Object.keys(job.parameters).length > 0) {
+      params.parameters = job.parameters;
+    }
+    if (job.resources && Object.keys(job.resources).length > 0) {
+      params.resources = job.resources as AppResourceDefaults;
+    }
+    if (job.env && Object.keys(job.env).length > 0) {
+      params.env = job.env;
+    }
+    if (job.pre_run) {
+      params.pre_run = job.pre_run;
+    }
+    if (job.post_run) {
+      params.post_run = job.post_run;
+    }
+    if (job.container) {
+      params.container = job.container;
+    }
+    if (job.container_args) {
+      params.container_args = job.container_args;
+    }
+    downloadTextFile(JSON.stringify(params, null, 2), `job-${id}-params.json`);
   };
 
   const handleRelaunch = () => {
@@ -398,6 +450,15 @@ export default function JobDetail() {
             </Tabs.List>
 
             <Tabs.Panel className="pt-4" value="parameters">
+              <div className="flex items-center justify-end mb-2">
+                <FgButton
+                  icon={HiOutlineDownload}
+                  onClick={handleDownloadParams}
+                  size="sm"
+                >
+                  Download params
+                </FgButton>
+              </div>
               {Object.keys(job.parameters).length > 0 ? (
                 <Card className="p-3 dark:border-surface-light">
                   {Object.entries(job.parameters).map(([key, value]) => (

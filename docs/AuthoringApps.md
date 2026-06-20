@@ -33,7 +33,7 @@ If a directory does not contain a `runnables.yaml` but does contain a `nextflow_
 - Converts JSON Schema parameter definitions to Fileglancer parameters, preserving types, defaults, descriptions, required flags, enum options, and `hidden` status
 - Groups parameters into sections based on the schema's `definitions` and `allOf` ordering
 - Sections with required parameters start expanded; others start collapsed
-- Reads `name` and `version` from `nextflow.config`'s `manifest` block if available, falling back to the schema's `title` and `description`
+- Reads `name` from `nextflow.config`'s `manifest` block if available, falling back to the schema's `title` and `description`
 - Adds an **Environment tab** with Nextflow-specific options:
   - **Profiles** — comma-separated list of Nextflow profiles (e.g. `standard,docker`)
   - **Extra Arguments** — additional Nextflow CLI arguments (e.g. `-resume`, `-with-tower`), appended to the command without shell quoting
@@ -50,7 +50,7 @@ If a directory does not contain a `runnables.yaml` but does contain a `pixi.toml
 - Preserves task `description` fields
 - Exposes task `env` variables as hidden parameters for visibility
 - Skips hidden tasks (names starting with `_`) and dependency-only tasks (no `cmd`)
-- Reads project `name`, `description`, and `version` from the project metadata
+- Reads project `name` and `description` from the project metadata
 - Collects tasks from both top-level and feature-specific task sections
 
 ### Multi-App Repositories
@@ -80,14 +80,13 @@ The following directories are skipped during discovery: `.git`, `node_modules`, 
 |-------|------|----------|-------------|
 | `name` | string | yes | Display name shown in the Fileglancer UI |
 | `description` | string | no | Short description of the app |
-| `version` | string | no | Version string (for display only) |
 | `repo_url` | string | no | GitHub URL of a separate repository containing the tool code (see [Separate Tool Repo](#separate-tool-repo)) |
-| `requirements` | list of strings | no | Tools that must be available on the server (see [Requirements](#requirements)) |
+| `requirements` | list of strings | no | Tools that must be available in the job execution environment (see [Requirements](#requirements)) |
 | `runnables` | list of objects | yes | One or more runnable definitions (see [Runnables](#runnables)) |
 
 ### Requirements
 
-The `requirements` field lists tools that must be installed on the server. Requirements can be specified at two levels:
+The `requirements` field lists tools that must be installed in the job execution environment. Requirements can be specified at two levels:
 
 - **Manifest-level** (`requirements` on the top-level manifest): Apply to all runnables by default. Use this for tools needed by every entry point.
 - **Entry-point-level** (`requirements` on a runnable): Additional requirements specific to that runnable. These are **merged** with manifest-level requirements when submitting a job. If the same tool appears at both levels, the entry-point version spec takes precedence.
@@ -111,7 +110,7 @@ runnables:
     # effective requirements: [pixi>=0.40, apptainer]
 ```
 
-Each entry is a tool name with an optional version constraint:
+Each entry is a tool name with an optional single version constraint:
 
 ```yaml
 requirements:
@@ -125,7 +124,9 @@ requirements:
 
 **Supported version operators:** `>=`, `<=`, `!=`, `==`, `>`, `<`
 
-If a requirement is not met (tool missing or version too old), job submission fails with a descriptive error message. Only requirements relevant to the selected entry point are checked — unmet requirements for other entry points do not block submission. If `requirements` is omitted or empty at both levels, no checks are performed.
+Compound, comma-separated, or chained version constraints such as `"pixi>=0.40,<0.60"` or `"pixi>=0.40<0.60"` are not supported. Use at most one comparison per tool.
+
+If a requirement is not met (tool missing or version too old), the job fails early with a descriptive error message in stderr. Only requirements relevant to the selected entry point are checked — unmet requirements for other entry points do not block submission. If `requirements` is omitted or empty at both levels, no checks are performed.
 
 ### Runnables
 
@@ -545,12 +546,11 @@ Repos are cloned into a per-user cache on first use and reused across runs; jobs
 When a user submits a job:
 
 1. The manifest is re-fetched from the cached clone
-2. Requirements are verified on the server
-3. The command is built with validated parameters
-4. A working directory is created at `~/.fileglancer/jobs/{id}-{app}-{runnable}/`
-5. The repository is symlinked into the working directory
-6. The command runs on the cluster with `stdout.log` and `stderr.log` captured
-7. Job status is monitored and updated in real time (PENDING → RUNNING → DONE/FAILED/KILLED)
+2. The command is built with validated parameters, with a requirement check prepended to the job script
+3. A working directory is created at `~/.fileglancer/jobs/{id}-{app}-{runnable}/`
+4. The repository is symlinked into the working directory
+5. The command runs on the cluster with `stdout.log` and `stderr.log` captured. Requirements are verified at runtime in the job's execution environment (after `$PATH`, conda, and env setup); if any are unmet the job fails early with a descriptive message in stderr
+6. Job status is monitored and updated in real time (PENDING → RUNNING → DONE/FAILED/KILLED)
 
 Users can view logs, relaunch with the same parameters, or cancel running jobs from the Fileglancer UI.
 
@@ -622,7 +622,6 @@ The URL must start with `http://` or `https://`. Fileglancer validates this befo
 ```yaml
 name: My Viewer
 description: Interactive data viewer
-version: "1.0"
 
 runnables:
   - id: view
@@ -673,7 +672,7 @@ apps:
 These paths are:
 
 1. **Appended to `$PATH` in every generated job script** — the user's own `$PATH` entries take precedence
-2. **Used when verifying tool requirements** — so `requirements: [nextflow]` can find `/opt/nextflow/bin/nextflow` even if it's not on the server process's default `$PATH`
+2. **Visible to the runtime requirement check** — so `requirements: [nextflow]` can find `/opt/nextflow/bin/nextflow` even if it's not on the user's default `$PATH`
 
 ### Container Cache Directory
 
@@ -686,7 +685,6 @@ See the [config.yaml.template](config.yaml.template) for all available cluster s
 ```yaml
 name: OME-Zarr Converter
 description: Convert Bio-Formats-compatible images to OME-Zarr using bioformats2raw
-version: "1.0"
 
 runnables:
   - id: convert

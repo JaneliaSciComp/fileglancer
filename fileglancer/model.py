@@ -424,11 +424,7 @@ class AppEntryPoint(BaseModel):
     @field_validator("requirements")
     @classmethod
     def validate_entry_point_requirements(cls, v):
-        for req in v:
-            tool = re.split(r"[><=!]", req)[0].strip()
-            if tool not in SUPPORTED_TOOLS:
-                raise ValueError(f"Unsupported tool: '{tool}'. Supported: {SUPPORTED_TOOLS}")
-        return v
+        return _validate_requirements(v)
 
     @field_validator("conda_env")
     @classmethod
@@ -506,17 +502,49 @@ class AppEntryPoint(BaseModel):
 
 
 SUPPORTED_TOOLS = {"pixi", "npm", "maven", "miniforge", "apptainer", "nextflow"}
+# Canonical parser for a single requirement spec, shared with fileglancer.apps.core
+# (imported there) so manifest validation and the runtime requirement check stay
+# in sync. Groups: 1=tool name, 2=operator (or None), 3=version (or None).
+_REQUIREMENT_OPERATOR_PATTERN = re.compile(r">=|<=|!=|==|>|<")
+_REQUIREMENT_PATTERN = re.compile(
+    r"^([a-zA-Z][a-zA-Z0-9_-]*)\s*(?:(>=|<=|!=|==|>|<)\s*([^,\s><=!]+))?$"
+)
 
 _SHELL_METACHAR_PATTERN = re.compile(r'[;&|`$(){}!<>\n\r]')
 _CONDA_ENV_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9_.-]+$')
 _CONDA_ENV_PATH_FORBIDDEN = re.compile(r'[;&|`$(){}!<>\n\r]')
 
 
+def _validate_requirements(requirements: List[str]) -> List[str]:
+    for req in requirements:
+        stripped = req.strip()
+        match = _REQUIREMENT_PATTERN.match(stripped)
+        if not match:
+            if (
+                "," in stripped
+                or len(_REQUIREMENT_OPERATOR_PATTERN.findall(stripped)) > 1
+            ):
+                raise ValueError(
+                    "Compound requirement specs are not supported; use at most "
+                    "one version comparison per tool, e.g. 'pixi>=0.40'."
+                )
+            raise ValueError(
+                f"Invalid requirement format: {req!r}. Expected a tool name "
+                "with an optional single version comparison, e.g. 'pixi>=0.40'."
+            )
+
+        tool = match.group(1)
+        if tool not in SUPPORTED_TOOLS:
+            raise ValueError(
+                f"Unsupported tool: '{tool}'. Supported: {SUPPORTED_TOOLS}"
+            )
+    return requirements
+
+
 class AppManifest(BaseModel):
     """Top-level app manifest (runnables.yaml)"""
     name: str = Field(description="Display name of the app")
     description: Optional[str] = Field(description="Description of the app", default=None)
-    version: Optional[str] = Field(description="Version of the app", default=None)
     repo_url: Optional[str] = Field(
         description="GitHub repo URL where the tool code lives. If absent, uses the repo containing this manifest.",
         default=None,
@@ -530,11 +558,7 @@ class AppManifest(BaseModel):
     @field_validator("requirements")
     @classmethod
     def validate_requirements(cls, v):
-        for req in v:
-            tool = re.split(r"[><=!]", req)[0].strip()
-            if tool not in SUPPORTED_TOOLS:
-                raise ValueError(f"Unsupported tool: '{tool}'. Supported: {SUPPORTED_TOOLS}")
-        return v
+        return _validate_requirements(v)
 
 
 class UserApp(BaseModel):
@@ -547,6 +571,73 @@ class UserApp(BaseModel):
     added_at: datetime = Field(description="When the app was added")
     updated_at: Optional[datetime] = Field(description="When the app was last updated", default=None)
     manifest: Optional[AppManifest] = Field(description="Cached manifest data", default=None)
+    listing_id: Optional[int] = Field(
+        description="If this app is also shared by the user, the id of the catalog listing",
+        default=None,
+    )
+
+
+class AppListing(BaseModel):
+    """A shared app listing in the catalog"""
+    id: int = Field(description="Unique identifier for this listing")
+    owner_username: str = Field(description="The user who published this listing")
+    url: str = Field(description="Git URL of the app repo")
+    manifest_path: str = Field(description="Manifest path within the repo", default="")
+    branch: Optional[str] = Field(description="Git branch", default=None)
+    name: str = Field(description="Display name for the catalog")
+    description: Optional[str] = Field(description="Description for the catalog", default=None)
+    published_at: datetime = Field(description="When this listing was published")
+    updated_at: Optional[datetime] = Field(description="When this listing was last edited", default=None)
+
+
+def validate_catalog_listing_name(name: Optional[str]) -> Optional[str]:
+    if name is None:
+        return None
+    stripped = name.strip()
+    if not stripped:
+        raise ValueError("Catalog listing name must not be empty")
+    return stripped
+
+
+def resolve_catalog_listing_name(
+    requested_name: Optional[str], fallback_name: str
+) -> str:
+    resolved = validate_catalog_listing_name(
+        requested_name if requested_name is not None else fallback_name
+    )
+    if resolved is None:
+        raise ValueError("Catalog listing name must not be empty")
+    return resolved
+
+
+class ShareAppRequest(BaseModel):
+    """Request to share (publish) one of the user's apps to the catalog"""
+    url: str = Field(description="URL of the user's app to share")
+    manifest_path: str = Field(description="Manifest path within the repo", default="")
+    name: Optional[str] = Field(
+        description="Override display name for the catalog (defaults to the app's name)",
+        default=None,
+    )
+    description: Optional[str] = Field(
+        description="Override description for the catalog (defaults to the app's description)",
+        default=None,
+    )
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v):
+        return validate_catalog_listing_name(v)
+
+
+class UpdateAppListingRequest(BaseModel):
+    """Request to update a listing's editable metadata"""
+    name: Optional[str] = Field(description="New display name", default=None)
+    description: Optional[str] = Field(description="New description", default=None)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v):
+        return validate_catalog_listing_name(v)
 
 
 class ManifestFetchRequest(BaseModel):

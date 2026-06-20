@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
 import { Accordion, Tabs, Typography } from '@material-tailwind/react';
+import toast from 'react-hot-toast';
 import {
   HiChevronDown,
+  HiOutlineDownload,
   HiOutlinePlus,
   HiOutlinePlay,
-  HiOutlineTrash
+  HiOutlineTrash,
+  HiOutlineUpload
 } from 'react-icons/hi';
 
 import FgButton from '@/components/designSystem/atoms/FgButton';
@@ -17,13 +20,19 @@ import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { validatePaths } from '@/queries/appsQueries';
 import { useClusterDefaultsQuery } from '@/queries/jobsQueries';
+import { downloadTextFile } from '@/utils';
 import {
   convertBackToForwardSlash,
   resolvePathToFsp
 } from '@/utils/pathHandling';
-import { flattenParameters, isParameterSection } from '@/shared.types';
+import {
+  flattenParameters,
+  isParameterSection,
+  parseAppLaunchParamsFile
+} from '@/shared.types';
 import type {
   AppEntryPoint,
+  AppLaunchParamsFile,
   AppManifest,
   AppParameter,
   AppParameterSection,
@@ -1025,38 +1034,159 @@ export default function AppLaunchForm({
 
   const hasSections = visibleParameters.some(isParameterSection);
 
-  const submitButton = (
-    <FgButton
-      className="!rounded-md"
-      disabled={validating || submitting}
-      icon={HiOutlinePlay}
-      loading={validating || submitting}
-      loadingText={validating ? 'Validating...' : 'Submitting...'}
-      onClick={handleSubmit}
-    >
-      {entryPoint.type === 'service' ? 'Start Service' : 'Submit Job'}
-    </FgButton>
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Export the current form state (all three tabs) as a downloadable JSON file.
+  // Uses the raw values the user entered (no path normalization) so that
+  // re-importing reproduces the form exactly.
+  const handleExport = () => {
+    const envRecord: Record<string, string> = {};
+    for (const { key, value } of envVars) {
+      if (key.trim()) {
+        envRecord[key.trim()] = value;
+      }
+    }
+
+    const params: AppLaunchParamsFile = {};
+    if (Object.keys(values).length > 0) {
+      params.parameters = values;
+    }
+    if (
+      resources.cpus ||
+      resources.memory ||
+      resources.walltime ||
+      resources.queue
+    ) {
+      params.resources = resources;
+    }
+    if (extraArgs.trim()) {
+      params.extra_args = extraArgs;
+    }
+    if (Object.keys(envRecord).length > 0) {
+      params.env = envRecord;
+    }
+    if (preRun.trim()) {
+      params.pre_run = preRun;
+    }
+    if (postRun.trim()) {
+      params.post_run = postRun;
+    }
+    if (containerImage.trim()) {
+      params.container = containerImage;
+    }
+    if (containerArgs.trim()) {
+      params.container_args = containerArgs;
+    }
+
+    downloadTextFile(
+      JSON.stringify(params, null, 2),
+      `${entryPoint.id || entryPoint.name}-params.json`
+    );
+  };
+
+  // Populate the form from an uploaded JSON file. Only keys present in the file
+  // are applied, so a partial file may target any subset of the three tabs.
+  const handleImportFile = async (file: File) => {
+    let parsed: AppLaunchParamsFile;
+    try {
+      parsed = parseAppLaunchParamsFile(await file.text());
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to read parameters file'
+      );
+      return;
+    }
+
+    if (parsed.parameters) {
+      setValues(prev => ({ ...prev, ...parsed.parameters }));
+    }
+    if (parsed.resources) {
+      setResources(prev => ({ ...prev, ...parsed.resources }));
+    }
+    if (parsed.extra_args !== undefined) {
+      setExtraArgs(parsed.extra_args);
+    }
+    if (parsed.env) {
+      setEnvVars(
+        Object.entries(parsed.env).map(([key, value]) => ({ key, value }))
+      );
+    }
+    if (parsed.pre_run !== undefined) {
+      setPreRun(parsed.pre_run);
+    }
+    if (parsed.post_run !== undefined) {
+      setPostRun(parsed.post_run);
+    }
+    if (parsed.container !== undefined) {
+      setContainerImage(parsed.container);
+    }
+    if (parsed.container_args !== undefined) {
+      setContainerArgs(parsed.container_args);
+    }
+
+    setErrors({});
+    toast.success('Parameters loaded');
+  };
+
+  const actionButtons = (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <FgButton
+        className="!rounded-md whitespace-nowrap"
+        icon={HiOutlineDownload}
+        onClick={handleExport}
+        variant="outline"
+      >
+        Export params
+      </FgButton>
+      <FgButton
+        className="!rounded-md whitespace-nowrap"
+        icon={HiOutlineUpload}
+        onClick={() => fileInputRef.current?.click()}
+        variant="outline"
+      >
+        Upload params file
+      </FgButton>
+      <FgButton
+        className="!rounded-md whitespace-nowrap"
+        disabled={validating || submitting}
+        icon={HiOutlinePlay}
+        loading={validating || submitting}
+        loadingText={validating ? 'Validating...' : 'Submitting...'}
+        onClick={handleSubmit}
+      >
+        {entryPoint.type === 'service' ? 'Start Service' : 'Submit Job'}
+      </FgButton>
+    </div>
   );
 
   return (
     <div>
-      <div className="flex items-start justify-between mb-4">
+      <input
+        accept="application/json,.json"
+        className="hidden"
+        onChange={e => {
+          const file = e.target.files?.[0];
+          if (file) {
+            void handleImportFile(file);
+          }
+          // Reset so selecting the same file again re-triggers onChange
+          e.target.value = '';
+        }}
+        ref={fileInputRef}
+        type="file"
+      />
+      <div className="flex items-start justify-between gap-4 mb-1">
         <div>
           <Typography className="font-bold mb-1" type="h5">
             {entryPoint.name}
           </Typography>
-          <Typography className="block mb-1">
-            {manifest.name}
-            {manifest.version ? ` v${manifest.version}` : ''}
-          </Typography>
-          {entryPoint.description ? (
-            <Typography className="block mb-6">
-              {entryPoint.description}
-            </Typography>
-          ) : null}
+          <Typography className="block">{manifest.name}</Typography>
         </div>
-        {submitButton}
+        {actionButtons}
       </div>
+      {entryPoint.description ? (
+        <Typography className="block mb-6">{entryPoint.description}</Typography>
+      ) : null}
 
       {/* Tabs */}
       <Tabs onValueChange={setActiveTab} value={activeTab}>
@@ -1263,7 +1393,7 @@ export default function AppLaunchForm({
       ) : null}
 
       {/* Submit (bottom) */}
-      <div className="flex justify-end mt-6">{submitButton}</div>
+      <div className="flex justify-end mt-6">{actionButtons}</div>
     </div>
   );
 }
