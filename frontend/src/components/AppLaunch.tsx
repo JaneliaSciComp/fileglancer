@@ -135,9 +135,9 @@ export default function AppLaunch() {
         container_args: containerArgs
       },
       {
-        onSuccess: () => {
+        onSuccess: job => {
           toast.success('Job submitted');
-          navigate('/apps/jobs');
+          navigate(`/apps/jobs/${job.id}`);
         }
       }
     );
