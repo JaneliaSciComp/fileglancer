@@ -281,13 +281,19 @@ def test_update_app_persists_manifest(test_client, db_session):
          patch("fileglancer.apps.get_app_branch",
                new=AsyncMock(return_value="main")), \
          patch("fileglancer.apps._ensure_repo_cache",
-               new=AsyncMock(return_value="/tmp/x")):
+               new=AsyncMock(return_value="/tmp/x")) as mock_ensure:
         response = test_client.post(
             "/api/apps/update",
             json={"url": "https://github.com/owner/repo", "manifest_path": ""},
         )
 
     assert response.status_code == 200
+    assert mock_ensure.await_count == 1
+    assert mock_ensure.await_args.kwargs == {
+        "pull": True,
+        "username": TEST_USERNAME,
+    }
+    assert mock_ensure.await_args.args == ("https://github.com/owner/repo",)
     body = response.json()
     assert body["name"] == "New"
     assert body["updated_at"] is not None
@@ -299,6 +305,40 @@ def test_update_app_persists_manifest(test_client, db_session):
     assert rows[0].updated_at is not None
     # added_at preserved across update.
     assert rows[0].added_at.replace(tzinfo=None) == older.replace(tzinfo=None)
+
+
+def test_update_app_pulls_separate_code_repo(test_client, db_session):
+    """Update refreshes a top-level repo_url code repo as well as the manifest repo."""
+    _seed_app(db_session, manifest=None, name="Old")
+
+    fresh = AppManifest(
+        name="New",
+        description="New",
+        repo_url="https://github.com/tools/code",
+        runnables=[AppEntryPoint(id="run", name="Run", command="echo hi")],
+    )
+
+    with patch("fileglancer.apps.fetch_app_manifest",
+               new=AsyncMock(return_value=fresh)), \
+         patch("fileglancer.apps.get_app_branch",
+               new=AsyncMock(return_value="main")), \
+         patch("fileglancer.apps._ensure_repo_cache",
+               new=AsyncMock(return_value="/tmp/x")) as mock_ensure:
+        response = test_client.post(
+            "/api/apps/update",
+            json={"url": "https://github.com/owner/repo", "manifest_path": ""},
+        )
+
+    assert response.status_code == 200
+    assert mock_ensure.await_count == 2
+    first_call, second_call = mock_ensure.await_args_list
+    assert first_call.args == ("https://github.com/owner/repo",)
+    assert first_call.kwargs == {"pull": True, "username": TEST_USERNAME}
+    assert second_call.args == ("https://github.com/tools/code",)
+    assert second_call.kwargs == {"pull": True, "username": TEST_USERNAME}
+
+    rows = list_user_apps(db_session, TEST_USERNAME)
+    assert rows[0].manifest["repo_url"] == "https://github.com/tools/code"
 
 
 def test_delete_app_removes_row(test_client, db_session):

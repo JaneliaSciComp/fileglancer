@@ -1679,6 +1679,19 @@ def create_app(settings):
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to read manifest after update: {str(e)}")
 
+        if manifest.repo_url and manifest.repo_url != body.url:
+            try:
+                await apps_module._ensure_repo_cache(
+                    manifest.repo_url,
+                    pull=True,
+                    username=username,
+                )
+            except Exception as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Failed to pull latest app code: {str(e)}",
+                )
+
         branch = await apps_module.get_app_branch(body.url)
 
         with db.get_db_session(settings.db_url) as session:
