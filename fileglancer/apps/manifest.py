@@ -3,6 +3,7 @@
 import asyncio
 import os
 import re
+from contextlib import suppress
 from pathlib import Path
 
 import yaml
@@ -83,23 +84,39 @@ def _parse_github_url(url: str) -> tuple[str, str, str | None]:
     return owner, repo, branch
 
 
-async def _run_git(args: list[str], timeout: int = 60):
+async def _run_git(args: list[str], timeout: int = 60) -> tuple[bytes, bytes]:
     """Run a git command asynchronously.
 
+    The timeout covers the command's full runtime, not just process creation.
     Raises ValueError with a readable message on failure.
     """
     env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
-    try:
-        proc = await asyncio.wait_for(
-            asyncio.create_subprocess_exec(
+    proc = None
+
+    async def _create_and_communicate() -> tuple[bytes, bytes]:
+        nonlocal proc
+        try:
+            proc = await asyncio.create_subprocess_exec(
                 *args,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
-            ),
+            )
+            return await proc.communicate()
+        except asyncio.CancelledError:
+            if proc is not None:
+                if proc.returncode is None:
+                    with suppress(ProcessLookupError):
+                        proc.kill()
+                with suppress(Exception):
+                    await proc.communicate()
+            raise
+
+    try:
+        stdout, stderr = await asyncio.wait_for(
+            _create_and_communicate(),
             timeout=timeout,
         )
-        stdout, stderr = await proc.communicate()
     except asyncio.TimeoutError:
         raise ValueError(f"Git command timed out after {timeout}s: {' '.join(args)}")
 
@@ -107,31 +124,25 @@ async def _run_git(args: list[str], timeout: int = 60):
         err = stderr.decode().strip() if stderr else "unknown error"
         raise ValueError(f"Git command failed: {err}")
 
+    return stdout, stderr
+
 
 async def _resolve_default_branch(clone_url: str) -> str:
     """Query a remote repo for its default branch (HEAD).
 
     Falls back to 'main' if the remote cannot be queried.
     """
-    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
     try:
-        proc = await asyncio.wait_for(
-            asyncio.create_subprocess_exec(
-                "git", "ls-remote", "--symref", clone_url, "HEAD",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=env,
-            ),
+        stdout, _ = await _run_git(
+            ["git", "ls-remote", "--symref", clone_url, "HEAD"],
             timeout=30,
         )
-        stdout, _ = await proc.communicate()
-        if proc.returncode == 0:
-            # Output: "ref: refs/heads/master\tHEAD\n..."
-            for line in stdout.decode().splitlines():
-                if line.startswith("ref:"):
-                    ref = line.split()[1]
-                    return ref.removeprefix("refs/heads/")
-    except (asyncio.TimeoutError, Exception):
+        # Output: "ref: refs/heads/master\tHEAD\n..."
+        for line in stdout.decode().splitlines():
+            if line.startswith("ref:"):
+                ref = line.split()[1]
+                return ref.removeprefix("refs/heads/")
+    except Exception:
         pass
     return "main"
 

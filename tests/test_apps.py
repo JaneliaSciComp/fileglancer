@@ -3,6 +3,7 @@
 import os
 import subprocess
 import sys
+import time
 
 import pytest
 from pydantic import ValidationError
@@ -755,7 +756,7 @@ class TestBuildCommandTildeExpansion:
 # --- _find_manifests_in_repo adapter fallback tests ---
 
 import fileglancer.apps.adapters as adapters_module
-from fileglancer.apps.manifest import _find_manifests_in_repo
+from fileglancer.apps.manifest import _find_manifests_in_repo, _run_git
 
 
 class _StubAdapter:
@@ -830,3 +831,21 @@ class TestFindManifestsAdapterFallback:
         )
 
         assert _find_manifests_in_repo(tmp_path) == []
+
+
+class TestRunGitTimeout:
+    @pytest.mark.asyncio
+    async def test_timeout_covers_command_runtime(self):
+        start = time.monotonic()
+
+        with pytest.raises(ValueError, match="timed out"):
+            await _run_git(
+                [
+                    sys.executable,
+                    "-c",
+                    "import time; time.sleep(2)",
+                ],
+                timeout=0.1,
+            )
+
+        assert time.monotonic() - start < 1.0
