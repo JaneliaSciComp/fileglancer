@@ -1000,6 +1000,27 @@ class TestNextflowRunsFromWorkDir:
         assert cmd.startswith("nextflow run repo -ansi-log false")
         assert cmd.index("-profile") < cmd.index("--input_dir")
 
+    def test_projectdir_default_rewritten_to_repo(self, tmp_path):
+        # Running from the work dir, projectDir assets live under repo/, so a
+        # $projectDir-relative schema default must rewrite to repo/... (not ./).
+        (tmp_path / "nextflow_schema.json").write_text(json.dumps({
+            "$defs": {
+                "opts": {
+                    "title": "Options",
+                    "properties": {
+                        "multiqc_config": {
+                            "type": "string",
+                            "default": "$projectDir/assets/multiqc_config.yml",
+                        }
+                    },
+                }
+            },
+            "allOf": [{"$ref": "#/$defs/opts"}],
+        }))
+        ep = NextflowAdapter().convert(tmp_path).runnables[0]
+        param = next(p for p in ep.flat_parameters() if p.key == "multiqc_config")
+        assert param.default == "repo/assets/multiqc_config.yml"
+
 
 class TestEffectiveWorkingDir:
     """working_dir resolution: explicit wins; containers default to 'work',

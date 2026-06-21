@@ -56,7 +56,10 @@ def _convert_property(name: str, prop: dict, is_required: bool) -> AppParameter:
     if "default" in prop:
         default = prop["default"]
         if isinstance(default, str) and default.startswith("$projectDir"):
-            default = "." + default[len("$projectDir"):]
+            # The generated command runs from the job work dir with the repo
+            # symlinked as `repo`, so projectDir-relative assets live under
+            # repo/. (Rewriting to ./ would resolve against the empty work dir.)
+            default = "repo" + default[len("$projectDir"):]
         kwargs["default"] = default
 
     if param_type == "enum":
