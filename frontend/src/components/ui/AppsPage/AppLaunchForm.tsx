@@ -44,6 +44,7 @@ interface AppLaunchFormProps {
   readonly entryPoint: AppEntryPoint;
   readonly onSubmit: (
     parameters: Record<string, unknown>,
+    envParameters: Record<string, unknown>,
     resources?: AppResourceDefaults,
     extraArgs?: string,
     env?: Record<string, string>,
@@ -55,6 +56,7 @@ interface AppLaunchFormProps {
   readonly submitting: boolean;
   readonly submitError?: string;
   readonly initialValues?: Record<string, unknown>;
+  readonly initialEnvParameters?: Record<string, unknown>;
   readonly initialResources?: AppResourceDefaults;
   readonly initialExtraArgs?: string;
   readonly initialEnv?: Record<string, string>;
@@ -701,6 +703,7 @@ export default function AppLaunchForm({
   submitting,
   submitError,
   initialValues: externalValues,
+  initialEnvParameters: externalEnvValues,
   initialResources,
   initialExtraArgs: externalExtraArgs,
   initialEnv,
@@ -712,8 +715,10 @@ export default function AppLaunchForm({
   const { defaultExtraArgs } = usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const clusterDefaultsQuery = useClusterDefaultsQuery();
-  const allParams = flattenParameters([
-    ...entryPoint.parameters,
+  // Pipeline parameters and env-tab parameters are independent namespaces with
+  // their own value dicts, so a key may appear in both without colliding.
+  const allParams = flattenParameters([...entryPoint.parameters]);
+  const envParamsFlat = flattenParameters([
     ...(entryPoint.env_parameters ?? [])
   ]);
 
@@ -728,6 +733,16 @@ export default function AppLaunchForm({
     ? { ...defaultValues, ...externalValues }
     : defaultValues;
 
+  const envDefaultValues: Record<string, unknown> = {};
+  for (const param of envParamsFlat) {
+    if (param.default !== undefined) {
+      envDefaultValues[param.key] = param.default;
+    }
+  }
+  const startingEnvValues = externalEnvValues
+    ? { ...envDefaultValues, ...externalEnvValues }
+    : envDefaultValues;
+
   // Compute which sections start open (those without collapsed: true)
   const initialOpenSections = entryPoint.parameters
     .filter(item => isParameterSection(item) && !item.collapsed)
@@ -739,6 +754,8 @@ export default function AppLaunchForm({
     externalExtraArgs ?? (defaultExtraArgs || configExtraArgs);
 
   const [values, setValues] = useState<Record<string, unknown>>(startingValues);
+  const [envValues, setEnvValues] =
+    useState<Record<string, unknown>>(startingEnvValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState('parameters');
   const [openSections, setOpenSections] =
@@ -826,6 +843,12 @@ export default function AppLaunchForm({
         return next;
       });
     }
+  };
+
+  // Env-tab params have their own value dict so their keys can't collide with
+  // pipeline param keys.
+  const handleEnvChange = (paramId: string, value: unknown) => {
+    setEnvValues(prev => ({ ...prev, [paramId]: value }));
   };
 
   const validate = (): boolean => {
@@ -994,8 +1017,17 @@ export default function AppLaunchForm({
     }
     const hasEnv = Object.keys(envRecord).length > 0;
 
+    // Env-tab parameter values (separate namespace), dropping empties.
+    const envParams: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(envValues)) {
+      if (val !== undefined && val !== null && val !== '') {
+        envParams[key] = val;
+      }
+    }
+
     onSubmit(
       params,
+      envParams,
       hasResourceOverrides ? resources : undefined,
       extraArgs.trim() || undefined,
       hasEnv ? envRecord : undefined,
@@ -1051,6 +1083,9 @@ export default function AppLaunchForm({
     if (Object.keys(values).length > 0) {
       params.parameters = values;
     }
+    if (Object.keys(envValues).length > 0) {
+      params.env_parameters = envValues;
+    }
     if (
       resources.cpus ||
       resources.memory ||
@@ -1099,6 +1134,9 @@ export default function AppLaunchForm({
 
     if (parsed.parameters) {
       setValues(prev => ({ ...prev, ...parsed.parameters }));
+    }
+    if (parsed.env_parameters) {
+      setEnvValues(prev => ({ ...prev, ...parsed.env_parameters }));
     }
     if (parsed.resources) {
       setResources(prev => ({ ...prev, ...parsed.resources }));
@@ -1337,20 +1375,20 @@ export default function AppLaunchForm({
                     </Accordion.Trigger>
                     <Accordion.Content className="pt-4 pb-2 pl-4">
                       <SectionContent
-                        errors={errors}
-                        onParamChange={handleChange}
+                        errors={{}}
+                        onParamChange={handleEnvChange}
                         section={item}
-                        values={values}
+                        values={envValues}
                       />
                     </Accordion.Content>
                   </Accordion.Item>
                 ) : (
                   <ParameterFieldRow
-                    error={errors[item.key]}
+                    error={undefined}
                     key={item.key}
-                    onChange={val => handleChange(item.key, val)}
+                    onChange={val => handleEnvChange(item.key, val)}
                     param={item}
-                    value={values[item.key]}
+                    value={envValues[item.key]}
                   />
                 )
               )}

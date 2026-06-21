@@ -992,6 +992,50 @@ class TestParameterKeyGeneration:
         )
         assert ep.flat_parameters()[0].key == "extra_args"
 
+    def test_same_key_allowed_across_groups(self):
+        # parameters and env_parameters are independent namespaces, so a key may
+        # appear in both (e.g. a pipeline --profile and Nextflow's -profile).
+        ep = AppEntryPoint(
+            id="r", name="r", command="run",
+            parameters=[AppParameter(flag="--profile", name="P", type="string")],
+            env_parameters=[AppParameter(flag="-profile", name="NfP", type="string")],
+        )
+        keys = [p.key for p in ep.flat_parameters()]
+        assert keys.count("profile") == 2
+
+    def test_duplicate_within_group_still_raises(self):
+        with pytest.raises(ValueError, match="Duplicate parameter key"):
+            AppEntryPoint(
+                id="r", name="r", command="run",
+                parameters=[
+                    AppParameter(flag="--profile", name="A", type="string"),
+                    AppParameter(key="profile", name="B", type="string", raw=True),
+                ],
+            )
+
+
+class TestBuildCommandEnvParameterSeparation:
+    """env_parameters resolve from their own value dict, independent of the
+    pipeline parameters namespace even when keys collide."""
+
+    def _ep(self):
+        return AppEntryPoint(
+            id="r", name="r", command="run",
+            parameters=[AppParameter(flag="--profile", name="Pipeline profile", type="string")],
+            env_parameters=[AppParameter(flag="-profile", name="Nextflow profile", type="string")],
+        )
+
+    def test_colliding_keys_resolve_from_own_dict(self):
+        cmd = build_command(
+            self._ep(), {"profile": "pipe"}, env_parameters={"profile": "nf"}
+        )
+        assert "--profile pipe" in cmd
+        assert "-profile nf" in cmd
+
+    def test_env_param_unknown_key_rejected(self):
+        with pytest.raises(ValueError, match="Unknown parameter 'bogus'"):
+            build_command(self._ep(), {}, env_parameters={"bogus": "x"})
+
 
 import json
 
@@ -1026,7 +1070,10 @@ class TestNextflowRunsFromWorkDir:
     def test_full_command_keeps_profile_before_pipeline_params(self, tmp_path):
         self._make_schema(tmp_path)
         ep = NextflowAdapter().convert(tmp_path).runnables[0]
-        cmd = build_command(ep, {"profile": "janeliaLSF", "input_dir": "/data/in"})
+        # profile is an env-tab param (separate namespace); pass it via env_parameters.
+        cmd = build_command(
+            ep, {"input_dir": "/data/in"}, env_parameters={"profile": "janeliaLSF"}
+        )
         assert cmd.startswith("nextflow run repo -ansi-log false")
         assert cmd.index("-profile") < cmd.index("--input_dir")
 

@@ -466,6 +466,12 @@ export default function JobDetail() {
     if (Object.keys(parameters).length > 0) {
       params.parameters = parameters;
     }
+    const envParameters = job.env_parameters
+      ? omitNullValues(job.env_parameters)
+      : {};
+    if (Object.keys(envParameters).length > 0) {
+      params.env_parameters = envParameters;
+    }
     const resources = job.resources ? omitNullValues(job.resources) : {};
     if (Object.keys(resources).length > 0) {
       params.resources = resources as AppResourceDefaults;
@@ -503,6 +509,7 @@ export default function JobDetail() {
     navigate(path, {
       state: {
         parameters: job.parameters,
+        env_parameters: job.env_parameters,
         resources: job.resources,
         env: job.env,
         pre_run: job.pre_run,
@@ -751,6 +758,15 @@ export default function JobDetail() {
                   sections.push({
                     title: 'Parameters',
                     entries: Object.entries(parameters)
+                  });
+                }
+                const envParameters = job.env_parameters
+                  ? omitNullValues(job.env_parameters)
+                  : {};
+                if (Object.keys(envParameters).length > 0) {
+                  sections.push({
+                    title: 'Environment parameters',
+                    entries: Object.entries(envParameters)
                   });
                 }
                 const resources = job.resources

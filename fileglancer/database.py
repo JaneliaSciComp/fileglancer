@@ -151,6 +151,10 @@ class JobDB(Base):
     entry_point_name = Column(String, nullable=False)
     entry_point_type = Column(String, nullable=False, server_default="job")
     parameters = Column(JSON, nullable=False)
+    # Environment-tab parameter values. A separate namespace from `parameters`
+    # so env-injected keys (e.g. Nextflow's -profile) can't collide with
+    # pipeline param keys.
+    env_parameters = Column(JSON, nullable=True)
     status = Column(String, nullable=False, default="PENDING")
     exit_code = Column(Integer, nullable=True)
     resources = Column(JSON, nullable=True)
@@ -944,6 +948,7 @@ def delete_expired_sessions(session: Session):
 
 def create_job(session: Session, username: str, app_url: str, app_name: str,
                entry_point_id: str, entry_point_name: str, parameters: Dict,
+               env_parameters: Optional[Dict] = None,
                resources: Optional[Dict] = None, manifest_path: str = "",
                entry_point_type: str = "job",
                env: Optional[Dict] = None, pre_run: Optional[str] = None,
@@ -964,6 +969,7 @@ def create_job(session: Session, username: str, app_url: str, app_name: str,
         entry_point_name=entry_point_name,
         entry_point_type=entry_point_type,
         parameters=parameters,
+        env_parameters=env_parameters,
         resources=resources,
         env=env,
         pre_run=pre_run,

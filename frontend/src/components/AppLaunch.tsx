@@ -48,6 +48,7 @@ export default function AppLaunch() {
   const relaunchState = isRelaunch
     ? (location.state as {
         parameters?: Record<string, unknown>;
+        env_parameters?: Record<string, unknown>;
         resources?: Record<string, unknown>;
         env?: Record<string, string>;
         pre_run?: string;
@@ -57,6 +58,7 @@ export default function AppLaunch() {
       } | null)
     : null;
   const relaunchParameters = relaunchState?.parameters;
+  const relaunchEnvParameters = relaunchState?.env_parameters;
   const relaunchResources = relaunchState?.resources as
     | AppResourceDefaults
     | undefined;
@@ -108,6 +110,7 @@ export default function AppLaunch() {
 
   const handleSubmit = (
     parameters: Record<string, unknown>,
+    envParameters: Record<string, unknown>,
     resources?: AppResourceDefaults,
     extraArgs?: string,
     env?: Record<string, string>,
@@ -126,6 +129,7 @@ export default function AppLaunch() {
         manifest_path: manifestPath,
         entry_point_id: selectedEntryPoint.id,
         parameters,
+        env_parameters: envParameters,
         resources,
         extra_args: extraArgs,
         env,
@@ -222,6 +226,7 @@ export default function AppLaunch() {
           initialContainer={relaunchContainer}
           initialContainerArgs={relaunchContainerArgs}
           initialEnv={relaunchEnv}
+          initialEnvParameters={relaunchEnvParameters}
           initialExtraArgs={relaunchExtraArgs}
           initialPostRun={relaunchPostRun}
           initialPreRun={relaunchPreRun}

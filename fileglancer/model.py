@@ -508,24 +508,31 @@ class AppEntryPoint(BaseModel):
 
     @model_validator(mode='after')
     def generate_parameter_keys(self):
-        positional_index = 0
-        keys_seen: dict[str, str] = {}
-        for param in self.flat_parameters():
-            if param.key:
-                # Honor an explicitly-authored key (e.g. flag-less raw args that
-                # want a readable name instead of a positional "_argN").
-                pass
-            elif param.flag is not None:
-                param.key = param.flag.lstrip("-")
-            else:
-                param.key = f"_arg{positional_index}"
-                positional_index += 1
-            if param.key in keys_seen:
-                raise ValueError(
-                    f"Duplicate parameter key '{param.key}' "
-                    f"(from '{param.name}' and '{keys_seen[param.key]}')"
-                )
-            keys_seen[param.key] = param.name
+        # `parameters` and `env_parameters` are independent namespaces whose
+        # values travel in separate dicts end-to-end, so keys must be unique
+        # *within* each group but may legitimately repeat across groups (e.g. a
+        # pipeline `--profile` param alongside Nextflow's injected `-profile`).
+        for group in (self.parameters, self.env_parameters):
+            positional_index = 0
+            keys_seen: dict[str, str] = {}
+            for item in group:
+                params = item.parameters if isinstance(item, AppParameterSection) else [item]
+                for param in params:
+                    if param.key:
+                        # Honor an explicitly-authored key (e.g. flag-less raw
+                        # args that want a readable name instead of "_argN").
+                        pass
+                    elif param.flag is not None:
+                        param.key = param.flag.lstrip("-")
+                    else:
+                        param.key = f"_arg{positional_index}"
+                        positional_index += 1
+                    if param.key in keys_seen:
+                        raise ValueError(
+                            f"Duplicate parameter key '{param.key}' "
+                            f"(from '{param.name}' and '{keys_seen[param.key]}')"
+                        )
+                    keys_seen[param.key] = param.name
         return self
 
     @model_validator(mode='after')
@@ -710,6 +717,10 @@ class Job(BaseModel):
     entry_point_name: str = Field(description="Display name of the entry point")
     entry_point_type: str = Field(description="Whether this is a batch job or long-running service", default="job")
     parameters: Dict = Field(description="Parameters used for the job")
+    env_parameters: Optional[Dict] = Field(
+        description="Environment-tab parameter values (separate namespace from parameters)",
+        default=None,
+    )
     status: str = Field(description="Job status (PENDING, RUNNING, DONE, FAILED, KILLED)")
     exit_code: Optional[int] = Field(description="Exit code of the job", default=None)
     resources: Optional[Dict] = Field(description="Requested resources", default=None)
@@ -736,6 +747,10 @@ class JobSubmitRequest(BaseModel):
     manifest_path: str = Field(description="Relative manifest path within the app repo", default="")
     entry_point_id: str = Field(description="Entry point to execute")
     parameters: Dict = Field(description="Parameter values keyed by parameter key")
+    env_parameters: Dict = Field(
+        description="Environment-tab parameter values, keyed by parameter key (separate namespace from parameters)",
+        default={},
+    )
     resources: Optional[AppResourceDefaults] = Field(description="Resource overrides", default=None)
     extra_args: Optional[str] = Field(description="Extra CLI args for the submit command (replaces config defaults)", default=None)
     env: Optional[Dict[str, str]] = Field(description="Environment variables to export", default=None)

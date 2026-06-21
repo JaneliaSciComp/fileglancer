@@ -13,6 +13,7 @@ from fileglancer import database as db
 from fileglancer.model import (
     AppEntryPoint,
     AppParameter,
+    AppParameterSection,
     _REQUIREMENT_PATTERN,
 )
 
@@ -339,49 +340,65 @@ def _validate_parameter_value(param: AppParameter, value, session=None) -> str:
     return str_val
 
 
-def build_command(entry_point: AppEntryPoint, parameters: dict, session=None) -> str:
+def _flatten_param_items(items) -> list:
+    """Flatten a list of AppParameter / AppParameterSection items into params."""
+    result = []
+    for item in items:
+        if isinstance(item, AppParameterSection):
+            result.extend(item.parameters)
+        else:
+            result.append(item)
+    return result
+
+
+def build_command(entry_point: AppEntryPoint, parameters: dict,
+                  env_parameters: dict = None, session=None) -> str:
     """Build a shell command from an entry point and parameter values.
 
-    All parameter values are validated and shell-escaped.
-    Flagged parameters are emitted first in declaration order,
-    then positional parameters (no flag) in declaration order.
-    When session is provided, file/directory parameters are validated
-    against allowed file share mounts.
-    Raises ValueError for invalid parameters.
+    `parameters` and `env_parameters` are independent namespaces: each param
+    draws its value from the dict for the group it was declared in, so the same
+    key may appear in both without colliding. Env-tab params are emitted first
+    (matching declaration order: env_parameters then parameters), e.g. so
+    Nextflow's `-profile` precedes the pipeline's `--params`.
+
+    All parameter values are validated and shell-escaped. Flagged parameters
+    are emitted first in declaration order, then positional parameters (no
+    flag). When session is provided, file/directory parameters are validated
+    against allowed file share mounts. Raises ValueError for invalid parameters.
     """
-    # Build a lookup of parameter definitions by key
-    flat_params = entry_point.flat_parameters()
-    param_defs = {p.key: p for p in flat_params}
+    env_parameters = env_parameters or {}
+    env_flat = _flatten_param_items(entry_point.env_parameters)
+    param_flat = _flatten_param_items(entry_point.parameters)
+    groups = ((env_flat, env_parameters), (param_flat, parameters))
 
-    # Validate required parameters
-    for param in flat_params:
-        if param.required and param.key not in parameters:
-            if param.default is None:
+    for flat, values in groups:
+        # Validate required parameters
+        for param in flat:
+            if param.required and param.key not in values and param.default is None:
                 raise ValueError(f"Required parameter '{param.name}' is missing")
+        # Check for unknown parameters
+        keys = {p.key for p in flat}
+        for param_key in values:
+            if param_key not in keys:
+                raise ValueError(f"Unknown parameter '{param_key}'")
 
-    # Check for unknown parameters
-    for param_key in parameters:
-        if param_key not in param_defs:
-            raise ValueError(f"Unknown parameter '{param_key}'")
-
-    # Compute effective values: user-provided merged with defaults
-    effective: dict[str, tuple[AppParameter, any]] = {}
-    for param in flat_params:
-        if param.key in parameters:
-            effective[param.key] = (param, parameters[param.key])
-        elif param.default is not None:
-            effective[param.key] = (param, param.default)
+    # Compute effective values (user-provided merged with defaults), keeping
+    # env-then-pipeline declaration order across the combined list.
+    effective: list[tuple[AppParameter, any]] = []
+    for flat, values in groups:
+        for param in flat:
+            if param.key in values:
+                effective.append((param, values[param.key]))
+            elif param.default is not None:
+                effective.append((param, param.default))
 
     # Start with the base command
     parts = [entry_point.command]
 
     # Pass 1: Flagged args in declaration order
-    for param in flat_params:
-        if param.flag is None:
+    for p, value in effective:
+        if p.flag is None:
             continue
-        if param.key not in effective:
-            continue
-        p, value = effective[param.key]
         validated = _validate_parameter_value(p, value, session=session)
         if p.type == "boolean":
             if value is True:
@@ -390,12 +407,9 @@ def build_command(entry_point: AppEntryPoint, parameters: dict, session=None) ->
             parts.append(f"{p.flag} {shlex.quote(validated)}")
 
     # Pass 2: Positional args in declaration order
-    for param in flat_params:
-        if param.flag is not None:
+    for p, value in effective:
+        if p.flag is not None:
             continue
-        if param.key not in effective:
-            continue
-        p, value = effective[param.key]
         validated = _validate_parameter_value(p, value, session=session)
         if p.raw:
             if _SHELL_METACHAR_PATTERN.search(validated):

@@ -424,6 +424,7 @@ async def submit_job(
     app_url: str,
     entry_point_id: str,
     parameters: dict,
+    env_parameters: Optional[dict] = None,
     resources: Optional[dict] = None,
     extra_args: Optional[str] = None,
     manifest_path: str = "",
@@ -449,6 +450,7 @@ async def submit_job(
     # A null parameter value means "not provided"; drop these so they are
     # neither used when building the command nor stored on the job record.
     parameters = {k: v for k, v in parameters.items() if v is not None}
+    env_parameters = {k: v for k, v in (env_parameters or {}).items() if v is not None}
 
     # Read manifest from the cache when available; fall back to disk.
     manifest = await get_or_load_manifest(username, app_url, manifest_path)
@@ -472,7 +474,7 @@ async def submit_job(
 
     # Build command (with DB session for path validation against file shares)
     with db.get_db_session(settings.db_url) as session:
-        command = build_command(entry_point, parameters, session=session)
+        command = build_command(entry_point, parameters, env_parameters, session=session)
 
     # Build resource spec (extra_args passed separately, not from manifest)
     overrides = dict(resources) if resources else {}
@@ -520,6 +522,7 @@ async def submit_job(
             entry_point_name=entry_point.name,
             entry_point_type=entry_point.type,
             parameters=parameters,
+            env_parameters=env_parameters or None,
             resources=resources_dict,
             manifest_path=manifest_path,
             env=merged_env or None,
