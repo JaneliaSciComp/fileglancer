@@ -1197,6 +1197,21 @@ export default function AppLaunchForm({
     </div>
   );
 
+  // Shown next to both the top and bottom submit buttons, so the user sees the
+  // error regardless of which button they used. Wording is direction-neutral
+  // since the same banner appears above and below the fields.
+  const submitErrorBanner = submitError ? (
+    <div className="mt-2 mb-4 p-3 bg-error/10 rounded text-error text-sm">
+      {submitError}
+    </div>
+  ) : null;
+  const validationErrorBanner =
+    Object.keys(errors).length > 0 ? (
+      <div className="mt-2 mb-4 p-3 bg-error/10 rounded text-error text-sm">
+        Please fix the highlighted errors before submitting.
+      </div>
+    ) : null;
+
   return (
     <div>
       <input
@@ -1222,6 +1237,9 @@ export default function AppLaunchForm({
         </div>
         {actionButtons}
       </div>
+      {/* Errors (top) */}
+      {validationErrorBanner}
+      {submitErrorBanner}
       {entryPoint.description ? (
         <Typography className="block mb-6">{entryPoint.description}</Typography>
       ) : null}
@@ -1424,19 +1442,9 @@ export default function AppLaunchForm({
         </Tabs.Panel>
       </Tabs>
 
-      {/* Validation error summary */}
-      {Object.keys(errors).length > 0 ? (
-        <div className="mt-6 mb-4 p-3 bg-error/10 rounded text-error text-sm">
-          Please fix the errors above before submitting.
-        </div>
-      ) : null}
-
-      {/* Submission error */}
-      {submitError ? (
-        <div className="mt-6 mb-4 p-3 bg-error/10 rounded text-error text-sm">
-          {submitError}
-        </div>
-      ) : null}
+      {/* Errors (bottom) */}
+      {validationErrorBanner}
+      {submitErrorBanner}
 
       {/* Submit (bottom) */}
       <div className="flex justify-end mt-6">{actionButtons}</div>
