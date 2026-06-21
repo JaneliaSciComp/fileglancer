@@ -1272,61 +1272,52 @@ export default function AppLaunchForm({
         </Tabs.List>
 
         <Tabs.Panel className="pt-4" value="parameters">
-          {hasHiddenParams ? (
-            <div className="flex justify-end mb-2">
-              <FgSwitch
-                checked={showHidden}
-                id="show-hidden-toggle"
-                label="Show hidden"
-                onChange={() => {
-                  if (!showHidden) {
-                    // Expand sections that contain hidden parameters
-                    const sectionsWithHidden = entryPoint.parameters
-                      .filter(
-                        item =>
-                          isParameterSection(item) &&
-                          item.parameters.some(p => p.hidden)
-                      )
-                      .map(item => (item as AppParameterSection).section);
-                    setOpenSections(prev => [
-                      ...new Set([...prev, ...sectionsWithHidden])
-                    ]);
-                  }
-                  setShowHidden(prev => !prev);
-                }}
-              />
-            </div>
-          ) : null}
-          <div className="max-w-2xl space-y-4">
-            {hasSections ? (
-              <Accordion
-                onValueChange={
-                  setOpenSections as Dispatch<SetStateAction<string | string[]>>
-                }
-                type="multiple"
-                value={openSections}
-              >
-                {visibleParameters.map(item =>
-                  isParameterSection(item) ? (
-                    <Accordion.Item
-                      key={`section-${item.section}`}
-                      value={item.section}
+          <div className="flex items-start gap-4">
+            <div className="max-w-2xl grow space-y-4">
+              {hasSections ? (
+                <Accordion
+                  onValueChange={
+                    setOpenSections as Dispatch<
+                      SetStateAction<string | string[]>
                     >
-                      <SectionTrigger
-                        description={item.description}
-                        isOpen={openSections.includes(item.section)}
-                        title={item.section}
-                      />
-                      <Accordion.Content className="pt-2 pb-4 pl-4">
-                        <SectionContent
-                          errors={errors}
-                          onParamChange={handleChange}
-                          section={item}
-                          values={values}
+                  }
+                  type="multiple"
+                  value={openSections}
+                >
+                  {visibleParameters.map(item =>
+                    isParameterSection(item) ? (
+                      <Accordion.Item
+                        key={`section-${item.section}`}
+                        value={item.section}
+                      >
+                        <SectionTrigger
+                          description={item.description}
+                          isOpen={openSections.includes(item.section)}
+                          title={item.section}
                         />
-                      </Accordion.Content>
-                    </Accordion.Item>
-                  ) : (
+                        <Accordion.Content className="pt-2 pb-4 pl-4">
+                          <SectionContent
+                            errors={errors}
+                            onParamChange={handleChange}
+                            section={item}
+                            values={values}
+                          />
+                        </Accordion.Content>
+                      </Accordion.Item>
+                    ) : (
+                      <ParameterFieldRow
+                        error={errors[item.key]}
+                        key={item.key}
+                        onChange={val => handleChange(item.key, val)}
+                        param={item}
+                        value={values[item.key]}
+                      />
+                    )
+                  )}
+                </Accordion>
+              ) : (
+                visibleParameters.map(item =>
+                  isParameterSection(item) ? null : (
                     <ParameterFieldRow
                       error={errors[item.key]}
                       key={item.key}
@@ -1335,21 +1326,34 @@ export default function AppLaunchForm({
                       value={values[item.key]}
                     />
                   )
-                )}
-              </Accordion>
-            ) : (
-              visibleParameters.map(item =>
-                isParameterSection(item) ? null : (
-                  <ParameterFieldRow
-                    error={errors[item.key]}
-                    key={item.key}
-                    onChange={val => handleChange(item.key, val)}
-                    param={item}
-                    value={values[item.key]}
-                  />
                 )
-              )
-            )}
+              )}
+            </div>
+            {hasHiddenParams ? (
+              <div className="shrink-0">
+                <FgSwitch
+                  checked={showHidden}
+                  id="show-hidden-toggle"
+                  label="Show hidden"
+                  onChange={() => {
+                    if (!showHidden) {
+                      // Expand sections that contain hidden parameters
+                      const sectionsWithHidden = entryPoint.parameters
+                        .filter(
+                          item =>
+                            isParameterSection(item) &&
+                            item.parameters.some(p => p.hidden)
+                        )
+                        .map(item => (item as AppParameterSection).section);
+                      setOpenSections(prev => [
+                        ...new Set([...prev, ...sectionsWithHidden])
+                      ]);
+                    }
+                    setShowHidden(prev => !prev);
+                  }}
+                />
+              </div>
+            ) : null}
           </div>
         </Tabs.Panel>
 
