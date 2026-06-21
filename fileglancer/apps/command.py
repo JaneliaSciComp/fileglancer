@@ -201,6 +201,46 @@ def build_requirements_check(requirements: list[str]) -> str:
 _SHELL_METACHAR_PATTERN = re.compile(r'[;&|`$(){}!<>\n\r]')
 _WINDOWS_DRIVE_PATTERN = re.compile(r'^[a-zA-Z]:/')
 
+# Cloud storage URI schemes that are passed through as opaque strings rather
+# than treated as local filesystem paths.
+_URI_PREFIXES = ("s3://", "gs://", "https://")
+
+
+def expand_user_path(path_value: str, username: str | None = None) -> str:
+    """Normalize a file/directory parameter value.
+
+    Replaces backslashes with '/', passes cloud-storage URIs through unchanged,
+    and expands a leading '~' / '~/' to the target user's home directory.
+
+    The home is resolved from *username* via pwd.getpwnam so this works from
+    the root server process, where os.geteuid() would wrongly resolve to
+    /root. Falls back to the effective uid's home, then os.path.expanduser,
+    when username is None (CLI / tests) or the lookup fails.
+    """
+    normalized = path_value.replace("\\", "/")
+
+    if normalized.startswith(_URI_PREFIXES):
+        return normalized
+
+    if normalized == "~" or normalized.startswith("~/"):
+        home = None
+        if username and pwd is not None:
+            try:
+                home = pwd.getpwnam(username).pw_dir
+            except KeyError:
+                home = None
+        if home is None and pwd is not None:
+            try:
+                home = pwd.getpwuid(os.geteuid()).pw_dir
+            except (AttributeError, KeyError):
+                home = None
+        if home is None:
+            home = os.path.expanduser("~")
+        home = home.replace("\\", "/")
+        return home + normalized[1:]
+
+    return normalized
+
 
 def validate_path_for_shell(path_value: str) -> str | None:
     """Validate path syntax for use in shell commands (no filesystem I/O).
@@ -212,7 +252,7 @@ def validate_path_for_shell(path_value: str) -> str | None:
     normalized = path_value.replace("\\", "/")
 
     # Cloud storage URIs are passed through as opaque strings
-    if normalized.startswith(("s3://", "gs://", "https://")):
+    if normalized.startswith(_URI_PREFIXES):
         return None
 
     if _SHELL_METACHAR_PATTERN.search(normalized):
@@ -244,7 +284,7 @@ def validate_path_in_filestore(path_value: str, fsps: list) -> str | None:
 
     # Relative paths and cloud storage URIs are not local filesystem paths;
     # skip filestore validation.
-    if normalized.startswith("./") or normalized.startswith(("s3://", "gs://", "https://")):
+    if normalized.startswith("./") or normalized.startswith(_URI_PREFIXES):
         return None
 
     expanded = os.path.expanduser(normalized)
@@ -259,6 +299,12 @@ def validate_path_in_filestore(path_value: str, fsps: list) -> str | None:
 
     from fileglancer.filestore import Filestore
     filestore = Filestore(fsp)
+    # NOTE: this runs on the server (root in production); validate_path's
+    # exists/readable checks therefore reflect root's access, not the submitting
+    # user's (false-pass on local FS where root bypasses perms, false-reject on
+    # root-squash NFS). Fully correct per-user validation would have to run in
+    # the setuid worker. The file-share containment check above is euid-
+    # independent and still holds.
     return filestore.validate_path(subpath)
 
 
@@ -268,7 +314,7 @@ def validate_path_in_filestore(path_value: str, fsps: list) -> str | None:
 _ENV_VAR_NAME_PATTERN = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 
 
-def _validate_parameter_value(param: AppParameter, value, session=None) -> str:
+def _validate_parameter_value(param: AppParameter, value, session=None, username=None) -> str:
     """Validate a single parameter value against its schema and return the string representation.
 
     When session is provided and param type is file/directory, validates that
@@ -314,17 +360,11 @@ def _validate_parameter_value(param: AppParameter, value, session=None) -> str:
     str_val = str(value)
 
     if param.type in ("file", "directory"):
-        str_val = str_val.replace("\\", "/")
-        # Expand ~ so the path works inside shlex.quote() single quotes,
-        # where the shell would not perform tilde expansion.
-        # Use euid so this works when the server runs as root with seteuid.
-        if str_val.startswith("~/") or str_val == "~":
-            try:
-                home = pwd.getpwuid(os.geteuid()).pw_dir
-            except (AttributeError, KeyError):
-                home = os.path.expanduser("~")
-            home = home.replace("\\", "/")
-            str_val = home + str_val[1:]
+        # Normalize and expand ~ so the path works inside shlex.quote() single
+        # quotes, where the shell would not perform tilde expansion. Resolve ~
+        # against the target user's home (the server runs as root and never
+        # seteuids, so euid would wrongly give /root).
+        str_val = expand_user_path(str_val, username)
         if session is not None:
             fsps = db.get_file_share_paths(session)
             error = validate_path_in_filestore(str_val, fsps)
@@ -352,7 +392,7 @@ def _flatten_param_items(items) -> list:
 
 
 def build_command(entry_point: AppEntryPoint, parameters: dict,
-                  env_parameters: dict = None, session=None) -> str:
+                  env_parameters: dict = None, session=None, username=None) -> str:
     """Build a shell command from an entry point and parameter values.
 
     `parameters` and `env_parameters` are independent namespaces: each param
@@ -399,7 +439,7 @@ def build_command(entry_point: AppEntryPoint, parameters: dict,
     for p, value in effective:
         if p.flag is None:
             continue
-        validated = _validate_parameter_value(p, value, session=session)
+        validated = _validate_parameter_value(p, value, session=session, username=username)
         if p.type == "boolean":
             if value is True:
                 parts.append(p.flag)
@@ -410,7 +450,7 @@ def build_command(entry_point: AppEntryPoint, parameters: dict,
     for p, value in effective:
         if p.flag is not None:
             continue
-        validated = _validate_parameter_value(p, value, session=session)
+        validated = _validate_parameter_value(p, value, session=session, username=username)
         if p.raw:
             if _SHELL_METACHAR_PATTERN.search(validated):
                 raise ValueError(

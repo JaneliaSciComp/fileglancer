@@ -14,6 +14,7 @@ from fileglancer.apps.command import (  # noqa: F401
     _TOOL_REGISTRY,
     build_command,
     build_requirements_check,
+    expand_user_path,
     merge_requirements,
     validate_path_for_shell,
     validate_path_in_filestore,

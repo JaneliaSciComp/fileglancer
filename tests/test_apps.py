@@ -23,6 +23,7 @@ from fileglancer.apps import (
     _container_sif_name,
     _build_container_script,
     build_command,
+    expand_user_path,
 )
 
 
@@ -753,6 +754,62 @@ class TestBuildCommandTildeExpansion:
     def test_absolute_path_unchanged(self, entry_point):
         cmd = build_command(entry_point, {"output_dir": "/data/output"})
         assert "/data/output" in cmd
+
+    def test_tilde_expanded_to_target_user_home(self, entry_point, monkeypatch):
+        """With a username, ~ resolves to that user's home, not the server's."""
+        import fileglancer.apps.command as command_mod
+        fake_pw = SimpleNamespace(pw_dir="/home/alice")
+        monkeypatch.setattr(command_mod.pwd, "getpwnam",
+                            lambda name: fake_pw if name == "alice" else (_ for _ in ()).throw(KeyError(name)))
+        cmd = build_command(entry_point, {"output_dir": "~/data"}, username="alice")
+        assert "/home/alice/data" in cmd
+        assert "~" not in cmd
+
+    def test_uri_passed_through_unchanged(self):
+        """A file/directory param holding a cloud URI is not mangled into a path."""
+        ep = AppEntryPoint(
+            id="test",
+            name="test",
+            command="test_cmd",
+            parameters=[{
+                "key": "input",
+                "name": "Input",
+                "type": "file",
+                "flag": "--input",
+            }],
+        )
+        cmd = build_command(ep, {"input": "s3://bucket/key"})
+        assert "s3://bucket/key" in cmd
+
+
+class TestExpandUserPath:
+    """expand_user_path normalizes file/dir param values consistently."""
+
+    def test_uri_unchanged(self):
+        assert expand_user_path("s3://bucket/key") == "s3://bucket/key"
+        assert expand_user_path("gs://bucket/key") == "gs://bucket/key"
+        assert expand_user_path("https://host/path") == "https://host/path"
+
+    def test_absolute_unchanged(self):
+        assert expand_user_path("/data/output") == "/data/output"
+
+    def test_backslashes_normalized(self):
+        assert expand_user_path("/data\\sub") == "/data/sub"
+
+    def test_tilde_uses_username_home(self, monkeypatch):
+        import fileglancer.apps.command as command_mod
+        monkeypatch.setattr(command_mod.pwd, "getpwnam",
+                            lambda name: SimpleNamespace(pw_dir="/home/bob"))
+        assert expand_user_path("~/x", username="bob") == "/home/bob/x"
+        assert expand_user_path("~", username="bob") == "/home/bob"
+
+    def test_unknown_username_falls_back_to_euid(self, monkeypatch):
+        import fileglancer.apps.command as command_mod
+        monkeypatch.setattr(command_mod.pwd, "getpwnam",
+                            lambda name: (_ for _ in ()).throw(KeyError(name)))
+        monkeypatch.setattr(command_mod.pwd, "getpwuid",
+                            lambda uid: SimpleNamespace(pw_dir="/home/server"))
+        assert expand_user_path("~/x", username="ghost") == "/home/server/x"
 
 
 # --- _find_manifests_in_repo adapter fallback tests ---

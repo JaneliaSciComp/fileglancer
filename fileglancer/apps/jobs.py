@@ -27,8 +27,10 @@ from fileglancer.apps.manifest import (
 from fileglancer.apps.command import (
     build_command,
     build_requirements_check,
+    expand_user_path,
     merge_requirements,
     _ENV_VAR_NAME_PATTERN,
+    _URI_PREFIXES,
 )
 from fileglancer.apps.jobfiles import _build_work_dir
 from fileglancer.model import AppEntryPoint
@@ -474,7 +476,7 @@ async def submit_job(
 
     # Build command (with DB session for path validation against file shares)
     with db.get_db_session(settings.db_url) as session:
-        command = build_command(entry_point, parameters, env_parameters, session=session)
+        command = build_command(entry_point, parameters, env_parameters, session=session, username=username)
 
     # Build resource spec (extra_args passed separately, not from manifest)
     overrides = dict(resources) if resources else {}
@@ -612,7 +614,13 @@ async def submit_job(
         for param in entry_point.flat_parameters():
             if param.type in ("file", "directory") and param.key in parameters:
                 path_val = str(parameters[param.key])
-                expanded = os.path.expanduser(path_val)
+                # Expand ~ against the user's home (same normalization as the
+                # command). Skip cloud-storage URIs and anything that isn't an
+                # absolute local path — those are not bind-mountable and would
+                # otherwise produce garbage binds (e.g. s3://bucket/k -> s3:/bucket).
+                expanded = expand_user_path(path_val, username)
+                if expanded.startswith(_URI_PREFIXES) or not expanded.startswith("/"):
+                    continue
                 if param.type == "directory":
                     bind_paths.append(expanded)
                 else:
