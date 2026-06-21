@@ -249,7 +249,7 @@ function SectionTrigger({
   readonly isOpen: boolean;
 }) {
   return (
-    <Accordion.Trigger className="flex w-full items-start justify-between gap-2 py-3 border-b border-primary-light">
+    <Accordion.Trigger className="flex w-full items-start justify-between gap-2 py-4">
       <div className="text-left">
         <div className="text-foreground font-bold text-sm">{title}</div>
         {description ? (
@@ -596,7 +596,7 @@ function EnvironmentTabContent({
           isOpen={openEnvSections.includes('environment')}
           title="Environment"
         />
-        <Accordion.Content className="pt-4 pb-2 pl-4">
+        <Accordion.Content className="pt-2 pb-4 pl-4">
           <EnvironmentSectionContent
             envVars={envVars}
             postRun={postRun}
@@ -615,7 +615,7 @@ function EnvironmentTabContent({
             isOpen={openEnvSections.includes('apptainer')}
             title="Container"
           />
-          <Accordion.Content className="pt-4 pb-2 pl-4">
+          <Accordion.Content className="pt-2 pb-4 pl-4">
             <div className="space-y-4">
               <div>
                 <label className="block text-foreground text-sm font-semibold mb-1">
@@ -681,7 +681,7 @@ function ClusterTabContent({
           isOpen={openClusterSections.includes('resources')}
           title="Resources"
         />
-        <Accordion.Content className="pt-4 pb-2 pl-4">
+        <Accordion.Content className="pt-2 pb-4 pl-4">
           <ResourcesSectionContent
             resources={resources}
             setResources={setResources}
@@ -695,7 +695,7 @@ function ClusterTabContent({
           isOpen={openClusterSections.includes('submitOptions')}
           title="Submit Options"
         />
-        <Accordion.Content className="pt-4 pb-2 pl-4">
+        <Accordion.Content className="pt-2 pb-4 pl-4">
           <SubmitOptionsSectionContent
             extraArgs={extraArgs}
             resources={resources}
@@ -1317,7 +1317,7 @@ export default function AppLaunchForm({
                         isOpen={openSections.includes(item.section)}
                         title={item.section}
                       />
-                      <Accordion.Content className="pt-4 pb-2 pl-4">
+                      <Accordion.Content className="pt-2 pb-4 pl-4">
                         <SectionContent
                           errors={errors}
                           onParamChange={handleChange}
@@ -1375,7 +1375,7 @@ export default function AppLaunchForm({
                       isOpen={openEnvParamSections.includes(item.section)}
                       title={item.section}
                     />
-                    <Accordion.Content className="pt-4 pb-2 pl-4">
+                    <Accordion.Content className="pt-2 pb-4 pl-4">
                       <SectionContent
                         errors={{}}
                         onParamChange={handleEnvChange}
