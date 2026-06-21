@@ -235,6 +235,40 @@ function ParameterFieldRow({
   );
 }
 
+// Trigger for a collapsible section. The title and description live in the
+// trigger (not the content) so the description stays visible when collapsed.
+// items-start keeps the chevron aligned with the title line rather than
+// centered against the title + description block.
+function SectionTrigger({
+  title,
+  description,
+  isOpen
+}: {
+  readonly title: string;
+  readonly description?: string;
+  readonly isOpen: boolean;
+}) {
+  return (
+    <Accordion.Trigger className="flex w-full items-start justify-between gap-2 py-3 border-b border-primary-light">
+      <div className="text-left">
+        <div className="text-foreground font-bold text-sm">{title}</div>
+        {description ? (
+          <Typography className="text-foreground" type="small">
+            {description}
+          </Typography>
+        ) : null}
+      </div>
+      <FgIcon
+        className={`text-foreground transition-transform shrink-0 mt-0.5 ${
+          isOpen ? 'rotate-180' : ''
+        }`}
+        icon={HiChevronDown}
+        size="sm"
+      />
+    </Accordion.Trigger>
+  );
+}
+
 function SectionContent({
   section,
   values,
@@ -347,12 +381,6 @@ function EnvironmentSectionContent({
 
   return (
     <div className="space-y-4">
-      <Typography className="text-foreground" type="small">
-        Set up the environment that your job runs in. Environment variables are
-        exported, and the pre- and post-run scripts let you load software
-        modules or do setup and cleanup around the main command.
-      </Typography>
-
       <EnvVarRows envVars={envVars} setEnvVars={setEnvVars} />
 
       <div>
@@ -402,13 +430,6 @@ function ResourcesSectionContent({
 
   return (
     <div className="space-y-4">
-      <Typography className="text-foreground" type="small">
-        These resources are requested for the single process that runs your 
-        command. If that command launches additional jobs on the cluster,
-        those sub-jobs request their own resources independently and are{' '}
-        not controlled here.
-      </Typography>
-
       <div>
         <label className="block text-foreground text-sm font-semibold mb-1">
           CPUs
@@ -490,11 +511,6 @@ function SubmitOptionsSectionContent({
 
   return (
     <div className="space-y-4">
-      <Typography className="text-foreground" type="small">
-        Controls how the main job is submitted to the cluster scheduler. These
-        are translated into <code>bsub</code> options. 
-      </Typography>
-
       <div>
         <label className="block text-foreground text-sm font-semibold mb-1">
           Queue
@@ -575,16 +591,11 @@ function EnvironmentTabContent({
       value={openEnvSections}
     >
       <Accordion.Item value="environment">
-        <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
-          <div className="text-foreground font-bold text-sm">Environment</div>
-          <FgIcon
-            className={`text-foreground transition-transform ${
-              openEnvSections.includes('environment') ? 'rotate-180' : ''
-            }`}
-            icon={HiChevronDown}
-            size="sm"
-          />
-        </Accordion.Trigger>
+        <SectionTrigger
+          description="Set up the environment that the job runs in. This controls the script that is submitted to the cluster."
+          isOpen={openEnvSections.includes('environment')}
+          title="Environment"
+        />
         <Accordion.Content className="pt-4 pb-2 pl-4">
           <EnvironmentSectionContent
             envVars={envVars}
@@ -599,16 +610,11 @@ function EnvironmentTabContent({
 
       {entryPoint.container ? (
         <Accordion.Item value="apptainer">
-          <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
-            <div className="text-foreground font-bold text-sm">Container</div>
-            <FgIcon
-              className={`text-foreground transition-transform ${
-                openEnvSections.includes('apptainer') ? 'rotate-180' : ''
-              }`}
-              icon={HiChevronDown}
-              size="sm"
-            />
-          </Accordion.Trigger>
+          <SectionTrigger
+            description="Run the command inside an Apptainer (Singularity) container image."
+            isOpen={openEnvSections.includes('apptainer')}
+            title="Container"
+          />
           <Accordion.Content className="pt-4 pb-2 pl-4">
             <div className="space-y-4">
               <div>
@@ -670,16 +676,11 @@ function ClusterTabContent({
       value={openClusterSections}
     >
       <Accordion.Item value="resources">
-        <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
-          <div className="text-foreground font-bold text-sm">Resources</div>
-          <FgIcon
-            className={`text-foreground transition-transform ${
-              openClusterSections.includes('resources') ? 'rotate-180' : ''
-            }`}
-            icon={HiChevronDown}
-            size="sm"
-          />
-        </Accordion.Trigger>
+        <SectionTrigger
+          description="These resources are requested for the single process that runs your command. These apply to the main job only, not to any jobs it submits on its own."
+          isOpen={openClusterSections.includes('resources')}
+          title="Resources"
+        />
         <Accordion.Content className="pt-4 pb-2 pl-4">
           <ResourcesSectionContent
             resources={resources}
@@ -689,18 +690,11 @@ function ClusterTabContent({
       </Accordion.Item>
 
       <Accordion.Item value="submitOptions">
-        <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
-          <div className="text-foreground font-bold text-sm">
-            Submit Options
-          </div>
-          <FgIcon
-            className={`text-foreground transition-transform ${
-              openClusterSections.includes('submitOptions') ? 'rotate-180' : ''
-            }`}
-            icon={HiChevronDown}
-            size="sm"
-          />
-        </Accordion.Trigger>
+        <SectionTrigger
+          description="Controls how the main job is submitted to the cluster scheduler, such as the queue and any extra scheduler options. These apply to the main job only, not to any jobs it submits on its own."
+          isOpen={openClusterSections.includes('submitOptions')}
+          title="Submit Options"
+        />
         <Accordion.Content className="pt-4 pb-2 pl-4">
           <SubmitOptionsSectionContent
             extraArgs={extraArgs}
@@ -1318,30 +1312,11 @@ export default function AppLaunchForm({
                       key={`section-${item.section}`}
                       value={item.section}
                     >
-                      <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
-                        <div className="text-left">
-                          <Typography className="text-foreground font-semibold text-base">
-                            {item.section}
-                          </Typography>
-                          {item.description ? (
-                            <Typography
-                              className="text-foreground"
-                              type="small"
-                            >
-                              {item.description}
-                            </Typography>
-                          ) : null}
-                        </div>
-                        <FgIcon
-                          className={`text-foreground transition-transform ${
-                            openSections.includes(item.section)
-                              ? 'rotate-180'
-                              : ''
-                          }`}
-                          icon={HiChevronDown}
-                          size="sm"
-                        />
-                      </Accordion.Trigger>
+                      <SectionTrigger
+                        description={item.description}
+                        isOpen={openSections.includes(item.section)}
+                        title={item.section}
+                      />
                       <Accordion.Content className="pt-4 pb-2 pl-4">
                         <SectionContent
                           errors={errors}
@@ -1395,27 +1370,11 @@ export default function AppLaunchForm({
                     key={`env-section-${item.section}`}
                     value={item.section}
                   >
-                    <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
-                      <div className="text-left">
-                        <div className="text-foreground font-bold text-sm">
-                          {item.section}
-                        </div>
-                        {item.description ? (
-                          <Typography className="text-foreground" type="small">
-                            {item.description}
-                          </Typography>
-                        ) : null}
-                      </div>
-                      <FgIcon
-                        className={`text-secondary transition-transform ${
-                          openEnvParamSections.includes(item.section)
-                            ? 'rotate-180'
-                            : ''
-                        }`}
-                        icon={HiChevronDown}
-                        size="sm"
-                      />
-                    </Accordion.Trigger>
+                    <SectionTrigger
+                      description={item.description}
+                      isOpen={openEnvParamSections.includes(item.section)}
+                      title={item.section}
+                    />
                     <Accordion.Content className="pt-4 pb-2 pl-4">
                       <SectionContent
                         errors={{}}
