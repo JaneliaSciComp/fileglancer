@@ -511,7 +511,11 @@ class AppEntryPoint(BaseModel):
         positional_index = 0
         keys_seen: dict[str, str] = {}
         for param in self.flat_parameters():
-            if param.flag is not None:
+            if param.key:
+                # Honor an explicitly-authored key (e.g. flag-less raw args that
+                # want a readable name instead of a positional "_argN").
+                pass
+            elif param.flag is not None:
                 param.key = param.flag.lstrip("-")
             else:
                 param.key = f"_arg{positional_index}"

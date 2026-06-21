@@ -160,6 +160,7 @@ class NextflowAdapter:
                         description="Comma-separated list of Nextflow profiles to apply (e.g. standard,docker)",
                     ),
                     AppParameter(
+                        key="extra_args",
                         name="Extra Arguments",
                         type="string",
                         description="Additional Nextflow command-line arguments (e.g. -resume, -with-tower)",

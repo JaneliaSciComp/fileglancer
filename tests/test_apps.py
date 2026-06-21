@@ -963,6 +963,36 @@ class TestEnumOptionsNormalization:
             build_command(ep, {"n": "4"})
 
 
+class TestParameterKeyGeneration:
+    """AppEntryPoint auto-generates parameter keys from the flag or a positional
+    index, but honors an explicitly-authored key."""
+
+    def test_flag_derived_key(self):
+        ep = AppEntryPoint(
+            id="r", name="r", command="run",
+            parameters=[AppParameter(flag="--outdir", name="Out", type="string")],
+        )
+        assert ep.flat_parameters()[0].key == "outdir"
+
+    def test_flagless_positional_key(self):
+        ep = AppEntryPoint(
+            id="r", name="r", command="run",
+            parameters=[AppParameter(name="Pos", type="string", raw=True)],
+        )
+        assert ep.flat_parameters()[0].key == "_arg0"
+
+    def test_explicit_key_honored(self):
+        # A flag-less raw arg with an authored key keeps it instead of "_arg0",
+        # so it reads as a real name in the params tab / exported JSON.
+        ep = AppEntryPoint(
+            id="r", name="r", command="run",
+            parameters=[
+                AppParameter(key="extra_args", name="Extra", type="string", raw=True),
+            ],
+        )
+        assert ep.flat_parameters()[0].key == "extra_args"
+
+
 import json
 
 from fileglancer.apps.nextflow import NextflowAdapter
