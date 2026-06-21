@@ -347,6 +347,12 @@ function EnvironmentSectionContent({
 
   return (
     <div className="space-y-4">
+      <Typography className="text-foreground" type="small">
+        Set up the environment that your job runs in. Environment variables are
+        exported, and the pre- and post-run scripts let you load software
+        modules or do setup and cleanup around the main command.
+      </Typography>
+
       <EnvVarRows envVars={envVars} setEnvVars={setEnvVars} />
 
       <div>
@@ -396,6 +402,13 @@ function ResourcesSectionContent({
 
   return (
     <div className="space-y-4">
+      <Typography className="text-foreground" type="small">
+        These resources are requested for the single process that runs your 
+        command. If that command launches additional jobs on the cluster,
+        those sub-jobs request their own resources independently and are{' '}
+        not controlled here.
+      </Typography>
+
       <div>
         <label className="block text-foreground text-sm font-semibold mb-1">
           CPUs
@@ -477,6 +490,11 @@ function SubmitOptionsSectionContent({
 
   return (
     <div className="space-y-4">
+      <Typography className="text-foreground" type="small">
+        Controls how the main job is submitted to the cluster scheduler. These
+        are translated into <code>bsub</code> options. 
+      </Typography>
+
       <div>
         <label className="block text-foreground text-sm font-semibold mb-1">
           Queue
@@ -1378,8 +1396,15 @@ export default function AppLaunchForm({
                     value={item.section}
                   >
                     <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
-                      <div className="text-foreground font-bold text-sm">
-                        {item.section}
+                      <div className="text-left">
+                        <div className="text-foreground font-bold text-sm">
+                          {item.section}
+                        </div>
+                        {item.description ? (
+                          <Typography className="text-foreground" type="small">
+                            {item.description}
+                          </Typography>
+                        ) : null}
                       </div>
                       <FgIcon
                         className={`text-secondary transition-transform ${

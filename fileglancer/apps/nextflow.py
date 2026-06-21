@@ -152,6 +152,10 @@ class NextflowAdapter:
         env_parameters = [
             AppParameterSection(
                 section="Nextflow",
+                description=(
+                    "Options for the Nextflow runner itself, separate from the "
+                    "pipeline's own parameters. "
+                ),
                 parameters=[
                     AppParameter(
                         flag="-profile",
