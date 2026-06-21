@@ -983,21 +983,43 @@ class TestNextflowRunsFromWorkDir:
             "allOf": [{"$ref": "#/$defs/input"}],
         }))
 
-    def test_command_cds_to_work_dir_and_runs_repo(self, tmp_path):
+    def test_runs_repo_from_work_dir(self, tmp_path):
         self._make_schema(tmp_path)
-        manifest = NextflowAdapter().convert(tmp_path)
-        cmd = manifest.runnables[0].command
-        assert cmd == 'cd "$FG_WORK_DIR" && nextflow run repo -ansi-log false'
-        # Must not run from the current (repo) directory.
-        assert "nextflow run ." not in cmd
+        ep = NextflowAdapter().convert(tmp_path).runnables[0]
+        # Clean command (no embedded cd) plus working_dir="work".
+        assert ep.command == "nextflow run repo -ansi-log false"
+        assert ep.working_dir == "work"
+        assert ep.effective_working_dir == "work"
 
     def test_full_command_keeps_profile_before_pipeline_params(self, tmp_path):
         self._make_schema(tmp_path)
-        manifest = NextflowAdapter().convert(tmp_path)
-        ep = manifest.runnables[0]
+        ep = NextflowAdapter().convert(tmp_path).runnables[0]
         cmd = build_command(ep, {"profile": "janeliaLSF", "input_dir": "/data/in"})
-        assert cmd.startswith('cd "$FG_WORK_DIR" && nextflow run repo -ansi-log false')
+        assert cmd.startswith("nextflow run repo -ansi-log false")
         assert cmd.index("-profile") < cmd.index("--input_dir")
+
+
+class TestEffectiveWorkingDir:
+    """working_dir resolution: explicit wins; containers default to 'work',
+    everything else to 'repo'."""
+
+    def test_default_is_repo(self):
+        ep = AppEntryPoint(id="r", name="r", command="python x.py")
+        assert ep.effective_working_dir == "repo"
+
+    def test_container_defaults_to_work(self):
+        ep = AppEntryPoint(id="r", name="r", command="cowsay hi",
+                           container="godlovedc/lolcow")
+        assert ep.effective_working_dir == "work"
+
+    def test_explicit_overrides_container_default(self):
+        ep = AppEntryPoint(id="r", name="r", command="run.sh",
+                           container="ghcr.io/org/img", working_dir="repo")
+        assert ep.effective_working_dir == "repo"
+
+    def test_explicit_work_without_container(self):
+        ep = AppEntryPoint(id="r", name="r", command="tool", working_dir="work")
+        assert ep.effective_working_dir == "work"
 
 
 from fileglancer.apps.pixi import _task_to_entry_point

@@ -584,10 +584,15 @@ async def submit_job(
         preamble_lines.append(f"export PATH=$PATH:{path_suffix}")
     if entry_point.type == "service":
         preamble_lines.append('export SERVICE_URL_PATH="$FG_WORK_DIR/service_url"')
-    # cd_suffix may include a Git-derived directory name (manifest_path), so
-    # shell-escape it. FG_WORK_DIR stays in its own double-quoted segment so it
-    # still expands; the relative suffix is quoted separately.
-    preamble_lines.append(f'cd "$FG_WORK_DIR"/{shlex.quote(cd_suffix)}')
+    # Choose the working directory. 'work' runs from the job's work dir (the
+    # repo is still reachable via the `repo` symlink); 'repo' runs from the
+    # cloned project (optionally the manifest's subdirectory). cd_suffix may
+    # include a Git-derived directory name, so shell-escape it — FG_WORK_DIR
+    # stays in its own double-quoted segment so it still expands.
+    if entry_point.effective_working_dir == "work":
+        preamble_lines.append('cd "$FG_WORK_DIR"')
+    else:
+        preamble_lines.append(f'cd "$FG_WORK_DIR"/{shlex.quote(cd_suffix)}')
     script_parts = ["\n".join(preamble_lines)]
 
     # Conda environment activation

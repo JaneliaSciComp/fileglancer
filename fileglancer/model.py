@@ -427,6 +427,15 @@ class AppEntryPoint(BaseModel):
         description="Default extra arguments for container exec (e.g. '--nv')",
         default=None,
     )
+    working_dir: Optional[Literal["work", "repo"]] = Field(
+        description=(
+            "Directory the command runs from: 'repo' (the cloned project, "
+            "optionally the manifest's subdirectory) or 'work' (the job's work "
+            "directory). Defaults to 'work' for container entry points and "
+            "'repo' otherwise."
+        ),
+        default=None,
+    )
     requirements: List[str] = Field(
         description="Required tools for this entry point, e.g. ['apptainer']. Merged with manifest-level requirements.",
         default=[],
@@ -474,6 +483,18 @@ class AppEntryPoint(BaseModel):
             if _SHELL_METACHAR_PATTERN.search(p):
                 raise ValueError(f"bind_paths entry contains forbidden characters: {p!r}")
         return v
+
+    @property
+    def effective_working_dir(self) -> str:
+        """Resolve where the command runs: 'work' or 'repo'.
+
+        An explicit working_dir wins; otherwise container entry points default
+        to 'work' (the repo clone isn't bind-mounted into the container, but the
+        work dir always is) and everything else defaults to 'repo'.
+        """
+        if self.working_dir:
+            return self.working_dir
+        return "work" if self.container else "repo"
 
     def flat_parameters(self) -> List[AppParameter]:
         """Return a flat list of all parameters, traversing sections."""
