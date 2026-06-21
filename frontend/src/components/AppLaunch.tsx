@@ -26,10 +26,15 @@ import type { AppEntryPoint, AppResourceDefaults } from '@/shared.types';
 import FgButton from './designSystem/atoms/FgButton';
 
 export default function AppLaunch() {
-  const { owner, repo, branch, entryPointId } = useParams<{
+  const {
+    owner,
+    repo,
+    branch: routeBranch,
+    entryPointId: routeEntryPointId
+  } = useParams<{
     owner: string;
     repo: string;
-    branch: string;
+    branch?: string;
     entryPointId?: string;
   }>();
   const [searchParams] = useSearchParams();
@@ -43,7 +48,9 @@ export default function AppLaunch() {
     useState<AppEntryPoint | null>(null);
 
   const manifestPath = searchParams.get('path') || '';
-  const appUrl = buildGithubUrl(owner!, repo!, branch!);
+  const branch = searchParams.get('branch') || routeBranch || 'main';
+  const entryPointId = searchParams.get('entryPointId') || routeEntryPointId;
+  const appUrl = buildGithubUrl(owner!, repo!, branch);
   const isRelaunch = location.pathname.startsWith('/apps/relaunch/');
   const relaunchState = isRelaunch
     ? (location.state as {

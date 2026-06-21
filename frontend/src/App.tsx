@@ -151,7 +151,23 @@ const AppComponent = () => {
                   <AppLaunch />
                 </RequireAuth>
               }
+              path="apps/launch/:owner/:repo"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <AppLaunch />
+                </RequireAuth>
+              }
               path="apps/relaunch/:owner/:repo/:branch/:entryPointId"
+            />
+            <Route
+              element={
+                <RequireAuth>
+                  <AppLaunch />
+                </RequireAuth>
+              }
+              path="apps/relaunch/:owner/:repo"
             />
             <Route
               element={

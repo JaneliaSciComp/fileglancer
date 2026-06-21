@@ -61,7 +61,7 @@ def _parse_github_url(url: str) -> tuple[str, str, str | None]:
     Branch is None when not specified in the URL.
     Raises ValueError if not a valid GitHub repo URL.
     """
-    pattern = r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/tree/([^/]+))?/?$"
+    pattern = r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/tree/(.+?))?/?$"
     match = re.match(pattern, url)
     if not match:
         raise ValueError(
@@ -76,7 +76,13 @@ def _parse_github_url(url: str) -> tuple[str, str, str | None]:
             raise ValueError(
                 f"Invalid app URL: {name} '{value}' contains invalid characters"
             )
-    if branch and (".." in branch or "\x00" in branch):
+    if branch and (
+        ".." in branch
+        or "\x00" in branch
+        or branch.startswith("/")
+        or branch.endswith("/")
+        or "//" in branch
+    ):
         raise ValueError(
             f"Invalid app URL: branch '{branch}' contains invalid characters"
         )
@@ -465,8 +471,8 @@ async def get_app_branch(url: str) -> str:
 
     If the URL doesn't specify a branch, resolves the remote's default branch.
     """
-    _, _, branch = _parse_github_url(url)
+    owner, repo, branch = _parse_github_url(url)
     if not branch:
-        clone_url = re.sub(r"(/tree/[^/]+)?/?$", ".git", url)
+        clone_url = f"https://github.com/{owner}/{repo}.git"
         branch = await _resolve_default_branch(clone_url)
     return branch

@@ -4,7 +4,7 @@
  */
 
 const GITHUB_URL_PATTERN =
-  /^https?:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?(?:\/tree\/([^/]+))?\/?$/;
+  /^https?:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?(?:\/tree\/(.+?))?\/?$/;
 
 export function parseGithubUrl(url: string): {
   owner: string;
@@ -40,14 +40,18 @@ export function buildLaunchPath(
   entryPointId?: string,
   manifestPath?: string
 ): string {
-  let path = `/apps/launch/${owner}/${repo}/${branch}`;
+  const params = new URLSearchParams();
+  if (branch && branch !== 'main') {
+    params.set('branch', branch);
+  }
   if (entryPointId) {
-    path += `/${entryPointId}`;
+    params.set('entryPointId', entryPointId);
   }
   if (manifestPath) {
-    path += `?path=${encodeURIComponent(manifestPath)}`;
+    params.set('path', manifestPath);
   }
-  return path;
+  const query = params.toString();
+  return `/apps/launch/${owner}/${repo}${query ? `?${query}` : ''}`;
 }
 
 export function buildLaunchPathFromApp(
@@ -72,9 +76,13 @@ export function buildRelaunchPath(
   entryPointId: string,
   manifestPath?: string
 ): string {
-  let path = `/apps/relaunch/${owner}/${repo}/${branch}/${entryPointId}`;
-  if (manifestPath) {
-    path += `?path=${encodeURIComponent(manifestPath)}`;
+  const params = new URLSearchParams();
+  if (branch && branch !== 'main') {
+    params.set('branch', branch);
   }
-  return path;
+  params.set('entryPointId', entryPointId);
+  if (manifestPath) {
+    params.set('path', manifestPath);
+  }
+  return `/apps/relaunch/${owner}/${repo}?${params.toString()}`;
 }

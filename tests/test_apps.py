@@ -910,7 +910,39 @@ class TestRunGitTimeout:
         assert time.monotonic() - start < 1.0
 
 
-from fileglancer.apps.manifest import validate_manifest_path, _safe_repo_subdir
+from fileglancer.apps.manifest import (
+    validate_manifest_path,
+    _safe_repo_subdir,
+    _parse_github_url,
+    get_app_branch,
+)
+
+
+class TestParseGitHubUrl:
+    def test_branch_name_may_contain_slashes(self):
+        owner, repo, branch = _parse_github_url(
+            "https://github.com/org/tool/tree/feature/my-tool"
+        )
+        assert (owner, repo, branch) == ("org", "tool", "feature/my-tool")
+
+    @pytest.mark.asyncio
+    async def test_get_app_branch_returns_slash_branch_without_remote_lookup(self):
+        branch = await get_app_branch(
+            "https://github.com/org/tool/tree/release/2026-06"
+        )
+        assert branch == "release/2026-06"
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://github.com/org/tool/tree/../escape",
+            "https://github.com/org/tool/tree/feature//bad",
+            "https://github.com/org/tool/tree//absolute-ish",
+        ],
+    )
+    def test_rejects_unsafe_branch_paths(self, url):
+        with pytest.raises(ValueError):
+            _parse_github_url(url)
 
 
 class TestValidateManifestPath:
