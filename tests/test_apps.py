@@ -1001,8 +1001,9 @@ class TestNextflowRunsFromWorkDir:
         assert cmd.index("-profile") < cmd.index("--input_dir")
 
     def test_projectdir_default_rewritten_to_repo(self, tmp_path):
-        # Running from the work dir, projectDir assets live under repo/, so a
-        # $projectDir-relative schema default must rewrite to repo/... (not ./).
+        # Running from the work dir, projectDir assets live under ./repo/, so a
+        # $projectDir-relative schema default must rewrite to ./repo/... The
+        # leading ./ also passes path validation (a bare repo/... is rejected).
         (tmp_path / "nextflow_schema.json").write_text(json.dumps({
             "$defs": {
                 "opts": {
@@ -1019,7 +1020,28 @@ class TestNextflowRunsFromWorkDir:
         }))
         ep = NextflowAdapter().convert(tmp_path).runnables[0]
         param = next(p for p in ep.flat_parameters() if p.key == "multiqc_config")
-        assert param.default == "repo/assets/multiqc_config.yml"
+        assert param.default == "./repo/assets/multiqc_config.yml"
+
+    def test_braced_projectdir_default_rewritten_to_repo(self, tmp_path):
+        # Nextflow also accepts the braced ${projectDir} form (used by nf-core
+        # schemas, e.g. rnaseq's ribo_database_manifest); it must rewrite too.
+        (tmp_path / "nextflow_schema.json").write_text(json.dumps({
+            "$defs": {
+                "opts": {
+                    "title": "Options",
+                    "properties": {
+                        "ribo_database_manifest": {
+                            "type": "string",
+                            "default": "${projectDir}/assets/rrna-db-defaults.txt",
+                        }
+                    },
+                }
+            },
+            "allOf": [{"$ref": "#/$defs/opts"}],
+        }))
+        ep = NextflowAdapter().convert(tmp_path).runnables[0]
+        param = next(p for p in ep.flat_parameters() if p.key == "ribo_database_manifest")
+        assert param.default == "./repo/assets/rrna-db-defaults.txt"
 
 
 class TestEffectiveWorkingDir:

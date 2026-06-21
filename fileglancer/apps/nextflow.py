@@ -55,11 +55,17 @@ def _convert_property(name: str, prop: dict, is_required: bool) -> AppParameter:
 
     if "default" in prop:
         default = prop["default"]
-        if isinstance(default, str) and default.startswith("$projectDir"):
+        if isinstance(default, str):
             # The generated command runs from the job work dir with the repo
             # symlinked as `repo`, so projectDir-relative assets live under
-            # repo/. (Rewriting to ./ would resolve against the empty work dir.)
-            default = "repo" + default[len("$projectDir"):]
+            # ./repo/. The leading ./ also satisfies path validation (a bare
+            # `repo/...` is rejected as neither absolute nor ./-relative), and
+            # rewriting to plain ./ would resolve against the empty work dir.
+            # Nextflow accepts both $projectDir and the braced ${projectDir}.
+            for token in ("${projectDir}", "$projectDir"):
+                if default.startswith(token):
+                    default = "./repo" + default[len(token):]
+                    break
         kwargs["default"] = default
 
     if param_type == "enum":
