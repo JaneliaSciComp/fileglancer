@@ -320,6 +320,40 @@ def test_create_proxied_path_at_fsp_root(test_client, temp_dir):
     assert response.text == "hello root"
 
 
+def test_data_link_returns_request_id_header(test_client, temp_dir):
+    """Serving a data link must return an S3-style x-amz-request-id header.
+
+    Carries over the feature added in x2s3 1.3.0: clients (Neuroglancer/N5/Vizarr)
+    can reference a specific request when correlating logs or reporting issues.
+    The header should be a 16-char uppercase-alphanumeric string and unique per
+    request. It is scoped to the /files/ proxy surface, so non-data endpoints
+    must not carry it.
+    """
+    import re
+
+    response = test_client.post("/api/proxied-path?fsp_name=tempdir&path=.")
+    assert response.status_code == 200
+    sharing_key = response.json()["sharing_key"]
+
+    with open(os.path.join(temp_dir, "root_file.txt"), "w") as f:
+        f.write("hello root")
+
+    r1 = test_client.get(f"/files/{sharing_key}/tempdir/root_file.txt")
+    assert r1.status_code == 200
+    request_id = r1.headers.get("x-amz-request-id")
+    assert request_id is not None, "data-link response must include x-amz-request-id"
+    assert re.fullmatch(r"[A-Z0-9]{16}", request_id), \
+        f"x-amz-request-id should be 16 uppercase alphanumerics, got {request_id!r}"
+
+    # Unique per request
+    r2 = test_client.get(f"/files/{sharing_key}/tempdir/root_file.txt")
+    assert r2.headers.get("x-amz-request-id") != request_id
+
+    # Scoped to data links: non-/files/ endpoints must not carry the header
+    api_response = test_client.get("/api/version")
+    assert "x-amz-request-id" not in api_response.headers
+
+
 def test_get_proxied_path_at_fsp_root_normalizes_dot(test_client):
     """Sidebar's `is there a link for the current folder?` query uses path='.'
     when the user is at the FSP root. After creating a link at the FSP root,

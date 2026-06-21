@@ -43,9 +43,48 @@ from fileglancer.log import AccessLogMiddleware
 from fileglancer.worker_pool import WorkerPool, WorkerError, WorkerDead
 from fileglancer import sshkeys
 
-from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response
+from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response, generate_request_id
 from x2s3.client_file import FileProxyClient
 from x2s3.client import ObjectHandle
+
+
+class RequestIdMiddleware:
+    """Pure ASGI middleware that attaches an S3-style x-amz-request-id header to
+    data-serving (proxy) responses.
+
+    x2s3 1.3.0 adds this header to every response from a standalone x2s3 server
+    via its own RequestIdMiddleware. Fileglancer, however, serves data links
+    through its own FastAPI app using x2s3's FileProxyClient directly, so x2s3's
+    middleware never runs for these responses. This carries the feature over:
+    clients (Neuroglancer/N5/Vizarr) get the same x-amz-request-id from
+    Fileglancer's /files/ proxy that they would from real S3 or x2s3, letting
+    them reference a specific request when correlating logs or reporting issues.
+
+    Scoped to the /files/ proxy paths since that is Fileglancer's S3-compatible
+    data-serving surface. Implemented as pure ASGI (rather than BaseHTTPMiddleware)
+    so it injects the header on the http.response.start event without re-wrapping
+    the body, leaving the file-streaming logic untouched.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or not scope.get("path", "").startswith("/files/"):
+            await self.app(scope, receive, send)
+            return
+
+        request_id = generate_request_id()
+        # Expose to downstream handlers/loggers via request.state.request_id
+        scope.setdefault("state", {})["request_id"] = request_id
+
+        async def send_with_request_id(message):
+            if message["type"] == "http.response.start":
+                headers = message.setdefault("headers", [])
+                headers.append((b"x-amz-request-id", request_id.encode("latin-1")))
+            await send(message)
+
+        await self.app(scope, receive, send_with_request_id)
 
 
 # Read version once at module load time
@@ -471,6 +510,11 @@ def create_app(settings):
     # This logs HTTP access information with authenticated username
     app.add_middleware(AccessLogMiddleware, settings=settings)
 
+    # Attach an S3-style x-amz-request-id header to data-link (/files/) responses,
+    # carrying over the feature added in x2s3 1.3.0 (which only applies it within
+    # x2s3's own app, not when Fileglancer proxies via FileProxyClient directly).
+    app.add_middleware(RequestIdMiddleware)
+
     # Generate random session_secret_key if not configured
     if settings.session_secret_key is None:
         settings.session_secret_key = secrets.token_urlsafe(32)
@@ -493,7 +537,7 @@ def create_app(settings):
         allow_credentials=True,
         allow_methods=["GET","HEAD","POST","PUT","PATCH","DELETE"],
         allow_headers=["*"],
-        expose_headers=["Range", "Content-Range"],
+        expose_headers=["Range", "Content-Range", "x-amz-request-id"],
     )
 
 
