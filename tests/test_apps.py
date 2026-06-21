@@ -8,6 +8,7 @@ import time
 import pytest
 from pydantic import ValidationError
 
+from conftest import requires_symlinks
 from fileglancer.model import (
     SUPPORTED_TOOLS,
     AppEntryPoint,
@@ -907,6 +908,7 @@ class TestSafeRepoSubdir:
         with pytest.raises(ValueError):
             _safe_repo_subdir(tmp_path, "../outside")
 
+    @requires_symlinks
     def test_symlink_escaping_repo_rejected(self, tmp_path):
         outside = tmp_path / "outside"
         outside.mkdir()
