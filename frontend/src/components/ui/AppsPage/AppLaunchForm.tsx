@@ -1357,76 +1357,84 @@ export default function AppLaunchForm({
           </div>
         </Tabs.Panel>
 
-        <Tabs.Panel className="pt-4 max-w-2xl" value="environment">
-          {(entryPoint.env_parameters ?? []).length > 0 ? (
-            <Accordion
-              onValueChange={
-                setOpenEnvParamSections as Dispatch<
-                  SetStateAction<string | string[]>
+        <Tabs.Panel className="pt-4" value="environment">
+          <div className="flex items-start justify-between gap-4">
+            <div className="max-w-2xl grow space-y-4">
+              {(entryPoint.env_parameters ?? []).length > 0 ? (
+                <Accordion
+                  onValueChange={
+                    setOpenEnvParamSections as Dispatch<
+                      SetStateAction<string | string[]>
+                    >
+                  }
+                  type="multiple"
+                  value={openEnvParamSections}
                 >
-              }
-              type="multiple"
-              value={openEnvParamSections}
-            >
-              {(entryPoint.env_parameters ?? []).map(item =>
-                isParameterSection(item) ? (
-                  <Accordion.Item
-                    key={`env-section-${item.section}`}
-                    value={item.section}
-                  >
-                    <SectionTrigger
-                      description={item.description}
-                      isOpen={openEnvParamSections.includes(item.section)}
-                      title={item.section}
-                    />
-                    <Accordion.Content className="pt-2 pb-4 pl-4">
-                      <SectionContent
-                        errors={{}}
-                        onParamChange={handleEnvChange}
-                        section={item}
-                        values={envValues}
+                  {(entryPoint.env_parameters ?? []).map(item =>
+                    isParameterSection(item) ? (
+                      <Accordion.Item
+                        key={`env-section-${item.section}`}
+                        value={item.section}
+                      >
+                        <SectionTrigger
+                          description={item.description}
+                          isOpen={openEnvParamSections.includes(item.section)}
+                          title={item.section}
+                        />
+                        <Accordion.Content className="pt-2 pb-4 pl-4">
+                          <SectionContent
+                            errors={{}}
+                            onParamChange={handleEnvChange}
+                            section={item}
+                            values={envValues}
+                          />
+                        </Accordion.Content>
+                      </Accordion.Item>
+                    ) : (
+                      <ParameterFieldRow
+                        error={undefined}
+                        key={item.key}
+                        onChange={val => handleEnvChange(item.key, val)}
+                        param={item}
+                        value={envValues[item.key]}
                       />
-                    </Accordion.Content>
-                  </Accordion.Item>
-                ) : (
-                  <ParameterFieldRow
-                    error={undefined}
-                    key={item.key}
-                    onChange={val => handleEnvChange(item.key, val)}
-                    param={item}
-                    value={envValues[item.key]}
-                  />
-                )
-              )}
-            </Accordion>
-          ) : null}
+                    )
+                  )}
+                </Accordion>
+              ) : null}
 
-          <EnvironmentTabContent
-            containerArgs={containerArgs}
-            containerImage={containerImage}
-            entryPoint={entryPoint}
-            envVars={envVars}
-            openEnvSections={openEnvSections}
-            postRun={postRun}
-            preRun={preRun}
-            setContainerArgs={setContainerArgs}
-            setContainerImage={setContainerImage}
-            setEnvVars={setEnvVars}
-            setOpenEnvSections={setOpenEnvSections}
-            setPostRun={setPostRun}
-            setPreRun={setPreRun}
-          />
+              <EnvironmentTabContent
+                containerArgs={containerArgs}
+                containerImage={containerImage}
+                entryPoint={entryPoint}
+                envVars={envVars}
+                openEnvSections={openEnvSections}
+                postRun={postRun}
+                preRun={preRun}
+                setContainerArgs={setContainerArgs}
+                setContainerImage={setContainerImage}
+                setEnvVars={setEnvVars}
+                setOpenEnvSections={setOpenEnvSections}
+                setPostRun={setPostRun}
+                setPreRun={setPreRun}
+              />
+            </div>
+          </div>
         </Tabs.Panel>
 
-        <Tabs.Panel className="pt-4 max-w-2xl" value="cluster">
-          <ClusterTabContent
-            extraArgs={extraArgs}
-            openClusterSections={openClusterSections}
-            resources={resources}
-            setExtraArgs={setExtraArgs}
-            setOpenClusterSections={setOpenClusterSections}
-            setResources={setResources}
-          />
+        <Tabs.Panel className="pt-4" value="cluster">
+          <div className="flex items-start justify-between gap-4">
+            <div className="max-w-2xl grow space-y-4">
+              <ClusterTabContent
+                extraArgs={extraArgs}
+                openClusterSections={openClusterSections}
+                resources={resources}
+                setExtraArgs={setExtraArgs}
+                setOpenClusterSections={setOpenClusterSections}
+                setResources={setResources}
+              />
+            </div>
+          </div>
         </Tabs.Panel>
       </Tabs>
 
