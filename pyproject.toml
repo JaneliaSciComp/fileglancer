@@ -160,8 +160,10 @@ migrate-create = "alembic -c fileglancer/alembic.ini revision --autogenerate"
 stamp-db = "python -m fileglancer.stamp_db"
 container-rebuild = "npx @devcontainers/cli up --workspace-folder . --remove-existing-container"
 container-shell = "npx @devcontainers/cli exec --workspace-folder . bash"
-container-claude = "npx @devcontainers/cli exec --workspace-folder . bash -lc 'pixi run claude --dangerously-skip-permissions'"
+container-claude = "npx @devcontainers/cli exec --workspace-folder . bash -lc 'pixi run claude --permission-mode auto'"
+container-codex = "npx @devcontainers/cli exec --workspace-folder . bash -lc 'pixi run codex --dangerously-bypass-approvals-and-sandbox'"
 claude = "claude"
+codex = "codex"
 
 [tool.pixi.tasks.test-py312]
 depends-on = [
