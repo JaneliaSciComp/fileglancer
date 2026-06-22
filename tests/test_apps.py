@@ -26,6 +26,12 @@ from fileglancer.apps import (
     expand_user_path,
 )
 
+# The `pwd` module is POSIX-only; on Windows `command_mod.pwd` is None, so tests
+# that patch pwd.getpwnam/getpwuid to exercise per-user home resolution cannot run.
+requires_pwd = pytest.mark.skipif(
+    sys.platform == "win32", reason="pwd module is not available on Windows"
+)
+
 
 # --- Model tests ---
 
@@ -781,6 +787,7 @@ class TestBuildCommandTildeExpansion:
         cmd = build_command(entry_point, {"output_dir": "/data/output"})
         assert "/data/output" in cmd
 
+    @requires_pwd
     def test_tilde_expanded_to_target_user_home(self, entry_point, monkeypatch):
         """With a username, ~ resolves to that user's home, not the server's."""
         import fileglancer.apps.command as command_mod
@@ -822,6 +829,7 @@ class TestExpandUserPath:
     def test_backslashes_normalized(self):
         assert expand_user_path("/data\\sub") == "/data/sub"
 
+    @requires_pwd
     def test_tilde_uses_username_home(self, monkeypatch):
         import fileglancer.apps.command as command_mod
         monkeypatch.setattr(command_mod.pwd, "getpwnam",
@@ -829,6 +837,7 @@ class TestExpandUserPath:
         assert expand_user_path("~/x", username="bob") == "/home/bob/x"
         assert expand_user_path("~", username="bob") == "/home/bob"
 
+    @requires_pwd
     def test_unknown_username_falls_back_to_euid(self, monkeypatch):
         import fileglancer.apps.command as command_mod
         monkeypatch.setattr(command_mod.pwd, "getpwnam",
