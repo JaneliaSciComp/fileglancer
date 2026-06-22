@@ -101,7 +101,13 @@ class NextflowAdapter:
 
         # Determine app metadata — use owner/repo from the cache path
         # (directory is {cache_base}/{owner}/{repo}/{branch})
-        name = f"{directory.parent.parent.name}/{directory.parent.name}"
+        try:
+            from fileglancer.apps.manifest import _repo_cache_base
+            cache_base = _repo_cache_base().resolve()
+            relative = directory.resolve().relative_to(cache_base)
+            name = f"{relative.parts[0]}/{relative.parts[1]}"
+        except Exception:
+            name = f"{directory.parent.parent.name}/{directory.parent.name}"
         description = schema.get("description")
 
         # Build parameters from definitions, ordered by allOf

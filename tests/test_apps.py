@@ -1236,6 +1236,37 @@ class TestNextflowRunsFromWorkDir:
         assert param.default == "./repo/assets/rrna-db-defaults.txt"
 
 
+class TestNextflowAdapterNaming:
+    def _make_schema(self, tmp_path):
+        (tmp_path / "nextflow_schema.json").write_text(json.dumps({
+            "description": "Test pipeline",
+            "$defs": {},
+            "allOf": [],
+        }))
+
+    def test_standard_naming(self, tmp_path):
+        from unittest.mock import patch
+        cache_base = tmp_path / "cache"
+        repo_dir = cache_base / "nf-core" / "rnaseq" / "main"
+        repo_dir.mkdir(parents=True, exist_ok=True)
+        self._make_schema(repo_dir)
+
+        with patch("fileglancer.apps.manifest._repo_cache_base", return_value=cache_base):
+            manifest = NextflowAdapter().convert(repo_dir)
+            assert manifest.name == "nf-core/rnaseq"
+
+    def test_slashed_branch_naming(self, tmp_path):
+        from unittest.mock import patch
+        cache_base = tmp_path / "cache"
+        repo_dir = cache_base / "nf-core" / "rnaseq" / "feature" / "slashed" / "branch"
+        repo_dir.mkdir(parents=True, exist_ok=True)
+        self._make_schema(repo_dir)
+
+        with patch("fileglancer.apps.manifest._repo_cache_base", return_value=cache_base):
+            manifest = NextflowAdapter().convert(repo_dir)
+            assert manifest.name == "nf-core/rnaseq"
+
+
 class TestEffectiveWorkingDir:
     """working_dir resolution: explicit wins; containers default to 'work',
     everything else to 'repo'."""
