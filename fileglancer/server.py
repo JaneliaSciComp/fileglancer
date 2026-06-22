@@ -43,9 +43,48 @@ from fileglancer.log import AccessLogMiddleware
 from fileglancer.worker_pool import WorkerPool, WorkerError, WorkerDead
 from fileglancer import sshkeys
 
-from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response
+from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response, generate_request_id
 from x2s3.client_file import FileProxyClient
 from x2s3.client import ObjectHandle
+
+
+class RequestIdMiddleware:
+    """Pure ASGI middleware that attaches an S3-style x-amz-request-id header to
+    data-serving (proxy) responses.
+
+    x2s3 1.3.0 adds this header to every response from a standalone x2s3 server
+    via its own RequestIdMiddleware. Fileglancer, however, serves data links
+    through its own FastAPI app using x2s3's FileProxyClient directly, so x2s3's
+    middleware never runs for these responses. This carries the feature over:
+    clients (Neuroglancer/N5/Vizarr) get the same x-amz-request-id from
+    Fileglancer's /files/ proxy that they would from real S3 or x2s3, letting
+    them reference a specific request when correlating logs or reporting issues.
+
+    Scoped to the /files/ proxy paths since that is Fileglancer's S3-compatible
+    data-serving surface. Implemented as pure ASGI (rather than BaseHTTPMiddleware)
+    so it injects the header on the http.response.start event without re-wrapping
+    the body, leaving the file-streaming logic untouched.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or not scope.get("path", "").startswith("/files/"):
+            await self.app(scope, receive, send)
+            return
+
+        request_id = generate_request_id()
+        # Expose to downstream handlers/loggers via request.state.request_id
+        scope.setdefault("state", {})["request_id"] = request_id
+
+        async def send_with_request_id(message):
+            if message["type"] == "http.response.start":
+                headers = message.setdefault("headers", [])
+                headers.append((b"x-amz-request-id", request_id.encode("latin-1")))
+            await send(message)
+
+        await self.app(scope, receive, send_with_request_id)
 
 
 # Read version once at module load time
@@ -134,6 +173,24 @@ def _validate_url_prefix(url_prefix: str) -> None:
         raise HTTPException(status_code=400, detail="Data link name must not start or end with /")
     if '//' in url_prefix:
         raise HTTPException(status_code=400, detail="Data link name must not contain consecutive slashes")
+    # `.` and `..` get collapsed by URL normalization at the recipient,
+    # which breaks key/path resolution when the link is opened.
+    if any(seg in (".", "..") for seg in url_prefix.split('/')):
+        raise HTTPException(status_code=400, detail="Data link name must not contain '.' or '..' segments")
+
+
+def _normalize_proxied_path(path: str) -> str:
+    """Normalize an FSP-relative path for a proxied path record.
+
+    The file browser surfaces the FSP root as "." (Filestore returns that as
+    rel_path). Strip a leading "./" and treat "." as "" so FSP-root data links
+    don't embed a literal "." in their share URL.
+    """
+    if path == "." or path == "./":
+        return ""
+    if path.startswith("./"):
+        return path[2:]
+    return path
 
 
 def _convert_ticket(db_ticket: db.TicketDB) -> Ticket:
@@ -276,6 +333,10 @@ def create_app(settings):
         Returns (info_dict, subpath) on success, or (error_response, "") on failure.
         """
         def try_strip_prefix(captured: str, prefix: str) -> str | None:
+            # Empty prefix (e.g. legacy records or FSP-root links): the entire
+            # captured path is the subpath.
+            if not prefix:
+                return captured
             if captured == prefix:
                 return ""
             if captured.startswith(prefix + "/"):
@@ -288,9 +349,14 @@ def create_app(settings):
             if not proxied_path:
                 return get_nosuchbucket_response(captured_path), ""
 
-            subpath = try_strip_prefix(captured_path, proxied_path.url_prefix)
+            # Treat legacy "." (FSP-root sentinel) as empty so old records that
+            # were created before _normalize_proxied_path still resolve.
+            stored_path = "" if proxied_path.path == "." else proxied_path.path
+            stored_prefix = "" if proxied_path.url_prefix == "." else proxied_path.url_prefix
+
+            subpath = try_strip_prefix(captured_path, stored_prefix)
             if subpath is None:
-                subpath = try_strip_prefix(captured_path, unquote(proxied_path.url_prefix))
+                subpath = try_strip_prefix(captured_path, unquote(stored_prefix))
             if subpath is None:
                 return get_error_response(404, "NoSuchKey", f"Path mismatch for sharing key {sharing_key}", captured_path), ""
 
@@ -298,8 +364,10 @@ def create_app(settings):
             if not fsp:
                 return get_error_response(400, "InvalidArgument", f"File share path {proxied_path.fsp_name} not found", captured_path), ""
             expanded_mount_path = os.path.expanduser(fsp.mount_path)
-            mount_path = f"{expanded_mount_path}/{proxied_path.path}"
-            target_name = captured_path.rsplit('/', 1)[-1] if captured_path else os.path.basename(proxied_path.path)
+            # For FSP-root links (empty path) use the mount path directly to
+            # avoid a stray trailing slash in mount_path.
+            mount_path = f"{expanded_mount_path}/{stored_path}" if stored_path else expanded_mount_path
+            target_name = captured_path.rsplit('/', 1)[-1] if captured_path else (os.path.basename(stored_path) or fsp.name)
             return {
                 "mount_path": mount_path,
                 "target_name": target_name,
@@ -442,6 +510,11 @@ def create_app(settings):
     # This logs HTTP access information with authenticated username
     app.add_middleware(AccessLogMiddleware, settings=settings)
 
+    # Attach an S3-style x-amz-request-id header to data-link (/files/) responses,
+    # carrying over the feature added in x2s3 1.3.0 (which only applies it within
+    # x2s3's own app, not when Fileglancer proxies via FileProxyClient directly).
+    app.add_middleware(RequestIdMiddleware)
+
     # Generate random session_secret_key if not configured
     if settings.session_secret_key is None:
         settings.session_secret_key = secrets.token_urlsafe(32)
@@ -464,7 +537,7 @@ def create_app(settings):
         allow_credentials=True,
         allow_methods=["GET","HEAD","POST","PUT","PATCH","DELETE"],
         allow_headers=["*"],
-        expose_headers=["Range", "Content-Range"],
+        expose_headers=["Range", "Content-Range", "x-amz-request-id"],
     )
 
 
@@ -500,6 +573,22 @@ def create_app(settings):
              description="Get the current version of the server")
     async def version_endpoint():
         return {"version": APP_VERSION}
+
+
+    @app.get("/api/viewers-config", include_in_schema=False)
+    async def get_viewers_config():
+        if not settings.viewers_config:
+            raise HTTPException(status_code=404, detail="No viewers configuration")
+
+        config_path = PathLib(settings.viewers_config)
+        if not config_path.exists() or not config_path.is_file():
+            logger.warning(f"Viewers config file not found: {settings.viewers_config}")
+            raise HTTPException(status_code=404, detail="Viewers configuration file not found")
+
+        return PlainTextResponse(
+            content=config_path.read_text(encoding="utf-8"),
+            media_type="text/yaml"
+        )
 
 
     # Authentication routes
@@ -980,8 +1069,17 @@ def create_app(settings):
                                   url_prefix: Optional[str] = Query(None, description="The URL path prefix after the sharing key. Defaults to basename of path."),
                                   username: str = Depends(get_current_user)):
 
+        # Normalize the FSP-relative path: the file browser surfaces the FSP
+        # root as "." (Filestore returns that as rel_path), but using "." in a
+        # share URL gets collapsed by URL normalization at the recipient,
+        # producing path mismatch / NoSuchBucket errors when the link is opened.
+        path = _normalize_proxied_path(path)
+
         if url_prefix is None:
-            url_prefix = quote(os.path.basename(path), safe='/')
+            # basename("") is "", which would fail validation, so fall back to
+            # the FSP name for FSP-root links.
+            default_prefix = os.path.basename(path) or fsp_name
+            url_prefix = quote(default_prefix, safe='/')
         elif not _VALID_URL_PREFIX_RE.match(url_prefix):
             url_prefix = quote(url_prefix, safe='/')
         _validate_url_prefix(url_prefix)
@@ -1006,6 +1104,13 @@ def create_app(settings):
     async def get_proxied_paths(fsp_name: str = Query(None, description="The name of the file share path that this proxied path is associated with"),
                                 path: str = Query(None, description="The path being proxied"),
                                 username: str = Depends(get_current_user)):
+
+        # The file browser surfaces the FSP root as ".", but we normalize "."
+        # to "" on write — apply the same normalization on lookup so the
+        # sidebar's "is there a link for the current folder?" query matches
+        # the stored row.
+        if path is not None:
+            path = _normalize_proxied_path(path)
 
         with db.get_db_session(settings.db_url) as session:
             db_proxied_paths = db.get_proxied_paths(session, username, fsp_name, path)
@@ -1033,6 +1138,8 @@ def create_app(settings):
                                   path: Optional[str] = Query(default=None, description="The path relative to the file share path mount point"),
                                   sharing_name: Optional[str] = Query(default=None, description="The sharing path of the proxied path"),
                                   username: str = Depends(get_current_user)):
+        if path is not None:
+            path = _normalize_proxied_path(path)
         # If path or fsp_name is changing, validate access via worker
         if path is not None or fsp_name is not None:
             with db.get_db_session(settings.db_url) as session:

@@ -153,6 +153,9 @@ notifications.yaml
 # Local VSCode settings
 .vscode/
 
+# Auto-generated devcontainer lockfile (pins feature/image digests; env-specific)
+.devcontainer/devcontainer-lock.json
+
 *storybook.log
 storybook-static
 

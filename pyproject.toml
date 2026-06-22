@@ -28,6 +28,7 @@ dependencies = [
     "cachetools >=6.2.1,<7",
     "click >=8.0,<9",
     "fastapi >=0.136.3,<0.137",
+    "httpx >=0.28.1,<0.29",
     "itsdangerous >=2.2.0,<3",
     "loguru >=0.7.3,<0.8",
     "pandas >=2.3.3,<3",
@@ -39,7 +40,7 @@ dependencies = [
     "sqlalchemy >=2.0.44,<3",
     "packaging >=24.0",
     "uvicorn >=0.38.0,<0.39",
-    "x2s3 >=1.2.0,<2",
+    "x2s3 >=1.3.0,<2",
     "py-cluster-api >=0.6.0,<0.7"
 ]
 
@@ -119,6 +120,9 @@ pypi-upload = "twine upload dist/*"
 twine = ">=6.2.0,<7"
 hatch = ">=1.14.1,<2"
 
+[tool.pixi.feature.release.pypi-dependencies]
+hatch-nodejs-version = ">=0.3.2,<0.4"
+
 [tool.pixi.feature.py312.dependencies]
 python = "3.12.*"
 
@@ -156,8 +160,10 @@ migrate-create = "alembic -c fileglancer/alembic.ini revision --autogenerate"
 stamp-db = "python -m fileglancer.stamp_db"
 container-rebuild = "npx @devcontainers/cli up --workspace-folder . --remove-existing-container"
 container-shell = "npx @devcontainers/cli exec --workspace-folder . bash"
-container-claude = "npx @devcontainers/cli exec --workspace-folder . bash -lc 'pixi run claude --dangerously-skip-permissions'"
+container-claude = "npx @devcontainers/cli exec --workspace-folder . bash -lc 'pixi run claude --permission-mode auto'"
+container-codex = "npx @devcontainers/cli exec --workspace-folder . bash -lc 'pixi run codex --dangerously-bypass-approvals-and-sandbox'"
 claude = "claude"
+codex = "codex"
 
 [tool.pixi.tasks.test-py312]
 depends-on = [
@@ -175,6 +181,7 @@ authlib = ">=1.6.5,<2"
 cachetools = ">=6.2.1,<7"
 click = ">=8.0,<9"
 fastapi = ">=0.136.3,<0.137"
+httpx = ">=0.28.1,<0.29"
 itsdangerous = ">=2.2.0,<3"
 loguru = ">=0.7.3,<0.8"
 pandas = ">=2.3.3,<3"

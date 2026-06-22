@@ -18,6 +18,7 @@ import { ExternalBucketProvider } from '@/contexts/ExternalBucketContext';
 import { ProfileContextProvider } from '@/contexts/ProfileContext';
 import { NotificationProvider } from '@/contexts/NotificationsContext';
 import { ServerHealthProvider } from '@/contexts/ServerHealthContext';
+import { ViewersProvider } from '@/contexts/ViewersContext';
 import FileglancerNavbar from '@/components/ui/Navbar/Navbar';
 import Notifications from '@/components/ui/Notifications/Notifications';
 import ErrorFallback from '@/components/ErrorFallback';
@@ -64,25 +65,27 @@ export const MainLayout = () => {
 
   return (
     <ServerHealthProvider>
-      <ZonesAndFspMapContextProvider>
-        <OpenFavoritesProvider>
-          <FileBrowserContextProvider filePath={filePath} fspName={fspName}>
-            <PreferencesProvider>
-              <ExternalBucketProvider>
-                <ProxiedPathProvider>
-                  <ProfileContextProvider>
-                    <NotificationProvider>
-                      <TicketProvider>
-                        <MainLayoutContent />
-                      </TicketProvider>
-                    </NotificationProvider>
-                  </ProfileContextProvider>
-                </ProxiedPathProvider>
-              </ExternalBucketProvider>
-            </PreferencesProvider>
-          </FileBrowserContextProvider>
-        </OpenFavoritesProvider>
-      </ZonesAndFspMapContextProvider>
+      <ViewersProvider>
+        <ZonesAndFspMapContextProvider>
+          <OpenFavoritesProvider>
+            <FileBrowserContextProvider filePath={filePath} fspName={fspName}>
+              <PreferencesProvider>
+                <ExternalBucketProvider>
+                  <ProxiedPathProvider>
+                    <ProfileContextProvider>
+                      <NotificationProvider>
+                        <TicketProvider>
+                          <MainLayoutContent />
+                        </TicketProvider>
+                      </NotificationProvider>
+                    </ProfileContextProvider>
+                  </ProxiedPathProvider>
+                </ExternalBucketProvider>
+              </PreferencesProvider>
+            </FileBrowserContextProvider>
+          </OpenFavoritesProvider>
+        </ZonesAndFspMapContextProvider>
+      </ViewersProvider>
     </ServerHealthProvider>
   );
 };

@@ -2,7 +2,7 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# Network firewall script for Claude Code devcontainer
+# Network firewall script for Claude Code and Codex devcontainer
 # Restricts outbound traffic to allowed domains only
 # Based on: https://github.com/anthropics/claude-code/blob/main/.devcontainer/init-firewall.sh
 
@@ -71,6 +71,9 @@ ALLOWED_DOMAINS=(
     "sentry.io"
     "statsig.anthropic.com"
     "statsig.com"
+    # Codex / OpenAI
+    "api.openai.com"
+    "chatgpt.com"
     # npm
     "registry.npmjs.org"
     # VS Code

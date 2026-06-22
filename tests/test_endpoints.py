@@ -293,6 +293,138 @@ def test_create_proxied_path(test_client, temp_dir):
     assert "sharing_name" in data
 
 
+def test_create_proxied_path_at_fsp_root(test_client, temp_dir):
+    """Data links created at the FSP root must produce working URLs.
+
+    Regression for issue #368: the file browser surfaces FSP root as ".",
+    but a literal "." in the share URL gets collapsed by URL normalization
+    at the recipient, breaking key/path resolution.
+    """
+    # Path "." (what the file browser sends at FSP root) should be normalized
+    response = test_client.post("/api/proxied-path?fsp_name=tempdir&path=.")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["path"] == "", "FSP-root path should be normalized to empty string"
+    assert "." not in data["url_prefix"].split("/"), \
+        "url_prefix must not contain a '.' segment that browsers would collapse"
+    # Default url_prefix at FSP root falls back to the FSP name
+    assert data["url_prefix"] == "tempdir"
+    sharing_key = data["sharing_key"]
+
+    # Resolving the share URL at the FSP root should not return Path mismatch.
+    # Create a test file at FSP root and verify it's reachable through the link.
+    with open(os.path.join(temp_dir, "root_file.txt"), "w") as f:
+        f.write("hello root")
+    response = test_client.get(f"/files/{sharing_key}/tempdir/root_file.txt")
+    assert response.status_code == 200
+    assert response.text == "hello root"
+
+
+def test_data_link_returns_request_id_header(test_client, temp_dir):
+    """Serving a data link must return an S3-style x-amz-request-id header.
+
+    Carries over the feature added in x2s3 1.3.0: clients (Neuroglancer/N5/Vizarr)
+    can reference a specific request when correlating logs or reporting issues.
+    The header should be a 16-char uppercase-alphanumeric string and unique per
+    request. It is scoped to the /files/ proxy surface, so non-data endpoints
+    must not carry it.
+    """
+    import re
+
+    response = test_client.post("/api/proxied-path?fsp_name=tempdir&path=.")
+    assert response.status_code == 200
+    sharing_key = response.json()["sharing_key"]
+
+    with open(os.path.join(temp_dir, "root_file.txt"), "w") as f:
+        f.write("hello root")
+
+    r1 = test_client.get(f"/files/{sharing_key}/tempdir/root_file.txt")
+    assert r1.status_code == 200
+    request_id = r1.headers.get("x-amz-request-id")
+    assert request_id is not None, "data-link response must include x-amz-request-id"
+    assert re.fullmatch(r"[A-Z0-9]{16}", request_id), \
+        f"x-amz-request-id should be 16 uppercase alphanumerics, got {request_id!r}"
+
+    # Unique per request
+    r2 = test_client.get(f"/files/{sharing_key}/tempdir/root_file.txt")
+    assert r2.headers.get("x-amz-request-id") != request_id
+
+    # Scoped to data links: non-/files/ endpoints must not carry the header
+    api_response = test_client.get("/api/version")
+    assert "x-amz-request-id" not in api_response.headers
+
+
+def test_get_proxied_path_at_fsp_root_normalizes_dot(test_client):
+    """Sidebar's `is there a link for the current folder?` query uses path='.'
+    when the user is at the FSP root. After creating a link at the FSP root,
+    the GET endpoint must return that link for path='.' (frontend never sees
+    the backend normalization) — otherwise the sidebar toggle/link UI fails
+    to reflect the just-created link.
+    """
+    # Create the FSP-root link via the same path the file browser sends ("."")
+    response = test_client.post("/api/proxied-path?fsp_name=tempdir&path=.")
+    assert response.status_code == 200
+    created = response.json()
+    assert created["path"] == ""
+
+    # Query with path="." (what the sidebar sends) — must find the link.
+    response = test_client.get("/api/proxied-path?fsp_name=tempdir&path=.")
+    assert response.status_code == 200
+    paths = response.json()["paths"]
+    assert len(paths) == 1, f"expected sidebar query to find the FSP-root link, got {paths}"
+    assert paths[0]["sharing_key"] == created["sharing_key"]
+
+    # Query with the normalized form too, for completeness
+    response = test_client.get("/api/proxied-path?fsp_name=tempdir&path=")
+    assert response.status_code == 200
+    paths = response.json()["paths"]
+    assert len(paths) == 1
+    assert paths[0]["sharing_key"] == created["sharing_key"]
+
+
+def test_create_proxied_path_rejects_dot_url_prefix(test_client):
+    """url_prefix containing '.' or '..' segments must be rejected."""
+    for bad_prefix in (".", "..", "./foo", "foo/.", "foo/./bar", "foo/../bar"):
+        response = test_client.post(
+            "/api/proxied-path",
+            params={"fsp_name": "tempdir", "path": "test_proxied_path",
+                    "url_prefix": bad_prefix},
+        )
+        assert response.status_code == 400, \
+            f"expected 400 for url_prefix={bad_prefix!r}, got {response.status_code}"
+
+
+def test_resolve_legacy_dot_proxied_path(test_client, temp_dir):
+    """Existing DB records with stored path='.' must still resolve.
+
+    Backward-compat for records created before the normalization fix.
+    """
+    # Directly insert a legacy record bypassing the API normalization
+    with open(os.path.join(temp_dir, "legacy.txt"), "w") as f:
+        f.write("legacy content")
+    from fileglancer.database import get_db_session, ProxiedPathDB
+    import secrets
+    sharing_key = secrets.token_urlsafe(16)
+    # Use the same db_url the test app uses
+    db_url = f"sqlite:///{os.path.join(temp_dir, 'test.db')}"
+    with get_db_session(db_url) as session:
+        session.add(ProxiedPathDB(
+            username=TEST_USERNAME,
+            sharing_key=sharing_key,
+            sharing_name=".",
+            fsp_name="tempdir",
+            path=".",
+            url_prefix=".",
+        ))
+        session.commit()
+
+    # The recipient's browser collapses the "." segment, so the request that
+    # actually arrives at the server has no url_prefix in the path.
+    response = test_client.get(f"/files/{sharing_key}/legacy.txt")
+    assert response.status_code == 200
+    assert response.text == "legacy content"
+
+
 def test_get_proxied_paths(test_client):
     """Test retrieving proxied paths for a user"""
     path = "test_proxied_path"
@@ -1462,3 +1594,86 @@ def test_broken_symlink_in_file_listing(test_client, temp_dir):
     regular = next((f for f in files if f["name"] == "regular.txt"), None)
     assert regular is not None, "Regular file should be in response"
     assert regular["is_symlink"] is False, "Regular file should not be marked as symlink"
+
+
+def test_viewers_config_not_set(test_client):
+    """Test that /api/viewers-config returns 404 when viewers_config is not set"""
+    response = test_client.get("/api/viewers-config")
+    assert response.status_code == 404
+
+
+def test_viewers_config_file_exists(temp_dir):
+    """Test that /api/viewers-config returns file contents as text/yaml when file exists"""
+    # Create a test viewers config file
+    config_content = "viewers:\n  - manifest_url: 'https://example.com/manifest.yaml'\n"
+    config_path = os.path.join(temp_dir, "viewers.config.yaml")
+    with open(config_path, 'w') as f:
+        f.write(config_content)
+
+    # Create app with viewers_config set
+    db_path = os.path.join(temp_dir, "test_vc.db")
+    db_url = f"sqlite:///{db_path}"
+    engine = create_engine(db_url)
+    Session = sessionmaker(bind=engine)
+    db_session = Session()
+    Base.metadata.create_all(engine)
+
+    settings = Settings(db_url=db_url, file_share_mounts=[], viewers_config=config_path)
+
+    import fileglancer.settings
+    import fileglancer.database
+    original_get_settings = fileglancer.settings.get_settings
+    fileglancer.settings.get_settings = lambda: settings
+    fileglancer.database.get_settings = lambda: settings
+
+    app = create_app(settings)
+    from fileglancer.server import get_current_user
+    app.dependency_overrides[get_current_user] = lambda: "testuser"
+    client = TestClient(app)
+
+    try:
+        response = client.get("/api/viewers-config")
+        assert response.status_code == 200
+        assert "text/yaml" in response.headers["content-type"]
+        assert response.text == config_content
+    finally:
+        db_session.close()
+        engine.dispose()
+        from fileglancer.database import dispose_engine
+        dispose_engine(db_url)
+        fileglancer.settings.get_settings = original_get_settings
+        fileglancer.database.get_settings = original_get_settings
+
+
+def test_viewers_config_file_missing(temp_dir):
+    """Test that /api/viewers-config returns 404 when configured file doesn't exist"""
+    db_path = os.path.join(temp_dir, "test_vcm.db")
+    db_url = f"sqlite:///{db_path}"
+    engine = create_engine(db_url)
+    Session = sessionmaker(bind=engine)
+    db_session = Session()
+    Base.metadata.create_all(engine)
+
+    settings = Settings(db_url=db_url, file_share_mounts=[], viewers_config="/nonexistent/viewers.config.yaml")
+
+    import fileglancer.settings
+    import fileglancer.database
+    original_get_settings = fileglancer.settings.get_settings
+    fileglancer.settings.get_settings = lambda: settings
+    fileglancer.database.get_settings = lambda: settings
+
+    app = create_app(settings)
+    from fileglancer.server import get_current_user
+    app.dependency_overrides[get_current_user] = lambda: "testuser"
+    client = TestClient(app)
+
+    try:
+        response = client.get("/api/viewers-config")
+        assert response.status_code == 404
+    finally:
+        db_session.close()
+        engine.dispose()
+        from fileglancer.database import dispose_engine
+        dispose_engine(db_url)
+        fileglancer.settings.get_settings = original_get_settings
+        fileglancer.database.get_settings = original_get_settings

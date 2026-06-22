@@ -21,15 +21,19 @@ pytestmark = pytest.mark.skipif(
     reason="Worker subsystem uses fork/setuid/SCM_RIGHTS (Unix-only)",
 )
 
+from conftest import requires_symlinks
 from fileglancer.user_worker import (
     _send,
     _send_with_fd,
     _recv,
     _ACTIONS,
+    _action_validate_proxied_path,
     WorkerContext,
     _HEADER_FMT,
     _HEADER_SIZE,
 )
+from fileglancer.filestore import Filestore
+from fileglancer.model import FileSharePath
 from fileglancer.worker_pool import (
     UserWorker,
     WorkerPool,
@@ -69,13 +73,18 @@ class TestIPCProtocol:
 
     def test_send_recv_large_message(self):
         """Messages larger than a single recv buffer work."""
+        import threading
+
         a, b = socket.socketpair()
         try:
-            # Create a message larger than typical socket buffer
+            # Larger than the default AF_UNIX socketpair buffer on macOS (~8KB),
+            # so the send must run concurrently with the recv to avoid deadlock.
             big_value = "x" * 100_000
             msg = {"data": big_value}
-            _send(a, msg)
+            t = threading.Thread(target=_send, args=(a, msg))
+            t.start()
             result = _recv(b)
+            t.join()
             assert result["data"] == big_value
         finally:
             a.close()
@@ -582,3 +591,49 @@ class TestWorkerMainLoop:
         parent.close()
         t.join(timeout=5)
         assert not t.is_alive()
+
+
+class _StubDb:
+    """Minimal db proxy exposing the file share paths the worker resolves."""
+
+    def __init__(self, fsps):
+        self._fsps = fsps
+
+    def get_file_share_paths(self):
+        return self._fsps
+
+
+class TestValidateProxiedPathAction:
+    """Tests for the validate_proxied_path action.
+
+    The action is wrapped with @with_filestore, which resolves the filestore
+    from ctx.db.get_file_share_paths() using request["fsp_name"]. Each test uses
+    a distinct fsp_name to avoid the module-level _filestore_cache.
+    """
+
+    def _ctx(self, fsp_name, mount_path):
+        fsp = FileSharePath(zone="test", name=fsp_name, mount_path=str(mount_path))
+        return WorkerContext(username="test", db=_StubDb([fsp]))
+
+    def test_accepts_regular_file(self, tmp_path):
+        (tmp_path / "file.txt").write_text("data")
+        ctx = self._ctx("vpp_file", tmp_path)
+        result = _action_validate_proxied_path(
+            {"fsp_name": "vpp_file", "path": "file.txt"}, ctx)
+        assert result == {"ok": True}
+
+    def test_missing_path_returns_error(self, tmp_path):
+        ctx = self._ctx("vpp_missing", tmp_path)
+        result = _action_validate_proxied_path(
+            {"fsp_name": "vpp_missing", "path": "nope.txt"}, ctx)
+        assert result["status_code"] == 400
+
+    @requires_symlinks
+    def test_accepts_symlink(self, tmp_path):
+        target = tmp_path / "target.txt"
+        target.write_text("data")
+        os.symlink(target, tmp_path / "link.txt")
+        ctx = self._ctx("vpp_symlink", tmp_path)
+        result = _action_validate_proxied_path(
+            {"fsp_name": "vpp_symlink", "path": "link.txt"}, ctx)
+        assert result == {"ok": True}

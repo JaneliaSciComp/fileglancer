@@ -310,10 +310,12 @@ test.describe('Symlink Navigation and Display', () => {
       propertiesPanel.getByRole('tab', { name: 'Convert' })
     ).not.toBeVisible();
 
-    // Data link section should NOT be visible (is_dir=false for file symlink)
+    // Data link controls are shown for any path, including symlinks to files.
+    // Wait for the loading state to resolve before asserting the control is present.
     await expect(
-      propertiesPanel.getByText('Create data link')
+      propertiesPanel.getByText('Loading data link information...')
     ).not.toBeVisible();
+    await expect(propertiesPanel.getByText('Create data link')).toBeVisible();
   });
 
   test('broken symlink properties panel shows correct content', async ({
@@ -353,9 +355,11 @@ test.describe('Symlink Navigation and Display', () => {
       propertiesPanel.getByRole('tab', { name: 'Convert' })
     ).not.toBeVisible();
 
-    // Data link section should NOT be visible (is_dir=false for broken symlink)
+    // Data link controls are shown for any path, including broken symlinks.
+    // Wait for the loading state to resolve before asserting the control is present.
     await expect(
-      propertiesPanel.getByText('Create data link')
-    ).not.toBeVisible();
+      propertiesPanel.getByText('Loading data link information...')
+    ).not.toBeVisible({ timeout: 10000 });
+    await expect(propertiesPanel.getByText('Create data link')).toBeVisible();
   });
 });

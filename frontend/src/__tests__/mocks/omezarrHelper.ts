@@ -17,15 +17,23 @@ export const omezarrHelperMock = {
       chunks: [1, 128, 128]
     },
     shapes: [[10, 512, 512]],
-    multiscale: {
-      axes: [
-        { name: 'z', type: 'space', unit: 'micrometer' },
-        { name: 'y', type: 'space', unit: 'micrometer' },
-        { name: 'x', type: 'space', unit: 'micrometer' }
-      ],
-      datasets: [{ path: '0' }],
-      version: '0.4'
-    },
+    multiscales: [
+      {
+        axes: [
+          { name: 'z', type: 'space', unit: 'micrometer' },
+          { name: 'y', type: 'space', unit: 'micrometer' },
+          { name: 'x', type: 'space', unit: 'micrometer' }
+        ],
+        datasets: [{ path: '0' }],
+        version: '0.4'
+      }
+    ],
+    axes: [
+      { name: 'z', type: 'space', unit: 'micrometer' },
+      { name: 'y', type: 'space', unit: 'micrometer' },
+      { name: 'x', type: 'space', unit: 'micrometer' }
+    ],
+    version: '0.4',
     omero: undefined,
     labels: undefined,
     scales: [[1.0, 0.5, 0.5]],
