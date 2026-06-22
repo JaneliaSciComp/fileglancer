@@ -172,7 +172,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d8/96/9e5625a7c52e7c41fc8c1f89f40d8b4b29577016fa3c645fbfb42433fe83/py_cluster_api-0.6.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/48/a2/87a0b61a3078be07ab04ec574ef6c683c764590ed0d2a50d00cbb23aeae7/pydantic_settings_yaml-0.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/42/2b/fef67d616931055bf3d6764885990a3ac647d68734a2d6a9e1d13de437a2/yarl-1.23.0-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: ./
       linux-aarch64:
@@ -336,7 +336,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d8/96/9e5625a7c52e7c41fc8c1f89f40d8b4b29577016fa3c645fbfb42433fe83/py_cluster_api-0.6.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/48/a2/87a0b61a3078be07ab04ec574ef6c683c764590ed0d2a50d00cbb23aeae7/pydantic_settings_yaml-0.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ea/d8/d1cb2378c81dd729e98c716582b1ccb08357e8488e4c24714658cc6630e8/yarl-1.23.0-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl
       - pypi: ./
       osx-64:
@@ -497,7 +497,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d8/96/9e5625a7c52e7c41fc8c1f89f40d8b4b29577016fa3c645fbfb42433fe83/py_cluster_api-0.6.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/48/a2/87a0b61a3078be07ab04ec574ef6c683c764590ed0d2a50d00cbb23aeae7/pydantic_settings_yaml-0.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/39/54/bc2b45559f86543d163b6e294417a107bb87557609007c007ad889afec18/yarl-1.23.0-cp314-cp314-macosx_10_15_x86_64.whl
       - pypi: ./
       osx-arm64:
@@ -658,7 +658,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d8/96/9e5625a7c52e7c41fc8c1f89f40d8b4b29577016fa3c645fbfb42433fe83/py_cluster_api-0.6.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/48/a2/87a0b61a3078be07ab04ec574ef6c683c764590ed0d2a50d00cbb23aeae7/pydantic_settings_yaml-0.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/24/f9/e8242b68362bffe6fb536c8db5076861466fc780f0f1b479fc4ffbebb128/yarl-1.23.0-cp314-cp314-macosx_11_0_arm64.whl
       - pypi: ./
       win-64:
@@ -817,7 +817,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d8/96/9e5625a7c52e7c41fc8c1f89f40d8b4b29577016fa3c645fbfb42433fe83/py_cluster_api-0.6.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/48/a2/87a0b61a3078be07ab04ec574ef6c683c764590ed0d2a50d00cbb23aeae7/pydantic_settings_yaml-0.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a9/5b/9b92f54c784c26e2a422e55a8d2607ab15b7ea3349e28359282f84f01d43/yarl-1.23.0-cp314-cp314-win_amd64.whl
       - pypi: ./
   release:
@@ -1037,7 +1037,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d8/96/9e5625a7c52e7c41fc8c1f89f40d8b4b29577016fa3c645fbfb42433fe83/py_cluster_api-0.6.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/48/a2/87a0b61a3078be07ab04ec574ef6c683c764590ed0d2a50d00cbb23aeae7/pydantic_settings_yaml-0.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/42/2b/fef67d616931055bf3d6764885990a3ac647d68734a2d6a9e1d13de437a2/yarl-1.23.0-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: ./
       linux-aarch64:
@@ -1246,7 +1246,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d8/96/9e5625a7c52e7c41fc8c1f89f40d8b4b29577016fa3c645fbfb42433fe83/py_cluster_api-0.6.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/48/a2/87a0b61a3078be07ab04ec574ef6c683c764590ed0d2a50d00cbb23aeae7/pydantic_settings_yaml-0.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ea/d8/d1cb2378c81dd729e98c716582b1ccb08357e8488e4c24714658cc6630e8/yarl-1.23.0-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl
       - pypi: ./
       osx-64:
@@ -1447,7 +1447,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d8/96/9e5625a7c52e7c41fc8c1f89f40d8b4b29577016fa3c645fbfb42433fe83/py_cluster_api-0.6.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/48/a2/87a0b61a3078be07ab04ec574ef6c683c764590ed0d2a50d00cbb23aeae7/pydantic_settings_yaml-0.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/39/54/bc2b45559f86543d163b6e294417a107bb87557609007c007ad889afec18/yarl-1.23.0-cp314-cp314-macosx_10_15_x86_64.whl
       - pypi: ./
       osx-arm64:
@@ -1648,7 +1648,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d8/96/9e5625a7c52e7c41fc8c1f89f40d8b4b29577016fa3c645fbfb42433fe83/py_cluster_api-0.6.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/48/a2/87a0b61a3078be07ab04ec574ef6c683c764590ed0d2a50d00cbb23aeae7/pydantic_settings_yaml-0.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/24/f9/e8242b68362bffe6fb536c8db5076861466fc780f0f1b479fc4ffbebb128/yarl-1.23.0-cp314-cp314-macosx_11_0_arm64.whl
       - pypi: ./
       win-64:
@@ -1848,7 +1848,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d8/96/9e5625a7c52e7c41fc8c1f89f40d8b4b29577016fa3c645fbfb42433fe83/py_cluster_api-0.6.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/48/a2/87a0b61a3078be07ab04ec574ef6c683c764590ed0d2a50d00cbb23aeae7/pydantic_settings_yaml-0.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a9/5b/9b92f54c784c26e2a422e55a8d2607ab15b7ea3349e28359282f84f01d43/yarl-1.23.0-cp314-cp314-win_amd64.whl
       - pypi: ./
   test:
@@ -2110,7 +2110,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/84/47/07046e0acedc12fe2bae79cf6c73ad67f51ae9d67df64d06b0f3eac73d36/pytest_html-4.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3e/43/7e7b2ec865caa92f67b8f0e9231a798d102724ca4c0e1f414316be1c1ef2/pytest_metadata-3.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/42/2b/fef67d616931055bf3d6764885990a3ac647d68734a2d6a9e1d13de437a2/yarl-1.23.0-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: ./
       linux-aarch64:
@@ -2362,7 +2362,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/84/47/07046e0acedc12fe2bae79cf6c73ad67f51ae9d67df64d06b0f3eac73d36/pytest_html-4.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3e/43/7e7b2ec865caa92f67b8f0e9231a798d102724ca4c0e1f414316be1c1ef2/pytest_metadata-3.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ea/d8/d1cb2378c81dd729e98c716582b1ccb08357e8488e4c24714658cc6630e8/yarl-1.23.0-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl
       - pypi: ./
       osx-64:
@@ -2614,7 +2614,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/84/47/07046e0acedc12fe2bae79cf6c73ad67f51ae9d67df64d06b0f3eac73d36/pytest_html-4.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3e/43/7e7b2ec865caa92f67b8f0e9231a798d102724ca4c0e1f414316be1c1ef2/pytest_metadata-3.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/39/54/bc2b45559f86543d163b6e294417a107bb87557609007c007ad889afec18/yarl-1.23.0-cp314-cp314-macosx_10_15_x86_64.whl
       - pypi: ./
       osx-arm64:
@@ -2866,7 +2866,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/84/47/07046e0acedc12fe2bae79cf6c73ad67f51ae9d67df64d06b0f3eac73d36/pytest_html-4.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3e/43/7e7b2ec865caa92f67b8f0e9231a798d102724ca4c0e1f414316be1c1ef2/pytest_metadata-3.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/24/f9/e8242b68362bffe6fb536c8db5076861466fc780f0f1b479fc4ffbebb128/yarl-1.23.0-cp314-cp314-macosx_11_0_arm64.whl
       - pypi: ./
       win-64:
@@ -3113,7 +3113,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/84/47/07046e0acedc12fe2bae79cf6c73ad67f51ae9d67df64d06b0f3eac73d36/pytest_html-4.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3e/43/7e7b2ec865caa92f67b8f0e9231a798d102724ca4c0e1f414316be1c1ef2/pytest_metadata-3.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a9/5b/9b92f54c784c26e2a422e55a8d2607ab15b7ea3349e28359282f84f01d43/yarl-1.23.0-cp314-cp314-win_amd64.whl
       - pypi: ./
   test-py312:
@@ -3377,7 +3377,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/84/47/07046e0acedc12fe2bae79cf6c73ad67f51ae9d67df64d06b0f3eac73d36/pytest_html-4.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3e/43/7e7b2ec865caa92f67b8f0e9231a798d102724ca4c0e1f414316be1c1ef2/pytest_metadata-3.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/66/3e/868e5c3364b6cee19ff3e1a122194fa4ce51def02c61023970442162859e/yarl-1.23.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: ./
       linux-aarch64:
@@ -3633,7 +3633,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/84/47/07046e0acedc12fe2bae79cf6c73ad67f51ae9d67df64d06b0f3eac73d36/pytest_html-4.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3e/43/7e7b2ec865caa92f67b8f0e9231a798d102724ca4c0e1f414316be1c1ef2/pytest_metadata-3.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/99/30/58260ed98e6ff7f90ba84442c1ddd758c9170d70327394a6227b310cd60f/yarl-1.23.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl
       - pypi: ./
       osx-64:
@@ -3885,7 +3885,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/84/47/07046e0acedc12fe2bae79cf6c73ad67f51ae9d67df64d06b0f3eac73d36/pytest_html-4.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3e/43/7e7b2ec865caa92f67b8f0e9231a798d102724ca4c0e1f414316be1c1ef2/pytest_metadata-3.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e3/6f/c6554045d59d64052698add01226bc867b52fe4a12373415d7991fdca95d/yarl-1.23.0-cp312-cp312-macosx_10_13_x86_64.whl
       - pypi: ./
       osx-arm64:
@@ -4137,7 +4137,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/84/47/07046e0acedc12fe2bae79cf6c73ad67f51ae9d67df64d06b0f3eac73d36/pytest_html-4.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3e/43/7e7b2ec865caa92f67b8f0e9231a798d102724ca4c0e1f414316be1c1ef2/pytest_metadata-3.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/19/2a/725ecc166d53438bc88f76822ed4b1e3b10756e790bafd7b523fe97c322d/yarl-1.23.0-cp312-cp312-macosx_11_0_arm64.whl
       - pypi: ./
       win-64:
@@ -4385,7 +4385,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/84/47/07046e0acedc12fe2bae79cf6c73ad67f51ae9d67df64d06b0f3eac73d36/pytest_html-4.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3e/43/7e7b2ec865caa92f67b8f0e9231a798d102724ca4c0e1f414316be1c1ef2/pytest_metadata-3.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/f5/be/25216a49daeeb7af2bec0db22d5e7df08ed1d7c9f65d78b14f3b74fd72fc/yarl-1.23.0-cp312-cp312-win_amd64.whl
       - pypi: ./
 packages:
@@ -6735,8 +6735,8 @@ packages:
   timestamp: 1776177910241
 - pypi: ./
   name: fileglancer
-  version: 2.9.0a0
-  sha256: b0bf50ed7bbb44f49a542cfe928652b6bbbccd4c23154951bfefcc9c392461d7
+  version: 2.9.1a0
+  sha256: 05b85158ef8c78b168257f4b6e796b4f46cb61284e5b3e99c6529d7313345978
   requires_dist:
   - alembic>=1.17.0,<2
   - atlassian-python-api>=4.0.7,<5
@@ -6757,7 +6757,7 @@ packages:
   - python-jose>=3.5.0,<4
   - sqlalchemy>=2.0.44,<3
   - uvicorn>=0.38.0,<0.39
-  - x2s3>=1.2.0,<2
+  - x2s3>=1.3.0,<2
   - hatch ; extra == 'release'
   - twine ; extra == 'release'
   - coverage ; extra == 'test'
@@ -16101,10 +16101,10 @@ packages:
   - pkg:pypi/wrapt?source=hash-mapping
   size: 86073
   timestamp: 1772794899504
-- pypi: https://files.pythonhosted.org/packages/c6/01/c330682e398978b2e151d9a6684826874e09b9319d565b6b6b73986093e5/x2s3-1.2.0-py3-none-any.whl
+- pypi: https://files.pythonhosted.org/packages/b0/6c/c25618e34b8ba7c26ef4f3f84df70e9e6c0fc8aa3806d04c1ab952051c8f/x2s3-1.3.0-py3-none-any.whl
   name: x2s3
-  version: 1.2.0
-  sha256: 1ae2eb80355498a23e03265cc0ed1eefddd4fbf021c4b09a99bfbfd30952c9c1
+  version: 1.3.0
+  sha256: deb292575bd242004a903ba1bd1892d6528a91f501d348b932322fbf4f4131fe
   requires_dist:
   - aiobotocore>=2.22
   - boto3>=1.37
