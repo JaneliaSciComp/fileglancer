@@ -16,9 +16,9 @@ export default function Links() {
         Data Links
       </Typography>
       <Typography className="mb-6 text-foreground">
-        Data links can be created for any file or folder. They provide a 
-        S3-compatible RESTful interface to your data, which can be used 
-        to open files in external viewers like Neuroglancer.
+        Data links can be created for any file or folder. They provide a
+        S3-compatible RESTful interface to your data, which can be used to open
+        files in external viewers like Neuroglancer.
       </Typography>
       <TableCard
         columns={linksColumns}
