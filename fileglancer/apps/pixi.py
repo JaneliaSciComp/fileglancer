@@ -150,19 +150,13 @@ def _task_to_entry_point(name: str, task: dict) -> AppEntryPoint | None:
         for arg in args:
             parameters.append(_convert_task_arg(arg))
 
-    # Convert env vars — these become informational string parameters
-    # (pixi handles them natively, but we expose them for visibility/override)
-    env = task.get("env")
-    if env:
-        for var_name, var_value in env.items():
-            parameters.append(AppParameter(
-                flag=f"--env:{var_name}",
-                name=var_name,
-                type="string",
-                description=f"Environment variable (default: {var_value})",
-                default=str(var_value),
-                hidden=True,
-            ))
+    # Surface task env vars as entry-point env defaults. Pixi already applies
+    # task env natively when running the task; exporting them in the generated
+    # job script keeps the values visible and overridable via the job's env.
+    # (Previously these were emitted as `--env:VAR` CLI flags, which `pixi run`
+    # does not understand and which broke the generated command.)
+    task_env = task.get("env")
+    env = {k: str(v) for k, v in task_env.items()} if task_env else None
 
     return AppEntryPoint(
         id=name,
@@ -170,6 +164,7 @@ def _task_to_entry_point(name: str, task: dict) -> AppEntryPoint | None:
         description=description,
         command=command,
         parameters=parameters,
+        env=env,
         pre_run='export PATH="$HOME/.pixi/bin:$PATH"',
     )
 

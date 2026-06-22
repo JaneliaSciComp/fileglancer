@@ -1053,13 +1053,17 @@ def _action_discover_manifests(request: dict, ctx: WorkerContext) -> dict:
 @action("read_manifest")
 def _action_read_manifest(request: dict, ctx: WorkerContext) -> dict:
     """Fetch and read a single manifest from a cached repo."""
-    from fileglancer.apps.manifest import _ensure_repo_cache, _read_manifest_file
+    from fileglancer.apps.manifest import (
+        _ensure_repo_cache,
+        _read_manifest_file,
+        _safe_repo_subdir,
+    )
     repo_dir = _run_async(_ensure_repo_cache(
         url=request["url"],
         pull=request.get("pull", False),
     ))
     manifest_path = request.get("manifest_path", "")
-    target_dir = repo_dir / manifest_path if manifest_path else repo_dir
+    target_dir = _safe_repo_subdir(repo_dir, manifest_path)
     manifest = _read_manifest_file(target_dir)
     return {"manifest": manifest.model_dump(mode="json")}
 

@@ -55,8 +55,17 @@ def _convert_property(name: str, prop: dict, is_required: bool) -> AppParameter:
 
     if "default" in prop:
         default = prop["default"]
-        if isinstance(default, str) and default.startswith("$projectDir"):
-            default = "." + default[len("$projectDir"):]
+        if isinstance(default, str):
+            # The generated command runs from the job work dir with the repo
+            # symlinked as `repo`, so projectDir-relative assets live under
+            # ./repo/. The leading ./ also satisfies path validation (a bare
+            # `repo/...` is rejected as neither absolute nor ./-relative), and
+            # rewriting to plain ./ would resolve against the empty work dir.
+            # Nextflow accepts both $projectDir and the braced ${projectDir}.
+            for token in ("${projectDir}", "$projectDir"):
+                if default.startswith(token):
+                    default = "./repo" + default[len(token):]
+                    break
         kwargs["default"] = default
 
     if param_type == "enum":
@@ -92,7 +101,13 @@ class NextflowAdapter:
 
         # Determine app metadata — use owner/repo from the cache path
         # (directory is {cache_base}/{owner}/{repo}/{branch})
-        name = f"{directory.parent.parent.name}/{directory.parent.name}"
+        try:
+            from fileglancer.apps.manifest import _repo_cache_base
+            cache_base = _repo_cache_base().resolve()
+            relative = directory.resolve().relative_to(cache_base)
+            name = f"{relative.parts[0]}/{relative.parts[1]}"
+        except Exception:
+            name = f"{directory.parent.parent.name}/{directory.parent.name}"
         description = schema.get("description")
 
         # Build parameters from definitions, ordered by allOf
@@ -143,6 +158,10 @@ class NextflowAdapter:
         env_parameters = [
             AppParameterSection(
                 section="Nextflow",
+                description=(
+                    "Options for the Nextflow runner itself, separate from the "
+                    "pipeline's own parameters. "
+                ),
                 parameters=[
                     AppParameter(
                         flag="-profile",
@@ -151,6 +170,7 @@ class NextflowAdapter:
                         description="Comma-separated list of Nextflow profiles to apply (e.g. standard,docker)",
                     ),
                     AppParameter(
+                        key="extra_args",
                         name="Extra Arguments",
                         type="string",
                         description="Additional Nextflow command-line arguments (e.g. -resume, -with-tower)",
@@ -160,11 +180,19 @@ class NextflowAdapter:
             ),
         ]
 
+        # Run from the job's work dir (working_dir="work") rather than the repo
+        # clone. `repo` is a symlink to the clone inside the work dir, so the
+        # directory form lets Nextflow resolve the pipeline's main script via
+        # main.nf or the manifest's mainScript. Launching from the work dir
+        # keeps Nextflow's launch-directory artifacts — .nextflow.log, the
+        # .nextflow/ cache/history, and work/ — out of the shared repo cache,
+        # where concurrent jobs would otherwise collide.
         entry_point = AppEntryPoint(
             id="run",
             name="Run pipeline",
             description=description,
-            command="nextflow run . -ansi-log false",
+            command="nextflow run repo -ansi-log false",
+            working_dir="work",
             parameters=parameters,
             env_parameters=env_parameters,
         )

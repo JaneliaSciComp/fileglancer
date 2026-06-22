@@ -44,6 +44,7 @@ interface AppLaunchFormProps {
   readonly entryPoint: AppEntryPoint;
   readonly onSubmit: (
     parameters: Record<string, unknown>,
+    envParameters: Record<string, unknown>,
     resources?: AppResourceDefaults,
     extraArgs?: string,
     env?: Record<string, string>,
@@ -55,6 +56,7 @@ interface AppLaunchFormProps {
   readonly submitting: boolean;
   readonly submitError?: string;
   readonly initialValues?: Record<string, unknown>;
+  readonly initialEnvParameters?: Record<string, unknown>;
   readonly initialResources?: AppResourceDefaults;
   readonly initialExtraArgs?: string;
   readonly initialEnv?: Record<string, string>;
@@ -230,6 +232,40 @@ function ParameterFieldRow({
         </Typography>
       ) : null}
     </div>
+  );
+}
+
+// Trigger for a collapsible section. The title and description live in the
+// trigger (not the content) so the description stays visible when collapsed.
+// items-start keeps the chevron aligned with the title line rather than
+// centered against the title + description block.
+function SectionTrigger({
+  title,
+  description,
+  isOpen
+}: {
+  readonly title: string;
+  readonly description?: string;
+  readonly isOpen: boolean;
+}) {
+  return (
+    <Accordion.Trigger className="flex w-full items-start justify-between gap-2 py-4">
+      <div className="text-left">
+        <div className="text-foreground font-bold text-sm">{title}</div>
+        {description ? (
+          <Typography className="text-foreground" type="small">
+            {description}
+          </Typography>
+        ) : null}
+      </div>
+      <FgIcon
+        className={`text-foreground transition-transform shrink-0 mt-0.5 ${
+          isOpen ? 'rotate-180' : ''
+        }`}
+        icon={HiChevronDown}
+        size="sm"
+      />
+    </Accordion.Trigger>
   );
 }
 
@@ -555,17 +591,12 @@ function EnvironmentTabContent({
       value={openEnvSections}
     >
       <Accordion.Item value="environment">
-        <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
-          <div className="text-foreground font-bold text-sm">Environment</div>
-          <FgIcon
-            className={`text-foreground transition-transform ${
-              openEnvSections.includes('environment') ? 'rotate-180' : ''
-            }`}
-            icon={HiChevronDown}
-            size="sm"
-          />
-        </Accordion.Trigger>
-        <Accordion.Content className="pt-4 pb-2 pl-4">
+        <SectionTrigger
+          description="Set up the environment that the job runs in. This controls the script that is submitted to the cluster."
+          isOpen={openEnvSections.includes('environment')}
+          title="Environment"
+        />
+        <Accordion.Content className="pt-2 pb-4 pl-4">
           <EnvironmentSectionContent
             envVars={envVars}
             postRun={postRun}
@@ -579,17 +610,12 @@ function EnvironmentTabContent({
 
       {entryPoint.container ? (
         <Accordion.Item value="apptainer">
-          <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
-            <div className="text-foreground font-bold text-sm">Container</div>
-            <FgIcon
-              className={`text-foreground transition-transform ${
-                openEnvSections.includes('apptainer') ? 'rotate-180' : ''
-              }`}
-              icon={HiChevronDown}
-              size="sm"
-            />
-          </Accordion.Trigger>
-          <Accordion.Content className="pt-4 pb-2 pl-4">
+          <SectionTrigger
+            description="Run the command inside an Apptainer (Singularity) container image."
+            isOpen={openEnvSections.includes('apptainer')}
+            title="Container"
+          />
+          <Accordion.Content className="pt-2 pb-4 pl-4">
             <div className="space-y-4">
               <div>
                 <label className="block text-foreground text-sm font-semibold mb-1">
@@ -650,17 +676,12 @@ function ClusterTabContent({
       value={openClusterSections}
     >
       <Accordion.Item value="resources">
-        <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
-          <div className="text-foreground font-bold text-sm">Resources</div>
-          <FgIcon
-            className={`text-foreground transition-transform ${
-              openClusterSections.includes('resources') ? 'rotate-180' : ''
-            }`}
-            icon={HiChevronDown}
-            size="sm"
-          />
-        </Accordion.Trigger>
-        <Accordion.Content className="pt-4 pb-2 pl-4">
+        <SectionTrigger
+          description="These resources are requested for the single process that runs your command. These apply to the main job only, not to any jobs it submits on its own."
+          isOpen={openClusterSections.includes('resources')}
+          title="Resources"
+        />
+        <Accordion.Content className="pt-2 pb-4 pl-4">
           <ResourcesSectionContent
             resources={resources}
             setResources={setResources}
@@ -669,19 +690,12 @@ function ClusterTabContent({
       </Accordion.Item>
 
       <Accordion.Item value="submitOptions">
-        <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
-          <div className="text-foreground font-bold text-sm">
-            Submit Options
-          </div>
-          <FgIcon
-            className={`text-foreground transition-transform ${
-              openClusterSections.includes('submitOptions') ? 'rotate-180' : ''
-            }`}
-            icon={HiChevronDown}
-            size="sm"
-          />
-        </Accordion.Trigger>
-        <Accordion.Content className="pt-4 pb-2 pl-4">
+        <SectionTrigger
+          description="Controls how the main job is submitted to the cluster scheduler, such as the queue and any extra scheduler options. These apply to the main job only, not to any jobs it submits on its own."
+          isOpen={openClusterSections.includes('submitOptions')}
+          title="Submit Options"
+        />
+        <Accordion.Content className="pt-2 pb-4 pl-4">
           <SubmitOptionsSectionContent
             extraArgs={extraArgs}
             resources={resources}
@@ -701,6 +715,7 @@ export default function AppLaunchForm({
   submitting,
   submitError,
   initialValues: externalValues,
+  initialEnvParameters: externalEnvValues,
   initialResources,
   initialExtraArgs: externalExtraArgs,
   initialEnv,
@@ -712,8 +727,10 @@ export default function AppLaunchForm({
   const { defaultExtraArgs } = usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const clusterDefaultsQuery = useClusterDefaultsQuery();
-  const allParams = flattenParameters([
-    ...entryPoint.parameters,
+  // Pipeline parameters and env-tab parameters are independent namespaces with
+  // their own value dicts, so a key may appear in both without colliding.
+  const allParams = flattenParameters([...entryPoint.parameters]);
+  const envParamsFlat = flattenParameters([
     ...(entryPoint.env_parameters ?? [])
   ]);
 
@@ -728,6 +745,16 @@ export default function AppLaunchForm({
     ? { ...defaultValues, ...externalValues }
     : defaultValues;
 
+  const envDefaultValues: Record<string, unknown> = {};
+  for (const param of envParamsFlat) {
+    if (param.default !== undefined) {
+      envDefaultValues[param.key] = param.default;
+    }
+  }
+  const startingEnvValues = externalEnvValues
+    ? { ...envDefaultValues, ...externalEnvValues }
+    : envDefaultValues;
+
   // Compute which sections start open (those without collapsed: true)
   const initialOpenSections = entryPoint.parameters
     .filter(item => isParameterSection(item) && !item.collapsed)
@@ -739,6 +766,8 @@ export default function AppLaunchForm({
     externalExtraArgs ?? (defaultExtraArgs || configExtraArgs);
 
   const [values, setValues] = useState<Record<string, unknown>>(startingValues);
+  const [envValues, setEnvValues] =
+    useState<Record<string, unknown>>(startingEnvValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState('parameters');
   const [openSections, setOpenSections] =
@@ -826,6 +855,12 @@ export default function AppLaunchForm({
         return next;
       });
     }
+  };
+
+  // Env-tab params have their own value dict so their keys can't collide with
+  // pipeline param keys.
+  const handleEnvChange = (paramId: string, value: unknown) => {
+    setEnvValues(prev => ({ ...prev, [paramId]: value }));
   };
 
   const validate = (): boolean => {
@@ -994,8 +1029,17 @@ export default function AppLaunchForm({
     }
     const hasEnv = Object.keys(envRecord).length > 0;
 
+    // Env-tab parameter values (separate namespace), dropping empties.
+    const envParams: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(envValues)) {
+      if (val !== undefined && val !== null && val !== '') {
+        envParams[key] = val;
+      }
+    }
+
     onSubmit(
       params,
+      envParams,
       hasResourceOverrides ? resources : undefined,
       extraArgs.trim() || undefined,
       hasEnv ? envRecord : undefined,
@@ -1051,6 +1095,9 @@ export default function AppLaunchForm({
     if (Object.keys(values).length > 0) {
       params.parameters = values;
     }
+    if (Object.keys(envValues).length > 0) {
+      params.env_parameters = envValues;
+    }
     if (
       resources.cpus ||
       resources.memory ||
@@ -1099,6 +1146,9 @@ export default function AppLaunchForm({
 
     if (parsed.parameters) {
       setValues(prev => ({ ...prev, ...parsed.parameters }));
+    }
+    if (parsed.env_parameters) {
+      setEnvValues(prev => ({ ...prev, ...parsed.env_parameters }));
     }
     if (parsed.resources) {
       setResources(prev => ({ ...prev, ...parsed.resources }));
@@ -1159,6 +1209,21 @@ export default function AppLaunchForm({
     </div>
   );
 
+  // Shown next to both the top and bottom submit buttons, so the user sees the
+  // error regardless of which button they used. Wording is direction-neutral
+  // since the same banner appears above and below the fields.
+  const submitErrorBanner = submitError ? (
+    <div className="mt-2 mb-4 p-3 bg-error/10 rounded text-error text-sm">
+      {submitError}
+    </div>
+  ) : null;
+  const validationErrorBanner =
+    Object.keys(errors).length > 0 ? (
+      <div className="mt-2 mb-4 p-3 bg-error/10 rounded text-error text-sm">
+        Please fix the highlighted errors before submitting.
+      </div>
+    ) : null;
+
   return (
     <div>
       <input
@@ -1184,6 +1249,9 @@ export default function AppLaunchForm({
         </div>
         {actionButtons}
       </div>
+      {/* Errors (top) */}
+      {validationErrorBanner}
+      {submitErrorBanner}
       {entryPoint.description ? (
         <Typography className="block mb-6">{entryPoint.description}</Typography>
       ) : null}
@@ -1204,80 +1272,52 @@ export default function AppLaunchForm({
         </Tabs.List>
 
         <Tabs.Panel className="pt-4" value="parameters">
-          {hasHiddenParams ? (
-            <div className="flex justify-end mb-2">
-              <FgSwitch
-                checked={showHidden}
-                id="show-hidden-toggle"
-                label="Show hidden"
-                onChange={() => {
-                  if (!showHidden) {
-                    // Expand sections that contain hidden parameters
-                    const sectionsWithHidden = entryPoint.parameters
-                      .filter(
-                        item =>
-                          isParameterSection(item) &&
-                          item.parameters.some(p => p.hidden)
-                      )
-                      .map(item => (item as AppParameterSection).section);
-                    setOpenSections(prev => [
-                      ...new Set([...prev, ...sectionsWithHidden])
-                    ]);
-                  }
-                  setShowHidden(prev => !prev);
-                }}
-              />
-            </div>
-          ) : null}
-          <div className="max-w-2xl space-y-4">
-            {hasSections ? (
-              <Accordion
-                onValueChange={
-                  setOpenSections as Dispatch<SetStateAction<string | string[]>>
-                }
-                type="multiple"
-                value={openSections}
-              >
-                {visibleParameters.map(item =>
-                  isParameterSection(item) ? (
-                    <Accordion.Item
-                      key={`section-${item.section}`}
-                      value={item.section}
+          <div className="flex items-start gap-4">
+            <div className="max-w-2xl grow space-y-4">
+              {hasSections ? (
+                <Accordion
+                  onValueChange={
+                    setOpenSections as Dispatch<
+                      SetStateAction<string | string[]>
                     >
-                      <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
-                        <div className="text-left">
-                          <Typography className="text-foreground font-semibold text-base">
-                            {item.section}
-                          </Typography>
-                          {item.description ? (
-                            <Typography
-                              className="text-foreground"
-                              type="small"
-                            >
-                              {item.description}
-                            </Typography>
-                          ) : null}
-                        </div>
-                        <FgIcon
-                          className={`text-foreground transition-transform ${
-                            openSections.includes(item.section)
-                              ? 'rotate-180'
-                              : ''
-                          }`}
-                          icon={HiChevronDown}
-                          size="sm"
+                  }
+                  type="multiple"
+                  value={openSections}
+                >
+                  {visibleParameters.map(item =>
+                    isParameterSection(item) ? (
+                      <Accordion.Item
+                        key={`section-${item.section}`}
+                        value={item.section}
+                      >
+                        <SectionTrigger
+                          description={item.description}
+                          isOpen={openSections.includes(item.section)}
+                          title={item.section}
                         />
-                      </Accordion.Trigger>
-                      <Accordion.Content className="pt-4 pb-2 pl-4">
-                        <SectionContent
-                          errors={errors}
-                          onParamChange={handleChange}
-                          section={item}
-                          values={values}
-                        />
-                      </Accordion.Content>
-                    </Accordion.Item>
-                  ) : (
+                        <Accordion.Content className="pt-2 pb-4 pl-4">
+                          <SectionContent
+                            errors={errors}
+                            onParamChange={handleChange}
+                            section={item}
+                            values={values}
+                          />
+                        </Accordion.Content>
+                      </Accordion.Item>
+                    ) : (
+                      <ParameterFieldRow
+                        error={errors[item.key]}
+                        key={item.key}
+                        onChange={val => handleChange(item.key, val)}
+                        param={item}
+                        value={values[item.key]}
+                      />
+                    )
+                  )}
+                </Accordion>
+              ) : (
+                visibleParameters.map(item =>
+                  isParameterSection(item) ? null : (
                     <ParameterFieldRow
                       error={errors[item.key]}
                       key={item.key}
@@ -1286,111 +1326,121 @@ export default function AppLaunchForm({
                       value={values[item.key]}
                     />
                   )
-                )}
-              </Accordion>
-            ) : (
-              visibleParameters.map(item =>
-                isParameterSection(item) ? null : (
-                  <ParameterFieldRow
-                    error={errors[item.key]}
-                    key={item.key}
-                    onChange={val => handleChange(item.key, val)}
-                    param={item}
-                    value={values[item.key]}
-                  />
                 )
-              )
-            )}
+              )}
+            </div>
+            {hasHiddenParams ? (
+              <div className="shrink-0">
+                <FgSwitch
+                  checked={showHidden}
+                  id="show-hidden-toggle"
+                  label="Show hidden"
+                  onChange={() => {
+                    if (!showHidden) {
+                      // Expand sections that contain hidden parameters
+                      const sectionsWithHidden = entryPoint.parameters
+                        .filter(
+                          item =>
+                            isParameterSection(item) &&
+                            item.parameters.some(p => p.hidden)
+                        )
+                        .map(item => (item as AppParameterSection).section);
+                      setOpenSections(prev => [
+                        ...new Set([...prev, ...sectionsWithHidden])
+                      ]);
+                    }
+                    setShowHidden(prev => !prev);
+                  }}
+                />
+              </div>
+            ) : null}
           </div>
         </Tabs.Panel>
 
-        <Tabs.Panel className="pt-4 max-w-2xl" value="environment">
-          {(entryPoint.env_parameters ?? []).length > 0 ? (
-            <Accordion
-              onValueChange={
-                setOpenEnvParamSections as Dispatch<
-                  SetStateAction<string | string[]>
+        <Tabs.Panel className="pt-4" value="environment">
+          <div className="flex items-start justify-between gap-4">
+            <div className="max-w-2xl grow space-y-4">
+              {(entryPoint.env_parameters ?? []).length > 0 ? (
+                <Accordion
+                  onValueChange={
+                    setOpenEnvParamSections as Dispatch<
+                      SetStateAction<string | string[]>
+                    >
+                  }
+                  type="multiple"
+                  value={openEnvParamSections}
                 >
-              }
-              type="multiple"
-              value={openEnvParamSections}
-            >
-              {(entryPoint.env_parameters ?? []).map(item =>
-                isParameterSection(item) ? (
-                  <Accordion.Item
-                    key={`env-section-${item.section}`}
-                    value={item.section}
-                  >
-                    <Accordion.Trigger className="flex w-full items-center justify-between py-3 border-b border-primary-light">
-                      <div className="text-foreground font-bold text-sm">
-                        {item.section}
-                      </div>
-                      <FgIcon
-                        className={`text-secondary transition-transform ${
-                          openEnvParamSections.includes(item.section)
-                            ? 'rotate-180'
-                            : ''
-                        }`}
-                        icon={HiChevronDown}
-                        size="sm"
+                  {(entryPoint.env_parameters ?? []).map(item =>
+                    isParameterSection(item) ? (
+                      <Accordion.Item
+                        key={`env-section-${item.section}`}
+                        value={item.section}
+                      >
+                        <SectionTrigger
+                          description={item.description}
+                          isOpen={openEnvParamSections.includes(item.section)}
+                          title={item.section}
+                        />
+                        <Accordion.Content className="pt-2 pb-4 pl-4">
+                          <SectionContent
+                            errors={{}}
+                            onParamChange={handleEnvChange}
+                            section={item}
+                            values={envValues}
+                          />
+                        </Accordion.Content>
+                      </Accordion.Item>
+                    ) : (
+                      <ParameterFieldRow
+                        error={undefined}
+                        key={item.key}
+                        onChange={val => handleEnvChange(item.key, val)}
+                        param={item}
+                        value={envValues[item.key]}
                       />
-                    </Accordion.Trigger>
-                    <Accordion.Content className="pt-4 pb-2 pl-4">
-                      <SectionContent
-                        errors={errors}
-                        onParamChange={handleChange}
-                        section={item}
-                        values={values}
-                      />
-                    </Accordion.Content>
-                  </Accordion.Item>
-                ) : null
-              )}
-            </Accordion>
-          ) : null}
+                    )
+                  )}
+                </Accordion>
+              ) : null}
 
-          <EnvironmentTabContent
-            containerArgs={containerArgs}
-            containerImage={containerImage}
-            entryPoint={entryPoint}
-            envVars={envVars}
-            openEnvSections={openEnvSections}
-            postRun={postRun}
-            preRun={preRun}
-            setContainerArgs={setContainerArgs}
-            setContainerImage={setContainerImage}
-            setEnvVars={setEnvVars}
-            setOpenEnvSections={setOpenEnvSections}
-            setPostRun={setPostRun}
-            setPreRun={setPreRun}
-          />
+              <EnvironmentTabContent
+                containerArgs={containerArgs}
+                containerImage={containerImage}
+                entryPoint={entryPoint}
+                envVars={envVars}
+                openEnvSections={openEnvSections}
+                postRun={postRun}
+                preRun={preRun}
+                setContainerArgs={setContainerArgs}
+                setContainerImage={setContainerImage}
+                setEnvVars={setEnvVars}
+                setOpenEnvSections={setOpenEnvSections}
+                setPostRun={setPostRun}
+                setPreRun={setPreRun}
+              />
+            </div>
+          </div>
         </Tabs.Panel>
 
-        <Tabs.Panel className="pt-4 max-w-2xl" value="cluster">
-          <ClusterTabContent
-            extraArgs={extraArgs}
-            openClusterSections={openClusterSections}
-            resources={resources}
-            setExtraArgs={setExtraArgs}
-            setOpenClusterSections={setOpenClusterSections}
-            setResources={setResources}
-          />
+        <Tabs.Panel className="pt-4" value="cluster">
+          <div className="flex items-start justify-between gap-4">
+            <div className="max-w-2xl grow space-y-4">
+              <ClusterTabContent
+                extraArgs={extraArgs}
+                openClusterSections={openClusterSections}
+                resources={resources}
+                setExtraArgs={setExtraArgs}
+                setOpenClusterSections={setOpenClusterSections}
+                setResources={setResources}
+              />
+            </div>
+          </div>
         </Tabs.Panel>
       </Tabs>
 
-      {/* Validation error summary */}
-      {Object.keys(errors).length > 0 ? (
-        <div className="mt-6 mb-4 p-3 bg-error/10 rounded text-error text-sm">
-          Please fix the errors above before submitting.
-        </div>
-      ) : null}
-
-      {/* Submission error */}
-      {submitError ? (
-        <div className="mt-6 mb-4 p-3 bg-error/10 rounded text-error text-sm">
-          {submitError}
-        </div>
-      ) : null}
+      {/* Errors (bottom) */}
+      {validationErrorBanner}
+      {submitErrorBanner}
 
       {/* Submit (bottom) */}
       <div className="flex justify-end mt-6">{actionButtons}</div>

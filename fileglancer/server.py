@@ -1786,6 +1786,19 @@ def create_app(settings):
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to read manifest after update: {str(e)}")
 
+        if manifest.repo_url and manifest.repo_url != body.url:
+            try:
+                await apps_module._ensure_repo_cache(
+                    manifest.repo_url,
+                    pull=True,
+                    username=username,
+                )
+            except Exception as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Failed to pull latest app code: {str(e)}",
+                )
+
         branch = await apps_module.get_app_branch(body.url)
 
         with db.get_db_session(settings.db_url) as session:
@@ -1959,6 +1972,7 @@ def create_app(settings):
                 app_url=body.app_url,
                 entry_point_id=body.entry_point_id,
                 parameters=body.parameters,
+                env_parameters=body.env_parameters,
                 resources=resources_dict,
                 extra_args=body.extra_args,
                 manifest_path=body.manifest_path,
@@ -2030,9 +2044,15 @@ def create_app(settings):
     async def delete_job(job_id: int,
                          username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
-            deleted = db.delete_job(session, job_id, username)
-            if not deleted:
+            db_job = db.get_job(session, job_id, username)
+            if db_job is None:
                 raise HTTPException(status_code=404, detail="Job not found")
+            if db_job.status in ("PENDING", "RUNNING"):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Job is active; cancel or stop it before deleting.",
+                )
+            db.delete_job(session, job_id, username)
         return {"message": "Job deleted"}
 
     @app.get("/api/jobs/{job_id}/files/{file_type}",
@@ -2083,6 +2103,7 @@ def create_app(settings):
             entry_point_name=db_job.entry_point_name,
             entry_point_type=db_job.entry_point_type,
             parameters=db_job.parameters,
+            env_parameters=db_job.env_parameters,
             status=db_job.status,
             exit_code=db_job.exit_code,
             resources=db_job.resources,

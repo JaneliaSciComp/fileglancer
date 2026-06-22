@@ -3,14 +3,17 @@
 import os
 import subprocess
 import sys
+import time
 
 import pytest
 from pydantic import ValidationError
 
+from conftest import requires_symlinks
 from fileglancer.model import (
     SUPPORTED_TOOLS,
     AppEntryPoint,
     AppManifest,
+    AppParameter,
     JobSubmitRequest,
 )
 from fileglancer.apps import (
@@ -20,6 +23,13 @@ from fileglancer.apps import (
     _container_sif_name,
     _build_container_script,
     build_command,
+    expand_user_path,
+)
+
+# The `pwd` module is POSIX-only; on Windows `command_mod.pwd` is None, so tests
+# that patch pwd.getpwnam/getpwuid to exercise per-user home resolution cannot run.
+requires_pwd = pytest.mark.skipif(
+    sys.platform == "win32", reason="pwd module is not available on Windows"
 )
 
 
@@ -80,6 +90,32 @@ class TestCondaEnvValidation:
     def test_rejects_path_with_pipe(self):
         with pytest.raises(ValidationError, match="forbidden characters"):
             AppEntryPoint(id="t", name="T", command="echo", conda_env="/opt/env|bad")
+
+
+class TestContainerArgsValidation:
+    def test_valid_args(self):
+        ep = AppEntryPoint(id="t", name="T", command="echo", container_args="--nv --bind /tmp")
+        assert ep.container_args == "--nv --bind /tmp"
+
+    def test_none_is_allowed(self):
+        ep = AppEntryPoint(id="t", name="T", command="echo", container_args=None)
+        assert ep.container_args is None
+
+    def test_rejects_with_semicolon(self):
+        with pytest.raises(ValidationError, match="container_args contains forbidden characters"):
+            AppEntryPoint(id="t", name="T", command="echo", container_args="--nv; rm -rf /")
+
+    def test_rejects_with_backtick(self):
+        with pytest.raises(ValidationError, match="container_args contains forbidden characters"):
+            AppEntryPoint(id="t", name="T", command="echo", container_args="--nv `whoami`")
+
+    def test_rejects_with_dollar(self):
+        with pytest.raises(ValidationError, match="container_args contains forbidden characters"):
+            AppEntryPoint(id="t", name="T", command="echo", container_args="--nv $HOME")
+
+    def test_rejects_with_pipe(self):
+        with pytest.raises(ValidationError, match="container_args contains forbidden characters"):
+            AppEntryPoint(id="t", name="T", command="echo", container_args="--nv | bad")
 
 
 # --- build_requirements_check tests ---
@@ -617,9 +653,9 @@ class TestContainerScriptGeneration:
             command="python run.py",
             work_dir="/work",
             bind_paths=[],
-            container_args="--nv",
+            container_args="--nv --bind 'my dir'",
         )
-        assert "--nv" in script
+        assert "--nv --bind 'my dir' \"$SIF_PATH\"" in script
 
     def test_pull_conditional(self):
         script = _build_container_script(
@@ -751,11 +787,70 @@ class TestBuildCommandTildeExpansion:
         cmd = build_command(entry_point, {"output_dir": "/data/output"})
         assert "/data/output" in cmd
 
+    @requires_pwd
+    def test_tilde_expanded_to_target_user_home(self, entry_point, monkeypatch):
+        """With a username, ~ resolves to that user's home, not the server's."""
+        import fileglancer.apps.command as command_mod
+        fake_pw = SimpleNamespace(pw_dir="/home/alice")
+        monkeypatch.setattr(command_mod.pwd, "getpwnam",
+                            lambda name: fake_pw if name == "alice" else (_ for _ in ()).throw(KeyError(name)))
+        cmd = build_command(entry_point, {"output_dir": "~/data"}, username="alice")
+        assert "/home/alice/data" in cmd
+        assert "~" not in cmd
+
+    def test_uri_passed_through_unchanged(self):
+        """A file/directory param holding a cloud URI is not mangled into a path."""
+        ep = AppEntryPoint(
+            id="test",
+            name="test",
+            command="test_cmd",
+            parameters=[{
+                "key": "input",
+                "name": "Input",
+                "type": "file",
+                "flag": "--input",
+            }],
+        )
+        cmd = build_command(ep, {"input": "s3://bucket/key"})
+        assert "s3://bucket/key" in cmd
+
+
+class TestExpandUserPath:
+    """expand_user_path normalizes file/dir param values consistently."""
+
+    def test_uri_unchanged(self):
+        assert expand_user_path("s3://bucket/key") == "s3://bucket/key"
+        assert expand_user_path("gs://bucket/key") == "gs://bucket/key"
+        assert expand_user_path("https://host/path") == "https://host/path"
+
+    def test_absolute_unchanged(self):
+        assert expand_user_path("/data/output") == "/data/output"
+
+    def test_backslashes_normalized(self):
+        assert expand_user_path("/data\\sub") == "/data/sub"
+
+    @requires_pwd
+    def test_tilde_uses_username_home(self, monkeypatch):
+        import fileglancer.apps.command as command_mod
+        monkeypatch.setattr(command_mod.pwd, "getpwnam",
+                            lambda name: SimpleNamespace(pw_dir="/home/bob"))
+        assert expand_user_path("~/x", username="bob") == "/home/bob/x"
+        assert expand_user_path("~", username="bob") == "/home/bob"
+
+    @requires_pwd
+    def test_unknown_username_falls_back_to_euid(self, monkeypatch):
+        import fileglancer.apps.command as command_mod
+        monkeypatch.setattr(command_mod.pwd, "getpwnam",
+                            lambda name: (_ for _ in ()).throw(KeyError(name)))
+        monkeypatch.setattr(command_mod.pwd, "getpwuid",
+                            lambda uid: SimpleNamespace(pw_dir="/home/server"))
+        assert expand_user_path("~/x", username="ghost") == "/home/server/x"
+
 
 # --- _find_manifests_in_repo adapter fallback tests ---
 
 import fileglancer.apps.adapters as adapters_module
-from fileglancer.apps.manifest import _find_manifests_in_repo
+from fileglancer.apps.manifest import _find_manifests_in_repo, _run_git
 
 
 class _StubAdapter:
@@ -830,3 +925,404 @@ class TestFindManifestsAdapterFallback:
         )
 
         assert _find_manifests_in_repo(tmp_path) == []
+
+
+class TestRunGitTimeout:
+    @pytest.mark.asyncio
+    async def test_timeout_covers_command_runtime(self):
+        start = time.monotonic()
+
+        with pytest.raises(ValueError, match="timed out"):
+            await _run_git(
+                [
+                    sys.executable,
+                    "-c",
+                    "import time; time.sleep(2)",
+                ],
+                timeout=0.1,
+            )
+
+        assert time.monotonic() - start < 1.0
+
+
+from fileglancer.apps.manifest import (
+    validate_manifest_path,
+    _safe_repo_subdir,
+    _parse_github_url,
+    get_app_branch,
+)
+
+
+class TestParseGitHubUrl:
+    def test_branch_name_may_contain_slashes(self):
+        owner, repo, branch = _parse_github_url(
+            "https://github.com/org/tool/tree/feature/my-tool"
+        )
+        assert (owner, repo, branch) == ("org", "tool", "feature/my-tool")
+
+    @pytest.mark.asyncio
+    async def test_get_app_branch_returns_slash_branch_without_remote_lookup(self):
+        branch = await get_app_branch(
+            "https://github.com/org/tool/tree/release/2026-06"
+        )
+        assert branch == "release/2026-06"
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://github.com/org/tool/tree/../escape",
+            "https://github.com/org/tool/tree/feature//bad",
+            "https://github.com/org/tool/tree//absolute-ish",
+        ],
+    )
+    def test_rejects_unsafe_branch_paths(self, url):
+        with pytest.raises(ValueError):
+            _parse_github_url(url)
+
+
+class TestValidateManifestPath:
+    """manifest_path comes from API bodies/query params, so it must be rejected
+    when it could escape the repo clone or inject shell content into the job
+    script."""
+
+    def test_empty_is_root(self):
+        assert validate_manifest_path("") == ""
+
+    def test_simple_relative_paths_pass(self):
+        assert validate_manifest_path("subdir") == "subdir"
+        assert validate_manifest_path("a/b/c") == "a/b/c"
+
+    def test_normalizes_dot_and_redundant_separators(self):
+        assert validate_manifest_path("./a") == "a"
+        assert validate_manifest_path("a//b") == "a/b"
+        assert validate_manifest_path("a/./b") == "a/b"
+
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            "..",
+            "../escape",
+            "a/../../etc/passwd",
+            "/etc/passwd",
+            "/abs/path",
+            "a\\b",
+            "a\x00b",
+        ],
+    )
+    def test_unsafe_paths_rejected(self, bad):
+        with pytest.raises(ValueError):
+            validate_manifest_path(bad)
+
+    def test_shell_metacharacters_allowed_but_contained(self):
+        # Shell metacharacters in a directory name are not a traversal risk and
+        # are neutralized by shlex.quote when used in the job script, so the
+        # validator accepts them (they remain a single path segment).
+        assert validate_manifest_path('weird;$(rm -rf)') == 'weird;$(rm -rf)'
+
+
+class TestSafeRepoSubdir:
+    def test_resolves_within_repo(self, tmp_path):
+        (tmp_path / "sub").mkdir()
+        assert _safe_repo_subdir(tmp_path, "sub") == (tmp_path / "sub").resolve()
+
+    def test_root_when_empty(self, tmp_path):
+        assert _safe_repo_subdir(tmp_path, "") == tmp_path.resolve()
+
+    def test_traversal_rejected(self, tmp_path):
+        with pytest.raises(ValueError):
+            _safe_repo_subdir(tmp_path, "../outside")
+
+    @requires_symlinks
+    def test_symlink_escaping_repo_rejected(self, tmp_path):
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        # A symlink inside the repo that points out of it must not be accepted.
+        (repo / "link").symlink_to(outside)
+        with pytest.raises(ValueError):
+            _safe_repo_subdir(repo, "link")
+
+
+class TestEnumOptionsNormalization:
+    """Enum options may be authored as numbers (e.g. a Nextflow schema enum).
+    They must normalize to strings so the stringifying UI/API round-trips."""
+
+    def test_numeric_options_become_strings(self):
+        param = AppParameter(name="N", type="enum", options=[1, 2, 3])
+        assert param.options == ["1", "2", "3"]
+
+    def test_string_options_unchanged(self):
+        param = AppParameter(name="Mode", type="enum", options=["a", "b"])
+        assert param.options == ["a", "b"]
+
+    def test_none_options_stay_none(self):
+        param = AppParameter(name="S", type="string")
+        assert param.options is None
+
+    def test_numeric_enum_value_validates(self):
+        # The UI submits the selected option as a string; build_command must
+        # accept it against numeric-authored options.
+        ep = AppEntryPoint(
+            id="run",
+            name="run",
+            command="tool",
+            parameters=[
+                AppParameter(flag="--n", name="N", type="enum", options=[1, 2, 3]),
+            ],
+        )
+        cmd = build_command(ep, {"n": "2"})
+        assert "--n 2" in cmd
+
+    def test_invalid_enum_value_rejected(self):
+        ep = AppEntryPoint(
+            id="run",
+            name="run",
+            command="tool",
+            parameters=[
+                AppParameter(flag="--n", name="N", type="enum", options=[1, 2, 3]),
+            ],
+        )
+        with pytest.raises(ValueError):
+            build_command(ep, {"n": "4"})
+
+
+class TestParameterKeyGeneration:
+    """AppEntryPoint auto-generates parameter keys from the flag or a positional
+    index, but honors an explicitly-authored key."""
+
+    def test_flag_derived_key(self):
+        ep = AppEntryPoint(
+            id="r", name="r", command="run",
+            parameters=[AppParameter(flag="--outdir", name="Out", type="string")],
+        )
+        assert ep.flat_parameters()[0].key == "outdir"
+
+    def test_flagless_positional_key(self):
+        ep = AppEntryPoint(
+            id="r", name="r", command="run",
+            parameters=[AppParameter(name="Pos", type="string", raw=True)],
+        )
+        assert ep.flat_parameters()[0].key == "_arg0"
+
+    def test_explicit_key_honored(self):
+        # A flag-less raw arg with an authored key keeps it instead of "_arg0",
+        # so it reads as a real name in the params tab / exported JSON.
+        ep = AppEntryPoint(
+            id="r", name="r", command="run",
+            parameters=[
+                AppParameter(key="extra_args", name="Extra", type="string", raw=True),
+            ],
+        )
+        assert ep.flat_parameters()[0].key == "extra_args"
+
+    def test_same_key_allowed_across_groups(self):
+        # parameters and env_parameters are independent namespaces, so a key may
+        # appear in both (e.g. a pipeline --profile and Nextflow's -profile).
+        ep = AppEntryPoint(
+            id="r", name="r", command="run",
+            parameters=[AppParameter(flag="--profile", name="P", type="string")],
+            env_parameters=[AppParameter(flag="-profile", name="NfP", type="string")],
+        )
+        keys = [p.key for p in ep.flat_parameters()]
+        assert keys.count("profile") == 2
+
+    def test_duplicate_within_group_still_raises(self):
+        with pytest.raises(ValueError, match="Duplicate parameter key"):
+            AppEntryPoint(
+                id="r", name="r", command="run",
+                parameters=[
+                    AppParameter(flag="--profile", name="A", type="string"),
+                    AppParameter(key="profile", name="B", type="string", raw=True),
+                ],
+            )
+
+
+class TestBuildCommandEnvParameterSeparation:
+    """env_parameters resolve from their own value dict, independent of the
+    pipeline parameters namespace even when keys collide."""
+
+    def _ep(self):
+        return AppEntryPoint(
+            id="r", name="r", command="run",
+            parameters=[AppParameter(flag="--profile", name="Pipeline profile", type="string")],
+            env_parameters=[AppParameter(flag="-profile", name="Nextflow profile", type="string")],
+        )
+
+    def test_colliding_keys_resolve_from_own_dict(self):
+        cmd = build_command(
+            self._ep(), {"profile": "pipe"}, env_parameters={"profile": "nf"}
+        )
+        assert "--profile pipe" in cmd
+        assert "-profile nf" in cmd
+
+    def test_env_param_unknown_key_rejected(self):
+        with pytest.raises(ValueError, match="Unknown parameter 'bogus'"):
+            build_command(self._ep(), {}, env_parameters={"bogus": "x"})
+
+
+import json
+
+from fileglancer.apps.nextflow import NextflowAdapter
+
+
+class TestNextflowRunsFromWorkDir:
+    """Auto-detected Nextflow apps must run from the job work dir (against the
+    `repo` symlink), not from inside the shared repo clone, so Nextflow's
+    .nextflow.log / .nextflow/ / work/ artifacts don't pollute the cache."""
+
+    def _make_schema(self, tmp_path):
+        (tmp_path / "nextflow_schema.json").write_text(json.dumps({
+            "description": "Test pipeline",
+            "$defs": {
+                "input": {
+                    "title": "Input",
+                    "properties": {"input_dir": {"type": "string"}},
+                }
+            },
+            "allOf": [{"$ref": "#/$defs/input"}],
+        }))
+
+    def test_runs_repo_from_work_dir(self, tmp_path):
+        self._make_schema(tmp_path)
+        ep = NextflowAdapter().convert(tmp_path).runnables[0]
+        # Clean command (no embedded cd) plus working_dir="work".
+        assert ep.command == "nextflow run repo -ansi-log false"
+        assert ep.working_dir == "work"
+        assert ep.effective_working_dir == "work"
+
+    def test_full_command_keeps_profile_before_pipeline_params(self, tmp_path):
+        self._make_schema(tmp_path)
+        ep = NextflowAdapter().convert(tmp_path).runnables[0]
+        # profile is an env-tab param (separate namespace); pass it via env_parameters.
+        cmd = build_command(
+            ep, {"input_dir": "/data/in"}, env_parameters={"profile": "janeliaLSF"}
+        )
+        assert cmd.startswith("nextflow run repo -ansi-log false")
+        assert cmd.index("-profile") < cmd.index("--input_dir")
+
+    def test_projectdir_default_rewritten_to_repo(self, tmp_path):
+        # Running from the work dir, projectDir assets live under ./repo/, so a
+        # $projectDir-relative schema default must rewrite to ./repo/... The
+        # leading ./ also passes path validation (a bare repo/... is rejected).
+        (tmp_path / "nextflow_schema.json").write_text(json.dumps({
+            "$defs": {
+                "opts": {
+                    "title": "Options",
+                    "properties": {
+                        "multiqc_config": {
+                            "type": "string",
+                            "default": "$projectDir/assets/multiqc_config.yml",
+                        }
+                    },
+                }
+            },
+            "allOf": [{"$ref": "#/$defs/opts"}],
+        }))
+        ep = NextflowAdapter().convert(tmp_path).runnables[0]
+        param = next(p for p in ep.flat_parameters() if p.key == "multiqc_config")
+        assert param.default == "./repo/assets/multiqc_config.yml"
+
+    def test_braced_projectdir_default_rewritten_to_repo(self, tmp_path):
+        # Nextflow also accepts the braced ${projectDir} form (used by nf-core
+        # schemas, e.g. rnaseq's ribo_database_manifest); it must rewrite too.
+        (tmp_path / "nextflow_schema.json").write_text(json.dumps({
+            "$defs": {
+                "opts": {
+                    "title": "Options",
+                    "properties": {
+                        "ribo_database_manifest": {
+                            "type": "string",
+                            "default": "${projectDir}/assets/rrna-db-defaults.txt",
+                        }
+                    },
+                }
+            },
+            "allOf": [{"$ref": "#/$defs/opts"}],
+        }))
+        ep = NextflowAdapter().convert(tmp_path).runnables[0]
+        param = next(p for p in ep.flat_parameters() if p.key == "ribo_database_manifest")
+        assert param.default == "./repo/assets/rrna-db-defaults.txt"
+
+
+class TestNextflowAdapterNaming:
+    def _make_schema(self, tmp_path):
+        (tmp_path / "nextflow_schema.json").write_text(json.dumps({
+            "description": "Test pipeline",
+            "$defs": {},
+            "allOf": [],
+        }))
+
+    def test_standard_naming(self, tmp_path):
+        from unittest.mock import patch
+        cache_base = tmp_path / "cache"
+        repo_dir = cache_base / "nf-core" / "rnaseq" / "main"
+        repo_dir.mkdir(parents=True, exist_ok=True)
+        self._make_schema(repo_dir)
+
+        with patch("fileglancer.apps.manifest._repo_cache_base", return_value=cache_base):
+            manifest = NextflowAdapter().convert(repo_dir)
+            assert manifest.name == "nf-core/rnaseq"
+
+    def test_slashed_branch_naming(self, tmp_path):
+        from unittest.mock import patch
+        cache_base = tmp_path / "cache"
+        repo_dir = cache_base / "nf-core" / "rnaseq" / "feature" / "slashed" / "branch"
+        repo_dir.mkdir(parents=True, exist_ok=True)
+        self._make_schema(repo_dir)
+
+        with patch("fileglancer.apps.manifest._repo_cache_base", return_value=cache_base):
+            manifest = NextflowAdapter().convert(repo_dir)
+            assert manifest.name == "nf-core/rnaseq"
+
+
+class TestEffectiveWorkingDir:
+    """working_dir resolution: explicit wins; containers default to 'work',
+    everything else to 'repo'."""
+
+    def test_default_is_repo(self):
+        ep = AppEntryPoint(id="r", name="r", command="python x.py")
+        assert ep.effective_working_dir == "repo"
+
+    def test_container_defaults_to_work(self):
+        ep = AppEntryPoint(id="r", name="r", command="cowsay hi",
+                           container="godlovedc/lolcow")
+        assert ep.effective_working_dir == "work"
+
+    def test_explicit_overrides_container_default(self):
+        ep = AppEntryPoint(id="r", name="r", command="run.sh",
+                           container="ghcr.io/org/img", working_dir="repo")
+        assert ep.effective_working_dir == "repo"
+
+    def test_explicit_work_without_container(self):
+        ep = AppEntryPoint(id="r", name="r", command="tool", working_dir="work")
+        assert ep.effective_working_dir == "work"
+
+
+from fileglancer.apps.pixi import _task_to_entry_point
+
+
+class TestPixiTaskEnv:
+    """Pixi task env vars must be exposed as entry-point env defaults, not as
+    bogus `--env:VAR` CLI flags that `pixi run` rejects."""
+
+    def test_env_mapped_to_entry_point_env(self):
+        ep = _task_to_entry_point(
+            "build", {"cmd": "make", "env": {"FOO": "bar", "N": 3}}
+        )
+        assert ep.env == {"FOO": "bar", "N": "3"}
+
+    def test_env_not_emitted_as_flags(self):
+        ep = _task_to_entry_point(
+            "build", {"cmd": "make", "env": {"FOO": "bar"}}
+        )
+        # No parameter should carry an --env: flag anymore.
+        assert all(
+            p.flag is None or not p.flag.startswith("--env:")
+            for p in ep.flat_parameters()
+        )
+        assert "--env:" not in build_command(ep, {})
+
+    def test_no_env_leaves_env_none(self):
+        ep = _task_to_entry_point("build", {"cmd": "make"})
+        assert ep.env is None

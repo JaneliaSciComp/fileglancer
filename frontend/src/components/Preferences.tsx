@@ -4,7 +4,6 @@ import DataLinkOptions from '@/components/ui/PreferencesPage/DataLinkOptions';
 import DisplayOptions from '@/components/ui/PreferencesPage/DisplayOptions';
 import JobOptions from '@/components/ui/PreferencesPage/JobOptions';
 import NeuroglancerOptions from '@/components/ui/PreferencesPage/NeuroglancerOptions';
-import ExperimentalOptions from '@/components/ui/PreferencesPage/ExperimentalOptions';
 import PathFormatOptions from '@/components/ui/PreferencesPage/PathFormatOptions';
 
 export default function Preferences() {
@@ -42,15 +41,6 @@ export default function Preferences() {
             </Typography>
             <div className="pl-4 max-w-md">
               <JobOptions />
-            </div>
-          </div>
-
-          <div>
-            <Typography className="font-semibold mb-4" type="lead">
-              Experimental features
-            </Typography>
-            <div className="pl-4 max-w-md">
-              <ExperimentalOptions />
             </div>
           </div>
         </Card.Body>

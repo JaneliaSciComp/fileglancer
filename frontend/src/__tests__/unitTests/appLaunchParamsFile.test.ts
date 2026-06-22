@@ -6,6 +6,7 @@ describe('parseAppLaunchParamsFile', () => {
   it('parses a full params object', () => {
     const text = JSON.stringify({
       parameters: { input: '/data/foo' },
+      env_parameters: { profile: 'janeliaLSF' },
       resources: { cpus: 4, memory: '16 GB' },
       extra_args: '-W 1:00',
       env: { FOO: 'bar' },
@@ -16,6 +17,7 @@ describe('parseAppLaunchParamsFile', () => {
     });
     const parsed = parseAppLaunchParamsFile(text);
     expect(parsed.parameters).toEqual({ input: '/data/foo' });
+    expect(parsed.env_parameters).toEqual({ profile: 'janeliaLSF' });
     expect(parsed.resources).toEqual({ cpus: 4, memory: '16 GB' });
     expect(parsed.env).toEqual({ FOO: 'bar' });
     expect(parsed.container).toBe('docker://img');

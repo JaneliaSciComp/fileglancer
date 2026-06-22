@@ -10,12 +10,6 @@ vi.mock('@/hooks/useActiveJobCount', () => ({
   useActiveJobCount: vi.fn(() => 0)
 }));
 
-vi.mock('@/contexts/PreferencesContext', () => ({
-  usePreferencesContext: vi.fn(() => ({
-    showAppsAndJobsPages: true
-  }))
-}));
-
 vi.mock('@/hooks/useTheme', () => ({
   default: vi.fn(() => ({
     toggleTheme: vi.fn(),
@@ -37,10 +31,8 @@ vi.mock('@/components/ui/widgets/FgTooltip', () => ({
 }));
 
 import { useActiveJobCount } from '@/hooks/useActiveJobCount';
-import { usePreferencesContext } from '@/contexts/PreferencesContext';
 
 const mockedUseActiveJobCount = vi.mocked(useActiveJobCount);
-const mockedUsePreferencesContext = vi.mocked(usePreferencesContext);
 
 function renderNavbar() {
   const queryClient = new QueryClient({
@@ -84,17 +76,5 @@ describe('Navbar badge', () => {
     renderNavbar();
 
     expect(screen.getByText('9+')).toBeInTheDocument();
-  });
-
-  test('badge is not visible when Apps link is hidden', () => {
-    mockedUseActiveJobCount.mockReturnValue(5);
-    mockedUsePreferencesContext.mockReturnValue({
-      showAppsAndJobsPages: false
-    } as ReturnType<typeof usePreferencesContext>);
-
-    renderNavbar();
-
-    expect(screen.queryByText('Apps')).not.toBeInTheDocument();
-    expect(screen.queryByText('5')).not.toBeInTheDocument();
   });
 });

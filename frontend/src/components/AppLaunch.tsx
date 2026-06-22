@@ -26,10 +26,15 @@ import type { AppEntryPoint, AppResourceDefaults } from '@/shared.types';
 import FgButton from './designSystem/atoms/FgButton';
 
 export default function AppLaunch() {
-  const { owner, repo, branch, entryPointId } = useParams<{
+  const {
+    owner,
+    repo,
+    branch: routeBranch,
+    entryPointId: routeEntryPointId
+  } = useParams<{
     owner: string;
     repo: string;
-    branch: string;
+    branch?: string;
     entryPointId?: string;
   }>();
   const [searchParams] = useSearchParams();
@@ -43,11 +48,14 @@ export default function AppLaunch() {
     useState<AppEntryPoint | null>(null);
 
   const manifestPath = searchParams.get('path') || '';
-  const appUrl = buildGithubUrl(owner!, repo!, branch!);
+  const branch = searchParams.get('branch') || routeBranch || 'main';
+  const entryPointId = searchParams.get('entryPointId') || routeEntryPointId;
+  const appUrl = buildGithubUrl(owner!, repo!, branch);
   const isRelaunch = location.pathname.startsWith('/apps/relaunch/');
   const relaunchState = isRelaunch
     ? (location.state as {
         parameters?: Record<string, unknown>;
+        env_parameters?: Record<string, unknown>;
         resources?: Record<string, unknown>;
         env?: Record<string, string>;
         pre_run?: string;
@@ -57,6 +65,7 @@ export default function AppLaunch() {
       } | null)
     : null;
   const relaunchParameters = relaunchState?.parameters;
+  const relaunchEnvParameters = relaunchState?.env_parameters;
   const relaunchResources = relaunchState?.resources as
     | AppResourceDefaults
     | undefined;
@@ -77,11 +86,14 @@ export default function AppLaunch() {
 
   useEffect(() => {
     if (appUrl) {
+      // The manifest identity is (url, manifest_path); reset the selection so
+      // a stale entry point from the previous app isn't carried over.
+      setSelectedEntryPoint(null);
       manifestMutation.mutate({ url: appUrl, manifest_path: manifestPath });
     }
-    // Only fetch on mount
+    // Re-fetch when the app identity (url or manifest path) changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appUrl]);
+  }, [appUrl, manifestPath]);
 
   const manifest = manifestMutation.data;
 
@@ -105,6 +117,7 @@ export default function AppLaunch() {
 
   const handleSubmit = (
     parameters: Record<string, unknown>,
+    envParameters: Record<string, unknown>,
     resources?: AppResourceDefaults,
     extraArgs?: string,
     env?: Record<string, string>,
@@ -123,6 +136,7 @@ export default function AppLaunch() {
         manifest_path: manifestPath,
         entry_point_id: selectedEntryPoint.id,
         parameters,
+        env_parameters: envParameters,
         resources,
         extra_args: extraArgs,
         env,
@@ -132,9 +146,9 @@ export default function AppLaunch() {
         container_args: containerArgs
       },
       {
-        onSuccess: () => {
+        onSuccess: job => {
           toast.success('Job submitted');
-          navigate('/apps/jobs');
+          navigate(`/apps/jobs/${job.id}`);
         }
       }
     );
@@ -219,6 +233,7 @@ export default function AppLaunch() {
           initialContainer={relaunchContainer}
           initialContainerArgs={relaunchContainerArgs}
           initialEnv={relaunchEnv}
+          initialEnvParameters={relaunchEnvParameters}
           initialExtraArgs={relaunchExtraArgs}
           initialPostRun={relaunchPostRun}
           initialPreRun={relaunchPreRun}

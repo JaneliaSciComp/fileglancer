@@ -78,6 +78,7 @@ type AppParameter = {
   max?: number;
   pattern?: string;
   hidden?: boolean;
+  raw?: boolean;
 };
 
 type AppParameterSection = {
@@ -122,7 +123,10 @@ type AppEntryPoint = {
   post_run?: string;
   conda_env?: string;
   container?: string;
+  bind_paths?: string[];
   container_args?: string;
+  working_dir?: 'work' | 'repo';
+  requirements?: string[];
 };
 
 type AppManifest = {
@@ -173,6 +177,7 @@ type Job = {
   entry_point_name: string;
   entry_point_type?: 'job' | 'service';
   parameters: Record<string, unknown>;
+  env_parameters?: Record<string, unknown>;
   status: 'PENDING' | 'RUNNING' | 'DONE' | 'FAILED' | 'KILLED';
   exit_code?: number;
   resources?: Record<string, unknown>;
@@ -198,6 +203,7 @@ type JobSubmitRequest = {
   manifest_path?: string;
   entry_point_id: string;
   parameters: Record<string, unknown>;
+  env_parameters?: Record<string, unknown>;
   resources?: AppResourceDefaults;
   extra_args?: string;
   env?: Record<string, string>;
@@ -215,6 +221,7 @@ type JobSubmitRequest = {
  */
 type AppLaunchParamsFile = {
   parameters?: Record<string, unknown>;
+  env_parameters?: Record<string, unknown>;
   resources?: AppResourceDefaults;
   extra_args?: string;
   env?: Record<string, string>;

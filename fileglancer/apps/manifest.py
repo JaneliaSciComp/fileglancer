@@ -3,7 +3,8 @@
 import asyncio
 import os
 import re
-from pathlib import Path
+from contextlib import suppress
+from pathlib import Path, PurePosixPath
 
 import yaml
 from loguru import logger
@@ -60,7 +61,7 @@ def _parse_github_url(url: str) -> tuple[str, str, str | None]:
     Branch is None when not specified in the URL.
     Raises ValueError if not a valid GitHub repo URL.
     """
-    pattern = r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/tree/([^/]+))?/?$"
+    pattern = r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/tree/(.+?))?/?$"
     match = re.match(pattern, url)
     if not match:
         raise ValueError(
@@ -75,7 +76,13 @@ def _parse_github_url(url: str) -> tuple[str, str, str | None]:
             raise ValueError(
                 f"Invalid app URL: {name} '{value}' contains invalid characters"
             )
-    if branch and (".." in branch or "\x00" in branch):
+    if branch and (
+        ".." in branch
+        or "\x00" in branch
+        or branch.startswith("/")
+        or branch.endswith("/")
+        or "//" in branch
+    ):
         raise ValueError(
             f"Invalid app URL: branch '{branch}' contains invalid characters"
         )
@@ -83,23 +90,90 @@ def _parse_github_url(url: str) -> tuple[str, str, str | None]:
     return owner, repo, branch
 
 
-async def _run_git(args: list[str], timeout: int = 60):
+def validate_manifest_path(manifest_path: str) -> str:
+    """Validate and normalize a user-supplied manifest path.
+
+    A manifest path is a directory path, relative to the repository root, that
+    locates a runnables.yaml (or auto-detected project). It originates from API
+    request bodies and query params, so it must never escape the cloned repo
+    (path traversal) nor carry shell-significant content into the generated job
+    script.
+
+    Returns the normalized relative POSIX path ("" for the repo root). Raises
+    ValueError for NUL bytes, backslashes, absolute paths, or '..' segments.
+    """
+    if not manifest_path:
+        return ""
+    if "\x00" in manifest_path:
+        raise ValueError("manifest_path must not contain NUL bytes")
+    if "\\" in manifest_path:
+        raise ValueError(
+            f"manifest_path must use '/' separators, not '\\': '{manifest_path}'"
+        )
+    pure = PurePosixPath(manifest_path)
+    if pure.is_absolute():
+        raise ValueError(
+            f"manifest_path must be relative, not absolute: '{manifest_path}'"
+        )
+    safe_parts: list[str] = []
+    for part in pure.parts:
+        # PurePosixPath already drops empty and '.' segments.
+        if part == "..":
+            raise ValueError(
+                f"manifest_path must not contain '..' segments: '{manifest_path}'"
+            )
+        safe_parts.append(part)
+    return "/".join(safe_parts)
+
+
+def _safe_repo_subdir(repo_dir: Path, manifest_path: str) -> Path:
+    """Resolve manifest_path under repo_dir, guaranteeing it stays inside.
+
+    Validates the path, joins it with the repo root, resolves symlinks, and
+    asserts the result is contained within the repo (defends against symlinks
+    that resolve outward). Raises ValueError otherwise.
+    """
+    safe = validate_manifest_path(manifest_path)
+    repo_root = repo_dir.resolve()
+    target = (repo_root / safe).resolve() if safe else repo_root
+    # Raises ValueError if target escaped the repo root.
+    target.relative_to(repo_root)
+    return target
+
+
+async def _run_git(args: list[str], timeout: int = 60) -> tuple[bytes, bytes]:
     """Run a git command asynchronously.
 
+    The timeout covers the command's full runtime, not just process creation.
     Raises ValueError with a readable message on failure.
     """
     env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
-    try:
-        proc = await asyncio.wait_for(
-            asyncio.create_subprocess_exec(
+    proc = None
+
+    async def _create_and_communicate() -> tuple[bytes, bytes]:
+        nonlocal proc
+        try:
+            proc = await asyncio.create_subprocess_exec(
                 *args,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
-            ),
+            )
+            return await proc.communicate()
+        except asyncio.CancelledError:
+            if proc is not None:
+                if proc.returncode is None:
+                    with suppress(ProcessLookupError):
+                        proc.kill()
+                with suppress(Exception):
+                    await proc.communicate()
+            raise
+
+    try:
+        stdout, stderr = await asyncio.wait_for(
+            _create_and_communicate(),
             timeout=timeout,
         )
-        stdout, stderr = await proc.communicate()
     except asyncio.TimeoutError:
         raise ValueError(f"Git command timed out after {timeout}s: {' '.join(args)}")
 
@@ -107,31 +181,25 @@ async def _run_git(args: list[str], timeout: int = 60):
         err = stderr.decode().strip() if stderr else "unknown error"
         raise ValueError(f"Git command failed: {err}")
 
+    return stdout, stderr
+
 
 async def _resolve_default_branch(clone_url: str) -> str:
     """Query a remote repo for its default branch (HEAD).
 
     Falls back to 'main' if the remote cannot be queried.
     """
-    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
     try:
-        proc = await asyncio.wait_for(
-            asyncio.create_subprocess_exec(
-                "git", "ls-remote", "--symref", clone_url, "HEAD",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=env,
-            ),
+        stdout, _ = await _run_git(
+            ["git", "ls-remote", "--symref", clone_url, "HEAD"],
             timeout=30,
         )
-        stdout, _ = await proc.communicate()
-        if proc.returncode == 0:
-            # Output: "ref: refs/heads/master\tHEAD\n..."
-            for line in stdout.decode().splitlines():
-                if line.startswith("ref:"):
-                    ref = line.split()[1]
-                    return ref.removeprefix("refs/heads/")
-    except (asyncio.TimeoutError, Exception):
+        # Output: "ref: refs/heads/master\tHEAD\n..."
+        for line in stdout.decode().splitlines():
+            if line.startswith("ref:"):
+                ref = line.split()[1]
+                return ref.removeprefix("refs/heads/")
+    except Exception:
         pass
     return "main"
 
@@ -306,12 +374,15 @@ async def fetch_app_manifest(url: str, manifest_path: str = "",
     When username is provided, the work is delegated to a worker subprocess
     running as the target user.
     """
+    # Reject traversal/unsafe input early, before any worker round-trip.
+    validate_manifest_path(manifest_path)
+
     if username:
         result = await _dispatch(username, "read_manifest", url=url, manifest_path=manifest_path)
         return AppManifest(**result["manifest"])
 
     repo_dir = await _ensure_repo_cache(url)
-    target_dir = repo_dir / manifest_path if manifest_path else repo_dir
+    target_dir = _safe_repo_subdir(repo_dir, manifest_path)
     return _read_manifest_file(target_dir)
 
 
@@ -400,8 +471,8 @@ async def get_app_branch(url: str) -> str:
 
     If the URL doesn't specify a branch, resolves the remote's default branch.
     """
-    _, _, branch = _parse_github_url(url)
+    owner, repo, branch = _parse_github_url(url)
     if not branch:
-        clone_url = re.sub(r"(/tree/[^/]+)?/?$", ".git", url)
+        clone_url = f"https://github.com/{owner}/{repo}.git"
         branch = await _resolve_default_branch(clone_url)
     return branch

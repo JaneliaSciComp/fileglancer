@@ -22,12 +22,15 @@ from fileglancer.apps.manifest import (
     _dispatch,
     _ensure_repo_cache,
     get_or_load_manifest,
+    validate_manifest_path,
 )
 from fileglancer.apps.command import (
     build_command,
     build_requirements_check,
+    expand_user_path,
     merge_requirements,
     _ENV_VAR_NAME_PATTERN,
+    _URI_PREFIXES,
 )
 from fileglancer.apps.jobfiles import _build_work_dir
 from fileglancer.model import AppEntryPoint
@@ -400,7 +403,11 @@ def _build_container_script(
     all_binds = sorted(set([work_dir] + bind_paths))
     bind_flags = " ".join(f"--bind {shlex.quote(p)}" for p in all_binds)
 
-    extra = f" {container_args}" if container_args else ""
+    extra = ""
+    if container_args:
+        # Split container_args using shlex.split and shell-escape each argument
+        split_args = shlex.split(container_args)
+        extra = " " + " ".join(shlex.quote(arg) for arg in split_args)
 
     resolved_dir = shlex.quote(cache_dir) if cache_dir else _DEFAULT_CONTAINER_CACHE_DIR
 
@@ -423,6 +430,7 @@ async def submit_job(
     app_url: str,
     entry_point_id: str,
     parameters: dict,
+    env_parameters: Optional[dict] = None,
     resources: Optional[dict] = None,
     extra_args: Optional[str] = None,
     manifest_path: str = "",
@@ -440,9 +448,15 @@ async def submit_job(
     """
     settings = get_settings()
 
+    # Reject traversal/unsafe manifest paths before they reach disk reads or
+    # the generated job script. get_or_load_manifest may serve a cached row
+    # without hitting fetch_app_manifest, so validate here too.
+    validate_manifest_path(manifest_path)
+
     # A null parameter value means "not provided"; drop these so they are
     # neither used when building the command nor stored on the job record.
     parameters = {k: v for k, v in parameters.items() if v is not None}
+    env_parameters = {k: v for k, v in (env_parameters or {}).items() if v is not None}
 
     # Read manifest from the cache when available; fall back to disk.
     manifest = await get_or_load_manifest(username, app_url, manifest_path)
@@ -466,7 +480,7 @@ async def submit_job(
 
     # Build command (with DB session for path validation against file shares)
     with db.get_db_session(settings.db_url) as session:
-        command = build_command(entry_point, parameters, session=session)
+        command = build_command(entry_point, parameters, env_parameters, session=session, username=username)
 
     # Build resource spec (extra_args passed separately, not from manifest)
     overrides = dict(resources) if resources else {}
@@ -514,6 +528,7 @@ async def submit_job(
             entry_point_name=entry_point.name,
             entry_point_type=entry_point.type,
             parameters=parameters,
+            env_parameters=env_parameters or None,
             resources=resources_dict,
             manifest_path=manifest_path,
             env=merged_env or None,
@@ -578,7 +593,15 @@ async def submit_job(
         preamble_lines.append(f"export PATH=$PATH:{path_suffix}")
     if entry_point.type == "service":
         preamble_lines.append('export SERVICE_URL_PATH="$FG_WORK_DIR/service_url"')
-    preamble_lines.append(f'cd "$FG_WORK_DIR/{cd_suffix}"')
+    # Choose the working directory. 'work' runs from the job's work dir (the
+    # repo is still reachable via the `repo` symlink); 'repo' runs from the
+    # cloned project (optionally the manifest's subdirectory). cd_suffix may
+    # include a Git-derived directory name, so shell-escape it — FG_WORK_DIR
+    # stays in its own double-quoted segment so it still expands.
+    if entry_point.effective_working_dir == "work":
+        preamble_lines.append('cd "$FG_WORK_DIR"')
+    else:
+        preamble_lines.append(f'cd "$FG_WORK_DIR"/{shlex.quote(cd_suffix)}')
     script_parts = ["\n".join(preamble_lines)]
 
     # Conda environment activation
@@ -595,7 +618,13 @@ async def submit_job(
         for param in entry_point.flat_parameters():
             if param.type in ("file", "directory") and param.key in parameters:
                 path_val = str(parameters[param.key])
-                expanded = os.path.expanduser(path_val)
+                # Expand ~ against the user's home (same normalization as the
+                # command). Skip cloud-storage URIs and anything that isn't an
+                # absolute local path — those are not bind-mountable and would
+                # otherwise produce garbage binds (e.g. s3://bucket/k -> s3:/bucket).
+                expanded = expand_user_path(path_val, username)
+                if expanded.startswith(_URI_PREFIXES) or not expanded.startswith("/"):
+                    continue
                 if param.type == "directory":
                     bind_paths.append(expanded)
                 else:

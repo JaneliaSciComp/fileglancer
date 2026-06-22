@@ -209,11 +209,11 @@ function InfoCard({
   readonly children: ReactNode;
 }) {
   return (
-    <div>
+    <div className="flex flex-col h-full">
       <Typography className="text-foreground font-bold mb-1">
         {title}
       </Typography>
-      <Card className="p-3 dark:border-surface-light">{children}</Card>
+      <Card className="p-3 dark:border-surface-light grow">{children}</Card>
     </div>
   );
 }
@@ -438,6 +438,7 @@ export default function JobDetail() {
   const cancelMutation = useCancelJobMutation();
 
   const isService = jobQuery.data?.entry_point_type === 'service';
+  const isActive = jobStatus === 'PENDING' || jobStatus === 'RUNNING';
 
   useEffect(() => {
     const checkDarkMode = () => {
@@ -464,6 +465,12 @@ export default function JobDetail() {
     const parameters = omitNullValues(job.parameters);
     if (Object.keys(parameters).length > 0) {
       params.parameters = parameters;
+    }
+    const envParameters = job.env_parameters
+      ? omitNullValues(job.env_parameters)
+      : {};
+    if (Object.keys(envParameters).length > 0) {
+      params.env_parameters = envParameters;
     }
     const resources = job.resources ? omitNullValues(job.resources) : {};
     if (Object.keys(resources).length > 0) {
@@ -502,6 +509,7 @@ export default function JobDetail() {
     navigate(path, {
       state: {
         parameters: job.parameters,
+        env_parameters: job.env_parameters,
         resources: job.resources,
         env: job.env,
         pre_run: job.pre_run,
@@ -572,13 +580,27 @@ export default function JobDetail() {
                 >
                   Export params
                 </FgButton>
-                <FgButton
-                  icon={HiOutlineRefresh}
-                  onClick={handleRelaunch}
-                  variant="outline"
-                >
-                  Relaunch
-                </FgButton>
+                {isActive ? (
+                  <FgButton
+                    color="error"
+                    disabled={cancelMutation.isPending}
+                    icon={HiOutlineStop}
+                    loading={cancelMutation.isPending}
+                    loadingText="Cancelling"
+                    onClick={() => setShowStopConfirm(true)}
+                    variant="outline"
+                  >
+                    Cancel
+                  </FgButton>
+                ) : (
+                  <FgButton
+                    icon={HiOutlineRefresh}
+                    onClick={handleRelaunch}
+                    variant="outline"
+                  >
+                    Relaunch
+                  </FgButton>
+                )}
               </div>
             </div>
           </div>
@@ -650,37 +672,38 @@ export default function JobDetail() {
             )
           ) : null}
 
-          {/* Stop Service confirmation dialog */}
+          {/* Cancel/Stop confirmation dialog */}
           <FgDialog
             onClose={() => setShowStopConfirm(false)}
             open={showStopConfirm}
           >
             <Typography className="text-foreground font-bold mb-2" type="h6">
-              Stop Service
+              {isService ? 'Stop Service' : 'Cancel Job'}
             </Typography>
             <Typography className="text-foreground mb-4">
-              Are you sure you want to stop this service? It will be terminated
-              and the URL will no longer be accessible.
+              {isService
+                ? 'Are you sure you want to stop this service? It will be terminated and the URL will no longer be accessible.'
+                : 'Are you sure you want to cancel this job? It will be terminated.'}
             </Typography>
             <div className="flex justify-end gap-2">
               <FgButton
                 onClick={() => setShowStopConfirm(false)}
                 variant="ghost"
               >
-                Cancel
+                Keep running
               </FgButton>
               <FgButton
                 color="error"
                 disabled={cancelMutation.isPending}
                 icon={HiOutlineStop}
                 loading={cancelMutation.isPending}
-                loadingText="Stopping..."
+                loadingText={isService ? 'Stopping...' : 'Cancelling...'}
                 onClick={() => {
                   cancelMutation.mutate(job.id);
                   setShowStopConfirm(false);
                 }}
               >
-                Stop Service
+                {isService ? 'Stop Service' : 'Cancel Job'}
               </FgButton>
             </div>
           </FgDialog>
@@ -735,6 +758,15 @@ export default function JobDetail() {
                   sections.push({
                     title: 'Parameters',
                     entries: Object.entries(parameters)
+                  });
+                }
+                const envParameters = job.env_parameters
+                  ? omitNullValues(job.env_parameters)
+                  : {};
+                if (Object.keys(envParameters).length > 0) {
+                  sections.push({
+                    title: 'Environment parameters',
+                    entries: Object.entries(envParameters)
                   });
                 }
                 const resources = job.resources

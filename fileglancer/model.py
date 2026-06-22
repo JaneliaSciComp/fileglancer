@@ -334,7 +334,7 @@ class AppParameter(BaseModel):
     description: Optional[str] = Field(description="Description of the parameter", default=None)
     required: bool = Field(description="Whether the parameter is required", default=False)
     default: Optional[Any] = Field(description="Default value for the parameter", default=None)
-    options: Optional[List[str|int|float]] = Field(description="Allowed values for enum type", default=None)
+    options: Optional[List[str]] = Field(description="Allowed values for enum type", default=None)
     min: Optional[float] = Field(description="Minimum value for numeric types", default=None)
     max: Optional[float] = Field(description="Maximum value for numeric types", default=None)
     pattern: Optional[str] = Field(description="Regex validation pattern for string types", default=None)
@@ -351,6 +351,17 @@ class AppParameter(BaseModel):
             if not stripped:
                 raise ValueError("Flag must have content after dashes")
         return v
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def stringify_options(cls, v):
+        # Enum options may be authored as numbers (e.g. a Nextflow schema with
+        # "enum": [1, 2]). The UI <select> stringifies values and backend
+        # validation compares str(value), so normalize options to strings here
+        # so numeric enums round-trip instead of failing validation.
+        if v is None:
+            return v
+        return [str(item) for item in v]
 
 
 class AppParameterSection(BaseModel):
@@ -416,6 +427,15 @@ class AppEntryPoint(BaseModel):
         description="Default extra arguments for container exec (e.g. '--nv')",
         default=None,
     )
+    working_dir: Optional[Literal["work", "repo"]] = Field(
+        description=(
+            "Directory the command runs from: 'repo' (the cloned project, "
+            "optionally the manifest's subdirectory) or 'work' (the job's work "
+            "directory). Defaults to 'work' for container entry points and "
+            "'repo' otherwise."
+        ),
+        default=None,
+    )
     requirements: List[str] = Field(
         description="Required tools for this entry point, e.g. ['apptainer']. Merged with manifest-level requirements.",
         default=[],
@@ -464,6 +484,27 @@ class AppEntryPoint(BaseModel):
                 raise ValueError(f"bind_paths entry contains forbidden characters: {p!r}")
         return v
 
+    @field_validator("container_args")
+    @classmethod
+    def validate_container_args(cls, v):
+        if v is None:
+            return v
+        if _SHELL_METACHAR_PATTERN.search(v):
+            raise ValueError(f"container_args contains forbidden characters: {v!r}")
+        return v
+
+    @property
+    def effective_working_dir(self) -> str:
+        """Resolve where the command runs: 'work' or 'repo'.
+
+        An explicit working_dir wins; otherwise container entry points default
+        to 'work' (the repo clone isn't bind-mounted into the container, but the
+        work dir always is) and everything else defaults to 'repo'.
+        """
+        if self.working_dir:
+            return self.working_dir
+        return "work" if self.container else "repo"
+
     def flat_parameters(self) -> List[AppParameter]:
         """Return a flat list of all parameters, traversing sections."""
         result = []
@@ -476,20 +517,31 @@ class AppEntryPoint(BaseModel):
 
     @model_validator(mode='after')
     def generate_parameter_keys(self):
-        positional_index = 0
-        keys_seen: dict[str, str] = {}
-        for param in self.flat_parameters():
-            if param.flag is not None:
-                param.key = param.flag.lstrip("-")
-            else:
-                param.key = f"_arg{positional_index}"
-                positional_index += 1
-            if param.key in keys_seen:
-                raise ValueError(
-                    f"Duplicate parameter key '{param.key}' "
-                    f"(from '{param.name}' and '{keys_seen[param.key]}')"
-                )
-            keys_seen[param.key] = param.name
+        # `parameters` and `env_parameters` are independent namespaces whose
+        # values travel in separate dicts end-to-end, so keys must be unique
+        # *within* each group but may legitimately repeat across groups (e.g. a
+        # pipeline `--profile` param alongside Nextflow's injected `-profile`).
+        for group in (self.parameters, self.env_parameters):
+            positional_index = 0
+            keys_seen: dict[str, str] = {}
+            for item in group:
+                params = item.parameters if isinstance(item, AppParameterSection) else [item]
+                for param in params:
+                    if param.key:
+                        # Honor an explicitly-authored key (e.g. flag-less raw
+                        # args that want a readable name instead of "_argN").
+                        pass
+                    elif param.flag is not None:
+                        param.key = param.flag.lstrip("-")
+                    else:
+                        param.key = f"_arg{positional_index}"
+                        positional_index += 1
+                    if param.key in keys_seen:
+                        raise ValueError(
+                            f"Duplicate parameter key '{param.key}' "
+                            f"(from '{param.name}' and '{keys_seen[param.key]}')"
+                        )
+                    keys_seen[param.key] = param.name
         return self
 
     @model_validator(mode='after')
@@ -674,6 +726,10 @@ class Job(BaseModel):
     entry_point_name: str = Field(description="Display name of the entry point")
     entry_point_type: str = Field(description="Whether this is a batch job or long-running service", default="job")
     parameters: Dict = Field(description="Parameters used for the job")
+    env_parameters: Optional[Dict] = Field(
+        description="Environment-tab parameter values (separate namespace from parameters)",
+        default=None,
+    )
     status: str = Field(description="Job status (PENDING, RUNNING, DONE, FAILED, KILLED)")
     exit_code: Optional[int] = Field(description="Exit code of the job", default=None)
     resources: Optional[Dict] = Field(description="Requested resources", default=None)
@@ -700,6 +756,10 @@ class JobSubmitRequest(BaseModel):
     manifest_path: str = Field(description="Relative manifest path within the app repo", default="")
     entry_point_id: str = Field(description="Entry point to execute")
     parameters: Dict = Field(description="Parameter values keyed by parameter key")
+    env_parameters: Dict = Field(
+        description="Environment-tab parameter values, keyed by parameter key (separate namespace from parameters)",
+        default={},
+    )
     resources: Optional[AppResourceDefaults] = Field(description="Resource overrides", default=None)
     extra_args: Optional[str] = Field(description="Extra CLI args for the submit command (replaces config defaults)", default=None)
     env: Optional[Dict[str, str]] = Field(description="Environment variables to export", default=None)
@@ -719,6 +779,20 @@ class JobSubmitRequest(BaseModel):
     def validate_extra_args(cls, v):
         if v is not None and _SHELL_METACHAR_PATTERN.search(v):
             raise ValueError(f"extra_args contains forbidden characters: {v!r}")
+        return v
+
+    @field_validator("container")
+    @classmethod
+    def validate_container(cls, v):
+        if v is not None and _SHELL_METACHAR_PATTERN.search(v):
+            raise ValueError(f"container contains forbidden characters: {v!r}")
+        return v
+
+    @field_validator("container_args")
+    @classmethod
+    def validate_container_args(cls, v):
+        if v is not None and _SHELL_METACHAR_PATTERN.search(v):
+            raise ValueError(f"container_args contains forbidden characters: {v!r}")
         return v
 
 

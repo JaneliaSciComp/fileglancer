@@ -158,3 +158,8 @@ notifications.yaml
 
 *storybook.log
 storybook-static
+
+# Nextflow artifacts (e.g. from running an app locally during dev).
+# *.log catches .nextflow.log but not the rotated .nextflow.log.1 etc.
+.nextflow/
+.nextflow.log*

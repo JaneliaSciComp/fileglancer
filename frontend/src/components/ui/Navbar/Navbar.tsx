@@ -30,7 +30,6 @@ import ProfileMenu from '@/components/ui/Navbar/ProfileMenu';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import useTheme from '@/hooks/useTheme';
 import { useActiveJobCount } from '@/hooks/useActiveJobCount';
-import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { trackEvent } from '@/utils/fathom';
 
 type NavLink = {
@@ -74,7 +73,6 @@ function LogoSvg() {
 
 // Links list component
 function NavList() {
-  const { showAppsAndJobsPages } = usePreferencesContext();
   const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
   const activeJobCount = useActiveJobCount();
 
@@ -93,9 +91,6 @@ function NavList() {
   ];
 
   const filteredLinks = links.filter(link => {
-    if (link.href === '/apps' && !showAppsAndJobsPages) {
-      return false;
-    }
     if (link.href === '/jobs' && !tasksEnabled) {
       return false;
     }
