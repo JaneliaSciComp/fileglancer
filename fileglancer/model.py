@@ -484,6 +484,15 @@ class AppEntryPoint(BaseModel):
                 raise ValueError(f"bind_paths entry contains forbidden characters: {p!r}")
         return v
 
+    @field_validator("container_args")
+    @classmethod
+    def validate_container_args(cls, v):
+        if v is None:
+            return v
+        if _SHELL_METACHAR_PATTERN.search(v):
+            raise ValueError(f"container_args contains forbidden characters: {v!r}")
+        return v
+
     @property
     def effective_working_dir(self) -> str:
         """Resolve where the command runs: 'work' or 'repo'.
@@ -770,6 +779,20 @@ class JobSubmitRequest(BaseModel):
     def validate_extra_args(cls, v):
         if v is not None and _SHELL_METACHAR_PATTERN.search(v):
             raise ValueError(f"extra_args contains forbidden characters: {v!r}")
+        return v
+
+    @field_validator("container")
+    @classmethod
+    def validate_container(cls, v):
+        if v is not None and _SHELL_METACHAR_PATTERN.search(v):
+            raise ValueError(f"container contains forbidden characters: {v!r}")
+        return v
+
+    @field_validator("container_args")
+    @classmethod
+    def validate_container_args(cls, v):
+        if v is not None and _SHELL_METACHAR_PATTERN.search(v):
+            raise ValueError(f"container_args contains forbidden characters: {v!r}")
         return v
 
 

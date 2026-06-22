@@ -86,6 +86,32 @@ class TestCondaEnvValidation:
             AppEntryPoint(id="t", name="T", command="echo", conda_env="/opt/env|bad")
 
 
+class TestContainerArgsValidation:
+    def test_valid_args(self):
+        ep = AppEntryPoint(id="t", name="T", command="echo", container_args="--nv --bind /tmp")
+        assert ep.container_args == "--nv --bind /tmp"
+
+    def test_none_is_allowed(self):
+        ep = AppEntryPoint(id="t", name="T", command="echo", container_args=None)
+        assert ep.container_args is None
+
+    def test_rejects_with_semicolon(self):
+        with pytest.raises(ValidationError, match="container_args contains forbidden characters"):
+            AppEntryPoint(id="t", name="T", command="echo", container_args="--nv; rm -rf /")
+
+    def test_rejects_with_backtick(self):
+        with pytest.raises(ValidationError, match="container_args contains forbidden characters"):
+            AppEntryPoint(id="t", name="T", command="echo", container_args="--nv `whoami`")
+
+    def test_rejects_with_dollar(self):
+        with pytest.raises(ValidationError, match="container_args contains forbidden characters"):
+            AppEntryPoint(id="t", name="T", command="echo", container_args="--nv $HOME")
+
+    def test_rejects_with_pipe(self):
+        with pytest.raises(ValidationError, match="container_args contains forbidden characters"):
+            AppEntryPoint(id="t", name="T", command="echo", container_args="--nv | bad")
+
+
 # --- build_requirements_check tests ---
 
 def _make_fake_tool(directory, name, version_output):
@@ -621,9 +647,9 @@ class TestContainerScriptGeneration:
             command="python run.py",
             work_dir="/work",
             bind_paths=[],
-            container_args="--nv",
+            container_args="--nv --bind 'my dir'",
         )
-        assert "--nv" in script
+        assert "--nv --bind 'my dir' \"$SIF_PATH\"" in script
 
     def test_pull_conditional(self):
         script = _build_container_script(

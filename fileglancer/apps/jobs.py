@@ -403,7 +403,11 @@ def _build_container_script(
     all_binds = sorted(set([work_dir] + bind_paths))
     bind_flags = " ".join(f"--bind {shlex.quote(p)}" for p in all_binds)
 
-    extra = f" {container_args}" if container_args else ""
+    extra = ""
+    if container_args:
+        # Split container_args using shlex.split and shell-escape each argument
+        split_args = shlex.split(container_args)
+        extra = " " + " ".join(shlex.quote(arg) for arg in split_args)
 
     resolved_dir = shlex.quote(cache_dir) if cache_dir else _DEFAULT_CONTAINER_CACHE_DIR
 
