@@ -1,50 +1,35 @@
 #!/bin/bash
 set -e
 
-# Fix ownership of .pixi volume (created as root by Docker)
-sudo chown -R "$(id -u):$(id -g)" .pixi 2>/dev/null || true
+# This phase runs as the unprivileged vscode user, AFTER the root entrypoint has
+# brought up the egress firewall. It has NO sudo and NO access to non-allowlisted
+# CDNs: Claude, Codex, the Playwright browser, and the firewall are all handled
+# at image-build / entrypoint time. Only steps that need the mounted workspace
+# remain, and they hit only allowlisted endpoints (pypi/conda/prefix.dev/npm).
 
-# Initialize pixi environment and install package dependencies
-echo "Installing pixi environment..."
-pixi install
+# Wait for the entrypoint's firewall to be in place before any network access.
+echo "Waiting for egress firewall to come up..."
+for _ in $(seq 1 60); do
+    [ -f /run/fg-firewall-ready ] && break
+    sleep 1
+done
+if [ ! -f /run/fg-firewall-ready ]; then
+    echo "ERROR: firewall readiness flag not found; aborting setup" >&2
+    exit 1
+fi
 
-# Install fileglancer in development mode (builds frontend + installs Python package)
-echo "Running dev-install (this builds frontend and installs the package)..."
+# Install the pixi environment from the lockfile (no resolution drift).
+echo "Installing pixi environment (locked)..."
+pixi install --locked
+
+# Build the frontend and install the Python package in development mode.
+echo "Running dev-install (frontend build + Python package)..."
 pixi run dev-install
 
-# Install Playwright browsers for UI tests (before firewall, as CDN IPs are dynamic)
-echo "Installing Playwright browsers..."
+# Install UI-test JS deps (the @playwright/test package). The matching browser
+# is already baked into the image at PLAYWRIGHT_BROWSERS_PATH.
+echo "Installing UI-test dependencies..."
 pixi run node-install-ui-tests
-cd frontend/ui-tests && pixi run npx playwright install
-
-# Install Claude Code via the native installer (before firewall, since claude.ai
-# CDN isn't in the allowlist). Installs to ~/.local/bin/claude, matching the
-# "installMethod: native" recorded in the bind-mounted ~/.claude.json from the host.
-if ! [ -x "$HOME/.local/bin/claude" ]; then
-    echo "Installing Claude Code (native)..."
-    curl -fsSL https://claude.ai/install.sh | bash
-fi
-
-# Initialize network firewall (restricts outbound to allowed domains)
-# This must happen AFTER Playwright and Claude installs since their CDN IPs are dynamic
-echo "Initializing network firewall..."
-sudo /usr/local/bin/init-firewall.sh
-
-# Install Codex CLI globally via npm (provided by pixi)
-if ! command -v codex &> /dev/null; then
-    echo "Installing Codex CLI..."
-    pixi run npm install -g @openai/codex
-fi
-
-# Lock down the firewall: now that setup is complete, revoke the vscode user's
-# passwordless sudo. The agent runs as unprivileged vscode, which cannot touch
-# iptables/ipset without root, so the egress allowlist can no longer be flushed
-# or bypassed from inside the container. NET_ADMIN/NET_RAW remain in the image
-# but are unusable without root, so this neutralizes them for the agent.
-# For maintenance you can still get a root shell from the HOST side:
-#   podman exec -u root <container> bash   (or: docker exec -u root ...)
-echo "Revoking in-container sudo to lock the firewall..."
-sudo rm -f /etc/sudoers.d/vscode
 
 echo ""
 echo "=========================================="

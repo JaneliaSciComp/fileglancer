@@ -40,8 +40,14 @@
   "remoteEnv": {
     "NODE_OPTIONS": "--max-old-space-size=2048",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-    "CLAUDE_CODE_DISABLE_ANALYTICS": "1"
+    "CLAUDE_CODE_DISABLE_ANALYTICS": "1",
+    "PLAYWRIGHT_BROWSERS_PATH": "/opt/ms-playwright"
   },
   "postCreateCommand": "bash .devcontainer/post-create.sh",
+  // Start the container as root so the entrypoint can initialize the firewall
+  // and fix volume ownership; all lifecycle commands and shells still run as the
+  // unprivileged vscode user. overrideCommand=false lets our ENTRYPOINT/CMD run.
+  "overrideCommand": false,
+  "containerUser": "root",
   "remoteUser": "vscode"
 }
