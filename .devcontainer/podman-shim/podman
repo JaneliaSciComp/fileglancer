@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Podman shim, used ONLY on the rootless-Podman path (wired up by dc.sh via
+# --docker-path). It must be named `podman` so the devcontainers CLI still
+# detects the Podman runtime.
+#
+# Why this exists: the CLI forces `--userns=keep-id` on `podman run`, which maps
+# the host user onto the SAME uid inside the container (e.g. 990465). We disable
+# the CLI's uid-renumber step because making it succeed would require a subuid
+# range of ~1,000,000 ids, which on this shared LDAP host would overlap real
+# users' uids. Instead we upgrade the flag to keep-id:uid=1000,gid=1000 so the
+# host user maps onto the container's vscode user (uid/gid 1000). Bind-mounted
+# files then appear owned by vscode and are writable, using only the existing
+# small subuid range. Every other invocation passes straight through.
+set -euo pipefail
+
+PODMAN_BIN="${FG_PODMAN_BIN:-/usr/bin/podman}"
+
+if [[ "${1:-}" == "run" ]]; then
+  rewritten=()
+  for arg in "$@"; do
+    case "$arg" in
+      --userns=keep-id) arg="--userns=keep-id:uid=1000,gid=1000" ;;
+    esac
+    rewritten+=("$arg")
+  done
+  exec "$PODMAN_BIN" "${rewritten[@]}"
+fi
+
+exec "$PODMAN_BIN" "$@"
