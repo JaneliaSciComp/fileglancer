@@ -1890,6 +1890,8 @@ def create_app(settings):
                 )
             listing_url = listing.url
             listing_manifest_path = listing.manifest_path
+            listing_name = listing.name
+            listing_description = listing.description
 
         try:
             manifest = await apps_module.fetch_app_manifest(
@@ -1909,7 +1911,7 @@ def create_app(settings):
             row = db.upsert_user_app(
                 session, username,
                 url=listing_url, manifest_path=listing_manifest_path,
-                name=manifest.name, description=manifest.description,
+                name=listing_name, description=listing_description,
                 branch=branch,
                 manifest=manifest.model_dump(mode="json"),
             )

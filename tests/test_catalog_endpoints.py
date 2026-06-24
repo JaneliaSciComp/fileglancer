@@ -337,9 +337,13 @@ def test_delete_listing_rejects_non_owner(client_factory, db_session):
 def test_add_from_listing_creates_independent_user_app(
     client_factory, db_session
 ):
-    """Adopter cloning the listing gets their own user_app row with a fresh
-    manifest fetched from disk — not the listing's snapshot (there is none)."""
-    listing = _seed_listing(db_session, owner_username=OWNER)
+    """Adopter cloning the listing gets their own user_app row that preserves
+    the listing's custom name/description, while the manifest itself is freshly
+    fetched from disk."""
+    listing = _seed_listing(
+        db_session, owner_username=OWNER,
+        name="Custom Name", description="Custom description",
+    )
     fresh = _make_manifest(name="Fetched", description="From disk")
 
     client = client_factory(ADOPTER)
@@ -354,14 +358,16 @@ def test_add_from_listing_creates_independent_user_app(
 
     assert response.status_code == 200
     body = response.json()
-    assert body["name"] == "Fetched"
-    assert body["description"] == "From disk"
+    assert body["name"] == "Custom Name"
+    assert body["description"] == "Custom description"
     assert body["branch"] == "main"
     assert body["manifest"]["name"] == "Fetched"
 
     rows = list_user_apps(db_session, ADOPTER)
     assert len(rows) == 1
     assert rows[0].url == "https://github.com/owner/repo"
+    assert rows[0].name == "Custom Name"
+    assert rows[0].description == "Custom description"
 
 
 def test_add_from_listing_rejects_when_already_added(
