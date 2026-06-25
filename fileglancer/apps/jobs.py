@@ -27,6 +27,7 @@ from fileglancer.apps.manifest import (
 from fileglancer.apps.command import (
     build_command,
     build_requirements_check,
+    collect_path_parameters,
     expand_user_path,
     merge_requirements,
     _ENV_VAR_NAME_PATTERN,
@@ -478,9 +479,32 @@ async def submit_job(
         manifest.requirements, entry_point.requirements
     )
 
-    # Build command (with DB session for path validation against file shares)
+    # Build command (with DB session for path validation against file shares).
+    # check_access=False because this runs on the root server, which can't
+    # reliably stat the user's files (root-squash NFS makes group-readable paths
+    # appear absent). Only euid-independent checks — syntax and file-share
+    # containment — run here; exists/readable is validated as the user below.
     with db.get_db_session(settings.db_url) as session:
-        command = build_command(entry_point, parameters, env_parameters, session=session, username=username)
+        command = build_command(entry_point, parameters, env_parameters,
+                                session=session, username=username, check_access=False)
+
+    # Authoritative per-user path validation: check that file/directory params
+    # exist and are readable, run in the setuid worker as the target user. This
+    # is the same fix applied to data links in commit f9858f48 — the server runs
+    # as a service account that isn't in the user's groups, so a redundant
+    # server-side check would wrongly reject (or, on local FS, wrongly accept)
+    # paths the user can actually access.
+    path_params = collect_path_parameters(entry_point, parameters, env_parameters)
+    if path_params:
+        paths_to_check = {str(i): value for i, (_, _, value) in enumerate(path_params)}
+        validation = await _dispatch(username, "validate_paths", paths=paths_to_check)
+        errors = (validation or {}).get("errors") or {}
+        if errors:
+            # Report the first failure, keyed back to its parameter name, to
+            # match the single-message format build_command would have raised.
+            idx = min(int(i) for i in errors)
+            _, param_name, _ = path_params[idx]
+            raise ValueError(f"Parameter '{param_name}': {errors[str(idx)]}")
 
     # Build resource spec (extra_args passed separately, not from manifest)
     overrides = dict(resources) if resources else {}

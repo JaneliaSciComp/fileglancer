@@ -268,12 +268,21 @@ def validate_path_for_shell(path_value: str) -> str | None:
     return None
 
 
-def validate_path_in_filestore(path_value: str, fsps: list) -> str | None:
-    """Validate a path exists and is readable within an allowed file share.
+def validate_path_in_filestore(path_value: str, fsps: list, check_access: bool = True) -> str | None:
+    """Validate a path within an allowed file share.
 
-    Performs syntax checks, then resolves the path against the given list of
-    file share paths. Returns an error message string if invalid, or None if
-    valid.
+    Always performs syntax checks and confirms the path resolves within an
+    allowed file share; both checks are euid-independent. When check_access is
+    True, additionally verifies the path exists and is readable.
+
+    The exists/readable check reflects the *calling process's* identity, so it
+    is only meaningful when this runs as the target user (i.e. in the setuid
+    worker). Callers running on the root server must pass check_access=False —
+    otherwise validation reflects root's access, not the user's (false-pass on
+    local FS where root bypasses perms, false-reject on root-squash NFS) — and
+    defer the access check to the worker (see submit_job).
+
+    Returns an error message string if invalid, or None if valid.
     """
     # Syntax check first
     error = validate_path_for_shell(path_value)
@@ -289,22 +298,19 @@ def validate_path_in_filestore(path_value: str, fsps: list) -> str | None:
 
     expanded = os.path.expanduser(normalized)
 
-    # Resolve to a file share path
+    # Resolve to a file share path (euid-independent containment check)
     from fileglancer.database import find_fsp_in_paths
     result = find_fsp_in_paths(fsps, expanded)
     if result is None:
         return "Path is not within an allowed file share"
 
+    if not check_access:
+        return None
+
     fsp, subpath = result
 
     from fileglancer.filestore import Filestore
     filestore = Filestore(fsp)
-    # NOTE: this runs on the server (root in production); validate_path's
-    # exists/readable checks therefore reflect root's access, not the submitting
-    # user's (false-pass on local FS where root bypasses perms, false-reject on
-    # root-squash NFS). Fully correct per-user validation would have to run in
-    # the setuid worker. The file-share containment check above is euid-
-    # independent and still holds.
     return filestore.validate_path(subpath)
 
 
@@ -314,12 +320,14 @@ def validate_path_in_filestore(path_value: str, fsps: list) -> str | None:
 _ENV_VAR_NAME_PATTERN = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 
 
-def _validate_parameter_value(param: AppParameter, value, session=None, username=None) -> str:
+def _validate_parameter_value(param: AppParameter, value, session=None, username=None,
+                              check_access: bool = True) -> str:
     """Validate a single parameter value against its schema and return the string representation.
 
     When session is provided and param type is file/directory, validates that
     the path is within an allowed file share mount. Otherwise falls back to
-    syntax-only validation.
+    syntax-only validation. check_access is forwarded to validate_path_in_filestore;
+    server-side callers should pass check_access=False (see submit_job).
 
     Raises ValueError if validation fails.
     """
@@ -367,7 +375,7 @@ def _validate_parameter_value(param: AppParameter, value, session=None, username
         str_val = expand_user_path(str_val, username)
         if session is not None:
             fsps = db.get_file_share_paths(session)
-            error = validate_path_in_filestore(str_val, fsps)
+            error = validate_path_in_filestore(str_val, fsps, check_access=check_access)
         else:
             error = validate_path_for_shell(str_val)
         if error:
@@ -392,7 +400,8 @@ def _flatten_param_items(items) -> list:
 
 
 def build_command(entry_point: AppEntryPoint, parameters: dict,
-                  env_parameters: dict = None, session=None, username=None) -> str:
+                  env_parameters: dict = None, session=None, username=None,
+                  check_access: bool = True) -> str:
     """Build a shell command from an entry point and parameter values.
 
     `parameters` and `env_parameters` are independent namespaces: each param
@@ -405,6 +414,9 @@ def build_command(entry_point: AppEntryPoint, parameters: dict,
     are emitted first in declaration order, then positional parameters (no
     flag). When session is provided, file/directory parameters are validated
     against allowed file share mounts. Raises ValueError for invalid parameters.
+    check_access controls whether file/directory paths are checked for
+    existence/readability; server-side callers should pass check_access=False
+    and defer that check to the setuid worker (see submit_job).
     """
     env_parameters = env_parameters or {}
     env_flat = _flatten_param_items(entry_point.env_parameters)
@@ -439,7 +451,8 @@ def build_command(entry_point: AppEntryPoint, parameters: dict,
     for p, value in effective:
         if p.flag is None:
             continue
-        validated = _validate_parameter_value(p, value, session=session, username=username)
+        validated = _validate_parameter_value(p, value, session=session, username=username,
+                                              check_access=check_access)
         if p.type == "boolean":
             if value is True:
                 parts.append(p.flag)
@@ -450,7 +463,8 @@ def build_command(entry_point: AppEntryPoint, parameters: dict,
     for p, value in effective:
         if p.flag is not None:
             continue
-        validated = _validate_parameter_value(p, value, session=session, username=username)
+        validated = _validate_parameter_value(p, value, session=session, username=username,
+                                              check_access=check_access)
         if p.raw:
             if _SHELL_METACHAR_PATTERN.search(validated):
                 raise ValueError(
@@ -461,3 +475,35 @@ def build_command(entry_point: AppEntryPoint, parameters: dict,
             parts.append(shlex.quote(validated))
 
     return (" \\\n  ").join(parts)
+
+
+def collect_path_parameters(entry_point: AppEntryPoint, parameters: dict,
+                            env_parameters: dict = None) -> list[tuple[str, str, str]]:
+    """Collect effective file/directory parameter values needing path validation.
+
+    Mirrors build_command's effective-value computation (user-provided merged
+    with defaults, across both the env and pipeline namespaces) but returns only
+    file/directory parameters as (param_key, param_name, raw_value) tuples.
+
+    Raw (un-expanded) values are returned so that authoritative validation can
+    run in the setuid worker, where '~' and access checks resolve as the target
+    user. See submit_job.
+    """
+    env_parameters = env_parameters or {}
+    env_flat = _flatten_param_items(entry_point.env_parameters)
+    param_flat = _flatten_param_items(entry_point.parameters)
+    groups = ((env_flat, env_parameters), (param_flat, parameters))
+
+    result: list[tuple[str, str, str]] = []
+    for flat, values in groups:
+        for param in flat:
+            if param.type not in ("file", "directory"):
+                continue
+            if param.key in values:
+                value = values[param.key]
+            elif param.default is not None:
+                value = param.default
+            else:
+                continue
+            result.append((param.key, param.name, str(value)))
+    return result
