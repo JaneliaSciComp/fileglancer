@@ -874,7 +874,8 @@ class TestBuildCommandCheckAccess:
         missing = str(tmp_path / "nope")
         cmd = build_command(self._ep(), {"input": missing},
                             session=object(), check_access=False)
-        assert missing in cmd
+        # build_command normalizes backslashes to forward slashes.
+        assert missing.replace("\\", "/") in cmd
 
     def test_check_access_false_still_rejects_outside_share(self, tmp_path, monkeypatch):
         """check_access=False does not bypass file-share containment."""
