@@ -23,6 +23,7 @@ from fileglancer.apps import (
     _container_sif_name,
     _build_container_script,
     build_command,
+    collect_path_parameters,
     expand_user_path,
 )
 
@@ -747,6 +748,26 @@ class TestValidatePathInFilestore:
         assert error is not None
         assert "invalid characters" in error
 
+    def test_check_access_false_skips_exists_check(self, tmp_path):
+        """With check_access=False, a nonexistent path inside a share passes.
+
+        Exists/readable checks must be deferred to the setuid worker; the
+        server-side call only confirms file-share containment.
+        """
+        from fileglancer.model import FileSharePath
+        fsp = FileSharePath(zone="test", name="test", mount_path=str(tmp_path))
+        missing = str(tmp_path / "no_such_file.txt")
+        # Default (check_access=True) rejects the missing path...
+        assert validate_path_in_filestore(missing, [fsp]) == "Path does not exist"
+        # ...but with check_access=False the containment check alone passes.
+        assert validate_path_in_filestore(missing, [fsp], check_access=False) is None
+
+    def test_check_access_false_still_enforces_containment(self):
+        """check_access=False does not bypass the file-share containment check."""
+        error = validate_path_in_filestore("/nowhere/file.txt", [], check_access=False)
+        assert error is not None
+        assert "not within an allowed file share" in error
+
 
 
 class TestBuildCommandTildeExpansion:
@@ -813,6 +834,98 @@ class TestBuildCommandTildeExpansion:
         )
         cmd = build_command(ep, {"input": "s3://bucket/key"})
         assert "s3://bucket/key" in cmd
+
+
+class TestBuildCommandCheckAccess:
+    """build_command(check_access=False) defers exists checks to the worker."""
+
+    def _ep(self):
+        return AppEntryPoint(
+            id="test",
+            name="test",
+            command="test_cmd",
+            parameters=[{
+                "key": "input",
+                "name": "Input Path",
+                "type": "directory",
+                "flag": "--input",
+            }],
+        )
+
+    def _stub_fsps(self, monkeypatch, tmp_path):
+        """Make build_command's file-share lookup return a share at tmp_path."""
+        from fileglancer.model import FileSharePath
+        import fileglancer.apps.command as command_mod
+
+        fsp = FileSharePath(zone="test", name="test", mount_path=str(tmp_path))
+        monkeypatch.setattr(command_mod.db, "get_file_share_paths",
+                            lambda session: [fsp])
+
+    def test_default_rejects_missing_path(self, tmp_path, monkeypatch):
+        """With a session and the default check_access, a missing path raises."""
+        self._stub_fsps(monkeypatch, tmp_path)
+        missing = str(tmp_path / "nope")
+        with pytest.raises(ValueError, match="Path does not exist"):
+            build_command(self._ep(), {"input": missing}, session=object())
+
+    def test_check_access_false_allows_missing_path(self, tmp_path, monkeypatch):
+        """check_access=False lets a missing-but-contained path build the command."""
+        self._stub_fsps(monkeypatch, tmp_path)
+        missing = str(tmp_path / "nope")
+        cmd = build_command(self._ep(), {"input": missing},
+                            session=object(), check_access=False)
+        assert missing in cmd
+
+    def test_check_access_false_still_rejects_outside_share(self, tmp_path, monkeypatch):
+        """check_access=False does not bypass file-share containment."""
+        self._stub_fsps(monkeypatch, tmp_path)
+        with pytest.raises(ValueError, match="not within an allowed file share"):
+            build_command(self._ep(), {"input": "/somewhere/else"},
+                          session=object(), check_access=False)
+
+
+class TestCollectPathParameters:
+    """collect_path_parameters gathers effective file/directory params."""
+
+    def test_collects_user_and_default_values_across_namespaces(self):
+        ep = AppEntryPoint(
+            id="test",
+            name="test",
+            command="test_cmd",
+            env_parameters=[{
+                "key": "envdir",
+                "name": "Env Dir",
+                "type": "directory",
+                "default": "/data/envdefault",
+            }],
+            parameters=[
+                {"key": "input", "name": "Input Path", "type": "file", "flag": "--input"},
+                {"key": "count", "name": "Count", "type": "integer", "flag": "--count"},
+                {"key": "outdir", "name": "Out Dir", "type": "directory",
+                 "flag": "--outdir", "default": "/data/outdefault"},
+            ],
+        )
+        result = collect_path_parameters(
+            ep,
+            {"input": "/data/in.txt", "count": 5},
+            env_parameters={},
+        )
+        # Only file/directory params; non-path 'count' excluded. Env namespace
+        # default included; pipeline 'outdir' falls back to its default.
+        assert result == [
+            ("envdir", "Env Dir", "/data/envdefault"),
+            ("input", "Input Path", "/data/in.txt"),
+            ("outdir", "Out Dir", "/data/outdefault"),
+        ]
+
+    def test_omits_path_params_without_value_or_default(self):
+        ep = AppEntryPoint(
+            id="test",
+            name="test",
+            command="test_cmd",
+            parameters=[{"key": "input", "name": "Input Path", "type": "file", "flag": "--input"}],
+        )
+        assert collect_path_parameters(ep, {}) == []
 
 
 class TestExpandUserPath:
