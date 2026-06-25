@@ -440,9 +440,19 @@ def build_command(entry_point: AppEntryPoint, parameters: dict,
     for flat, values in groups:
         for param in flat:
             if param.key in values:
-                effective.append((param, values[param.key]))
+                value = values[param.key]
             elif param.default is not None:
-                effective.append((param, param.default))
+                value = param.default
+            else:
+                continue
+            # An optional flagged param with an empty value (an empty-string
+            # manifest default, or "" passed in a payload) is omitted entirely
+            # rather than emitted as `--flag ''`, which no CLI expects (e.g.
+            # argparse rejects '' against its choices). Required params keep the
+            # empty value so validation raises a clear error.
+            if value == "" and not param.required and param.flag is not None:
+                continue
+            effective.append((param, value))
 
     # Start with the base command
     parts = [entry_point.command]
