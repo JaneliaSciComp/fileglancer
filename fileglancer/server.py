@@ -1317,33 +1317,6 @@ def create_app(settings):
             logger.opt(exception=sys.exc_info()).info("Error requesting head")
             return get_error_response(500, "InternalError", "Error requesting HEAD", path)
 
-
-    def _get_mounted_filestore(fsp: FileSharePath):
-        """Constructs a filestore for the given file share path, checking to make sure it is mounted."""
-        filestore = Filestore(fsp)
-        try:
-            filestore.get_file_info(None)
-        except FileNotFoundError:
-            return None
-        return filestore
-
-
-    def _get_filestore(path_name: str):
-        """Get a filestore for the given path name."""
-        # Get file share path using centralized function and filter for the requested path
-        with db.get_db_session(settings.db_url) as session:
-            fsp = db.get_file_share_path(session, path_name)
-            if fsp is None:
-                return None, f"File share path '{path_name}' not found"
-
-        # Create a filestore for the file share path
-        filestore = _get_mounted_filestore(fsp)
-        if filestore is None:
-            return None, f"File share path '{path_name}' is not mounted"
-
-        return filestore, None
-
-
     # Profile endpoint
     @app.get("/api/profile", description="Get the current user's profile")
     async def get_profile(username: str = Depends(get_current_user)):
