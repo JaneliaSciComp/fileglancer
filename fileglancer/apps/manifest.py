@@ -3,6 +3,7 @@
 import asyncio
 import os
 import re
+import shutil
 from contextlib import suppress
 from pathlib import Path, PurePosixPath
 
@@ -55,20 +56,33 @@ def _get_repo_lock(owner: str, repo: str, branch: str) -> asyncio.Lock:
     return _repo_locks[key]
 
 
+_HTTPS_GITHUB_RE = r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/tree/(.+?))?/?$"
+# scp-style (git@github.com:owner/repo.git) and ssh:// forms. SSH URLs don't
+# carry a branch (no /tree/...), so branch is always None for them.
+_SSH_SCP_GITHUB_RE = r"git@github\.com:([^/]+)/([^/]+?)(?:\.git)?/?$"
+_SSH_PROTO_GITHUB_RE = r"ssh://git@github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$"
+
+
 def _parse_github_url(url: str) -> tuple[str, str, str | None]:
     """Parse a GitHub repo URL into (owner, repo, branch).
 
-    Branch is None when not specified in the URL.
+    Accepts HTTPS (https://github.com/owner/repo[/tree/branch]) and SSH
+    (git@github.com:owner/repo.git or ssh://git@github.com/owner/repo) forms.
+    Branch is None when not specified in the URL (always None for SSH forms).
     Raises ValueError if not a valid GitHub repo URL.
     """
-    pattern = r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/tree/(.+?))?/?$"
-    match = re.match(pattern, url)
-    if not match:
-        raise ValueError(
-            f"Invalid app URL: '{url}'. Only GitHub repository URLs are supported "
-            f"(e.g., https://github.com/owner/repo)."
-        )
-    owner, repo, branch = match.groups()
+    branch: str | None = None
+    match = re.match(_HTTPS_GITHUB_RE, url)
+    if match:
+        owner, repo, branch = match.groups()
+    else:
+        match = re.match(_SSH_SCP_GITHUB_RE, url) or re.match(_SSH_PROTO_GITHUB_RE, url)
+        if not match:
+            raise ValueError(
+                f"Invalid app URL: '{url}'. Only GitHub repository URLs are supported "
+                f"(e.g., https://github.com/owner/repo or git@github.com:owner/repo.git)."
+            )
+        owner, repo = match.group(1), match.group(2)
 
     # Validate segments to prevent path traversal
     for name, value in [("owner", owner), ("repo", repo)]:
@@ -141,13 +155,64 @@ def _safe_repo_subdir(repo_dir: Path, manifest_path: str) -> Path:
     return target
 
 
-async def _run_git(args: list[str], timeout: int = 60) -> tuple[bytes, bytes]:
+# When cloning over SSH, never prompt interactively (that would hang the
+# worker under GIT_TERMINAL_PROMPT=0, which only governs git's own prompts, not
+# ssh's). BatchMode disables passphrase/password prompts; accept-new trusts the
+# GitHub host key on first use so a missing known_hosts entry isn't a hard fail.
+_SSH_GIT_ENV = {
+    "GIT_SSH_COMMAND": "ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new",
+}
+
+# Substrings (lowercased) that mark an HTTPS git failure as an auth/access
+# problem — the signal to retry the same repo over SSH. Private and nonexistent
+# repos both look like this over HTTPS (GitHub won't confirm a repo exists to an
+# unauthenticated client).
+_GIT_AUTH_ERROR_MARKERS = (
+    "could not read username",
+    "authentication failed",
+    "terminal prompts disabled",
+    "repository not found",
+    "fatal: could not read",
+)
+
+
+def _is_git_auth_error(message: str) -> bool:
+    low = message.lower()
+    return any(marker in low for marker in _GIT_AUTH_ERROR_MARKERS)
+
+
+def _github_remote_urls(owner: str, repo: str) -> tuple[str, str]:
+    """Return (https, ssh) clone URLs for a GitHub owner/repo."""
+    return (
+        f"https://github.com/{owner}/{repo}.git",
+        f"git@github.com:{owner}/{repo}.git",
+    )
+
+
+def _repo_access_error(owner: str, repo: str, branch: str,
+                       https_err: str, ssh_err: str) -> str:
+    """Build a user-facing message for a repo that couldn't be cloned either way."""
+    return (
+        f"Could not access the repository {owner}/{repo} (revision '{branch}'). "
+        f"If it is private, make sure it exists and that you have access. Fileglancer "
+        f"tried HTTPS and then SSH (git@github.com) as your user — for SSH access, your "
+        f"SSH key must be configured on this server and added to your GitHub account.\n"
+        f"  HTTPS: {https_err}\n"
+        f"  SSH: {ssh_err}"
+    )
+
+
+async def _run_git(args: list[str], timeout: int = 60,
+                   extra_env: dict | None = None) -> tuple[bytes, bytes]:
     """Run a git command asynchronously.
 
     The timeout covers the command's full runtime, not just process creation.
+    extra_env is merged into the subprocess environment (e.g. GIT_SSH_COMMAND).
     Raises ValueError with a readable message on failure.
     """
     env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    if extra_env:
+        env.update(extra_env)
     proc = None
 
     async def _create_and_communicate() -> tuple[bytes, bytes]:
@@ -184,24 +249,68 @@ async def _run_git(args: list[str], timeout: int = 60) -> tuple[bytes, bytes]:
     return stdout, stderr
 
 
-async def _resolve_default_branch(clone_url: str) -> str:
+async def _resolve_default_branch(owner: str, repo: str) -> str:
     """Query a remote repo for its default branch (HEAD).
 
-    Falls back to 'main' if the remote cannot be queried.
+    Tries HTTPS first, then SSH if HTTPS fails for auth/access reasons (private
+    repos). Falls back to 'main' if the remote cannot be queried.
     """
-    try:
-        stdout, _ = await _run_git(
-            ["git", "ls-remote", "--symref", clone_url, "HEAD"],
-            timeout=30,
-        )
-        # Output: "ref: refs/heads/master\tHEAD\n..."
-        for line in stdout.decode().splitlines():
-            if line.startswith("ref:"):
-                ref = line.split()[1]
-                return ref.removeprefix("refs/heads/")
-    except Exception:
-        pass
+    https_url, ssh_url = _github_remote_urls(owner, repo)
+    for url, extra_env in ((https_url, None), (ssh_url, _SSH_GIT_ENV)):
+        try:
+            stdout, _ = await _run_git(
+                ["git", "ls-remote", "--symref", url, "HEAD"],
+                timeout=30, extra_env=extra_env,
+            )
+            # Output: "ref: refs/heads/master\tHEAD\n..."
+            for line in stdout.decode().splitlines():
+                if line.startswith("ref:"):
+                    ref = line.split()[1]
+                    return ref.removeprefix("refs/heads/")
+            # Reached the remote but found no symref line — stop, use the default.
+            break
+        except ValueError as e:
+            # Only fall through to the SSH attempt for auth/access failures.
+            if not _is_git_auth_error(str(e)):
+                break
+        except Exception:
+            break
     return "main"
+
+
+async def _clone_repo(owner: str, repo: str, branch: str, repo_dir: Path) -> None:
+    """Clone owner/repo at branch into repo_dir, trying HTTPS then SSH.
+
+    On an HTTPS auth/access failure (e.g. a private repo), retries over SSH as
+    the current user. If both transports fail, raises ValueError with a
+    user-facing message describing both errors.
+    """
+    https_url, ssh_url = _github_remote_urls(owner, repo)
+    try:
+        await _run_git(
+            ["git", "clone", "--branch", branch, https_url, str(repo_dir)],
+            timeout=120,
+        )
+        return
+    except ValueError as https_err:
+        if not _is_git_auth_error(str(https_err)):
+            raise
+        logger.info(
+            f"HTTPS clone of {owner}/{repo} failed authentication; retrying over SSH"
+        )
+        # git creates the target directory before failing, so a leftover partial
+        # clone would make the SSH attempt fail with "already exists". Clear it.
+        shutil.rmtree(repo_dir, ignore_errors=True)
+        try:
+            await _run_git(
+                ["git", "clone", "--branch", branch, ssh_url, str(repo_dir)],
+                timeout=120, extra_env=_SSH_GIT_ENV,
+            )
+        except ValueError as ssh_err:
+            shutil.rmtree(repo_dir, ignore_errors=True)
+            raise ValueError(
+                _repo_access_error(owner, repo, branch, str(https_err), str(ssh_err))
+            )
 
 
 async def _ensure_repo_cache(url: str, pull: bool = False,
@@ -218,9 +327,8 @@ async def _ensure_repo_cache(url: str, pull: bool = False,
     the worker subprocess itself, or in single-user dev mode).
     """
     owner, repo, branch = _parse_github_url(url)
-    clone_url = f"https://github.com/{owner}/{repo}.git"
     if not branch:
-        branch = await _resolve_default_branch(clone_url)
+        branch = await _resolve_default_branch(owner, repo)
 
     if username:
         lock = _get_repo_lock(owner, repo, branch)
@@ -245,10 +353,7 @@ async def _ensure_repo_cache(url: str, pull: bool = False,
         else:
             logger.info(f"Cloning {owner}/{repo} ({branch}) into {repo_dir}")
             repo_dir.parent.mkdir(parents=True, exist_ok=True)
-            await _run_git(
-                ["git", "clone", "--branch", branch, clone_url, str(repo_dir)],
-                timeout=120,
-            )
+            await _clone_repo(owner, repo, branch, repo_dir)
 
     return repo_dir
 
@@ -473,6 +578,5 @@ async def get_app_branch(url: str) -> str:
     """
     owner, repo, branch = _parse_github_url(url)
     if not branch:
-        clone_url = f"https://github.com/{owner}/{repo}.git"
-        branch = await _resolve_default_branch(clone_url)
+        branch = await _resolve_default_branch(owner, repo)
     return branch

@@ -1063,6 +1063,8 @@ from fileglancer.apps.manifest import (
     validate_manifest_path,
     _safe_repo_subdir,
     _parse_github_url,
+    _is_git_auth_error,
+    _clone_repo,
     get_app_branch,
 )
 
@@ -1073,6 +1075,103 @@ class TestParseGitHubUrl:
             "https://github.com/org/tool/tree/feature/my-tool"
         )
         assert (owner, repo, branch) == ("org", "tool", "feature/my-tool")
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "git@github.com:org/tool.git",
+            "git@github.com:org/tool",
+            "ssh://git@github.com/org/tool.git",
+            "ssh://git@github.com/org/tool",
+        ],
+    )
+    def test_parses_ssh_urls(self, url):
+        assert _parse_github_url(url) == ("org", "tool", None)
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://gitlab.com/org/tool",
+            "git@gitlab.com:org/tool.git",
+            "not a url",
+        ],
+    )
+    def test_rejects_non_github_urls(self, url):
+        with pytest.raises(ValueError):
+            _parse_github_url(url)
+
+
+class TestCloneFallback:
+    def test_auth_error_detection(self):
+        assert _is_git_auth_error(
+            "fatal: could not read Username for 'https://github.com': "
+            "terminal prompts disabled"
+        )
+        assert _is_git_auth_error("remote: Repository not found.")
+        assert not _is_git_auth_error("fatal: Remote branch v9 not found")
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_ssh_on_https_auth_error(self, tmp_path, monkeypatch):
+        from fileglancer.apps import manifest as m
+
+        calls = []
+
+        async def fake_run_git(args, timeout=60, extra_env=None):
+            calls.append((args, extra_env))
+            if "https://github.com/org/tool.git" in args:
+                raise ValueError(
+                    "Git command failed: fatal: could not read Username for "
+                    "'https://github.com': terminal prompts disabled"
+                )
+            return (b"", b"")
+
+        monkeypatch.setattr(m, "_run_git", fake_run_git)
+        monkeypatch.setattr(m.shutil, "rmtree", lambda *a, **k: None)
+
+        await _clone_repo("org", "tool", "v0.1.0", tmp_path / "dest")
+
+        used = [args for args, _ in calls]
+        assert any("https://github.com/org/tool.git" in a for a in used)
+        # The SSH retry was attempted with the SSH-specific environment.
+        ssh_call = next(
+            (env for args, env in calls if "git@github.com:org/tool.git" in args),
+            None,
+        )
+        assert ssh_call is not None and "GIT_SSH_COMMAND" in ssh_call
+
+    @pytest.mark.asyncio
+    async def test_raises_understandable_error_when_both_fail(self, tmp_path, monkeypatch):
+        from fileglancer.apps import manifest as m
+
+        async def fake_run_git(args, timeout=60, extra_env=None):
+            raise ValueError(
+                "Git command failed: fatal: could not read Username for "
+                "'https://github.com': terminal prompts disabled"
+            )
+
+        monkeypatch.setattr(m, "_run_git", fake_run_git)
+        monkeypatch.setattr(m.shutil, "rmtree", lambda *a, **k: None)
+
+        with pytest.raises(ValueError, match="Could not access the repository org/tool"):
+            await _clone_repo("org", "tool", "v0.1.0", tmp_path / "dest")
+
+    @pytest.mark.asyncio
+    async def test_non_auth_clone_error_is_not_retried(self, tmp_path, monkeypatch):
+        from fileglancer.apps import manifest as m
+
+        calls = []
+
+        async def fake_run_git(args, timeout=60, extra_env=None):
+            calls.append(args)
+            raise ValueError("Git command failed: fatal: Remote branch v9 not found")
+
+        monkeypatch.setattr(m, "_run_git", fake_run_git)
+        monkeypatch.setattr(m.shutil, "rmtree", lambda *a, **k: None)
+
+        with pytest.raises(ValueError, match="Remote branch v9 not found"):
+            await _clone_repo("org", "tool", "v9", tmp_path / "dest")
+        # Only the HTTPS attempt should have run — no SSH retry for a non-auth error.
+        assert len(calls) == 1
 
     @pytest.mark.asyncio
     async def test_get_app_branch_returns_slash_branch_without_remote_lookup(self):
