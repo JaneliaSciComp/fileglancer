@@ -543,11 +543,17 @@ async def submit_job(
         cache_dir_pref = db.get_user_preference(session, username, "apptainerCacheDir")
         container_cache_dir = cache_dir_pref.get("value") if cache_dir_pref else None
 
+        # Prefer the name the user saved for this app (which may be a custom name
+        # chosen when adding it from the catalog) over the raw manifest name, so
+        # jobs are labeled consistently with the user's library.
+        user_app = db.get_user_app(session, username, app_url, manifest_path)
+        app_name = user_app.name if user_app is not None else manifest.name
+
         db_job = db.create_job(
             session=session,
             username=username,
             app_url=app_url,
-            app_name=manifest.name,
+            app_name=app_name,
             entry_point_id=entry_point.id,
             entry_point_name=entry_point.name,
             entry_point_type=entry_point.type,

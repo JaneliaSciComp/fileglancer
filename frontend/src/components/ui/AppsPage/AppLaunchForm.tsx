@@ -64,6 +64,10 @@ interface AppLaunchFormProps {
   readonly initialPostRun?: string;
   readonly initialContainer?: string;
   readonly initialContainerArgs?: string;
+  // Display name for the app; defaults to the manifest name when omitted. Lets
+  // callers show a user's custom app name (e.g. chosen when adding from the
+  // catalog) instead of the raw manifest name.
+  readonly appName?: string;
 }
 
 type EnvVar = { key: string; value: string };
@@ -722,7 +726,8 @@ export default function AppLaunchForm({
   initialPreRun,
   initialPostRun,
   initialContainer,
-  initialContainerArgs
+  initialContainerArgs,
+  appName
 }: AppLaunchFormProps) {
   const { defaultExtraArgs } = usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
@@ -1245,7 +1250,7 @@ export default function AppLaunchForm({
           <Typography className="font-bold mb-1" type="h5">
             {entryPoint.name}
           </Typography>
-          <Typography className="block">{manifest.name}</Typography>
+          <Typography className="block">{appName ?? manifest.name}</Typography>
         </div>
         {actionButtons}
       </div>
