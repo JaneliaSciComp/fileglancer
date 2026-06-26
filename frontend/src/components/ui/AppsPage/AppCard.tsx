@@ -8,6 +8,7 @@ import {
   HiOutlinePlay,
   HiOutlineTrash
 } from 'react-icons/hi';
+import { FaUsers, FaUsersSlash } from 'react-icons/fa6';
 
 import AppInfoDialog from '@/components/ui/AppsPage/AppInfoDialog';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
@@ -45,11 +46,22 @@ export default function AppCard({
 }: AppCardProps) {
   const navigate = useNavigate();
   const [infoOpen, setInfoOpen] = useState(false);
+  const [startInShareView, setStartInShareView] = useState(false);
 
   const isShared = app.listing_id !== undefined && app.listing_id !== null;
 
   const handleLaunch = () => {
     navigate(buildLaunchPathFromApp(app.url, app.manifest_path));
+  };
+
+  const handleInfo = () => {
+    setStartInShareView(false);
+    setInfoOpen(true);
+  };
+
+  const handleShare = () => {
+    setStartInShareView(true);
+    setInfoOpen(true);
   };
 
   return (
@@ -65,13 +77,38 @@ export default function AppCard({
           <FgTooltip label="App info">
             <IconButton
               className="text-foreground hover:text-primary"
-              onClick={() => setInfoOpen(true)}
+              onClick={handleInfo}
               size="sm"
               variant="ghost"
             >
               <FgIcon icon={HiOutlineInformationCircle} />
             </IconButton>
           </FgTooltip>
+          {isShared ? (
+            <FgTooltip label="Unshare from catalog">
+              <IconButton
+                className="text-foreground hover:text-error"
+                disabled={unsharing}
+                onClick={onUnshare}
+                size="sm"
+                variant="ghost"
+              >
+                <FgIcon icon={FaUsersSlash} />
+              </IconButton>
+            </FgTooltip>
+          ) : (
+            <FgTooltip label="Share to catalog">
+              <IconButton
+                className="text-foreground hover:text-primary"
+                disabled={sharing}
+                onClick={handleShare}
+                size="sm"
+                variant="ghost"
+              >
+                <FgIcon icon={FaUsers} />
+              </IconButton>
+            </FgTooltip>
+          )}
           <FgTooltip label="Remove app">
             <IconButton
               className="text-foreground hover:text-error"
@@ -128,6 +165,7 @@ export default function AppCard({
         open={infoOpen}
         removing={removing}
         sharing={sharing}
+        startInShareView={startInShareView}
         unsharing={unsharing}
         updating={updating}
       />

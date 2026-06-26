@@ -31,6 +31,7 @@ interface AppInfoDialogProps {
   readonly removing: boolean;
   readonly sharing: boolean;
   readonly unsharing: boolean;
+  readonly startInShareView?: boolean;
 }
 
 function AppInfoTable({ app }: { readonly app: UserApp }) {
@@ -86,7 +87,8 @@ export default function AppInfoDialog({
   updating,
   removing,
   sharing,
-  unsharing
+  unsharing,
+  startInShareView = false
 }: AppInfoDialogProps) {
   const isShared = app.listing_id !== undefined && app.listing_id !== null;
 
@@ -97,19 +99,25 @@ export default function AppInfoDialog({
   const [description, setDescription] = useState('');
   const [shareError, setShareError] = useState('');
 
-  // Always return to the info view when the dialog is (re)opened.
-  useEffect(() => {
-    if (open) {
-      setShareView(false);
-    }
-  }, [open]);
-
   const openShareForm = () => {
     setName(app.name);
     setDescription(app.description ?? '');
     setShareError('');
     setShareView(true);
   };
+
+  // Open into the share form when requested (and shareable), otherwise always
+  // return to the info view when the dialog is (re)opened.
+  useEffect(() => {
+    if (open) {
+      if (startInShareView && !isShared) {
+        openShareForm();
+      } else {
+        setShareView(false);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const handleShareSubmit = async () => {
     if (!name.trim()) {
