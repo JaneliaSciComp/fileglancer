@@ -41,7 +41,7 @@ function ListingInfoTable({ listing }: { readonly listing: AppListing }) {
         </tr>
         {listing.branch ? (
           <tr>
-            <td className={labelClass}>Branch</td>
+            <td className={labelClass}>Revision</td>
             <td className={valueClass}>{listing.branch}</td>
           </tr>
         ) : null}

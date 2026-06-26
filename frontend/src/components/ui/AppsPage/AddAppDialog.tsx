@@ -108,7 +108,12 @@ export default function AddAppDialog({
         />
       </FgFormField>
 
-      <FgFormField htmlFor="branch" label="Branch" optional>
+      <FgFormField
+        helperText="Tag or branch name"
+        htmlFor="branch"
+        label="Revision"
+        optional
+      >
         <FgInput
           onChange={e => {
             setBranch(e.target.value);

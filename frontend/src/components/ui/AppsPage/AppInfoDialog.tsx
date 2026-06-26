@@ -52,7 +52,7 @@ function AppInfoTable({ app }: { readonly app: UserApp }) {
         </tr>
         {app.branch ? (
           <tr>
-            <td className={labelClass}>Branch</td>
+            <td className={labelClass}>Revision</td>
             <td className={valueClass}>{app.branch}</td>
           </tr>
         ) : null}
