@@ -1,6 +1,7 @@
 FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
 
-# Install firewall dependencies and pixi
+# System packages: firewall tooling (iptables/ipset/dns/jq/aggregate), curl, and
+# the sandbox helpers bubblewrap + socat.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     iptables \
     ipset \
@@ -8,35 +9,52 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     jq \
     aggregate \
     curl \
+    ca-certificates \
+    gnupg \
+    bubblewrap \
+    socat \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Playwright browser dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libglib2.0-0t64 \
-    libnspr4 \
-    libnss3 \
-    libdbus-1-3 \
-    libatk1.0-0t64 \
-    libatk-bridge2.0-0t64 \
-    libcups2t64 \
-    libxcb1 \
-    libxkbcommon0 \
-    libatspi2.0-0t64 \
-    libx11-6 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libcairo2 \
-    libpango-1.0-0 \
-    libasound2t64 \
+# Node.js, build-time only: needed to install the Codex CLI and the Playwright
+# browser at image-build time (when no credentials are mounted). The project
+# itself uses pixi's own Node for builds at runtime.
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Install pixi system-wide
 RUN curl -fsSL https://pixi.sh/install.sh | PIXI_HOME=/usr/local bash
 
-# Copy firewall init script
+# Playwright browser + OS deps, pinned to the project's version, in a shared path
+# readable by the vscode user. The config defines no projects, so only chromium
+# is needed. Done at build time so the runtime (firewalled) phase never needs the
+# dynamic Playwright CDN.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+RUN npx --yes playwright@1.56.1 install --with-deps chromium \
+    && rm -rf /var/lib/apt/lists/*
+
+# Codex CLI (global). Build-time install -> no credentials present to leak.
+RUN npm install -g @openai/codex
+
+# Claude Code (native installer) as the vscode user so it lands in
+# /home/vscode/.local/bin and matches installMethod "native".
+USER vscode
+RUN curl -fsSL https://claude.ai/install.sh | HOME=/home/vscode bash
+USER root
+
+# Firewall script + root entrypoint that brings it up before any workload runs.
 COPY init-firewall.sh /usr/local/bin/init-firewall.sh
-RUN chmod +x /usr/local/bin/init-firewall.sh
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/init-firewall.sh /usr/local/bin/entrypoint.sh
+
+# Bake "no sudo for vscode" into the image: the agent runs unprivileged and can
+# never escalate or modify the firewall. Privileged setup (firewall init, volume
+# chown) happens in the root entrypoint instead. For maintenance, exec as root
+# from the host: `podman exec -u root <container> bash`.
+RUN rm -f /etc/sudoers.d/vscode
+
+# Start as root so the entrypoint can set up the firewall, then exec the
+# long-running command. The devcontainers CLI execs all lifecycle commands and
+# shells as the unprivileged remoteUser (vscode).
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["sleep", "infinity"]
