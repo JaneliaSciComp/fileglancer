@@ -28,11 +28,19 @@ else
     echo "No Docker DNS rules to restore"
 fi
 
-# First allow DNS and localhost before any restrictions
-iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
-iptables -A INPUT -p udp --sport 53 -j ACCEPT
-iptables -A OUTPUT -p tcp --dport 22 -j ACCEPT
-iptables -A INPUT -p tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
+# Allow DNS, but ONLY to the resolvers configured in /etc/resolv.conf -- not to
+# any host. This closes "send DNS to an arbitrary external resolver" tunneling.
+# (Outbound SSH is intentionally NOT opened wholesale: SSH to GitHub still works
+# because GitHub's ranges are in the allowed-domains set below, while SSH to any
+# other host is blocked.)
+while read -r ns; do
+    [[ "$ns" =~ ^[0-9.]+$ ]] || continue
+    echo "Allowing DNS to resolver $ns"
+    iptables -A OUTPUT -p udp -d "$ns" --dport 53 -j ACCEPT
+    iptables -A OUTPUT -p tcp -d "$ns" --dport 53 -j ACCEPT
+done < <(awk '/^nameserver/ {print $2}' /etc/resolv.conf)
+
+# Allow localhost
 iptables -A INPUT -i lo -j ACCEPT
 iptables -A OUTPUT -o lo -j ACCEPT
 
@@ -111,19 +119,10 @@ for domain in "${ALLOWED_DOMAINS[@]}"; do
     done < <(echo "$ips")
 done
 
-# Get host IP from default route
-HOST_IP=$(ip route | grep default | cut -d" " -f3)
-if [ -z "$HOST_IP" ]; then
-    echo "ERROR: Failed to detect host IP"
-    exit 1
-fi
-
-HOST_NETWORK=$(echo "$HOST_IP" | sed "s/\.[0-9]*$/.0\/24/")
-echo "Host network detected as: $HOST_NETWORK"
-
-# Set up remaining iptables rules
-iptables -A INPUT -s "$HOST_NETWORK" -j ACCEPT
-iptables -A OUTPUT -d "$HOST_NETWORK" -j ACCEPT
+# Note: the host's local /24 subnet is intentionally NOT allowed wholesale.
+# Reaching the host or specific internal services should go through an entry in
+# the allowed-domains set above, not blanket subnet access (which enables
+# lateral movement to neighboring machines).
 
 # Set default policies to DROP
 iptables -P INPUT DROP

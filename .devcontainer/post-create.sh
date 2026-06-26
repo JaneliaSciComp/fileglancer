@@ -36,6 +36,16 @@ if ! command -v codex &> /dev/null; then
     pixi run npm install -g @openai/codex
 fi
 
+# Lock down the firewall: now that setup is complete, revoke the vscode user's
+# passwordless sudo. The agent runs as unprivileged vscode, which cannot touch
+# iptables/ipset without root, so the egress allowlist can no longer be flushed
+# or bypassed from inside the container. NET_ADMIN/NET_RAW remain in the image
+# but are unusable without root, so this neutralizes them for the agent.
+# For maintenance you can still get a root shell from the HOST side:
+#   podman exec -u root <container> bash   (or: docker exec -u root ...)
+echo "Revoking in-container sudo to lock the firewall..."
+sudo rm -f /etc/sudoers.d/vscode
+
 echo ""
 echo "=========================================="
 echo "Dev container setup complete!"
