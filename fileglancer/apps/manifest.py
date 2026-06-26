@@ -189,6 +189,25 @@ def _github_remote_urls(owner: str, repo: str) -> tuple[str, str]:
     )
 
 
+def _is_git_ref_not_found(message: str) -> bool:
+    """True if a git failure means the requested branch/tag doesn't exist
+    (as opposed to an auth/access problem) — i.e. the remote was reachable."""
+    low = message.lower()
+    return (
+        "not found in upstream" in low
+        or "could not find remote ref" in low
+        or ("remote branch" in low and "not found" in low)
+    )
+
+
+def _ref_not_found_error(owner: str, repo: str, branch: str) -> str:
+    """User-facing message for a revision that doesn't exist in the repo."""
+    return (
+        f"Revision '{branch}' was not found in repository {owner}/{repo}. "
+        f"Check that the tag or branch name is spelled correctly."
+    )
+
+
 def _repo_access_error(owner: str, repo: str, branch: str,
                        https_err: str, ssh_err: str) -> str:
     """Build a user-facing message for a repo that couldn't be cloned either way."""
@@ -293,14 +312,17 @@ async def _clone_repo(owner: str, repo: str, branch: str, repo_dir: Path) -> Non
         )
         return
     except ValueError as https_err:
+        shutil.rmtree(repo_dir, ignore_errors=True)
+        # The remote was reachable over HTTPS but the branch/tag doesn't exist
+        # (public repo, mistyped revision) — authoritative, don't try SSH.
+        if _is_git_ref_not_found(str(https_err)):
+            raise ValueError(_ref_not_found_error(owner, repo, branch))
+        # Anything other than an auth/access failure is surfaced as-is.
         if not _is_git_auth_error(str(https_err)):
             raise
         logger.info(
             f"HTTPS clone of {owner}/{repo} failed authentication; retrying over SSH"
         )
-        # git creates the target directory before failing, so a leftover partial
-        # clone would make the SSH attempt fail with "already exists". Clear it.
-        shutil.rmtree(repo_dir, ignore_errors=True)
         try:
             await _run_git(
                 ["git", "clone", "--branch", branch, ssh_url, str(repo_dir)],
@@ -308,6 +330,10 @@ async def _clone_repo(owner: str, repo: str, branch: str, repo_dir: Path) -> Non
             )
         except ValueError as ssh_err:
             shutil.rmtree(repo_dir, ignore_errors=True)
+            # SSH reached the repo (auth worked) but the revision is missing —
+            # report that plainly instead of the misleading "can't access" text.
+            if _is_git_ref_not_found(str(ssh_err)):
+                raise ValueError(_ref_not_found_error(owner, repo, branch))
             raise ValueError(
                 _repo_access_error(owner, repo, branch, str(https_err), str(ssh_err))
             )
@@ -348,8 +374,18 @@ async def _ensure_repo_cache(url: str, pull: bool = False,
             logger.debug(f"Repo cache hit: {owner}/{repo} ({branch})")
             if pull:
                 logger.info(f"Pulling latest for {owner}/{repo} ({branch})")
-                await _run_git(["git", "-C", str(repo_dir), "fetch", "origin", branch])
-                await _run_git(["git", "-C", str(repo_dir), "reset", "--hard", f"origin/{branch}"])
+                # `branch` may be a tag or commit, not a branch, so there is no
+                # origin/<branch> tracking ref to reset to. Fetch the ref and
+                # reset to FETCH_HEAD, which works for branches, tags and SHAs.
+                # Pass the SSH env so private repos with an SSH origin don't
+                # prompt (harmless for HTTPS origins, which ignore GIT_SSH_COMMAND).
+                await _run_git(
+                    ["git", "-C", str(repo_dir), "fetch", "origin", branch],
+                    extra_env=_SSH_GIT_ENV,
+                )
+                await _run_git(
+                    ["git", "-C", str(repo_dir), "reset", "--hard", "FETCH_HEAD"]
+                )
         else:
             logger.info(f"Cloning {owner}/{repo} ({branch}) into {repo_dir}")
             repo_dir.parent.mkdir(parents=True, exist_ok=True)

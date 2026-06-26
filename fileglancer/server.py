@@ -1688,12 +1688,15 @@ def create_app(settings):
                                                                    username=username)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
-        except HTTPException:
+        except HTTPException as e:
             # The worker already produced a meaningful, user-facing message
-            # (e.g. a private-repo clone failure). Surface it directly instead
-            # of nesting it inside a generic "Failed to clone or scan repo: ..."
-            # wrapper, which would prepend the inner status code as noise.
-            raise
+            # (e.g. a mistyped revision or a private-repo clone failure). Surface
+            # it directly instead of nesting it inside a generic "Failed to clone
+            # or scan repo: ..." wrapper. The worker's default 500 for an uncaught
+            # error is, for this endpoint, a problem with the requested repo, so
+            # present it as a 400 (preserving other codes like 503 worker-dead).
+            status = 400 if e.status_code == 500 else e.status_code
+            raise HTTPException(status_code=status, detail=e.detail)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to clone or scan repo: {str(e)}")
 

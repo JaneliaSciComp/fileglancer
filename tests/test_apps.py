@@ -1156,22 +1156,88 @@ class TestCloneFallback:
             await _clone_repo("org", "tool", "v0.1.0", tmp_path / "dest")
 
     @pytest.mark.asyncio
-    async def test_non_auth_clone_error_is_not_retried(self, tmp_path, monkeypatch):
+    async def test_https_ref_not_found_is_not_retried(self, tmp_path, monkeypatch):
         from fileglancer.apps import manifest as m
 
         calls = []
 
         async def fake_run_git(args, timeout=60, extra_env=None):
             calls.append(args)
-            raise ValueError("Git command failed: fatal: Remote branch v9 not found")
+            raise ValueError(
+                "Git command failed: fatal: Remote branch v9 not found in upstream origin"
+            )
 
         monkeypatch.setattr(m, "_run_git", fake_run_git)
         monkeypatch.setattr(m.shutil, "rmtree", lambda *a, **k: None)
 
-        with pytest.raises(ValueError, match="Remote branch v9 not found"):
+        with pytest.raises(ValueError, match="Revision 'v9' was not found"):
             await _clone_repo("org", "tool", "v9", tmp_path / "dest")
-        # Only the HTTPS attempt should have run — no SSH retry for a non-auth error.
+        # A reachable remote with a missing ref is authoritative — no SSH retry.
         assert len(calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_ssh_ref_not_found_reports_revision_not_access(self, tmp_path, monkeypatch):
+        """Private repo + mistyped tag: HTTPS auth-fails, SSH reaches the repo but
+        the revision is missing — report the revision, not a misleading
+        'can't access / maybe private' message."""
+        from fileglancer.apps import manifest as m
+
+        async def fake_run_git(args, timeout=60, extra_env=None):
+            if "https://github.com/org/tool.git" in args:
+                raise ValueError(
+                    "Git command failed: fatal: could not read Username for "
+                    "'https://github.com': terminal prompts disabled"
+                )
+            raise ValueError(
+                "Git command failed: fatal: Remote branch v1.0.1 not found in upstream origin"
+            )
+
+        monkeypatch.setattr(m, "_run_git", fake_run_git)
+        monkeypatch.setattr(m.shutil, "rmtree", lambda *a, **k: None)
+
+        with pytest.raises(ValueError, match="Revision 'v1.0.1' was not found") as exc:
+            await _clone_repo("org", "tool", "v1.0.1", tmp_path / "dest")
+        assert "private" not in str(exc.value).lower()
+
+    def test_ref_not_found_detection(self):
+        from fileglancer.apps.manifest import _is_git_ref_not_found
+
+        assert _is_git_ref_not_found(
+            "fatal: Remote branch v1.0.1 not found in upstream origin"
+        )
+        assert _is_git_ref_not_found("fatal: could not find remote ref refs/tags/v9")
+        assert not _is_git_ref_not_found(
+            "fatal: could not read Username for 'https://github.com'"
+        )
+
+    @pytest.mark.asyncio
+    async def test_pull_resets_to_fetch_head_not_origin_branch(self, tmp_path, monkeypatch):
+        """A cached tag/SHA has no origin/<ref> tracking branch, so the pull must
+        reset to FETCH_HEAD (works for branches, tags and SHAs)."""
+        from fileglancer.apps import manifest as m
+
+        monkeypatch.setattr(m, "_repo_cache_base", lambda username=None: tmp_path)
+        # Pre-create the cache dir so _ensure_repo_cache takes the pull branch.
+        repo_dir = tmp_path / "org" / "tool" / "v0.1.0"
+        repo_dir.mkdir(parents=True)
+
+        calls = []
+
+        async def fake_run_git(args, timeout=60, extra_env=None):
+            calls.append(args)
+            return (b"", b"")
+
+        monkeypatch.setattr(m, "_run_git", fake_run_git)
+
+        await m._ensure_repo_cache(
+            "https://github.com/org/tool/tree/v0.1.0", pull=True
+        )
+
+        reset_calls = [a for a in calls if "reset" in a]
+        assert reset_calls, "expected a reset during pull"
+        # Must reset to FETCH_HEAD, never origin/<tag>.
+        assert "FETCH_HEAD" in reset_calls[0]
+        assert not any("origin/v0.1.0" in a for a in reset_calls)
 
     @pytest.mark.asyncio
     async def test_get_app_branch_returns_slash_branch_without_remote_lookup(self):
