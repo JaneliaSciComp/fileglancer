@@ -1201,6 +1201,67 @@ class TestEnumOptionsNormalization:
             build_command(ep, {"n": "4"})
 
 
+class TestOptionalFlagEmptyValue:
+    """An optional flagged param with an empty value must be omitted entirely,
+    not emitted as `--flag ''`. No CLI expects an empty flag value (e.g. argparse
+    rejects '' against its choices).
+
+    The UI form strips empty values before submitting, so the empty value reaches
+    build_command via a manifest default="" (the typical case: the UI drops the
+    blank selection, then build_command re-fills from the default) or via an
+    API/CLI/relaunch payload that didn't pass through the form. build_command is
+    the authoritative boundary and must stay robust regardless of caller."""
+
+    def _ep(self, **param_kwargs):
+        return AppEntryPoint(
+            id="run",
+            name="run",
+            command="tool",
+            parameters=[AppParameter(name="Preset", type="enum",
+                                     options=["webknossos", "paintera"],
+                                     **param_kwargs)],
+        )
+
+    def test_empty_string_default_omits_flag(self):
+        # Typical failure path: the UI drops the blank selection, build_command
+        # fills from the manifest default, and an empty-string default must not
+        # resurrect `--preset ''`.
+        ep = self._ep(flag="--preset", default="")
+        cmd = build_command(ep, {})
+        assert "--preset" not in cmd
+        assert cmd == "tool"
+
+    def test_empty_value_in_payload_omits_flag(self):
+        # Defensive: a "" handed in directly (API/CLI/relaunch JSON) is dropped
+        # rather than emitted, even though the UI form would have stripped it.
+        ep = self._ep(flag="--preset")
+        cmd = build_command(ep, {"preset": ""})
+        assert "--preset" not in cmd
+        assert cmd == "tool"
+
+    def test_selected_value_still_emitted(self):
+        ep = self._ep(flag="--preset")
+        cmd = build_command(ep, {"preset": "webknossos"})
+        assert "--preset webknossos" in cmd
+
+    def test_required_empty_value_still_validates(self):
+        # Required params keep the empty value so validation raises rather than
+        # silently dropping a mandatory flag.
+        ep = self._ep(flag="--preset", required=True)
+        with pytest.raises(ValueError):
+            build_command(ep, {"preset": ""})
+
+    def test_empty_positional_value_preserved(self):
+        # The omit-empty rule targets flagged params; a flag-less positional
+        # with an empty value keeps an empty quoted arg (positional slots count).
+        ep = AppEntryPoint(
+            id="run", name="run", command="tool",
+            parameters=[AppParameter(name="Pos", type="string")],
+        )
+        cmd = build_command(ep, {"_arg0": ""})
+        assert cmd.endswith("''")
+
+
 class TestParameterKeyGeneration:
     """AppEntryPoint auto-generates parameter keys from the flag or a positional
     index, but honors an explicitly-authored key."""
