@@ -317,15 +317,16 @@ function JobOverview({
         <InfoCard title="Execution">
           <InfoRow
             label="App"
+            value={`${job.app_name} — ${job.entry_point_name}`}
+          />
+          <InfoRow
+            label="Repository"
             value={
               repoUrl ? (
-                <FgExternalLink href={repoUrl}>{job.app_name}</FgExternalLink>
-              ) : (
-                job.app_name
-              )
+                <FgExternalLink href={repoUrl}>{repoUrl}</FgExternalLink>
+              ) : null
             }
           />
-          <InfoRow label="Entry point" value={job.entry_point_name} />
           <InfoRow
             label="Type"
             value={job.entry_point_type === 'service' ? 'Service' : 'Batch job'}
