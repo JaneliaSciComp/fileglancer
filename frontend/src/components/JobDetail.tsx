@@ -203,13 +203,15 @@ function FileDownloadButton({
 /** A titled card holding a small set of label/value rows. */
 function InfoCard({
   title,
-  children
+  children,
+  className
 }: {
   readonly title: string;
   readonly children: ReactNode;
+  readonly className?: string;
 }) {
   return (
-    <div className="flex flex-col h-full">
+    <div className={`flex flex-col h-full${className ? ` ${className}` : ''}`}>
       <Typography className="text-foreground font-bold mb-1">
         {title}
       </Typography>
@@ -241,11 +243,19 @@ function InfoRow({
   );
 }
 
-/** Best-effort GitHub repo link for an app manifest URL; null if not parseable. */
-function appRepoUrl(appUrl: string): string | null {
+/**
+ * Best-effort GitHub repo link for an app manifest URL; null if not parseable.
+ * The label is "owner/repo", with "(branch)" appended when a non-default branch
+ * is specified.
+ */
+function appRepoLink(appUrl: string): { href: string; label: string } | null {
   try {
     const { owner, repo, branch } = parseGithubUrl(appUrl);
-    return buildGithubUrl(owner, repo, branch);
+    const label =
+      branch && branch !== 'main'
+        ? `${owner}/${repo} (${branch})`
+        : `${owner}/${repo}`;
+    return { href: buildGithubUrl(owner, repo, branch), label };
   } catch {
     return null;
   }
@@ -277,7 +287,7 @@ function JobOverview({
     ? formatDuration(job.created_at, job.started_at)
     : null;
   const exitMeaning = exitCodeMeaning(job.exit_code);
-  const repoUrl = appRepoUrl(job.app_url);
+  const repoLink = appRepoLink(job.app_url);
 
   const stdoutTail =
     stdoutContent !== null && stdoutContent !== undefined
@@ -291,8 +301,8 @@ function JobOverview({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <InfoCard title="Status">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <InfoCard className="md:col-span-2" title="Status">
           <InfoRow label={isActive ? 'Elapsed' : 'Runtime'} value={runtime} />
           <InfoRow label="Queue wait" value={queueWait} />
           <InfoRow label="Submitted" value={formatDateString(job.created_at)} />
@@ -314,7 +324,7 @@ function JobOverview({
           />
         </InfoCard>
 
-        <InfoCard title="Execution">
+        <InfoCard className="md:col-span-3" title="Execution">
           <InfoRow
             label="App"
             value={`${job.app_name} — ${job.entry_point_name}`}
@@ -322,8 +332,10 @@ function JobOverview({
           <InfoRow
             label="Repository"
             value={
-              repoUrl ? (
-                <FgExternalLink href={repoUrl}>{repoUrl}</FgExternalLink>
+              repoLink ? (
+                <FgExternalLink href={repoLink.href}>
+                  {repoLink.label}
+                </FgExternalLink>
               ) : null
             }
           />
