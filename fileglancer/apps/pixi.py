@@ -169,30 +169,24 @@ def _task_to_entry_point(name: str, task: dict) -> AppEntryPoint | None:
     )
 
 
-def _get_git_repo_and_branch(directory: Path) -> tuple[str, str] | None:
-    """Get the repo name and branch from a git directory.
+def _get_git_repo_name(directory: Path) -> str | None:
+    """Get the repo name from a git directory's origin remote.
 
-    Returns (repo_name, branch) or None if not a git repo.
+    Returns the repo name (e.g. "repo" for ".../owner/repo.git") or None if not
+    a git repo or the remote can't be read.
     """
     try:
         repo_url = subprocess.run(
             ["git", "-C", str(directory), "remote", "get-url", "origin"],
             capture_output=True, text=True, timeout=5,
         )
-        branch = subprocess.run(
-            ["git", "-C", str(directory), "rev-parse", "--abbrev-ref", "HEAD"],
-            capture_output=True, text=True, timeout=5,
-        )
-        if repo_url.returncode != 0 or branch.returncode != 0:
+        if repo_url.returncode != 0:
             return None
 
         # Extract repo name from URL (e.g. "https://github.com/owner/repo.git" -> "repo")
         url = repo_url.stdout.strip()
         repo_name = url.rstrip("/").rsplit("/", 1)[-1].removesuffix(".git")
-        branch_name = branch.stdout.strip()
-
-        if repo_name and branch_name:
-            return repo_name, branch_name
+        return repo_name or None
     except (subprocess.TimeoutExpired, FileNotFoundError):
         pass
     return None
@@ -211,13 +205,14 @@ class PixiAdapter:
         project = config.get("project", config.get("workspace", {}))
         description = project.get("description")
 
-        # Use repo_name/branch as the app name if in a git repo
-        git_info = _get_git_repo_and_branch(directory)
-        if git_info:
-            repo_name, branch_name = git_info
-            name = f"{repo_name}/{branch_name}"
-        else:
-            name = project.get("name", directory.name)
+        # Prefer the pixi project's declared name. Fall back to the git repo
+        # name, then the directory name. (directory is the cached repo, whose
+        # leaf is the branch/revision — a poor name, hence the fallbacks.)
+        name = (
+            project.get("name")
+            or _get_git_repo_name(directory)
+            or directory.name
+        )
 
         # Collect and convert tasks
         tasks = _collect_tasks(config)

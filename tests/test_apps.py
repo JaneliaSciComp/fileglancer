@@ -1600,3 +1600,42 @@ class TestPixiTaskEnv:
     def test_no_env_leaves_env_none(self):
         ep = _task_to_entry_point("build", {"cmd": "make"})
         assert ep.env is None
+
+
+class TestPixiAdapterName:
+    """The generated app name should come from the pixi project's name, not a
+    repo/branch combination (which produced ugly names like 'repo/HEAD')."""
+
+    def _write_pixi(self, tmp_path, body: str):
+        (tmp_path / "pixi.toml").write_text(body)
+
+    def test_uses_project_name_from_pixi_toml(self, tmp_path):
+        from fileglancer.apps.pixi import PixiAdapter
+
+        self._write_pixi(
+            tmp_path,
+            '[project]\nname = "SmartSPIM"\n\n[tasks]\nrun = "echo hi"\n',
+        )
+        manifest = PixiAdapter().convert(tmp_path)
+        assert manifest.name == "SmartSPIM"
+
+    def test_falls_back_to_git_repo_name(self, tmp_path, monkeypatch):
+        from fileglancer.apps import pixi as pixi_mod
+        from fileglancer.apps.pixi import PixiAdapter
+
+        # pixi.toml without a project name
+        self._write_pixi(tmp_path, '[tasks]\nrun = "echo hi"\n')
+        monkeypatch.setattr(
+            pixi_mod, "_get_git_repo_name", lambda d: "SmartSPIMGlancer"
+        )
+        manifest = PixiAdapter().convert(tmp_path)
+        assert manifest.name == "SmartSPIMGlancer"
+
+    def test_falls_back_to_directory_name(self, tmp_path, monkeypatch):
+        from fileglancer.apps import pixi as pixi_mod
+        from fileglancer.apps.pixi import PixiAdapter
+
+        self._write_pixi(tmp_path, '[tasks]\nrun = "echo hi"\n')
+        monkeypatch.setattr(pixi_mod, "_get_git_repo_name", lambda d: None)
+        manifest = PixiAdapter().convert(tmp_path)
+        assert manifest.name == tmp_path.name
