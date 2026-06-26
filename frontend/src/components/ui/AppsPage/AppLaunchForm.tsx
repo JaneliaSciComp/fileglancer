@@ -1279,7 +1279,11 @@ export default function AppLaunchForm({
         <Tabs.Panel className="pt-4" value="parameters">
           <div className="flex items-start gap-4">
             <div className="max-w-2xl grow space-y-4">
-              {hasSections ? (
+              {allParams.length === 0 ? (
+                <Typography className="text-foreground" type="small">
+                  There are no parameters to set for this app.
+                </Typography>
+              ) : hasSections ? (
                 <Accordion
                   onValueChange={
                     setOpenSections as Dispatch<
