@@ -4,6 +4,7 @@ import {
   buildAppUrl,
   buildLaunchPath,
   buildRelaunchPath,
+  canonicalGithubUrl,
   isGithubRepoUrl,
   parseGithubUrl
 } from '@/utils/appUrls';
@@ -41,6 +42,28 @@ describe('app URL helpers', () => {
     expect(isGithubRepoUrl('git@github.com:org/tool.git')).toBe(true);
     expect(isGithubRepoUrl('https://gitlab.com/org/tool')).toBe(false);
     expect(isGithubRepoUrl('not a url')).toBe(false);
+  });
+
+  test('canonicalGithubUrl normalizes cosmetic URL variations', () => {
+    // These all refer to the same app and must canonicalize identically, so an
+    // installed-app lookup by URL doesn't wrongly miss (the "not in your
+    // library" bug).
+    const canonical = 'https://github.com/Org/Repo';
+    expect(canonicalGithubUrl('https://github.com/Org/Repo')).toBe(canonical);
+    expect(canonicalGithubUrl('https://github.com/Org/Repo.git')).toBe(
+      canonical
+    );
+    expect(canonicalGithubUrl('https://github.com/Org/Repo/')).toBe(canonical);
+    expect(canonicalGithubUrl('https://github.com/Org/Repo/tree/main')).toBe(
+      canonical
+    );
+    expect(canonicalGithubUrl('git@github.com:Org/Repo.git')).toBe(canonical);
+    // Non-default branches are preserved.
+    expect(canonicalGithubUrl('https://github.com/Org/Repo/tree/dev')).toBe(
+      'https://github.com/Org/Repo/tree/dev'
+    );
+    // Unparseable input is returned unchanged.
+    expect(canonicalGithubUrl('not a url')).toBe('not a url');
   });
 
   test('buildAppUrl normalizes SSH input and applies the revision', () => {

@@ -12,6 +12,7 @@ from typing import Optional, Dict, List
 from loguru import logger
 from cachetools import LRUCache
 
+from fileglancer.giturls import canonical_github_url
 from fileglancer.model import FileSharePath
 from fileglancer.settings import get_settings
 from fileglancer.utils import slugify_path
@@ -960,7 +961,7 @@ def create_job(session: Session, username: str, app_url: str, app_name: str,
     now = datetime.now(UTC)
     job = JobDB(
         username=username,
-        app_url=app_url,
+        app_url=canonical_github_url(app_url),
         app_name=app_name,
         manifest_path=manifest_path,
         entry_point_id=entry_point_id,
@@ -1076,7 +1077,7 @@ def get_user_app(session: Session, username: str, url: str,
     """Get a single user app by (username, url, manifest_path)."""
     return session.query(UserAppDB).filter_by(
         username=username,
-        url=url,
+        url=canonical_github_url(url),
         manifest_path=manifest_path,
     ).first()
 
@@ -1096,6 +1097,7 @@ def upsert_user_app(session: Session, username: str, url: str,
     refreshes like a lazy manifest backfill.
     """
     now = datetime.now(UTC)
+    url = canonical_github_url(url)
     row = get_user_app(session, username, url, manifest_path)
     if row is None:
         row = UserAppDB(
@@ -1125,7 +1127,7 @@ def delete_user_app(session: Session, username: str, url: str,
     """Delete a user app row. Returns True if a row was deleted."""
     deleted = session.query(UserAppDB).filter_by(
         username=username,
-        url=url,
+        url=canonical_github_url(url),
         manifest_path=manifest_path,
     ).delete()
     session.commit()
@@ -1158,7 +1160,7 @@ def get_app_listing_for_app(session: Session, owner_username: str, url: str,
     """Get the listing (if any) that this user has published for a given app."""
     return session.query(AppListingDB).filter_by(
         owner_username=owner_username,
-        url=url,
+        url=canonical_github_url(url),
         manifest_path=manifest_path,
     ).first()
 
@@ -1168,6 +1170,7 @@ def create_app_listing(session: Session, owner_username: str, url: str,
                        description: Optional[str] = None,
                        branch: Optional[str] = None) -> AppListingDB:
     """Publish a new listing. Raises ValueError if a duplicate exists."""
+    url = canonical_github_url(url)
     existing = get_app_listing_for_app(session, owner_username, url, manifest_path)
     if existing is not None:
         raise ValueError("This app is already shared")

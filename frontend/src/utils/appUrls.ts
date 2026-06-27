@@ -35,6 +35,21 @@ export function parseGithubUrl(url: string): {
   throw new Error(`Invalid GitHub URL: ${url}`);
 }
 
+/**
+ * Normalize a GitHub URL to its canonical https form (no ".git" suffix, no
+ * trailing slash, no redundant "/tree/main"). Returns the input unchanged if it
+ * can't be parsed. Use this to compare URLs by repo identity rather than exact
+ * string, since stored app URLs may carry any of those cosmetic variations.
+ */
+export function canonicalGithubUrl(url: string): string {
+  try {
+    const { owner, repo, branch } = parseGithubUrl(url);
+    return buildGithubUrl(owner, repo, branch);
+  } catch {
+    return url;
+  }
+}
+
 /** True if the string parses as a GitHub repo URL (HTTPS or SSH). */
 export function isGithubRepoUrl(url: string): boolean {
   try {

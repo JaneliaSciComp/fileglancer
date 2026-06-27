@@ -15,7 +15,7 @@ import {
 import toast from 'react-hot-toast';
 
 import AppLaunchForm from '@/components/ui/AppsPage/AppLaunchForm';
-import { buildGithubUrl } from '@/utils';
+import { buildGithubUrl, canonicalGithubUrl } from '@/utils';
 import {
   useAppsQuery,
   useAddAppMutation,
@@ -79,9 +79,14 @@ export default function AppLaunch() {
   const relaunchContainer = relaunchState?.container;
   const relaunchContainerArgs = relaunchState?.container_args;
 
-  // Check if app is in user's library
+  // Check if app is in user's library. Match by canonical URL identity rather
+  // than exact string: stored app URLs may carry cosmetic variations (a ".git"
+  // suffix, trailing slash, or "/tree/main") that don't survive the round-trip
+  // through the route, which would otherwise make an installed app — e.g. one
+  // added from the catalog — wrongly appear "not in your library".
   const installedApp = appsQuery.data?.find(
-    a => a.url === appUrl && a.manifest_path === manifestPath
+    a =>
+      canonicalGithubUrl(a.url) === appUrl && a.manifest_path === manifestPath
   );
   const isInstalled = installedApp !== undefined;
 

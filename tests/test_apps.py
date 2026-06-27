@@ -1088,6 +1088,37 @@ class TestParseGitHubUrl:
     def test_parses_ssh_urls(self, url):
         assert _parse_github_url(url) == ("org", "tool", None)
 
+
+class TestCanonicalGithubUrl:
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://github.com/Org/Repo",
+            "https://github.com/Org/Repo.git",
+            "https://github.com/Org/Repo/",
+            "https://github.com/Org/Repo/tree/main",
+            "git@github.com:Org/Repo.git",
+            "ssh://git@github.com/Org/Repo",
+        ],
+    )
+    def test_cosmetic_variations_canonicalize_identically(self, url):
+        from fileglancer.giturls import canonical_github_url
+
+        assert canonical_github_url(url) == "https://github.com/Org/Repo"
+
+    def test_non_default_branch_preserved(self):
+        from fileglancer.giturls import canonical_github_url
+
+        assert (
+            canonical_github_url("https://github.com/Org/Repo/tree/dev")
+            == "https://github.com/Org/Repo/tree/dev"
+        )
+
+    def test_unparseable_returned_unchanged(self):
+        from fileglancer.giturls import canonical_github_url
+
+        assert canonical_github_url("not a url") == "not a url"
+
     @pytest.mark.parametrize(
         "url",
         [

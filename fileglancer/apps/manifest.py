@@ -2,7 +2,6 @@
 
 import asyncio
 import os
-import re
 import shutil
 from contextlib import suppress
 from pathlib import Path, PurePosixPath
@@ -12,6 +11,10 @@ from loguru import logger
 
 from fileglancer import database as db
 from fileglancer.apps.adapters import try_adapt
+# GitHub URL parsing/canonicalization lives in fileglancer.giturls (which has no
+# fileglancer deps) so the database layer can reuse it without an import cycle.
+# Re-exported for the apps module's internal callers and existing imports.
+from fileglancer.giturls import _parse_github_url, canonical_github_url  # noqa: F401
 from fileglancer.model import AppManifest
 from fileglancer.settings import get_settings
 
@@ -54,54 +57,6 @@ def _get_repo_lock(owner: str, repo: str, branch: str) -> asyncio.Lock:
     if key not in _repo_locks:
         _repo_locks[key] = asyncio.Lock()
     return _repo_locks[key]
-
-
-_HTTPS_GITHUB_RE = r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/tree/(.+?))?/?$"
-# scp-style (git@github.com:owner/repo.git) and ssh:// forms. SSH URLs don't
-# carry a branch (no /tree/...), so branch is always None for them.
-_SSH_SCP_GITHUB_RE = r"git@github\.com:([^/]+)/([^/]+?)(?:\.git)?/?$"
-_SSH_PROTO_GITHUB_RE = r"ssh://git@github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$"
-
-
-def _parse_github_url(url: str) -> tuple[str, str, str | None]:
-    """Parse a GitHub repo URL into (owner, repo, branch).
-
-    Accepts HTTPS (https://github.com/owner/repo[/tree/branch]) and SSH
-    (git@github.com:owner/repo.git or ssh://git@github.com/owner/repo) forms.
-    Branch is None when not specified in the URL (always None for SSH forms).
-    Raises ValueError if not a valid GitHub repo URL.
-    """
-    branch: str | None = None
-    match = re.match(_HTTPS_GITHUB_RE, url)
-    if match:
-        owner, repo, branch = match.groups()
-    else:
-        match = re.match(_SSH_SCP_GITHUB_RE, url) or re.match(_SSH_PROTO_GITHUB_RE, url)
-        if not match:
-            raise ValueError(
-                f"Invalid app URL: '{url}'. Only GitHub repository URLs are supported "
-                f"(e.g., https://github.com/owner/repo or git@github.com:owner/repo.git)."
-            )
-        owner, repo = match.group(1), match.group(2)
-
-    # Validate segments to prevent path traversal
-    for name, value in [("owner", owner), ("repo", repo)]:
-        if ".." in value or "\x00" in value:
-            raise ValueError(
-                f"Invalid app URL: {name} '{value}' contains invalid characters"
-            )
-    if branch and (
-        ".." in branch
-        or "\x00" in branch
-        or branch.startswith("/")
-        or branch.endswith("/")
-        or "//" in branch
-    ):
-        raise ValueError(
-            f"Invalid app URL: branch '{branch}' contains invalid characters"
-        )
-
-    return owner, repo, branch
 
 
 def validate_manifest_path(manifest_path: str) -> str:

@@ -394,6 +394,7 @@ export type {
 export {
   parseGithubUrl,
   isGithubRepoUrl,
+  canonicalGithubUrl,
   buildAppUrl,
   buildGithubUrl,
   buildLaunchPath,

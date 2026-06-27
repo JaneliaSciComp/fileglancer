@@ -23,6 +23,8 @@ from fileglancer.database import (
     get_job,
     update_job_status,
     list_user_apps,
+    upsert_user_app,
+    get_user_app,
 )
 from fileglancer.model import AppEntryPoint, AppManifest
 
@@ -131,6 +133,27 @@ def _seed_job(db_session, *, status="DONE"):
         update_job_status(db_session, job.id, status)
     db_session.refresh(job)
     return job
+
+
+def test_url_normalized_on_write_and_lookup(db_session):
+    """Stored app URLs are canonicalized on write, and lookups by any cosmetic
+    variant (.git, trailing slash, /tree/main) resolve to the same row."""
+    row = upsert_user_app(
+        db_session, TEST_USERNAME,
+        url="https://github.com/owner/repo.git", manifest_path="",
+        name="Demo",
+    )
+    assert row.url == "https://github.com/owner/repo"
+
+    for variant in (
+        "https://github.com/owner/repo",
+        "https://github.com/owner/repo.git",
+        "https://github.com/owner/repo/",
+        "https://github.com/owner/repo/tree/main",
+        "git@github.com:owner/repo.git",
+    ):
+        found = get_user_app(db_session, TEST_USERNAME, variant, "")
+        assert found is not None and found.id == row.id, variant
 
 
 def test_get_apps_empty(test_client):
