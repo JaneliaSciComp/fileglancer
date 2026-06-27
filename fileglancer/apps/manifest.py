@@ -318,7 +318,8 @@ async def _ensure_repo_cache(url: str, pull: bool = False,
             return Path(result["repo_dir"])
 
     # Running as the current user (worker subprocess or dev mode)
-    logger.debug(f"ensure_repo running in-process as euid={os.geteuid()}")
+    euid = os.geteuid() if hasattr(os, "geteuid") else "n/a"
+    logger.debug(f"ensure_repo running in-process as euid={euid}")
     cache_base = _repo_cache_base()
     repo_dir = (cache_base / owner / repo / branch).resolve()
     repo_dir.relative_to(cache_base.resolve())
