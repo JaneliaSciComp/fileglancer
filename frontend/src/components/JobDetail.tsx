@@ -19,7 +19,7 @@ import {
 import AnsiText from '@/components/ui/AppsPage/AnsiText';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
-import FgDialog from '@/components/ui/Dialogs/FgDialog';
+import CancelJobDialog from '@/components/ui/Dialogs/CancelJob';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import type {
   JobFileInfo,
@@ -686,40 +686,16 @@ export default function JobDetail() {
           ) : null}
 
           {/* Cancel/Stop confirmation dialog */}
-          <FgDialog
+          <CancelJobDialog
+            isPending={cancelMutation.isPending}
+            isService={isService}
             onClose={() => setShowStopConfirm(false)}
+            onConfirm={() => {
+              cancelMutation.mutate(job.id);
+              setShowStopConfirm(false);
+            }}
             open={showStopConfirm}
-          >
-            <Typography className="text-foreground font-bold mb-2" type="h6">
-              {isService ? 'Stop Service' : 'Cancel Job'}
-            </Typography>
-            <Typography className="text-foreground mb-4">
-              {isService
-                ? 'Are you sure you want to stop this service? It will be terminated and the URL will no longer be accessible.'
-                : 'Are you sure you want to cancel this job? It will be terminated.'}
-            </Typography>
-            <div className="flex justify-end gap-2">
-              <FgButton
-                onClick={() => setShowStopConfirm(false)}
-                variant="ghost"
-              >
-                Keep running
-              </FgButton>
-              <FgButton
-                color="error"
-                disabled={cancelMutation.isPending}
-                icon={HiOutlineStop}
-                loading={cancelMutation.isPending}
-                loadingText={isService ? 'Stopping...' : 'Cancelling...'}
-                onClick={() => {
-                  cancelMutation.mutate(job.id);
-                  setShowStopConfirm(false);
-                }}
-              >
-                {isService ? 'Stop Service' : 'Cancel Job'}
-              </FgButton>
-            </div>
-          </FgDialog>
+          />
 
           {/* Tabs */}
           <Tabs onValueChange={setActiveTab} value={activeTab}>
