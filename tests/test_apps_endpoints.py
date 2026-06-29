@@ -253,9 +253,7 @@ def test_add_app_persists_manifest_and_branch(test_client, db_session):
     to the bare canonical URL."""
     manifest = _make_manifest(name="From Add")
     with patch("fileglancer.apps.discover_app_manifests",
-               new=AsyncMock(return_value=[("", manifest)])), \
-         patch("fileglancer.apps.manifest._resolve_default_branch",
-               new=AsyncMock(return_value="main")):
+               new=AsyncMock(return_value=("main", [("", manifest)]))):
         response = test_client.post(
             "/api/apps",
             json={"url": "https://github.com/owner/repo"},
@@ -280,9 +278,7 @@ def test_add_app_bakes_resolved_default_into_url(test_client, db_session):
     it dedups against an explicit '/tree/master' add. branch stays "" (unpinned)."""
     manifest = _make_manifest(name="Master Default")
     with patch("fileglancer.apps.discover_app_manifests",
-               new=AsyncMock(return_value=[("", manifest)])), \
-         patch("fileglancer.apps.manifest._resolve_default_branch",
-               new=AsyncMock(return_value="master")):
+               new=AsyncMock(return_value=("master", [("", manifest)]))):
         response = test_client.post(
             "/api/apps",
             json={"url": "https://github.com/owner/repo"},
@@ -299,11 +295,33 @@ def test_add_app_bakes_resolved_default_into_url(test_client, db_session):
     assert rows[0].branch == ""
 
 
+def test_add_uses_worker_resolved_branch_not_server(test_client, db_session):
+    """The branch is resolved in the worker (as the user), not the server. add()
+    must not call the server-side default-branch resolver — otherwise a private
+    repo's non-main default would be lost to the server's 'main' fallback."""
+    manifest = _make_manifest(name="Private")
+    with patch("fileglancer.apps.discover_app_manifests",
+               new=AsyncMock(return_value=("develop", [("", manifest)]))), \
+         patch("fileglancer.apps.manifest._resolve_default_branch",
+               new=AsyncMock(side_effect=AssertionError("server must not resolve"))):
+        response = test_client.post(
+            "/api/apps",
+            json={"url": "https://github.com/owner/private-repo"},
+        )
+
+    assert response.status_code == 200
+    rows = list_user_apps(db_session, TEST_USERNAME)
+    assert len(rows) == 1
+    # The worker-resolved default (develop) is baked into the stored URL.
+    assert rows[0].url == "https://github.com/owner/private-repo/tree/develop"
+    assert rows[0].branch == ""
+
+
 def test_add_app_pinned_revision_kept(test_client, db_session):
     """An explicit '/tree/dev' URL is pinned: branch records 'dev'."""
     manifest = _make_manifest(name="Pinned")
     with patch("fileglancer.apps.discover_app_manifests",
-               new=AsyncMock(return_value=[("", manifest)])):
+               new=AsyncMock(return_value=("dev", [("", manifest)]))):
         response = test_client.post(
             "/api/apps",
             json={"url": "https://github.com/owner/repo/tree/dev"},
@@ -324,9 +342,7 @@ def test_add_app_dedups_bare_against_resolved_default(test_client, db_session):
               branch="", manifest=manifest.model_dump(mode="json"))
 
     with patch("fileglancer.apps.discover_app_manifests",
-               new=AsyncMock(return_value=[("", manifest)])), \
-         patch("fileglancer.apps.manifest._resolve_default_branch",
-               new=AsyncMock(return_value="master")):
+               new=AsyncMock(return_value=("master", [("", manifest)]))):
         response = test_client.post(
             "/api/apps",
             json={"url": "https://github.com/owner/repo"},
@@ -343,9 +359,7 @@ def test_add_app_dedups(test_client, db_session):
               manifest=manifest.model_dump(mode="json"))
 
     with patch("fileglancer.apps.discover_app_manifests",
-               new=AsyncMock(return_value=[("", manifest)])), \
-         patch("fileglancer.apps.manifest._resolve_default_branch",
-               new=AsyncMock(return_value="main")):
+               new=AsyncMock(return_value=("main", [("", manifest)]))):
         response = test_client.post(
             "/api/apps",
             json={"url": "https://github.com/owner/repo"},

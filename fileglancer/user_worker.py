@@ -1035,18 +1035,29 @@ def _action_ensure_repo(request: dict, ctx: WorkerContext) -> dict:
 
 @action("discover_manifests")
 def _action_discover_manifests(request: dict, ctx: WorkerContext) -> dict:
-    """Clone/pull repo and discover all manifests."""
-    from fileglancer.apps.manifest import _ensure_repo_cache, _find_manifests_in_repo
+    """Clone/pull repo and discover all manifests.
+
+    Resolves the default branch here, in the user's worker, so a private repo's
+    real default (reachable via the user's SSH key) is used rather than the
+    server process's "main" fallback.
+    """
+    from fileglancer.apps.manifest import (
+        _ensure_repo_cache,
+        _find_manifests_in_repo,
+        get_app_branch,
+    )
     repo_dir = _run_async(_ensure_repo_cache(
         url=request["url"],
         pull=True,
     ))
+    branch = _run_async(get_app_branch(request["url"]))
     results = _find_manifests_in_repo(repo_dir)
     return {
+        "branch": branch,
         "manifests": [
             {"path": path, "manifest": manifest.model_dump(mode="json")}
             for path, manifest in results
-        ]
+        ],
     }
 
 

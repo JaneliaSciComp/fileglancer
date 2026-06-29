@@ -1681,10 +1681,11 @@ def create_app(settings):
               description="Add an app by URL (discovers all manifests in the repo)")
     async def add_user_app(body: AppAddRequest,
                            username: str = Depends(get_current_user)):
-        # Clone the repo and discover all manifests
+        # Clone the repo and discover all manifests. The worker resolves the
+        # branch as the user, so a private repo's real default is used.
         try:
-            discovered = await apps_module.discover_app_manifests(body.url,
-                                                                   username=username)
+            resolved_branch, discovered = await apps_module.discover_app_manifests(
+                body.url, username=username)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except HTTPException as e:
@@ -1707,10 +1708,10 @@ def create_app(settings):
                        f"Make sure a manifest exists in the repository.",
             )
 
-        # Bake the resolved revision into the stored URL (so a repo whose
+        # Bake the worker-resolved revision into the stored URL (so a repo whose
         # default is e.g. "master" dedups against an explicit ".../tree/master"),
         # and record the user's requested revision separately ("" = unpinned).
-        canonical_url, requested = await apps_module.resolve_app_url(body.url)
+        canonical_url, requested = apps_module.canonical_app_url(body.url, resolved_branch)
         new_apps: list[UserApp] = []
 
         with db.get_db_session(settings.db_url) as session:

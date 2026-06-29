@@ -67,8 +67,9 @@ def canonical_github_url(url: str) -> str:
     default branch" while "/tree/main" means the main branch specifically, so for
     a repo defaulting to e.g. "master" these are different refs that this
     collapses together. Callers that need the real cloned revision in the URL
-    resolve the default branch first (see resolve_app_url) rather than relying on
-    this. The frontend's buildGithubUrl/canonicalGithubUrl fold "main" the same
+    resolve the default branch first (see canonical_app_url, fed by the
+    worker-resolved branch) rather than relying on this. The frontend's
+    buildGithubUrl/canonicalGithubUrl fold "main" the same
     way, and the "is it installed?" comparison depends on both sides matching.
 
     Returns the input unchanged if it isn't a parseable GitHub URL.

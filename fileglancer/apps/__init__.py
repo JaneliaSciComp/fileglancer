@@ -6,9 +6,9 @@ from fileglancer.apps.manifest import (  # noqa: F401
     discover_app_manifests,
     fetch_app_manifest,
     get_app_branch,
+    canonical_app_url,
     get_or_load_manifest,
     refresh_cached_manifest,
-    resolve_app_url,
     set_worker_exec,
 )
 from fileglancer.apps.command import (  # noqa: F401

@@ -445,25 +445,32 @@ def _find_manifests_in_repo(repo_dir: Path) -> list[tuple[str, AppManifest]]:
 MANIFEST_FILENAME = _MANIFEST_FILENAME
 
 
-async def discover_app_manifests(url: str,
-                                 username: str | None = None) -> list[tuple[str, AppManifest]]:
+async def discover_app_manifests(
+    url: str,
+    username: str | None = None,
+) -> tuple[str, list[tuple[str, AppManifest]]]:
     """Clone/pull a GitHub repo and discover all manifest files.
 
-    Returns a list of (relative_dir_path, AppManifest) tuples.
-    Raises ValueError if the URL is invalid or the clone fails.
+    Returns (resolved_branch, [(relative_dir_path, AppManifest), ...]). The
+    resolved branch is the revision actually cloned — resolved in the same
+    process that does the clone, so a private repo's real default branch is used
+    rather than a fallback. Raises ValueError if the URL is invalid or the clone
+    fails.
 
     When username is provided, the work is delegated to a worker subprocess
-    running as the target user.
+    running as the target user (which holds the user's SSH credentials).
     """
     if username:
         result = await _dispatch(username, "discover_manifests", url=url)
-        return [
+        manifests = [
             (item["path"], AppManifest(**item["manifest"]))
             for item in result["manifests"]
         ]
+        return result["branch"], manifests
 
     repo_dir = await _ensure_repo_cache(url, pull=True)
-    return _find_manifests_in_repo(repo_dir)
+    branch = await get_app_branch(url)
+    return branch, _find_manifests_in_repo(repo_dir)
 
 
 async def fetch_app_manifest(url: str, manifest_path: str = "",
@@ -576,20 +583,19 @@ async def get_app_branch(url: str) -> str:
     return branch
 
 
-async def resolve_app_url(url: str) -> tuple[str, str]:
-    """Resolve an app URL into its (canonical_url, requested_branch) pair.
+def canonical_app_url(url: str, resolved_branch: str) -> tuple[str, str]:
+    """Build the (canonical_url, requested_branch) pair to store for an app.
 
-    Called once, at add time, to fix the app's revision. The canonical URL
-    carries the revision that will be cloned: the branch named in the URL, or —
-    when the URL is bare — the repo's default branch resolved over the network.
-    So a repo whose default is "master" yields ".../tree/master" even from a bare
-    URL, while "main" folds back to the bare URL. The revision is fixed from here
-    on; the app does not re-resolve later (re-add it to pick up a moved default).
+    Called once, at add time, to fix the app's revision. Pure string work — no
+    network: the resolved branch is supplied by the caller (resolved in whatever
+    process actually cloned the repo, e.g. the user's worker for private repos).
 
-    requested_branch is the revision the user asked for verbatim — "" means they
-    gave a bare URL and took whatever the default was at add time.
+    The canonical URL carries the resolved revision being cloned, so a repo whose
+    default is "master" yields ".../tree/master" while "main" folds to the bare
+    URL. requested_branch is the revision the user asked for verbatim — "" means
+    they gave a bare URL and took whatever the default was at add time. The
+    revision is fixed from here on; the app does not re-resolve later (re-add it
+    to pick up a moved default).
     """
     owner, repo, url_branch = _parse_github_url(url)
-    requested = url_branch or ""
-    revision = requested or await _resolve_default_branch(owner, repo)
-    return github_url_at_branch(owner, repo, revision), requested
+    return github_url_at_branch(owner, repo, resolved_branch), (url_branch or "")
