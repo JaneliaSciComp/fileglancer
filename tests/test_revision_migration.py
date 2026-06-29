@@ -112,6 +112,33 @@ def test_null_branch_legacy_row_left_untouched(engine):
     assert row.branch is None
 
 
+def test_rewrite_colliding_with_null_branch_row_is_dropped(engine):
+    """A known row that bakes to a NULL-branch legacy row's URL is dropped
+    instead of tripping the table's unique constraint."""
+    with engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO user_apps (username, url, branch, manifest_path, name, added_at) "
+            "VALUES "
+            # Left untouched: explicit URL, but the legacy row has no recorded
+            # requested/resolved branch split.
+            "('bob', 'https://github.com/o/r/tree/master', NULL, '', 'legacy', '2026-01-01'),"
+            # Would bake to the same URL as the legacy row.
+            "('bob', 'https://github.com/o/r', 'master', '', 'known', '2026-01-01')"
+        ))
+
+    with engine.begin() as conn:
+        mig._migrate_unique_table(conn, "user_apps", "username")
+
+    with engine.begin() as conn:
+        rows = conn.execute(text(
+            "SELECT name, url, branch FROM user_apps ORDER BY name"
+        )).fetchall()
+
+    assert [(r.name, r.url, r.branch) for r in rows] == [
+        ("legacy", "https://github.com/o/r/tree/master", None),
+    ]
+
+
 def test_dedupes_bare_against_explicit_revision(engine):
     """A bare master-default row collapses onto an explicit /tree/master row."""
     with engine.begin() as conn:

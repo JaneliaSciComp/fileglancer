@@ -97,11 +97,17 @@ def _migrate_unique_table(conn, table, owner_col):
 
     targets = {r.id: _target(r) for r in rows}
 
-    # Pass 1: rows already at their target URL are the winners on collision.
+    # Pass 1: rows that will remain at their current URL are the winners on
+    # collision. This includes NULL-branch legacy rows (target is None): they are
+    # deliberately left untouched, so another row that bakes to their URL must be
+    # dropped instead of violating the table's UNIQUE(owner, url, manifest_path)
+    # constraint.
     seen = {}
     for r in rows:
         t = targets[r.id]
-        if t is not None and t[0] == r.url:
+        if t is None:
+            seen[(r.owner, r.url, r.manifest_path)] = r.id
+        elif t[0] == r.url:
             seen[(r.owner, t[0], r.manifest_path)] = r.id
 
     # Pass 2: rewrite the rest, dropping any that collide with a claimed URL.
