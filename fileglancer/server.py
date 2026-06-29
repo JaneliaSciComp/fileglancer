@@ -87,6 +87,56 @@ class RequestIdMiddleware:
         await self.app(scope, receive, send_with_request_id)
 
 
+class PrivateNetworkAccessMiddleware:
+    """Pure ASGI middleware that grants browser Private Network Access (PNA)
+    preflights.
+
+    Chromium browsers (Chrome/Edge) send a CORS preflight before any request from
+    a public-origin page (e.g. https://neuroglancer-demo.appspot.com) to a
+    private-network address (e.g. an internal host serving Fileglancer's /files/
+    data links). The preflight carries `Access-Control-Request-Private-Network: true`,
+    and the request only proceeds if the response echoes
+    `Access-Control-Allow-Private-Network: true`. Starlette's CORSMiddleware does not
+    emit this header, so without it Chromium blocks cross-origin viewers
+    (Neuroglancer/N5/Vizarr) from loading data hosted on an internal network.
+
+    (Firefox uses a separate user-permission model -- Local Network Access -- rather
+    than this header, so this neither helps nor harms Firefox.)
+
+    Registered outside CORSMiddleware so it can append the header to the preflight
+    response that CORSMiddleware generates. Implemented as pure ASGI so it only
+    touches response headers without re-wrapping the body. The header is added only
+    when the PNA request header is present, which the browser sends solely on
+    preflights, so it never appears on normal data responses.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        # ASGI lowercases header names; the request header value is the ASCII "true".
+        requested = any(
+            name == b"access-control-request-private-network"
+            and value.strip().lower() == b"true"
+            for name, value in scope.get("headers", [])
+        )
+        if not requested:
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_pna(message):
+            if message["type"] == "http.response.start":
+                headers = message.setdefault("headers", [])
+                headers.append((b"access-control-allow-private-network", b"true"))
+            await send(message)
+
+        await self.app(scope, receive, send_with_pna)
+
+
 # Read version once at module load time
 def _read_version() -> str:
     """Read version from package metadata or package.json file"""
@@ -539,6 +589,10 @@ def create_app(settings):
         allow_headers=["*"],
         expose_headers=["Range", "Content-Range", "x-amz-request-id"],
     )
+
+    # Echo Access-Control-Allow-Private-Network on PNA preflights. Added after
+    # (i.e. outside) CORSMiddleware so it wraps the preflight response CORS emits.
+    app.add_middleware(PrivateNetworkAccessMiddleware)
 
 
     @app.exception_handler(StarletteHTTPException)

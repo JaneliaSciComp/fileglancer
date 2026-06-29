@@ -132,6 +132,28 @@ def test_version_endpoint(test_client):
     assert isinstance(data["version"], str)
 
 
+def test_pna_preflight_grants_private_network(test_client):
+    """A CORS preflight carrying Access-Control-Request-Private-Network must be
+    answered with Access-Control-Allow-Private-Network: true so Chromium permits
+    public-origin viewers (e.g. Neuroglancer) to load data from an internal host."""
+    response = test_client.options(
+        "/files/somekey/some.zarr/.zattrs",
+        headers={
+            "Origin": "https://neuroglancer-demo.appspot.com",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Private-Network": "true",
+        },
+    )
+    assert response.headers.get("access-control-allow-private-network") == "true"
+
+
+def test_pna_header_absent_without_request(test_client):
+    """The PNA grant header must not leak onto responses that did not ask for it."""
+    response = test_client.get("/api/version")
+    assert response.status_code == 200
+    assert "access-control-allow-private-network" not in response.headers
+
+
 def test_root_endpoint(test_client):
     """Test root endpoint - should serve SPA index.html"""
     response = test_client.get("/", follow_redirects=False)
