@@ -1132,6 +1132,24 @@ class TestCanonicalGithubUrl:
             _parse_github_url(url)
 
 
+class TestGithubUrlAtBranch:
+    def test_default_branch_folds_to_bare(self):
+        from fileglancer.giturls import github_url_at_branch
+
+        assert (
+            github_url_at_branch("Org", "Repo", "main")
+            == "https://github.com/Org/Repo"
+        )
+
+    def test_non_default_branch_is_explicit(self):
+        from fileglancer.giturls import github_url_at_branch
+
+        assert (
+            github_url_at_branch("Org", "Repo", "master")
+            == "https://github.com/Org/Repo/tree/master"
+        )
+
+
 class TestCloneFallback:
     def test_auth_error_detection(self):
         assert _is_git_auth_error(

@@ -14,7 +14,11 @@ from fileglancer.apps.adapters import try_adapt
 # GitHub URL parsing/canonicalization lives in fileglancer.giturls (which has no
 # fileglancer deps) so the database layer can reuse it without an import cycle.
 # Re-exported for the apps module's internal callers and existing imports.
-from fileglancer.giturls import _parse_github_url, canonical_github_url  # noqa: F401
+from fileglancer.giturls import (  # noqa: F401
+    _parse_github_url,
+    canonical_github_url,
+    github_url_at_branch,
+)
 from fileglancer.model import AppManifest
 from fileglancer.settings import get_settings
 
@@ -516,13 +520,13 @@ async def get_or_load_manifest(username: str, url: str,
     manifest = await fetch_app_manifest(url, manifest_path, username=username)
 
     if row_exists:
-        branch = await get_app_branch(url)
+        # branch=None: this is a cache refresh, so leave the requested revision
+        # (the branch column) untouched.
         with db.get_db_session(settings.db_url) as session:
             db.upsert_user_app(
                 session, username,
                 url=url, manifest_path=manifest_path,
                 name=manifest.name, description=manifest.description,
-                branch=branch,
                 manifest=manifest.model_dump(mode="json"),
                 bump_updated_at=False,
             )
@@ -533,7 +537,7 @@ async def get_or_load_manifest(username: str, url: str,
 async def refresh_cached_manifest(username: str, url: str,
                                    manifest_path: str = "",
                                    bump_updated_at: bool = False
-                                   ) -> tuple[AppManifest, str]:
+                                   ) -> AppManifest:
     """Re-read the manifest from disk and sync the cache.
 
     Call this after any operation that mutates the on-disk YAML
@@ -541,12 +545,11 @@ async def refresh_cached_manifest(username: str, url: str,
 
     No-op on the DB if (username, url, manifest_path) has no row —
     callers that need to insert a new row should use upsert_user_app
-    directly.
+    directly. Leaves the requested revision (the branch column) untouched.
 
-    Returns (manifest, branch).
+    Returns the refreshed manifest.
     """
     manifest = await fetch_app_manifest(url, manifest_path, username=username)
-    branch = await get_app_branch(url)
 
     settings = get_settings()
     with db.get_db_session(settings.db_url) as session:
@@ -555,12 +558,11 @@ async def refresh_cached_manifest(username: str, url: str,
                 session, username,
                 url=url, manifest_path=manifest_path,
                 name=manifest.name, description=manifest.description,
-                branch=branch,
                 manifest=manifest.model_dump(mode="json"),
                 bump_updated_at=bump_updated_at,
             )
 
-    return manifest, branch
+    return manifest
 
 
 async def get_app_branch(url: str) -> str:
@@ -572,3 +574,22 @@ async def get_app_branch(url: str) -> str:
     if not branch:
         branch = await _resolve_default_branch(owner, repo)
     return branch
+
+
+async def resolve_app_url(url: str) -> tuple[str, str]:
+    """Resolve an app URL into its (canonical_url, requested_branch) pair.
+
+    Called once, at add time, to fix the app's revision. The canonical URL
+    carries the revision that will be cloned: the branch named in the URL, or —
+    when the URL is bare — the repo's default branch resolved over the network.
+    So a repo whose default is "master" yields ".../tree/master" even from a bare
+    URL, while "main" folds back to the bare URL. The revision is fixed from here
+    on; the app does not re-resolve later (re-add it to pick up a moved default).
+
+    requested_branch is the revision the user asked for verbatim — "" means they
+    gave a bare URL and took whatever the default was at add time.
+    """
+    owner, repo, url_branch = _parse_github_url(url)
+    requested = url_branch or ""
+    revision = requested or await _resolve_default_branch(owner, repo)
+    return github_url_at_branch(owner, repo, revision), requested

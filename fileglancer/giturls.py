@@ -58,10 +58,20 @@ def _parse_github_url(url: str) -> tuple[str, str, str | None]:
 def canonical_github_url(url: str) -> str:
     """Normalize a GitHub URL to its canonical https form.
 
-    Strips a ".git" suffix, trailing slash, and a redundant "/tree/main", and
-    folds SSH forms to https — so the same repo always has one stored
-    representation. A non-default branch is kept as "/tree/<branch>". Returns the
-    input unchanged if it isn't a parseable GitHub URL.
+    Strips a ".git" suffix and trailing slash, folds SSH forms to https, and
+    treats "/tree/main" as the bare repo URL — so the same repo has one stored
+    representation. Any other branch is kept as "/tree/<branch>".
+
+    Note the "main" folding is shorthand for "the default branch", which is only
+    accurate for repos whose default actually is "main": a bare URL means "the
+    default branch" while "/tree/main" means the main branch specifically, so for
+    a repo defaulting to e.g. "master" these are different refs that this
+    collapses together. Callers that need the real cloned revision in the URL
+    resolve the default branch first (see resolve_app_url) rather than relying on
+    this. The frontend's buildGithubUrl/canonicalGithubUrl fold "main" the same
+    way, and the "is it installed?" comparison depends on both sides matching.
+
+    Returns the input unchanged if it isn't a parseable GitHub URL.
     """
     try:
         owner, repo, branch = _parse_github_url(url)
@@ -70,3 +80,13 @@ def canonical_github_url(url: str) -> str:
     if branch and branch != "main":
         return f"https://github.com/{owner}/{repo}/tree/{branch}"
     return f"https://github.com/{owner}/{repo}"
+
+
+def github_url_at_branch(owner: str, repo: str, branch: str) -> str:
+    """Build the canonical https URL for owner/repo at a specific branch.
+
+    The default branch "main" folds away (a bare repo URL implies it), so a
+    non-default branch like "master" stays explicit as "/tree/master". Use this
+    to bake a *resolved* revision into a stored app URL.
+    """
+    return canonical_github_url(f"https://github.com/{owner}/{repo}/tree/{branch}")

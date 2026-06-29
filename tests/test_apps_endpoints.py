@@ -184,23 +184,21 @@ def test_get_apps_uses_db_cache(test_client, db_session):
 
 
 def test_get_apps_backfills_null_manifest(test_client, db_session):
-    _seed_app(db_session, manifest=None, branch=None, name="Stale Name")
+    _seed_app(db_session, manifest=None, branch="dev", name="Stale Name")
     manifest = _make_manifest(name="Fresh Name", description="Fresh")
 
-    # refresh_cached_manifest calls these directly inside apps/core.py, so
-    # patches must target the core namespace, not the apps re-export.
+    # refresh_cached_manifest calls fetch_app_manifest directly inside
+    # apps/manifest.py, so patch the manifest namespace, not the apps re-export.
     with patch("fileglancer.apps.manifest.fetch_app_manifest",
-               new=AsyncMock(return_value=manifest)) as mock_fetch, \
-         patch("fileglancer.apps.manifest.get_app_branch",
-               new=AsyncMock(return_value="dev")) as mock_branch:
+               new=AsyncMock(return_value=manifest)) as mock_fetch:
         response = test_client.get("/api/apps")
 
     assert response.status_code == 200
     assert mock_fetch.await_count == 1
-    assert mock_branch.await_count == 1
 
     body = response.json()
     assert body[0]["name"] == "Fresh Name"
+    # The backfill only fills the manifest; the requested revision is preserved.
     assert body[0]["branch"] == "dev"
     assert body[0]["manifest"]["name"] == "Fresh Name"
 
@@ -251,10 +249,12 @@ def test_get_apps_backfill_handles_fetch_failure(test_client, db_session):
 
 
 def test_add_app_persists_manifest_and_branch(test_client, db_session):
+    """A bare URL is unpinned: branch is "" and the resolved default (main) folds
+    to the bare canonical URL."""
     manifest = _make_manifest(name="From Add")
     with patch("fileglancer.apps.discover_app_manifests",
                new=AsyncMock(return_value=[("", manifest)])), \
-         patch("fileglancer.apps.get_app_branch",
+         patch("fileglancer.apps.manifest._resolve_default_branch",
                new=AsyncMock(return_value="main")):
         response = test_client.post(
             "/api/apps",
@@ -265,24 +265,86 @@ def test_add_app_persists_manifest_and_branch(test_client, db_session):
     body = response.json()
     assert len(body) == 1
     assert body[0]["name"] == "From Add"
-    assert body[0]["branch"] == "main"
+    assert body[0]["branch"] == ""
+    assert body[0]["url"] == "https://github.com/owner/repo"
     assert body[0]["manifest"]["name"] == "From Add"
 
     rows = list_user_apps(db_session, TEST_USERNAME)
     assert len(rows) == 1
     assert rows[0].manifest["name"] == "From Add"
-    assert rows[0].branch == "main"
+    assert rows[0].branch == ""
+
+
+def test_add_app_bakes_resolved_default_into_url(test_client, db_session):
+    """A bare URL for a repo whose default is 'master' stores '/tree/master', so
+    it dedups against an explicit '/tree/master' add. branch stays "" (unpinned)."""
+    manifest = _make_manifest(name="Master Default")
+    with patch("fileglancer.apps.discover_app_manifests",
+               new=AsyncMock(return_value=[("", manifest)])), \
+         patch("fileglancer.apps.manifest._resolve_default_branch",
+               new=AsyncMock(return_value="master")):
+        response = test_client.post(
+            "/api/apps",
+            json={"url": "https://github.com/owner/repo"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body[0]["url"] == "https://github.com/owner/repo/tree/master"
+    assert body[0]["branch"] == ""
+
+    rows = list_user_apps(db_session, TEST_USERNAME)
+    assert len(rows) == 1
+    assert rows[0].url == "https://github.com/owner/repo/tree/master"
+    assert rows[0].branch == ""
+
+
+def test_add_app_pinned_revision_kept(test_client, db_session):
+    """An explicit '/tree/dev' URL is pinned: branch records 'dev'."""
+    manifest = _make_manifest(name="Pinned")
+    with patch("fileglancer.apps.discover_app_manifests",
+               new=AsyncMock(return_value=[("", manifest)])):
+        response = test_client.post(
+            "/api/apps",
+            json={"url": "https://github.com/owner/repo/tree/dev"},
+        )
+
+    assert response.status_code == 200
+    rows = list_user_apps(db_session, TEST_USERNAME)
+    assert len(rows) == 1
+    assert rows[0].url == "https://github.com/owner/repo/tree/dev"
+    assert rows[0].branch == "dev"
+
+
+def test_add_app_dedups_bare_against_resolved_default(test_client, db_session):
+    """The dedup-hole fix: a bare URL for a master-default repo matches an already
+    stored '/tree/master' row, so the add is a no-op (409)."""
+    manifest = _make_manifest()
+    _seed_app(db_session, url="https://github.com/owner/repo/tree/master",
+              branch="", manifest=manifest.model_dump(mode="json"))
+
+    with patch("fileglancer.apps.discover_app_manifests",
+               new=AsyncMock(return_value=[("", manifest)])), \
+         patch("fileglancer.apps.manifest._resolve_default_branch",
+               new=AsyncMock(return_value="master")):
+        response = test_client.post(
+            "/api/apps",
+            json={"url": "https://github.com/owner/repo"},
+        )
+
+    assert response.status_code == 409
+    assert len(list_user_apps(db_session, TEST_USERNAME)) == 1
 
 
 def test_add_app_dedups(test_client, db_session):
     """Adding the same repo twice returns 409 and inserts no new rows."""
     manifest = _make_manifest()
-    _seed_app(db_session, url="https://github.com/owner/repo",
+    _seed_app(db_session, url="https://github.com/owner/repo", branch="",
               manifest=manifest.model_dump(mode="json"))
 
     with patch("fileglancer.apps.discover_app_manifests",
                new=AsyncMock(return_value=[("", manifest)])), \
-         patch("fileglancer.apps.get_app_branch",
+         patch("fileglancer.apps.manifest._resolve_default_branch",
                new=AsyncMock(return_value="main")):
         response = test_client.post(
             "/api/apps",
@@ -362,6 +424,49 @@ def test_update_app_pulls_separate_code_repo(test_client, db_session):
 
     rows = list_user_apps(db_session, TEST_USERNAME)
     assert rows[0].manifest["repo_url"] == "https://github.com/tools/code"
+
+
+@pytest.mark.parametrize(
+    "stored_url,stored_branch",
+    [
+        # Unpinned app pinned to master at add time.
+        ("https://github.com/owner/repo/tree/master", ""),
+        # Explicitly pinned app.
+        ("https://github.com/owner/repo/tree/dev", "dev"),
+    ],
+)
+def test_update_pulls_stored_revision_and_never_re_resolves(
+    test_client, db_session, stored_url, stored_branch
+):
+    """The revision is fixed at add time: update re-pulls the stored URL as-is,
+    never re-resolving the default branch or moving the app to a new URL."""
+    _seed_app(db_session, url=stored_url, branch=stored_branch,
+              manifest=None, name="Old")
+    fresh = _make_manifest(name="New")
+
+    with patch("fileglancer.apps.fetch_app_manifest",
+               new=AsyncMock(return_value=fresh)), \
+         patch("fileglancer.apps.manifest._resolve_default_branch",
+               new=AsyncMock(side_effect=AssertionError("must not re-resolve"))), \
+         patch("fileglancer.apps._ensure_repo_cache",
+               new=AsyncMock(return_value="/tmp/x")) as mock_ensure:
+        response = test_client.post(
+            "/api/apps/update",
+            json={"url": stored_url, "manifest_path": ""},
+        )
+
+    assert response.status_code == 200
+    assert mock_ensure.await_args_list[0].args == (stored_url,)
+    body = response.json()
+    assert body["url"] == stored_url
+    assert body["branch"] == stored_branch
+    assert body["manifest"]["name"] == "New"
+
+    rows = list_user_apps(db_session, TEST_USERNAME)
+    assert len(rows) == 1
+    assert rows[0].url == stored_url
+    # The revision fixed at add time is preserved.
+    assert rows[0].branch == stored_branch
 
 
 def test_delete_app_removes_row(test_client, db_session):
@@ -507,23 +612,21 @@ async def test_refresh_cached_manifest_syncs_existing_row(test_app, db_session):
     """refresh_cached_manifest updates an existing row from disk."""
     from fileglancer.apps import refresh_cached_manifest
 
-    _seed_app(db_session, manifest=None, name="Stale")
+    _seed_app(db_session, manifest=None, name="Stale", branch="dev")
     fresh = _make_manifest(name="Synced")
 
     with patch("fileglancer.apps.manifest.fetch_app_manifest",
-               new=AsyncMock(return_value=fresh)), \
-         patch("fileglancer.apps.manifest.get_app_branch",
-               new=AsyncMock(return_value="main")):
-        manifest, branch = await refresh_cached_manifest(
+               new=AsyncMock(return_value=fresh)):
+        manifest = await refresh_cached_manifest(
             TEST_USERNAME, "https://github.com/owner/repo", "",
         )
 
     assert manifest.name == "Synced"
-    assert branch == "main"
 
     rows = list_user_apps(db_session, TEST_USERNAME)
     assert rows[0].manifest["name"] == "Synced"
-    assert rows[0].branch == "main"
+    # A cache refresh leaves the requested revision (branch) untouched.
+    assert rows[0].branch == "dev"
     # Silent refresh by default — updated_at stays NULL.
     assert rows[0].updated_at is None
 
@@ -535,10 +638,8 @@ async def test_refresh_cached_manifest_no_op_for_uninstalled(test_app, db_sessio
 
     fresh = _make_manifest()
     with patch("fileglancer.apps.manifest.fetch_app_manifest",
-               new=AsyncMock(return_value=fresh)), \
-         patch("fileglancer.apps.manifest.get_app_branch",
-               new=AsyncMock(return_value="main")):
-        manifest, branch = await refresh_cached_manifest(
+               new=AsyncMock(return_value=fresh)):
+        manifest = await refresh_cached_manifest(
             TEST_USERNAME, "https://github.com/new/repo", "",
         )
 
@@ -555,9 +656,7 @@ async def test_refresh_cached_manifest_bumps_updated_at(test_app, db_session):
     fresh = _make_manifest(name="Updated")
 
     with patch("fileglancer.apps.manifest.fetch_app_manifest",
-               new=AsyncMock(return_value=fresh)), \
-         patch("fileglancer.apps.manifest.get_app_branch",
-               new=AsyncMock(return_value="main")):
+               new=AsyncMock(return_value=fresh)):
         await refresh_cached_manifest(
             TEST_USERNAME, "https://github.com/owner/repo", "",
             bump_updated_at=True,

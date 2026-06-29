@@ -1095,6 +1095,11 @@ def upsert_user_app(session: Session, username: str, url: str,
     On update, added_at is preserved. updated_at is bumped only when
     bump_updated_at is True (the default) — set False for invisible
     refreshes like a lazy manifest backfill.
+
+    branch holds the user's *requested* revision ("" means unpinned / track the
+    default branch). Pass branch=None to leave an existing row's branch
+    untouched — manifest-cache refreshes use this so they don't clobber the
+    requested revision with a resolved one.
     """
     now = datetime.now(UTC)
     url = canonical_github_url(url)
@@ -1114,7 +1119,8 @@ def upsert_user_app(session: Session, username: str, url: str,
     else:
         row.name = name
         row.description = description
-        row.branch = branch
+        if branch is not None:
+            row.branch = branch
         row.manifest = manifest
         if bump_updated_at:
             row.updated_at = now
