@@ -1096,10 +1096,12 @@ def upsert_user_app(session: Session, username: str, url: str,
     bump_updated_at is True (the default) — set False for invisible
     refreshes like a lazy manifest backfill.
 
-    branch holds the user's *requested* revision ("" means unpinned / track the
-    default branch). Pass branch=None to leave an existing row's branch
-    untouched — manifest-cache refreshes use this so they don't clobber the
-    requested revision with a resolved one.
+    branch holds the user's *requested* revision ("" means no explicit revision
+    was requested). The fixed revision actually cloned is encoded in url; due to
+    canonical URL folding, a bare stored URL means the fixed "main" revision.
+    Pass branch=None to leave an existing row's branch untouched —
+    manifest-cache refreshes use this so they don't clobber the requested
+    revision with a resolved one.
     """
     now = datetime.now(UTC)
     url = canonical_github_url(url)

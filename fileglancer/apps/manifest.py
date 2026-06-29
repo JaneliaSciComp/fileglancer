@@ -18,6 +18,7 @@ from fileglancer.giturls import (  # noqa: F401
     _parse_github_url,
     canonical_github_url,
     github_url_at_branch,
+    github_url_with_branch,
 )
 from fileglancer.model import AppManifest
 from fileglancer.settings import get_settings
@@ -469,7 +470,10 @@ async def discover_app_manifests(
         return result["branch"], manifests
 
     repo_dir = await _ensure_repo_cache(url, pull=True)
-    branch = await get_app_branch(url)
+    owner, repo, _ = _parse_github_url(url)
+    branch = repo_dir.relative_to(
+        (_repo_cache_base() / owner / repo).resolve()
+    ).as_posix()
     return branch, _find_manifests_in_repo(repo_dir)
 
 
@@ -517,6 +521,7 @@ async def get_or_load_manifest(username: str, url: str,
         row = db.get_user_app(session, username, url, manifest_path)
         stored = row.manifest if row else None
         row_exists = row is not None
+        row_url = row.url if row is not None else url
 
     if stored is not None:
         try:
@@ -524,7 +529,8 @@ async def get_or_load_manifest(username: str, url: str,
         except ValidationError as e:
             logger.warning(f"Stored manifest schema mismatch for {url}: {e}")
 
-    manifest = await fetch_app_manifest(url, manifest_path, username=username)
+    fetch_url = clone_url_for_stored_app(row_url) if row_exists else url
+    manifest = await fetch_app_manifest(fetch_url, manifest_path, username=username)
 
     if row_exists:
         # branch=None: this is a cache refresh, so leave the requested revision
@@ -532,7 +538,7 @@ async def get_or_load_manifest(username: str, url: str,
         with db.get_db_session(settings.db_url) as session:
             db.upsert_user_app(
                 session, username,
-                url=url, manifest_path=manifest_path,
+                url=row_url, manifest_path=manifest_path,
                 name=manifest.name, description=manifest.description,
                 manifest=manifest.model_dump(mode="json"),
                 bump_updated_at=False,
@@ -556,14 +562,20 @@ async def refresh_cached_manifest(username: str, url: str,
 
     Returns the refreshed manifest.
     """
-    manifest = await fetch_app_manifest(url, manifest_path, username=username)
-
     settings = get_settings()
     with db.get_db_session(settings.db_url) as session:
-        if db.get_user_app(session, username, url, manifest_path) is not None:
+        row = db.get_user_app(session, username, url, manifest_path)
+        row_exists = row is not None
+        row_url = row.url if row_exists else url
+
+    fetch_url = clone_url_for_stored_app(row_url) if row_exists else url
+    manifest = await fetch_app_manifest(fetch_url, manifest_path, username=username)
+
+    with db.get_db_session(settings.db_url) as session:
+        if row_exists:
             db.upsert_user_app(
                 session, username,
-                url=url, manifest_path=manifest_path,
+                url=row_url, manifest_path=manifest_path,
                 name=manifest.name, description=manifest.description,
                 manifest=manifest.model_dump(mode="json"),
                 bump_updated_at=bump_updated_at,
@@ -599,3 +611,16 @@ def canonical_app_url(url: str, resolved_branch: str) -> tuple[str, str]:
     """
     owner, repo, url_branch = _parse_github_url(url)
     return github_url_at_branch(owner, repo, resolved_branch), (url_branch or "")
+
+
+def clone_url_for_stored_app(url: str) -> str:
+    """Return the explicit GitHub URL to clone/fetch for a stored app URL.
+
+    Stored app URLs are canonical and intentionally fold the fixed "main"
+    revision to a bare URL for UI and de-dupe compatibility. A bare GitHub URL is
+    unsafe for operational git work, though, because git interprets it as "the
+    repo's current default branch". Treat a stored bare URL as the fixed "main"
+    revision and make it explicit before cloning, fetching, or reading from disk.
+    """
+    owner, repo, branch = _parse_github_url(url)
+    return github_url_with_branch(owner, repo, branch or "main")

@@ -3,8 +3,9 @@
 Rewrites stored app/listing URLs so the canonical URL always carries the
 revision actually cloned (e.g. ".../tree/master" for a repo whose default is
 "master"; "main" still folds to the bare URL). The ``branch`` column flips to
-mean the *requested* revision — "" when the app was added from a bare URL and
-should track the default branch.
+mean the *requested* revision — "" when the app was added from a bare URL. The
+revision is fixed at migration/add time; a bare stored URL means the fixed
+"main" revision, not "whatever the default branch is now".
 
 Before this migration ``branch`` held the resolved revision and the bare/master
 ambiguity meant a bare URL and an explicit "/tree/master" were stored as two

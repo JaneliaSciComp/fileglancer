@@ -91,3 +91,13 @@ def github_url_at_branch(owner: str, repo: str, branch: str) -> str:
     to bake a *resolved* revision into a stored app URL.
     """
     return canonical_github_url(f"https://github.com/{owner}/{repo}/tree/{branch}")
+
+
+def github_url_with_branch(owner: str, repo: str, branch: str) -> str:
+    """Build an explicit https URL for owner/repo at branch.
+
+    Unlike github_url_at_branch, this intentionally does *not* fold "main" to a
+    bare repo URL. Use it for operational clone/fetch calls where a bare URL
+    would mean "current default branch" and therefore could move over time.
+    """
+    return f"https://github.com/{owner}/{repo}/tree/{branch}"

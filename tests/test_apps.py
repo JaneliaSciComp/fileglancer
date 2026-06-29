@@ -1150,6 +1150,24 @@ class TestGithubUrlAtBranch:
         )
 
 
+class TestCloneUrlForStoredApp:
+    def test_bare_stored_url_means_fixed_main(self):
+        from fileglancer.apps import clone_url_for_stored_app
+
+        assert (
+            clone_url_for_stored_app("https://github.com/Org/Repo")
+            == "https://github.com/Org/Repo/tree/main"
+        )
+
+    def test_non_main_revision_stays_explicit(self):
+        from fileglancer.apps import clone_url_for_stored_app
+
+        assert (
+            clone_url_for_stored_app("https://github.com/Org/Repo/tree/master")
+            == "https://github.com/Org/Repo/tree/master"
+        )
+
+
 class TestCloneFallback:
     def test_auth_error_detection(self):
         assert _is_git_auth_error(

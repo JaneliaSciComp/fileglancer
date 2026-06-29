@@ -350,13 +350,14 @@ def test_add_from_listing_creates_independent_user_app(
     with patch(
         "fileglancer.apps.fetch_app_manifest",
         new=AsyncMock(return_value=fresh),
-    ), patch(
-        "fileglancer.apps.get_app_branch",
-        new=AsyncMock(return_value="main"),
-    ):
+    ) as mock_fetch:
         response = client.post(f"/api/catalog/{listing.id}/add")
 
     assert response.status_code == 200
+    assert mock_fetch.await_args.args == (
+        "https://github.com/owner/repo/tree/main",
+        "",
+    )
     body = response.json()
     assert body["name"] == "Custom Name"
     assert body["description"] == "Custom description"

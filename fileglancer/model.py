@@ -617,7 +617,7 @@ class UserApp(BaseModel):
     """A user's saved app reference"""
     url: str = Field(description="URL to the app manifest")
     manifest_path: str = Field(description="Relative directory path to the manifest within the repo", default="")
-    branch: Optional[str] = Field(description="Revision the user requested; empty means track the repo's default branch. The actually-cloned revision is baked into url.", default=None)
+    branch: Optional[str] = Field(description="Revision the user requested; empty means no explicit revision was requested. The fixed actually-cloned revision is baked into url; a bare stored URL means main.", default=None)
     name: str = Field(description="App name from manifest")
     description: Optional[str] = Field(description="App description from manifest", default=None)
     added_at: datetime = Field(description="When the app was added")
@@ -635,7 +635,7 @@ class AppListing(BaseModel):
     owner_username: str = Field(description="The user who published this listing")
     url: str = Field(description="Git URL of the app repo")
     manifest_path: str = Field(description="Manifest path within the repo", default="")
-    branch: Optional[str] = Field(description="Revision the user requested; empty means track the repo's default branch. The actually-cloned revision is baked into url.", default=None)
+    branch: Optional[str] = Field(description="Revision the user requested; empty means no explicit revision was requested. The fixed actually-cloned revision is baked into url; a bare stored URL means main.", default=None)
     name: str = Field(description="Display name for the catalog")
     description: Optional[str] = Field(description="Description for the catalog", default=None)
     published_at: datetime = Field(description="When this listing was published")

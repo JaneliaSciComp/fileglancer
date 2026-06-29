@@ -184,7 +184,8 @@ def test_get_apps_uses_db_cache(test_client, db_session):
 
 
 def test_get_apps_backfills_null_manifest(test_client, db_session):
-    _seed_app(db_session, manifest=None, branch="dev", name="Stale Name")
+    _seed_app(db_session, url="https://github.com/owner/repo/tree/dev",
+              manifest=None, branch="dev", name="Stale Name")
     manifest = _make_manifest(name="Fresh Name", description="Fresh")
 
     # refresh_cached_manifest calls fetch_app_manifest directly inside
@@ -377,8 +378,8 @@ def test_update_app_persists_manifest(test_client, db_session):
 
     with patch("fileglancer.apps.fetch_app_manifest",
                new=AsyncMock(return_value=fresh)), \
-         patch("fileglancer.apps.get_app_branch",
-               new=AsyncMock(return_value="main")), \
+         patch("fileglancer.apps.manifest._resolve_default_branch",
+               new=AsyncMock(side_effect=AssertionError("must not re-resolve"))), \
          patch("fileglancer.apps._ensure_repo_cache",
                new=AsyncMock(return_value="/tmp/x")) as mock_ensure:
         response = test_client.post(
@@ -392,13 +393,16 @@ def test_update_app_persists_manifest(test_client, db_session):
         "pull": True,
         "username": TEST_USERNAME,
     }
-    assert mock_ensure.await_args.args == ("https://github.com/owner/repo",)
+    # A stored bare URL means the fixed "main" revision, not current default.
+    assert mock_ensure.await_args.args == ("https://github.com/owner/repo/tree/main",)
     body = response.json()
+    assert body["url"] == "https://github.com/owner/repo"
     assert body["name"] == "New"
     assert body["updated_at"] is not None
 
     rows = list_user_apps(db_session, TEST_USERNAME)
     assert len(rows) == 1
+    assert rows[0].url == "https://github.com/owner/repo"
     assert rows[0].name == "New"
     assert rows[0].manifest["name"] == "New"
     assert rows[0].updated_at is not None
@@ -419,8 +423,8 @@ def test_update_app_pulls_separate_code_repo(test_client, db_session):
 
     with patch("fileglancer.apps.fetch_app_manifest",
                new=AsyncMock(return_value=fresh)), \
-         patch("fileglancer.apps.get_app_branch",
-               new=AsyncMock(return_value="main")), \
+         patch("fileglancer.apps.manifest._resolve_default_branch",
+               new=AsyncMock(side_effect=AssertionError("must not re-resolve"))), \
          patch("fileglancer.apps._ensure_repo_cache",
                new=AsyncMock(return_value="/tmp/x")) as mock_ensure:
         response = test_client.post(
@@ -431,7 +435,7 @@ def test_update_app_pulls_separate_code_repo(test_client, db_session):
     assert response.status_code == 200
     assert mock_ensure.await_count == 2
     first_call, second_call = mock_ensure.await_args_list
-    assert first_call.args == ("https://github.com/owner/repo",)
+    assert first_call.args == ("https://github.com/owner/repo/tree/main",)
     assert first_call.kwargs == {"pull": True, "username": TEST_USERNAME}
     assert second_call.args == ("https://github.com/tools/code",)
     assert second_call.kwargs == {"pull": True, "username": TEST_USERNAME}
@@ -440,17 +444,51 @@ def test_update_app_pulls_separate_code_repo(test_client, db_session):
     assert rows[0].manifest["repo_url"] == "https://github.com/tools/code"
 
 
+def test_update_app_does_not_pull_same_repo_with_cosmetic_url(test_client, db_session):
+    """A manifest repo_url that canonicalizes to the stored app URL is the same
+    repo, even when the operational clone URL had to make /tree/main explicit."""
+    _seed_app(db_session, url="https://github.com/owner/repo", branch="",
+              manifest=None, name="Old")
+
+    fresh = AppManifest(
+        name="New",
+        description="New",
+        repo_url="https://github.com/owner/repo/tree/main",
+        runnables=[AppEntryPoint(id="run", name="Run", command="echo hi")],
+    )
+
+    with patch("fileglancer.apps.fetch_app_manifest",
+               new=AsyncMock(return_value=fresh)), \
+         patch("fileglancer.apps.manifest._resolve_default_branch",
+               new=AsyncMock(side_effect=AssertionError("must not re-resolve"))), \
+         patch("fileglancer.apps._ensure_repo_cache",
+               new=AsyncMock(return_value="/tmp/x")) as mock_ensure:
+        response = test_client.post(
+            "/api/apps/update",
+            json={"url": "https://github.com/owner/repo", "manifest_path": ""},
+        )
+
+    assert response.status_code == 200
+    assert mock_ensure.await_count == 1
+    assert mock_ensure.await_args.args == (
+        "https://github.com/owner/repo/tree/main",
+    )
+
+
 @pytest.mark.parametrize(
-    "stored_url,stored_branch",
+    "stored_url,stored_branch,clone_url",
     [
+        # Stored bare URL is the fixed main revision; operational git calls make
+        # that explicit so they don't follow a moved default branch.
+        ("https://github.com/owner/repo", "", "https://github.com/owner/repo/tree/main"),
         # Unpinned app pinned to master at add time.
-        ("https://github.com/owner/repo/tree/master", ""),
+        ("https://github.com/owner/repo/tree/master", "", "https://github.com/owner/repo/tree/master"),
         # Explicitly pinned app.
-        ("https://github.com/owner/repo/tree/dev", "dev"),
+        ("https://github.com/owner/repo/tree/dev", "dev", "https://github.com/owner/repo/tree/dev"),
     ],
 )
 def test_update_pulls_stored_revision_and_never_re_resolves(
-    test_client, db_session, stored_url, stored_branch
+    test_client, db_session, stored_url, stored_branch, clone_url
 ):
     """The revision is fixed at add time: update re-pulls the stored URL as-is,
     never re-resolving the default branch or moving the app to a new URL."""
@@ -470,7 +508,7 @@ def test_update_pulls_stored_revision_and_never_re_resolves(
         )
 
     assert response.status_code == 200
-    assert mock_ensure.await_args_list[0].args == (stored_url,)
+    assert mock_ensure.await_args_list[0].args == (clone_url,)
     body = response.json()
     assert body["url"] == stored_url
     assert body["branch"] == stored_branch
@@ -568,8 +606,8 @@ def test_fetch_manifest_backfills_null_cache(test_client, db_session):
 
     with patch("fileglancer.apps.manifest.fetch_app_manifest",
                new=AsyncMock(return_value=fresh)) as mock_fetch, \
-         patch("fileglancer.apps.manifest.get_app_branch",
-               new=AsyncMock(return_value="main")):
+         patch("fileglancer.apps.manifest._resolve_default_branch",
+               new=AsyncMock(side_effect=AssertionError("must not re-resolve"))):
         response = test_client.post("/api/apps/manifest", json={
             "url": "https://github.com/owner/repo",
             "manifest_path": "",
@@ -577,6 +615,10 @@ def test_fetch_manifest_backfills_null_cache(test_client, db_session):
 
     assert response.status_code == 200
     assert mock_fetch.await_count == 1
+    assert mock_fetch.await_args.args == (
+        "https://github.com/owner/repo/tree/main",
+        "",
+    )
     assert response.json()["name"] == "Backfilled"
 
     # Row was updated silently (updated_at stays NULL).
@@ -626,16 +668,23 @@ async def test_refresh_cached_manifest_syncs_existing_row(test_app, db_session):
     """refresh_cached_manifest updates an existing row from disk."""
     from fileglancer.apps import refresh_cached_manifest
 
-    _seed_app(db_session, manifest=None, name="Stale", branch="dev")
+    _seed_app(db_session, url="https://github.com/owner/repo/tree/dev",
+              manifest=None, name="Stale", branch="dev")
     fresh = _make_manifest(name="Synced")
 
     with patch("fileglancer.apps.manifest.fetch_app_manifest",
-               new=AsyncMock(return_value=fresh)):
+               new=AsyncMock(return_value=fresh)) as mock_fetch, \
+         patch("fileglancer.apps.manifest._resolve_default_branch",
+               new=AsyncMock(side_effect=AssertionError("must not re-resolve"))):
         manifest = await refresh_cached_manifest(
-            TEST_USERNAME, "https://github.com/owner/repo", "",
+            TEST_USERNAME, "https://github.com/owner/repo/tree/dev", "",
         )
 
     assert manifest.name == "Synced"
+    assert mock_fetch.await_args.args == (
+        "https://github.com/owner/repo/tree/dev",
+        "",
+    )
 
     rows = list_user_apps(db_session, TEST_USERNAME)
     assert rows[0].manifest["name"] == "Synced"

@@ -19,6 +19,7 @@ from cluster_api import ResourceSpec
 
 from fileglancer import database as db
 from fileglancer.apps.manifest import (
+    clone_url_for_stored_app,
     _dispatch,
     _ensure_repo_cache,
     get_or_load_manifest,
@@ -34,6 +35,7 @@ from fileglancer.apps.command import (
     _URI_PREFIXES,
 )
 from fileglancer.apps.jobfiles import _build_work_dir
+from fileglancer.giturls import canonical_github_url
 from fileglancer.model import AppEntryPoint
 from fileglancer.settings import get_settings
 
@@ -538,6 +540,9 @@ async def submit_job(
             if v is not None
         }
 
+    stored_app_url = app_url
+    app_clone_url = clone_url_for_stored_app(stored_app_url)
+
     with db.get_db_session(settings.db_url) as session:
         # Read user's container cache dir preference
         cache_dir_pref = db.get_user_preference(session, username, "apptainerCacheDir")
@@ -548,6 +553,9 @@ async def submit_job(
         # jobs are labeled consistently with the user's library.
         user_app = db.get_user_app(session, username, app_url, manifest_path)
         app_name = user_app.name if user_app is not None else manifest.name
+        if user_app is not None:
+            stored_app_url = user_app.url
+            app_clone_url = clone_url_for_stored_app(stored_app_url)
 
         db_job = db.create_job(
             session=session,
@@ -582,7 +590,7 @@ async def submit_job(
     # Ensure the repo is cached in the user's cache (~username/.fileglancer/apps).
     # Pulling is never done here; updates are an explicit user action via the
     # "Update" app endpoint. The manifest read above already reflects the cache.
-    if manifest.repo_url and manifest.repo_url != app_url:
+    if manifest.repo_url and canonical_github_url(manifest.repo_url) != stored_app_url:
         # Manifest and tool code live in separate repos: cache the code repo
         # and run from its root.
         cached_repo_dir = await _ensure_repo_cache(manifest.repo_url, username=username)
@@ -590,7 +598,7 @@ async def submit_job(
     else:
         # Manifest and tool code share one repo: cache it and run from the
         # subdirectory that contains the manifest.
-        cached_repo_dir = await _ensure_repo_cache(app_url, username=username)
+        cached_repo_dir = await _ensure_repo_cache(app_clone_url, username=username)
         cd_suffix = f"repo/{manifest_path}" if manifest_path else "repo"
 
     # Build environment variable export lines

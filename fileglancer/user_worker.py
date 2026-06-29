@@ -1044,13 +1044,17 @@ def _action_discover_manifests(request: dict, ctx: WorkerContext) -> dict:
     from fileglancer.apps.manifest import (
         _ensure_repo_cache,
         _find_manifests_in_repo,
-        get_app_branch,
+        _parse_github_url,
+        _repo_cache_base,
     )
     repo_dir = _run_async(_ensure_repo_cache(
         url=request["url"],
         pull=True,
     ))
-    branch = _run_async(get_app_branch(request["url"]))
+    owner, repo, _ = _parse_github_url(request["url"])
+    branch = repo_dir.relative_to(
+        (_repo_cache_base() / owner / repo).resolve()
+    ).as_posix()
     results = _find_manifests_in_repo(repo_dir)
     return {
         "branch": branch,

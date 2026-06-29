@@ -34,6 +34,7 @@ from urllib.parse import quote, unquote
 from fileglancer import database as db
 from fileglancer import auth
 from fileglancer import apps as apps_module
+from fileglancer.giturls import canonical_github_url
 from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
@@ -1761,20 +1762,27 @@ def create_app(settings):
         # The revision is fixed at add time and baked into body.url, so update
         # just pulls that revision again and re-reads the manifest — it never
         # re-resolves the default branch or moves the app to a new URL.
+        with db.get_db_session(settings.db_url) as session:
+            existing = db.get_user_app(session, username, body.url, body.manifest_path)
+            if existing is None:
+                raise HTTPException(status_code=404, detail="App not found")
+            stored_url = existing.url
+
+        clone_url = apps_module.clone_url_for_stored_app(stored_url)
         try:
-            await apps_module._ensure_repo_cache(body.url, pull=True, username=username)
+            await apps_module._ensure_repo_cache(clone_url, pull=True, username=username)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to pull latest code: {str(e)}")
 
         try:
-            manifest = await apps_module.fetch_app_manifest(body.url, body.manifest_path,
+            manifest = await apps_module.fetch_app_manifest(clone_url, body.manifest_path,
                                                             username=username)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to read manifest after update: {str(e)}")
 
-        if manifest.repo_url and manifest.repo_url != body.url:
+        if manifest.repo_url and canonical_github_url(manifest.repo_url) != stored_url:
             try:
                 await apps_module._ensure_repo_cache(
                     manifest.repo_url,
@@ -1791,7 +1799,7 @@ def create_app(settings):
             # branch omitted (None) so the revision fixed at add time is preserved.
             row = db.upsert_user_app(
                 session, username,
-                url=body.url, manifest_path=body.manifest_path,
+                url=stored_url, manifest_path=body.manifest_path,
                 name=manifest.name, description=manifest.description,
                 manifest=manifest.model_dump(mode="json"),
             )
@@ -1907,9 +1915,10 @@ def create_app(settings):
             listing_description = listing.description
             listing_branch = listing.branch or ""
 
+        clone_url = apps_module.clone_url_for_stored_app(listing_url)
         try:
             manifest = await apps_module.fetch_app_manifest(
-                listing_url, listing_manifest_path, username=username,
+                clone_url, listing_manifest_path, username=username,
             )
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
