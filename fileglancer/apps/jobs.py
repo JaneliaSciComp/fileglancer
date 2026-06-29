@@ -541,7 +541,9 @@ async def submit_job(
         }
 
     stored_app_url = app_url
-    app_clone_url = clone_url_for_stored_app(stored_app_url)
+    # Not in the user's library: clone the URL as given (a bare URL resolves the
+    # current default). Overridden below with the pinned URL when installed.
+    app_clone_url = app_url
 
     with db.get_db_session(settings.db_url) as session:
         # Read user's container cache dir preference
@@ -555,7 +557,7 @@ async def submit_job(
         app_name = user_app.name if user_app is not None else manifest.name
         if user_app is not None:
             stored_app_url = user_app.url
-            app_clone_url = clone_url_for_stored_app(stored_app_url)
+            app_clone_url = clone_url_for_stored_app(stored_app_url, user_app.branch)
 
         db_job = db.create_job(
             session=session,

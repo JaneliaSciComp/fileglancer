@@ -41,8 +41,6 @@ class _Row:
         ("https://github.com/o/r", "master", "https://github.com/o/r/tree/master", ""),
         # Explicitly pinned branch -> URL unchanged, requested recorded.
         ("https://github.com/o/r/tree/dev", "dev", "https://github.com/o/r/tree/dev", "dev"),
-        # Defensive: missing branch column falls back to the URL/main.
-        ("https://github.com/o/r", None, "https://github.com/o/r", ""),
     ],
 )
 def test_target(url, branch, expected_url, expected_requested):
@@ -51,6 +49,11 @@ def test_target(url, branch, expected_url, expected_requested):
 
 def test_target_unparseable_left_alone():
     assert mig._target(_Row("not a url", "main")) is None
+
+
+def test_target_null_branch_left_alone():
+    # Legacy rows with an unrecorded default are left untouched (not assumed main).
+    assert mig._target(_Row("https://github.com/o/r", None)) is None
 
 
 @pytest.fixture
@@ -86,6 +89,27 @@ def test_bakes_resolved_revision_and_flips_branch(engine):
     assert by_name["m"] == ("https://github.com/o/master_repo/tree/master", "")
     assert by_name["n"] == ("https://github.com/o/main_repo", "")
     assert by_name["p"] == ("https://github.com/o/pinned/tree/dev", "dev")
+
+
+def test_null_branch_legacy_row_left_untouched(engine):
+    """A row with no recorded branch (migrated from user_preferences) keeps its
+    bare URL and NULL branch — it is not assumed to be 'main'."""
+    with engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO user_apps (username, url, branch, manifest_path, name, added_at) "
+            "VALUES ('bob', 'https://github.com/o/legacy', NULL, '', 'l', '2026-01-01')"
+        ))
+
+    with engine.begin() as conn:
+        mig._migrate_unique_table(conn, "user_apps", "username")
+
+    with engine.begin() as conn:
+        row = conn.execute(text(
+            "SELECT url, branch FROM user_apps WHERE name = 'l'"
+        )).fetchone()
+
+    assert row.url == "https://github.com/o/legacy"
+    assert row.branch is None
 
 
 def test_dedupes_bare_against_explicit_revision(engine):

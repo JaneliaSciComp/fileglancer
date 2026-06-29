@@ -522,6 +522,7 @@ async def get_or_load_manifest(username: str, url: str,
         stored = row.manifest if row else None
         row_exists = row is not None
         row_url = row.url if row is not None else url
+        row_branch = row.branch if row is not None else None
 
     if stored is not None:
         try:
@@ -529,7 +530,7 @@ async def get_or_load_manifest(username: str, url: str,
         except ValidationError as e:
             logger.warning(f"Stored manifest schema mismatch for {url}: {e}")
 
-    fetch_url = clone_url_for_stored_app(row_url) if row_exists else url
+    fetch_url = clone_url_for_stored_app(row_url, row_branch) if row_exists else url
     manifest = await fetch_app_manifest(fetch_url, manifest_path, username=username)
 
     if row_exists:
@@ -567,8 +568,9 @@ async def refresh_cached_manifest(username: str, url: str,
         row = db.get_user_app(session, username, url, manifest_path)
         row_exists = row is not None
         row_url = row.url if row_exists else url
+        row_branch = row.branch if row_exists else None
 
-    fetch_url = clone_url_for_stored_app(row_url) if row_exists else url
+    fetch_url = clone_url_for_stored_app(row_url, row_branch) if row_exists else url
     manifest = await fetch_app_manifest(fetch_url, manifest_path, username=username)
 
     with db.get_db_session(settings.db_url) as session:
@@ -613,14 +615,23 @@ def canonical_app_url(url: str, resolved_branch: str) -> tuple[str, str]:
     return github_url_at_branch(owner, repo, resolved_branch), (url_branch or "")
 
 
-def clone_url_for_stored_app(url: str) -> str:
-    """Return the explicit GitHub URL to clone/fetch for a stored app URL.
+def clone_url_for_stored_app(url: str, branch: str | None) -> str:
+    """Return the explicit GitHub URL to clone/fetch for a stored app.
 
     Stored app URLs are canonical and intentionally fold the fixed "main"
     revision to a bare URL for UI and de-dupe compatibility. A bare GitHub URL is
     unsafe for operational git work, though, because git interprets it as "the
-    repo's current default branch". Treat a stored bare URL as the fixed "main"
-    revision and make it explicit before cloning, fetching, or reading from disk.
+    repo's current default branch", which can move. So for a *pinned* app, make
+    the revision explicit (a bare URL means the fixed "main").
+
+    branch is the row's recorded revision. None marks a legacy row migrated from
+    user_preferences whose default branch was never recorded: those historically
+    tracked the repo's default branch, so the URL is returned unchanged (a bare
+    URL keeps resolving the current default) rather than guessing "main", which
+    would break a repo that defaults to e.g. "master". Such rows get pinned the
+    next time the app is re-added.
     """
-    owner, repo, branch = _parse_github_url(url)
-    return github_url_with_branch(owner, repo, branch or "main")
+    if branch is None:
+        return url
+    owner, repo, url_branch = _parse_github_url(url)
+    return github_url_with_branch(owner, repo, url_branch or "main")

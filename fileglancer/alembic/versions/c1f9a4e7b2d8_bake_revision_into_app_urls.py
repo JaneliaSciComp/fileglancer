@@ -15,8 +15,14 @@ wins), mirroring b8e4f1a92c37.
 
 The requested revision is recovered from the URL's shape: a stored "/tree/<x>"
 was an explicit pin (requested = x), while a bare URL was unpinned
-(requested = ""). jobs carry no branch column and are historical, so they are
-left untouched.
+(requested = "").
+
+Rows whose ``branch`` is NULL are legacy entries migrated from
+user_preferences whose resolved default was never recorded. We can't resolve it
+here (no network), and assuming "main" would break a repo defaulting to e.g.
+"master", so those rows are left untouched and keep tracking the default branch
+until they are re-added. jobs carry no branch column and are historical, so
+they are left untouched too.
 
 Revision ID: c1f9a4e7b2d8
 Revises: b8e4f1a92c37
@@ -62,13 +68,21 @@ def _at_branch(owner, repo, branch):
 
 
 def _target(row):
-    """Return (new_url, requested_branch) for a row, or None to leave it alone."""
+    """Return (new_url, requested_branch) for a row, or None to leave it alone.
+
+    A NULL branch is a legacy row (migrated from user_preferences) whose resolved
+    default was never recorded. We can't resolve it here without network, and
+    assuming "main" would break a repo defaulting to e.g. "master". Leave such
+    rows untouched (branch stays NULL) so they keep tracking the default until
+    re-added; only rows with a known resolved revision are rewritten.
+    """
+    if row.branch is None:
+        return None
     parsed = _parse(row.url)
     if parsed is None:
         return None
     owner, repo, url_branch = parsed
     requested = url_branch or ""
-    # branch column held the resolved revision; fall back defensively.
     resolved = row.branch or url_branch or "main"
     return _at_branch(owner, repo, resolved), requested
 

@@ -600,14 +600,13 @@ def test_fetch_manifest_reads_disk_for_uninstalled(test_client, db_session):
 
 
 def test_fetch_manifest_backfills_null_cache(test_client, db_session):
-    """If row exists with NULL manifest, endpoint reads disk and writes back."""
-    _seed_app(db_session, manifest=None, name="Stale", branch=None)
+    """If a pinned row has a NULL manifest, the endpoint reads disk and writes
+    back, fetching the pinned (explicit) URL."""
+    _seed_app(db_session, manifest=None, name="Stale", branch="")
     fresh = _make_manifest(name="Backfilled")
 
     with patch("fileglancer.apps.manifest.fetch_app_manifest",
-               new=AsyncMock(return_value=fresh)) as mock_fetch, \
-         patch("fileglancer.apps.manifest._resolve_default_branch",
-               new=AsyncMock(side_effect=AssertionError("must not re-resolve"))):
+               new=AsyncMock(return_value=fresh)) as mock_fetch:
         response = test_client.post("/api/apps/manifest", json={
             "url": "https://github.com/owner/repo",
             "manifest_path": "",
@@ -615,11 +614,29 @@ def test_fetch_manifest_backfills_null_cache(test_client, db_session):
 
     assert response.status_code == 200
     assert mock_fetch.await_count == 1
+    # branch="" is a pinned "main", so the fetch URL is made explicit.
     assert mock_fetch.await_args.args == (
         "https://github.com/owner/repo/tree/main",
         "",
     )
     assert response.json()["name"] == "Backfilled"
+
+
+def test_fetch_manifest_legacy_null_branch_tracks_default(test_client, db_session):
+    """A legacy row with NULL branch (unknown default) is fetched with its stored
+    bare URL — git resolves the default — rather than being pinned to main."""
+    _seed_app(db_session, manifest=None, name="Legacy", branch=None)
+    fresh = _make_manifest(name="Backfilled")
+
+    with patch("fileglancer.apps.manifest.fetch_app_manifest",
+               new=AsyncMock(return_value=fresh)) as mock_fetch:
+        response = test_client.post("/api/apps/manifest", json={
+            "url": "https://github.com/owner/repo",
+            "manifest_path": "",
+        })
+
+    assert response.status_code == 200
+    assert mock_fetch.await_args.args == ("https://github.com/owner/repo", "")
 
     # Row was updated silently (updated_at stays NULL).
     rows = list_user_apps(db_session, TEST_USERNAME)

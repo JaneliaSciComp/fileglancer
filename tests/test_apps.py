@@ -1154,8 +1154,9 @@ class TestCloneUrlForStoredApp:
     def test_bare_stored_url_means_fixed_main(self):
         from fileglancer.apps import clone_url_for_stored_app
 
+        # A pinned app (branch recorded, "" = took the default which was main).
         assert (
-            clone_url_for_stored_app("https://github.com/Org/Repo")
+            clone_url_for_stored_app("https://github.com/Org/Repo", "")
             == "https://github.com/Org/Repo/tree/main"
         )
 
@@ -1163,8 +1164,19 @@ class TestCloneUrlForStoredApp:
         from fileglancer.apps import clone_url_for_stored_app
 
         assert (
-            clone_url_for_stored_app("https://github.com/Org/Repo/tree/master")
+            clone_url_for_stored_app("https://github.com/Org/Repo/tree/master", "master")
             == "https://github.com/Org/Repo/tree/master"
+        )
+
+    def test_null_branch_legacy_row_tracks_default(self):
+        from fileglancer.apps import clone_url_for_stored_app
+
+        # branch is None: a legacy row with an unknown default — return the URL
+        # unchanged so git resolves the current default, rather than guessing
+        # "main" and breaking a repo that defaults to e.g. "master".
+        assert (
+            clone_url_for_stored_app("https://github.com/Org/Repo", None)
+            == "https://github.com/Org/Repo"
         )
 
 

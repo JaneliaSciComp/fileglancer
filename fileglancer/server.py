@@ -1767,8 +1767,9 @@ def create_app(settings):
             if existing is None:
                 raise HTTPException(status_code=404, detail="App not found")
             stored_url = existing.url
+            stored_branch = existing.branch
 
-        clone_url = apps_module.clone_url_for_stored_app(stored_url)
+        clone_url = apps_module.clone_url_for_stored_app(stored_url, stored_branch)
         try:
             await apps_module._ensure_repo_cache(clone_url, pull=True, username=username)
         except Exception as e:
@@ -1913,9 +1914,10 @@ def create_app(settings):
             listing_manifest_path = listing.manifest_path
             listing_name = listing.name
             listing_description = listing.description
-            listing_branch = listing.branch or ""
+            # Keep None (legacy "track default") distinct from "" (pinned main).
+            listing_branch = listing.branch
 
-        clone_url = apps_module.clone_url_for_stored_app(listing_url)
+        clone_url = apps_module.clone_url_for_stored_app(listing_url, listing_branch)
         try:
             manifest = await apps_module.fetch_app_manifest(
                 clone_url, listing_manifest_path, username=username,
