@@ -10,12 +10,19 @@ READY_FLAG="/run/fg-firewall-ready"
 
 rm -f "$READY_FLAG"
 
-# Fix ownership of the mounted .pixi volume if it isn't already the dev user's.
-# On rootless Podman (keep-id) it's already 1000:1000 -> no-op. On Docker/Colima
-# named volumes are created root-owned, so chown them to vscode.
-if [ -d "$WORKSPACE/.pixi" ] && [ "$(stat -c %u "$WORKSPACE/.pixi")" != "1000" ]; then
-    echo "entrypoint: fixing ownership of $WORKSPACE/.pixi"
-    chown -R 1000:1000 "$WORKSPACE/.pixi" || true
+# Fix ownership of the mounted .pixi volume if ANY file in it isn't the dev
+# user's. On rootless Podman (keep-id) it's already correct -> no-op. On
+# Docker/Colima named volumes are created root-owned, and a stale volume can have
+# root-owned contents under a correctly-owned top dir, so probe the whole tree
+# (find -quit stops at the first offender) and chown recursively when needed.
+# Resolve the dev user by NAME, not a hardcoded 1000: the devcontainers CLI's
+# updateRemoteUserUID may remap vscode's UID to the host user's, and chowning to
+# the wrong UID is exactly what leaves pixi with "Permission denied".
+DEV_USER="$(id -u vscode)"
+if [ -d "$WORKSPACE/.pixi" ] && \
+   [ -n "$(find "$WORKSPACE/.pixi" -not -uid "$DEV_USER" -print -quit 2>/dev/null)" ]; then
+    echo "entrypoint: fixing ownership of $WORKSPACE/.pixi -> vscode ($DEV_USER)"
+    chown -R vscode:vscode "$WORKSPACE/.pixi"
 fi
 
 # Bring up the egress allowlist firewall before the agent can run. Fail closed:
