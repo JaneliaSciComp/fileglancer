@@ -22,8 +22,10 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Install pixi system-wide
-RUN curl -fsSL https://pixi.sh/install.sh | PIXI_HOME=/usr/local bash
+# Install pixi system-wide. Pin the version so the container's pixi agrees with
+# the committed pixi.lock; an unpinned (latest) pixi can compute a different
+# workspace hash and reject the lock as "not up-to-date".
+RUN curl -fsSL https://pixi.sh/install.sh | PIXI_VERSION=0.66.0 PIXI_HOME=/usr/local bash
 
 # Playwright browser + OS deps, pinned to the project's version, in a shared path
 # readable by the vscode user. The config defines no projects, so only chromium
