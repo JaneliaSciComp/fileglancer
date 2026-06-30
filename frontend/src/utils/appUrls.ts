@@ -5,21 +5,70 @@
 
 const GITHUB_URL_PATTERN =
   /^https?:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?(?:\/tree\/(.+?))?\/?$/;
+// SSH forms: git@github.com:owner/repo(.git) and ssh://git@github.com/owner/repo(.git).
+// SSH URLs don't carry a branch, so callers supply the revision separately.
+const GITHUB_SSH_SCP_PATTERN =
+  /^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
+const GITHUB_SSH_PROTO_PATTERN =
+  /^ssh:\/\/git@github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
 
 export function parseGithubUrl(url: string): {
   owner: string;
   repo: string;
   branch: string;
 } {
-  const match = url.match(GITHUB_URL_PATTERN);
-  if (!match) {
-    throw new Error(`Invalid GitHub URL: ${url}`);
+  const trimmed = url.trim();
+  const httpsMatch = trimmed.match(GITHUB_URL_PATTERN);
+  if (httpsMatch) {
+    return {
+      owner: httpsMatch[1],
+      repo: httpsMatch[2],
+      branch: httpsMatch[3] || 'main'
+    };
   }
-  return {
-    owner: match[1],
-    repo: match[2],
-    branch: match[3] || 'main'
-  };
+  const sshMatch =
+    trimmed.match(GITHUB_SSH_SCP_PATTERN) ??
+    trimmed.match(GITHUB_SSH_PROTO_PATTERN);
+  if (sshMatch) {
+    return { owner: sshMatch[1], repo: sshMatch[2], branch: 'main' };
+  }
+  throw new Error(`Invalid GitHub URL: ${url}`);
+}
+
+/**
+ * Normalize a GitHub URL to its canonical https form (no ".git" suffix, no
+ * trailing slash, no redundant "/tree/main"). Returns the input unchanged if it
+ * can't be parsed. Use this to compare URLs by repo identity rather than exact
+ * string, since stored app URLs may carry any of those cosmetic variations.
+ */
+export function canonicalGithubUrl(url: string): string {
+  try {
+    const { owner, repo, branch } = parseGithubUrl(url);
+    return buildGithubUrl(owner, repo, branch);
+  } catch {
+    return url;
+  }
+}
+
+/** True if the string parses as a GitHub repo URL (HTTPS or SSH). */
+export function isGithubRepoUrl(url: string): boolean {
+  try {
+    parseGithubUrl(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Combine a user-entered repo URL (HTTPS or SSH) and an optional revision into
+ * a canonical https GitHub app URL. The revision overrides any branch in the
+ * URL; when empty, the URL's own branch (or the default) is kept. Throws if the
+ * repo URL can't be parsed.
+ */
+export function buildAppUrl(repoUrl: string, revision: string): string {
+  const { owner, repo, branch } = parseGithubUrl(repoUrl);
+  return buildGithubUrl(owner, repo, revision.trim() || branch);
 }
 
 export function buildGithubUrl(

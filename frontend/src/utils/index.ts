@@ -393,6 +393,9 @@ export type {
 // Re-export app URL utilities
 export {
   parseGithubUrl,
+  isGithubRepoUrl,
+  canonicalGithubUrl,
+  buildAppUrl,
   buildGithubUrl,
   buildLaunchPath,
   buildLaunchPathFromApp,

@@ -34,6 +34,7 @@ from urllib.parse import quote, unquote
 from fileglancer import database as db
 from fileglancer import auth
 from fileglancer import apps as apps_module
+from fileglancer.giturls import canonical_github_url
 from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
@@ -1718,7 +1719,7 @@ def create_app(settings):
         for idx in needs_backfill:
             snap = snapshots[idx]
             try:
-                manifest, branch = await apps_module.refresh_cached_manifest(
+                manifest = await apps_module.refresh_cached_manifest(
                     username, snap["url"], snap["manifest_path"],
                 )
             except Exception as e:
@@ -1729,19 +1730,28 @@ def create_app(settings):
             user_app.manifest = manifest
             user_app.name = manifest.name
             user_app.description = manifest.description
-            user_app.branch = branch
         return result
 
     @app.post("/api/apps", response_model=list[UserApp],
               description="Add an app by URL (discovers all manifests in the repo)")
     async def add_user_app(body: AppAddRequest,
                            username: str = Depends(get_current_user)):
-        # Clone the repo and discover all manifests
+        # Clone the repo and discover all manifests. The worker resolves the
+        # branch as the user, so a private repo's real default is used.
         try:
-            discovered = await apps_module.discover_app_manifests(body.url,
-                                                                   username=username)
+            resolved_branch, discovered = await apps_module.discover_app_manifests(
+                body.url, username=username)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
+        except HTTPException as e:
+            # The worker already produced a meaningful, user-facing message
+            # (e.g. a mistyped revision or a private-repo clone failure). Surface
+            # it directly instead of nesting it inside a generic "Failed to clone
+            # or scan repo: ..." wrapper. The worker's default 500 for an uncaught
+            # error is, for this endpoint, a problem with the requested repo, so
+            # present it as a 400 (preserving other codes like 503 worker-dead).
+            status = 400 if e.status_code == 500 else e.status_code
+            raise HTTPException(status_code=status, detail=e.detail)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to clone or scan repo: {str(e)}")
 
@@ -1753,18 +1763,21 @@ def create_app(settings):
                        f"Make sure a manifest exists in the repository.",
             )
 
-        branch = await apps_module.get_app_branch(body.url)
+        # Bake the worker-resolved revision into the stored URL (so a repo whose
+        # default is e.g. "master" dedups against an explicit ".../tree/master"),
+        # and record the user's requested revision separately ("" = unpinned).
+        canonical_url, requested = apps_module.canonical_app_url(body.url, resolved_branch)
         new_apps: list[UserApp] = []
 
         with db.get_db_session(settings.db_url) as session:
             for manifest_path, manifest in discovered:
-                if db.get_user_app(session, username, body.url, manifest_path) is not None:
+                if db.get_user_app(session, username, canonical_url, manifest_path) is not None:
                     continue  # silently skip duplicates
                 row = db.upsert_user_app(
                     session, username,
-                    url=body.url, manifest_path=manifest_path,
+                    url=canonical_url, manifest_path=manifest_path,
                     name=manifest.name, description=manifest.description,
-                    branch=branch,
+                    branch=requested,
                     manifest=manifest.model_dump(mode="json"),
                 )
                 new_apps.append(UserApp(
@@ -1800,20 +1813,31 @@ def create_app(settings):
               description="Pull latest code and re-read the manifest for an app")
     async def update_user_app(body: ManifestFetchRequest,
                               username: str = Depends(get_current_user)):
+        # The revision is fixed at add time and baked into body.url, so update
+        # just pulls that revision again and re-reads the manifest — it never
+        # re-resolves the default branch or moves the app to a new URL.
+        with db.get_db_session(settings.db_url) as session:
+            existing = db.get_user_app(session, username, body.url, body.manifest_path)
+            if existing is None:
+                raise HTTPException(status_code=404, detail="App not found")
+            stored_url = existing.url
+            stored_branch = existing.branch
+
+        clone_url = apps_module.clone_url_for_stored_app(stored_url, stored_branch)
         try:
-            await apps_module._ensure_repo_cache(body.url, pull=True, username=username)
+            await apps_module._ensure_repo_cache(clone_url, pull=True, username=username)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to pull latest code: {str(e)}")
 
         try:
-            manifest = await apps_module.fetch_app_manifest(body.url, body.manifest_path,
+            manifest = await apps_module.fetch_app_manifest(clone_url, body.manifest_path,
                                                             username=username)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to read manifest after update: {str(e)}")
 
-        if manifest.repo_url and manifest.repo_url != body.url:
+        if manifest.repo_url and canonical_github_url(manifest.repo_url) != stored_url:
             try:
                 await apps_module._ensure_repo_cache(
                     manifest.repo_url,
@@ -1826,14 +1850,12 @@ def create_app(settings):
                     detail=f"Failed to pull latest app code: {str(e)}",
                 )
 
-        branch = await apps_module.get_app_branch(body.url)
-
         with db.get_db_session(settings.db_url) as session:
+            # branch omitted (None) so the revision fixed at add time is preserved.
             row = db.upsert_user_app(
                 session, username,
-                url=body.url, manifest_path=body.manifest_path,
+                url=stored_url, manifest_path=body.manifest_path,
                 name=manifest.name, description=manifest.description,
-                branch=branch,
                 manifest=manifest.model_dump(mode="json"),
             )
             return UserApp(
@@ -1944,27 +1966,29 @@ def create_app(settings):
                 )
             listing_url = listing.url
             listing_manifest_path = listing.manifest_path
+            listing_name = listing.name
+            listing_description = listing.description
+            # Keep None (legacy "track default") distinct from "" (pinned main).
+            listing_branch = listing.branch
 
+        clone_url = apps_module.clone_url_for_stored_app(listing_url, listing_branch)
         try:
             manifest = await apps_module.fetch_app_manifest(
-                listing_url, listing_manifest_path, username=username,
+                clone_url, listing_manifest_path, username=username,
             )
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to fetch manifest: {str(e)}")
 
-        try:
-            branch = await apps_module.get_app_branch(listing_url)
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Failed to resolve branch: {str(e)}")
-
+        # The listing already carries the canonical URL (resolved revision baked
+        # in) and the requested revision, so copy them straight over.
         with db.get_db_session(settings.db_url) as session:
             row = db.upsert_user_app(
                 session, username,
                 url=listing_url, manifest_path=listing_manifest_path,
-                name=manifest.name, description=manifest.description,
-                branch=branch,
+                name=listing_name, description=listing_description,
+                branch=listing_branch,
                 manifest=manifest.model_dump(mode="json"),
             )
             return UserApp(

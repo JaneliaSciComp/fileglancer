@@ -37,7 +37,7 @@ function formatDuration(job: Job): string {
 type JobActionCallbacks = {
   onViewDetail: (jobId: number) => void;
   onRelaunch: (job: Job) => void;
-  onCancel: (jobId: number) => void;
+  onCancel: (job: Job) => void;
   onDelete: (jobId: number) => void;
 };
 
@@ -160,7 +160,7 @@ export function createAppsJobsColumns(
           },
           {
             name: isService ? 'Stop Service' : 'Cancel',
-            action: props => props.onCancel(props.job.id),
+            action: props => props.onCancel(props.job),
             shouldShow: canCancel
           },
           {

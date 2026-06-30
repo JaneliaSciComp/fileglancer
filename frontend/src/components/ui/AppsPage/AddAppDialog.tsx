@@ -5,20 +5,7 @@ import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgFormField from '@/components/designSystem/molecules/FgFormField';
 import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
-
-const GITHUB_URL_PATTERN = /^https?:\/\/github\.com\/[^/]+\/[^/]+\/?$/;
-
-function isValidGitHubUrl(url: string): boolean {
-  return GITHUB_URL_PATTERN.test(url.trim());
-}
-
-function buildAppUrl(repoUrl: string, branch: string): string {
-  let url = repoUrl.trim().replace(/\/+$/, '');
-  if (branch.trim()) {
-    url += `/tree/${branch.trim()}`;
-  }
-  return url;
-}
+import { buildAppUrl, isGithubRepoUrl } from '@/utils';
 
 interface AddAppDialogProps {
   readonly open: boolean;
@@ -42,8 +29,8 @@ export default function AddAppDialog({
       setUrlError('');
       return false;
     }
-    if (!isValidGitHubUrl(url)) {
-      setUrlError('Please enter a valid GitHub repository URL');
+    if (!isGithubRepoUrl(url)) {
+      setUrlError('Please enter a valid GitHub repository URL (HTTPS or SSH)');
       return false;
     }
     setUrlError('');
@@ -72,7 +59,7 @@ export default function AddAppDialog({
     onClose();
   };
 
-  const urlIsValid = repoUrl.trim() !== '' && isValidGitHubUrl(repoUrl);
+  const urlIsValid = repoUrl.trim() !== '' && isGithubRepoUrl(repoUrl);
 
   return (
     <FgDialog className="max-w-lg" onClose={handleClose} open={open}>
@@ -81,8 +68,9 @@ export default function AddAppDialog({
       </Typography>
 
       <Typography className="mb-2 text-foreground text-sm">
-        Enter a GitHub repository URL containing a <code>runnables.yaml</code>{' '}
-        manifest.
+        Enter a GitHub repository URL (HTTPS or SSH) containing a{' '}
+        <code>runnables.yaml</code> manifest. Private repositories are accessed
+        over SSH using your configured SSH key.
       </Typography>
 
       <FgFormField
@@ -102,13 +90,18 @@ export default function AddAppDialog({
               handleAdd();
             }
           }}
-          placeholder="https://github.com/org/repo"
+          placeholder="https://github.com/org/repo or git@github.com:org/repo.git"
           type="text"
           value={repoUrl}
         />
       </FgFormField>
 
-      <FgFormField htmlFor="branch" label="Branch" optional>
+      <FgFormField
+        helperText="Tag or branch name"
+        htmlFor="branch"
+        label="Revision"
+        optional
+      >
         <FgInput
           onChange={e => {
             setBranch(e.target.value);

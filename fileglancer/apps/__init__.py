@@ -3,9 +3,11 @@
 from fileglancer.apps.manifest import (  # noqa: F401
     MANIFEST_FILENAME,
     _ensure_repo_cache,
+    clone_url_for_stored_app,
     discover_app_manifests,
     fetch_app_manifest,
     get_app_branch,
+    canonical_app_url,
     get_or_load_manifest,
     refresh_cached_manifest,
     set_worker_exec,

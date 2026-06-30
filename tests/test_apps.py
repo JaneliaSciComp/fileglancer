@@ -1063,6 +1063,8 @@ from fileglancer.apps.manifest import (
     validate_manifest_path,
     _safe_repo_subdir,
     _parse_github_url,
+    _is_git_auth_error,
+    _clone_repo,
     get_app_branch,
 )
 
@@ -1073,6 +1075,248 @@ class TestParseGitHubUrl:
             "https://github.com/org/tool/tree/feature/my-tool"
         )
         assert (owner, repo, branch) == ("org", "tool", "feature/my-tool")
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "git@github.com:org/tool.git",
+            "git@github.com:org/tool",
+            "ssh://git@github.com/org/tool.git",
+            "ssh://git@github.com/org/tool",
+        ],
+    )
+    def test_parses_ssh_urls(self, url):
+        assert _parse_github_url(url) == ("org", "tool", None)
+
+
+class TestCanonicalGithubUrl:
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://github.com/Org/Repo",
+            "https://github.com/Org/Repo.git",
+            "https://github.com/Org/Repo/",
+            "https://github.com/Org/Repo/tree/main",
+            "git@github.com:Org/Repo.git",
+            "ssh://git@github.com/Org/Repo",
+        ],
+    )
+    def test_cosmetic_variations_canonicalize_identically(self, url):
+        from fileglancer.giturls import canonical_github_url
+
+        assert canonical_github_url(url) == "https://github.com/Org/Repo"
+
+    def test_non_default_branch_preserved(self):
+        from fileglancer.giturls import canonical_github_url
+
+        assert (
+            canonical_github_url("https://github.com/Org/Repo/tree/dev")
+            == "https://github.com/Org/Repo/tree/dev"
+        )
+
+    def test_unparseable_returned_unchanged(self):
+        from fileglancer.giturls import canonical_github_url
+
+        assert canonical_github_url("not a url") == "not a url"
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://gitlab.com/org/tool",
+            "git@gitlab.com:org/tool.git",
+            "not a url",
+        ],
+    )
+    def test_rejects_non_github_urls(self, url):
+        with pytest.raises(ValueError):
+            _parse_github_url(url)
+
+
+class TestGithubUrlAtBranch:
+    def test_default_branch_folds_to_bare(self):
+        from fileglancer.giturls import github_url_at_branch
+
+        assert (
+            github_url_at_branch("Org", "Repo", "main")
+            == "https://github.com/Org/Repo"
+        )
+
+    def test_non_default_branch_is_explicit(self):
+        from fileglancer.giturls import github_url_at_branch
+
+        assert (
+            github_url_at_branch("Org", "Repo", "master")
+            == "https://github.com/Org/Repo/tree/master"
+        )
+
+
+class TestCloneUrlForStoredApp:
+    def test_bare_stored_url_means_fixed_main(self):
+        from fileglancer.apps import clone_url_for_stored_app
+
+        # A pinned app (branch recorded, "" = took the default which was main).
+        assert (
+            clone_url_for_stored_app("https://github.com/Org/Repo", "")
+            == "https://github.com/Org/Repo/tree/main"
+        )
+
+    def test_non_main_revision_stays_explicit(self):
+        from fileglancer.apps import clone_url_for_stored_app
+
+        assert (
+            clone_url_for_stored_app("https://github.com/Org/Repo/tree/master", "master")
+            == "https://github.com/Org/Repo/tree/master"
+        )
+
+    def test_null_branch_legacy_row_tracks_default(self):
+        from fileglancer.apps import clone_url_for_stored_app
+
+        # branch is None: a legacy row with an unknown default — return the URL
+        # unchanged so git resolves the current default, rather than guessing
+        # "main" and breaking a repo that defaults to e.g. "master".
+        assert (
+            clone_url_for_stored_app("https://github.com/Org/Repo", None)
+            == "https://github.com/Org/Repo"
+        )
+
+
+class TestCloneFallback:
+    def test_auth_error_detection(self):
+        assert _is_git_auth_error(
+            "fatal: could not read Username for 'https://github.com': "
+            "terminal prompts disabled"
+        )
+        assert _is_git_auth_error("remote: Repository not found.")
+        assert not _is_git_auth_error("fatal: Remote branch v9 not found")
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_ssh_on_https_auth_error(self, tmp_path, monkeypatch):
+        from fileglancer.apps import manifest as m
+
+        calls = []
+
+        async def fake_run_git(args, timeout=60, extra_env=None):
+            calls.append((args, extra_env))
+            if "https://github.com/org/tool.git" in args:
+                raise ValueError(
+                    "Git command failed: fatal: could not read Username for "
+                    "'https://github.com': terminal prompts disabled"
+                )
+            return (b"", b"")
+
+        monkeypatch.setattr(m, "_run_git", fake_run_git)
+        monkeypatch.setattr(m.shutil, "rmtree", lambda *a, **k: None)
+
+        await _clone_repo("org", "tool", "v0.1.0", tmp_path / "dest")
+
+        used = [args for args, _ in calls]
+        assert any("https://github.com/org/tool.git" in a for a in used)
+        # The SSH retry was attempted with the SSH-specific environment.
+        ssh_call = next(
+            (env for args, env in calls if "git@github.com:org/tool.git" in args),
+            None,
+        )
+        assert ssh_call is not None and "GIT_SSH_COMMAND" in ssh_call
+
+    @pytest.mark.asyncio
+    async def test_raises_understandable_error_when_both_fail(self, tmp_path, monkeypatch):
+        from fileglancer.apps import manifest as m
+
+        async def fake_run_git(args, timeout=60, extra_env=None):
+            raise ValueError(
+                "Git command failed: fatal: could not read Username for "
+                "'https://github.com': terminal prompts disabled"
+            )
+
+        monkeypatch.setattr(m, "_run_git", fake_run_git)
+        monkeypatch.setattr(m.shutil, "rmtree", lambda *a, **k: None)
+
+        with pytest.raises(ValueError, match="Could not access the repository org/tool"):
+            await _clone_repo("org", "tool", "v0.1.0", tmp_path / "dest")
+
+    @pytest.mark.asyncio
+    async def test_https_ref_not_found_is_not_retried(self, tmp_path, monkeypatch):
+        from fileglancer.apps import manifest as m
+
+        calls = []
+
+        async def fake_run_git(args, timeout=60, extra_env=None):
+            calls.append(args)
+            raise ValueError(
+                "Git command failed: fatal: Remote branch v9 not found in upstream origin"
+            )
+
+        monkeypatch.setattr(m, "_run_git", fake_run_git)
+        monkeypatch.setattr(m.shutil, "rmtree", lambda *a, **k: None)
+
+        with pytest.raises(ValueError, match="Revision 'v9' was not found"):
+            await _clone_repo("org", "tool", "v9", tmp_path / "dest")
+        # A reachable remote with a missing ref is authoritative — no SSH retry.
+        assert len(calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_ssh_ref_not_found_reports_revision_not_access(self, tmp_path, monkeypatch):
+        """Private repo + mistyped tag: HTTPS auth-fails, SSH reaches the repo but
+        the revision is missing — report the revision, not a misleading
+        'can't access / maybe private' message."""
+        from fileglancer.apps import manifest as m
+
+        async def fake_run_git(args, timeout=60, extra_env=None):
+            if "https://github.com/org/tool.git" in args:
+                raise ValueError(
+                    "Git command failed: fatal: could not read Username for "
+                    "'https://github.com': terminal prompts disabled"
+                )
+            raise ValueError(
+                "Git command failed: fatal: Remote branch v1.0.1 not found in upstream origin"
+            )
+
+        monkeypatch.setattr(m, "_run_git", fake_run_git)
+        monkeypatch.setattr(m.shutil, "rmtree", lambda *a, **k: None)
+
+        with pytest.raises(ValueError, match="Revision 'v1.0.1' was not found") as exc:
+            await _clone_repo("org", "tool", "v1.0.1", tmp_path / "dest")
+        assert "private" not in str(exc.value).lower()
+
+    def test_ref_not_found_detection(self):
+        from fileglancer.apps.manifest import _is_git_ref_not_found
+
+        assert _is_git_ref_not_found(
+            "fatal: Remote branch v1.0.1 not found in upstream origin"
+        )
+        assert _is_git_ref_not_found("fatal: could not find remote ref refs/tags/v9")
+        assert not _is_git_ref_not_found(
+            "fatal: could not read Username for 'https://github.com'"
+        )
+
+    @pytest.mark.asyncio
+    async def test_pull_resets_to_fetch_head_not_origin_branch(self, tmp_path, monkeypatch):
+        """A cached tag/SHA has no origin/<ref> tracking branch, so the pull must
+        reset to FETCH_HEAD (works for branches, tags and SHAs)."""
+        from fileglancer.apps import manifest as m
+
+        monkeypatch.setattr(m, "_repo_cache_base", lambda username=None: tmp_path)
+        # Pre-create the cache dir so _ensure_repo_cache takes the pull branch.
+        repo_dir = tmp_path / "org" / "tool" / "v0.1.0"
+        repo_dir.mkdir(parents=True)
+
+        calls = []
+
+        async def fake_run_git(args, timeout=60, extra_env=None):
+            calls.append(args)
+            return (b"", b"")
+
+        monkeypatch.setattr(m, "_run_git", fake_run_git)
+
+        await m._ensure_repo_cache(
+            "https://github.com/org/tool/tree/v0.1.0", pull=True
+        )
+
+        reset_calls = [a for a in calls if "reset" in a]
+        assert reset_calls, "expected a reset during pull"
+        # Must reset to FETCH_HEAD, never origin/<tag>.
+        assert "FETCH_HEAD" in reset_calls[0]
+        assert not any("origin/v0.1.0" in a for a in reset_calls)
 
     @pytest.mark.asyncio
     async def test_get_app_branch_returns_slash_branch_without_remote_lookup(self):
@@ -1501,3 +1745,42 @@ class TestPixiTaskEnv:
     def test_no_env_leaves_env_none(self):
         ep = _task_to_entry_point("build", {"cmd": "make"})
         assert ep.env is None
+
+
+class TestPixiAdapterName:
+    """The generated app name should come from the pixi project's name, not a
+    repo/branch combination (which produced ugly names like 'repo/HEAD')."""
+
+    def _write_pixi(self, tmp_path, body: str):
+        (tmp_path / "pixi.toml").write_text(body)
+
+    def test_uses_project_name_from_pixi_toml(self, tmp_path):
+        from fileglancer.apps.pixi import PixiAdapter
+
+        self._write_pixi(
+            tmp_path,
+            '[project]\nname = "SmartSPIM"\n\n[tasks]\nrun = "echo hi"\n',
+        )
+        manifest = PixiAdapter().convert(tmp_path)
+        assert manifest.name == "SmartSPIM"
+
+    def test_falls_back_to_git_repo_name(self, tmp_path, monkeypatch):
+        from fileglancer.apps import pixi as pixi_mod
+        from fileglancer.apps.pixi import PixiAdapter
+
+        # pixi.toml without a project name
+        self._write_pixi(tmp_path, '[tasks]\nrun = "echo hi"\n')
+        monkeypatch.setattr(
+            pixi_mod, "_get_git_repo_name", lambda d: "SmartSPIMGlancer"
+        )
+        manifest = PixiAdapter().convert(tmp_path)
+        assert manifest.name == "SmartSPIMGlancer"
+
+    def test_falls_back_to_directory_name(self, tmp_path, monkeypatch):
+        from fileglancer.apps import pixi as pixi_mod
+        from fileglancer.apps.pixi import PixiAdapter
+
+        self._write_pixi(tmp_path, '[tasks]\nrun = "echo hi"\n')
+        monkeypatch.setattr(pixi_mod, "_get_git_repo_name", lambda d: None)
+        manifest = PixiAdapter().convert(tmp_path)
+        assert manifest.name == tmp_path.name

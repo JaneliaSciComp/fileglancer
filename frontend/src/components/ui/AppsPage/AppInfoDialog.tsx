@@ -12,6 +12,19 @@ import type { UserApp } from '@/shared.types';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
+import { parseGithubUrl } from '@/utils/appUrls';
+
+/**
+ * The revision actually cloned, parsed out of the canonical app URL (which
+ * always carries it). Falls back to the requested branch, then null.
+ */
+function appRevision(app: UserApp): string | null {
+  try {
+    return parseGithubUrl(app.url).branch;
+  } catch {
+    return app.branch || null;
+  }
+}
 
 interface AppInfoDialogProps {
   readonly app: UserApp;
@@ -31,12 +44,14 @@ interface AppInfoDialogProps {
   readonly removing: boolean;
   readonly sharing: boolean;
   readonly unsharing: boolean;
+  readonly startInShareView?: boolean;
 }
 
 function AppInfoTable({ app }: { readonly app: UserApp }) {
   const labelClass =
     'text-foreground font-medium pr-4 py-1.5 align-top whitespace-nowrap';
   const valueClass = 'text-foreground py-1.5';
+  const revision = appRevision(app);
 
   return (
     <table className="w-full text-sm mb-6">
@@ -49,10 +64,10 @@ function AppInfoTable({ app }: { readonly app: UserApp }) {
             </FgExternalLink>
           </td>
         </tr>
-        {app.branch ? (
+        {revision ? (
           <tr>
-            <td className={labelClass}>Branch</td>
-            <td className={valueClass}>{app.branch}</td>
+            <td className={labelClass}>Revision</td>
+            <td className={valueClass}>{revision}</td>
           </tr>
         ) : null}
         {app.description ? (
@@ -86,7 +101,8 @@ export default function AppInfoDialog({
   updating,
   removing,
   sharing,
-  unsharing
+  unsharing,
+  startInShareView = false
 }: AppInfoDialogProps) {
   const isShared = app.listing_id !== undefined && app.listing_id !== null;
 
@@ -97,19 +113,25 @@ export default function AppInfoDialog({
   const [description, setDescription] = useState('');
   const [shareError, setShareError] = useState('');
 
-  // Always return to the info view when the dialog is (re)opened.
-  useEffect(() => {
-    if (open) {
-      setShareView(false);
-    }
-  }, [open]);
-
   const openShareForm = () => {
     setName(app.name);
     setDescription(app.description ?? '');
     setShareError('');
     setShareView(true);
   };
+
+  // Open into the share form when requested (and shareable), otherwise always
+  // return to the info view when the dialog is (re)opened.
+  useEffect(() => {
+    if (open) {
+      if (startInShareView && !isShared) {
+        openShareForm();
+      } else {
+        setShareView(false);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const handleShareSubmit = async () => {
     if (!name.trim()) {

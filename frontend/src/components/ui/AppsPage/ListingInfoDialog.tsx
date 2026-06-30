@@ -8,6 +8,19 @@ import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import { formatDateString } from '@/utils';
+import { parseGithubUrl } from '@/utils/appUrls';
+
+/**
+ * The revision actually cloned, parsed out of the canonical listing URL (which
+ * always carries it). Falls back to the requested branch, then null.
+ */
+function listingRevision(listing: AppListing): string | null {
+  try {
+    return parseGithubUrl(listing.url).branch;
+  } catch {
+    return listing.branch || null;
+  }
+}
 
 interface ListingInfoDialogProps {
   readonly listing: AppListing;
@@ -27,6 +40,7 @@ function ListingInfoTable({ listing }: { readonly listing: AppListing }) {
   const valueClass = 'text-foreground py-1.5';
 
   const publishedAt = formatDateString(listing.published_at);
+  const revision = listingRevision(listing);
 
   return (
     <table className="w-full text-sm mb-6">
@@ -39,10 +53,10 @@ function ListingInfoTable({ listing }: { readonly listing: AppListing }) {
             </FgExternalLink>
           </td>
         </tr>
-        {listing.branch ? (
+        {revision ? (
           <tr>
-            <td className={labelClass}>Branch</td>
-            <td className={valueClass}>{listing.branch}</td>
+            <td className={labelClass}>Revision</td>
+            <td className={valueClass}>{revision}</td>
           </tr>
         ) : null}
         <tr>

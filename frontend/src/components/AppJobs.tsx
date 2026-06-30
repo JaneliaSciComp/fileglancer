@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
 import FgLink from '@/components/designSystem/atoms/FgLink';
+import CancelJobDialog from '@/components/ui/Dialogs/CancelJob';
 import { TableCard } from '@/components/ui/Table/TableCard';
 import { createAppsJobsColumns } from '@/components/ui/Table/appsJobsColumns';
 import { buildRelaunchPath, parseGithubUrl } from '@/utils';
@@ -20,6 +21,7 @@ export default function AppJobs() {
   const jobsQuery = useJobsQuery();
   const cancelJobMutation = useCancelJobMutation();
   const deleteJobMutation = useDeleteJobMutation();
+  const [jobToCancel, setJobToCancel] = useState<Job | null>(null);
 
   const handleViewJobDetail = (jobId: number) => {
     navigate(`/apps/jobs/${jobId}`);
@@ -47,10 +49,17 @@ export default function AppJobs() {
     });
   };
 
-  const handleCancelJob = async (jobId: number) => {
+  const handleConfirmCancelJob = async () => {
+    if (!jobToCancel) {
+      return;
+    }
+    const job = jobToCancel;
+    setJobToCancel(null);
     try {
-      await cancelJobMutation.mutateAsync(jobId);
-      toast.success('Job cancelled');
+      await cancelJobMutation.mutateAsync(job.id);
+      toast.success(
+        job.entry_point_type === 'service' ? 'Service stopped' : 'Job cancelled'
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to cancel job';
@@ -74,7 +83,7 @@ export default function AppJobs() {
       createAppsJobsColumns({
         onViewDetail: handleViewJobDetail,
         onRelaunch: handleRelaunch,
-        onCancel: handleCancelJob,
+        onCancel: setJobToCancel,
         onDelete: handleDeleteJob
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -95,6 +104,14 @@ export default function AppJobs() {
         errorState={jobsQuery.error}
         gridColsClass="grid-cols-[2fr_2fr_1fr_2fr_1fr_1fr]"
         loadingState={jobsQuery.isPending}
+      />
+
+      <CancelJobDialog
+        isPending={cancelJobMutation.isPending}
+        isService={jobToCancel?.entry_point_type === 'service'}
+        onClose={() => setJobToCancel(null)}
+        onConfirm={handleConfirmCancelJob}
+        open={jobToCancel !== null}
       />
     </div>
   );
