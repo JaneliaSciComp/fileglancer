@@ -10,6 +10,7 @@ import DeleteAppDialog from '@/components/ui/AppsPage/DeleteAppDialog';
 import {
   useAppsQuery,
   useAddAppMutation,
+  useDiscoverAppsMutation,
   useUpdateAppMutation,
   useRemoveAppMutation,
   useShareAppMutation,
@@ -26,6 +27,7 @@ export default function Apps() {
 
   const appsQuery = useAppsQuery();
   const addAppMutation = useAddAppMutation();
+  const discoverAppsMutation = useDiscoverAppsMutation();
   const updateAppMutation = useUpdateAppMutation();
   const removeAppMutation = useRemoveAppMutation();
   const shareAppMutation = useShareAppMutation();
@@ -85,8 +87,13 @@ export default function Apps() {
     toast.success('Shared to catalog');
   };
 
-  const handleAddFromUrl = async (url: string) => {
-    const apps = await addAppMutation.mutateAsync(url);
+  const handleDiscover = (url: string) => discoverAppsMutation.mutateAsync(url);
+
+  const handleAddFromUrl = async (url: string, manifestPaths?: string[]) => {
+    const apps = await addAppMutation.mutateAsync({
+      url,
+      manifest_paths: manifestPaths
+    });
     const count = apps.length;
     toast.success(`${count} app${count !== 1 ? 's' : ''} added`);
     setShowAddDialog(false);
@@ -165,8 +172,10 @@ export default function Apps() {
 
       <AddAppDialog
         adding={addAppMutation.isPending}
+        discovering={discoverAppsMutation.isPending}
         onAdd={handleAddFromUrl}
         onClose={() => setShowAddDialog(false)}
+        onDiscover={handleDiscover}
         open={showAddDialog}
       />
       <DeleteAppDialog

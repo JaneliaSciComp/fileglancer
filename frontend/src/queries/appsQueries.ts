@@ -6,7 +6,12 @@ import {
   getResponseJsonOrError,
   throwResponseNotOkError
 } from '@/queries/queryUtils';
-import type { AppListing, AppManifest, UserApp } from '@/shared.types';
+import type {
+  AppListing,
+  AppManifest,
+  DiscoveredApp,
+  UserApp
+} from '@/shared.types';
 
 // --- Query Keys ---
 
@@ -71,15 +76,44 @@ export function useManifestPreviewMutation(): UseMutationResult<
   });
 }
 
-export function useAddAppMutation(): UseMutationResult<
-  UserApp[],
+export function useDiscoverAppsMutation(): UseMutationResult<
+  DiscoveredApp[],
   Error,
   string
 > {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (url: string) => {
-      const response = await sendFetchRequest('/api/apps', 'POST', { url });
+      const response = await sendFetchRequest('/api/apps/discover', 'POST', {
+        url
+      });
+      const data = await getResponseJsonOrError(response);
+      if (!response.ok) {
+        throwResponseNotOkError(response, data);
+      }
+      return data as DiscoveredApp[];
+    }
+  });
+}
+
+export function useAddAppMutation(): UseMutationResult<
+  UserApp[],
+  Error,
+  { url: string; manifest_paths?: string[] }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      url,
+      manifest_paths
+    }: {
+      url: string;
+      manifest_paths?: string[];
+    }) => {
+      const response = await sendFetchRequest('/api/apps', 'POST', {
+        url,
+        // Only include manifest_paths when provided; omitting it adds all apps.
+        ...(manifest_paths ? { manifest_paths } : {})
+      });
       const data = await getResponseJsonOrError(response);
       if (!response.ok) {
         throwResponseNotOkError(response, data);

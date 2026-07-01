@@ -1732,15 +1732,15 @@ def create_app(settings):
             user_app.description = manifest.description
         return result
 
-    @app.post("/api/apps", response_model=list[UserApp],
-              description="Add an app by URL (discovers all manifests in the repo)")
-    async def add_user_app(body: AppAddRequest,
-                           username: str = Depends(get_current_user)):
-        # Clone the repo and discover all manifests. The worker resolves the
-        # branch as the user, so a private repo's real default is used.
+    async def _discover_repo_manifests(url: str, username: str):
+        """Clone/scan a repo and return (resolved_branch, canonical_url, discovered).
+
+        Shared by the discover and add endpoints so both surface identical,
+        user-facing errors for a bad URL/revision/private-repo clone.
+        """
         try:
             resolved_branch, discovered = await apps_module.discover_app_manifests(
-                body.url, username=username)
+                url, username=username)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except HTTPException as e:
@@ -1764,9 +1764,50 @@ def create_app(settings):
             )
 
         # Bake the worker-resolved revision into the stored URL (so a repo whose
-        # default is e.g. "master" dedups against an explicit ".../tree/master"),
-        # and record the user's requested revision separately ("" = unpinned).
-        canonical_url, requested = apps_module.canonical_app_url(body.url, resolved_branch)
+        # default is e.g. "master" dedups against an explicit ".../tree/master").
+        canonical_url, _ = apps_module.canonical_app_url(url, resolved_branch)
+        return resolved_branch, canonical_url, discovered
+
+    @app.post("/api/apps/discover", response_model=list[DiscoveredApp],
+              description="Discover the apps (manifests) in a repo without adding them")
+    async def discover_user_apps(body: AppAddRequest,
+                                 username: str = Depends(get_current_user)):
+        _, canonical_url, discovered = await _discover_repo_manifests(body.url, username)
+        with db.get_db_session(settings.db_url) as session:
+            return [
+                DiscoveredApp(
+                    manifest_path=manifest_path,
+                    name=manifest.name,
+                    description=manifest.description,
+                    already_added=db.get_user_app(
+                        session, username, canonical_url, manifest_path) is not None,
+                )
+                for manifest_path, manifest in discovered
+            ]
+
+    @app.post("/api/apps", response_model=list[UserApp],
+              description="Add apps by URL (all discovered manifests, or the subset in manifest_paths)")
+    async def add_user_app(body: AppAddRequest,
+                           username: str = Depends(get_current_user)):
+        # Clone the repo and discover all manifests. The worker resolves the
+        # branch as the user, so a private repo's real default is used.
+        resolved_branch, canonical_url, discovered = await _discover_repo_manifests(
+            body.url, username)
+
+        # Restrict to the requested subset when manifest_paths is provided; an
+        # omitted/null list means "add everything" (backward compatible). Paths
+        # not present in the repo are ignored.
+        if body.manifest_paths is not None:
+            wanted = set(body.manifest_paths)
+            discovered = [(p, m) for p, m in discovered if p in wanted]
+            if not discovered:
+                raise HTTPException(
+                    status_code=400,
+                    detail="None of the requested apps were found in the repository.",
+                )
+
+        # Record the user's requested revision separately ("" = unpinned).
+        _, requested = apps_module.canonical_app_url(body.url, resolved_branch)
         new_apps: list[UserApp] = []
 
         with db.get_db_session(settings.db_url) as session:

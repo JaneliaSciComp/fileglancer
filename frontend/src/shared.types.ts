@@ -150,6 +150,13 @@ type UserApp = {
   listing_id?: number;
 };
 
+type DiscoveredApp = {
+  manifest_path: string;
+  name: string;
+  description?: string;
+  already_added: boolean;
+};
+
 type AppListing = {
   id: number;
   owner_username: string;
@@ -258,6 +265,7 @@ export type {
   AppParameterItem,
   AppParameterSection,
   AppResourceDefaults,
+  DiscoveredApp,
   FetchRequestOptions,
   FileOrFolder,
   FileSharePath,

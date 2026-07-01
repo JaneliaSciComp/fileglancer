@@ -335,6 +335,112 @@ def test_add_app_pinned_revision_kept(test_client, db_session):
     assert rows[0].branch == "dev"
 
 
+def test_discover_lists_all_apps(test_client):
+    """POST /api/apps/discover returns every manifest in the repo without adding."""
+    m1 = _make_manifest(name="VS Code", description="IDE")
+    m2 = _make_manifest(name="JupyterLab", description="Notebook")
+    with patch("fileglancer.apps.discover_app_manifests",
+               new=AsyncMock(return_value=("main", [("vscode", m1), ("jupyterlab", m2)]))):
+        response = test_client.post(
+            "/api/apps/discover",
+            json={"url": "https://github.com/owner/monorepo"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [a["manifest_path"] for a in body] == ["vscode", "jupyterlab"]
+    assert [a["name"] for a in body] == ["VS Code", "JupyterLab"]
+    assert all(a["already_added"] is False for a in body)
+    # Discovery must not create any rows.
+    assert test_client.get("/api/apps").json() == []
+
+
+def test_discover_marks_already_added(test_client, db_session):
+    """Apps the user already has are flagged already_added=True."""
+    m1 = _make_manifest(name="VS Code")
+    m2 = _make_manifest(name="JupyterLab")
+    _seed_app(db_session, url="https://github.com/owner/monorepo",
+              manifest_path="vscode", branch="",
+              manifest=m1.model_dump(mode="json"))
+    with patch("fileglancer.apps.discover_app_manifests",
+               new=AsyncMock(return_value=("main", [("vscode", m1), ("jupyterlab", m2)]))):
+        response = test_client.post(
+            "/api/apps/discover",
+            json={"url": "https://github.com/owner/monorepo"},
+        )
+
+    assert response.status_code == 200
+    by_path = {a["manifest_path"]: a for a in response.json()}
+    assert by_path["vscode"]["already_added"] is True
+    assert by_path["jupyterlab"]["already_added"] is False
+
+
+def test_discover_no_manifests_404(test_client):
+    with patch("fileglancer.apps.discover_app_manifests",
+               new=AsyncMock(return_value=("main", []))):
+        response = test_client.post(
+            "/api/apps/discover",
+            json={"url": "https://github.com/owner/empty"},
+        )
+    assert response.status_code == 404
+
+
+def test_add_subset_via_manifest_paths(test_client, db_session):
+    """manifest_paths adds only the selected apps, not the whole repo."""
+    m1 = _make_manifest(name="VS Code")
+    m2 = _make_manifest(name="JupyterLab")
+    m3 = _make_manifest(name="marimo")
+    discovered = [("vscode", m1), ("jupyterlab", m2), ("marimo", m3)]
+    with patch("fileglancer.apps.discover_app_manifests",
+               new=AsyncMock(return_value=("main", discovered))):
+        response = test_client.post(
+            "/api/apps",
+            json={
+                "url": "https://github.com/owner/monorepo",
+                "manifest_paths": ["vscode", "marimo"],
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert {a["manifest_path"] for a in body} == {"vscode", "marimo"}
+    rows = list_user_apps(db_session, TEST_USERNAME)
+    assert {r.manifest_path for r in rows} == {"vscode", "marimo"}
+
+
+def test_add_null_manifest_paths_adds_all(test_client, db_session):
+    """Omitting manifest_paths preserves the add-everything behavior."""
+    m1 = _make_manifest(name="VS Code")
+    m2 = _make_manifest(name="JupyterLab")
+    with patch("fileglancer.apps.discover_app_manifests",
+               new=AsyncMock(return_value=("main", [("vscode", m1), ("jupyterlab", m2)]))):
+        response = test_client.post(
+            "/api/apps",
+            json={"url": "https://github.com/owner/monorepo"},
+        )
+
+    assert response.status_code == 200
+    assert len(response.json()) == 2
+    assert len(list_user_apps(db_session, TEST_USERNAME)) == 2
+
+
+def test_add_manifest_paths_no_match_400(test_client, db_session):
+    """A manifest_paths list matching nothing in the repo is a client error."""
+    m1 = _make_manifest(name="VS Code")
+    with patch("fileglancer.apps.discover_app_manifests",
+               new=AsyncMock(return_value=("main", [("vscode", m1)]))):
+        response = test_client.post(
+            "/api/apps",
+            json={
+                "url": "https://github.com/owner/monorepo",
+                "manifest_paths": ["does-not-exist"],
+            },
+        )
+
+    assert response.status_code == 400
+    assert len(list_user_apps(db_session, TEST_USERNAME)) == 0
+
+
 def test_add_app_dedups_bare_against_resolved_default(test_client, db_session):
     """The dedup-hole fix: a bare URL for a master-default repo matches an already
     stored '/tree/master' row, so the add is a no-op (409)."""

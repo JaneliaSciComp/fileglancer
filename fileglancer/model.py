@@ -713,6 +713,25 @@ class ManifestFetchRequest(BaseModel):
 class AppAddRequest(BaseModel):
     """Request to add an app"""
     url: str = Field(description="URL to the app manifest or GitHub repo")
+    manifest_paths: Optional[List[str]] = Field(
+        description=(
+            "Manifest paths (relative dirs within the repo) to add. When omitted "
+            "or null, every discovered manifest in the repo is added. Use this to "
+            "add a subset of a multi-app repository."
+        ),
+        default=None,
+    )
+
+
+class DiscoveredApp(BaseModel):
+    """A manifest discovered in a repo, for previewing before adding"""
+    manifest_path: str = Field(description="Relative directory path to the manifest within the repo", default="")
+    name: str = Field(description="App name from the manifest")
+    description: Optional[str] = Field(description="App description from the manifest", default=None)
+    already_added: bool = Field(
+        description="True if the user has already added this manifest from this repo",
+        default=False,
+    )
 
 
 class AppRemoveRequest(BaseModel):

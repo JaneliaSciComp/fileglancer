@@ -166,7 +166,7 @@ export default function AppLaunch() {
 
   const handleInstall = async () => {
     try {
-      const apps = await addAppMutation.mutateAsync(appUrl);
+      const apps = await addAppMutation.mutateAsync({ url: appUrl });
       const count = apps.length;
       toast.success(`${count} app${count !== 1 ? 's' : ''} added`);
     } catch (error) {
