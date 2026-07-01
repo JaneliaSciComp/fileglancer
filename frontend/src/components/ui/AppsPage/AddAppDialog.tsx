@@ -204,7 +204,7 @@ export default function AddAppDialog({
           <Typography className="mb-1 text-foreground font-bold" type="h6">
             Select apps to add
           </Typography>
-          <Typography className="mb-3 text-secondary text-sm">
+          <Typography className="mb-3 text-foreground text-sm">
             This repository contains {discovered.length} apps. Choose which ones
             to add.
           </Typography>
@@ -250,18 +250,15 @@ export default function AddAppDialog({
                       {app.name}
                     </label>
                     {app.already_added ? (
-                      <span className="ml-2 text-secondary text-xs">
+                      <span className="ml-2 text-foreground text-xs">
                         (already added)
                       </span>
                     ) : null}
                     {app.description ? (
-                      <p className="text-secondary text-xs mt-0.5 break-words">
+                      <p className="text-foreground text-xs mt-0.5 break-words">
                         {app.description}
                       </p>
                     ) : null}
-                    <p className="text-secondary text-xs mt-0.5 font-mono break-all">
-                      {app.manifest_path || 'repository root'}
-                    </p>
                   </div>
                 </div>
               );
