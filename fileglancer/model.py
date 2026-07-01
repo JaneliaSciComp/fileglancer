@@ -436,6 +436,16 @@ class AppEntryPoint(BaseModel):
         ),
         default=None,
     )
+    auto_url: bool = Field(
+        description=(
+            "For service entry points only: have Fileglancer write "
+            "http://$FG_HOSTNAME:$FG_SERVICE_PORT to SERVICE_URL_PATH before the "
+            "command runs. Set this when your service binds to the "
+            "Fileglancer-provided $FG_SERVICE_PORT so you don't have to write the "
+            "URL file yourself."
+        ),
+        default=False,
+    )
     requirements: List[str] = Field(
         description="Required tools for this entry point, e.g. ['apptainer']. Merged with manifest-level requirements.",
         default=[],
@@ -550,6 +560,8 @@ class AppEntryPoint(BaseModel):
             raise ValueError("conda_env and container are mutually exclusive — use one or the other")
         if self.bind_paths and not self.container:
             raise ValueError("bind_paths requires container to be set")
+        if self.auto_url and self.type != "service":
+            raise ValueError("auto_url is only valid for service entry points (type: service)")
         return self
 
 

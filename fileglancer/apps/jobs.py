@@ -390,6 +390,33 @@ def _container_sif_name(container_url: str) -> str:
 _DEFAULT_CONTAINER_CACHE_DIR = "$HOME/.fileglancer/apptainer_cache"
 
 
+# Runtime helper emitted for service jobs. It allocates a free TCP port on the
+# compute node (a port chosen on the submit host would be meaningless there) and
+# exports it as FG_SERVICE_PORT along with FG_HOSTNAME, so a service command can
+# bind to a known address without reimplementing port discovery. Prefers python
+# (authoritative bind-to-0), then falls back to a bash probe of ephemeral ports.
+_SERVICE_PORT_HELPER = r"""# Fileglancer service setup: pick a free port and expose the hostname
+__fg_free_port() {
+  local p py i
+  for py in python3 python; do
+    if command -v "$py" >/dev/null 2>&1; then
+      p="$("$py" -c 'import socket; s=socket.socket(); s.bind(("",0)); print(s.getsockname()[1]); s.close()' 2>/dev/null)" || true
+      [ -n "$p" ] && { printf '%s' "$p"; return 0; }
+    fi
+  done
+  for i in $(seq 1 50); do
+    p=$(( (RANDOM % 16384) + 49152 ))
+    if ! (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null; then
+      printf '%s' "$p"; return 0
+    fi
+  done
+  printf '%s' 8080
+}
+export FG_HOSTNAME="$(hostname)"
+export FG_SERVICE_PORT="$(__fg_free_port)"
+"""
+
+
 def _build_container_script(
     container_url: str,
     command: str,
@@ -426,6 +453,43 @@ def _build_container_script(
         f'  {command}',
     ]
     return "\n".join(lines)
+
+
+def _container_bind_paths(entry_point, parameters: dict, username: Optional[str],
+                          cached_repo_dir) -> list[str]:
+    """Compute the host paths to bind-mount into a container runnable.
+
+    Binds are drawn from three sources, in order:
+
+    1. Each file/directory parameter's value (a file binds its parent dir).
+       Cloud-storage URIs and non-absolute values are skipped — they are not
+       bind-mountable and would otherwise produce garbage binds.
+    2. The runnable's explicit `bind_paths`.
+    3. The cached repo clone, but only when the command runs from `repo`. The
+       `repo` symlink lives inside the (already-bound) work dir yet points at
+       the clone outside it, so without this bind the symlink dangles in the
+       container and the `cd` into it fails. Container runnables default to
+       `work`, so this is only added when the author opts into `repo`.
+
+    The work dir itself is always bound by `_build_container_script`, so it is
+    not included here.
+    """
+    bind_paths: list[str] = []
+    for param in entry_point.flat_parameters():
+        if param.type in ("file", "directory") and param.key in parameters:
+            path_val = str(parameters[param.key])
+            expanded = expand_user_path(path_val, username)
+            if expanded.startswith(_URI_PREFIXES) or not expanded.startswith("/"):
+                continue
+            if param.type == "directory":
+                bind_paths.append(expanded)
+            else:
+                bind_paths.append(str(Path(expanded).parent))
+    if entry_point.bind_paths:
+        bind_paths.extend(entry_point.bind_paths)
+    if entry_point.effective_working_dir == "repo":
+        bind_paths.append(str(cached_repo_dir))
+    return bind_paths
 
 
 async def submit_job(
@@ -633,6 +697,15 @@ async def submit_job(
         preamble_lines.append(f"export PATH=$PATH:{path_suffix}")
     if entry_point.type == "service":
         preamble_lines.append('export SERVICE_URL_PATH="$FG_WORK_DIR/service_url"')
+        preamble_lines.append(_SERVICE_PORT_HELPER)
+        # When the author opts in with auto_url, write the service URL for them
+        # using the port we just allocated, so a service that binds to
+        # $FG_SERVICE_PORT needs no URL-writing code of its own. A service that
+        # manages its own URL simply leaves auto_url unset and overwrites this.
+        if entry_point.auto_url:
+            preamble_lines.append(
+                'printf \'http://%s:%s\' "$FG_HOSTNAME" "$FG_SERVICE_PORT" > "$SERVICE_URL_PATH"'
+            )
     # Choose the working directory. 'work' runs from the job's work dir (the
     # repo is still reachable via the `repo` symlink); 'repo' runs from the
     # cloned project (optionally the manifest's subdirectory). cd_suffix may
@@ -654,23 +727,9 @@ async def submit_job(
 
     # If container is defined, wrap command in apptainer exec
     if effective_container:
-        bind_paths = []
-        for param in entry_point.flat_parameters():
-            if param.type in ("file", "directory") and param.key in parameters:
-                path_val = str(parameters[param.key])
-                # Expand ~ against the user's home (same normalization as the
-                # command). Skip cloud-storage URIs and anything that isn't an
-                # absolute local path — those are not bind-mountable and would
-                # otherwise produce garbage binds (e.g. s3://bucket/k -> s3:/bucket).
-                expanded = expand_user_path(path_val, username)
-                if expanded.startswith(_URI_PREFIXES) or not expanded.startswith("/"):
-                    continue
-                if param.type == "directory":
-                    bind_paths.append(expanded)
-                else:
-                    bind_paths.append(str(Path(expanded).parent))
-        if entry_point.bind_paths:
-            bind_paths.extend(entry_point.bind_paths)
+        bind_paths = _container_bind_paths(
+            entry_point, parameters, username, cached_repo_dir
+        )
 
         command = _build_container_script(
             container_url=effective_container,

@@ -22,6 +22,8 @@ from fileglancer.apps import (
     build_requirements_check,
     _container_sif_name,
     _build_container_script,
+    _container_bind_paths,
+    _SERVICE_PORT_HELPER,
     build_command,
     collect_path_parameters,
     expand_user_path,
@@ -677,6 +679,125 @@ class TestContainerScriptGeneration:
         # Should not have docker://docker://
         assert "docker://docker://" not in script
         assert "docker://ghcr.io/org/image:1.0" in script
+
+
+class TestContainerBindPaths:
+    """_container_bind_paths decides what host paths get mounted into a container."""
+
+    def _ep(self, **kwargs):
+        defaults = dict(id="t", name="T", command="echo",
+                        container="ghcr.io/org/image:tag")
+        defaults.update(kwargs)
+        return AppEntryPoint(**defaults)
+
+    def test_directory_param_bound_directly(self):
+        ep = self._ep(parameters=[
+            AppParameter(flag="--data", name="Data", type="directory")
+        ])
+        binds = _container_bind_paths(ep, {"data": "/groups/lab/data"}, None, "/cache/repo")
+        assert "/groups/lab/data" in binds
+
+    def test_file_param_binds_parent_dir(self):
+        ep = self._ep(parameters=[
+            AppParameter(flag="--in", name="In", type="file")
+        ])
+        binds = _container_bind_paths(ep, {"in": "/groups/lab/x.tif"}, None, "/cache/repo")
+        assert "/groups/lab" in binds
+        assert "/groups/lab/x.tif" not in binds
+
+    def test_cloud_uri_and_relative_skipped(self):
+        ep = self._ep(parameters=[
+            AppParameter(flag="--a", name="A", type="directory"),
+            AppParameter(flag="--b", name="B", type="directory"),
+        ])
+        binds = _container_bind_paths(
+            ep, {"a": "s3://bucket/key", "b": "./rel"}, None, "/cache/repo"
+        )
+        assert binds == []  # neither is a bind-mountable absolute local path
+
+    def test_explicit_bind_paths_included(self):
+        ep = self._ep(bind_paths=["/shared/ref", "/scratch"])
+        binds = _container_bind_paths(ep, {}, None, "/cache/repo")
+        assert "/shared/ref" in binds and "/scratch" in binds
+
+    def test_repo_bound_only_when_working_dir_repo(self):
+        # Container default is working_dir=work → repo NOT bound.
+        work_ep = self._ep()
+        assert "work" == work_ep.effective_working_dir
+        assert "/cache/repo" not in _container_bind_paths(work_ep, {}, None, "/cache/repo")
+
+        # Opt into repo → the cached clone is bound so the repo symlink resolves.
+        repo_ep = self._ep(working_dir="repo")
+        assert "/cache/repo" in _container_bind_paths(repo_ep, {}, None, "/cache/repo")
+
+
+# --- Service port / URL tests (FG_SERVICE_PORT + auto_url) ---
+
+class TestServicePortHelper:
+    """The preamble helper Fileglancer injects for service-type jobs."""
+
+    def test_helper_exports_port_and_hostname(self):
+        assert "export FG_SERVICE_PORT=" in _SERVICE_PORT_HELPER
+        assert "export FG_HOSTNAME=" in _SERVICE_PORT_HELPER
+
+    def test_helper_is_valid_bash(self):
+        # The generated snippet must at least parse as bash.
+        result = subprocess.run(
+            ["bash", "-n", "-c", _SERVICE_PORT_HELPER],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0, result.stderr
+
+    def test_helper_picks_a_free_port_at_runtime(self):
+        # Run the helper and confirm FG_SERVICE_PORT is a plausible TCP port.
+        script = _SERVICE_PORT_HELPER + '\necho "$FG_SERVICE_PORT"'
+        result = subprocess.run(
+            ["bash", "-c", script], capture_output=True, text=True,
+        )
+        assert result.returncode == 0, result.stderr
+        port = int(result.stdout.strip().splitlines()[-1])
+        assert 1 <= port <= 65535
+
+    def test_helper_robust_under_set_euo_pipefail(self):
+        # A deployment may prepend `set -euo pipefail` via script_prologue; the
+        # helper must still allocate a port and not abort the job.
+        script = "set -euo pipefail\n" + _SERVICE_PORT_HELPER + '\necho "$FG_SERVICE_PORT"'
+        result = subprocess.run(
+            ["bash", "-c", script], capture_output=True, text=True,
+        )
+        assert result.returncode == 0, result.stderr
+        assert int(result.stdout.strip().splitlines()[-1]) >= 1
+
+
+class TestServiceAutoUrl:
+    """auto_url is service-only and drives Fileglancer to write the URL file."""
+
+    def test_auto_url_defaults_false(self):
+        ep = AppEntryPoint(id="t", name="T", command="echo", type="service")
+        assert ep.auto_url is False
+
+    def test_auto_url_allowed_on_service(self):
+        ep = AppEntryPoint(id="t", name="T", command="echo",
+                           type="service", auto_url=True)
+        assert ep.auto_url is True
+
+    def test_auto_url_rejected_on_job(self):
+        with pytest.raises(ValidationError, match="auto_url is only valid for service"):
+            AppEntryPoint(id="t", name="T", command="echo",
+                          type="job", auto_url=True)
+
+    def test_auto_url_write_command_uses_provided_port(self):
+        # Mirror the preamble line submit_job emits when auto_url is set, and
+        # confirm it writes a valid http URL built from the helper's values.
+        write_line = (
+            'printf \'http://%s:%s\' "$FG_HOSTNAME" "$FG_SERVICE_PORT"'
+        )
+        script = _SERVICE_PORT_HELPER + "\n" + write_line
+        result = subprocess.run(
+            ["bash", "-c", script], capture_output=True, text=True,
+        )
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.startswith("http://")
 
 
 # --- Path validation tests ---

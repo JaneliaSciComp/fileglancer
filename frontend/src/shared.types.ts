@@ -126,6 +126,7 @@ type AppEntryPoint = {
   bind_paths?: string[];
   container_args?: string;
   working_dir?: 'work' | 'repo';
+  auto_url?: boolean;
   requirements?: string[];
 };
 
