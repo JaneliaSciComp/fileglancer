@@ -118,6 +118,22 @@ export function buildLaunchPathFromApp(
   );
 }
 
+export function buildAppDetailPath(
+  appUrl: string,
+  manifestPath: string
+): string {
+  const { owner, repo, branch } = parseGithubUrl(appUrl);
+  const params = new URLSearchParams();
+  if (branch && branch !== 'main') {
+    params.set('branch', branch);
+  }
+  if (manifestPath) {
+    params.set('path', manifestPath);
+  }
+  const query = params.toString();
+  return `/apps/detail/${owner}/${repo}${query ? `?${query}` : ''}`;
+}
+
 export function buildRelaunchPath(
   owner: string,
   repo: string,

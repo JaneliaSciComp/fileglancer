@@ -399,8 +399,12 @@ export {
   buildGithubUrl,
   buildLaunchPath,
   buildLaunchPathFromApp,
+  buildAppDetailPath,
   buildRelaunchPath
 } from './appUrls';
+
+// Re-export app icon utilities
+export { getAppIconType, getEntryPointIconType } from './appIcons';
 
 // Re-export Neuroglancer URL utilities
 export {

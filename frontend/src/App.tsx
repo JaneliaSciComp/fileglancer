@@ -10,6 +10,7 @@ import { OtherPagesLayout } from './layouts/OtherPagesLayout';
 import AppsLayout from './layouts/AppsLayout';
 import Login from '@/components/Login';
 import Apps from '@/components/Apps';
+import AppDetail from '@/components/AppDetail';
 import Catalog from '@/components/Catalog';
 import AppJobs from '@/components/AppJobs';
 import AppLaunch from '@/components/AppLaunch';
@@ -128,50 +129,26 @@ const AppComponent = () => {
               <Route element={<Apps />} index />
               <Route element={<Catalog />} path="catalog" />
               <Route element={<AppJobs />} path="jobs" />
-              {/* Render job detail inside the layout so the My Apps / App
-                  Catalog / Jobs tabs stay visible when drilling into a job. */}
+              {/* Render job/app detail and launch inside the layout so the
+                  My Apps / App Catalog / Jobs tabs stay visible when drilling
+                  into a job or an app. */}
               <Route element={<JobDetail />} path="jobs/:jobId" />
+              <Route element={<AppDetail />} path="detail/:owner/:repo" />
+              <Route
+                element={<AppLaunch />}
+                path="launch/:owner/:repo/:branch/:entryPointId"
+              />
+              <Route
+                element={<AppLaunch />}
+                path="launch/:owner/:repo/:branch"
+              />
+              <Route element={<AppLaunch />} path="launch/:owner/:repo" />
+              <Route
+                element={<AppLaunch />}
+                path="relaunch/:owner/:repo/:branch/:entryPointId"
+              />
+              <Route element={<AppLaunch />} path="relaunch/:owner/:repo" />
             </Route>
-            <Route
-              element={
-                <RequireAuth>
-                  <AppLaunch />
-                </RequireAuth>
-              }
-              path="apps/launch/:owner/:repo/:branch/:entryPointId"
-            />
-            <Route
-              element={
-                <RequireAuth>
-                  <AppLaunch />
-                </RequireAuth>
-              }
-              path="apps/launch/:owner/:repo/:branch"
-            />
-            <Route
-              element={
-                <RequireAuth>
-                  <AppLaunch />
-                </RequireAuth>
-              }
-              path="apps/launch/:owner/:repo"
-            />
-            <Route
-              element={
-                <RequireAuth>
-                  <AppLaunch />
-                </RequireAuth>
-              }
-              path="apps/relaunch/:owner/:repo/:branch/:entryPointId"
-            />
-            <Route
-              element={
-                <RequireAuth>
-                  <AppLaunch />
-                </RequireAuth>
-              }
-              path="apps/relaunch/:owner/:repo"
-            />
             {tasksEnabled ? (
               <Route
                 element={

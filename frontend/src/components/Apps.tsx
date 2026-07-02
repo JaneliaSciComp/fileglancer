@@ -6,86 +6,24 @@ import toast from 'react-hot-toast';
 
 import AppCard from '@/components/ui/AppsPage/AppCard';
 import AddAppDialog from '@/components/ui/AppsPage/AddAppDialog';
-import DeleteAppDialog from '@/components/ui/AppsPage/DeleteAppDialog';
+import AppActionDialogs from '@/components/ui/AppsPage/AppActionDialogs';
 import {
   useAppsQuery,
   useAddAppMutation,
-  useDiscoverAppsMutation,
-  useUpdateAppMutation,
-  useRemoveAppMutation,
-  useShareAppMutation,
-  useUnshareListingMutation
+  useDiscoverAppsMutation
 } from '@/queries/appsQueries';
+import { useAppActions } from '@/hooks/useAppActions';
 import FgButton from './designSystem/atoms/FgButton';
 import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 import { DOCS_BASE_URL } from '@/constants/docs';
-import type { UserApp } from '@/shared.types';
 
 export default function Apps() {
-  const [deleteApp, setDeleteApp] = useState<UserApp | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
 
   const appsQuery = useAppsQuery();
   const addAppMutation = useAddAppMutation();
   const discoverAppsMutation = useDiscoverAppsMutation();
-  const updateAppMutation = useUpdateAppMutation();
-  const removeAppMutation = useRemoveAppMutation();
-  const shareAppMutation = useShareAppMutation();
-  const unshareListingMutation = useUnshareListingMutation();
-
-  const handleRequestRemove = (app: UserApp) => {
-    setDeleteApp(app);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!deleteApp) {
-      return;
-    }
-    try {
-      await removeAppMutation.mutateAsync({
-        url: deleteApp.url,
-        manifest_path: deleteApp.manifest_path
-      });
-      toast.success('App removed');
-      setDeleteApp(null);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Failed to remove app';
-      toast.error(message);
-    }
-  };
-
-  const handleUpdateApp = async ({
-    url,
-    manifest_path
-  }: {
-    url: string;
-    manifest_path: string;
-  }) => {
-    try {
-      await updateAppMutation.mutateAsync({ url, manifest_path });
-      toast.success('App updated');
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Failed to update app';
-      toast.error(message);
-    }
-  };
-
-  const handleShare = async (params: {
-    url: string;
-    manifest_path: string;
-    name: string;
-    description: string;
-  }) => {
-    await shareAppMutation.mutateAsync({
-      url: params.url,
-      manifest_path: params.manifest_path,
-      name: params.name,
-      description: params.description
-    });
-    toast.success('Shared to catalog');
-  };
+  const actions = useAppActions();
 
   const handleDiscover = (url: string) => discoverAppsMutation.mutateAsync(url);
 
@@ -97,17 +35,6 @@ export default function Apps() {
     const count = apps.length;
     toast.success(`${count} app${count !== 1 ? 's' : ''} added`);
     setShowAddDialog(false);
-  };
-
-  const handleUnshare = async (listingId: number) => {
-    try {
-      await unshareListingMutation.mutateAsync({ listing_id: listingId });
-      toast.success('Removed from catalog');
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Failed to unshare';
-      toast.error(message);
-    }
   };
 
   return (
@@ -144,20 +71,9 @@ export default function Apps() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
           {appsQuery.data.map(app => (
             <AppCard
+              actions={actions}
               app={app}
               key={`${app.url}::${app.manifest_path}`}
-              onRemove={() => handleRequestRemove(app)}
-              onShare={handleShare}
-              onUnshare={() =>
-                app.listing_id !== undefined
-                  ? handleUnshare(app.listing_id)
-                  : undefined
-              }
-              onUpdate={handleUpdateApp}
-              removing={removeAppMutation.isPending}
-              sharing={shareAppMutation.isPending}
-              unsharing={unshareListingMutation.isPending}
-              updating={updateAppMutation.isPending}
             />
           ))}
         </div>
@@ -178,13 +94,7 @@ export default function Apps() {
         onDiscover={handleDiscover}
         open={showAddDialog}
       />
-      <DeleteAppDialog
-        app={deleteApp}
-        onClose={() => setDeleteApp(null)}
-        onConfirm={handleConfirmDelete}
-        open={deleteApp !== null}
-        removing={removeAppMutation.isPending}
-      />
+      <AppActionDialogs actions={actions} />
     </div>
   );
 }

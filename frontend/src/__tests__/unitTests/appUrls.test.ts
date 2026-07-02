@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import {
+  buildAppDetailPath,
   buildAppUrl,
   buildLaunchPath,
   buildRelaunchPath,
@@ -85,6 +86,18 @@ describe('app URL helpers', () => {
     ).toBe(
       '/apps/launch/org/tool?branch=feature%2Fmy-tool&entryPointId=run&path=apps%2Fdemo'
     );
+  });
+
+  test('builds detail paths, omitting the default branch and empty manifest path', () => {
+    expect(buildAppDetailPath('https://github.com/org/tool', '')).toBe(
+      '/apps/detail/org/tool'
+    );
+    expect(
+      buildAppDetailPath(
+        'https://github.com/org/tool/tree/feature/my-tool',
+        'apps/demo'
+      )
+    ).toBe('/apps/detail/org/tool?branch=feature%2Fmy-tool&path=apps%2Fdemo');
   });
 
   test('builds relaunch paths with slash branches in the query string', () => {

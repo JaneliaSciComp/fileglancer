@@ -7,15 +7,17 @@ import {
 } from 'react-router';
 
 import { Card, Typography } from '@material-tailwind/react';
-import {
-  HiOutlineArrowLeft,
-  HiOutlineDownload,
-  HiOutlinePlay
-} from 'react-icons/hi';
+import { HiOutlineDownload, HiOutlinePlay } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
 import AppLaunchForm from '@/components/ui/AppsPage/AppLaunchForm';
-import { buildGithubUrl, canonicalGithubUrl } from '@/utils';
+import AppPageHeader from '@/components/ui/AppsPage/AppPageHeader';
+import {
+  buildAppDetailPath,
+  buildGithubUrl,
+  canonicalGithubUrl,
+  getAppIconType
+} from '@/utils';
 import {
   useAppsQuery,
   useAddAppMutation,
@@ -178,14 +180,16 @@ export default function AppLaunch() {
 
   return (
     <div>
-      <FgButton
-        className="mb-6"
-        icon={HiOutlineArrowLeft}
-        onClick={() => navigate('/apps')}
-        variant="outline"
-      >
-        Back to Apps
-      </FgButton>
+      <AppPageHeader
+        backLabel={installedApp ? 'Back to app details' : 'Back to My Apps'}
+        backTo={
+          installedApp
+            ? buildAppDetailPath(installedApp.url, installedApp.manifest_path)
+            : '/apps'
+        }
+        icon={manifest ? getAppIconType(manifest) : undefined}
+        title={displayName}
+      />
 
       {/* Not-installed banner */}
       {!appsQuery.isPending && !isInstalled ? (
@@ -257,9 +261,6 @@ export default function AppLaunch() {
         />
       ) : manifest ? (
         <div className="max-w-2xl">
-          <Typography className="font-bold mb-1" type="h5">
-            {displayName}
-          </Typography>
           {manifest.description ? (
             <Typography className="mb-6">{manifest.description}</Typography>
           ) : null}

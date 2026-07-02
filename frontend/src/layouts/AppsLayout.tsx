@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router';
+import { NavLink, Outlet, useLocation } from 'react-router';
 import type { ReactNode } from 'react';
 
 import FgBadge from '@/components/designSystem/atoms/FgBadge';
@@ -9,6 +9,8 @@ interface TabItem {
   label: string;
   end?: boolean;
   badge?: ReactNode;
+  /** Overrides NavLink's own active-state matching when set. */
+  isActive?: boolean;
 }
 
 function tabClass({ isActive }: { isActive: boolean }) {
@@ -33,9 +35,18 @@ function TabUnderline({ active }: { readonly active: boolean }) {
 
 export default function AppsLayout() {
   const activeJobCount = useActiveJobCount();
+  const { pathname } = useLocation();
+
+  // App detail and launch pages are drill-downs from My Apps, so keep that tab
+  // highlighted there (NavLink's own matching would mark it inactive).
+  const myAppsActive =
+    pathname === '/apps' ||
+    pathname.startsWith('/apps/detail/') ||
+    pathname.startsWith('/apps/launch/') ||
+    pathname.startsWith('/apps/relaunch/');
 
   const tabs: TabItem[] = [
-    { to: '/apps', label: 'My Apps', end: true },
+    { to: '/apps', label: 'My Apps', end: true, isActive: myAppsActive },
     { to: '/apps/catalog', label: 'App Catalog' },
     {
       to: '/apps/jobs',
@@ -58,12 +69,18 @@ export default function AppsLayout() {
         <ul className="flex gap-1 -mb-px">
           {tabs.map(tab => (
             <li key={tab.to}>
-              <NavLink className={tabClass} end={tab.end} to={tab.to}>
+              <NavLink
+                className={({ isActive }) =>
+                  tabClass({ isActive: tab.isActive ?? isActive })
+                }
+                end={tab.end}
+                to={tab.to}
+              >
                 {({ isActive }) => (
                   <>
                     <span>{tab.label}</span>
                     {tab.badge}
-                    <TabUnderline active={isActive} />
+                    <TabUnderline active={tab.isActive ?? isActive} />
                   </>
                 )}
               </NavLink>
