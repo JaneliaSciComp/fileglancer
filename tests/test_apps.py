@@ -624,6 +624,9 @@ class TestContainerScriptGeneration:
             bind_paths=[],
         )
         assert "apptainer pull" in script
+        # Pull without populating Apptainer's own cache, so the SIF we keep is
+        # the only copy (no multi-GB duplicate under ~/.apptainer/cache).
+        assert "apptainer pull --disable-cache" in script
         assert "apptainer exec" in script
         assert "docker://ghcr.io/org/image:1.0" in script
         assert "ghcr.io_org_image_1.0.sif" in script

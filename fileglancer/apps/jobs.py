@@ -505,7 +505,12 @@ def _build_container_script(
         # Report the (often multi-minute) image download so the UI can say so.
         # FG_PHASE_PATH is set in the preamble; guard in case it is not.
         '  [ -n "$FG_PHASE_PATH" ] && printf pulling_image > "$FG_PHASE_PATH" 2>/dev/null || true',
-        f'  apptainer pull "$SIF_PATH" {shlex.quote(docker_url)}',
+        # --disable-cache: the built SIF here is the only copy we keep. We pull
+        # only when it's missing, so Apptainer's own layer/SIF cache would just
+        # duplicate gigabytes to speed up a re-pull that rarely happens. Skipping
+        # it means a re-pull (if this SIF is deleted) re-downloads from the
+        # registry, which is the right trade for not double-storing every image.
+        f'  apptainer pull --disable-cache "$SIF_PATH" {shlex.quote(docker_url)}',
         'fi',
         '[ -n "$FG_PHASE_PATH" ] && printf starting > "$FG_PHASE_PATH" 2>/dev/null || true',
         f'apptainer exec {bind_flags}{extra} "$SIF_PATH" \\',
