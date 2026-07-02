@@ -50,21 +50,12 @@ export default function FileSelectorTable({
   onItemClick,
   onItemDoubleClick
 }: FileSelectorTableProps) {
-  const { hideDotFiles, pathPreference } = usePreferencesContext();
+  const { pathPreference } = usePreferencesContext();
   const [sorting, setSorting] = useState<SortingState>([]);
 
-  const displayFiles = useMemo(() => {
-    let filtered = data;
-
-    // Filter out dot files if preference is set
-    if (hideDotFiles) {
-      filtered = filtered.filter(
-        (file: FileOrFolder) => !file.name.startsWith('.')
-      );
-    }
-
-    return filtered;
-  }, [data, hideDotFiles]);
+  // Dot-file visibility is handled upstream by useFileSelector (which keeps a
+  // dialog-local override), so the incoming data is already filtered.
+  const displayFiles = data;
 
   const columns = useMemo<ColumnDef<FileOrFolder>[]>(
     () => [

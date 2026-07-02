@@ -177,7 +177,7 @@ export default function FileSelectorButton({
       </FgButton>
       {showDialog ? (
         <FgDialog
-          className="w-[800px] max-w-[90vw] max-h-max"
+          className="w-[920px] max-w-[92vw] max-h-max"
           onClose={onClose}
           open={showDialog}
         >
@@ -199,7 +199,7 @@ export default function FileSelectorButton({
             zonesData={zonesQuery.data}
           />
 
-          {/* Toolbar: go home, new folder, show/hide dot files */}
+          {/* Toolbar: go home, new folder, show/hide dot files, filter */}
           <div className="mt-2 flex items-center gap-1">
             <FgTooltip
               as={IconButton}
@@ -231,6 +231,29 @@ export default function FileSelectorButton({
               onClick={toggleHideDotFiles}
               triggerClasses={toolbarBtnClasses}
             />
+            <div className="relative ml-1 flex-1">
+              <Input
+                className="bg-background text-foreground [&::-webkit-search-cancel-button]:appearance-none"
+                onChange={handleSearchChange}
+                placeholder="Type to filter"
+                type="search"
+                value={searchQuery}
+              >
+                <Input.Icon>
+                  <FgIcon className="h-full w-full" icon={HiOutlineFunnel} />
+                </Input.Icon>
+              </Input>
+              {searchQuery ? (
+                <button
+                  aria-label="Clear search"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-primary hover:text-primary/80 transition-colors"
+                  onClick={clearSearch}
+                  type="button"
+                >
+                  <FgIcon className="font-bold" icon={HiXMark} />
+                </button>
+              ) : null}
+            </div>
           </div>
 
           {/* Inline new-folder form */}
@@ -273,33 +296,9 @@ export default function FileSelectorButton({
             </form>
           ) : null}
 
-          {/* Search input */}
-          <div className="my-2 relative">
-            <Input
-              className="bg-background text-foreground [&::-webkit-search-cancel-button]:appearance-none"
-              onChange={handleSearchChange}
-              placeholder="Type to filter"
-              type="search"
-              value={searchQuery}
-            >
-              <Input.Icon>
-                <FgIcon className="h-full w-full" icon={HiOutlineFunnel} />
-              </Input.Icon>
-            </Input>
-            {searchQuery ? (
-              <button
-                aria-label="Clear search"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-primary hover:text-primary/80 transition-colors"
-                onClick={clearSearch}
-                type="button"
-              >
-                <FgIcon className="font-bold" icon={HiXMark} />
-              </button>
-            ) : null}
-          </div>
-
-          {/* Table with loading/error states */}
-          <div className="my-4 h-96">
+          {/* Table with loading/error states. Height scales with the
+              viewport so shorter screens shrink the (scrollable) file list. */}
+          <div className="my-4 h-[50vh] max-h-96 min-h-[10rem]">
             {zonesQuery.isPending ? (
               <div className="flex items-center justify-center h-full">
                 <Spinner
@@ -350,21 +349,6 @@ export default function FileSelectorButton({
               </Typography>
             </div>
           ) : null}
-
-          {/* Selected path display */}
-
-          <div className="mb-4 p-2 h-14 bg-surface rounded">
-            <Typography className="text-sm text-foreground/60">
-              Selected:
-            </Typography>
-            {state.selectedItem ? (
-              <Typography className="text-sm text-foreground font-mono truncate">
-                {state.selectedItem.displayPath}
-              </Typography>
-            ) : (
-              <div className="h-5" />
-            )}
-          </div>
 
           {/* Action buttons */}
           <div className="flex justify-end gap-2 mt-4">

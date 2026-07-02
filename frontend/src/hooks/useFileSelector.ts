@@ -47,8 +47,7 @@ type FileSelectorOptions = {
 
 export default function useFileSelector(options?: FileSelectorOptions) {
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
-  const { pathPreference, isFilteredByGroups, hideDotFiles } =
-    usePreferencesContext();
+  const { pathPreference, isFilteredByGroups } = usePreferencesContext();
   const { profile } = useProfileContext();
 
   const initialLocation = options?.initialLocation;
@@ -95,16 +94,13 @@ export default function useFileSelector(options?: FileSelectorOptions) {
     selectedItem: null
   });
 
-  // Local-only dot-file visibility for the dialog: null follows the global
-  // preference; once the user toggles inside the dialog it overrides locally
+  // Local-only dot-file visibility for the dialog. Always starts hidden,
+  // ignoring the global preference; the user can toggle it within the dialog
   // without ever writing the global preference.
-  const [hideDotFilesOverride, setHideDotFilesOverride] = useState<
-    boolean | null
-  >(null);
-  const hideDotFilesEffective = hideDotFilesOverride ?? hideDotFiles;
+  const [hideDotFilesLocal, setHideDotFilesLocal] = useState<boolean>(true);
   const toggleHideDotFiles = useCallback(() => {
-    setHideDotFilesOverride(prev => !(prev ?? hideDotFiles));
-  }, [hideDotFiles]);
+    setHideDotFilesLocal(prev => !prev);
+  }, []);
 
   // If the profile (and thus home) resolves only after mount, apply the home
   // default once, as long as the user hasn't already navigated away.
@@ -292,7 +288,7 @@ export default function useFileSelector(options?: FileSelectorOptions) {
     } else {
       // In filesystem mode, return files from query
       let files = fileQuery.data?.files || [];
-      if (hideDotFilesEffective) {
+      if (hideDotFilesLocal) {
         files = files.filter(item => !item.name.startsWith('.'));
       }
       if (normalizedQuery) {
@@ -310,7 +306,7 @@ export default function useFileSelector(options?: FileSelectorOptions) {
     isFilteredByGroups,
     profile,
     normalizedQuery,
-    hideDotFilesEffective
+    hideDotFilesLocal
   ]);
 
   // Navigation methods
@@ -333,7 +329,7 @@ export default function useFileSelector(options?: FileSelectorOptions) {
   const reset = useCallback(() => {
     lastResolvedPath.current = undefined;
     setSearchQuery('');
-    setHideDotFilesOverride(null);
+    setHideDotFilesLocal(true);
     setState({
       currentLocation: defaultLocation,
       selectedItem: null
@@ -478,7 +474,7 @@ export default function useFileSelector(options?: FileSelectorOptions) {
     clearSearch,
     isFilteredByGroups,
     userHasGroups,
-    hideDotFiles: hideDotFilesEffective,
+    hideDotFiles: hideDotFilesLocal,
     toggleHideDotFiles
   };
 }
