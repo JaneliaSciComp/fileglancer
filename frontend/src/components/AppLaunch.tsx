@@ -243,7 +243,6 @@ export default function AppLaunch() {
         </div>
       ) : manifest && selectedEntryPoint ? (
         <AppLaunchForm
-          appName={displayName}
           entryPoint={selectedEntryPoint}
           initialContainer={relaunchContainer}
           initialContainerArgs={relaunchContainerArgs}
@@ -254,7 +253,6 @@ export default function AppLaunch() {
           initialPreRun={relaunchPreRun}
           initialResources={relaunchResources}
           initialValues={relaunchParameters}
-          manifest={manifest}
           onSubmit={handleSubmit}
           submitError={submitJobMutation.error?.message}
           submitting={submitJobMutation.isPending}

@@ -33,14 +33,12 @@ import {
 import type {
   AppEntryPoint,
   AppLaunchParamsFile,
-  AppManifest,
   AppParameter,
   AppParameterSection,
   AppResourceDefaults
 } from '@/shared.types';
 
 interface AppLaunchFormProps {
-  readonly manifest: AppManifest;
   readonly entryPoint: AppEntryPoint;
   readonly onSubmit: (
     parameters: Record<string, unknown>,
@@ -64,10 +62,6 @@ interface AppLaunchFormProps {
   readonly initialPostRun?: string;
   readonly initialContainer?: string;
   readonly initialContainerArgs?: string;
-  // Display name for the app; defaults to the manifest name when omitted. Lets
-  // callers show a user's custom app name (e.g. chosen when adding from the
-  // catalog) instead of the raw manifest name.
-  readonly appName?: string;
 }
 
 type EnvVar = { key: string; value: string };
@@ -714,7 +708,6 @@ function ClusterTabContent({
 }
 
 export default function AppLaunchForm({
-  manifest,
   entryPoint,
   onSubmit,
   submitting,
@@ -727,8 +720,7 @@ export default function AppLaunchForm({
   initialPreRun,
   initialPostRun,
   initialContainer,
-  initialContainerArgs,
-  appName
+  initialContainerArgs
 }: AppLaunchFormProps) {
   const { defaultExtraArgs } = usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
@@ -1254,12 +1246,9 @@ export default function AppLaunchForm({
         type="file"
       />
       <div className="flex items-start justify-between gap-4 mb-1">
-        <div>
-          <Typography className="font-bold mb-1" type="h5">
-            {entryPoint.name}
-          </Typography>
-          <Typography className="block">{appName ?? manifest.name}</Typography>
-        </div>
+        <Typography className="font-bold mb-1" type="h5">
+          {entryPoint.name}
+        </Typography>
         {actionButtons}
       </div>
       {/* Errors (top) */}
