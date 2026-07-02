@@ -128,6 +128,9 @@ const AppComponent = () => {
               <Route element={<Apps />} index />
               <Route element={<Catalog />} path="catalog" />
               <Route element={<AppJobs />} path="jobs" />
+              {/* Render job detail inside the layout so the My Apps / App
+                  Catalog / Jobs tabs stay visible when drilling into a job. */}
+              <Route element={<JobDetail />} path="jobs/:jobId" />
             </Route>
             <Route
               element={
@@ -168,14 +171,6 @@ const AppComponent = () => {
                 </RequireAuth>
               }
               path="apps/relaunch/:owner/:repo"
-            />
-            <Route
-              element={
-                <RequireAuth>
-                  <JobDetail />
-                </RequireAuth>
-              }
-              path="apps/jobs/:jobId"
             />
             {tasksEnabled ? (
               <Route
