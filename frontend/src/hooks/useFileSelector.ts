@@ -40,32 +40,89 @@ type FileSelectorOptions = {
   initialPath?: string;
   mode?: FileSelectorMode;
   pathPreferenceOverride?: ['linux_path'];
+  // When neither initialLocation nor initialPath resolves to a folder, open in
+  // the user's home directory instead of the top-level zones list.
+  defaultToHome?: boolean;
 };
 
 export default function useFileSelector(options?: FileSelectorOptions) {
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
-  const { pathPreference, isFilteredByGroups } = usePreferencesContext();
+  const { pathPreference, isFilteredByGroups, hideDotFiles } =
+    usePreferencesContext();
   const { profile } = useProfileContext();
 
   const initialLocation = options?.initialLocation;
   const mode = options?.mode ?? 'any';
+  const defaultToHome = options?.defaultToHome ?? false;
   const overrideKey = options?.pathPreferenceOverride?.[0];
   const effectivePathPreference = useMemo(
     () => (overrideKey ? ([overrideKey] as ['linux_path']) : pathPreference),
     [overrideKey, pathPreference]
   );
 
-  // Initialize location based on initialLocation prop
+  // The user's home directory as a filesystem location, when known.
+  const homeLocation = useMemo<FileSelectorLocation | undefined>(() => {
+    if (!profile?.homeFileSharePathName) {
+      return undefined;
+    }
+    return {
+      type: 'filesystem',
+      fspName: profile.homeFileSharePathName,
+      path: profile.homeDirectoryName || '.'
+    };
+  }, [profile]);
+
+  // Where the selector starts (and returns to on reset): an explicit
+  // initialLocation, else the home directory when defaultToHome is set, else
+  // the top-level zones list.
+  const defaultLocation = useMemo<FileSelectorLocation>(() => {
+    if (initialLocation) {
+      return {
+        type: 'filesystem',
+        fspName: initialLocation.fspName,
+        path: initialLocation.path
+      };
+    }
+    if (defaultToHome && homeLocation) {
+      return homeLocation;
+    }
+    return { type: 'zones' };
+  }, [initialLocation, defaultToHome, homeLocation]);
+
+  // Initialize location based on the resolved default location
   const [state, setState] = useState<FileSelectorState>({
-    currentLocation: initialLocation
-      ? {
-          type: 'filesystem',
-          fspName: initialLocation.fspName,
-          path: initialLocation.path
-        }
-      : { type: 'zones' },
+    currentLocation: defaultLocation,
     selectedItem: null
   });
+
+  // Local-only dot-file visibility for the dialog: null follows the global
+  // preference; once the user toggles inside the dialog it overrides locally
+  // without ever writing the global preference.
+  const [hideDotFilesOverride, setHideDotFilesOverride] = useState<
+    boolean | null
+  >(null);
+  const hideDotFilesEffective = hideDotFilesOverride ?? hideDotFiles;
+  const toggleHideDotFiles = useCallback(() => {
+    setHideDotFilesOverride(prev => !(prev ?? hideDotFiles));
+  }, [hideDotFiles]);
+
+  // If the profile (and thus home) resolves only after mount, apply the home
+  // default once, as long as the user hasn't already navigated away.
+  const appliedHomeRef = useRef(false);
+  useEffect(() => {
+    if (!defaultToHome || initialLocation || options?.initialPath) {
+      return;
+    }
+    if (appliedHomeRef.current || !homeLocation) {
+      return;
+    }
+    appliedHomeRef.current = true;
+    setState(prev =>
+      prev.currentLocation.type === 'zones'
+        ? { currentLocation: homeLocation, selectedItem: null }
+        : prev
+    );
+  }, [defaultToHome, initialLocation, options?.initialPath, homeLocation]);
 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -234,7 +291,10 @@ export default function useFileSelector(options?: FileSelectorOptions) {
       return items;
     } else {
       // In filesystem mode, return files from query
-      const files = fileQuery.data?.files || [];
+      let files = fileQuery.data?.files || [];
+      if (hideDotFilesEffective) {
+        files = files.filter(item => !item.name.startsWith('.'));
+      }
       if (normalizedQuery) {
         return files.filter(item =>
           item.name.toLowerCase().includes(normalizedQuery)
@@ -249,7 +309,8 @@ export default function useFileSelector(options?: FileSelectorOptions) {
     fileQuery.data,
     isFilteredByGroups,
     profile,
-    normalizedQuery
+    normalizedQuery,
+    hideDotFilesEffective
   ]);
 
   // Navigation methods
@@ -261,21 +322,23 @@ export default function useFileSelector(options?: FileSelectorOptions) {
     });
   }, []);
 
+  // Jump to the user's home directory (no-op until the profile resolves).
+  const navigateHome = useCallback(() => {
+    if (homeLocation) {
+      navigateToLocation(homeLocation);
+    }
+  }, [homeLocation, navigateToLocation]);
+
   // Reset to initial state (for when dialog is closed/cancelled)
   const reset = useCallback(() => {
     lastResolvedPath.current = undefined;
     setSearchQuery('');
+    setHideDotFilesOverride(null);
     setState({
-      currentLocation: initialLocation
-        ? {
-            type: 'filesystem',
-            fspName: initialLocation.fspName,
-            path: initialLocation.path
-          }
-        : { type: 'zones' },
+      currentLocation: defaultLocation,
       selectedItem: null
     });
-  }, [initialLocation]);
+  }, [defaultLocation]);
 
   // Select an item and generate its full filesystem path
   // If no item provided, selects the current folder/location
@@ -405,6 +468,8 @@ export default function useFileSelector(options?: FileSelectorOptions) {
     fileQuery,
     zonesQuery: zonesAndFspQuery,
     navigateToLocation,
+    navigateHome,
+    canGoHome: homeLocation !== undefined,
     selectItem,
     handleItemDoubleClick,
     reset,
@@ -412,6 +477,8 @@ export default function useFileSelector(options?: FileSelectorOptions) {
     handleSearchChange,
     clearSearch,
     isFilteredByGroups,
-    userHasGroups
+    userHasGroups,
+    hideDotFiles: hideDotFilesEffective,
+    toggleHideDotFiles
   };
 }

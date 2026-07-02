@@ -1,15 +1,22 @@
 import { useState, useEffect } from 'react';
-import type { MouseEvent } from 'react';
-import { Input, Typography } from '@material-tailwind/react';
+import type { ChangeEvent, FormEvent, MouseEvent } from 'react';
+import { IconButton, Input, Typography } from '@material-tailwind/react';
 import { HiOutlineFolder, HiOutlineFunnel, HiXMark } from 'react-icons/hi2';
+import { HiHome, HiFolderAdd, HiEye, HiEyeOff } from 'react-icons/hi';
+import toast from 'react-hot-toast';
 
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
+import FgTooltip from '@/components/ui/widgets/FgTooltip';
+import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
 import FileSelectorBreadcrumbs from './FileSelectorBreadcrumbs';
 import FileSelectorTable from './FileSelectorTable';
 import { Spinner } from '@/components/ui/widgets/Loaders';
 import useFileSelector from '@/hooks/useFileSelector';
+import useFileNameValidation from '@/hooks/useFileNameValidation';
+import { useCreateFolderMutation } from '@/queries/fileQueries';
+import { joinPaths } from '@/utils';
 import type {
   FileSelectorInitialLocation,
   FileSelectorMode
@@ -33,7 +40,12 @@ type FileSelectorButtonProps = {
   readonly mode?: FileSelectorMode;
   readonly useServerPath?: boolean;
   readonly initialPath?: string;
+  readonly defaultToHome?: boolean;
 };
+
+// Icon-button styling matched to the file browser toolbar.
+const toolbarBtnClasses =
+  'inline-grid place-items-center border align-middle select-none font-sans font-medium text-center transition-all duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:pointer-events-none data-[shape=circular]:rounded-full text-sm min-w-[38px] min-h-[38px] rounded-md shadow-sm hover:shadow-md bg-transparent border-primary text-primary hover:bg-primary hover:text-primary-foreground outline-none group';
 
 export default function FileSelectorButton({
   onSelect,
@@ -42,9 +54,12 @@ export default function FileSelectorButton({
   initialLocation,
   mode = 'any',
   useServerPath,
-  initialPath
+  initialPath,
+  defaultToHome = false
 }: FileSelectorButtonProps) {
   const [showDialog, setShowDialog] = useState(false);
+  const [showNewFolder, setShowNewFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
 
   // Use initialPath if provided, otherwise fall back to last confirmed selection's parent
   const effectiveInitialPath =
@@ -56,6 +71,8 @@ export default function FileSelectorButton({
     fileQuery,
     zonesQuery,
     navigateToLocation,
+    navigateHome,
+    canGoHome,
     selectItem,
     handleItemDoubleClick,
     reset,
@@ -63,13 +80,23 @@ export default function FileSelectorButton({
     handleSearchChange,
     clearSearch,
     isFilteredByGroups,
-    userHasGroups
+    userHasGroups,
+    hideDotFiles,
+    toggleHideDotFiles
   } = useFileSelector({
     initialLocation,
     initialPath: showDialog ? effectiveInitialPath : undefined,
     mode,
-    pathPreferenceOverride: useServerPath ? ['linux_path'] : undefined
+    pathPreferenceOverride: useServerPath ? ['linux_path'] : undefined,
+    defaultToHome
   });
+
+  const createFolderMutation = useCreateFolderMutation();
+  const nameValidation = useFileNameValidation(newFolderName);
+
+  // New folders can only be made inside a file share (not at the zones/zone level).
+  const currentFilesystem =
+    state.currentLocation.type === 'filesystem' ? state.currentLocation : null;
 
   // When dialog opens, select the current folder
   useEffect(() => {
@@ -78,9 +105,39 @@ export default function FileSelectorButton({
     }
   }, [showDialog, selectItem]);
 
+  const resetNewFolder = () => {
+    setShowNewFolder(false);
+    setNewFolderName('');
+  };
+
   const onClose = () => {
     reset();
+    resetNewFolder();
     setShowDialog(false);
+  };
+
+  const handleCreateFolder = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (
+      !currentFilesystem ||
+      !newFolderName.trim() ||
+      !nameValidation.isValid
+    ) {
+      return;
+    }
+    const base = currentFilesystem.path === '.' ? '' : currentFilesystem.path;
+    try {
+      await createFolderMutation.mutateAsync({
+        fspName: currentFilesystem.fspName,
+        folderPath: joinPaths(base, newFolderName.trim())
+      });
+      toast.success('New folder created!');
+      resetNewFolder();
+    } catch (err) {
+      toast.error(
+        `Error creating folder: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
   };
 
   const handleSelect = () => {
@@ -141,6 +198,80 @@ export default function FileSelectorButton({
             onNavigate={navigateToLocation}
             zonesData={zonesQuery.data}
           />
+
+          {/* Toolbar: go home, new folder, show/hide dot files */}
+          <div className="mt-2 flex items-center gap-1">
+            <FgTooltip
+              as={IconButton}
+              disabledCondition={!canGoHome}
+              icon={HiHome}
+              label="Go to home folder"
+              onClick={() => {
+                resetNewFolder();
+                navigateHome();
+              }}
+              triggerClasses={toolbarBtnClasses}
+            />
+            <FgTooltip
+              as={IconButton}
+              disabledCondition={!currentFilesystem}
+              icon={HiFolderAdd}
+              label="New folder"
+              onClick={() => {
+                if (currentFilesystem) {
+                  setShowNewFolder(prev => !prev);
+                }
+              }}
+              triggerClasses={toolbarBtnClasses}
+            />
+            <FgTooltip
+              as={IconButton}
+              icon={hideDotFiles ? HiEyeOff : HiEye}
+              label={hideDotFiles ? 'Show dot files' : 'Hide dot files'}
+              onClick={toggleHideDotFiles}
+              triggerClasses={toolbarBtnClasses}
+            />
+          </div>
+
+          {/* Inline new-folder form */}
+          {showNewFolder && currentFilesystem ? (
+            <form
+              className="mt-2 flex items-start gap-2"
+              onSubmit={handleCreateFolder}
+            >
+              <div className="flex-1">
+                <FgInput
+                  autoFocus
+                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                    setNewFolderName(event.target.value)
+                  }
+                  placeholder="New folder name ..."
+                  type="text"
+                  value={newFolderName}
+                />
+                {nameValidation.errorMessage ? (
+                  <Typography className="mt-1 text-xs text-error">
+                    {nameValidation.errorMessage}
+                  </Typography>
+                ) : null}
+              </div>
+              <FgButton
+                disabled={
+                  !newFolderName.trim() ||
+                  !nameValidation.isValid ||
+                  createFolderMutation.isPending
+                }
+                loading={createFolderMutation.isPending}
+                loadingText="Creating..."
+                type="submit"
+              >
+                Create
+              </FgButton>
+              <FgButton onClick={resetNewFolder} type="button" variant="ghost">
+                Cancel
+              </FgButton>
+            </form>
+          ) : null}
 
           {/* Search input */}
           <div className="my-2 relative">

@@ -165,6 +165,7 @@ function ParameterField({
             }
           />
           <FileSelectorButton
+            defaultToHome
             initialPath={
               typeof value === 'string' &&
               !value.startsWith('s3://') &&
