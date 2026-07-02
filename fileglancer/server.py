@@ -1795,8 +1795,8 @@ def create_app(settings):
             body.url, username)
 
         # Restrict to the requested subset when manifest_paths is provided; an
-        # omitted/null list means "add everything" (backward compatible). Paths
-        # not present in the repo are ignored.
+        # omitted/null list means "add every discovered manifest". Paths not
+        # present in the repo are ignored.
         if body.manifest_paths is not None:
             wanted = set(body.manifest_paths)
             discovered = [(p, m) for p, m in discovered if p in wanted]

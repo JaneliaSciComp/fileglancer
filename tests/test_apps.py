@@ -1910,12 +1910,10 @@ class TestPixiAdapterName:
 class TestPollLoopStopRace:
     """The poll loop must not orphan a job submitted while it is stopping.
 
-    Regression: the loop used to sleep a full poll_interval before clearing
-    _poll_task, so a job submitted during that window saw a live task,
-    ensure_poll_loop() no-op'd, and the job was left in PENDING forever once the
-    loop exited. The loop now decides to stop *before* sleeping and re-checks
-    for active jobs (no await in between) so a mid-cycle submission keeps it
-    alive.
+    When _poll_jobs reports no active jobs, the loop re-checks for active jobs
+    before exiting, with no await in between, and keeps polling if one appeared
+    during the cycle. So a job submitted just as the loop is about to stop is
+    still picked up rather than left unpolled in PENDING.
     """
 
     def test_keeps_polling_when_job_appears_during_stop(self, tmp_path, monkeypatch):

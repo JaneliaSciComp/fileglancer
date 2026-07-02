@@ -204,15 +204,14 @@ async def _poll_loop(settings):
                     has_jobs = True  # keep polling on error
 
                 if not has_jobs:
-                    # No active jobs — stop the loop. Clear _poll_task and
-                    # return *without* sleeping first: sleeping here (as the
-                    # old code did) left a poll_interval-long window in which
-                    # _poll_task was still set but the loop was on its way out,
-                    # so a job submitted during that window saw a live task,
-                    # ensure_poll_loop() no-op'd, and the job was then orphaned
-                    # in PENDING when the loop exited. Re-check for active jobs
-                    # first (no await in between) to catch a job that was
-                    # submitted during this very cycle.
+                    # No active jobs: stop the loop. Clear _poll_task and return
+                    # with no await in between, so a concurrent submit_job()
+                    # either sees this task still alive or starts a fresh loop —
+                    # there is no gap where _poll_task is set while the loop is
+                    # exiting. Re-check for active jobs immediately before
+                    # returning (again, no await in between) so a job submitted
+                    # during this cycle keeps the loop running rather than being
+                    # left unpolled.
                     if _get_any_active_username(settings) is None:
                         logger.info("No active jobs — poll loop stopping")
                         _poll_task = None
