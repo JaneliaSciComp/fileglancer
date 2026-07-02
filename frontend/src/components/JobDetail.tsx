@@ -223,10 +223,14 @@ function InfoCard({
 /** A label/value row; renders nothing when the value is empty. */
 function InfoRow({
   label,
-  value
+  value,
+  truncate = false
 }: {
   readonly label: string;
   readonly value: ReactNode;
+  // When true, render the value as a single line clipped with an ellipsis
+  // (full text shown on hover) instead of wrapping across multiple lines.
+  readonly truncate?: boolean;
 }) {
   if (value === null || value === undefined || value === '') {
     return null;
@@ -236,7 +240,10 @@ function InfoRow({
       <Typography className="text-foreground text-sm font-semibold shrink-0">
         {label}:
       </Typography>
-      <Typography className="text-foreground whitespace-pre-wrap break-all">
+      <Typography
+        className={`text-foreground ${truncate ? 'truncate min-w-0 flex-1' : 'whitespace-pre-wrap break-all'}`}
+        title={truncate && typeof value === 'string' ? value : undefined}
+      >
         {value}
       </Typography>
     </div>
@@ -358,7 +365,7 @@ function JobOverview({
               ))}
             </div>
           ) : null}
-          <InfoRow label="Command" value={job.command} />
+          <InfoRow label="Command" truncate value={job.command} />
           <InfoRow label="Container" value={job.container} />
           <InfoRow label="Container args" value={job.container_args} />
           <InfoRow label="Conda env" value={job.conda_env} />
