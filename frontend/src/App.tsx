@@ -12,6 +12,7 @@ import Login from '@/components/Login';
 import Apps from '@/components/Apps';
 import AppDetail from '@/components/AppDetail';
 import Catalog from '@/components/Catalog';
+import ListingDetail from '@/components/ListingDetail';
 import AppJobs from '@/components/AppJobs';
 import AppLaunch from '@/components/AppLaunch';
 import JobDetail from '@/components/JobDetail';
@@ -128,6 +129,7 @@ const AppComponent = () => {
             >
               <Route element={<Apps />} index />
               <Route element={<Catalog />} path="catalog" />
+              <Route element={<ListingDetail />} path="catalog/:listingId" />
               <Route element={<AppJobs />} path="jobs" />
               {/* Render job/app detail and launch inside the layout so the
                   My Apps / App Catalog / Jobs tabs stay visible when drilling

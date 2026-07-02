@@ -1,17 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Typography } from '@material-tailwind/react';
-import toast from 'react-hot-toast';
 
 import ListingCard from '@/components/ui/AppsPage/ListingCard';
 import FgCheckbox from '@/components/designSystem/atoms/formElements/FgCheckbox';
-import {
-  useAppsQuery,
-  useAddFromListingMutation,
-  useCatalogQuery,
-  useUnshareListingMutation
-} from '@/queries/appsQueries';
+import { useAppsQuery, useCatalogQuery } from '@/queries/appsQueries';
+import { useListingActions } from '@/hooks/useListingActions';
 import { useProfileContext } from '@/contexts/ProfileContext';
-import type { AppListing } from '@/shared.types';
+import type { UserApp } from '@/shared.types';
 
 export default function Catalog() {
   const [search, setSearch] = useState('');
@@ -20,23 +15,21 @@ export default function Catalog() {
   const catalogQuery = useCatalogQuery();
   const appsQuery = useAppsQuery();
   const { profile } = useProfileContext();
+  const actions = useListingActions();
 
-  const addFromListingMutation = useAddFromListingMutation();
-  const unshareListingMutation = useUnshareListingMutation();
-
-  const myAppKeys = useMemo(() => {
-    const set = new Set<string>();
+  const myAppsByKey = useMemo(() => {
+    const map = new Map<string, UserApp>();
     (appsQuery.data ?? []).forEach(a =>
-      set.add(`${a.url}::${a.manifest_path}`)
+      map.set(`${a.url}::${a.manifest_path}`, a)
     );
-    return set;
+    return map;
   }, [appsQuery.data]);
 
   const filteredListings = useMemo(() => {
     const term = search.trim().toLowerCase();
     const listings = catalogQuery.data ?? [];
     return listings.filter(l => {
-      if (hideInstalled && myAppKeys.has(`${l.url}::${l.manifest_path}`)) {
+      if (hideInstalled && myAppsByKey.has(`${l.url}::${l.manifest_path}`)) {
         return false;
       }
       if (!term) {
@@ -48,25 +41,7 @@ export default function Catalog() {
         l.owner_username.toLowerCase().includes(term)
       );
     });
-  }, [catalogQuery.data, search, hideInstalled, myAppKeys]);
-
-  const handleAddFromListing = async (listing: AppListing) => {
-    try {
-      await addFromListingMutation.mutateAsync({ listing_id: listing.id });
-      toast.success(`Added "${listing.name}"`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to add app');
-    }
-  };
-
-  const handleUnshare = async (listing: AppListing) => {
-    try {
-      await unshareListingMutation.mutateAsync({ listing_id: listing.id });
-      toast.success('Listing removed');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to unshare');
-    }
-  };
+  }, [catalogQuery.data, search, hideInstalled, myAppsByKey]);
 
   const totalListings = catalogQuery.data?.length ?? 0;
 
@@ -119,27 +94,19 @@ export default function Catalog() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
           {filteredListings.map(listing => {
-            const key = `${listing.url}::${listing.manifest_path}`;
-            const alreadyAdded = myAppKeys.has(key);
+            const installedApp = myAppsByKey.get(
+              `${listing.url}::${listing.manifest_path}`
+            );
             const isOwner =
               profile?.username !== undefined &&
               profile.username === listing.owner_username;
-            const isAdding =
-              addFromListingMutation.isPending &&
-              addFromListingMutation.variables?.listing_id === listing.id;
-            const isUnsharing =
-              unshareListingMutation.isPending &&
-              unshareListingMutation.variables?.listing_id === listing.id;
             return (
               <ListingCard
-                adding={isAdding}
-                canAdd={!alreadyAdded}
+                actions={actions}
                 canManage={isOwner}
+                installedApp={installedApp}
                 key={listing.id}
                 listing={listing}
-                onAdd={handleAddFromListing}
-                onUnshare={handleUnshare}
-                unsharing={isUnsharing}
               />
             );
           })}
