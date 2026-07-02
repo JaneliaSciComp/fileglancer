@@ -3,7 +3,7 @@ import { Card, Typography } from '@material-tailwind/react';
 import { HiOutlinePlus } from 'react-icons/hi';
 import { HiOutlineEllipsisVertical } from 'react-icons/hi2';
 
-import DataLinksActionsMenu from '@/components/ui/Menus/DataLinksActions';
+import CardActionsMenu from '@/components/ui/Menus/CardActionsMenu';
 import type { MenuItem } from '@/components/ui/Menus/FgMenuItems';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
@@ -100,7 +100,7 @@ export default function ListingCard({
               </FgButton>
             </FgTooltip>
           ) : null}
-          <DataLinksActionsMenu<AppListing>
+          <CardActionsMenu<AppListing>
             actionProps={listing}
             menuItems={menuItems}
             triggerIcon={HiOutlineEllipsisVertical}

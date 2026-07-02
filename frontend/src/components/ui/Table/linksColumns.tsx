@@ -4,7 +4,7 @@ import { Typography } from '@material-tailwind/react';
 import type { ColumnDef } from '@tanstack/react-table';
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
 import DataLinkUsageDialog from '@/components/ui/Dialogs/dataLinkUsage/DataLinkUsageDialog';
-import DataLinksActionsMenu from '@/components/ui/Menus/DataLinksActions';
+import CardActionsMenu from '@/components/ui/Menus/CardActionsMenu';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
@@ -190,7 +190,7 @@ function ActionsCell({ item }: { readonly item: ProxiedPath }) {
       key={`action-${item.sharing_key}`}
     >
       <div onClick={e => e.stopPropagation()}>
-        <DataLinksActionsMenu<ProxiedPathRowActionProps>
+        <CardActionsMenu<ProxiedPathRowActionProps>
           actionProps={actionProps}
           menuItems={menuItems}
         />

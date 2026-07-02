@@ -1,7 +1,7 @@
 import type { ColumnDef } from '@tanstack/react-table';
 
 import FgLink from '@/components/designSystem/atoms/FgLink';
-import DataLinksActionsMenu from '@/components/ui/Menus/DataLinksActions';
+import CardActionsMenu from '@/components/ui/Menus/CardActionsMenu';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import JobStatusBadge from '@/components/ui/AppsPage/JobStatusBadge';
 import { formatDateString } from '@/utils';
@@ -178,7 +178,7 @@ export function createAppsJobsColumns(
 
         return (
           <div className="flex items-center justify-end h-full">
-            <DataLinksActionsMenu<JobRowActionProps>
+            <CardActionsMenu<JobRowActionProps>
               actionProps={actionProps}
               menuItems={menuItems}
             />

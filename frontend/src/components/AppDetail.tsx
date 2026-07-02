@@ -8,7 +8,7 @@ import AppActionDialogs from '@/components/ui/AppsPage/AppActionDialogs';
 import AppInfoTable from '@/components/ui/AppsPage/AppInfoTable';
 import AppPageHeader from '@/components/ui/AppsPage/AppPageHeader';
 import EntryPointsList from '@/components/ui/AppsPage/EntryPointsList';
-import DataLinksActionsMenu from '@/components/ui/Menus/DataLinksActions';
+import CardActionsMenu from '@/components/ui/Menus/CardActionsMenu';
 import type { MenuItem } from '@/components/ui/Menus/FgMenuItems';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgLink from '@/components/designSystem/atoms/FgLink';
@@ -150,7 +150,7 @@ export default function AppDetail() {
                 Launch
               </FgButton>
             ) : null}
-            <DataLinksActionsMenu<UserApp>
+            <CardActionsMenu<UserApp>
               actionProps={app}
               menuItems={menuItems}
               triggerIcon={HiOutlineEllipsisVertical}

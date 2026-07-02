@@ -6,7 +6,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import type { NGLink } from '@/queries/ngLinkQueries';
 import { formatDateString } from '@/utils';
 import FgTooltip from '../widgets/FgTooltip';
-import DataLinksActionsMenu from '@/components/ui/Menus/DataLinksActions';
+import CardActionsMenu from '@/components/ui/Menus/CardActionsMenu';
 import type { MenuItem } from '@/components/ui/Menus/FgMenuItems';
 import toast from 'react-hot-toast';
 import { copyToClipboard } from '@/utils/copyText';
@@ -69,7 +69,7 @@ function ActionsCell({
   return (
     <div className="min-w-0 flex items-center">
       <div onClick={e => e.stopPropagation()}>
-        <DataLinksActionsMenu<NGLinkRowActionProps>
+        <CardActionsMenu<NGLinkRowActionProps>
           actionProps={{ item, onEdit, onDelete }}
           menuItems={menuItems}
         />

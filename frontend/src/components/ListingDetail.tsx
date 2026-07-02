@@ -7,7 +7,7 @@ import { HiOutlineEllipsisVertical } from 'react-icons/hi2';
 import AppPageHeader from '@/components/ui/AppsPage/AppPageHeader';
 import EntryPointsList from '@/components/ui/AppsPage/EntryPointsList';
 import ListingInfoTable from '@/components/ui/AppsPage/ListingInfoTable';
-import DataLinksActionsMenu from '@/components/ui/Menus/DataLinksActions';
+import CardActionsMenu from '@/components/ui/Menus/CardActionsMenu';
 import type { MenuItem } from '@/components/ui/Menus/FgMenuItems';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import {
@@ -127,7 +127,7 @@ export default function ListingDetail() {
               </FgButton>
             ) : null}
             {hasMenuItems ? (
-              <DataLinksActionsMenu<AppListing>
+              <CardActionsMenu<AppListing>
                 actionProps={listing}
                 menuItems={menuItems}
                 triggerIcon={HiOutlineEllipsisVertical}

@@ -7,17 +7,17 @@ import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgMenuItems from './FgMenuItems';
 import type { MenuItem } from './FgMenuItems';
 
-type SharedActionsMenuProps<T = unknown> = {
+type CardActionsMenuProps<T = unknown> = {
   readonly menuItems: MenuItem<T>[];
   readonly actionProps: T;
   readonly triggerIcon?: IconType;
 };
 
-export default function DataLinksActionsMenu<T>({
+export default function CardActionsMenu<T>({
   menuItems,
   actionProps,
   triggerIcon = HiOutlineEllipsisHorizontalCircle
-}: SharedActionsMenuProps<T>) {
+}: CardActionsMenuProps<T>) {
   return (
     <Menu>
       <Menu.Trigger
