@@ -743,15 +743,14 @@ def _action_get_job_file(request: dict, ctx: WorkerContext) -> dict:
 
 @action("get_service_url")
 def _action_get_service_url(request: dict, ctx: WorkerContext) -> dict:
-    """Read service URL from job work directory."""
-    from fileglancer.apps.jobfiles import get_service_url
+    """Read the service URL and startup phase from a job's work directory."""
+    from fileglancer.apps.jobfiles import get_service_url, get_service_phase
 
     job_id = request["job_id"]
     db_job = ctx.db.get_job(job_id, ctx.username)
     if db_job is None:
         return {"error": f"Job {job_id} not found", "status_code": 404}
-    url = get_service_url(db_job)
-    return {"service_url": url}
+    return {"service_url": get_service_url(db_job), "phase": get_service_phase(db_job)}
 
 
 # ---------------------------------------------------------------------------

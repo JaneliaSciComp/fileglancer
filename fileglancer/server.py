@@ -2091,13 +2091,15 @@ def create_app(settings):
             jobs = []
             for j in db_jobs:
                 service_url = None
+                phase = None
                 if getattr(j, 'entry_point_type', 'job') == 'service' and j.status == 'RUNNING':
                     try:
                         result = await _worker_exec(username, "get_service_url", job_id=j.id)
                         service_url = result.get("service_url")
+                        phase = result.get("phase")
                     except Exception:
                         pass
-                jobs.append(_convert_job(j, service_url=service_url))
+                jobs.append(_convert_job(j, service_url=service_url, phase=phase))
             return JobResponse(jobs=jobs)
 
     @app.get("/api/jobs/{job_id}", response_model=Job,
@@ -2113,13 +2115,15 @@ def create_app(settings):
             # rather than paying a worker roundtrip + NFS glob/stat.
             files = apps_module.get_job_file_paths(db_job)
             service_url = None
+            phase = None
             if getattr(db_job, 'entry_point_type', 'job') == 'service' and db_job.status == 'RUNNING':
                 try:
                     svc_result = await _worker_exec(username, "get_service_url", job_id=job_id)
                     service_url = svc_result.get("service_url")
+                    phase = svc_result.get("phase")
                 except Exception:
                     pass
-            return _convert_job(db_job, service_url=service_url, files=files)
+            return _convert_job(db_job, service_url=service_url, files=files, phase=phase)
 
     @app.post("/api/jobs/{job_id}/cancel",
               description="Cancel a running job")
@@ -2180,11 +2184,12 @@ def create_app(settings):
             return dt.replace(tzinfo=UTC)
         return dt
 
-    def _convert_job(db_job: db.JobDB, service_url: str = None, files: dict = None) -> Job:
+    def _convert_job(db_job: db.JobDB, service_url: str = None, files: dict = None,
+                     phase: str = None) -> Job:
         """Convert a database JobDB to a Pydantic Job model.
 
-        File-reading fields (service_url, files) must be passed in pre-computed
-        by the caller, since they require user-context file I/O.
+        File-reading fields (service_url, phase, files) must be passed in
+        pre-computed by the caller, since they require user-context file I/O.
         """
         return Job(
             id=db_job.id,
@@ -2210,6 +2215,7 @@ def create_app(settings):
             work_dir=db_job.work_dir,
             cluster_job_id=db_job.cluster_job_id,
             service_url=service_url,
+            phase=phase,
             created_at=_ensure_utc(db_job.created_at),
             started_at=_ensure_utc(db_job.started_at),
             finished_at=_ensure_utc(db_job.finished_at),

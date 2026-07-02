@@ -115,6 +115,37 @@ def get_service_url(db_job: db.JobDB) -> Optional[str]:
     return url
 
 
+# Startup phases a service job writes to its 'phase' file so the UI can explain
+# a wait before the URL appears (chiefly a container image still downloading).
+_SERVICE_PHASES = ("pulling_image", "starting")
+
+
+def get_service_phase(db_job: db.JobDB) -> Optional[str]:
+    """Read the current startup phase from a service job's work directory.
+
+    The generated job script writes a short marker (see _SERVICE_PHASES) to a
+    'phase' file — e.g. 'pulling_image' while Apptainer downloads the container
+    image, then 'starting'. This lets the UI show why a service is taking a
+    while before its URL is published. Returns None unless the job is a RUNNING
+    service with a recognized phase written.
+    """
+    if getattr(db_job, 'entry_point_type', 'job') != 'service':
+        return None
+    if db_job.status != 'RUNNING':
+        return None
+
+    phase_file = _resolve_work_dir(db_job) / "phase"
+    if not phase_file.is_file():
+        return None
+
+    try:
+        phase = phase_file.read_text().strip()
+    except OSError:
+        return None
+
+    return phase if phase in _SERVICE_PHASES else None
+
+
 def get_job_file_paths(db_job: db.JobDB) -> dict[str, dict]:
     """Return file path info for a job's files (script, stdout, stderr, service_url).
 

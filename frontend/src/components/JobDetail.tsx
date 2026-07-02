@@ -675,7 +675,9 @@ export default function JobDetail() {
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-warning" />
                 </span>
                 <Typography className="text-foreground flex-1">
-                  Service is starting up...
+                  {job.phase === 'pulling_image'
+                    ? 'Downloading container image… first launch can take a few minutes.'
+                    : 'Service is starting up…'}
                 </Typography>
                 <FgButton
                   color="error"

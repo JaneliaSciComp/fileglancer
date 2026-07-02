@@ -37,4 +37,5 @@ from fileglancer.apps.jobfiles import (  # noqa: F401
     get_job_file_content,
     get_job_file_paths,
     get_service_url,
+    get_service_phase,
 )

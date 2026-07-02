@@ -812,6 +812,7 @@ class Job(BaseModel):
     work_dir: Optional[str] = Field(description="Working directory the job ran in", default=None)
     cluster_job_id: Optional[str] = Field(description="Cluster-assigned job ID", default=None)
     service_url: Optional[str] = Field(description="URL of the running service (for service-type jobs)", default=None)
+    phase: Optional[str] = Field(description="Startup phase of a running service before its URL is ready, e.g. 'pulling_image' or 'starting'", default=None)
     created_at: datetime = Field(description="When the job was created")
     started_at: Optional[datetime] = Field(description="When the job started running", default=None)
     finished_at: Optional[datetime] = Field(description="When the job finished", default=None)

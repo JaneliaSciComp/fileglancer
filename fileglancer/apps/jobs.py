@@ -502,8 +502,12 @@ def _build_container_script(
         'mkdir -p "$APPTAINER_CACHE_DIR"',
         f'SIF_PATH="$APPTAINER_CACHE_DIR/{sif_name}"',
         'if [ ! -f "$SIF_PATH" ]; then',
+        # Report the (often multi-minute) image download so the UI can say so.
+        # FG_PHASE_PATH is set in the preamble; guard in case it is not.
+        '  [ -n "$FG_PHASE_PATH" ] && printf pulling_image > "$FG_PHASE_PATH" 2>/dev/null || true',
         f'  apptainer pull "$SIF_PATH" {shlex.quote(docker_url)}',
         'fi',
+        '[ -n "$FG_PHASE_PATH" ] && printf starting > "$FG_PHASE_PATH" 2>/dev/null || true',
         f'apptainer exec {bind_flags}{extra} "$SIF_PATH" \\',
         f'  {command}',
     ]
@@ -740,6 +744,9 @@ async def submit_job(
     preamble_lines = [
         "unset PIXI_PROJECT_MANIFEST",
         f"export FG_WORK_DIR={shlex.quote(str(work_dir))}",
+        # Where the script reports its startup phase (e.g. pulling a container
+        # image). The UI reads this to explain a wait before a service is ready.
+        'export FG_PHASE_PATH="$FG_WORK_DIR/phase"',
     ]
     # For local executor, trap EXIT to write the exit code to a file so
     # PID-based polling can determine the final status after the process exits.

@@ -201,6 +201,7 @@ type Job = {
   work_dir?: string;
   cluster_job_id?: string;
   service_url?: string;
+  phase?: string;
   created_at: string;
   started_at?: string;
   finished_at?: string;

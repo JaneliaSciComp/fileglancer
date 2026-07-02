@@ -229,7 +229,7 @@ class TestBuildRequirementsCheck:
 
 from types import SimpleNamespace
 
-from fileglancer.apps.jobfiles import get_job_file_paths, read_job_file
+from fileglancer.apps.jobfiles import get_job_file_paths, read_job_file, get_service_phase
 
 
 def _fake_job(**overrides):
@@ -886,6 +886,43 @@ class TestServiceUrlPublisher:
                                 capture_output=True, text=True, timeout=30)
         assert not url_file.exists()
         assert "never opened" in result.stderr
+
+
+class TestServicePhase:
+    """The 'phase' marker the container script writes and get_service_phase reads."""
+
+    def test_container_script_reports_pull_and_start_phases(self):
+        script = _build_container_script("docker://x/y:latest", "run", "/wd", [])
+        # 'pulling_image' is written inside the "SIF missing" branch (the pull),
+        # 'starting' unconditionally before exec.
+        assert 'printf pulling_image > "$FG_PHASE_PATH"' in script
+        assert 'printf starting > "$FG_PHASE_PATH"' in script
+        pull_i = script.index("apptainer pull")
+        assert script.index("pulling_image") < pull_i < script.index("apptainer exec")
+
+    def _svc(self, tmp_path, phase=None, **kw):
+        if phase is not None:
+            (tmp_path / "phase").write_text(phase)
+        kw.setdefault("entry_point_type", "service")
+        kw.setdefault("status", "RUNNING")
+        return _fake_job(work_dir=str(tmp_path), **kw)
+
+    def test_reads_recognized_phase_for_running_service(self, tmp_path):
+        assert get_service_phase(self._svc(tmp_path, "pulling_image")) == "pulling_image"
+        (tmp_path / "phase").write_text("starting")
+        assert get_service_phase(self._svc(tmp_path)) == "starting"
+
+    def test_none_when_not_running(self, tmp_path):
+        assert get_service_phase(self._svc(tmp_path, "pulling_image", status="PENDING")) is None
+
+    def test_none_for_non_service(self, tmp_path):
+        assert get_service_phase(self._svc(tmp_path, "starting", entry_point_type="job")) is None
+
+    def test_none_when_no_phase_file(self, tmp_path):
+        assert get_service_phase(self._svc(tmp_path)) is None
+
+    def test_rejects_unknown_phase(self, tmp_path):
+        assert get_service_phase(self._svc(tmp_path, "garbage")) is None
 
 
 # --- Path validation tests ---
