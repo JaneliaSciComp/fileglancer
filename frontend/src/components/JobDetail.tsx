@@ -19,6 +19,7 @@ import AnsiText from '@/components/ui/AppsPage/AnsiText';
 import AppPageHeader from '@/components/ui/AppsPage/AppPageHeader';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
+import FgLink from '@/components/designSystem/atoms/FgLink';
 import CancelJobDialog from '@/components/ui/Dialogs/CancelJob';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import type {
@@ -30,6 +31,7 @@ import type {
 import JobStatusBadge from '@/components/ui/AppsPage/JobStatusBadge';
 import {
   formatDateString,
+  buildAppDetailPath,
   buildRelaunchPath,
   parseGithubUrl,
   buildGithubUrl,
@@ -269,6 +271,15 @@ function appRepoLink(appUrl: string): { href: string; label: string } | null {
   }
 }
 
+/** Best-effort link to the app's detail page; null if the URL isn't parseable. */
+function appDetailLink(job: Job): string | null {
+  try {
+    return buildAppDetailPath(job.app_url, job.manifest_path);
+  } catch {
+    return null;
+  }
+}
+
 const RECENT_OUTPUT_LINES = 20;
 
 /** The job Overview tab: status, execution details, recent output. */
@@ -294,6 +305,7 @@ function JobOverview({
     : null;
   const exitMeaning = exitCodeMeaning(job.exit_code);
   const repoLink = appRepoLink(job.app_url);
+  const detailPath = appDetailLink(job);
 
   const stdoutTail =
     stdoutContent !== null && stdoutContent !== undefined
@@ -334,7 +346,15 @@ function JobOverview({
         <InfoCard className="md:col-span-3" title="Execution">
           <InfoRow
             label="App"
-            value={`${job.app_name} — ${job.entry_point_name}`}
+            value={
+              detailPath ? (
+                <FgLink to={detailPath}>
+                  {`${job.app_name} — ${job.entry_point_name}`}
+                </FgLink>
+              ) : (
+                `${job.app_name} — ${job.entry_point_name}`
+              )
+            }
           />
           <InfoRow
             label="Repository"

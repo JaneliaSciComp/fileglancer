@@ -1,4 +1,4 @@
-import { useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { Typography } from '@material-tailwind/react';
 import { HiOutlinePlay, HiOutlineRefresh } from 'react-icons/hi';
 import { HiOutlineEllipsisVertical } from 'react-icons/hi2';
@@ -11,17 +11,28 @@ import EntryPointsList from '@/components/ui/AppsPage/EntryPointsList';
 import DataLinksActionsMenu from '@/components/ui/Menus/DataLinksActions';
 import type { MenuItem } from '@/components/ui/Menus/FgMenuItems';
 import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgLink from '@/components/designSystem/atoms/FgLink';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
+import JobStatusBadge from '@/components/ui/AppsPage/JobStatusBadge';
 import { useAppsQuery } from '@/queries/appsQueries';
+import { useJobsQuery } from '@/queries/jobsQueries';
 import { useAppActions } from '@/hooks/useAppActions';
-import { buildGithubUrl, canonicalGithubUrl, getAppIconType } from '@/utils';
+import {
+  buildGithubUrl,
+  canonicalGithubUrl,
+  formatDateString,
+  getAppIconType
+} from '@/utils';
 import type { UserApp } from '@/shared.types';
+
+const RECENT_JOBS_LIMIT = 5;
 
 export default function AppDetail() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const appsQuery = useAppsQuery();
+  const jobsQuery = useJobsQuery();
   const actions = useAppActions({ onRemoved: () => navigate('/apps') });
 
   const manifestPath = searchParams.get('path') || '';
@@ -68,6 +79,15 @@ export default function AppDetail() {
 
   const isShared = app.listing_id !== undefined && app.listing_id !== null;
   const runnables = app.manifest?.runnables ?? [];
+
+  const appJobs = (jobsQuery.data ?? [])
+    .filter(
+      job =>
+        canonicalGithubUrl(job.app_url) === appUrl &&
+        (job.manifest_path || '') === manifestPath
+    )
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const recentJobs = appJobs.slice(0, RECENT_JOBS_LIMIT);
 
   const menuItems: MenuItem<UserApp>[] = [
     {
@@ -154,6 +174,42 @@ export default function AppDetail() {
           onLaunch={ep => actions.launch(app, ep.id)}
           runnables={runnables}
         />
+
+        {recentJobs.length > 0 ? (
+          <div className="mt-8">
+            <Typography
+              className="text-foreground font-semibold mb-3"
+              type="h6"
+            >
+              Recent Jobs
+            </Typography>
+            <div className="flex flex-col divide-y divide-surface-light dark:divide-surface border border-surface-light dark:border-surface rounded-lg">
+              {recentJobs.map(job => (
+                <Link
+                  className="flex items-center gap-3 px-4 py-2 transition-colors hover:bg-surface dark:hover:bg-surface-light first:rounded-t-lg last:rounded-b-lg"
+                  key={job.id}
+                  to={`/apps/jobs/${job.id}`}
+                >
+                  <JobStatusBadge status={job.status} />
+                  <Typography className="text-foreground text-sm font-medium truncate">
+                    {job.entry_point_name}
+                  </Typography>
+                  <Typography
+                    className="text-foreground/70 text-xs ml-auto flex-shrink-0"
+                    type="small"
+                  >
+                    {formatDateString(job.created_at)}
+                  </Typography>
+                </Link>
+              ))}
+            </div>
+            {appJobs.length > RECENT_JOBS_LIMIT ? (
+              <Typography className="mt-2 text-sm">
+                <FgLink to="/apps/jobs">View all {appJobs.length} jobs</FgLink>
+              </Typography>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <AppActionDialogs actions={actions} />
