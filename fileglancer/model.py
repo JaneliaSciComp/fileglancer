@@ -438,13 +438,24 @@ class AppEntryPoint(BaseModel):
     )
     auto_url: bool = Field(
         description=(
-            "For service entry points only: have Fileglancer write "
-            "http://$FG_HOSTNAME:$FG_SERVICE_PORT to SERVICE_URL_PATH before the "
-            "command runs. Set this when your service binds to the "
-            "Fileglancer-provided $FG_SERVICE_PORT so you don't have to write the "
-            "URL file yourself."
+            "For service entry points only: have Fileglancer publish the service "
+            "URL for you. Once the service's port ($FG_SERVICE_PORT) is accepting "
+            "connections, Fileglancer writes http://$FG_HOSTNAME:$FG_SERVICE_PORT "
+            "(plus service_url_suffix, if set) to SERVICE_URL_PATH. Set this when "
+            "your service binds to the Fileglancer-provided $FG_SERVICE_PORT."
         ),
         default=False,
+    )
+    service_url_suffix: Optional[str] = Field(
+        description=(
+            "For auto_url service entry points: text appended to "
+            "http://$FG_HOSTNAME:$FG_SERVICE_PORT when publishing the URL, e.g. a "
+            "path and/or query for one-click auth. May contain the placeholders "
+            "${FG_SERVICE_TOKEN}, ${FG_SERVICE_PORT}, ${FG_HOSTNAME} (braces "
+            "required) and literal URL text; nothing else. Example: "
+            "'/?access_token=${FG_SERVICE_TOKEN}'."
+        ),
+        default=None,
     )
     requirements: List[str] = Field(
         description="Required tools for this entry point, e.g. ['apptainer']. Merged with manifest-level requirements.",
@@ -482,6 +493,23 @@ class AppEntryPoint(BaseModel):
             return v
         if _SHELL_METACHAR_PATTERN.search(v):
             raise ValueError(f"container URL contains forbidden characters: {v!r}")
+        return v
+
+    @field_validator("service_url_suffix")
+    @classmethod
+    def validate_service_url_suffix(cls, v):
+        if v is None:
+            return v
+        # Strip the recognized ${FG_*} placeholders, then reject anything that
+        # would be unsafe or unexpanded inside the double-quoted shell string the
+        # suffix is emitted into (a stray $, quote, backtick, backslash, newline).
+        residual = _SERVICE_URL_PLACEHOLDER.sub("", v)
+        if _SERVICE_URL_UNSAFE.search(residual):
+            raise ValueError(
+                "service_url_suffix may contain only literal URL text and the "
+                "placeholders ${FG_SERVICE_TOKEN}, ${FG_SERVICE_PORT}, "
+                f"${{FG_HOSTNAME}} (braces required); got: {v!r}"
+            )
         return v
 
     @field_validator("bind_paths")
@@ -562,6 +590,8 @@ class AppEntryPoint(BaseModel):
             raise ValueError("bind_paths requires container to be set")
         if self.auto_url and self.type != "service":
             raise ValueError("auto_url is only valid for service entry points (type: service)")
+        if self.service_url_suffix is not None and not self.auto_url:
+            raise ValueError("service_url_suffix requires auto_url to be set")
         return self
 
 
@@ -575,6 +605,13 @@ _REQUIREMENT_PATTERN = re.compile(
 )
 
 _SHELL_METACHAR_PATTERN = re.compile(r'[;&|`$(){}!<>\n\r]')
+# Placeholders Fileglancer substitutes into service_url_suffix at runtime.
+_SERVICE_URL_PLACEHOLDER = re.compile(r'\$\{(?:FG_SERVICE_TOKEN|FG_SERVICE_PORT|FG_HOSTNAME)\}')
+# The suffix is emitted inside a double-quoted shell string, so only these are
+# dangerous once the recognized placeholders are removed: a stray $, a double
+# quote, a backtick, a backslash, or a newline. Everything else (?, &, =, /, %,
+# ...) is literal inside double quotes and valid in a URL.
+_SERVICE_URL_UNSAFE = re.compile(r'[$"`\\\n\r]')
 _CONDA_ENV_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9_.-]+$')
 _CONDA_ENV_PATH_FORBIDDEN = re.compile(r'[;&|`$(){}!<>\n\r]')
 

@@ -420,7 +420,10 @@ _DEFAULT_CONTAINER_CACHE_DIR = "$HOME/.fileglancer/apptainer_cache"
 # exports it as FG_SERVICE_PORT along with FG_HOSTNAME, so a service command can
 # bind to a known address without reimplementing port discovery. Prefers python
 # (authoritative bind-to-0), then falls back to a bash probe of ephemeral ports.
-_SERVICE_PORT_HELPER = r"""# Fileglancer service setup: pick a free port and expose the hostname
+# It also mints FG_SERVICE_TOKEN, a URL-safe random secret the service can use
+# for auth (e.g. --token-password="$FG_SERVICE_TOKEN") and that auto_url can
+# splice into the published URL via the ${FG_SERVICE_TOKEN} placeholder.
+_SERVICE_PORT_HELPER = r"""# Fileglancer service setup: pick a free port, expose the hostname, mint a token
 __fg_free_port() {
   local p py i
   for py in python3 python; do
@@ -439,7 +442,34 @@ __fg_free_port() {
 }
 export FG_HOSTNAME="$(hostname)"
 export FG_SERVICE_PORT="$(__fg_free_port)"
+export FG_SERVICE_TOKEN="$(openssl rand -hex 24 2>/dev/null || python3 -c 'import secrets; print(secrets.token_hex(24))' 2>/dev/null || date +%s%N | sha256sum | cut -c1-48)"
 """
+
+
+def _build_service_url_publisher(suffix: str = "") -> str:
+    """Bash that publishes the service URL once $FG_SERVICE_PORT is live.
+
+    Runs in the background so it tolerates a slow start (the container image may
+    still be pulling); it writes SERVICE_URL_PATH only when the port accepts a
+    connection, and gives up after a bounded wait, logging to stderr. `suffix` is
+    appended to http://$FG_HOSTNAME:$FG_SERVICE_PORT and may reference the
+    ${FG_SERVICE_TOKEN}/${FG_SERVICE_PORT}/${FG_HOSTNAME} shell variables; it is
+    validated for shell-safety at manifest load (AppEntryPoint), so it is safe to
+    embed inside the double-quoted printf argument here.
+    """
+    return "\n".join([
+        "# Publish the service URL once the port is accepting connections.",
+        "(",
+        "  for _ in $(seq 1 3600); do",
+        '    if (exec 3<>"/dev/tcp/127.0.0.1/$FG_SERVICE_PORT") 2>/dev/null; then',
+        f'      printf \'http://%s:%s%s\' "$FG_HOSTNAME" "$FG_SERVICE_PORT" "{suffix}" > "$SERVICE_URL_PATH"',
+        "      exit 0",
+        "    fi",
+        "    sleep 1",
+        "  done",
+        '  echo "Fileglancer: port $FG_SERVICE_PORT never opened; service URL not published." >&2',
+        ") &",
+    ])
 
 
 def _build_container_script(
@@ -723,13 +753,14 @@ async def submit_job(
     if entry_point.type == "service":
         preamble_lines.append('export SERVICE_URL_PATH="$FG_WORK_DIR/service_url"')
         preamble_lines.append(_SERVICE_PORT_HELPER)
-        # When the author opts in with auto_url, write the service URL for them
-        # using the port we just allocated, so a service that binds to
-        # $FG_SERVICE_PORT needs no URL-writing code of its own. A service that
-        # manages its own URL simply leaves auto_url unset and overwrites this.
+        # With auto_url, Fileglancer publishes the URL for the author: a
+        # background probe waits for $FG_SERVICE_PORT to accept connections and
+        # then writes http://$FG_HOSTNAME:$FG_SERVICE_PORT plus the optional
+        # (validated) service_url_suffix. A service that manages its own URL
+        # leaves auto_url unset and writes SERVICE_URL_PATH itself.
         if entry_point.auto_url:
             preamble_lines.append(
-                'printf \'http://%s:%s\' "$FG_HOSTNAME" "$FG_SERVICE_PORT" > "$SERVICE_URL_PATH"'
+                _build_service_url_publisher(entry_point.service_url_suffix or "")
             )
     # Choose the working directory. 'work' runs from the job's work dir (the
     # repo is still reachable via the `repo` symlink); 'repo' runs from the

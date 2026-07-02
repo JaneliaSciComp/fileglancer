@@ -24,6 +24,7 @@ from fileglancer.apps.command import (  # noqa: F401
 )
 from fileglancer.apps.jobs import (  # noqa: F401
     _build_container_script,
+    _build_service_url_publisher,
     _container_bind_paths,
     _container_sif_name,
     _SERVICE_PORT_HELPER,

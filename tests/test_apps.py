@@ -24,6 +24,7 @@ from fileglancer.apps import (
     _build_container_script,
     _container_bind_paths,
     _SERVICE_PORT_HELPER,
+    _build_service_url_publisher,
     build_command,
     collect_path_parameters,
     expand_user_path,
@@ -736,9 +737,19 @@ class TestContainerBindPaths:
 class TestServicePortHelper:
     """The preamble helper Fileglancer injects for service-type jobs."""
 
-    def test_helper_exports_port_and_hostname(self):
+    def test_helper_exports_port_hostname_and_token(self):
         assert "export FG_SERVICE_PORT=" in _SERVICE_PORT_HELPER
         assert "export FG_HOSTNAME=" in _SERVICE_PORT_HELPER
+        assert "export FG_SERVICE_TOKEN=" in _SERVICE_PORT_HELPER
+
+    def test_helper_mints_a_urlsafe_token(self):
+        import re
+        script = _SERVICE_PORT_HELPER + '\necho "$FG_SERVICE_TOKEN"'
+        result = subprocess.run(["bash", "-c", script], capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr
+        token = result.stdout.strip().splitlines()[-1]
+        # Non-empty and URL-safe (hex), so no encoding is needed in the URL.
+        assert re.fullmatch(r"[0-9a-f]{16,}", token), token
 
     def test_helper_is_valid_bash(self):
         # The generated snippet must at least parse as bash.
@@ -770,7 +781,7 @@ class TestServicePortHelper:
 
 
 class TestServiceAutoUrl:
-    """auto_url is service-only and drives Fileglancer to write the URL file."""
+    """auto_url is service-only and drives Fileglancer to publish the URL file."""
 
     def test_auto_url_defaults_false(self):
         ep = AppEntryPoint(id="t", name="T", command="echo", type="service")
@@ -786,18 +797,95 @@ class TestServiceAutoUrl:
             AppEntryPoint(id="t", name="T", command="echo",
                           type="job", auto_url=True)
 
-    def test_auto_url_write_command_uses_provided_port(self):
-        # Mirror the preamble line submit_job emits when auto_url is set, and
-        # confirm it writes a valid http URL built from the helper's values.
-        write_line = (
-            'printf \'http://%s:%s\' "$FG_HOSTNAME" "$FG_SERVICE_PORT"'
-        )
-        script = _SERVICE_PORT_HELPER + "\n" + write_line
-        result = subprocess.run(
-            ["bash", "-c", script], capture_output=True, text=True,
-        )
+
+class TestServiceUrlSuffix:
+    """service_url_suffix is a restricted template validated for shell-safety."""
+
+    def _ep(self, suffix, **kw):
+        kw.setdefault("type", "service")
+        kw.setdefault("auto_url", True)
+        return AppEntryPoint(id="t", name="T", command="echo",
+                             service_url_suffix=suffix, **kw)
+
+    def test_allows_literal_and_known_placeholders(self):
+        ep = self._ep("/?access_token=${FG_SERVICE_TOKEN}")
+        assert ep.service_url_suffix == "/?access_token=${FG_SERVICE_TOKEN}"
+
+    def test_allows_multiple_query_params_and_paths(self):
+        # ? & = / are literal inside the double-quoted emission; base paths ok.
+        ep = self._ep("/lab?token=${FG_SERVICE_TOKEN}&reset=1")
+        assert "reset=1" in ep.service_url_suffix
+
+    def test_rejects_unknown_placeholder(self):
+        with pytest.raises(ValidationError, match="service_url_suffix"):
+            self._ep("/?t=${SECRET}")
+
+    def test_rejects_bare_dollar(self):
+        with pytest.raises(ValidationError, match="service_url_suffix"):
+            self._ep("/?t=$FG_SERVICE_TOKEN")  # braces required
+
+    def test_rejects_shell_injection_chars(self):
+        for bad in ['/`whoami`', '/"x"', "/\\x"]:
+            with pytest.raises(ValidationError, match="service_url_suffix"):
+                self._ep(bad)
+
+    def test_requires_auto_url(self):
+        with pytest.raises(ValidationError, match="service_url_suffix requires auto_url"):
+            AppEntryPoint(id="t", name="T", command="echo", type="service",
+                          auto_url=False, service_url_suffix="/?t=x")
+
+
+class TestServiceUrlPublisher:
+    """The backgrounded readiness probe that publishes SERVICE_URL_PATH."""
+
+    def test_publisher_is_valid_bash(self):
+        snippet = _build_service_url_publisher("/?access_token=${FG_SERVICE_TOKEN}")
+        result = subprocess.run(["bash", "-n", "-c", snippet],
+                                capture_output=True, text=True)
         assert result.returncode == 0, result.stderr
-        assert result.stdout.startswith("http://")
+        assert "SERVICE_URL_PATH" in snippet and "3600" in snippet
+
+    def test_publishes_tokenized_url_only_once_port_is_up(self, tmp_path):
+        import socket
+        # Bind a real port so the probe's TCP connect succeeds.
+        srv = socket.socket()
+        srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        srv.bind(("127.0.0.1", 0))
+        port = srv.getsockname()[1]
+        srv.listen()
+        try:
+            url_file = tmp_path / "service_url"
+            env = (
+                f'export FG_HOSTNAME=h1 FG_SERVICE_PORT={port} '
+                f'FG_SERVICE_TOKEN=deadbeef SERVICE_URL_PATH={url_file}\n'
+            )
+            # Run the publisher in the foreground (drop the trailing &) so the
+            # test can wait for it deterministically.
+            snippet = _build_service_url_publisher(
+                "/?access_token=${FG_SERVICE_TOKEN}").rstrip().removesuffix("&")
+            result = subprocess.run(["bash", "-c", env + snippet],
+                                    capture_output=True, text=True, timeout=30)
+            assert result.returncode == 0, result.stderr
+            assert url_file.read_text() == f"http://h1:{port}/?access_token=deadbeef"
+        finally:
+            srv.close()
+
+    def test_does_not_publish_when_port_never_opens(self, tmp_path):
+        import socket
+        # Grab a free port number, then close it so nothing is listening.
+        s = socket.socket(); s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]; s.close()
+        url_file = tmp_path / "service_url"
+        env = (
+            f'export FG_HOSTNAME=h1 FG_SERVICE_PORT={port} '
+            f'FG_SERVICE_TOKEN=x SERVICE_URL_PATH={url_file}\n'
+        )
+        # Shrink the loop to 2 iterations so the timeout path is quick.
+        snippet = _build_service_url_publisher("").replace("$(seq 1 3600)", "$(seq 1 2)")
+        snippet = snippet.rstrip().removesuffix("&")
+        result = subprocess.run(["bash", "-c", env + snippet],
+                                capture_output=True, text=True, timeout=30)
+        assert not url_file.exists()
+        assert "never opened" in result.stderr
 
 
 # --- Path validation tests ---
