@@ -193,6 +193,20 @@ export default function useFileSelector(options?: FileSelectorOptions) {
     return (zonesAndFspQuery.data?.[fspKey] as FileSharePath) || null;
   }, [state.currentLocation, zonesAndFspQuery.data]);
 
+  // Path to show in the editable path field, in the user's preferred format:
+  // the selected item when there is one, otherwise the current folder.
+  const currentPathDisplay = useMemo(() => {
+    if (state.selectedItem) {
+      return state.selectedItem.displayPath;
+    }
+    if (state.currentLocation.type === 'filesystem' && currentFsp) {
+      const subPath =
+        state.currentLocation.path === '.' ? '' : state.currentLocation.path;
+      return getPreferredPathForDisplay(pathPreference, currentFsp, subPath);
+    }
+    return '';
+  }, [state.selectedItem, state.currentLocation, currentFsp, pathPreference]);
+
   // Build the items to display based on current location
   const displayItems = useMemo((): FileOrFolder[] => {
     if (zonesAndFspQuery.isPending || !zonesAndFspQuery.data) {
@@ -317,6 +331,27 @@ export default function useFileSelector(options?: FileSelectorOptions) {
       selectedItem: null
     });
   }, []);
+
+  // Resolve a raw path (in any OS format, e.g. pasted by the user) to an FSP
+  // and navigate the browser into it. Returns false if no FSP matches.
+  const navigateToRawPath = useCallback(
+    (rawPath: string): boolean => {
+      if (!rawPath.trim() || !zonesAndFspQuery.data) {
+        return false;
+      }
+      const resolved = resolvePathToFsp(rawPath, zonesAndFspQuery.data);
+      if (!resolved) {
+        return false;
+      }
+      navigateToLocation({
+        type: 'filesystem',
+        fspName: resolved.fsp.name,
+        path: resolved.subpath || '.'
+      });
+      return true;
+    },
+    [zonesAndFspQuery.data, navigateToLocation]
+  );
 
   // Jump to the user's home directory (no-op until the profile resolves).
   const navigateHome = useCallback(() => {
@@ -464,7 +499,9 @@ export default function useFileSelector(options?: FileSelectorOptions) {
     fileQuery,
     zonesQuery: zonesAndFspQuery,
     navigateToLocation,
+    navigateToRawPath,
     navigateHome,
+    currentPathDisplay,
     canGoHome: homeLocation !== undefined,
     selectItem,
     handleItemDoubleClick,

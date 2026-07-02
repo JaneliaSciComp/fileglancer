@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { ChangeEvent, FormEvent, MouseEvent } from 'react';
+import type { ChangeEvent, FormEvent, KeyboardEvent, MouseEvent } from 'react';
 import { IconButton, Input, Typography } from '@material-tailwind/react';
 import { HiOutlineFolder, HiOutlineFunnel, HiXMark } from 'react-icons/hi2';
 import { HiHome, HiFolderAdd, HiEye, HiEyeOff } from 'react-icons/hi';
@@ -60,6 +60,9 @@ export default function FileSelectorButton({
   const [showDialog, setShowDialog] = useState(false);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  // Editable path field: local while typing, kept in sync with the current
+  // selection/location so pasting a path can navigate the browser there.
+  const [pathInput, setPathInput] = useState('');
 
   // Use initialPath if provided, otherwise fall back to last confirmed selection's parent
   const effectiveInitialPath =
@@ -71,8 +74,10 @@ export default function FileSelectorButton({
     fileQuery,
     zonesQuery,
     navigateToLocation,
+    navigateToRawPath,
     navigateHome,
     canGoHome,
+    currentPathDisplay,
     selectItem,
     handleItemDoubleClick,
     reset,
@@ -104,6 +109,22 @@ export default function FileSelectorButton({
       selectItem();
     }
   }, [showDialog, selectItem]);
+
+  // Reflect the current selection/location in the editable path field.
+  useEffect(() => {
+    setPathInput(currentPathDisplay);
+  }, [currentPathDisplay]);
+
+  const handlePathInputSubmit = () => {
+    const trimmed = pathInput.trim();
+    if (!trimmed || trimmed === currentPathDisplay) {
+      return;
+    }
+    if (!navigateToRawPath(trimmed)) {
+      toast.error('No file share found for that path');
+      setPathInput(currentPathDisplay);
+    }
+  };
 
   const resetNewFolder = () => {
     setShowNewFolder(false);
@@ -349,6 +370,29 @@ export default function FileSelectorButton({
               </Typography>
             </div>
           ) : null}
+
+          {/* Editable path: paste a path here to navigate the browser there */}
+          <div className="mb-4">
+            <Typography className="mb-1 text-sm text-foreground/60">
+              Path
+            </Typography>
+            <FgInput
+              className="font-mono"
+              onBlur={handlePathInputSubmit}
+              onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                setPathInput(event.target.value)
+              }
+              onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  handlePathInputSubmit();
+                }
+              }}
+              placeholder="Type or paste a path to navigate ..."
+              type="text"
+              value={pathInput}
+            />
+          </div>
 
           {/* Action buttons */}
           <div className="flex justify-end gap-2 mt-4">
