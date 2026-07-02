@@ -646,10 +646,16 @@ def _action_validate_paths(request: dict, ctx: WorkerContext) -> dict:
     from fileglancer.apps.command import validate_path_in_filestore
 
     paths = request["paths"]
+    # Keys whose directory may not exist yet (create_if_missing params) are
+    # checked for file-share containment only — Fileglancer creates them at
+    # submit time, so a missing-but-in-share path is valid here.
+    create_if_missing = set(request.get("create_if_missing") or [])
     fsps = ctx.db.get_file_share_paths()
     errors = {}
     for param_key, path_value in paths.items():
-        error = validate_path_in_filestore(path_value, fsps)
+        error = validate_path_in_filestore(
+            path_value, fsps, check_access=param_key not in create_if_missing
+        )
         if error:
             errors[param_key] = error
     return {"errors": errors}

@@ -29,6 +29,7 @@ from fileglancer.user_worker import (
     _ACTIONS,
     _action_validate_proxied_path,
     _action_create_dirs,
+    _action_validate_paths,
     WorkerContext,
     _HEADER_FMT,
     _HEADER_SIZE,
@@ -678,3 +679,37 @@ class TestCreateDirsAction:
         result = _action_create_dirs({"paths": {"0": "~/.fileglancer/logs"}}, ctx)
         assert result == {"errors": {}}
         assert (tmp_path / ".fileglancer" / "logs").is_dir()
+
+
+class TestValidatePathsAction:
+    """validate_paths checks existence, except for create_if_missing keys."""
+
+    def _ctx(self, mount_path):
+        fsp = FileSharePath(zone="test", name="vp", mount_path=str(mount_path))
+        return WorkerContext(username="test", db=_StubDb([fsp]))
+
+    def test_missing_dir_fails_by_default(self, tmp_path):
+        ctx = self._ctx(tmp_path)
+        missing = tmp_path / "logs"
+        result = _action_validate_paths({"paths": {"logdir": str(missing)}}, ctx)
+        assert "logdir" in result["errors"]
+
+    def test_missing_dir_ok_when_create_if_missing(self, tmp_path):
+        ctx = self._ctx(tmp_path)
+        missing = tmp_path / "logs"
+        result = _action_validate_paths(
+            {"paths": {"logdir": str(missing)}, "create_if_missing": ["logdir"]},
+            ctx,
+        )
+        assert result == {"errors": {}}
+
+    def test_create_if_missing_still_enforces_containment(self, tmp_path):
+        share = tmp_path / "share"
+        share.mkdir()
+        ctx = self._ctx(share)
+        outside = tmp_path / "outside" / "logs"
+        result = _action_validate_paths(
+            {"paths": {"logdir": str(outside)}, "create_if_missing": ["logdir"]},
+            ctx,
+        )
+        assert "logdir" in result["errors"]

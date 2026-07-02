@@ -883,6 +883,11 @@ class JobSubmitRequest(BaseModel):
 class PathValidationRequest(BaseModel):
     """Request to validate file/directory paths"""
     paths: Dict[str, str] = Field(description="Map of parameter key to path value")
+    create_if_missing: List[str] = Field(
+        default=[],
+        description="Keys whose directory may not exist yet (create_if_missing "
+                    "params): validated for file-share containment only, not existence",
+    )
 
 
 class PathValidationResponse(BaseModel):

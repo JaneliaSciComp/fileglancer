@@ -127,10 +127,12 @@ export function useAddAppMutation(): UseMutationResult<
 }
 
 export async function validatePaths(
-  paths: Record<string, string>
+  paths: Record<string, string>,
+  createIfMissing: string[] = []
 ): Promise<Record<string, string>> {
   const response = await sendFetchRequest('/api/apps/validate-paths', 'POST', {
-    paths
+    paths,
+    create_if_missing: createIfMissing
   });
   const data = await getResponseJsonOrError(response);
   if (!response.ok) {

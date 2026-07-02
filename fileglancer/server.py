@@ -1914,7 +1914,8 @@ def create_app(settings):
               description="Validate file/directory paths for app parameters")
     async def validate_paths(body: PathValidationRequest,
                              username: str = Depends(get_current_user)):
-        result = await _worker_exec(username, "validate_paths", paths=body.paths)
+        result = await _worker_exec(username, "validate_paths", paths=body.paths,
+                                    create_if_missing=body.create_if_missing)
         return PathValidationResponse(errors=result.get("errors", {}))
 
     # --- Catalog (shared apps) API ---
