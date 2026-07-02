@@ -404,7 +404,11 @@ export {
 } from './appUrls';
 
 // Re-export app icon utilities
-export { getAppIconType, getEntryPointIconType } from './appIcons';
+export {
+  getAppIconType,
+  getEntryPointIconType,
+  getEntryPointTypeIconType
+} from './appIcons';
 
 // Re-export Neuroglancer URL utilities
 export {

@@ -16,6 +16,7 @@ import {
 } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 import AnsiText from '@/components/ui/AppsPage/AnsiText';
+import AppPageHeader from '@/components/ui/AppsPage/AppPageHeader';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import CancelJobDialog from '@/components/ui/Dialogs/CancelJob';
@@ -34,6 +35,7 @@ import {
   buildGithubUrl,
   downloadTextFile,
   formatDuration,
+  getEntryPointTypeIconType,
   stripLsfFooter,
   tailLines,
   exitCodeMeaning
@@ -572,19 +574,14 @@ export default function JobDetail() {
       ) : job ? (
         <div>
           {/* Job Info Header */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 min-w-0">
-                <Typography className="font-bold truncate" type="h5">
-                  {job.app_name} &mdash; {job.entry_point_name}
-                </Typography>
-                <JobStatusBadge status={job.status} />
-              </div>
-              <div className="flex items-center gap-2">
+          <AppPageHeader
+            actions={
+              <>
                 <FgButton
                   className="!rounded-md whitespace-nowrap"
                   icon={HiOutlineDownload}
                   onClick={handleDownloadParams}
+                  size="sm"
                   variant="outline"
                 >
                   Export params
@@ -597,6 +594,7 @@ export default function JobDetail() {
                     loading={cancelMutation.isPending}
                     loadingText="Cancelling"
                     onClick={() => setShowStopConfirm(true)}
+                    size="sm"
                     variant="outline"
                   >
                     Cancel
@@ -605,14 +603,21 @@ export default function JobDetail() {
                   <FgButton
                     icon={HiOutlineRefresh}
                     onClick={handleRelaunch}
+                    size="sm"
                     variant="outline"
                   >
                     Relaunch
                   </FgButton>
                 )}
-              </div>
-            </div>
-          </div>
+              </>
+            }
+            backLabel="Back to Jobs"
+            backTo="/apps/jobs"
+            icon={getEntryPointTypeIconType(job.entry_point_type)}
+            title={`${job.app_name} — ${job.entry_point_name}`}
+          >
+            <JobStatusBadge status={job.status} />
+          </AppPageHeader>
 
           {/* Service URL banner */}
           {isService && job.status === 'RUNNING' ? (

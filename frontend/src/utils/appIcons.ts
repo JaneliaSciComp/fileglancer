@@ -4,9 +4,14 @@ import { IoTerminal } from 'react-icons/io5';
 
 import type { AppEntryPoint, AppManifest } from '@/shared.types';
 
+/** Icon for an entry point type: a server for services, a terminal for batch jobs. */
+export function getEntryPointTypeIconType(type?: 'job' | 'service'): IconType {
+  return type === 'service' ? FaServer : IoTerminal;
+}
+
 /** Icon representing an entry point: a server for services, a terminal for batch jobs. */
 export function getEntryPointIconType(entryPoint?: AppEntryPoint): IconType {
-  return entryPoint?.type === 'service' ? FaServer : IoTerminal;
+  return getEntryPointTypeIconType(entryPoint?.type);
 }
 
 /**
