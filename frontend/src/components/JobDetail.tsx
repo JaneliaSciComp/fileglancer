@@ -5,7 +5,6 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { Card, Tabs, Typography } from '@material-tailwind/react';
 import {
   HiExternalLink,
-  HiOutlineArrowLeft,
   HiOutlineDownload,
   HiOutlineRefresh,
   HiOutlineStop
@@ -541,15 +540,6 @@ export default function JobDetail() {
 
   return (
     <div>
-      <FgButton
-        className="mb-6"
-        icon={HiOutlineArrowLeft}
-        onClick={() => navigate('/apps/jobs')}
-        variant="outline"
-      >
-        Back to Jobs
-      </FgButton>
-
       {jobQuery.isPending ? (
         <div className="animate-pulse">
           {/* Title skeleton */}
