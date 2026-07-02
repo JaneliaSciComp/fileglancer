@@ -275,7 +275,6 @@ function JobOverview({
   job,
   stdoutContent,
   stderrContent,
-  stdoutPending,
   isDarkMode,
   onViewStdout,
   onViewStderr
@@ -283,7 +282,6 @@ function JobOverview({
   readonly job: Job;
   readonly stdoutContent: string | null | undefined;
   readonly stderrContent: string | null | undefined;
-  readonly stdoutPending: boolean;
   readonly isDarkMode: boolean;
   readonly onViewStdout: () => void;
   readonly onViewStderr: () => void;
@@ -304,6 +302,7 @@ function JobOverview({
     stderrContent !== null && stderrContent !== undefined
       ? tailLines(stripLsfFooter(stderrContent), RECENT_OUTPUT_LINES)
       : null;
+  const hasStdout = Boolean(stdoutTail && stdoutTail.trim());
   const hasStderr = Boolean(stderrTail && stderrTail.trim());
 
   return (
@@ -373,7 +372,7 @@ function JobOverview({
         </InfoCard>
       </div>
 
-      {job.started_at ? (
+      {hasStdout ? (
         <div>
           <div className="flex items-center justify-between mb-1">
             <Typography className="text-foreground font-bold">
@@ -388,7 +387,7 @@ function JobOverview({
             </button>
           </div>
           <FilePreview
-            content={stdoutPending ? undefined : (stdoutTail ?? null)}
+            content={stdoutTail}
             isDarkMode={isDarkMode}
             language="text"
           />
@@ -739,7 +738,6 @@ export default function JobDetail() {
                 onViewStdout={() => setActiveTab('stdout')}
                 stderrContent={stderrQuery.data}
                 stdoutContent={stdoutQuery.data}
-                stdoutPending={stdoutQuery.isPending}
               />
             </Tabs.Panel>
 
