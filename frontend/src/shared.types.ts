@@ -79,6 +79,7 @@ type AppParameter = {
   pattern?: string;
   hidden?: boolean;
   raw?: boolean;
+  create_if_missing?: boolean;
 };
 
 type AppParameterSection = {

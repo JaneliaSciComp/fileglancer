@@ -28,6 +28,7 @@ from fileglancer.apps.manifest import (
 from fileglancer.apps.command import (
     build_command,
     build_requirements_check,
+    collect_creatable_dirs,
     collect_path_parameters,
     expand_user_path,
     merge_requirements,
@@ -624,6 +625,20 @@ async def submit_job(
     # as a service account that isn't in the user's groups, so a redundant
     # server-side check would wrongly reject (or, on local FS, wrongly accept)
     # paths the user can actually access.
+    # Create any directory params flagged create_if_missing first, as the user,
+    # so a home default like '~/.fileglancer/logs' exists by the time the
+    # existence check below runs. Containment (within a file share) is enforced
+    # in the worker before makedirs, so this never writes outside a share.
+    creatable_dirs = collect_creatable_dirs(entry_point, parameters, env_parameters)
+    if creatable_dirs:
+        paths_to_create = {str(i): value for i, (_, value) in enumerate(creatable_dirs)}
+        creation = await _dispatch(username, "create_dirs", paths=paths_to_create)
+        errors = (creation or {}).get("errors") or {}
+        if errors:
+            idx = min(int(i) for i in errors)
+            param_name, _ = creatable_dirs[idx]
+            raise ValueError(f"Parameter '{param_name}': {errors[str(idx)]}")
+
     path_params = collect_path_parameters(entry_point, parameters, env_parameters)
     if path_params:
         paths_to_check = {str(i): value for i, (_, _, value) in enumerate(path_params)}

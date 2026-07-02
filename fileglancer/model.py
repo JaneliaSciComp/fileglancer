@@ -340,6 +340,12 @@ class AppParameter(BaseModel):
     pattern: Optional[str] = Field(description="Regex validation pattern for string types", default=None)
     hidden: bool = Field(description="Whether the parameter is hidden by default in the UI", default=False)
     raw: bool = Field(description="If true, value is appended to the command without shell quoting", default=False)
+    create_if_missing: bool = Field(
+        description="directory params only: create the resolved directory (as the user, "
+                    "within an allowed file share) before the existence check, so a home "
+                    "default like '~/.fileglancer/logs' works on first launch",
+        default=False,
+    )
 
     @field_validator("flag")
     @classmethod
@@ -362,6 +368,15 @@ class AppParameter(BaseModel):
         if v is None:
             return v
         return [str(item) for item in v]
+
+    @model_validator(mode='after')
+    def validate_create_if_missing(self):
+        if self.create_if_missing and self.type != "directory":
+            raise ValueError(
+                f"create_if_missing is only valid on directory parameters, "
+                f"but '{self.name}' has type '{self.type}'"
+            )
+        return self
 
 
 class AppParameterSection(BaseModel):

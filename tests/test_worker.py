@@ -28,6 +28,7 @@ from fileglancer.user_worker import (
     _recv,
     _ACTIONS,
     _action_validate_proxied_path,
+    _action_create_dirs,
     WorkerContext,
     _HEADER_FMT,
     _HEADER_SIZE,
@@ -637,3 +638,43 @@ class TestValidateProxiedPathAction:
         result = _action_validate_proxied_path(
             {"fsp_name": "vpp_symlink", "path": "link.txt"}, ctx)
         assert result == {"ok": True}
+
+
+class TestCreateDirsAction:
+    """create_dirs makes directories within a share, refusing anything outside."""
+
+    def _ctx(self, mount_path):
+        fsp = FileSharePath(zone="test", name="cd", mount_path=str(mount_path))
+        return WorkerContext(username="test", db=_StubDb([fsp]))
+
+    def test_creates_missing_directory(self, tmp_path):
+        ctx = self._ctx(tmp_path)
+        target = tmp_path / "logs" / "run1"
+        result = _action_create_dirs({"paths": {"0": str(target)}}, ctx)
+        assert result == {"errors": {}}
+        assert target.is_dir()
+
+    def test_existing_directory_is_noop(self, tmp_path):
+        ctx = self._ctx(tmp_path)
+        target = tmp_path / "logs"
+        target.mkdir()
+        result = _action_create_dirs({"paths": {"0": str(target)}}, ctx)
+        assert result == {"errors": {}}
+        assert target.is_dir()
+
+    def test_refuses_path_outside_any_share(self, tmp_path):
+        share = tmp_path / "share"
+        share.mkdir()
+        ctx = self._ctx(share)
+        outside = tmp_path / "outside" / "dir"
+        result = _action_create_dirs({"paths": {"0": str(outside)}}, ctx)
+        assert "0" in result["errors"]
+        assert not outside.exists()
+
+    def test_expands_tilde_as_the_user(self, tmp_path, monkeypatch):
+        # Point HOME at a share so '~' resolves inside it.
+        monkeypatch.setenv("HOME", str(tmp_path))
+        ctx = self._ctx(tmp_path)
+        result = _action_create_dirs({"paths": {"0": "~/.fileglancer/logs"}}, ctx)
+        assert result == {"errors": {}}
+        assert (tmp_path / ".fileglancer" / "logs").is_dir()

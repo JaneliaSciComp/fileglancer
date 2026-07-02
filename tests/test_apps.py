@@ -26,6 +26,7 @@ from fileglancer.apps import (
     _SERVICE_PORT_HELPER,
     _build_service_url_publisher,
     build_command,
+    collect_creatable_dirs,
     collect_path_parameters,
     expand_user_path,
 )
@@ -1176,6 +1177,81 @@ class TestCollectPathParameters:
             parameters=[{"key": "input", "name": "Input Path", "type": "file", "flag": "--input"}],
         )
         assert collect_path_parameters(ep, {}) == []
+
+
+class TestCreateIfMissingValidation:
+    """create_if_missing is only valid on directory params."""
+
+    def test_accepted_on_directory(self):
+        p = AppParameter(key="d", name="Dir", type="directory", create_if_missing=True)
+        assert p.create_if_missing is True
+
+    def test_defaults_false(self):
+        p = AppParameter(key="d", name="Dir", type="directory")
+        assert p.create_if_missing is False
+
+    @pytest.mark.parametrize("bad_type", ["file", "string", "integer", "enum"])
+    def test_rejected_on_non_directory(self, bad_type):
+        kwargs = {"key": "p", "name": "P", "type": bad_type, "create_if_missing": True}
+        if bad_type == "enum":
+            kwargs["options"] = ["a", "b"]
+        with pytest.raises(ValidationError):
+            AppParameter(**kwargs)
+
+
+class TestCollectCreatableDirs:
+    """collect_creatable_dirs gathers directory params flagged create_if_missing."""
+
+    def test_collects_via_default_and_user_value(self):
+        ep = AppEntryPoint(
+            id="test",
+            name="test",
+            command="test_cmd",
+            env_parameters=[{
+                "key": "envdir", "name": "Env Dir", "type": "directory",
+                "default": "~/.fileglancer/env", "create_if_missing": True,
+            }],
+            parameters=[
+                {"key": "logdir", "name": "Log Dir", "type": "directory",
+                 "flag": "--logdir", "default": "~/.fileglancer/logs",
+                 "create_if_missing": True},
+                # directory without the flag -> excluded
+                {"key": "indir", "name": "In Dir", "type": "directory",
+                 "flag": "--indir", "default": "/data/in"},
+            ],
+        )
+        result = collect_creatable_dirs(
+            ep,
+            {"logdir": "/data/mylogs"},  # user override
+            env_parameters={},
+        )
+        # Env default included; pipeline 'logdir' uses the user value; 'indir'
+        # excluded (no create_if_missing).
+        assert result == [
+            ("Env Dir", "~/.fileglancer/env"),
+            ("Log Dir", "/data/mylogs"),
+        ]
+
+    def test_omits_when_no_effective_value(self):
+        ep = AppEntryPoint(
+            id="test",
+            name="test",
+            command="test_cmd",
+            parameters=[{"key": "logdir", "name": "Log Dir", "type": "directory",
+                         "flag": "--logdir", "create_if_missing": True}],
+        )
+        assert collect_creatable_dirs(ep, {}) == []
+
+    def test_omits_empty_string_value(self):
+        ep = AppEntryPoint(
+            id="test",
+            name="test",
+            command="test_cmd",
+            parameters=[{"key": "logdir", "name": "Log Dir", "type": "directory",
+                         "flag": "--logdir", "default": "~/logs",
+                         "create_if_missing": True}],
+        )
+        assert collect_creatable_dirs(ep, {"logdir": ""}) == []
 
 
 class TestExpandUserPath:

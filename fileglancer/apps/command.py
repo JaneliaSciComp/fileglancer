@@ -517,3 +517,35 @@ def collect_path_parameters(entry_point: AppEntryPoint, parameters: dict,
                 continue
             result.append((param.key, param.name, str(value)))
     return result
+
+
+def collect_creatable_dirs(entry_point: AppEntryPoint, parameters: dict,
+                           env_parameters: dict = None) -> list[tuple[str, str]]:
+    """Collect effective directory values for params with create_if_missing set.
+
+    Mirrors collect_path_parameters' effective-value logic (user value else
+    default, across both the env and pipeline namespaces) but returns only
+    directory params carrying create_if_missing, as (param_name, raw_value)
+    tuples. Raw (un-expanded) values are returned so the setuid worker resolves
+    '~' as the target user. See submit_job.
+    """
+    env_parameters = env_parameters or {}
+    env_flat = _flatten_param_items(entry_point.env_parameters)
+    param_flat = _flatten_param_items(entry_point.parameters)
+    groups = ((env_flat, env_parameters), (param_flat, parameters))
+
+    result: list[tuple[str, str]] = []
+    for flat, values in groups:
+        for param in flat:
+            if param.type != "directory" or not param.create_if_missing:
+                continue
+            if param.key in values:
+                value = values[param.key]
+            elif param.default is not None:
+                value = param.default
+            else:
+                continue
+            if value == "":
+                continue
+            result.append((param.name, str(value)))
+    return result

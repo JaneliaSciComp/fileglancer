@@ -655,6 +655,37 @@ def _action_validate_paths(request: dict, ctx: WorkerContext) -> dict:
     return {"errors": errors}
 
 
+@action("create_dirs")
+def _action_create_dirs(request: dict, ctx: WorkerContext) -> dict:
+    """Create directories for app params with create_if_missing set.
+
+    Runs as the target user in the setuid worker. Each path is expanded ('~'
+    resolves to this user's home), confirmed to be within an allowed file share
+    (containment only — the directory need not exist yet), and only then created
+    with exist_ok=True. Never creates anything outside a file share. Best-effort:
+    per-path failures are returned in {"errors": {index: message}} rather than
+    aborting the batch.
+    """
+    from fileglancer.apps.command import validate_path_in_filestore
+
+    paths = request["paths"]
+    fsps = ctx.db.get_file_share_paths()
+    errors = {}
+    for key, path_value in paths.items():
+        # Containment check without the exists/readable check — the directory is
+        # about to be created, so it legitimately may not exist yet.
+        error = validate_path_in_filestore(path_value, fsps, check_access=False)
+        if error:
+            errors[key] = error
+            continue
+        expanded = os.path.expanduser(path_value.replace("\\", "/"))
+        try:
+            os.makedirs(expanded, exist_ok=True)
+        except OSError as e:
+            errors[key] = str(e)
+    return {"errors": errors}
+
+
 @action("get_profile")
 def _action_get_profile(request: dict, ctx: WorkerContext) -> dict:
     """Get user profile information."""
