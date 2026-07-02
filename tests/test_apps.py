@@ -1905,3 +1905,41 @@ class TestPixiAdapterName:
         monkeypatch.setattr(pixi_mod, "_get_git_repo_name", lambda d: None)
         manifest = PixiAdapter().convert(tmp_path)
         assert manifest.name == tmp_path.name
+
+
+class TestPollLoopStopRace:
+    """The poll loop must not orphan a job submitted while it is stopping.
+
+    Regression: the loop used to sleep a full poll_interval before clearing
+    _poll_task, so a job submitted during that window saw a live task,
+    ensure_poll_loop() no-op'd, and the job was left in PENDING forever once the
+    loop exited. The loop now decides to stop *before* sleeping and re-checks
+    for active jobs (no await in between) so a mid-cycle submission keeps it
+    alive.
+    """
+
+    def test_keeps_polling_when_job_appears_during_stop(self, tmp_path, monkeypatch):
+        import asyncio
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, patch
+        import fileglancer.apps.jobs as jobs_mod
+
+        monkeypatch.setattr(jobs_mod, "_POLL_LOCK_PATH", str(tmp_path / "poll.lock"))
+        monkeypatch.setattr(jobs_mod, "_poll_task", None, raising=False)
+        settings = SimpleNamespace(cluster=SimpleNamespace(poll_interval=0.01))
+
+        # _poll_jobs reports "no active jobs" every cycle. The stop re-check
+        # returns a user first (a job appeared mid-cycle -> keep going), then
+        # None (really nothing -> stop).
+        with patch.object(jobs_mod, "_poll_jobs", new=AsyncMock(return_value=False)) as poll_jobs, \
+             patch.object(jobs_mod, "_get_any_active_username",
+                          side_effect=["someuser", None]) as active_user:
+            async def run():
+                await asyncio.wait_for(jobs_mod._poll_loop(settings), timeout=5)
+            asyncio.run(run())
+
+        # Polled twice: it did NOT exit on the first no-jobs cycle because the
+        # re-check still saw an active job.
+        assert poll_jobs.await_count == 2
+        assert active_user.call_count == 2
+        assert jobs_mod._poll_task is None

@@ -185,24 +185,50 @@ async def _poll_loop(settings):
         lock_fd = None
         try:
             lock_fd = open(_POLL_LOCK_PATH, "w")
-            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             try:
-                has_jobs = await _poll_jobs(settings)
-            except Exception:
-                logger.exception("Error in job poll loop")
-                has_jobs = True  # keep polling on error
-            # Hold lock through the sleep so no other worker polls
-            # until this interval is over
-            await asyncio.sleep(settings.cluster.poll_interval)
-            fcntl.flock(lock_fd, fcntl.LOCK_UN)
-            lock_fd.close()
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                # Another worker holds the lock this cycle — skip and retry.
+                lock_fd.close()
+                lock_fd = None
+                await asyncio.sleep(settings.cluster.poll_interval)
+                continue
 
-            if not has_jobs:
-                logger.info("No active jobs — poll loop stopping")
-                _poll_task = None
-                return
+            # try/finally so the lock is always released, even if the task is
+            # cancelled (e.g. on shutdown) while we hold it.
+            try:
+                try:
+                    has_jobs = await _poll_jobs(settings)
+                except Exception:
+                    logger.exception("Error in job poll loop")
+                    has_jobs = True  # keep polling on error
+
+                if not has_jobs:
+                    # No active jobs — stop the loop. Clear _poll_task and
+                    # return *without* sleeping first: sleeping here (as the
+                    # old code did) left a poll_interval-long window in which
+                    # _poll_task was still set but the loop was on its way out,
+                    # so a job submitted during that window saw a live task,
+                    # ensure_poll_loop() no-op'd, and the job was then orphaned
+                    # in PENDING when the loop exited. Re-check for active jobs
+                    # first (no await in between) to catch a job that was
+                    # submitted during this very cycle.
+                    if _get_any_active_username(settings) is None:
+                        logger.info("No active jobs — poll loop stopping")
+                        _poll_task = None
+                        return
+                    # A job appeared mid-cycle; keep polling.
+                    continue
+
+                # Hold the lock through the sleep so a co-worker doesn't
+                # double-poll within the same interval.
+                await asyncio.sleep(settings.cluster.poll_interval)
+            finally:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                lock_fd.close()
+                lock_fd = None
         except OSError:
-            # Another worker is polling this cycle — skip and retry
+            # Opening the lock file failed — retry next cycle.
             if lock_fd:
                 lock_fd.close()
             await asyncio.sleep(settings.cluster.poll_interval)
