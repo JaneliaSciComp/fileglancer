@@ -1,17 +1,23 @@
+import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { Typography } from '@material-tailwind/react';
 import { HiOutlinePlus } from 'react-icons/hi';
 import { HiOutlineEllipsisVertical } from 'react-icons/hi2';
 
 import AppPageHeader from '@/components/ui/AppsPage/AppPageHeader';
+import EntryPointsList from '@/components/ui/AppsPage/EntryPointsList';
 import ListingInfoTable from '@/components/ui/AppsPage/ListingInfoTable';
 import DataLinksActionsMenu from '@/components/ui/Menus/DataLinksActions';
 import type { MenuItem } from '@/components/ui/Menus/FgMenuItems';
 import FgButton from '@/components/designSystem/atoms/FgButton';
-import { useAppsQuery, useCatalogQuery } from '@/queries/appsQueries';
+import {
+  useAppsQuery,
+  useCatalogQuery,
+  useManifestPreviewMutation
+} from '@/queries/appsQueries';
 import { useListingActions } from '@/hooks/useListingActions';
 import { useProfileContext } from '@/contexts/ProfileContext';
-import { getAppIconType } from '@/utils';
+import { buildLaunchPathFromApp, getAppIconType } from '@/utils';
 import type { AppListing } from '@/shared.types';
 
 const BACK_PROPS = {
@@ -28,8 +34,24 @@ export default function ListingDetail() {
   const actions = useListingActions({
     onUnshared: () => navigate('/apps/catalog')
   });
+  const manifestMutation = useManifestPreviewMutation();
 
   const listing = catalogQuery.data?.find(l => l.id === Number(listingId));
+  const listingUrl = listing?.url;
+  const listingManifestPath = listing?.manifest_path;
+
+  // Listings don't carry the manifest, so fetch a preview to show the entry
+  // points and the correct type icon.
+  useEffect(() => {
+    if (listingUrl !== undefined) {
+      manifestMutation.mutate({
+        url: listingUrl,
+        manifest_path: listingManifestPath ?? ''
+      });
+    }
+    // Re-fetch when the listing identity (url or manifest path) changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listingUrl, listingManifestPath]);
 
   if (catalogQuery.isPending) {
     return (
@@ -65,6 +87,7 @@ export default function ListingDetail() {
     a => a.url === listing.url && a.manifest_path === listing.manifest_path
   );
   const alreadyAdded = installedApp !== undefined;
+  const manifest = installedApp?.manifest ?? manifestMutation.data;
   const canManage =
     profile?.username !== undefined &&
     profile.username === listing.owner_username;
@@ -112,7 +135,7 @@ export default function ListingDetail() {
             ) : null}
           </>
         }
-        icon={getAppIconType(installedApp?.manifest)}
+        icon={getAppIconType(manifest)}
         title={listing.name}
       >
         {alreadyAdded ? (
@@ -124,6 +147,25 @@ export default function ListingDetail() {
 
       <div className="max-w-2xl">
         <ListingInfoTable listing={listing} />
+
+        {manifestMutation.isPending && !manifest ? (
+          <Typography className="text-foreground" type="small">
+            Loading entry points...
+          </Typography>
+        ) : (
+          <EntryPointsList
+            onLaunch={ep =>
+              navigate(
+                buildLaunchPathFromApp(
+                  listing.url,
+                  listing.manifest_path,
+                  ep.id
+                )
+              )
+            }
+            runnables={manifest?.runnables ?? []}
+          />
+        )}
       </div>
     </div>
   );
