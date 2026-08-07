@@ -53,7 +53,11 @@ describe('FileTable select column', () => {
               last_modified: 1647855213
             },
             files: [
-              { name: 'file1.txt', is_dir: false, path: `${subpath}/file1.txt` },
+              {
+                name: 'file1.txt',
+                is_dir: false,
+                path: `${subpath}/file1.txt`
+              },
               { name: 'file2.txt', is_dir: false, path: `${subpath}/file2.txt` }
             ]
           });
