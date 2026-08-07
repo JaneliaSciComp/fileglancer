@@ -65,4 +65,40 @@ describe('buildViewState', () => {
     ]);
     expect((ng_state as any).layers).toHaveLength(1);
   });
+
+  it('skips a dataset whose metadata fetch throws and keeps the rest', async () => {
+    (getOmeZarrMetadata as any).mockRejectedValueOnce(new Error('gone'));
+    const { ng_state, layers } = await buildViewState([
+      { url: 'a', sharing_key: 'ka', fsp_name: 'f', path: '/a', label: 'A' },
+      { url: 'b', sharing_key: 'kb', fsp_name: 'f', path: '/b', label: 'B' }
+    ]);
+    expect((ng_state as any).layers).toHaveLength(1);
+    expect(layers).toEqual([
+      { sharing_key: 'kb', layer_index: 0, channel: null, opts: null }
+    ]);
+  });
+
+  it('narrows layers to those matching the requested channel', async () => {
+    (generateNeuroglancerStateForOmeZarr as any).mockReturnValue(
+      encoded({
+        layers: [
+          { name: 'DAPI', type: 'image' },
+          { name: 'GFP', type: 'image' }
+        ]
+      })
+    );
+    const { ng_state } = await buildViewState([
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        fsp_name: 'f',
+        path: '/a',
+        channel: 'GFP',
+        label: 'A'
+      }
+    ]);
+    expect((ng_state as any).layers).toEqual([
+      { name: 'GFP', type: 'image', archived: false }
+    ]);
+  });
 });
