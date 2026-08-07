@@ -18,6 +18,7 @@ import useZarrMetadata from '@/hooks/useZarrMetadata';
 import useN5Metadata from '@/hooks/useN5Metadata';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
+import { useCartContext } from '@/contexts/CartContext';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
 import { useHandleDownload } from '@/hooks/useHandleDownload';
 import { useHandleView } from '@/hooks/useHandleView';
@@ -61,6 +62,7 @@ export default function FileBrowser({
   } = useFileBrowserContext();
   const { folderPreferenceMap, handleContextMenuFavorite } =
     usePreferencesContext();
+  const { addToCart } = useCartContext();
   const { displayFiles } = useHideDotFiles();
   const { handleDownload } = useHandleDownload();
   const { handleView } = useHandleView();
@@ -185,6 +187,26 @@ export default function FileBrowser({
         },
         shouldShow:
           tasksEnabled &&
+          fileBrowserState.selectedFiles[0]?.is_dir &&
+          !fileBrowserState.selectedFiles[0]?.is_symlink
+      },
+      {
+        name: 'Add to Neuroglancer cart',
+        action: () => {
+          const file = fileBrowserState.selectedFiles[0];
+          if (!file) {
+            return;
+          }
+          addToCart([
+            {
+              fsp_name: fileQuery.data?.currentFileSharePath?.name ?? '',
+              path: file.path,
+              label: file.name
+            }
+          ]);
+          toast.success(`Added "${file.name}" to the Neuroglancer cart`);
+        },
+        shouldShow:
           fileBrowserState.selectedFiles[0]?.is_dir &&
           !fileBrowserState.selectedFiles[0]?.is_symlink
       },
