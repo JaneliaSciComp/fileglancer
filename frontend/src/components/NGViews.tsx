@@ -33,8 +33,10 @@ type CartGroup = {
   items: CartItem[];
 };
 
+type CartGroupBuilder = CartGroup & { hasBaseLabel: boolean };
+
 function groupCartByDataset(cart: CartItem[]): CartGroup[] {
-  const groups = new Map<string, CartGroup>();
+  const groups = new Map<string, CartGroupBuilder>();
   for (const item of cart) {
     const key = datasetKey(item.fsp_name, item.path);
     const existing = groups.get(key);
@@ -43,17 +45,24 @@ function groupCartByDataset(cart: CartItem[]): CartGroup[] {
       // Prefer the base (no-channel) entry's label for the dataset row.
       if (!item.channel) {
         existing.label = item.label;
+        existing.hasBaseLabel = true;
       }
     } else {
+      // A channel-only entry's label is the channel name (e.g. "DAPI"), not
+      // the dataset name - fall back to the path until/unless a base entry
+      // shows up, rather than letting a channel string become the header.
       groups.set(key, {
         fsp_name: item.fsp_name,
         path: item.path,
-        label: item.label,
+        label: item.channel ? item.path : item.label,
+        hasBaseLabel: !item.channel,
         items: [item]
       });
     }
   }
-  return Array.from(groups.values());
+  return Array.from(groups.values()).map(
+    ({ hasBaseLabel: _hasBaseLabel, ...group }) => group
+  );
 }
 
 export default function NGViews() {
