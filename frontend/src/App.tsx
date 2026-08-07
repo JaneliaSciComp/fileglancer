@@ -34,7 +34,6 @@ import ApiTokens from '@/components/ApiTokens';
 import ErrorFallback from '@/components/ErrorFallback';
 import NGViews from '@/components/NGViews';
 import { ViewsProvider } from '@/contexts/ViewsContext';
-import { CartProvider } from '@/contexts/CartContext';
 
 function RequireAuth({ children }: { readonly children: ReactNode }) {
   const { loading, authStatus } = useAuthContext();
@@ -125,9 +124,7 @@ const AppComponent = () => {
               element={
                 <RequireAuth>
                   <ViewsProvider>
-                    <CartProvider>
-                      <NGViews />
-                    </CartProvider>
+                    <NGViews />
                   </ViewsProvider>
                 </RequireAuth>
               }
