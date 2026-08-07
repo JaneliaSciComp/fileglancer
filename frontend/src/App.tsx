@@ -22,12 +22,13 @@ import Help from '@/components/Help';
 import Jobs from '@/components/Jobs';
 import Preferences from '@/components/Preferences';
 import Links from '@/components/Links';
-import NGLinks from '@/components/NGLinks';
 import Notifications from '@/components/Notifications';
 import SSHKeys from '@/components/SSHKeys';
 import ApiTokens from '@/components/ApiTokens';
 import ErrorFallback from '@/components/ErrorFallback';
-import { NGLinkProvider } from '@/contexts/NGLinkContext';
+import NGViews from '@/components/NGViews';
+import { ViewsProvider } from '@/contexts/ViewsContext';
+import { CartProvider } from '@/contexts/CartContext';
 
 function RequireAuth({ children }: { readonly children: ReactNode }) {
   const { loading, authStatus } = useAuthContext();
@@ -117,12 +118,14 @@ const AppComponent = () => {
             <Route
               element={
                 <RequireAuth>
-                  <NGLinkProvider>
-                    <NGLinks />
-                  </NGLinkProvider>
+                  <ViewsProvider>
+                    <CartProvider>
+                      <NGViews />
+                    </CartProvider>
+                  </ViewsProvider>
                 </RequireAuth>
               }
-              path="nglinks"
+              path="ngviews"
             />
             {tasksEnabled ? (
               <Route
