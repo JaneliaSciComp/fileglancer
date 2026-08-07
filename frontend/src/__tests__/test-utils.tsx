@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ZonesAndFspMapContextProvider } from '@/contexts/ZonesAndFspMapContext';
 import { FileBrowserContextProvider } from '@/contexts/FileBrowserContext';
 import { PreferencesProvider } from '@/contexts/PreferencesContext';
+import { CartProvider } from '@/contexts/CartContext';
 import { ProxiedPathProvider } from '@/contexts/ProxiedPathContext';
 import { OpenFavoritesProvider } from '@/contexts/OpenFavoritesContext';
 import { TicketProvider } from '@/contexts/TicketsContext';
@@ -41,15 +42,17 @@ const Browse = ({ children }: { children: ReactNode }) => {
         <OpenFavoritesProvider>
           <FileBrowserTestingWrapper>
             <PreferencesProvider>
-              <ViewersProvider>
-                <ExternalBucketProvider>
-                  <ProxiedPathProvider>
-                    <ProfileContextProvider>
-                      <TicketProvider>{children}</TicketProvider>
-                    </ProfileContextProvider>
-                  </ProxiedPathProvider>
-                </ExternalBucketProvider>
-              </ViewersProvider>
+              <CartProvider>
+                <ViewersProvider>
+                  <ExternalBucketProvider>
+                    <ProxiedPathProvider>
+                      <ProfileContextProvider>
+                        <TicketProvider>{children}</TicketProvider>
+                      </ProfileContextProvider>
+                    </ProxiedPathProvider>
+                  </ExternalBucketProvider>
+                </ViewersProvider>
+              </CartProvider>
             </PreferencesProvider>
           </FileBrowserTestingWrapper>
         </OpenFavoritesProvider>
