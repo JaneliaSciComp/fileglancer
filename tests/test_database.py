@@ -413,22 +413,17 @@ def test_mark_view_layers_broken(db_session):
     assert get_view_by_short_key(db_session, v.short_key) is not None
 
 
-def test_delete_views_for_data_link(db_session):
-    linked_a = create_view(db_session, "u", "a", {"layers": []},
-                           [{"data_link_id": 5, "layer_index": 0, "channel": None, "opts": None}], "read")
-    linked_b = create_view(db_session, "u", "b", {"layers": []},
-                           [{"data_link_id": 5, "layer_index": 0, "channel": None, "opts": None}], "read")
-    other = create_view(db_session, "u", "c", {"layers": []},
-                        [{"data_link_id": 6, "layer_index": 0, "channel": None, "opts": None}], "read")
+def test_get_views_for_data_link_owner_filter(db_session):
+    layer = [{"data_link_id": 11, "layer_index": 0, "channel": None, "opts": None}]
+    mine = create_view(db_session, "me", "mine", {"layers": []}, layer, "read")
+    create_view(db_session, "other", "theirs", {"layers": []}, layer, "read")
 
-    deleted = delete_views_for_data_link(db_session, 5)
-    assert deleted == 2
-    assert get_view_by_short_key(db_session, linked_a.short_key) is None
-    assert get_view_by_short_key(db_session, linked_b.short_key) is None
-    assert get_view_by_short_key(db_session, other.short_key) is not None
-    # the deleted views' layers are gone; the surviving view's layer remains
-    assert db_session.query(ViewLayerDB).filter_by(data_link_id=5).count() == 0
-    assert db_session.query(ViewLayerDB).filter_by(data_link_id=6).count() == 1
+    # unfiltered: both owners' views
+    all_deps = get_views_for_data_link(db_session, 11)
+    assert {v.owner for v in all_deps} == {"me", "other"}
+    # owner-scoped: only mine
+    mine_only = get_views_for_data_link(db_session, 11, owner="me")
+    assert [v.short_key for v in mine_only] == [mine.short_key]
 
 
 def test_view_pydantic_from_orm(db_session):
