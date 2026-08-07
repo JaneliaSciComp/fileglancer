@@ -1084,15 +1084,18 @@ def delete_view(session: Session, username: str, short_key: str) -> int:
     return 1
 
 
-def get_views_for_data_link(session: Session, data_link_id: int) -> List[ViewDB]:
-    """Distinct Views that have at least one layer backed by this Data Link."""
-    return (
+def get_views_for_data_link(session: Session, data_link_id: int, owner: Optional[str] = None) -> List[ViewDB]:
+    """Distinct Views that have at least one layer backed by this Data Link.
+    If `owner` is given, restrict to Views owned by that user (used to avoid
+    disclosing other users' Views when guarding a Data Link deletion)."""
+    query = (
         session.query(ViewDB)
         .join(ViewLayerDB, ViewLayerDB.view_id == ViewDB.id)
         .filter(ViewLayerDB.data_link_id == data_link_id)
-        .distinct()
-        .all()
     )
+    if owner is not None:
+        query = query.filter(ViewDB.owner == owner)
+    return query.distinct().all()
 
 
 def mark_view_layers_broken(session: Session, data_link_id: int) -> int:
@@ -1105,16 +1108,6 @@ def mark_view_layers_broken(session: Session, data_link_id: int) -> int:
         layer.broken = True
     session.commit()
     return len(layers)
-
-
-def delete_views_for_data_link(session: Session, data_link_id: int) -> int:
-    """Delete every View that has at least one layer backed by this Data Link
-    (cascades to its layers). Returns the number of Views deleted."""
-    views = get_views_for_data_link(session, data_link_id)
-    for view in views:
-        session.delete(view)
-    session.commit()
-    return len(views)
 
 
 def get_tickets(session: Session, username: str, fsp_name: str = None, path: str = None) -> List[TicketDB]:

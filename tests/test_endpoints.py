@@ -2174,34 +2174,24 @@ def test_dependent_views_endpoint(test_client, temp_dir):
     assert [v["name"] for v in resp.json()["views"]] == ["uses dl1"]
 
 
-def test_delete_data_link_blocks_then_marks_broken(test_client, temp_dir):
+def test_delete_data_link_blocks_then_confirms_marks_broken(test_client, temp_dir):
     sk = _make_proxied_path(test_client, temp_dir, "dl2")
     created = test_client.post("/api/neuroglancer/views", json={
         "name": "v", "ng_state": {}, "layers": [{"layer_index": 0, "sharing_key": sk}]}).json()
 
-    # no mode + dependents -> 409 listing the dependent view
+    # no confirm + own dependents -> 409 listing the caller's own view
     resp = test_client.delete(f"/api/proxied-path/{sk}")
     assert resp.status_code == 409
     detail = resp.json()["detail"]
     assert detail["dependent_views"][0]["short_key"] == created["short_key"]
 
-    # mark_broken -> link gone, view survives
-    resp = test_client.delete(f"/api/proxied-path/{sk}?mode=mark_broken")
+    # confirm=true -> link gone, view survives with its layer marked broken
+    resp = test_client.delete(f"/api/proxied-path/{sk}?confirm=true")
     assert resp.status_code == 200
     assert test_client.get(f"/api/proxied-path/{sk}").status_code == 404
     view = test_client.get(f"/api/neuroglancer/views/{created['short_key']}").json()
     assert view["layers"][0]["broken"] is True
     assert view["layers"][0]["data_link_id"] is None
-
-
-def test_delete_data_link_cascade(test_client, temp_dir):
-    sk = _make_proxied_path(test_client, temp_dir, "dl3")
-    created = test_client.post("/api/neuroglancer/views", json={
-        "name": "v", "ng_state": {}, "layers": [{"layer_index": 0, "sharing_key": sk}]}).json()
-
-    resp = test_client.delete(f"/api/proxied-path/{sk}?mode=cascade")
-    assert resp.status_code == 200
-    assert test_client.get(f"/api/neuroglancer/views/{created['short_key']}").status_code == 404
 
 
 def test_delete_data_link_no_dependents_still_works(test_client, temp_dir):
