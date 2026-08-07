@@ -1035,7 +1035,7 @@ def create_view(
 
 
 def get_view_by_short_key(session: Session, short_key: str) -> Optional[ViewDB]:
-    """Get an owned View by its short key."""
+    """Get a View by its short key. No owner filter — callers scope ownership."""
     return session.query(ViewDB).filter_by(short_key=short_key).first()
 
 
