@@ -58,7 +58,8 @@ describe('buildViewState', () => {
       zarrVersion: 2
     });
     (
-      (await import('@/omezarr-helper')).generateNeuroglancerStateForDataURL as any
+      (await import('@/omezarr-helper'))
+        .generateNeuroglancerStateForDataURL as any
     ).mockReturnValue(encoded({ layers: [{ name: 'fallback' }] }));
     const { ng_state } = await buildViewState([
       { url: 'a', sharing_key: 'ka', fsp_name: 'f', path: '/a', label: 'A' }

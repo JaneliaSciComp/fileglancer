@@ -41,10 +41,7 @@ vi.mock('@/components/ui/BrowsePage/FileTable', () => ({
   }) => (
     <div>
       {data.map(file => (
-        <button
-          key={file.path}
-          onClick={e => handleContextMenuClick(e, file)}
-        >
+        <button key={file.path} onClick={e => handleContextMenuClick(e, file)}>
           menu-{file.name}
         </button>
       ))}
@@ -55,7 +52,18 @@ vi.mock('@/components/ui/BrowsePage/FileTable', () => ({
 const noop = vi.fn();
 
 function renderFileBrowser() {
-  return render(<FileBrowser mainPanelWidth={800} setShowConvertFileDialog={noop} setShowDeleteDialog={noop} setShowPermissionsDialog={noop} setShowRenameDialog={noop} showPropertiesDrawer={false} togglePropertiesDrawer={noop} />, { initialEntries: ['/browse/test_fsp/my_folder'] });
+  return render(
+    <FileBrowser
+      mainPanelWidth={800}
+      setShowConvertFileDialog={noop}
+      setShowDeleteDialog={noop}
+      setShowPermissionsDialog={noop}
+      setShowRenameDialog={noop}
+      showPropertiesDrawer={false}
+      togglePropertiesDrawer={noop}
+    />,
+    { initialEntries: ['/browse/test_fsp/my_folder'] }
+  );
 }
 
 describe('FileBrowser row context menu - Add to Neuroglancer cart', () => {
