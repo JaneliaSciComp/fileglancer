@@ -322,6 +322,35 @@ def test_delete_proxied_path(db_session, fsp):
     assert deleted_path is None
 
 
+def test_create_and_get_view(db_session):
+    layers = [
+        {"data_link_id": None, "layer_index": 0, "channel": "Ch0", "opts": {"color": "red"}},
+        {"data_link_id": None, "layer_index": 1, "channel": None, "opts": None},
+    ]
+    view = create_view(
+        db_session,
+        username="testuser",
+        name="seed6 overlay",
+        ng_state={"layers": []},
+        layers=layers,
+        sharing_mode="read",
+    )
+    assert view.short_key is not None
+    assert view.read_key is not None
+    assert view.edit_key is not None
+    assert view.short_key != view.read_key != view.edit_key
+    assert view.owner == "testuser"
+    assert view.sharing_mode == "read"
+
+    fetched = get_view_by_short_key(db_session, view.short_key)
+    assert fetched is not None
+    assert fetched.name == "seed6 overlay"
+    assert len(fetched.layers) == 2
+    assert {l.layer_index for l in fetched.layers} == {0, 1}
+    assert fetched.layers[0].channel == "Ch0"
+    assert fetched.layers[0].broken is False
+
+
 def test_create_proxied_path_for_file(db_session, fsp):
     """Regression: create_proxied_path should succeed for a file path (not 500 on os.listdir)."""
     username = "testuser"
