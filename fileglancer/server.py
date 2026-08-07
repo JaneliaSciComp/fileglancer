@@ -1491,6 +1491,69 @@ def create_app(settings):
                                    continuation_token, delimiter, encoding_type,
                                    fetch_owner, max_keys, prefix, start_after)
 
+    @app.post("/api/neuroglancer/views", response_model=View,
+              description="Create a Neuroglancer View from a client-built state and layer list")
+    async def create_view_endpoint(payload: ViewCreateRequest,
+                                   username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            layers = []
+            for layer in payload.layers:
+                data_link_id = None
+                if layer.sharing_key:
+                    pp = db.get_proxied_path_by_sharing_key(session, layer.sharing_key)
+                    if not pp:
+                        raise HTTPException(status_code=400,
+                                            detail=f"Unknown data link sharing key: {layer.sharing_key}")
+                    data_link_id = pp.id
+                layers.append({
+                    "data_link_id": data_link_id,
+                    "layer_index": layer.layer_index,
+                    "channel": layer.channel,
+                    "opts": layer.opts,
+                })
+            view = db.create_view(session, username, payload.name, payload.ng_state,
+                                  layers, payload.sharing_mode)
+            return View.model_validate(view)
+
+    @app.get("/api/neuroglancer/views", response_model=ViewResponse,
+             description="List the current user's Neuroglancer Views")
+    async def list_views_endpoint(username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            views = db.get_views(session, username)
+            return ViewResponse(views=[View.model_validate(v) for v in views])
+
+    @app.get("/api/neuroglancer/views/{short_key}", response_model=View,
+             description="Get one of the current user's Neuroglancer Views")
+    async def get_view_endpoint(short_key: str = Path(..., description="The View's short key"),
+                                username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            view = db.get_view_by_short_key(session, short_key)
+            if not view or view.owner != username:
+                raise HTTPException(status_code=404, detail="View not found")
+            return View.model_validate(view)
+
+    @app.put("/api/neuroglancer/views/{short_key}", response_model=View,
+             description="Update (rename / restate) one of the current user's Views")
+    async def update_view_endpoint(payload: ViewUpdateRequest,
+                                   short_key: str = Path(..., description="The View's short key"),
+                                   username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            view = db.update_view(session, username, short_key,
+                                  name=payload.name, ng_state=payload.ng_state)
+            if not view:
+                raise HTTPException(status_code=404, detail="View not found")
+            return View.model_validate(view)
+
+    @app.delete("/api/neuroglancer/views/{short_key}",
+                description="Delete one of the current user's Views")
+    async def delete_view_endpoint(short_key: str = Path(..., description="The View's short key"),
+                                   username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            deleted = db.delete_view(session, username, short_key)
+            if deleted == 0:
+                raise HTTPException(status_code=404, detail="View not found")
+            return {"message": f"View {short_key} deleted"}
+
 
     @app.get("/files/{sharing_key}/{path:path}")
     async def target_dispatcher(request: Request,
