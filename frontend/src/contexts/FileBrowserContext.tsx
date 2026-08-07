@@ -29,6 +29,8 @@ type FileBrowserState = {
   propertiesTarget: FileOrFolder | null;
   selectedFiles: FileOrFolder[];
   dataLinkPath: string | null;
+  checkedPaths: Set<string>;
+  checkedFiles: FileOrFolder[];
 };
 
 // Internal state
@@ -85,6 +87,9 @@ type FileBrowserContextType = {
   ) => void;
   updateFilesWithContextMenuClick: (file: FileOrFolder) => void;
   clearSelection: () => void;
+  toggleChecked: (path: string) => void;
+  checkPaths: (paths: string[]) => void;
+  clearChecked: () => void;
 };
 
 const FileBrowserContext = createContext<FileBrowserContextType | null>(null);
@@ -114,6 +119,9 @@ export const FileBrowserContextProvider = ({
     selectedFiles: []
   });
 
+  // Multi-select set (independent of single-select). Keyed on file path.
+  const [checkedPaths, setCheckedPaths] = useState<Set<string>>(new Set());
+
   // Fetch file data using Tanstack Query (includes 403 fallback handling)
   const fileQuery = useFileQuery(fspName, filePath || '.');
 
@@ -133,6 +141,26 @@ export const FileBrowserContextProvider = ({
     },
     []
   );
+
+  const toggleChecked = useCallback((path: string) => {
+    setCheckedPaths(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  }, []);
+
+  const checkPaths = useCallback((paths: string[]) => {
+    setCheckedPaths(prev => new Set([...prev, ...paths]));
+  }, []);
+
+  const clearChecked = useCallback(() => {
+    setCheckedPaths(new Set());
+  }, []);
 
   const handleLeftClick = (
     file: FileOrFolder,
@@ -191,6 +219,7 @@ export const FileBrowserContextProvider = ({
           propertiesTargetName: null,
           selectedFiles: []
         });
+        setCheckedPaths(new Set());
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -289,13 +318,20 @@ export const FileBrowserContextProvider = ({
     return propertiesTarget.path;
   }, [propertiesTarget, fileQuery.data?.currentFileOrFolder?.path]);
 
+  const checkedFiles = useMemo(
+    () => (fileQuery.data?.files ?? []).filter(f => checkedPaths.has(f.path)),
+    [fileQuery.data?.files, checkedPaths]
+  );
+
   return (
     <FileBrowserContext.Provider
       value={{
         fileBrowserState: {
           propertiesTarget,
           selectedFiles: internalState.selectedFiles,
-          dataLinkPath
+          dataLinkPath,
+          checkedPaths,
+          checkedFiles
         },
 
         // URL params
@@ -321,7 +357,10 @@ export const FileBrowserContextProvider = ({
         // Actions
         handleLeftClick,
         updateFilesWithContextMenuClick,
-        clearSelection
+        clearSelection,
+        toggleChecked,
+        checkPaths,
+        clearChecked
       }}
     >
       {children}
