@@ -2125,3 +2125,32 @@ def test_view_create_with_unknown_sharing_key_400(test_client):
         "layers": [{"layer_index": 0, "sharing_key": "does-not-exist"}],
     })
     assert resp.status_code == 400
+
+
+def test_ngview_serves_state_by_read_key(test_client):
+    resp = test_client.post("/api/neuroglancer/views", json={
+        "name": "readable",
+        "ng_state": {"layers": [{"name": "img"}], "position": [1, 2, 3]},
+        "sharing_mode": "read",
+    })
+    assert resp.status_code == 200, resp.text
+    created = resp.json()
+    read_key = created["read_key"]
+
+    # public read endpoint serves the stored ng_state verbatim
+    resp = test_client.get(f"/ngview/{read_key}")
+    assert resp.status_code == 200
+    assert resp.json() == {"layers": [{"name": "img"}], "position": [1, 2, 3], "title": "readable"}
+    assert resp.headers.get("cache-control") == "no-store"
+
+    # Rename updates the served title (name is the single source of truth)
+    resp = test_client.put(f"/api/neuroglancer/views/{created['short_key']}", json={"name": "renamed view"})
+    assert resp.status_code == 200
+    resp = test_client.get(f"/ngview/{read_key}")
+    assert resp.status_code == 200
+    assert resp.json()["title"] == "renamed view"
+
+    # the short_key is NOT a valid read key
+    assert test_client.get(f"/ngview/{created['short_key']}").status_code == 404
+    # unknown key 404s
+    assert test_client.get("/ngview/nope").status_code == 404
