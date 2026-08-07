@@ -86,6 +86,18 @@ function normalizeFspRootPath(filePath: string | null | undefined): string {
 }
 
 /**
+ * Builds the key used to identify a unique dataset (fsp_name + normalized
+ * path) across the cart/checkout/views pipeline. Uses normalizeFspRootPath
+ * so lookups against Data Links match what was actually created/stored.
+ * Example:
+ * datasetKey('myFSP', '.'); // Returns 'myFSP::'
+ * datasetKey('myFSP', 'my_folder/my_zarr'); // Returns 'myFSP::my_folder/my_zarr'
+ */
+function datasetKey(fsp_name: string, path: string): string {
+  return `${fsp_name}::${normalizeFspRootPath(path)}`;
+}
+
+/**
  * Constructs a sharable URL to access file contents from the browser with the Fileglancer API.
  * If no filePath is provided, it returns the endpoint URL with the FSP path appended - this is the base URL.
  * If filePath is provided, this is appended to the base URL with proper URL escaping.
@@ -274,6 +286,7 @@ function resolvePathToFsp(
 
 export {
   convertBackToForwardSlash,
+  datasetKey,
   escapePathForUrl,
   getFileURL,
   getLastSegmentFromPath,
