@@ -33,22 +33,29 @@ function decodeState(encoded: string | null): NgState | null {
 async function generateStateForDataset(
   ds: ResolvedCheckoutDataset
 ): Promise<NgState | null> {
-  const metadata = await getOmeZarrMetadata(ds.url);
-  const multiscale = metadata.multiscales?.[0];
-  // ponytail: default layerType 'image' — the thumbnail-edge heuristic used
-  // for the single-dir preview needs a rendered thumbnail we don't have here.
-  const encoded = multiscale
-    ? generateNeuroglancerStateForOmeZarr(
-        ds.url,
-        metadata.zarrVersion,
-        'image',
-        multiscale,
-        metadata.arr,
-        metadata.labels,
-        metadata.omero
-      )
-    : generateNeuroglancerStateForDataURL(ds.url, metadata.zarrVersion);
-  return decodeState(encoded);
+  try {
+    const metadata = await getOmeZarrMetadata(ds.url);
+    const multiscale = metadata.multiscales?.[0];
+    // ponytail: default layerType 'image' — the thumbnail-edge heuristic used
+    // for the single-dir preview needs a rendered thumbnail we don't have here.
+    const encoded = multiscale
+      ? generateNeuroglancerStateForOmeZarr(
+          ds.url,
+          metadata.zarrVersion,
+          'image',
+          multiscale,
+          metadata.arr,
+          metadata.labels,
+          metadata.omero
+        )
+      : generateNeuroglancerStateForDataURL(ds.url, metadata.zarrVersion);
+    return decodeState(encoded);
+  } catch (error) {
+    // One broken cart entry (moved/deleted file, missing multiscale) must
+    // not abort the whole checkout — skip it, keep the rest.
+    log.error(`Failed to generate Neuroglancer state for ${ds.url}`, error);
+    return null;
+  }
 }
 
 // If the cart entry names a channel, keep only layers whose name matches it;
