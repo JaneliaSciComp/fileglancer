@@ -68,8 +68,9 @@ Backend:
 - Generic user preferences (`UserPreferenceDB`, `database.py:75`; routes
   `server.py:972-1005`) — the Layer Cart is stored here, not in a new table.
 - `secrets.token_urlsafe(12)` key pattern for short/sharing keys.
-- Linear Alembic chain; head is
-  `c1f9a4e7b2d8_bake_revision_into_app_urls`.
+- Linear Alembic chain; head at authoring time is
+  `e7b2a9c4f130_add_name_to_jobs` (verify the live head before generating a
+  migration — it advances as PRs merge).
 
 Frontend:
 
@@ -128,8 +129,9 @@ created_at / updated_at
   reload/devices, via the existing preference CRUD.
   `# ponytail: cart-as-preference; a table only if it needs indexing or cross-user sharing`.
 
-One Alembic migration adds both tables with `down_revision = c1f9a4e7b2d8`.
-Legacy `neuroglancer_states` is left untouched.
+One Alembic migration adds both tables, chained off the current head
+(`e7b2a9c4f130` at authoring time). Legacy `neuroglancer_states` is left
+untouched.
 
 ## 5. API
 
