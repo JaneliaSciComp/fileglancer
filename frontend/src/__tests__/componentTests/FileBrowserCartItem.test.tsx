@@ -61,7 +61,9 @@ function renderFileBrowser() {
 describe('FileBrowser row context menu - Add to Neuroglancer cart', () => {
   beforeEach(() => {
     addToCart.mockClear();
+    addToCart.mockResolvedValue(undefined);
     vi.mocked(toast.success).mockClear();
+    vi.mocked(toast.error).mockClear();
 
     server.use(
       http.get('/api/files/:fspName', ({ params, request }) => {
@@ -114,6 +116,25 @@ describe('FileBrowser row context menu - Add to Neuroglancer cart', () => {
     expect(toast.success).toHaveBeenCalledWith(
       'Added "subfolder" to the Neuroglancer cart'
     );
+  });
+
+  it('toasts an error and does not toast success when addToCart rejects', async () => {
+    addToCart.mockRejectedValueOnce(new Error('preference update failed'));
+    const user = userEvent.setup();
+    renderFileBrowser();
+
+    const menuButton = await screen.findByText('menu-subfolder');
+    await user.click(menuButton);
+
+    const cartItem = await screen.findByText('Add to Neuroglancer cart');
+    await user.click(cartItem);
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        'Error adding "subfolder" to the Neuroglancer cart: preference update failed'
+      );
+    });
+    expect(toast.success).not.toHaveBeenCalled();
   });
 
   it('does not show the item for a plain file', async () => {
