@@ -1039,6 +1039,62 @@ def get_view_by_short_key(session: Session, short_key: str) -> Optional[ViewDB]:
     return session.query(ViewDB).filter_by(short_key=short_key).first()
 
 
+def get_view_by_read_key(session: Session, read_key: str) -> Optional[ViewDB]:
+    """Resolve a View by its read key (read-only share access)."""
+    return session.query(ViewDB).filter_by(read_key=read_key).first()
+
+
+def get_views(session: Session, username: str) -> List[ViewDB]:
+    """Get all Views owned by a user, newest first."""
+    return (
+        session.query(ViewDB)
+        .filter_by(owner=username)
+        .order_by(ViewDB.created_at.desc())
+        .all()
+    )
+
+
+def update_view(
+    session: Session,
+    username: str,
+    short_key: str,
+    name: Optional[str] = None,
+    ng_state: Optional[Dict] = None,
+) -> Optional[ViewDB]:
+    """Update an owned View's name and/or state. Returns None if not owned/found."""
+    view = session.query(ViewDB).filter_by(short_key=short_key, owner=username).first()
+    if not view:
+        return None
+    if name is not None:
+        view.name = name
+    if ng_state is not None:
+        view.ng_state = ng_state
+    view.updated_at = datetime.now(UTC)
+    session.commit()
+    return view
+
+
+def delete_view(session: Session, username: str, short_key: str) -> int:
+    """Delete an owned View (cascades to its layers). Returns rows deleted."""
+    view = session.query(ViewDB).filter_by(short_key=short_key, owner=username).first()
+    if not view:
+        return 0
+    session.delete(view)
+    session.commit()
+    return 1
+
+
+def get_views_for_data_link(session: Session, data_link_id: int) -> List[ViewDB]:
+    """Distinct Views that have at least one layer backed by this Data Link."""
+    return (
+        session.query(ViewDB)
+        .join(ViewLayerDB, ViewLayerDB.view_id == ViewDB.id)
+        .filter(ViewLayerDB.data_link_id == data_link_id)
+        .distinct()
+        .all()
+    )
+
+
 def get_tickets(session: Session, username: str, fsp_name: str = None, path: str = None) -> List[TicketDB]:
     """Get tickets for a user, optionally filtered by fsp_name and path"""
     logger.info(f"Getting tickets for {username} with fsp_name={fsp_name} and path={path}")
