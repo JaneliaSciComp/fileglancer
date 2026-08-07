@@ -2154,3 +2154,58 @@ def test_ngview_serves_state_by_read_key(test_client):
     assert test_client.get(f"/ngview/{created['short_key']}").status_code == 404
     # unknown key 404s
     assert test_client.get("/ngview/nope").status_code == 404
+
+
+def _make_proxied_path(test_client, test_app_temp_dir, subdir):
+    # The test FSP "tempdir" is mounted at test_app_temp_dir; create a real dir.
+    os.makedirs(os.path.join(test_app_temp_dir, subdir), exist_ok=True)
+    resp = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path={subdir}")
+    assert resp.status_code == 200, resp.text
+    return resp.json()["sharing_key"]
+
+
+def test_dependent_views_endpoint(test_client, temp_dir):
+    sk = _make_proxied_path(test_client, temp_dir, "dl1")
+    test_client.post("/api/neuroglancer/views", json={
+        "name": "uses dl1", "ng_state": {}, "layers": [{"layer_index": 0, "sharing_key": sk}]})
+
+    resp = test_client.get(f"/api/proxied-path/{sk}/views")
+    assert resp.status_code == 200
+    assert [v["name"] for v in resp.json()["views"]] == ["uses dl1"]
+
+
+def test_delete_data_link_blocks_then_marks_broken(test_client, temp_dir):
+    sk = _make_proxied_path(test_client, temp_dir, "dl2")
+    created = test_client.post("/api/neuroglancer/views", json={
+        "name": "v", "ng_state": {}, "layers": [{"layer_index": 0, "sharing_key": sk}]}).json()
+
+    # no mode + dependents -> 409 listing the dependent view
+    resp = test_client.delete(f"/api/proxied-path/{sk}")
+    assert resp.status_code == 409
+    detail = resp.json()["detail"]
+    assert detail["dependent_views"][0]["short_key"] == created["short_key"]
+
+    # mark_broken -> link gone, view survives
+    resp = test_client.delete(f"/api/proxied-path/{sk}?mode=mark_broken")
+    assert resp.status_code == 200
+    assert test_client.get(f"/api/proxied-path/{sk}").status_code == 404
+    view = test_client.get(f"/api/neuroglancer/views/{created['short_key']}").json()
+    assert view["layers"][0]["broken"] is True
+    assert view["layers"][0]["data_link_id"] is None
+
+
+def test_delete_data_link_cascade(test_client, temp_dir):
+    sk = _make_proxied_path(test_client, temp_dir, "dl3")
+    created = test_client.post("/api/neuroglancer/views", json={
+        "name": "v", "ng_state": {}, "layers": [{"layer_index": 0, "sharing_key": sk}]}).json()
+
+    resp = test_client.delete(f"/api/proxied-path/{sk}?mode=cascade")
+    assert resp.status_code == 200
+    assert test_client.get(f"/api/neuroglancer/views/{created['short_key']}").status_code == 404
+
+
+def test_delete_data_link_no_dependents_still_works(test_client, temp_dir):
+    sk = _make_proxied_path(test_client, temp_dir, "dl4")
+    resp = test_client.delete(f"/api/proxied-path/{sk}")
+    assert resp.status_code == 200
+    assert test_client.get(f"/api/proxied-path/{sk}").status_code == 404
