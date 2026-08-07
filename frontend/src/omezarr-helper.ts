@@ -784,6 +784,29 @@ async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
   return metadata;
 }
 
+/**
+ * Get the channel labels for an OME-Zarr dataset: from `omero.channels[].label`
+ * when present, else synthesized `Channel 0..n-1` from the `c` axis length,
+ * else `[]` when there is no channel axis.
+ */
+async function getOmeZarrChannels(dataUrl: string): Promise<string[]> {
+  const metadata = await getOmeZarrMetadata(dataUrl);
+  const multiscale = metadata.multiscales?.[0];
+  if (!multiscale) {
+    return [];
+  }
+  if (metadata.omero?.channels?.length) {
+    return metadata.omero.channels.map((ch, i) => ch.label || `Channel ${i}`);
+  }
+  const axesMap = getAxesMap(multiscale);
+  const cAxis = axesMap['c'];
+  if (!cAxis) {
+    return [];
+  }
+  const count = metadata.arr.shape[cAxis.index];
+  return Array.from({ length: count }, (_, i) => `Channel ${i}`);
+}
+
 type ThumbnailResult = [thumbnail: string | null, errorMessage: string | null];
 
 async function getOmeZarrThumbnail(
@@ -926,6 +949,7 @@ export {
   getNeuroglancerSource,
   getZarrArray,
   getOmeZarrMetadata,
+  getOmeZarrChannels,
   getOmeZarrThumbnail,
   generateNeuroglancerStateForDataURL,
   generateNeuroglancerStateForZarrArray,
