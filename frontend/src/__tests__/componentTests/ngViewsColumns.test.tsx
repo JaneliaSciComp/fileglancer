@@ -9,6 +9,7 @@ import {
 
 import { useNGViewsColumns } from '@/components/ui/Table/ngViewsColumns';
 import type { View } from '@/queries/viewQueries';
+import { formatDateString } from '@/utils';
 
 const view: View = {
   short_key: 'k1',
@@ -75,6 +76,9 @@ describe('useNGViewsColumns', () => {
     expect(screen.getByText('My View')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument(); // layer count
     expect(screen.getByText(/shared/i)).toBeInTheDocument(); // sharing label
+    expect(
+      screen.getByText(formatDateString(view.updated_at))
+    ).toBeInTheDocument(); // updated date
   });
 
   it('fires onRename and onDelete from the actions menu', async () => {
@@ -82,8 +86,14 @@ describe('useNGViewsColumns', () => {
     const onRename = vi.fn();
     const onDelete = vi.fn();
     render(<TableProbe onDelete={onDelete} onRename={onRename} />);
-    await user.click(screen.getByRole('button')); // the CardActionsMenu trigger
+    const trigger = screen.getByRole('button'); // the CardActionsMenu trigger
+
+    await user.click(trigger);
     await user.click(await screen.findByText('Rename'));
     expect(onRename).toHaveBeenCalledWith(view);
+
+    await user.click(trigger);
+    await user.click(await screen.findByText('Delete'));
+    expect(onDelete).toHaveBeenCalledWith(view);
   });
 });
