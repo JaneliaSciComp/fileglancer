@@ -1397,6 +1397,18 @@ def create_app(settings):
             return JSONResponse(content=entry.state, headers={"Cache-Control": "no-store"})
 
 
+    @app.get("/ngview/{key}", name="get_view_state", include_in_schema=False)
+    async def get_view_state(key: str = Path(..., description="A View's read key")):
+        with db.get_db_session(settings.db_url) as session:
+            view = db.get_view_by_read_key(session, key)
+            if not view:
+                raise HTTPException(status_code=404, detail="View not found")
+            # Title is the View's name (single source of truth); inject it so the
+            # embedded viewer titles from the current name and survives renames.
+            state = {**view.ng_state, "title": view.name}
+            return JSONResponse(content=state, headers={"Cache-Control": "no-store"})
+
+
     @app.get("/api/neuroglancer/nglinks", response_model=NeuroglancerShortLinkResponse,
              description="List stored Neuroglancer short links for the current user")
     async def get_neuroglancer_short_links(request: Request,
