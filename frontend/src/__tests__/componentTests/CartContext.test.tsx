@@ -18,8 +18,14 @@ vi.mock('@/queries/preferencesQueries', () => ({
 import { CartProvider, useCartContext } from '@/contexts/CartContext';
 
 function Probe() {
-  const { cart, cartCount, addToCart, removeFromCart, clearCart } =
-    useCartContext();
+  const {
+    cart,
+    cartCount,
+    addToCart,
+    removeFromCart,
+    removeManyFromCart,
+    clearCart
+  } = useCartContext();
   return (
     <div>
       <span data-testid="count">{cartCount}</span>
@@ -35,6 +41,13 @@ function Probe() {
         add
       </button>
       <button onClick={() => removeFromCart('/a')}>remove</button>
+      <button
+        onClick={() =>
+          removeManyFromCart([{ path: '/a' }, { path: '/b', channel: 'DAPI' }])
+        }
+      >
+        removeMany
+      </button>
       <button onClick={() => clearCart()}>clear</button>
     </div>
   );
@@ -68,6 +81,26 @@ describe('CartContext', () => {
     expect(mutateAsync).toHaveBeenCalledWith({
       key: 'neuroglancerCart',
       value: [{ fsp_name: 'fsp', path: '/a', label: 'a' }]
+    });
+  });
+
+  it('removeManyFromCart filters all removals in a single persist call', async () => {
+    cartData = [
+      { fsp_name: 'fsp', path: '/a', label: 'a' },
+      { fsp_name: 'fsp', path: '/b', channel: 'DAPI', label: 'DAPI' },
+      { fsp_name: 'fsp', path: '/c', label: 'c' }
+    ];
+    const user = userEvent.setup();
+    render(
+      <CartProvider>
+        <Probe />
+      </CartProvider>
+    );
+    await user.click(screen.getByText('removeMany'));
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+    expect(mutateAsync).toHaveBeenCalledWith({
+      key: 'neuroglancerCart',
+      value: [{ fsp_name: 'fsp', path: '/c', label: 'c' }]
     });
   });
 

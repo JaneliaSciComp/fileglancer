@@ -30,7 +30,7 @@ export default function CartDatasetRow({
   items,
   dataLinkUrl
 }: CartDatasetRowProps) {
-  const { addToCart, removeFromCart } = useCartContext();
+  const { addToCart, removeFromCart, removeManyFromCart } = useCartContext();
   const [isOpen, setIsOpen] = useState(false);
   const [channels, setChannels] = useState<string[] | undefined>(undefined);
   const [loadingChannels, setLoadingChannels] = useState(false);
@@ -59,9 +59,9 @@ export default function CartDatasetRow({
 
   const handleRemoveDataset = async () => {
     try {
-      for (const item of items) {
-        await removeFromCart(item.path, item.channel);
-      }
+      await removeManyFromCart(
+        items.map(item => ({ path: item.path, channel: item.channel }))
+      );
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to remove dataset'

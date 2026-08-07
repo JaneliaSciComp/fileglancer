@@ -18,19 +18,36 @@ const view: View = {
   layers: []
 };
 
-// Dataset A has an existing Data Link (channel expansion enabled).
+// Dataset A has an existing Data Link (channel expansion enabled) and TWO
+// cart entries (a base entry + an already-checked "GFP" channel entry), to
+// exercise the multi-entry "Remove" batch path.
 // Dataset B has no Data Link (channel expansion disabled + hint).
-const cartA: CartItem = { fsp_name: 'fsp1', path: '/a', label: 'Dataset A' };
+const cartABase: CartItem = {
+  fsp_name: 'fsp1',
+  path: '/a',
+  label: 'Dataset A'
+};
+const cartAGfp: CartItem = {
+  fsp_name: 'fsp1',
+  path: '/a',
+  channel: 'GFP',
+  label: 'GFP'
+};
 const cartB: CartItem = { fsp_name: 'fsp2', path: '/b', label: 'Dataset B' };
 
-const { addToCart, removeFromCart, clearCart, getOmeZarrChannels } = vi.hoisted(
-  () => ({
-    addToCart: vi.fn().mockResolvedValue(undefined),
-    removeFromCart: vi.fn().mockResolvedValue(undefined),
-    clearCart: vi.fn().mockResolvedValue(undefined),
-    getOmeZarrChannels: vi.fn().mockResolvedValue(['DAPI', 'GFP'])
-  })
-);
+const {
+  addToCart,
+  removeFromCart,
+  removeManyFromCart,
+  clearCart,
+  getOmeZarrChannels
+} = vi.hoisted(() => ({
+  addToCart: vi.fn().mockResolvedValue(undefined),
+  removeFromCart: vi.fn().mockResolvedValue(undefined),
+  removeManyFromCart: vi.fn().mockResolvedValue(undefined),
+  clearCart: vi.fn().mockResolvedValue(undefined),
+  getOmeZarrChannels: vi.fn().mockResolvedValue(['DAPI', 'GFP'])
+}));
 
 vi.mock('@/contexts/ViewsContext', () => ({
   useViewsContext: () => ({
@@ -42,10 +59,11 @@ vi.mock('@/contexts/ViewsContext', () => ({
 }));
 vi.mock('@/contexts/CartContext', () => ({
   useCartContext: () => ({
-    cart: [cartA, cartB],
-    cartCount: 2,
+    cart: [cartABase, cartAGfp, cartB],
+    cartCount: 3,
     addToCart,
     removeFromCart,
+    removeManyFromCart,
     clearCart
   })
 }));
@@ -80,6 +98,7 @@ import NGViews from '@/components/NGViews';
 beforeEach(() => {
   addToCart.mockClear();
   removeFromCart.mockClear();
+  removeManyFromCart.mockClear();
   clearCart.mockClear();
   getOmeZarrChannels.mockClear();
 });
@@ -134,6 +153,23 @@ describe('Layer Cart tab', () => {
         { fsp_name: 'fsp1', path: '/a', channel: 'DAPI', label: 'DAPI' }
       ]);
     });
+  });
+
+  it('removing a multi-entry dataset clears every entry in one batch call, not a loop', async () => {
+    const user = await renderCartTab();
+    const removeButtons = screen.getAllByRole('button', { name: /^remove$/i });
+    // Dataset A (base + GFP channel entries) is the first row.
+    await user.click(removeButtons[0]);
+
+    await waitFor(() => {
+      expect(removeManyFromCart).toHaveBeenCalledTimes(1);
+    });
+    expect(removeManyFromCart).toHaveBeenCalledWith([
+      { path: '/a', channel: undefined },
+      { path: '/a', channel: 'GFP' }
+    ]);
+    // The bug being regression-tested: no per-item loop calling single-remove.
+    expect(removeFromCart).not.toHaveBeenCalled();
   });
 
   it('shows the Create View control and a Clear cart button', async () => {
