@@ -192,19 +192,27 @@ export default function FileBrowser({
       },
       {
         name: 'Add to Neuroglancer cart',
-        action: () => {
+        action: async () => {
           const file = fileBrowserState.selectedFiles[0];
           if (!file) {
             return;
           }
-          addToCart([
-            {
-              fsp_name: fileQuery.data?.currentFileSharePath?.name ?? '',
-              path: file.path,
-              label: file.name
-            }
-          ]);
-          toast.success(`Added "${file.name}" to the Neuroglancer cart`);
+          try {
+            await addToCart([
+              {
+                fsp_name: fileQuery.data?.currentFileSharePath?.name ?? '',
+                path: file.path,
+                label: file.name
+              }
+            ]);
+            toast.success(`Added "${file.name}" to the Neuroglancer cart`);
+          } catch (error) {
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            toast.error(
+              `Error adding "${file.name}" to the Neuroglancer cart: ${errorMessage}`
+            );
+          }
         },
         shouldShow:
           fileBrowserState.selectedFiles[0]?.is_dir &&
