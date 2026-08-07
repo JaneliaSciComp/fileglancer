@@ -1,6 +1,12 @@
 import type { ReactNode } from 'react';
 import { useEffect } from 'react';
-import { BrowserRouter, Route, Routes, useNavigate } from 'react-router';
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useNavigate
+} from 'react-router';
 import { ErrorBoundary } from 'react-error-boundary';
 
 import { AuthContextProvider, useAuthContext } from '@/contexts/AuthContext';
@@ -126,6 +132,11 @@ const AppComponent = () => {
                 </RequireAuth>
               }
               path="ngviews"
+            />
+            {/* ponytail: legacy /nglinks path redirects; the short-link serving routes (/ng/{key}) are untouched. */}
+            <Route
+              element={<Navigate replace to="/ngviews" />}
+              path="nglinks"
             />
             {tasksEnabled ? (
               <Route
