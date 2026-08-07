@@ -3,7 +3,7 @@ import shlex
 from datetime import datetime
 from typing import Annotated, Any, List, Literal, Optional, Dict, Union
 
-from pydantic import BaseModel, Discriminator, Field, HttpUrl, Tag, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Discriminator, Field, HttpUrl, Tag, field_validator, model_validator
 
 from fileglancer.giturls import _parse_github_url
 
@@ -164,6 +164,39 @@ class ProxiedPathResponse(BaseModel):
     paths: List[ProxiedPath] = Field(
         description="A list of proxied paths"
     )
+
+
+class ViewLayer(BaseModel):
+    """One dataset/channel layer of a Neuroglancer View."""
+    model_config = ConfigDict(from_attributes=True)
+
+    layer_index: int = Field(description="Position of this layer within the View")
+    data_link_id: Optional[int] = Field(
+        default=None,
+        description="ID of the Data Link (proxied path) backing this layer; null if broken",
+    )
+    channel: Optional[str] = Field(default=None, description="Channel identifier, if this layer is one channel")
+    opts: Optional[Dict] = Field(default=None, description="Per-layer options")
+    broken: bool = Field(default=False, description="True if the backing Data Link was deleted")
+
+
+class View(BaseModel):
+    """A Neuroglancer View: saved NG state + its layers + sharing settings."""
+    model_config = ConfigDict(from_attributes=True)
+
+    short_key: str = Field(description="Owner-facing key identifying this View")
+    read_key: str = Field(description="Key that opens this View read-only")
+    name: str = Field(description="Display name of the View")
+    ng_state: Dict = Field(description="The Neuroglancer state JSON")
+    sharing_mode: str = Field(description="'private' or 'read'")
+    owner: str = Field(description="Username of the View owner")
+    created_at: datetime = Field(description="When this View was created")
+    updated_at: datetime = Field(description="When this View was last updated")
+    layers: List[ViewLayer] = Field(default_factory=list, description="The layers of this View")
+
+
+class ViewResponse(BaseModel):
+    views: List[View] = Field(description="A list of Neuroglancer Views")
 
 
 class ExternalBucket(BaseModel):
