@@ -32,6 +32,7 @@ vi.mock('@/contexts/CartContext', () => ({
     cartCount: 1,
     addToCart: vi.fn(),
     removeFromCart: vi.fn(),
+    removeManyFromCart: vi.fn(),
     clearCart: vi.fn()
   })
 }));
