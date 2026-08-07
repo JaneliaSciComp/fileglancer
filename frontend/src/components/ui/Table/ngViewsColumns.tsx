@@ -4,7 +4,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import toast from 'react-hot-toast';
 
 import type { View } from '@/queries/viewQueries';
-import { formatDateString } from '@/utils';
+import { downloadTextFile, formatDateString } from '@/utils';
 import { constructNeuroglancerUrl } from '@/utils/neuroglancerUrl';
 import { copyToClipboard } from '@/utils/copyText';
 import FgTooltip from '../widgets/FgTooltip';
@@ -17,19 +17,6 @@ const SHARING_LABEL: Record<View['sharing_mode'], string> = {
   private: 'Private',
   read: 'Shared (read link)'
 };
-
-// ponytail: inline blob download; extract to a util only if a second caller appears.
-function downloadJsonState(view: View) {
-  const blob = new Blob([JSON.stringify(view.ng_state, null, 2)], {
-    type: 'application/json'
-  });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `${view.name || view.short_key}.json`;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
 
 type ViewRowActionProps = {
   item: View;
@@ -78,7 +65,10 @@ function ActionsCell({
     {
       name: 'Download JSON state',
       action: ({ item }) => {
-        downloadJsonState(item);
+        downloadTextFile(
+          JSON.stringify(item.ng_state, null, 2),
+          `${item.name || item.short_key}.json`
+        );
       }
     },
     {
