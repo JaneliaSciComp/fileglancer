@@ -9,6 +9,7 @@ import ZarrPreview from './ZarrPreview';
 import N5Preview from './N5Preview';
 import Table from './FileTable';
 import FileViewer from './FileViewer';
+import SelectionBar from './SelectionBar';
 import ContextMenu, {
   type ContextMenuItem
 } from '@/components/ui/Menus/ContextMenu';
@@ -366,6 +367,7 @@ export default function FileBrowser({
           y={contextMenuCoords.y}
         />
       ) : null}
+      <SelectionBar />
     </>
   );
 }
