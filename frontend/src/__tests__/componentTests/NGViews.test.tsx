@@ -38,6 +38,12 @@ vi.mock('@/contexts/CartContext', () => ({
 vi.mock('@/hooks/useDefaultNeuroglancerBaseUrl', () => ({
   useDefaultNeuroglancerBaseUrl: () => 'https://ng.example/'
 }));
+vi.mock('@/queries/proxiedPathQueries', () => ({
+  useAllProxiedPathsQuery: () => ({ data: [], error: null, isPending: false })
+}));
+vi.mock('@/components/ui/Views/CreateViewButton', () => ({
+  default: () => <button type="button">Create View</button>
+}));
 
 import NGViews from '@/components/NGViews';
 

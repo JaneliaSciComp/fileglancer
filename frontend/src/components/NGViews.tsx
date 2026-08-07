@@ -1,25 +1,84 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
 import { TableCard } from '@/components/ui/Table/TableCard';
 import { useNGViewsColumns } from '@/components/ui/Table/ngViewsColumns';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
+import CartDatasetRow from '@/components/ui/Views/CartDatasetRow';
+import CreateViewButton from '@/components/ui/Views/CreateViewButton';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgBadge from '@/components/designSystem/atoms/FgBadge';
 import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
 import { useViewsContext } from '@/contexts/ViewsContext';
 import { useCartContext } from '@/contexts/CartContext';
 import { useDefaultNeuroglancerBaseUrl } from '@/hooks/useDefaultNeuroglancerBaseUrl';
+import { useAllProxiedPathsQuery } from '@/queries/proxiedPathQueries';
+import { normalizeFspRootPath } from '@/utils/pathHandling';
 import type { View } from '@/queries/viewQueries';
+import type { CartItem } from '@/contexts/CartContext';
 
 type ViewsTab = 'views' | 'cart';
+
+// Same normalization useCartCheckout/CreateViewButton apply before
+// comparing against the proxied-path list, so this lookup matches what
+// checkout will actually resolve/create for the same dataset.
+const datasetKey = (fsp_name: string, path: string) =>
+  `${fsp_name}::${normalizeFspRootPath(path)}`;
+
+type CartGroup = {
+  fsp_name: string;
+  path: string;
+  label: string;
+  items: CartItem[];
+};
+
+function groupCartByDataset(cart: CartItem[]): CartGroup[] {
+  const groups = new Map<string, CartGroup>();
+  for (const item of cart) {
+    const key = datasetKey(item.fsp_name, item.path);
+    const existing = groups.get(key);
+    if (existing) {
+      existing.items.push(item);
+      // Prefer the base (no-channel) entry's label for the dataset row.
+      if (!item.channel) {
+        existing.label = item.label;
+      }
+    } else {
+      groups.set(key, {
+        fsp_name: item.fsp_name,
+        path: item.path,
+        label: item.label,
+        items: [item]
+      });
+    }
+  }
+  return Array.from(groups.values());
+}
 
 export default function NGViews() {
   const { allViewsQuery, updateViewMutation, deleteViewMutation } =
     useViewsContext();
-  const { cart, cartCount, removeFromCart, clearCart } = useCartContext();
+  const { cart, cartCount, clearCart } = useCartContext();
+  const allProxiedPathsQuery = useAllProxiedPathsQuery();
   const baseUrl = useDefaultNeuroglancerBaseUrl();
+
+  const cartGroups = useMemo(() => groupCartByDataset(cart), [cart]);
+  const dataLinkUrlByDataset = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of allProxiedPathsQuery.data ?? []) {
+      map.set(datasetKey(p.fsp_name, p.path), p.url);
+    }
+    return map;
+  }, [allProxiedPathsQuery.data]);
+
+  const handleClearCart = async () => {
+    try {
+      await clearCart();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Clear failed');
+    }
+  };
 
   const [tab, setTab] = useState<ViewsTab>('views');
   const [renameItem, setRenameItem] = useState<View | undefined>(undefined);
@@ -121,28 +180,31 @@ export default function NGViews() {
               </Typography>
             ) : (
               <>
-                {cart.map(entry => (
-                  <div
-                    className="flex items-center justify-between border-b border-surface py-2"
-                    key={`${entry.path}::${entry.channel ?? ''}`}
-                  >
-                    <Typography className="text-foreground truncate">
-                      {entry.label}
-                    </Typography>
-                    <FgButton
-                      onClick={() => removeFromCart(entry.path, entry.channel)}
-                      variant="ghost"
-                    >
-                      Remove
-                    </FgButton>
-                  </div>
+                {cartGroups.map(group => (
+                  <CartDatasetRow
+                    dataLinkUrl={dataLinkUrlByDataset.get(
+                      datasetKey(group.fsp_name, group.path)
+                    )}
+                    fsp_name={group.fsp_name}
+                    items={group.items}
+                    key={datasetKey(group.fsp_name, group.path)}
+                    label={group.label}
+                    path={group.path}
+                  />
                 ))}
-                <div>
-                  <FgButton onClick={() => clearCart()} variant="ghost">
+                <div className="flex gap-3">
+                  <CreateViewButton
+                    datasets={cart}
+                    defaultName="New View"
+                    label="Create View"
+                  />
+                  <FgButton
+                    onClick={() => void handleClearCart()}
+                    variant="ghost"
+                  >
                     Clear cart
                   </FgButton>
                 </div>
-                {/* Create View checkout + Fiji-style tree land in PR 5. */}
               </>
             )}
           </div>
