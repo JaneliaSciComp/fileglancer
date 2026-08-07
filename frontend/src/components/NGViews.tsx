@@ -14,17 +14,11 @@ import { useViewsContext } from '@/contexts/ViewsContext';
 import { useCartContext } from '@/contexts/CartContext';
 import { useDefaultNeuroglancerBaseUrl } from '@/hooks/useDefaultNeuroglancerBaseUrl';
 import { useAllProxiedPathsQuery } from '@/queries/proxiedPathQueries';
-import { normalizeFspRootPath } from '@/utils/pathHandling';
+import { datasetKey } from '@/utils/pathHandling';
 import type { View } from '@/queries/viewQueries';
 import type { CartItem } from '@/contexts/CartContext';
 
 type ViewsTab = 'views' | 'cart';
-
-// Same normalization useCartCheckout/CreateViewButton apply before
-// comparing against the proxied-path list, so this lookup matches what
-// checkout will actually resolve/create for the same dataset.
-const datasetKey = (fsp_name: string, path: string) =>
-  `${fsp_name}::${normalizeFspRootPath(path)}`;
 
 type CartGroup = {
   fsp_name: string;
@@ -33,10 +27,8 @@ type CartGroup = {
   items: CartItem[];
 };
 
-type CartGroupBuilder = CartGroup & { hasBaseLabel: boolean };
-
 function groupCartByDataset(cart: CartItem[]): CartGroup[] {
-  const groups = new Map<string, CartGroupBuilder>();
+  const groups = new Map<string, CartGroup>();
   for (const item of cart) {
     const key = datasetKey(item.fsp_name, item.path);
     const existing = groups.get(key);
@@ -45,7 +37,6 @@ function groupCartByDataset(cart: CartItem[]): CartGroup[] {
       // Prefer the base (no-channel) entry's label for the dataset row.
       if (!item.channel) {
         existing.label = item.label;
-        existing.hasBaseLabel = true;
       }
     } else {
       // A channel-only entry's label is the channel name (e.g. "DAPI"), not
@@ -55,14 +46,11 @@ function groupCartByDataset(cart: CartItem[]): CartGroup[] {
         fsp_name: item.fsp_name,
         path: item.path,
         label: item.channel ? item.path : item.label,
-        hasBaseLabel: !item.channel,
         items: [item]
       });
     }
   }
-  return Array.from(groups.values()).map(
-    ({ hasBaseLabel: _hasBaseLabel, ...group }) => group
-  );
+  return Array.from(groups.values());
 }
 
 export default function NGViews() {

@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 
 const createProxied = vi.fn();
 const createViewAsync = vi.fn();
+const buildViewState = vi.hoisted(() => vi.fn());
 
 vi.mock('@/queries/proxiedPathQueries', () => ({
   useAllProxiedPathsQuery: () => ({
@@ -18,10 +19,7 @@ vi.mock('@/contexts/ViewsContext', () => ({
   })
 }));
 vi.mock('@/utils/viewCheckout', () => ({
-  buildViewState: vi.fn().mockResolvedValue({
-    ng_state: { layers: [] },
-    layers: [{ sharing_key: 'ka', layer_index: 0, channel: null, opts: null }]
-  })
+  buildViewState
 }));
 
 import { useCartCheckout } from '@/hooks/useCartCheckout';
@@ -41,6 +39,10 @@ beforeEach(() => {
     url: 'http://b'
   });
   createViewAsync.mockReset().mockResolvedValue({ short_key: 'v1', name: 'N' });
+  buildViewState.mockReset().mockResolvedValue({
+    ng_state: { layers: [] },
+    layers: [{ sharing_key: 'ka', layer_index: 0, channel: null, opts: null }]
+  });
 });
 
 describe('useCartCheckout', () => {
@@ -60,5 +62,23 @@ describe('useCartCheckout', () => {
     expect(createViewAsync).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'My View', ng_state: { layers: [] } })
     );
+  });
+
+  it('drops the base entry when a channel entry exists for the same dataset', async () => {
+    const { result } = renderHook(() => useCartCheckout(), { wrapper });
+    await result.current.checkout(
+      [
+        { fsp_name: 'f', path: '/a', label: 'A' }, // base entry, no channel
+        { fsp_name: 'f', path: '/a', label: 'DAPI', channel: 'DAPI' } // channel entry, same dataset
+      ],
+      'My View'
+    );
+
+    expect(buildViewState).toHaveBeenCalledTimes(1);
+    const resolvedDatasets = buildViewState.mock.calls[0][0];
+    expect(resolvedDatasets).toHaveLength(1);
+    expect(resolvedDatasets).toEqual([
+      expect.objectContaining({ fsp_name: 'f', path: '/a', channel: 'DAPI' })
+    ]);
   });
 });
