@@ -1342,7 +1342,7 @@ def create_app(settings):
             pp = db.get_proxied_path_by_sharing_key(session, sharing_key)
             if not pp or pp.username != username:
                 raise HTTPException(status_code=404, detail="Proxied path not found")
-            views = db.get_views_for_data_link(session, pp.id)
+            views = db.get_views_for_data_link(session, pp.id, owner=username)
             return ViewResponse(views=[View.model_validate(v) for v in views])
 
 
@@ -1377,26 +1377,24 @@ def create_app(settings):
 
     @app.delete("/api/proxied-path/{sharing_key}", description="Delete a proxied path by sharing key")
     async def delete_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path"),
-                                  mode: Optional[str] = Query(None, description="How to resolve dependent Views: 'mark_broken' or 'cascade'"),
+                                  confirm: bool = Query(False, description="Confirm deletion even though it breaks the caller's own Views"),
                                   username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
             pp = db.get_proxied_path_by_sharing_key(session, sharing_key)
             if not pp or pp.username != username:
                 raise HTTPException(status_code=404, detail="Proxied path not found")
-            dependents = db.get_views_for_data_link(session, pp.id)
-            if dependents and mode not in ("mark_broken", "cascade"):
-                # ponytail: JSONResponse (not HTTPException) here because the
-                # app-wide StarletteHTTPException handler stringifies dict
-                # details into {"error": str(detail)}; this route needs the
-                # structured {"detail": {...}} body for the PR 5 dialog.
+            # Disclose only the caller's OWN dependent Views (never leak others').
+            own_dependents = db.get_views_for_data_link(session, pp.id, owner=username)
+            if own_dependents and not confirm:
+                # ponytail: JSONResponse (not HTTPException) so the structured detail
+                # survives the app-wide handler at server.py:~614 that stringifies dict details.
                 return JSONResponse(status_code=409, content={"detail": {
-                    "message": "This data link backs one or more Neuroglancer Views. Choose how to proceed.",
-                    "dependent_views": [{"short_key": v.short_key, "name": v.name} for v in dependents],
+                    "message": "This data link backs Neuroglancer Views you own; they will be marked broken.",
+                    "dependent_views": [{"short_key": v.short_key, "name": v.name} for v in own_dependents],
                 }})
-            if dependents and mode == "mark_broken":
-                db.mark_view_layers_broken(session, pp.id)
-            elif dependents and mode == "cascade":
-                db.delete_views_for_data_link(session, pp.id)
+            # Mark ALL layers on this link broken (any owner) for referential integrity,
+            # so other users' Views degrade gracefully without disclosing them here.
+            db.mark_view_layers_broken(session, pp.id)
             db.delete_proxied_path(session, username, sharing_key)
             return {"message": f"Proxied path {sharing_key} deleted for user {username}"}
 
@@ -1425,6 +1423,9 @@ def create_app(settings):
             return JSONResponse(content=entry.state, headers={"Cache-Control": "no-store"})
 
 
+    # ponytail: sharing_mode is not enforced here — every View is readable by its
+    # read_key (bearer token). A future PR adds "public" (unauthenticated/listed)
+    # vs owner-only semantics; until then sharing_mode is a stored label only.
     @app.get("/ngview/{key}", name="get_view_state", include_in_schema=False)
     async def get_view_state(key: str = Path(..., description="A View's read key")):
         with db.get_db_session(settings.db_url) as session:
