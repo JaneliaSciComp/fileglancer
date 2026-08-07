@@ -808,3 +808,26 @@ class TestFindBestFspMatch:
         )
         assert result is None
 
+
+def test_view_request_models_validate_sharing_mode():
+    from pydantic import ValidationError
+    from fileglancer.model import ViewCreateRequest, ViewLayerInput
+
+    req = ViewCreateRequest(
+        name="demo",
+        ng_state={"layers": []},
+        sharing_mode="read",
+        layers=[ViewLayerInput(sharing_key="abc", layer_index=0)],
+    )
+    assert req.sharing_mode == "read"
+    assert req.layers[0].sharing_key == "abc"
+    assert req.layers[0].channel is None
+
+    # default sharing_mode
+    assert ViewCreateRequest(name="d", ng_state={}).sharing_mode == "read"
+
+    # invalid sharing_mode is rejected at the boundary
+    import pytest
+    with pytest.raises(ValidationError):
+        ViewCreateRequest(name="d", ng_state={}, sharing_mode="public")
+
