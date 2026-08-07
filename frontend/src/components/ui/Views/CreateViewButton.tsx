@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router';
 import { useCartCheckout } from '@/hooks/useCartCheckout';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useAllProxiedPathsQuery } from '@/queries/proxiedPathQueries';
-import { normalizeFspRootPath } from '@/utils/pathHandling';
+import { datasetKey } from '@/utils/pathHandling';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgSwitch from '@/components/designSystem/atoms/formElements/FgSwitch';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
@@ -20,11 +20,6 @@ interface CreateViewButtonProps {
   readonly disabled?: boolean;
   readonly onCreated?: (view: View) => void;
 }
-
-// Same normalization useCartCheckout applies before comparing/creating Data
-// Links, so this count matches what checkout will actually create.
-const datasetKey = (fsp_name: string, path: string) =>
-  `${fsp_name}::${normalizeFspRootPath(path)}`;
 
 export default function CreateViewButton({
   datasets,
