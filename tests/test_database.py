@@ -365,23 +365,30 @@ def test_get_views_and_read_key(db_session):
 
 
 def test_update_and_delete_view(db_session):
-    v = create_view(db_session, "u", "before", {"layers": [1]}, [], "read")
+    layers = [{"data_link_id": None, "layer_index": 0, "channel": None, "opts": None}]
+    v = create_view(db_session, "u", "before", {"layers": [1]}, layers, "read")
+    view_id = v.id
     updated = update_view(db_session, "u", v.short_key, name="after", ng_state={"layers": [2]})
     assert updated.name == "after"
     assert updated.ng_state == {"layers": [2]}
     assert update_view(db_session, "wronguser", v.short_key, name="x") is None
 
+    assert db_session.query(ViewLayerDB).filter_by(view_id=view_id).count() == 1  # layer exists pre-delete
     assert delete_view(db_session, "u", v.short_key) == 1
     assert get_view_by_short_key(db_session, v.short_key) is None
+    assert db_session.query(ViewLayerDB).filter_by(view_id=view_id).count() == 0  # cascade removed the join row
 
 
 def test_get_views_for_data_link(db_session):
-    layers = [{"data_link_id": 42, "layer_index": 0, "channel": None, "opts": None}]
+    layers = [
+        {"data_link_id": 42, "layer_index": 0, "channel": None, "opts": None},
+        {"data_link_id": 42, "layer_index": 1, "channel": "Ch1", "opts": None},
+    ]
     v = create_view(db_session, "u", "linked", {"layers": []}, layers, "read")
     create_view(db_session, "u", "unlinked", {"layers": []}, [], "read")
 
     dependents = get_views_for_data_link(db_session, 42)
-    assert [d.short_key for d in dependents] == [v.short_key]
+    assert [d.short_key for d in dependents] == [v.short_key]  # distinct: one entry despite two matching layers
     assert get_views_for_data_link(db_session, 999) == []
 
 
