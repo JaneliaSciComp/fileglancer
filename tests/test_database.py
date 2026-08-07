@@ -392,6 +392,23 @@ def test_get_views_for_data_link(db_session):
     assert get_views_for_data_link(db_session, 999) == []
 
 
+def test_view_pydantic_from_orm(db_session):
+    from fileglancer.model import View
+    layers = [{"data_link_id": 7, "layer_index": 0, "channel": "Ch0", "opts": None}]
+    view_db = create_view(db_session, "u", "demo", {"layers": []}, layers, "read")
+
+    model = View.model_validate(view_db)
+    assert model.short_key == view_db.short_key
+    assert model.read_key == view_db.read_key
+    assert model.name == "demo"
+    assert model.sharing_mode == "read"
+    assert len(model.layers) == 1
+    assert model.layers[0].channel == "Ch0"
+    assert model.layers[0].broken is False
+    # edit_key must NOT be exposed in read-only scope
+    assert not hasattr(model, "edit_key")
+
+
 def test_create_proxied_path_for_file(db_session, fsp):
     """Regression: create_proxied_path should succeed for a file path (not 500 on os.listdir)."""
     username = "testuser"
