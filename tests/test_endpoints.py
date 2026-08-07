@@ -2070,3 +2070,58 @@ def test_bucket_root_lists_names_with_spaces(test_client, temp_dir):
         response = test_client.get(f"/files/{keys[0]}")
         assert response.status_code == 200
         assert response.text == "spaced"
+
+
+def test_views_crud(test_client):
+    # create
+    resp = test_client.post("/api/neuroglancer/views", json={
+        "name": "seed6 overlay",
+        "ng_state": {"layers": [{"name": "img"}]},
+        "sharing_mode": "read",
+        "layers": [{"layer_index": 0, "channel": "Ch0"}],
+    })
+    assert resp.status_code == 200, resp.text
+    created = resp.json()
+    assert created["name"] == "seed6 overlay"
+    assert created["sharing_mode"] == "read"
+    assert created["owner"] == "testuser"
+    assert created["read_key"] and created["short_key"]
+    assert "edit_key" not in created          # never exposed
+    assert len(created["layers"]) == 1 and created["layers"][0]["channel"] == "Ch0"
+    short_key = created["short_key"]
+
+    # list
+    resp = test_client.get("/api/neuroglancer/views")
+    assert resp.status_code == 200
+    names = [v["name"] for v in resp.json()["views"]]
+    assert "seed6 overlay" in names
+
+    # get one
+    resp = test_client.get(f"/api/neuroglancer/views/{short_key}")
+    assert resp.status_code == 200
+    assert resp.json()["short_key"] == short_key
+
+    # update (rename)
+    resp = test_client.put(f"/api/neuroglancer/views/{short_key}", json={"name": "renamed"})
+    assert resp.status_code == 200
+    assert resp.json()["name"] == "renamed"
+
+    # delete
+    resp = test_client.delete(f"/api/neuroglancer/views/{short_key}")
+    assert resp.status_code == 200
+    assert test_client.get(f"/api/neuroglancer/views/{short_key}").status_code == 404
+
+
+def test_view_get_and_update_missing_returns_404(test_client):
+    assert test_client.get("/api/neuroglancer/views/nope").status_code == 404
+    assert test_client.put("/api/neuroglancer/views/nope", json={"name": "x"}).status_code == 404
+    assert test_client.delete("/api/neuroglancer/views/nope").status_code == 404
+
+
+def test_view_create_with_unknown_sharing_key_400(test_client):
+    resp = test_client.post("/api/neuroglancer/views", json={
+        "name": "bad",
+        "ng_state": {},
+        "layers": [{"layer_index": 0, "sharing_key": "does-not-exist"}],
+    })
+    assert resp.status_code == 400
