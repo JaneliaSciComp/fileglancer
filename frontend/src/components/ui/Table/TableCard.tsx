@@ -74,6 +74,7 @@ type DataType =
   | 'data links'
   | 'tasks'
   | 'NG links'
+  | 'NG views'
   | 'jobs'
   | 'apps'
   | 'shared apps';
