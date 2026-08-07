@@ -1095,6 +1095,28 @@ def get_views_for_data_link(session: Session, data_link_id: int) -> List[ViewDB]
     )
 
 
+def mark_view_layers_broken(session: Session, data_link_id: int) -> int:
+    """Detach a Data Link from all View layers that use it: null the
+    data_link_id and set broken=True. Returns the number of layers updated.
+    Leaves the Views themselves intact (degraded)."""
+    layers = session.query(ViewLayerDB).filter_by(data_link_id=data_link_id).all()
+    for layer in layers:
+        layer.data_link_id = None
+        layer.broken = True
+    session.commit()
+    return len(layers)
+
+
+def delete_views_for_data_link(session: Session, data_link_id: int) -> int:
+    """Delete every View that has at least one layer backed by this Data Link
+    (cascades to its layers). Returns the number of Views deleted."""
+    views = get_views_for_data_link(session, data_link_id)
+    for view in views:
+        session.delete(view)
+    session.commit()
+    return len(views)
+
+
 def get_tickets(session: Session, username: str, fsp_name: str = None, path: str = None) -> List[TicketDB]:
     """Get tickets for a user, optionally filtered by fsp_name and path"""
     logger.info(f"Getting tickets for {username} with fsp_name={fsp_name} and path={path}")

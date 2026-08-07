@@ -392,6 +392,45 @@ def test_get_views_for_data_link(db_session):
     assert get_views_for_data_link(db_session, 999) == []
 
 
+def test_mark_view_layers_broken(db_session):
+    layers = [
+        {"data_link_id": 7, "layer_index": 0, "channel": None, "opts": None},
+        {"data_link_id": 7, "layer_index": 1, "channel": "Ch1", "opts": None},
+        {"data_link_id": 8, "layer_index": 2, "channel": None, "opts": None},
+    ]
+    v = create_view(db_session, "u", "mixed", {"layers": []}, layers, "read")
+
+    updated = mark_view_layers_broken(db_session, 7)
+    assert updated == 2
+
+    db_session.refresh(v)
+    by_index = {l.layer_index: l for l in v.layers}
+    assert by_index[0].data_link_id is None and by_index[0].broken is True
+    assert by_index[1].data_link_id is None and by_index[1].broken is True
+    # the data_link_id=8 layer is untouched
+    assert by_index[2].data_link_id == 8 and by_index[2].broken is False
+    # the View itself still exists
+    assert get_view_by_short_key(db_session, v.short_key) is not None
+
+
+def test_delete_views_for_data_link(db_session):
+    linked_a = create_view(db_session, "u", "a", {"layers": []},
+                           [{"data_link_id": 5, "layer_index": 0, "channel": None, "opts": None}], "read")
+    linked_b = create_view(db_session, "u", "b", {"layers": []},
+                           [{"data_link_id": 5, "layer_index": 0, "channel": None, "opts": None}], "read")
+    other = create_view(db_session, "u", "c", {"layers": []},
+                        [{"data_link_id": 6, "layer_index": 0, "channel": None, "opts": None}], "read")
+
+    deleted = delete_views_for_data_link(db_session, 5)
+    assert deleted == 2
+    assert get_view_by_short_key(db_session, linked_a.short_key) is None
+    assert get_view_by_short_key(db_session, linked_b.short_key) is None
+    assert get_view_by_short_key(db_session, other.short_key) is not None
+    # the deleted views' layers are gone; the surviving view's layer remains
+    assert db_session.query(ViewLayerDB).filter_by(data_link_id=5).count() == 0
+    assert db_session.query(ViewLayerDB).filter_by(data_link_id=6).count() == 1
+
+
 def test_view_pydantic_from_orm(db_session):
     from fileglancer.model import View
     layers = [{"data_link_id": 7, "layer_index": 0, "channel": "Ch0", "opts": None}]
