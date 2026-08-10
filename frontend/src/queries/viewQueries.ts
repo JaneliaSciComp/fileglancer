@@ -64,7 +64,8 @@ export const viewQueryKeys = {
   all: ['views'] as const,
   list: () => ['views', 'list'] as const,
   forDataLink: (sharingKey: string) =>
-    ['views', 'forDataLink', sharingKey] as const
+    ['views', 'forDataLink', sharingKey] as const,
+  state: (readKey: string) => ['views', 'state', readKey] as const
 };
 
 /**
@@ -130,6 +131,28 @@ const fetchViewsForDataLink = async (
 };
 
 /**
+ * Fetches a View's raw Neuroglancer state by its public read key.
+ * Mirrors fetchViews' manual status branch: 404 (unknown/removed key) → null,
+ * not an error, so the embedded viewer can render a "View not found" state.
+ * The endpoint (GET /ngview/{key}) returns the bare ng_state object, unwrapped.
+ */
+const fetchViewState = async (
+  readKey: string,
+  signal?: AbortSignal
+): Promise<Record<string, unknown> | null> => {
+  const url = buildUrl('/ngview/', readKey, null);
+  const response = await sendFetchRequest(url, 'GET', undefined, { signal });
+  if (response.status === 404) {
+    return null;
+  }
+  const data = await getResponseJsonOrError(response);
+  if (!response.ok) {
+    throwResponseNotOkError(response, data);
+  }
+  return data as Record<string, unknown>;
+};
+
+/**
  * Query hook for fetching all Views belonging to the current user
  *
  * @returns Query result with all Views
@@ -152,6 +175,20 @@ export function useViewsForDataLinkQuery(
     queryKey: viewQueryKeys.forDataLink(sharingKey ?? ''),
     queryFn: ({ signal }) => fetchViewsForDataLink(sharingKey!, signal),
     enabled: !!sharingKey
+  });
+}
+
+/**
+ * Query hook for a View's Neuroglancer state by read key. Disabled until a
+ * read key is provided. Data is `null` when the key resolves to no View.
+ */
+export function useViewStateByReadKey(
+  readKey?: string
+): UseQueryResult<Record<string, unknown> | null, Error> {
+  return useQuery<Record<string, unknown> | null, Error>({
+    queryKey: viewQueryKeys.state(readKey ?? ''),
+    queryFn: ({ signal }) => fetchViewState(readKey!, signal),
+    enabled: !!readKey
   });
 }
 
