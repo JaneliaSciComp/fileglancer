@@ -26,6 +26,24 @@ vi.mock('@/contexts/CartContext', async importOriginal => {
   };
 });
 
+// FileBrowser also renders a "View in Neuroglancer" item that depends on
+// useCreateViewFlow, which in turn needs a ViewsProvider this test's render
+// tree doesn't set up. This suite only cares about the cart item, so stub
+// the hook rather than wiring up ViewsProvider.
+vi.mock('@/hooks/useCreateViewFlow', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/hooks/useCreateViewFlow')>();
+  return {
+    ...actual,
+    useCreateViewFlow: () => ({
+      startCreateView: vi.fn(),
+      consentDialog: null,
+      consentOpen: false,
+      pending: false
+    })
+  };
+});
+
 // FileTable virtualizes rows in a way that doesn't render meaningfully in
 // jsdom. Stub it with plain buttons that invoke the same
 // handleContextMenuClick callback FileBrowser wires up, so the test can
