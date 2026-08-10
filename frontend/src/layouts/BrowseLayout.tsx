@@ -9,6 +9,7 @@ import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import useLayoutPrefs from '@/hooks/useLayoutPrefs';
 import Sidebar from '@/components/ui/Sidebar/Sidebar';
 import PropertiesDrawer from '@/components/ui/PropertiesDrawer/PropertiesDrawer';
+import BrowseRightRail from '@/components/ui/BrowsePage/BrowseRightRail';
 
 export type OutletContextType = {
   setShowPermissionsDialog: Dispatch<SetStateAction<boolean>>;
@@ -31,7 +32,9 @@ export const BrowsePageLayout = () => {
     togglePropertiesDrawer,
     showPropertiesDrawer,
     showSidebar,
-    toggleSidebar
+    toggleSidebar,
+    propertiesDrawerMode,
+    selectDrawerMode
   } = useLayoutPrefs();
 
   const outletContextValue: OutletContextType = {
@@ -46,66 +49,74 @@ export const BrowsePageLayout = () => {
   };
 
   return (
-    <div
-      className={`flex h-full w-full overflow-y-hidden ${preferenceQuery.isPending ? 'animate-pulse gap-4 p-4' : ''}`}
-    >
-      {preferenceQuery.isPending ? (
-        <>
-          <div className="bg-surface rounded h-full w-1/4" />
-          <div className="bg-surface rounded h-full w-1/2" />
-          <div className="bg-surface rounded h-full w-1/4" />
-        </>
-      ) : (
-        <PanelGroup
-          autoSaveId="layout"
-          direction="horizontal"
-          key={`layout-${preferenceQuery.isPending}`}
-          storage={layoutPrefsStorage}
-        >
-          {showSidebar ? (
-            <>
-              <Panel defaultSize={24} id="sidebar" minSize={10} order={1}>
-                <Sidebar />
-              </Panel>
-              <PanelResizeHandle className="group relative w-3 bg-surface border-r border-surface hover:border-secondary/60">
-                <FgIcon
-                  className="stroke-2 absolute -right-1 top-1/2 stroke-surface-foreground pointer-events-none"
-                  icon={PiDotsSixVerticalBold}
-                />
-              </PanelResizeHandle>
-            </>
-          ) : null}
-          <Panel id="main" order={2} style={{ overflowX: 'auto' }}>
-            <Outlet context={outletContextValue} />
-          </Panel>
-          {showPropertiesDrawer ? (
-            <>
-              {/* Need a little extra width on this handle to make up for the apparent extra width added by the sidebar grey inner border on the other handle */}
-              <PanelResizeHandle className="group relative w-3.5 bg-surface border-l border-surface hover:border-secondary/60">
-                <FgIcon
-                  className="stroke-2 absolute -left-1 top-1/2 stroke-surface-foreground pointer-events-none"
-                  icon={PiDotsSixVerticalBold}
-                />
-              </PanelResizeHandle>
-              <Panel
-                className="bg-background"
-                defaultSize={24}
-                id="properties"
-                minSize={15}
-                order={3}
-                role="complementary"
-                style={{ overflowX: 'auto' }}
-              >
-                <PropertiesDrawer
-                  setShowConvertFileDialog={setShowConvertFileDialog}
-                  setShowPermissionsDialog={setShowPermissionsDialog}
-                  togglePropertiesDrawer={togglePropertiesDrawer}
-                />
-              </Panel>
-            </>
-          ) : null}
-        </PanelGroup>
-      )}
+    <div className="flex h-full w-full overflow-y-hidden">
+      <div
+        className={`flex-1 min-w-0 h-full ${preferenceQuery.isPending ? 'animate-pulse flex gap-4 p-4' : ''}`}
+      >
+        {preferenceQuery.isPending ? (
+          <>
+            <div className="bg-surface rounded h-full w-1/4" />
+            <div className="bg-surface rounded h-full w-1/2" />
+            <div className="bg-surface rounded h-full w-1/4" />
+          </>
+        ) : (
+          <PanelGroup
+            autoSaveId="layout"
+            direction="horizontal"
+            key={`layout-${preferenceQuery.isPending}`}
+            storage={layoutPrefsStorage}
+          >
+            {showSidebar ? (
+              <>
+                <Panel defaultSize={24} id="sidebar" minSize={10} order={1}>
+                  <Sidebar />
+                </Panel>
+                <PanelResizeHandle className="group relative w-3 bg-surface border-r border-surface hover:border-secondary/60">
+                  <FgIcon
+                    className="stroke-2 absolute -right-1 top-1/2 stroke-surface-foreground pointer-events-none"
+                    icon={PiDotsSixVerticalBold}
+                  />
+                </PanelResizeHandle>
+              </>
+            ) : null}
+            <Panel id="main" order={2} style={{ overflowX: 'auto' }}>
+              <Outlet context={outletContextValue} />
+            </Panel>
+            {showPropertiesDrawer ? (
+              <>
+                {/* Need a little extra width on this handle to make up for the apparent extra width added by the sidebar grey inner border on the other handle */}
+                <PanelResizeHandle className="group relative w-3.5 bg-surface border-l border-surface hover:border-secondary/60">
+                  <FgIcon
+                    className="stroke-2 absolute -left-1 top-1/2 stroke-surface-foreground pointer-events-none"
+                    icon={PiDotsSixVerticalBold}
+                  />
+                </PanelResizeHandle>
+                <Panel
+                  className="bg-background"
+                  defaultSize={24}
+                  id="properties"
+                  minSize={15}
+                  order={3}
+                  role="complementary"
+                  style={{ overflowX: 'auto' }}
+                >
+                  <PropertiesDrawer
+                    mode={propertiesDrawerMode}
+                    setShowConvertFileDialog={setShowConvertFileDialog}
+                    setShowPermissionsDialog={setShowPermissionsDialog}
+                    togglePropertiesDrawer={togglePropertiesDrawer}
+                  />
+                </Panel>
+              </>
+            ) : null}
+          </PanelGroup>
+        )}
+      </div>
+      <BrowseRightRail
+        isOpen={showPropertiesDrawer}
+        mode={propertiesDrawerMode}
+        onSelect={selectDrawerMode}
+      />
     </div>
   );
 };
