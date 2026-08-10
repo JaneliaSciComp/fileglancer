@@ -1,7 +1,7 @@
 /* eslint-disable react/jsx-max-depth */
 // Disable max depth because of many context providers
 
-import { Outlet, useParams } from 'react-router';
+import { Outlet, useParams, useLocation } from 'react-router';
 import { Toaster } from 'react-hot-toast';
 import { ErrorBoundary } from 'react-error-boundary';
 import { ShepherdJourneyProvider } from 'react-shepherd';
@@ -25,12 +25,13 @@ import Notifications from '@/components/ui/Notifications/Notifications';
 import ErrorFallback from '@/components/ErrorFallback';
 import { ServerDownOverlay } from '@/components/ui/Dialogs/ServerDownOverlay';
 import { useServerHealthContext } from '@/contexts/ServerHealthContext';
-import { isConnectLoginPopup } from '@/utils';
+import { isConnectLoginPopup, isBareLayoutPath } from '@/utils';
 
 const MainLayoutContent = () => {
   const { showWarningOverlay, checkHealth, nextRetrySeconds } =
     useServerHealthContext();
-  const bare = isConnectLoginPopup();
+  const location = useLocation();
+  const bare = isConnectLoginPopup() || isBareLayoutPath(location.pathname);
 
   return (
     <ShepherdJourneyProvider>
