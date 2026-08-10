@@ -21,6 +21,7 @@ import {
 } from '@/utils/pathHandling';
 import type { FileSharePath } from '@/shared.types';
 import type { PendingToolKey } from '@/hooks/useZarrMetadata';
+import { DependentViewsError } from '@/queries/proxiedPathQueries';
 import FgDialog from './FgDialog';
 import TextWithFilePath from './TextWithFilePath';
 import DataLinkOptions, {
@@ -54,7 +55,10 @@ interface DeleteLinkDialogProps extends CommonDataLinkDialogProps {
   action: 'delete';
   pending: boolean;
   proxiedPath: ProxiedPath;
-  handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
+  handleDeleteDataLink: (
+    proxiedPath: ProxiedPath,
+    confirm?: boolean
+  ) => Promise<void>;
 }
 
 type DataLinkDialogProps =
@@ -190,6 +194,9 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
   const [openAdvancedSections, setOpenAdvancedSections] = useState<string[]>(
     []
   );
+  const [dependentViews, setDependentViews] = useState<
+    { short_key: string; name: string }[] | null
+  >(null);
 
   const customSubpathError = useMemo(
     () =>
@@ -356,18 +363,46 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               be able to use it to view these data. You can create a new data
               link at any time.
             </Typography>
+            {dependentViews && dependentViews.length > 0 ? (
+              <div className="flex flex-col gap-2 bg-surface/30 p-2 rounded">
+                <Typography className="text-foreground font-semibold">
+                  These Neuroglancer Views you own use this data link and will
+                  be marked broken:
+                </Typography>
+                <ul className="list-disc pl-5">
+                  {dependentViews.map(v => (
+                    <li className="text-foreground text-sm" key={v.short_key}>
+                      {v.name || v.short_key}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <BtnContainer>
               <FgButton
                 color="error"
-                disabled={false}
+                disabled={props.pending}
                 loading={props.pending}
                 loadingText="Deleting..."
                 onClick={async () => {
-                  await props.handleDeleteDataLink(props.proxiedPath);
-                  props.setShowDataLinkDialog(false);
+                  if (dependentViews) {
+                    // Second click: user confirmed despite dependent Views.
+                    await props.handleDeleteDataLink(props.proxiedPath, true);
+                    props.setShowDataLinkDialog(false);
+                    return;
+                  }
+                  try {
+                    await props.handleDeleteDataLink(props.proxiedPath, false);
+                    props.setShowDataLinkDialog(false);
+                  } catch (error) {
+                    if (error instanceof DependentViewsError) {
+                      setDependentViews(error.views);
+                    }
+                    // other errors are already toasted in handleDeleteDataLink
+                  }
                 }}
               >
-                Delete
+                {dependentViews ? 'Delete anyway' : 'Delete'}
               </FgButton>
               <CancelBtn setShowDataLinkDialog={props.setShowDataLinkDialog} />
             </BtnContainer>
