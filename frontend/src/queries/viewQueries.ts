@@ -62,7 +62,9 @@ type ViewsResponse = {
 // Query key factory for Views
 export const viewQueryKeys = {
   all: ['views'] as const,
-  list: () => ['views', 'list'] as const
+  list: () => ['views', 'list'] as const,
+  forDataLink: (sharingKey: string) =>
+    ['views', 'forDataLink', sharingKey] as const
 };
 
 /**
@@ -106,6 +108,28 @@ const fetchViews = async (signal?: AbortSignal): Promise<View[]> => {
 };
 
 /**
+ * Fetches the Views (owned by the current user) that depend on a Data Link.
+ * Returns [] on 404. Mirrors fetchViews: manual status branch so a 404 is not
+ * an error and the {error} envelope is not required.
+ */
+const fetchViewsForDataLink = async (
+  sharingKey: string,
+  signal?: AbortSignal
+): Promise<View[]> => {
+  const url = buildUrl('/api/proxied-path', `${sharingKey}/views`);
+  const response = await sendFetchRequest(url, 'GET', undefined, { signal });
+  const data = (await getResponseJsonOrError(response)) as ViewsResponse;
+
+  if (response.ok) {
+    return data?.views ?? [];
+  }
+  if (response.status === 404) {
+    return [];
+  }
+  throwResponseNotOkError(response, data);
+};
+
+/**
  * Query hook for fetching all Views belonging to the current user
  *
  * @returns Query result with all Views
@@ -114,6 +138,20 @@ export function useViewsQuery(): UseQueryResult<View[], Error> {
   return useQuery<View[], Error>({
     queryKey: viewQueryKeys.list(),
     queryFn: ({ signal }) => fetchViews(signal)
+  });
+}
+
+/**
+ * Query hook for the Views that depend on a given Data Link (by sharing key).
+ * Disabled until a sharing key is provided.
+ */
+export function useViewsForDataLinkQuery(
+  sharingKey?: string
+): UseQueryResult<View[], Error> {
+  return useQuery<View[], Error>({
+    queryKey: viewQueryKeys.forDataLink(sharingKey ?? ''),
+    queryFn: ({ signal }) => fetchViewsForDataLink(sharingKey!, signal),
+    enabled: !!sharingKey
   });
 }
 
