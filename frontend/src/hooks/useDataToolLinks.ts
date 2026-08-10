@@ -7,6 +7,7 @@ import {
   type ProxiedPath
 } from '@/contexts/ProxiedPathContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
+import { DependentViewsError } from '@/queries/proxiedPathQueries';
 import { useExternalBucketContext } from '@/contexts/ExternalBucketContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import {
@@ -52,7 +53,10 @@ export default function useDataToolLinks(
   setPendingToolKey: Dispatch<SetStateAction<PendingToolKey>>
 ): {
   handleCreateDataLink: (pathOverride?: string) => Promise<boolean>;
-  handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
+  handleDeleteDataLink: (
+    proxiedPath: ProxiedPath,
+    confirm?: boolean
+  ) => Promise<void>;
   handleToolClick: (toolKey: PendingToolKey) => Promise<void>;
   handleDialogConfirm: (urlPrefixOverride?: string) => Promise<void>;
   handleDialogCancel: () => void;
@@ -64,7 +68,10 @@ export default function useDataToolLinks(
   setShowDataLinkDialog: Dispatch<SetStateAction<boolean>>
 ): {
   handleCreateDataLink: (pathOverride?: string) => Promise<boolean>;
-  handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
+  handleDeleteDataLink: (
+    proxiedPath: ProxiedPath,
+    confirm?: boolean
+  ) => Promise<void>;
   handleToolClick: (toolKey: PendingToolKey) => Promise<void>;
   handleDialogConfirm: (urlPrefixOverride?: string) => Promise<void>;
   handleDialogCancel: () => void;
@@ -294,7 +301,10 @@ export default function useDataToolLinks(
     setShowDataLinkDialog(false);
   };
 
-  const handleDeleteDataLink = async (proxiedPath: ProxiedPath) => {
+  const handleDeleteDataLink = async (
+    proxiedPath: ProxiedPath,
+    confirm = false
+  ) => {
     if (!proxiedPath) {
       toast.error('Proxied path not found');
       return;
@@ -302,11 +312,15 @@ export default function useDataToolLinks(
 
     try {
       await deleteProxiedPathMutation.mutateAsync({
-        sharing_key: proxiedPath.sharing_key
+        sharing_key: proxiedPath.sharing_key,
+        confirm
       });
       await allProxiedPathsQuery.refetch();
       toast.success('Successfully deleted data link');
     } catch (error) {
+      if (error instanceof DependentViewsError) {
+        throw error; // the dialog catches this to show the confirm step
+      }
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       toast.error(`Error deleting data link: ${errorMessage}`);
