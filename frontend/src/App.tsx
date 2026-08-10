@@ -34,7 +34,6 @@ import ApiTokens from '@/components/ApiTokens';
 import ErrorFallback from '@/components/ErrorFallback';
 import NGViews from '@/components/NGViews';
 import NeuroglancerView from '@/components/NeuroglancerView';
-import { ViewsProvider } from '@/contexts/ViewsContext';
 
 function RequireAuth({ children }: { readonly children: ReactNode }) {
   const { loading, authStatus } = useAuthContext();
@@ -124,9 +123,7 @@ const AppComponent = () => {
             <Route
               element={
                 <RequireAuth>
-                  <ViewsProvider>
-                    <NGViews />
-                  </ViewsProvider>
+                  <NGViews />
                 </RequireAuth>
               }
               path="ngviews"
