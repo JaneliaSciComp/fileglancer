@@ -10,7 +10,7 @@ import {
 } from 'react-icons/hi';
 
 import { useViewStateByReadKey } from '@/queries/viewQueries';
-import { useDefaultNeuroglancerBaseUrl } from '@/hooks/useDefaultNeuroglancerBaseUrl';
+import { useInternalNeuroglancerBaseUrl } from '@/hooks/useDefaultNeuroglancerBaseUrl';
 import { constructNeuroglancerUrl } from '@/utils/neuroglancerUrl';
 import { downloadTextFile } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
@@ -20,7 +20,7 @@ import FgIcon from '@/components/designSystem/atoms/FgIcon';
 export default function NeuroglancerView() {
   const { readKey } = useParams();
   const stateQuery = useViewStateByReadKey(readKey);
-  const baseUrl = useDefaultNeuroglancerBaseUrl();
+  const baseUrl = useInternalNeuroglancerBaseUrl();
   const containerRef = useRef<HTMLDivElement>(null);
 
   if (stateQuery.isPending) {
