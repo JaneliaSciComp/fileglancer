@@ -112,7 +112,7 @@ vi.mock('@/components/ui/Views/CreateViewButton', () => ({
   )
 }));
 
-import NGViews from '@/components/NGViews';
+import CartList from '@/components/ui/Views/CartList';
 
 beforeEach(() => {
   addToCart.mockClear();
@@ -127,10 +127,9 @@ async function renderCartTab() {
   const user = userEvent.setup();
   render(
     <MemoryRouter>
-      <NGViews />
+      <CartList />
     </MemoryRouter>
   );
-  await user.click(screen.getByRole('button', { name: /layer cart/i }));
   return user;
 }
 
