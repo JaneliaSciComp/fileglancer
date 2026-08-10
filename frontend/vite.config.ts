@@ -56,6 +56,12 @@ export default defineConfig({
           ? 'https://localhost:7878'
           : 'http://localhost:7878',
         secure: false
+      },
+      '/ngview': {
+        target: process.env.SSL_KEYFILE
+          ? 'https://localhost:7878'
+          : 'http://localhost:7878',
+        secure: false
       }
     }
   },
