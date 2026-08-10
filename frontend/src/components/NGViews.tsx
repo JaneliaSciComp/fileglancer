@@ -1,83 +1,21 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
 import { TableCard } from '@/components/ui/Table/TableCard';
 import { useNGViewsColumns } from '@/components/ui/Table/ngViewsColumns';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
-import CartDatasetRow from '@/components/ui/Views/CartDatasetRow';
-import CreateViewButton from '@/components/ui/Views/CreateViewButton';
 import FgButton from '@/components/designSystem/atoms/FgButton';
-import FgBadge from '@/components/designSystem/atoms/FgBadge';
 import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
 import { useViewsContext } from '@/contexts/ViewsContext';
-import { useCartContext } from '@/contexts/CartContext';
 import { useDefaultNeuroglancerBaseUrl } from '@/hooks/useDefaultNeuroglancerBaseUrl';
-import { useAllProxiedPathsQuery } from '@/queries/proxiedPathQueries';
-import { datasetKey } from '@/utils/pathHandling';
 import type { View } from '@/queries/viewQueries';
-import type { CartItem } from '@/contexts/CartContext';
-
-type ViewsTab = 'views' | 'cart';
-
-type CartGroup = {
-  fsp_name: string;
-  path: string;
-  label: string;
-  items: CartItem[];
-};
-
-function groupCartByDataset(cart: CartItem[]): CartGroup[] {
-  const groups = new Map<string, CartGroup>();
-  for (const item of cart) {
-    const key = datasetKey(item.fsp_name, item.path);
-    const existing = groups.get(key);
-    if (existing) {
-      existing.items.push(item);
-      // Prefer the base (no-channel) entry's label for the dataset row.
-      if (!item.channel) {
-        existing.label = item.label;
-      }
-    } else {
-      // A channel-only entry's label is the channel name (e.g. "DAPI"), not
-      // the dataset name - fall back to the path until/unless a base entry
-      // shows up, rather than letting a channel string become the header.
-      groups.set(key, {
-        fsp_name: item.fsp_name,
-        path: item.path,
-        label: item.channel ? item.path : item.label,
-        items: [item]
-      });
-    }
-  }
-  return Array.from(groups.values());
-}
 
 export default function NGViews() {
   const { allViewsQuery, updateViewMutation, deleteViewMutation } =
     useViewsContext();
-  const { cart, cartCount, clearCart } = useCartContext();
-  const allProxiedPathsQuery = useAllProxiedPathsQuery();
   const baseUrl = useDefaultNeuroglancerBaseUrl();
 
-  const cartGroups = useMemo(() => groupCartByDataset(cart), [cart]);
-  const dataLinkUrlByDataset = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const p of allProxiedPathsQuery.data ?? []) {
-      map.set(datasetKey(p.fsp_name, p.path), p.url);
-    }
-    return map;
-  }, [allProxiedPathsQuery.data]);
-
-  const handleClearCart = async () => {
-    try {
-      await clearCart();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Clear failed');
-    }
-  };
-
-  const [tab, setTab] = useState<ViewsTab>('views');
   const [renameItem, setRenameItem] = useState<View | undefined>(undefined);
   const [renameValue, setRenameValue] = useState('');
   const [deleteItem, setDeleteItem] = useState<View | undefined>(undefined);
@@ -119,13 +57,6 @@ export default function NGViews() {
 
   const columns = useNGViewsColumns(handleOpenRename, setDeleteItem, baseUrl);
 
-  const tabClass = (active: boolean) =>
-    `flex items-center gap-2 px-4 py-2 border-b-2 ${
-      active
-        ? 'border-primary text-foreground font-semibold'
-        : 'border-transparent text-foreground/70'
-    }`;
-
   return (
     <>
       <div className="w-full">
@@ -133,79 +64,17 @@ export default function NGViews() {
           Neuroglancer Views
         </Typography>
         <Typography className="mb-4 text-foreground">
-          Saved Neuroglancer Views and your working Layer Cart.
+          Your saved Neuroglancer Views.
         </Typography>
 
-        {/* ponytail: local-state tab bar, not the AppsLayout resizable rail —
-            two tabs don't need panels. */}
-        <div className="flex gap-2 mb-4 border-b border-surface">
-          <button
-            className={tabClass(tab === 'views')}
-            onClick={() => setTab('views')}
-            type="button"
-          >
-            Saved Views
-          </button>
-          <button
-            className={tabClass(tab === 'cart')}
-            onClick={() => setTab('cart')}
-            type="button"
-          >
-            Layer Cart
-            {cartCount > 0 ? (
-              <FgBadge color="secondary" size="sm" variant="pill">
-                {cartCount > 9 ? '9+' : cartCount}
-              </FgBadge>
-            ) : null}
-          </button>
-        </div>
-
-        {tab === 'views' ? (
-          <TableCard
-            columns={columns}
-            data={allViewsQuery.data || []}
-            dataType="NG views"
-            errorState={allViewsQuery.error}
-            gridColsClass="grid-cols-[2fr_0.6fr_1fr_1fr_0.6fr]"
-            loadingState={allViewsQuery.isPending}
-          />
-        ) : (
-          <div className="flex flex-col gap-3">
-            {cart.length === 0 ? (
-              <Typography className="text-foreground/70">
-                Your Layer Cart is empty. Add datasets from the file browser.
-              </Typography>
-            ) : (
-              <>
-                {cartGroups.map(group => (
-                  <CartDatasetRow
-                    dataLinkUrl={dataLinkUrlByDataset.get(
-                      datasetKey(group.fsp_name, group.path)
-                    )}
-                    fsp_name={group.fsp_name}
-                    items={group.items}
-                    key={datasetKey(group.fsp_name, group.path)}
-                    label={group.label}
-                    path={group.path}
-                  />
-                ))}
-                <div className="flex gap-3">
-                  <CreateViewButton
-                    datasets={cart}
-                    defaultName="New View"
-                    label="Create View"
-                  />
-                  <FgButton
-                    onClick={() => void handleClearCart()}
-                    variant="ghost"
-                  >
-                    Clear cart
-                  </FgButton>
-                </div>
-              </>
-            )}
-          </div>
-        )}
+        <TableCard
+          columns={columns}
+          data={allViewsQuery.data || []}
+          dataType="NG views"
+          errorState={allViewsQuery.error}
+          gridColsClass="grid-cols-[2fr_0.6fr_1fr_1fr_0.6fr]"
+          loadingState={allViewsQuery.isPending}
+        />
       </div>
 
       {renameItem ? (
