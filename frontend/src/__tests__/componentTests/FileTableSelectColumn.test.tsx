@@ -27,7 +27,9 @@ vi.mock('react-router', async () => {
       showPermissionsDialog: false,
       showPropertiesDrawer: false,
       showSidebar: false,
-      showConvertFileDialog: false
+      showConvertFileDialog: false,
+      propertiesDrawerMode: 'properties',
+      selectDrawerMode: vi.fn()
     })
   };
 });
