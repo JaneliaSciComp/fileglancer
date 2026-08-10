@@ -6,7 +6,7 @@ const { useViewStateByReadKey } = vi.hoisted(() => ({
 }));
 vi.mock('@/queries/viewQueries', () => ({ useViewStateByReadKey }));
 vi.mock('@/hooks/useDefaultNeuroglancerBaseUrl', () => ({
-  useDefaultNeuroglancerBaseUrl: () => 'https://ng.example/'
+  useInternalNeuroglancerBaseUrl: () => 'https://ng.example/'
 }));
 vi.mock('react-router', () => ({ useParams: () => ({ readKey: 'rk1' }) }));
 
