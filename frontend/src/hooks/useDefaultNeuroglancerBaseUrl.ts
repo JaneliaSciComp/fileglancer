@@ -35,3 +35,25 @@ export function useDefaultNeuroglancerBaseUrl(): string {
     return DEFAULT_NEUROGLANCER_BASE_URL;
   }, [validViewers, viewerUrlSources]);
 }
+
+/**
+ * The Internal (deployment-configured) Neuroglancer base URL, ignoring the
+ * user's Internal/External viewer-URL preference. The embedded viewer uses
+ * this because the "External" preference (e.g. neuroglancer-demo.appspot.com)
+ * sends X-Frame-Options and won't render in an iframe; the configured/internal
+ * deployment is same-origin/frameable. Portable: no hardcoded URL — falls back
+ * to DEFAULT_NEUROGLANCER_BASE_URL only where no internal NG is configured.
+ */
+export function useInternalNeuroglancerBaseUrl(): string {
+  const { validViewers } = useViewersContext();
+  return useMemo(() => {
+    const neuroglancer = validViewers.find(v => v.key === 'neuroglancer');
+    if (neuroglancer) {
+      return (
+        resolveViewerTemplate(neuroglancer, 'configured').split('#!')[0] ||
+        DEFAULT_NEUROGLANCER_BASE_URL
+      );
+    }
+    return DEFAULT_NEUROGLANCER_BASE_URL;
+  }, [validViewers]);
+}
