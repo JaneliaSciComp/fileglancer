@@ -20,7 +20,9 @@ const fakeResponse = (status: number, body: unknown) =>
   }) as unknown as Response;
 
 function wrapper({ children }: { children: ReactNode }) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
@@ -31,20 +33,26 @@ describe('useViewsForDataLinkQuery', () => {
     sendFetchRequest.mockResolvedValue(
       fakeResponse(200, { views: [{ short_key: 'v1', name: 'A' }] })
     );
-    const { result } = renderHook(() => useViewsForDataLinkQuery('k1'), { wrapper });
+    const { result } = renderHook(() => useViewsForDataLinkQuery('k1'), {
+      wrapper
+    });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toHaveLength(1);
   });
 
   it('treats 404 as an empty list', async () => {
     sendFetchRequest.mockResolvedValue(fakeResponse(404, {}));
-    const { result } = renderHook(() => useViewsForDataLinkQuery('k1'), { wrapper });
+    const { result } = renderHook(() => useViewsForDataLinkQuery('k1'), {
+      wrapper
+    });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual([]);
   });
 
   it('is disabled without a sharing key', () => {
-    const { result } = renderHook(() => useViewsForDataLinkQuery(undefined), { wrapper });
+    const { result } = renderHook(() => useViewsForDataLinkQuery(undefined), {
+      wrapper
+    });
     expect(result.current.fetchStatus).toBe('idle');
     expect(sendFetchRequest).not.toHaveBeenCalled();
   });
