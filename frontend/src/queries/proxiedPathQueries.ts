@@ -35,7 +35,24 @@ type CreateProxiedPathPayload = {
  */
 type DeleteProxiedPathPayload = {
   sharing_key: string;
+  confirm?: boolean;
 };
+
+/**
+ * Thrown when a data link backs Views the caller owns and `confirm` was not
+ * set. Carries the dependent Views so the UI can list them and re-issue the
+ * delete with confirm=true. The backend returns 409 with this structured body
+ * (see server.py delete_proxied_path); the app's usual {error} envelope would
+ * lose the list, so we branch on status manually here.
+ */
+export class DependentViewsError extends Error {
+  views: { short_key: string; name: string }[];
+  constructor(message: string, views: { short_key: string; name: string }[]) {
+    super(message);
+    this.name = 'DependentViewsError';
+    this.views = views;
+  }
+}
 
 // Query key factory for proxied paths
 export const proxiedPathQueryKeys = {
@@ -247,8 +264,28 @@ export function useDeleteProxiedPathMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: async (payload: DeleteProxiedPathPayload) => {
-      const url = buildUrl('/api/proxied-path/', payload.sharing_key, null);
-      await sendRequestAndThrowForNotOk(url, 'DELETE');
+      const url = buildUrl(
+        '/api/proxied-path/',
+        payload.sharing_key,
+        payload.confirm ? { confirm: 'true' } : null
+      );
+      const response = await sendFetchRequest(url, 'DELETE');
+      if (response.status === 409) {
+        const body = (await getResponseJsonOrError(response)) as {
+          detail?: {
+            message?: string;
+            dependent_views?: { short_key: string; name: string }[];
+          };
+        };
+        throw new DependentViewsError(
+          body?.detail?.message ?? 'This data link is used by Views you own.',
+          body?.detail?.dependent_views ?? []
+        );
+      }
+      if (!response.ok) {
+        const body = await getResponseJsonOrError(response);
+        throwResponseNotOkError(response, body);
+      }
     },
     // Optimistic update
     onMutate: async (deletedPath: DeleteProxiedPathPayload) => {
