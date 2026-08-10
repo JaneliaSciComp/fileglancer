@@ -8,6 +8,7 @@ import { useLocation, useNavigate } from 'react-router';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import CartList from '@/components/ui/Views/CartList';
 
+import AppearsInViews from '@/components/ui/PropertiesDrawer/AppearsInViews';
 import PermissionsTable from '@/components/ui/PropertiesDrawer/PermissionsTable';
 import OverviewTable from '@/components/ui/PropertiesDrawer/OverviewTable';
 import TicketDetails from '@/components/ui/PropertiesDrawer/TicketDetails';
@@ -371,6 +372,11 @@ export default function PropertiesDrawer({
                       ) : null}
                     </>
                   )}
+                  {proxiedPathByFspAndPathQuery.data?.sharing_key ? (
+                    <AppearsInViews
+                      sharingKey={proxiedPathByFspAndPathQuery.data.sharing_key}
+                    />
+                  ) : null}
                 </Tabs.Panel>
 
                 {/*Permissions panel*/}
