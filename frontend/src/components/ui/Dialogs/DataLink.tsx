@@ -387,8 +387,15 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
                 onClick={async () => {
                   if (dependentViews) {
                     // Second click: user confirmed despite dependent Views.
-                    await props.handleDeleteDataLink(props.proxiedPath, true);
-                    props.setShowDataLinkDialog(false);
+                    try {
+                      await props.handleDeleteDataLink(props.proxiedPath, true);
+                      props.setShowDataLinkDialog(false);
+                    } catch (error) {
+                      if (error instanceof DependentViewsError) {
+                        setDependentViews(error.views);
+                      }
+                      // other errors are already toasted in handleDeleteDataLink
+                    }
                     return;
                   }
                   try {
