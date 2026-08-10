@@ -9,7 +9,6 @@ import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import useLayoutPrefs from '@/hooks/useLayoutPrefs';
 import Sidebar from '@/components/ui/Sidebar/Sidebar';
 import PropertiesDrawer from '@/components/ui/PropertiesDrawer/PropertiesDrawer';
-import BrowseRightRail from '@/components/ui/BrowsePage/BrowseRightRail';
 
 export type OutletContextType = {
   setShowPermissionsDialog: Dispatch<SetStateAction<boolean>>;
@@ -20,6 +19,8 @@ export type OutletContextType = {
   showPropertiesDrawer: boolean;
   showSidebar: boolean;
   showConvertFileDialog: boolean;
+  propertiesDrawerMode: 'properties' | 'cart';
+  selectDrawerMode: (mode: 'properties' | 'cart') => void;
 };
 
 export const BrowsePageLayout = () => {
@@ -45,7 +46,9 @@ export const BrowsePageLayout = () => {
     showPermissionsDialog: showPermissionsDialog,
     showPropertiesDrawer: showPropertiesDrawer,
     showSidebar: showSidebar,
-    showConvertFileDialog: showConvertFileDialog
+    showConvertFileDialog: showConvertFileDialog,
+    propertiesDrawerMode: propertiesDrawerMode,
+    selectDrawerMode: selectDrawerMode
   };
 
   return (
@@ -112,11 +115,6 @@ export const BrowsePageLayout = () => {
           </PanelGroup>
         )}
       </div>
-      <BrowseRightRail
-        isOpen={showPropertiesDrawer}
-        mode={propertiesDrawerMode}
-        onSelect={selectDrawerMode}
-      />
     </div>
   );
 };

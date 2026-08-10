@@ -3,7 +3,7 @@ import { Card, IconButton, Typography, Tabs } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 import { HiOutlineDocument, HiOutlineDuplicate, HiX } from 'react-icons/hi';
 import { HiFolder } from 'react-icons/hi2';
-import { useLocation, useNavigate } from 'react-router';
+import { useLocation } from 'react-router';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import CartList from '@/components/ui/Views/CartList';
@@ -93,7 +93,6 @@ export default function PropertiesDrawer({
   mode = 'properties'
 }: PropertiesDrawerProps) {
   const location = useLocation();
-  const navigate = useNavigate();
   const [showDataLinkDialog, setShowDataLinkDialog] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('overview');
 
@@ -159,13 +158,6 @@ export default function PropertiesDrawer({
           // functional gain.
           <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-auto p-2">
             <CartList />
-            <FgButton
-              className="self-start"
-              onClick={() => navigate('/ngviews?tab=cart')}
-              variant="outline"
-            >
-              Open full Layer Cart
-            </FgButton>
           </div>
         ) : (
           <>
