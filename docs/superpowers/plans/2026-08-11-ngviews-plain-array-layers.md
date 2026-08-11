@@ -107,6 +107,34 @@ async function getOmeZarrChannels(dataUrl: string): Promise<string[]> {
 - Manual on dev: add `affs`, `lsds`, `img_zyx`, `seg` under `seed6/data.zarr`, Create View,
   confirm 4 layers in the Saved Views table and 4 tabs in the embedded viewer.
 
+## Follow-up (deferred to later PRs in the stack)
+
+QA on dev after the initial fix surfaced these; user chose to keep this branch to
+the type-default fix and split the rest:
+
+- **Per-layer type override in the Layer Cart**: image / segmentation /
+  multi-channel selector per cart dataset, plumbed through `ViewLayerInput.opts`
+  into the generated NG state. Covers segmentation-by-choice and the multichannel
+  case below.
+- **Multi-channel arrays (affs, lsds)**: a bare multi-channel float array renders
+  as one grey channel because there is no channel dimension/shader. Needs the NG
+  state to emit a local `c` dimension + shader; Neuroglancer cannot infer it
+  without OME axis metadata. Overlaps the override work.
+- **Show data paths on the view page**: `/view/:readKey` address bar is the short
+  app route by design; **Copy link already yields the full Neuroglancer-style URL
+  with every layer's data source embedded**. Optional: a panel on `/view` that
+  lists each layer's full data URL, mirroring how a data link shows its path.
+
+## Type default (done in this branch)
+
+Plain-array fallback no longer emits `type:'new'` (which forces Neuroglancer's
+layer-type picker and renders raw grey). `generateStateForPlainZarr` now opens the
+array, guesses a type from name + dtype (`guessPlainLayerType`: integer dtype +
+name matching `seg|label|mask` -> `segmentation`, else `image`), and uses the
+explicit-type generator `generateNeuroglancerStateForZarrArray`. The existing
+thumbnail-edge heuristic (`determineLayerType`) is not usable here — checkout has
+no rendered thumbnail (see `viewCheckout.ts:39`).
+
 ## Out of scope (separate items, noted not fixed)
 
 - **Misalignment**: cross-array coordinate spaces are not reconciled — first dataset's
