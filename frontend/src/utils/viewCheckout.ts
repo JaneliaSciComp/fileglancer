@@ -1,7 +1,8 @@
 import {
   getOmeZarrMetadata,
   generateNeuroglancerStateForOmeZarr,
-  generateNeuroglancerStateForDataURL
+  generateNeuroglancerStateForDataURL,
+  generateStateForPlainZarr
 } from '@/omezarr-helper';
 import type { ViewLayerInput } from '@/queries/viewQueries';
 import { default as log } from '@/logger';
@@ -52,11 +53,21 @@ async function generateStateForDataset(
         )
       : generateNeuroglancerStateForDataURL(ds.url, metadata.zarrVersion);
     return decodeState(encoded);
-  } catch (error) {
-    // One broken cart entry (moved/deleted file, missing multiscale) must
-    // not abort the whole checkout — skip it, keep the rest.
-    log.error(`Failed to generate Neuroglancer state for ${ds.url}`, error);
-    return null;
+  } catch (omeError) {
+    // Not an OME-Zarr multiscale group. Try it as a plain Zarr array before
+    // giving up, so a manually-added array directory still becomes one layer.
+    try {
+      return decodeState(await generateStateForPlainZarr(ds.url));
+    } catch (plainError) {
+      // Genuinely broken (moved/deleted, not a Zarr array) — skip this one
+      // cart entry, keep the rest.
+      log.error(
+        `Failed to generate Neuroglancer state for ${ds.url}`,
+        omeError,
+        plainError
+      );
+      return null;
+    }
   }
 }
 
