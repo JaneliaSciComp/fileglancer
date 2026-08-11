@@ -5,12 +5,14 @@ const encoded = (state: unknown) => encodeURIComponent(JSON.stringify(state));
 vi.mock('@/omezarr-helper', () => ({
   getOmeZarrMetadata: vi.fn(),
   generateNeuroglancerStateForOmeZarr: vi.fn(),
-  generateNeuroglancerStateForDataURL: vi.fn()
+  generateNeuroglancerStateForDataURL: vi.fn(),
+  generateStateForPlainZarr: vi.fn()
 }));
 
 import {
   getOmeZarrMetadata,
-  generateNeuroglancerStateForOmeZarr
+  generateNeuroglancerStateForOmeZarr,
+  generateStateForPlainZarr
 } from '@/omezarr-helper';
 import { buildViewState } from '@/utils/viewCheckout';
 
@@ -18,6 +20,9 @@ const md = { multiscales: [{}], arr: {}, zarrVersion: 2 };
 
 beforeEach(() => {
   (getOmeZarrMetadata as any).mockReset().mockResolvedValue(md);
+  (generateStateForPlainZarr as any)
+    .mockReset()
+    .mockRejectedValue(new Error('not a plain array'));
   (generateNeuroglancerStateForOmeZarr as any)
     .mockReset()
     .mockImplementation((url: string) =>
@@ -67,8 +72,31 @@ describe('buildViewState', () => {
     expect((ng_state as any).layers).toHaveLength(1);
   });
 
-  it('skips a dataset whose metadata fetch throws and keeps the rest', async () => {
+  it('falls back to a plain-array layer when the dataset is not OME-Zarr', async () => {
+    // Both cart entries are bare Zarr arrays: OME metadata throws, plain-array
+    // generation succeeds, so each still contributes one layer.
+    (getOmeZarrMetadata as any).mockRejectedValue(new Error('not a group'));
+    (generateStateForPlainZarr as any).mockImplementation((url: string) =>
+      encoded({ layers: [{ name: `${url}-plain` }] })
+    );
+    const { ng_state, layers } = await buildViewState([
+      { url: 'a', sharing_key: 'ka', fsp_name: 'f', path: '/a', label: 'A' },
+      { url: 'b', sharing_key: 'kb', fsp_name: 'f', path: '/b', label: 'B' }
+    ]);
+    expect((ng_state as any).layers).toHaveLength(2);
+    expect(layers).toEqual([
+      { sharing_key: 'ka', layer_index: 0, channel: null, opts: null },
+      { sharing_key: 'kb', layer_index: 1, channel: null, opts: null }
+    ]);
+  });
+
+  it('skips a dataset only when it is neither OME-Zarr nor a plain array', async () => {
+    // OME metadata throws AND plain-array generation throws (genuinely broken /
+    // moved / not a Zarr array) → drop just that entry, keep the rest.
     (getOmeZarrMetadata as any).mockRejectedValueOnce(new Error('gone'));
+    (generateStateForPlainZarr as any).mockRejectedValueOnce(
+      new Error('also gone')
+    );
     const { ng_state, layers } = await buildViewState([
       { url: 'a', sharing_key: 'ka', fsp_name: 'f', path: '/a', label: 'A' },
       { url: 'b', sharing_key: 'kb', fsp_name: 'f', path: '/b', label: 'B' }
