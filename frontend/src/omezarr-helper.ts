@@ -790,18 +790,36 @@ async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
  * checkout when a cart dataset is a bare array, so each added directory still
  * becomes one layer.
  */
+/**
+ * Guess a Neuroglancer layer type for a plain array from its name and dtype.
+ * Label/segmentation volumes are integer-typed and usually named seg/label/mask;
+ * everything else is treated as an image. This only sets the default so the
+ * layer resolves without Neuroglancer's "new layer" type picker — the user can
+ * still switch the type in the viewer.
+ */
+function guessPlainLayerType(dataUrl: string, dtype: string): LayerType {
+  const name = getLayerName(dataUrl).toLowerCase();
+  const isInteger = /^(u?int)/.test(dtype);
+  if (isInteger && /seg|label|mask/.test(name)) {
+    return 'segmentation';
+  }
+  return 'image';
+}
+
 async function generateStateForPlainZarr(dataUrl: string): Promise<string> {
   // Probe the storage version (needed for the |zarrN: source suffix): try v2
   // first (most fileglancer data), then v3. If neither opens, this throws and
   // the caller skips the dataset.
   let zarrVersion: 2 | 3 = 2;
+  let arr;
   try {
-    await getZarrArray(dataUrl, 2);
+    arr = await getZarrArray(dataUrl, 2);
   } catch {
-    await getZarrArray(dataUrl, 3);
+    arr = await getZarrArray(dataUrl, 3);
     zarrVersion = 3;
   }
-  return generateNeuroglancerStateForDataURL(dataUrl, zarrVersion);
+  const layerType = guessPlainLayerType(dataUrl, String(arr.dtype));
+  return generateNeuroglancerStateForZarrArray(dataUrl, zarrVersion, layerType);
 }
 
 /**
