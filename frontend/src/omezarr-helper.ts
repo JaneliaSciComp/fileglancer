@@ -785,12 +785,39 @@ async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
 }
 
 /**
+ * Open a plain Zarr array (not an OME-Zarr multiscale group) with auto-detected
+ * storage version and emit a single-layer Neuroglancer state. Used by the Views
+ * checkout when a cart dataset is a bare array, so each added directory still
+ * becomes one layer.
+ */
+async function generateStateForPlainZarr(dataUrl: string): Promise<string> {
+  // Probe the storage version (needed for the |zarrN: source suffix): try v2
+  // first (most fileglancer data), then v3. If neither opens, this throws and
+  // the caller skips the dataset.
+  let zarrVersion: 2 | 3 = 2;
+  try {
+    await getZarrArray(dataUrl, 2);
+  } catch {
+    await getZarrArray(dataUrl, 3);
+    zarrVersion = 3;
+  }
+  return generateNeuroglancerStateForDataURL(dataUrl, zarrVersion);
+}
+
+/**
  * Get the channel labels for an OME-Zarr dataset: from `omero.channels[].label`
  * when present, else synthesized `Channel 0..n-1` from the `c` axis length,
  * else `[]` when there is no channel axis.
  */
 async function getOmeZarrChannels(dataUrl: string): Promise<string[]> {
-  const metadata = await getOmeZarrMetadata(dataUrl);
+  let metadata;
+  try {
+    metadata = await getOmeZarrMetadata(dataUrl);
+  } catch {
+    // Plain array / no multiscale group: no channels to enumerate. Return []
+    // instead of throwing so the cart row shows its no-channel hint.
+    return [];
+  }
   const multiscale = metadata.multiscales?.[0];
   if (!multiscale) {
     return [];
@@ -953,6 +980,7 @@ export {
   getOmeZarrChannels,
   getOmeZarrThumbnail,
   generateNeuroglancerStateForDataURL,
+  generateStateForPlainZarr,
   generateNeuroglancerStateForZarrArray,
   generateNeuroglancerStateForOmeZarr,
   translateUnitToNeuroglancer,
