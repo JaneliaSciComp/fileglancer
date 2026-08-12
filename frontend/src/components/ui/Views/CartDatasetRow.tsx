@@ -1,13 +1,16 @@
 import { useState } from 'react';
-import { Collapse, Typography } from '@material-tailwind/react';
-import { HiChevronRight } from 'react-icons/hi';
+import { Link } from 'react-router';
+import { Collapse, IconButton, Typography } from '@material-tailwind/react';
+import { HiChevronRight, HiOutlineTrash } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
-import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgCheckbox from '@/components/designSystem/atoms/formElements/FgCheckbox';
+import ZarrAxisTable from '@/components/ui/BrowsePage/ZarrAxisTable';
 import { useCartContext } from '@/contexts/CartContext';
-import { getOmeZarrChannels } from '@/omezarr-helper';
+import { getOmeZarrChannels, getOmeZarrMetadata } from '@/omezarr-helper';
+import type { Metadata } from '@/omezarr-helper';
+import { makeBrowseLink } from '@/utils';
 import type { CartItem } from '@/contexts/CartContext';
 
 interface CartDatasetRowProps {
@@ -34,6 +37,8 @@ export default function CartDatasetRow({
   const [isOpen, setIsOpen] = useState(false);
   const [channels, setChannels] = useState<string[] | undefined>(undefined);
   const [loadingChannels, setLoadingChannels] = useState(false);
+  const [metadata, setMetadata] = useState<Metadata | null>(null);
+  const [loadingMeta, setLoadingMeta] = useState(false);
 
   const checkedChannels = new Set(
     items.map(item => item.channel).filter((c): c is string => Boolean(c))
@@ -53,6 +58,16 @@ export default function CartDatasetRow({
         setChannels([]);
       } finally {
         setLoadingChannels(false);
+      }
+    }
+    if (nextOpen && metadata === null && !loadingMeta && dataLinkUrl) {
+      setLoadingMeta(true);
+      try {
+        setMetadata(await getOmeZarrMetadata(dataLinkUrl));
+      } catch {
+        // Metadata is a nice-to-have here; ignore fetch failures.
+      } finally {
+        setLoadingMeta(false);
       }
     }
   };
@@ -99,30 +114,43 @@ export default function CartDatasetRow({
           />
           <Typography className="text-foreground truncate">{label}</Typography>
         </button>
-        <FgButton onClick={() => void handleRemoveDataset()} variant="ghost">
-          Remove
-        </FgButton>
+        <IconButton
+          aria-label="Remove dataset"
+          onClick={() => void handleRemoveDataset()}
+          variant="ghost"
+        >
+          <FgIcon icon={HiOutlineTrash} size="sm" />
+        </IconButton>
       </div>
+      <Link
+        className="block pl-6 text-primary text-xs truncate hover:underline"
+        to={makeBrowseLink(fsp_name, path)}
+      >
+        {path}
+      </Link>
 
       {dataLinkUrl ? (
         <Collapse open={isOpen}>
-          <div className="pl-6 flex flex-col gap-1 pt-2">
-            {loadingChannels ? (
-              <Typography className="text-foreground/70 text-sm">
-                Loading channels...
-              </Typography>
-            ) : (
-              (channels ?? []).map(channel => (
-                <FgCheckbox
-                  checked={checkedChannels.has(channel)}
-                  key={channel}
-                  label={channel}
-                  onChange={e =>
-                    void handleToggleChannel(channel, e.target.checked)
-                  }
-                />
-              ))
-            )}
+          <div className="pl-6 flex flex-col gap-2 pt-2">
+            {metadata ? <ZarrAxisTable metadata={metadata} /> : null}
+            <div className="flex flex-col gap-1">
+              {loadingChannels ? (
+                <Typography className="text-foreground/70 text-sm">
+                  Loading channels...
+                </Typography>
+              ) : (
+                (channels ?? []).map(channel => (
+                  <FgCheckbox
+                    checked={checkedChannels.has(channel)}
+                    key={channel}
+                    label={channel}
+                    onChange={e =>
+                      void handleToggleChannel(channel, e.target.checked)
+                    }
+                  />
+                ))
+              )}
+            </div>
           </div>
         </Collapse>
       ) : (
