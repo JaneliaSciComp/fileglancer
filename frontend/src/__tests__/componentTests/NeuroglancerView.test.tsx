@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import type { ReactNode } from 'react';
 
@@ -16,9 +17,20 @@ vi.mock('react-router', () => ({
     createElement('a', { href: to }, children)
 }));
 
+const { copyToClipboard } = vi.hoisted(() => ({
+  copyToClipboard: vi.fn()
+}));
+vi.mock('@/utils/copyText', () => ({ copyToClipboard }));
+
 import NeuroglancerView from '@/components/NeuroglancerView';
 
 describe('NeuroglancerView', () => {
+  beforeEach(() => {
+    copyToClipboard.mockReset();
+    copyToClipboard.mockResolvedValue({ success: true });
+    window.history.replaceState(null, '', '/');
+  });
+
   it('shows a loading state while pending', () => {
     useViewStateByReadKey.mockReturnValue({
       data: undefined,
@@ -84,5 +96,33 @@ describe('NeuroglancerView', () => {
     });
     render(<NeuroglancerView />);
     expect(screen.getAllByText('Untitled View').length).toBeGreaterThan(0);
+  });
+
+  it('reflects the full state into the app URL hash after load', () => {
+    const data = { title: 'My View', layers: [{ name: 'L0' }] };
+    useViewStateByReadKey.mockReturnValue({
+      data,
+      isPending: false,
+      isError: false
+    });
+    render(<NeuroglancerView />);
+    expect(window.location.hash).toBe(
+      '#!' + encodeURIComponent(JSON.stringify(data))
+    );
+  });
+
+  it('copies the current page URL (not the external URL) when "Copy link" is clicked', async () => {
+    const user = userEvent.setup();
+    useViewStateByReadKey.mockReturnValue({
+      data: { title: 'My View', layers: [{ name: 'L0' }] },
+      isPending: false,
+      isError: false
+    });
+    render(<NeuroglancerView />);
+    await user.click(screen.getByRole('button', { name: /copy link/i }));
+    expect(copyToClipboard).toHaveBeenCalledWith(window.location.href);
+    expect(copyToClipboard).not.toHaveBeenCalledWith(
+      expect.stringContaining('https://ng.example/')
+    );
   });
 });
