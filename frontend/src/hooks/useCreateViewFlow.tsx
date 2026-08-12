@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router';
 import type { ReactNode } from 'react';
 
 import { useCartCheckout } from '@/hooks/useCartCheckout';
+import { useCartContext } from '@/contexts/CartContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useAllProxiedPathsQuery } from '@/queries/proxiedPathQueries';
 import { datasetKey } from '@/utils/pathHandling';
@@ -24,6 +25,7 @@ type PendingRequest = {
 
 export function useCreateViewFlow() {
   const { checkout } = useCartCheckout();
+  const { clearCart } = useCartContext();
   const {
     areDataLinksAutomatic,
     dataLinkSubpathMode,
@@ -44,6 +46,8 @@ export function useCreateViewFlow() {
     try {
       const view = await checkout(request.datasets, name);
       toast.success(`Created View "${name}"`);
+      // Every successful checkout consumes the cart, regardless of caller.
+      await clearCart();
       if (request.onCreated) {
         request.onCreated(view);
       } else {
