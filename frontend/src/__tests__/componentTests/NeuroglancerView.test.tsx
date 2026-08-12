@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { createElement } from 'react';
+import type { ReactNode } from 'react';
 
 const { useViewStateByReadKey } = vi.hoisted(() => ({
   useViewStateByReadKey: vi.fn()
@@ -8,7 +10,11 @@ vi.mock('@/queries/viewQueries', () => ({ useViewStateByReadKey }));
 vi.mock('@/hooks/useDefaultNeuroglancerBaseUrl', () => ({
   useInternalNeuroglancerBaseUrl: () => 'https://ng.example/'
 }));
-vi.mock('react-router', () => ({ useParams: () => ({ readKey: 'rk1' }) }));
+vi.mock('react-router', () => ({
+  useParams: () => ({ readKey: 'rk1' }),
+  Link: ({ to, children }: { to: string; children: ReactNode }) =>
+    createElement('a', { href: to }, children)
+}));
 
 import NeuroglancerView from '@/components/NeuroglancerView';
 
@@ -47,7 +53,7 @@ describe('NeuroglancerView', () => {
         JSON.stringify({ title: 'My View', layers: [{ name: 'L0' }] })
       )
     );
-    expect(screen.getByText('My View')).toBeInTheDocument();
+    expect(screen.getAllByText('My View').length).toBeGreaterThan(0);
     expect(
       screen.getByRole('button', { name: /copy link/i })
     ).toBeInTheDocument();
@@ -57,5 +63,26 @@ describe('NeuroglancerView', () => {
     expect(
       screen.getByRole('button', { name: /open external/i })
     ).toBeInTheDocument();
+  });
+
+  it('shows a breadcrumb linking back to the NG Views list', () => {
+    useViewStateByReadKey.mockReturnValue({
+      data: { title: 'My View', layers: [{ name: 'L0' }] },
+      isPending: false,
+      isError: false
+    });
+    render(<NeuroglancerView />);
+    const crumbLink = screen.getByRole('link', { name: /ng views/i });
+    expect(crumbLink).toHaveAttribute('href', '/ngviews');
+  });
+
+  it('falls back to "Untitled View" when the view has no title', () => {
+    useViewStateByReadKey.mockReturnValue({
+      data: { layers: [{ name: 'L0' }] },
+      isPending: false,
+      isError: false
+    });
+    render(<NeuroglancerView />);
+    expect(screen.getAllByText('Untitled View').length).toBeGreaterThan(0);
   });
 });

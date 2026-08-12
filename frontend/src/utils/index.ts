@@ -469,11 +469,3 @@ export function isConnectLoginPopup(): boolean {
     next.startsWith('/connect-complete')
   );
 }
-
-/**
- * Routes rendered without the app's navbar/nav chrome (full-viewport). The
- * embedded Neuroglancer viewer (/view/:readKey) fills the window.
- */
-export function isBareLayoutPath(pathname: string): boolean {
-  return pathname.startsWith('/view/');
-}
