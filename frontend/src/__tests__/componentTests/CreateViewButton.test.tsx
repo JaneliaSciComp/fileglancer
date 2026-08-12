@@ -19,6 +19,9 @@ vi.mock('@/queries/proxiedPathQueries', () => ({
   useAllProxiedPathsQuery: () => ({ data: [] }) // nothing exists → 1 new link
 }));
 vi.mock('react-router', () => ({ useNavigate: () => vi.fn() }));
+vi.mock('@/contexts/CartContext', () => ({
+  useCartContext: () => ({ clearCart: vi.fn().mockResolvedValue(undefined) })
+}));
 
 import CreateViewButton from '@/components/ui/Views/CreateViewButton';
 
