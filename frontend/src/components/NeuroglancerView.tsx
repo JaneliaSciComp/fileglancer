@@ -35,11 +35,11 @@ export default function NeuroglancerView() {
       return;
     }
     window.history.replaceState(
-      null,
+      window.history.state,
       '',
       '#!' + encodeURIComponent(JSON.stringify(ngState))
     );
-  }, [ngState, readKey]);
+  }, [ngState]);
 
   if (stateQuery.isPending) {
     return (
@@ -61,7 +61,8 @@ export default function NeuroglancerView() {
   const externalUrl = constructNeuroglancerUrl(ngState, baseUrl);
 
   const handleCopy = async () => {
-    const result = await copyToClipboard(window.location.href);
+    const shortLink = `${window.location.origin}/view/${readKey}`;
+    const result = await copyToClipboard(shortLink);
     if (result.success) {
       toast.success('Neuroglancer link copied');
     } else {
@@ -70,9 +71,9 @@ export default function NeuroglancerView() {
   };
 
   const handleFullscreen = () => {
-    // ponytail: native Fullscreen API on the container — the /view route is
-    // already chrome-less, so this just drops the top bar into the OS
-    // fullscreen; no custom fullscreen state machine.
+    // ponytail: native Fullscreen API on the container, deliberately scoped
+    // to this component (excluding the app navbar) rather than the whole
+    // route; no custom fullscreen state machine.
     void containerRef.current?.requestFullscreen?.();
   };
 
