@@ -18,20 +18,16 @@ export default function CreateViewButton({
   disabled = false,
   onCreated
 }: CreateViewButtonProps) {
-  const { startCreateView, dialog, open, pending } = useCreateViewFlow();
+  const { startCreateView, dialog } = useCreateViewFlow();
 
   return (
     <>
-      {!open ? (
-        <FgButton
-          disabled={disabled || pending}
-          loading={pending}
-          loadingText="Creating..."
-          onClick={() => startCreateView(datasets, defaultName, onCreated)}
-        >
-          {label}
-        </FgButton>
-      ) : null}
+      <FgButton
+        disabled={disabled}
+        onClick={() => startCreateView(datasets, defaultName, onCreated)}
+      >
+        {label}
+      </FgButton>
       {dialog}
     </>
   );
