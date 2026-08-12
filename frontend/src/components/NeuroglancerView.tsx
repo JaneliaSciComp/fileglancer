@@ -27,8 +27,9 @@ export default function NeuroglancerView() {
 
   // Reflect the full state into the app's own URL hash so copy-pasting the
   // current page URL is a full-state shareable link, matching Neuroglancer's
-  // own address-bar convention. Display/share only — readKey (route param)
-  // remains the source of truth; the hash is never read back.
+  // own address-bar convention.
+  // ponytail: hash is display/share only; if it should ever drive editable
+  // state, that's the editable stack.
   useEffect(() => {
     if (!ngState) {
       return;
