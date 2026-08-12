@@ -46,14 +46,20 @@ export function useCreateViewFlow() {
     try {
       const view = await checkout(request.datasets, name);
       toast.success(`Created View "${name}"`);
-      // Every successful checkout consumes the cart, regardless of caller.
-      await clearCart();
       if (request.onCreated) {
         request.onCreated(view);
       } else {
         navigate('/ngviews');
       }
       setRequest(null);
+      // Fire-and-forget: the View already exists, so a cart-clear failure
+      // (a separate network mutation) must never re-trigger "Checkout
+      // failed" or block navigation/dialog-close above. Worst case is a
+      // stale cart item, which is low-stakes and independently retryable
+      // via the manual "Clear cart" button.
+      clearCart().catch(() => {
+        toast.error('View created, but the cart could not be cleared');
+      });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Checkout failed');
     } finally {
