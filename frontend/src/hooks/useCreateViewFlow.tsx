@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router';
 import type { ReactNode } from 'react';
 
 import { useCartCheckout } from '@/hooks/useCartCheckout';
-import { useCartContext } from '@/contexts/CartContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useAllProxiedPathsQuery } from '@/queries/proxiedPathQueries';
 import { datasetKey } from '@/utils/pathHandling';
@@ -25,7 +24,6 @@ type PendingRequest = {
 
 export function useCreateViewFlow() {
   const { checkout } = useCartCheckout();
-  const { clearCart } = useCartContext();
   const {
     areDataLinksAutomatic,
     dataLinkSubpathMode,
@@ -52,14 +50,6 @@ export function useCreateViewFlow() {
         navigate('/ngviews');
       }
       setRequest(null);
-      // Fire-and-forget: the View already exists, so a cart-clear failure
-      // (a separate network mutation) must never re-trigger "Checkout
-      // failed" or block navigation/dialog-close above. Worst case is a
-      // stale cart item, which is low-stakes and independently retryable
-      // via the manual "Clear cart" button.
-      clearCart().catch(() => {
-        toast.error('View created, but the cart could not be cleared');
-      });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Checkout failed');
     } finally {
@@ -157,5 +147,5 @@ export function useCreateViewFlow() {
     </FgDialog>
   ) : null;
 
-  return { startCreateView, dialog, open, pending };
+  return { startCreateView, dialog, pending };
 }
