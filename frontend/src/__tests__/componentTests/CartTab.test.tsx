@@ -40,13 +40,28 @@ const {
   removeFromCart,
   removeManyFromCart,
   clearCart,
-  getOmeZarrChannels
+  getOmeZarrChannels,
+  getOmeZarrMetadata,
+  getAxesMap
 } = vi.hoisted(() => ({
   addToCart: vi.fn().mockResolvedValue(undefined),
   removeFromCart: vi.fn().mockResolvedValue(undefined),
   removeManyFromCart: vi.fn().mockResolvedValue(undefined),
   clearCart: vi.fn().mockResolvedValue(undefined),
-  getOmeZarrChannels: vi.fn().mockResolvedValue(['DAPI', 'GFP'])
+  getOmeZarrChannels: vi.fn().mockResolvedValue(['DAPI', 'GFP']),
+  getOmeZarrMetadata: vi.fn().mockResolvedValue({
+    arr: { shape: [3, 2048, 2048] },
+    multiscales: [{ axes: [{ name: 'c' }, { name: 'y' }, { name: 'x' }] }]
+  }),
+  // Real implementation (not a stub): CartDatasetRow's dims formatting
+  // depends on this actually mapping axis name -> shape index.
+  getAxesMap: vi.fn((multiscale: { axes?: { name: string }[] }) => {
+    const map: Record<string, { name: string; index: number }> = {};
+    (multiscale.axes ?? []).forEach((axis, i) => {
+      map[axis.name] = { ...axis, index: i };
+    });
+    return map;
+  })
 }));
 
 vi.mock('@/contexts/ViewsContext', () => ({
@@ -71,7 +86,11 @@ vi.mock('@/hooks/useDefaultNeuroglancerBaseUrl', () => ({
   useDefaultNeuroglancerBaseUrl: () => 'https://ng.example/'
 }));
 vi.mock('@/omezarr-helper', () => ({
-  getOmeZarrChannels
+  getOmeZarrChannels,
+  getOmeZarrMetadata,
+  getAxesMap,
+  getResolvedScales: () => [1, 0.65, 0.65],
+  translateUnitToNeuroglancer: (unit?: string) => unit ?? ''
 }));
 vi.mock('@/queries/proxiedPathQueries', () => ({
   useAllProxiedPathsQuery: () => ({
@@ -101,6 +120,7 @@ beforeEach(() => {
   removeManyFromCart.mockClear();
   clearCart.mockClear();
   getOmeZarrChannels.mockClear();
+  getOmeZarrMetadata.mockClear();
 });
 
 async function renderCartTab() {
@@ -132,6 +152,48 @@ describe('Layer Cart tab', () => {
     expect(screen.getByText('GFP')).toBeInTheDocument();
   });
 
+  it('lazy-loads and shows the axis table when expanding a dataset with a Data Link', async () => {
+    getOmeZarrMetadata.mockResolvedValueOnce({
+      shapes: [[3, 2048, 2048]],
+      arr: { chunks: [1, 512, 512] },
+      multiscales: [
+        {
+          axes: [{ name: 'c' }, { name: 'y' }, { name: 'x' }],
+          datasets: [
+            {
+              coordinateTransformations: [
+                { type: 'scale', scale: [1, 0.65, 0.65] }
+              ]
+            }
+          ]
+        }
+      ]
+    });
+    const user = await renderCartTab();
+    await user.click(screen.getByRole('button', { name: /Dataset A/ }));
+
+    await waitFor(() => {
+      expect(getOmeZarrMetadata).toHaveBeenCalledWith('https://data.example/a');
+    });
+    expect(await screen.findByText('Chunk Size')).toBeInTheDocument();
+  });
+
+  it('shows no dims text (and does not crash) when metadata has no axes', async () => {
+    getOmeZarrMetadata.mockResolvedValueOnce({
+      arr: { shape: [] },
+      multiscales: undefined
+    });
+    const user = await renderCartTab();
+    await user.click(screen.getByRole('button', { name: /Dataset A/ }));
+
+    await waitFor(() => {
+      expect(getOmeZarrMetadata).toHaveBeenCalled();
+    });
+    // Channels still render fine; no dims string is shown for this dataset.
+    expect(await screen.findByText('DAPI')).toBeInTheDocument();
+    expect(screen.queryByText(/×/)).not.toBeInTheDocument();
+  });
+
   it('disables expansion and shows a hint for a dataset with no Data Link', async () => {
     await renderCartTab();
     const expandButton = screen.getByRole('button', { name: 'Dataset B' });
@@ -157,7 +219,9 @@ describe('Layer Cart tab', () => {
 
   it('removing a multi-entry dataset clears every entry in one batch call, not a loop', async () => {
     const user = await renderCartTab();
-    const removeButtons = screen.getAllByRole('button', { name: /^remove$/i });
+    const removeButtons = screen.getAllByRole('button', {
+      name: /remove dataset/i
+    });
     // Dataset A (base + GFP channel entries) is the first row.
     await user.click(removeButtons[0]);
 

@@ -946,6 +946,7 @@ async function determineLayerType(
 export {
   getScaleTransform,
   getResolvedScales,
+  getAxesMap,
   getNeuroglancerSource,
   getZarrArray,
   getOmeZarrMetadata,
