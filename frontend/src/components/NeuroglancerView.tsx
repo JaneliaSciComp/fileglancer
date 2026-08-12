@@ -16,6 +16,7 @@ import { downloadTextFile } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
+import FgLink from '@/components/designSystem/atoms/FgLink';
 
 export default function NeuroglancerView() {
   const { readKey } = useParams();
@@ -40,7 +41,7 @@ export default function NeuroglancerView() {
     );
   }
 
-  const title = (ngState.title as string) || 'Neuroglancer View';
+  const title = (ngState.title as string) || 'Untitled View';
   const externalUrl = constructNeuroglancerUrl(ngState, baseUrl);
 
   const handleCopy = async () => {
@@ -64,39 +65,50 @@ export default function NeuroglancerView() {
       className="flex h-full w-full flex-col bg-background"
       ref={containerRef}
     >
-      <div className="flex shrink-0 items-center justify-between gap-4 border-b border-surface px-4 py-2">
-        <Typography
-          className="truncate text-foreground font-semibold"
-          type="h6"
-        >
-          {title}
-        </Typography>
-        <div className="flex shrink-0 items-center gap-2">
-          <FgButton onClick={() => void handleCopy()} variant="ghost">
-            <FgIcon icon={HiOutlineDuplicate} size="sm" /> Copy link
-          </FgButton>
-          <FgButton
-            onClick={() =>
-              downloadTextFile(
-                JSON.stringify(ngState, null, 2),
-                `${title}.json`
-              )
-            }
-            variant="ghost"
+      <div className="flex shrink-0 flex-col gap-1 border-b border-surface px-4 py-2">
+        <div className="flex items-center gap-1 text-foreground/70">
+          <FgLink size="sm" to="/ngviews">
+            NG Views
+          </FgLink>
+          <Typography variant="small">/</Typography>
+          <Typography className="truncate" variant="small">
+            {title}
+          </Typography>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <Typography
+            className="truncate text-foreground font-semibold"
+            type="h6"
           >
-            <FgIcon icon={HiOutlineDownload} size="sm" /> Download JSON
-          </FgButton>
-          <FgButton
-            onClick={() =>
-              window.open(externalUrl, '_blank', 'noopener,noreferrer')
-            }
-            variant="ghost"
-          >
-            <FgIcon icon={HiOutlineExternalLink} size="sm" /> Open external
-          </FgButton>
-          <FgButton onClick={handleFullscreen} variant="ghost">
-            <FgIcon icon={HiOutlineArrowsExpand} size="sm" /> Fullscreen
-          </FgButton>
+            {title}
+          </Typography>
+          <div className="flex shrink-0 items-center gap-2">
+            <FgButton onClick={() => void handleCopy()} variant="ghost">
+              <FgIcon icon={HiOutlineDuplicate} size="sm" /> Copy link
+            </FgButton>
+            <FgButton
+              onClick={() =>
+                downloadTextFile(
+                  JSON.stringify(ngState, null, 2),
+                  `${title}.json`
+                )
+              }
+              variant="ghost"
+            >
+              <FgIcon icon={HiOutlineDownload} size="sm" /> Download JSON
+            </FgButton>
+            <FgButton
+              onClick={() =>
+                window.open(externalUrl, '_blank', 'noopener,noreferrer')
+              }
+              variant="ghost"
+            >
+              <FgIcon icon={HiOutlineExternalLink} size="sm" /> Open external
+            </FgButton>
+            <FgButton onClick={handleFullscreen} variant="ghost">
+              <FgIcon icon={HiOutlineArrowsExpand} size="sm" /> Fullscreen
+            </FgButton>
+          </div>
         </div>
       </div>
       <iframe
