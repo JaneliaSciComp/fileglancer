@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useParams } from 'react-router';
 import { Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
@@ -23,6 +23,22 @@ export default function NeuroglancerView() {
   const stateQuery = useViewStateByReadKey(readKey);
   const baseUrl = useInternalNeuroglancerBaseUrl();
   const containerRef = useRef<HTMLDivElement>(null);
+  const ngState = stateQuery.data;
+
+  // Reflect the full state into the app's own URL hash so copy-pasting the
+  // current page URL is a full-state shareable link, matching Neuroglancer's
+  // own address-bar convention. Display/share only — readKey (route param)
+  // remains the source of truth; the hash is never read back.
+  useEffect(() => {
+    if (!ngState) {
+      return;
+    }
+    window.history.replaceState(
+      null,
+      '',
+      '#!' + encodeURIComponent(JSON.stringify(ngState))
+    );
+  }, [ngState, readKey]);
 
   if (stateQuery.isPending) {
     return (
@@ -32,7 +48,6 @@ export default function NeuroglancerView() {
     );
   }
 
-  const ngState = stateQuery.data;
   if (stateQuery.isError || !ngState) {
     return (
       <div className="flex h-full w-full items-center justify-center">
@@ -45,7 +60,7 @@ export default function NeuroglancerView() {
   const externalUrl = constructNeuroglancerUrl(ngState, baseUrl);
 
   const handleCopy = async () => {
-    const result = await copyToClipboard(externalUrl);
+    const result = await copyToClipboard(window.location.href);
     if (result.success) {
       toast.success('Neuroglancer link copied');
     } else {
