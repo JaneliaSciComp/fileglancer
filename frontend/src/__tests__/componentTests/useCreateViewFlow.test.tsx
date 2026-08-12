@@ -3,9 +3,13 @@ import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const checkout = vi.fn();
+const clearCart = vi.fn();
 let automatic = true;
 vi.mock('@/hooks/useCartCheckout', () => ({
   useCartCheckout: () => ({ checkout })
+}));
+vi.mock('@/contexts/CartContext', () => ({
+  useCartContext: () => ({ clearCart })
 }));
 vi.mock('@/contexts/PreferencesContext', () => ({
   usePreferencesContext: () => ({
@@ -38,6 +42,7 @@ beforeEach(() => {
   checkout
     .mockReset()
     .mockResolvedValue({ short_key: 'v1', read_key: 'rk1', name: 'A' });
+  clearCart.mockReset().mockResolvedValue(undefined);
   automatic = true;
 });
 
@@ -67,6 +72,7 @@ describe('useCreateViewFlow', () => {
     expect(onCreated).toHaveBeenCalledWith(
       expect.objectContaining({ read_key: 'rk1' })
     );
+    expect(clearCart).toHaveBeenCalled();
   });
 
   it('opens the dialog with data-link consent copy when links are not automatic, and waits for Continue', async () => {
@@ -86,5 +92,22 @@ describe('useCreateViewFlow', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /continue/i }));
     expect(checkout).toHaveBeenCalledWith(datasets, 'A');
+    expect(clearCart).toHaveBeenCalled();
+  });
+
+  it('does not clear the cart when checkout fails', async () => {
+    checkout.mockReset().mockRejectedValue(new Error('checkout failed'));
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+
+    act(() => {
+      apiRef.current!.startCreateView(datasets, 'A');
+    });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /^create$/i }));
+
+    expect(checkout).toHaveBeenCalledWith(datasets, 'A');
+    expect(clearCart).not.toHaveBeenCalled();
   });
 });
