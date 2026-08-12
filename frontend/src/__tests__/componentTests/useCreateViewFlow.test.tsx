@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import toast from 'react-hot-toast';
 
 const checkout = vi.fn();
 const clearCart = vi.fn();
@@ -109,5 +110,29 @@ describe('useCreateViewFlow', () => {
 
     expect(checkout).toHaveBeenCalledWith(datasets, 'A');
     expect(clearCart).not.toHaveBeenCalled();
+  });
+
+  it('still completes onCreated/navigate/dialog-close when checkout succeeds but clearCart rejects, without a "Checkout failed" toast', async () => {
+    clearCart.mockReset().mockRejectedValue(new Error('cart clear failed'));
+    const onCreated = vi.fn();
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+
+    act(() => {
+      apiRef.current!.startCreateView(datasets, 'A', onCreated);
+    });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /^create$/i }));
+
+    // The View was created successfully, so the success path must complete
+    // regardless of the cart-clear failure.
+    expect(onCreated).toHaveBeenCalledWith(
+      expect.objectContaining({ read_key: 'rk1' })
+    );
+    expect(apiRef.current!.open).toBe(false);
+    expect(toast.error).not.toHaveBeenCalledWith('Checkout failed');
+
+    await waitFor(() => expect(clearCart).toHaveBeenCalled());
   });
 });
