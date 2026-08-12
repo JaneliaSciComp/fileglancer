@@ -1,4 +1,5 @@
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router';
 
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { useCartContext } from '@/contexts/CartContext';
@@ -12,6 +13,7 @@ import type { CartItem } from '@/contexts/CartContext';
 export default function SelectionBar() {
   const { fileBrowserState, clearChecked, fileQuery } = useFileBrowserContext();
   const { addToCart } = useCartContext();
+  const navigate = useNavigate();
 
   const { checkedFiles } = fileBrowserState;
 
@@ -53,6 +55,7 @@ export default function SelectionBar() {
         datasets={selectionDatasets}
         defaultName="New View"
         label="New View from selection"
+        onCreated={view => navigate(`/view/${view.read_key}`)}
       />
       <FgButton onClick={clearChecked} variant="ghost">
         Clear
