@@ -6,6 +6,7 @@ import type { View } from '@/queries/viewQueries';
 
 const clearChecked = vi.fn();
 const addToCart = vi.fn().mockResolvedValue(undefined);
+const clearCart = vi.fn().mockResolvedValue(undefined);
 const navigate = vi.hoisted(() => vi.fn());
 const createdView: View = vi.hoisted(() => ({
   short_key: 'v1',
@@ -36,7 +37,7 @@ vi.mock('@/contexts/FileBrowserContext', () => ({
 }));
 
 vi.mock('@/contexts/CartContext', () => ({
-  useCartContext: () => ({ addToCart })
+  useCartContext: () => ({ addToCart, clearCart })
 }));
 
 vi.mock('@/components/ui/Views/CreateViewButton', () => ({
@@ -52,6 +53,7 @@ import SelectionBar from '@/components/ui/BrowsePage/SelectionBar';
 beforeEach(() => {
   clearChecked.mockClear();
   addToCart.mockClear();
+  clearCart.mockClear();
   navigate.mockClear();
   vi.mocked(toast.success).mockClear();
   vi.mocked(toast.error).mockClear();
@@ -90,7 +92,7 @@ describe('SelectionBar', () => {
     ).toBeInTheDocument();
   });
 
-  it('navigates to the embedded viewer when a View is created', async () => {
+  it('navigates to the embedded viewer when a View is created, without clearing the cart', async () => {
     const user = userEvent.setup();
     render(<SelectionBar />);
 
@@ -99,6 +101,10 @@ describe('SelectionBar', () => {
     );
 
     expect(navigate).toHaveBeenCalledWith('/view/rk1');
+    // Datasets here come from fileBrowserState.checkedFiles, not the cart -
+    // a View created from a file-browser selection must never wipe an
+    // unrelated Layer Cart.
+    expect(clearCart).not.toHaveBeenCalled();
   });
 
   it('clears the selection when Clear is clicked', async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { CartItem } from '@/contexts/CartContext';
 import type { View } from '@/queries/viewQueries';
@@ -20,11 +20,12 @@ const createdView: View = vi.hoisted(() => ({
 
 let cart: CartItem[] = [];
 const navigate = vi.hoisted(() => vi.fn());
+const clearCart = vi.hoisted(() => vi.fn());
 vi.mock('react-router', () => ({ useNavigate: () => navigate }));
 vi.mock('@/contexts/CartContext', () => ({
   useCartContext: () => ({
     cart,
-    clearCart: vi.fn().mockResolvedValue(undefined)
+    clearCart
   })
 }));
 vi.mock('@/queries/proxiedPathQueries', () => ({
@@ -53,6 +54,7 @@ import CartList from '@/components/ui/Views/CartList';
 
 beforeEach(() => {
   navigate.mockClear();
+  clearCart.mockReset().mockResolvedValue(undefined);
 });
 
 describe('CartList', () => {
@@ -74,7 +76,7 @@ describe('CartList', () => {
     ).toBeInTheDocument();
   });
 
-  it('navigates to the embedded viewer when a View is created', async () => {
+  it('navigates to the embedded viewer and clears the cart when a View is created', async () => {
     cart = [cartA, cartB];
     const user = userEvent.setup();
     render(<CartList />);
@@ -82,5 +84,9 @@ describe('CartList', () => {
     await user.click(screen.getByRole('button', { name: /create view/i }));
 
     expect(navigate).toHaveBeenCalledWith('/view/rk1');
+    // CartList's datasets come from the persisted cart, so it - unlike
+    // SelectionBar/FileBrowser - is the one caller that should clear it
+    // after a successful checkout.
+    await waitFor(() => expect(clearCart).toHaveBeenCalled());
   });
 });

@@ -111,7 +111,7 @@ describe('NeuroglancerView', () => {
     );
   });
 
-  it('copies the current page URL (not the external URL) when "Copy link" is clicked', async () => {
+  it('copies the canonical short link (not the full-state hash URL or the external URL) when "Copy link" is clicked', async () => {
     const user = userEvent.setup();
     useViewStateByReadKey.mockReturnValue({
       data: { title: 'My View', layers: [{ name: 'L0' }] },
@@ -120,7 +120,10 @@ describe('NeuroglancerView', () => {
     });
     render(<NeuroglancerView />);
     await user.click(screen.getByRole('button', { name: /copy link/i }));
-    expect(copyToClipboard).toHaveBeenCalledWith(window.location.href);
+    expect(copyToClipboard).toHaveBeenCalledWith(
+      `${window.location.origin}/view/rk1`
+    );
+    expect(copyToClipboard).not.toHaveBeenCalledWith(window.location.href);
     expect(copyToClipboard).not.toHaveBeenCalledWith(
       expect.stringContaining('https://ng.example/')
     );
