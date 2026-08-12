@@ -67,7 +67,7 @@ export default function FileBrowser({
     usePreferencesContext();
   const { addToCart } = useCartContext();
   const navigate = useNavigate();
-  const { startCreateView, consentDialog } = useCreateViewFlow();
+  const { startCreateView, dialog } = useCreateViewFlow();
   const { displayFiles } = useHideDotFiles();
   const { handleDownload } = useHandleDownload();
   const { handleView } = useHandleView();
@@ -395,7 +395,7 @@ export default function FileBrowser({
         />
       ) : null}
       <SelectionBar />
-      {consentDialog}
+      {dialog}
     </>
   );
 }
