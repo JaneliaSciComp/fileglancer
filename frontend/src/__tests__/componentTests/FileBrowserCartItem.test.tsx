@@ -37,8 +37,8 @@ vi.mock('@/hooks/useCreateViewFlow', async importOriginal => {
     ...actual,
     useCreateViewFlow: () => ({
       startCreateView: vi.fn(),
-      consentDialog: null,
-      consentOpen: false,
+      dialog: null,
+      open: false,
       pending: false
     })
   };

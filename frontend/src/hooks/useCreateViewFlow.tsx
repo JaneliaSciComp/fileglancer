@@ -108,8 +108,8 @@ export function useCreateViewFlow() {
             <Typography className="text-foreground">
               This will create {request.newLinkCount} data link
               {request.newLinkCount === 1 ? '' : 's'} and 1 View. If you share
-              the data link(s) with internal collaborators, they will be able
-              to view these data.
+              the data link(s) with internal collaborators, they will be able to
+              view these data.
             </Typography>
             <div className="flex flex-col gap-2">
               <Typography className="font-semibold text-foreground">
