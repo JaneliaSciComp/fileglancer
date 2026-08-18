@@ -203,6 +203,7 @@ def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optiona
         logger.warning(f"No external proxy URL was provided, proxy links will not be available.")
         url = None
     return ProxiedPath(
+        id=db_path.id,
         username=db_path.username,
         sharing_key=db_path.sharing_key,
         sharing_name=db_path.sharing_name,
