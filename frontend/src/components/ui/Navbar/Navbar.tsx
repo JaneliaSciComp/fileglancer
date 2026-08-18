@@ -30,7 +30,6 @@ import ProfileMenu from '@/components/ui/Navbar/ProfileMenu';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import useTheme from '@/hooks/useTheme';
 import { useActiveJobCount } from '@/hooks/useActiveJobCount';
-import { useCartCount } from '@/hooks/useCartCount';
 import { trackEvent } from '@/utils/fathom';
 
 type NavLink = {
@@ -76,7 +75,6 @@ function LogoSvg() {
 function NavList() {
   const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
   const activeJobCount = useActiveJobCount();
-  const cartCount = useCartCount();
 
   const links: NavLink[] = [
     { icon: HiOutlineFolder, title: 'Browse Files', href: '/browse' },
@@ -84,8 +82,7 @@ function NavList() {
     {
       icon: HiOutlineEye,
       title: 'NG Views',
-      href: '/ngviews',
-      badge: cartCount
+      href: '/ngviews'
     },
     {
       icon: HiOutlineRocketLaunch,
