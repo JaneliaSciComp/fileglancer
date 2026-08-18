@@ -485,7 +485,7 @@ export default function Table({
           const isSelected = selectedFileNames.has(row.original.name);
           return (
             <div
-              className={`grid cursor-pointer hover:bg-surface dark:hover:bg-surface-light ${isSelected ? 'bg-primary-light/20 outline outline-1 outline-primary' : virtualRow.index % 2 === 0 ? 'bg-surface-light dark:bg-surface/50' : ''}`}
+              className={`grid cursor-pointer hover:bg-surface dark:hover:bg-surface-light ${isSelected ? 'bg-primary-light/20 outline outline-1 outline-primary z-10' : virtualRow.index % 2 === 0 ? 'bg-surface-light dark:bg-surface/50' : ''}`}
               data-index={virtualRow.index}
               key={row.id}
               onClick={() =>
