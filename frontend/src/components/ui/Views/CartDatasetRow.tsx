@@ -125,7 +125,7 @@ export default function CartDatasetRow({
           onClick={() => void handleRemoveDataset()}
           variant="ghost"
         >
-          <FgIcon icon={HiOutlineTrash} size="sm" />
+          <FgIcon color="error" icon={HiOutlineTrash} size="sm" />
         </IconButton>
       </div>
       <Link
