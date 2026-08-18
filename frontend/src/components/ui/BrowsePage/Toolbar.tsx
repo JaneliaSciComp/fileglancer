@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router';
-import { ButtonGroup, IconButton } from '@material-tailwind/react';
+import { Badge, ButtonGroup, IconButton } from '@material-tailwind/react';
 import {
   HiRefresh,
   HiEye,
@@ -16,7 +16,6 @@ import {
 import { GoSidebarCollapse, GoSidebarExpand } from 'react-icons/go';
 
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
-import FgBadge from '@/components/designSystem/atoms/FgBadge';
 import { useCartCount } from '@/hooks/useCartCount';
 import NavigationButton from './NavigationButton';
 import NewFolderButton from './NewFolderButton';
@@ -236,29 +235,27 @@ export default function Toolbar({
                 : ''
             }`}
           />
-          <div className="relative">
-            <FgTooltip
-              as={IconButton}
-              icon={HiOutlineShoppingCart}
-              label="View Layer Cart"
-              onClick={() => selectDrawerMode('cart')}
-              triggerClasses={`${triggerClasses} ${
-                showPropertiesDrawer && propertiesDrawerMode === 'cart'
-                  ? '!bg-primary !text-primary-foreground'
-                  : ''
-              }`}
-            />
+          {/* Cart badge mirrors the count badge style used in the navbar. */}
+          <Badge color="secondary" overlap="circular" placement="top-end">
+            <Badge.Content>
+              <FgTooltip
+                as={IconButton}
+                icon={HiOutlineShoppingCart}
+                label="View Layer Cart"
+                onClick={() => selectDrawerMode('cart')}
+                triggerClasses={`${triggerClasses} ${
+                  showPropertiesDrawer && propertiesDrawerMode === 'cart'
+                    ? '!bg-primary !text-primary-foreground'
+                    : ''
+                }`}
+              />
+            </Badge.Content>
             {cartCount > 0 ? (
-              <FgBadge
-                className="absolute -top-1 -right-1 pointer-events-none"
-                color="secondary"
-                size="sm"
-                variant="pill"
-              >
+              <Badge.Indicator className="p-0 pointer-events-none text-[10px] min-w-4 min-h-4">
                 {cartCount > 9 ? '9+' : cartCount}
-              </FgBadge>
+              </Badge.Indicator>
             ) : null}
-          </div>
+          </Badge>
         </div>
       </div>
     </div>
