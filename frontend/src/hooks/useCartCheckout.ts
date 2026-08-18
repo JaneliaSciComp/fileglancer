@@ -78,6 +78,7 @@ export function useCartCheckout() {
           fsp_name: ds.fsp_name,
           path: ds.path,
           channel: ds.channel,
+          channelIndex: ds.channelIndex,
           label: ds.label
         };
       });
