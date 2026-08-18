@@ -84,10 +84,16 @@ export default function CartDatasetRow({
     }
   };
 
-  const handleToggleChannel = async (channel: string, checked: boolean) => {
+  const handleToggleChannel = async (
+    channel: string,
+    index: number,
+    checked: boolean
+  ) => {
     try {
       if (checked) {
-        await addToCart([{ fsp_name, path, channel, label: channel }]);
+        await addToCart([
+          { fsp_name, path, channel, label: channel, channelIndex: index }
+        ]);
       } else {
         await removeFromCart(path, channel);
       }
@@ -134,18 +140,21 @@ export default function CartDatasetRow({
           <div className="pl-6 flex flex-col gap-2 pt-2">
             {metadata ? <ZarrAxisTable metadata={metadata} /> : null}
             <div className="flex flex-col gap-1">
+              <Typography className="text-foreground/70 text-xs font-semibold">
+                Optional: select channels to create per-channel layers
+              </Typography>
               {loadingChannels ? (
                 <Typography className="text-foreground/70 text-sm">
                   Loading channels...
                 </Typography>
               ) : (
-                (channels ?? []).map(channel => (
+                (channels ?? []).map((channel, index) => (
                   <FgCheckbox
                     checked={checkedChannels.has(channel)}
                     key={channel}
                     label={channel}
                     onChange={e =>
-                      void handleToggleChannel(channel, e.target.checked)
+                      void handleToggleChannel(channel, index, e.target.checked)
                     }
                   />
                 ))

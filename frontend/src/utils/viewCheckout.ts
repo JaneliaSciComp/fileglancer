@@ -12,6 +12,7 @@ export type ResolvedCheckoutDataset = {
   fsp_name: string;
   path: string;
   channel?: string;
+  channelIndex?: number;
   label: string;
 };
 
@@ -46,7 +47,8 @@ async function generateStateForDataset(
           multiscale,
           metadata.arr,
           metadata.labels,
-          metadata.omero
+          metadata.omero,
+          ds.channel !== undefined
         )
       : generateNeuroglancerStateForDataURL(ds.url, metadata.zarrVersion);
     return decodeState(encoded);
@@ -58,17 +60,16 @@ async function generateStateForDataset(
   }
 }
 
-// If the cart entry names a channel, keep only layers whose name matches it;
-// otherwise keep every layer the dataset produced.
-function selectLayers(state: NgState, channel?: string): NgLayer[] {
+// With a channel selection, checkout forces the per-channel layer path, so
+// layers are in c-axis index order; pick the selected channel's layer by
+// index. No channel → keep every layer the dataset produced.
+function selectLayers(state: NgState, channelIndex?: number): NgLayer[] {
   const layers = state.layers ?? [];
-  if (!channel) {
+  if (channelIndex === undefined) {
     return layers;
   }
-  const matched = layers.filter(l =>
-    (l.name ?? '').toString().toLowerCase().includes(channel.toLowerCase())
-  );
-  return matched.length ? matched : layers;
+  const picked = layers[channelIndex];
+  return picked ? [picked] : layers;
 }
 
 // ponytail: merge per-dataset generated states instead of refactoring the
@@ -91,7 +92,7 @@ export async function buildViewState(
     if (!base) {
       base = state;
     }
-    for (const layer of selectLayers(state, ds.channel)) {
+    for (const layer of selectLayers(state, ds.channelIndex)) {
       const layer_index = combinedLayers.length;
       combinedLayers.push({ ...layer, archived: layer_index >= 4 });
       viewLayers.push({

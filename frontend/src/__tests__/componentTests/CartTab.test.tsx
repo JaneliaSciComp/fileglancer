@@ -212,7 +212,13 @@ describe('Layer Cart tab', () => {
 
     await waitFor(() => {
       expect(addToCart).toHaveBeenCalledWith([
-        { fsp_name: 'fsp1', path: '/a', channel: 'DAPI', label: 'DAPI' }
+        {
+          fsp_name: 'fsp1',
+          path: '/a',
+          channel: 'DAPI',
+          label: 'DAPI',
+          channelIndex: 0
+        }
       ]);
     });
   });
