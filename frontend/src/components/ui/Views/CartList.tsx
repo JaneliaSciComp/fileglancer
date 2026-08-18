@@ -92,7 +92,11 @@ export default function CartList() {
           defaultName="New View"
           label="Create View"
         />
-        <FgButton onClick={() => void handleClearCart()} variant="ghost">
+        <FgButton
+          color="error"
+          onClick={() => void handleClearCart()}
+          variant="ghost"
+        >
           Clear cart
         </FgButton>
       </div>
