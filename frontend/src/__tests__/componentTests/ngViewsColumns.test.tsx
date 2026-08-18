@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import userEvent from '@testing-library/user-event';
 import {
   useReactTable,
@@ -10,6 +11,15 @@ import {
 import { useNGViewsColumns } from '@/components/ui/Table/ngViewsColumns';
 import type { View } from '@/queries/viewQueries';
 import { formatDateString } from '@/utils';
+
+vi.mock('@/queries/proxiedPathQueries', () => ({
+  useAllProxiedPathsQuery: () => ({
+    data: [
+      { id: 1, fsp_name: 'nrs', path: 'dudman/reg.zarr/g1_r0' },
+      { id: 2, fsp_name: 'nrs', path: 'dudman/reg.zarr/g1_r1' }
+    ]
+  })
+}));
 
 const view: View = {
   short_key: 'k1',
@@ -72,7 +82,11 @@ function TableProbe({
 
 describe('useNGViewsColumns', () => {
   it('renders name, layer count, sharing label and updated date', () => {
-    render(<TableProbe onDelete={vi.fn()} onRename={vi.fn()} />);
+    render(
+      <MemoryRouter>
+        <TableProbe onDelete={vi.fn()} onRename={vi.fn()} />
+      </MemoryRouter>
+    );
     expect(screen.getByText('My View')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument(); // layer count
     expect(screen.getByText(/shared/i)).toBeInTheDocument(); // sharing label
@@ -81,11 +95,27 @@ describe('useNGViewsColumns', () => {
     ).toBeInTheDocument(); // updated date
   });
 
+  it('renders a browse link per layer source', () => {
+    render(
+      <MemoryRouter>
+        <TableProbe onDelete={vi.fn()} onRename={vi.fn()} />
+      </MemoryRouter>
+    );
+    const link = screen.getByText('dudman/reg.zarr/g1_r0');
+    expect(link).toBeInTheDocument();
+    expect(link.closest('a')).toHaveAttribute('href');
+    expect(screen.getByText('dudman/reg.zarr/g1_r1')).toBeInTheDocument();
+  });
+
   it('fires onRename and onDelete from the actions menu', async () => {
     const user = userEvent.setup();
     const onRename = vi.fn();
     const onDelete = vi.fn();
-    render(<TableProbe onDelete={onDelete} onRename={onRename} />);
+    render(
+      <MemoryRouter>
+        <TableProbe onDelete={onDelete} onRename={onRename} />
+      </MemoryRouter>
+    );
     const trigger = screen.getByRole('button'); // the CardActionsMenu trigger
 
     await user.click(trigger);

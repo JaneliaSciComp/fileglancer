@@ -1,12 +1,14 @@
 import { useMemo } from 'react';
+import { Link } from 'react-router';
 import { Typography } from '@material-tailwind/react';
 import type { ColumnDef } from '@tanstack/react-table';
 import toast from 'react-hot-toast';
 
 import type { View } from '@/queries/viewQueries';
-import { downloadTextFile, formatDateString } from '@/utils';
+import { downloadTextFile, formatDateString, makeBrowseLink } from '@/utils';
 import { constructNeuroglancerUrl } from '@/utils/neuroglancerUrl';
 import { copyToClipboard } from '@/utils/copyText';
+import { useAllProxiedPathsQuery } from '@/queries/proxiedPathQueries';
 import FgTooltip from '../widgets/FgTooltip';
 import CardActionsMenu from '@/components/ui/Menus/CardActionsMenu';
 import type { MenuItem } from '@/components/ui/Menus/FgMenuItems';
@@ -103,6 +105,18 @@ export function useNGViewsColumns(
   onDelete: (item: View) => void,
   baseUrl: string
 ): ColumnDef<View>[] {
+  // Views listed here are the current user's own, so their backing Data Links
+  // are in this (current-user-scoped) query. Layers whose Data Link is missing
+  // or broken simply don't resolve to a browse link.
+  const proxiedPathsQuery = useAllProxiedPathsQuery();
+  const pathById = useMemo(() => {
+    const map = new Map<number, { fsp_name: string; path: string }>();
+    for (const p of proxiedPathsQuery.data ?? []) {
+      map.set(p.id, { fsp_name: p.fsp_name, path: p.path });
+    }
+    return map;
+  }, [proxiedPathsQuery.data]);
+
   return useMemo(
     () => [
       {
@@ -132,19 +146,70 @@ export function useNGViewsColumns(
         header: 'Layers',
         accessorFn: row => row.layers.length,
         cell: ({ getValue }) => (
-          <Typography className="text-foreground" variant="small">
-            {getValue() as number}
-          </Typography>
+          <div className="flex items-center h-full">
+            <Typography className="text-foreground" variant="small">
+              {getValue() as number}
+            </Typography>
+          </div>
         ),
         enableSorting: true
+      },
+      {
+        id: 'sources',
+        header: 'Sources',
+        cell: ({ row }) => {
+          // De-dupe: per-channel layers of one dataset share a source path.
+          const seen = new Set<string>();
+          const sources: { fsp_name: string; path: string }[] = [];
+          for (const layer of row.original.layers) {
+            const src =
+              layer.data_link_id !== null
+                ? pathById.get(layer.data_link_id)
+                : undefined;
+            if (!src) {
+              continue;
+            }
+            const key = `${src.fsp_name}::${src.path}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              sources.push(src);
+            }
+          }
+          if (sources.length === 0) {
+            return (
+              <div className="flex items-center h-full">
+                <Typography className="text-foreground/60" variant="small">
+                  —
+                </Typography>
+              </div>
+            );
+          }
+          return (
+            <div className="flex flex-col justify-center gap-0.5 h-full min-w-0">
+              {sources.map(src => (
+                <Link
+                  className="text-primary text-xs truncate hover:underline"
+                  key={`${src.fsp_name}::${src.path}`}
+                  onClick={e => e.stopPropagation()}
+                  to={makeBrowseLink(src.fsp_name, src.path)}
+                >
+                  {src.path}
+                </Link>
+              ))}
+            </div>
+          );
+        },
+        enableSorting: false
       },
       {
         accessorKey: 'sharing_mode',
         header: 'Sharing',
         cell: ({ row }) => (
-          <Typography className="text-foreground" variant="small">
-            {SHARING_LABEL[row.original.sharing_mode]}
-          </Typography>
+          <div className="flex items-center h-full">
+            <Typography className="text-foreground" variant="small">
+              {SHARING_LABEL[row.original.sharing_mode]}
+            </Typography>
+          </div>
         ),
         enableSorting: true
       },
@@ -152,9 +217,11 @@ export function useNGViewsColumns(
         accessorKey: 'updated_at',
         header: 'Updated',
         cell: ({ cell }) => (
-          <Typography className="text-foreground truncate" variant="small">
-            {formatDateString(cell.getValue() as string)}
-          </Typography>
+          <div className="flex items-center h-full">
+            <Typography className="text-foreground truncate" variant="small">
+              {formatDateString(cell.getValue() as string)}
+            </Typography>
+          </div>
         ),
         enableSorting: true
       },
@@ -172,6 +239,6 @@ export function useNGViewsColumns(
         enableSorting: false
       }
     ],
-    [onRename, onDelete, baseUrl]
+    [onRename, onDelete, baseUrl, pathById]
   );
 }
