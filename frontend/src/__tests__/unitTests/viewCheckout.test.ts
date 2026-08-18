@@ -79,7 +79,7 @@ describe('buildViewState', () => {
     ]);
   });
 
-  it('narrows layers to those matching the requested channel', async () => {
+  it('selects the layer at the requested channel index', async () => {
     (generateNeuroglancerStateForOmeZarr as any).mockReturnValue(
       encoded({
         layers: [
@@ -95,11 +95,62 @@ describe('buildViewState', () => {
         fsp_name: 'f',
         path: '/a',
         channel: 'GFP',
+        channelIndex: 1,
         label: 'A'
       }
     ]);
     expect((ng_state as any).layers).toEqual([
       { name: 'GFP', type: 'image', archived: false }
     ]);
+  });
+
+  it('selects one per-channel layer per channel entry by index', async () => {
+    // Checkout forces the per-channel layer path when a channel is selected
+    // (8th generator arg = true), yielding layers in c-axis index order.
+    (generateNeuroglancerStateForOmeZarr as any).mockImplementation(
+      (...args: unknown[]) => {
+        const perChannel = args[7] === true;
+        return encoded({
+          layers: perChannel
+            ? [
+                { name: 'Ch0', localPosition: [0] },
+                { name: 'Ch1', localPosition: [1] },
+                { name: 'Ch2', localPosition: [2] },
+                { name: 'Ch3', localPosition: [3] }
+              ]
+            : [{ name: 'combined', localPosition: [] }]
+        });
+      }
+    );
+
+    const noChannel = await buildViewState([
+      { url: 'a', sharing_key: 'ka', fsp_name: 'f', path: '/a', label: 'A' }
+    ]);
+    expect((noChannel.ng_state as any).layers).toHaveLength(1);
+
+    const twoChannels = await buildViewState([
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        fsp_name: 'f',
+        path: '/a',
+        channel: 'Ch0',
+        channelIndex: 0,
+        label: 'A'
+      },
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        fsp_name: 'f',
+        path: '/a',
+        channel: 'Ch2',
+        channelIndex: 2,
+        label: 'A'
+      }
+    ]);
+    const layers = (twoChannels.ng_state as any).layers;
+    expect(layers).toHaveLength(2);
+    expect(layers[0].localPosition).toEqual([0]);
+    expect(layers[1].localPosition).toEqual([2]);
   });
 });
