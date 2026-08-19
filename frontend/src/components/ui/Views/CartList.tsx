@@ -7,7 +7,6 @@ import CartDatasetRow from '@/components/ui/Views/CartDatasetRow';
 import CreateViewButton from '@/components/ui/Views/CreateViewButton';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import { useCartContext } from '@/contexts/CartContext';
-import { useAllProxiedPathsQuery } from '@/queries/proxiedPathQueries';
 import { datasetKey } from '@/utils/pathHandling';
 import type { CartItem } from '@/contexts/CartContext';
 
@@ -46,17 +45,9 @@ function groupCartByDataset(cart: CartItem[]): CartGroup[] {
 
 export default function CartList() {
   const { cart, clearCart } = useCartContext();
-  const allProxiedPathsQuery = useAllProxiedPathsQuery();
   const navigate = useNavigate();
 
   const cartGroups = useMemo(() => groupCartByDataset(cart), [cart]);
-  const dataLinkUrlByDataset = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const p of allProxiedPathsQuery.data ?? []) {
-      map.set(datasetKey(p.fsp_name, p.path), p.url);
-    }
-    return map;
-  }, [allProxiedPathsQuery.data]);
 
   const handleClearCart = async () => {
     try {
@@ -78,9 +69,6 @@ export default function CartList() {
     <div className="flex flex-col gap-3">
       {cartGroups.map(group => (
         <CartDatasetRow
-          dataLinkUrl={dataLinkUrlByDataset.get(
-            datasetKey(group.fsp_name, group.path)
-          )}
           fsp_name={group.fsp_name}
           items={group.items}
           key={datasetKey(group.fsp_name, group.path)}

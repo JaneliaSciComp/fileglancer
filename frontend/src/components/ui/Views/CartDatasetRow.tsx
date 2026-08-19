@@ -11,6 +11,7 @@ import { useCartContext } from '@/contexts/CartContext';
 import { getOmeZarrChannels, getOmeZarrMetadata } from '@/omezarr-helper';
 import type { Metadata } from '@/omezarr-helper';
 import { makeBrowseLink } from '@/utils';
+import { getFileURL } from '@/utils/pathHandling';
 import type { CartItem } from '@/contexts/CartContext';
 
 interface CartDatasetRowProps {
@@ -18,20 +19,18 @@ interface CartDatasetRowProps {
   readonly path: string;
   readonly label: string;
   readonly items: CartItem[];
-  readonly dataLinkUrl: string | undefined;
 }
 
 // ponytail: two-level dataset->channel tree via MT Collapse (no generic
-// TreeView exists). Channel URL comes from an existing Data Link; if a
-// dataset has no link yet, expansion is disabled with a hint rather than
-// creating a link just to browse channels. Non-Zarr/N5 datasets simply fail
-// getOmeZarrChannels gracefully (toast) instead of a hard pre-check.
+// TreeView exists). Metadata/channels are fetched from the internal
+// /api/content URL (credentialed), so no Data Link is required to inspect
+// dimensions or pick channels. Non-Zarr/N5 datasets fail gracefully in
+// getOmeZarrChannels (toast) instead of a hard pre-check.
 export default function CartDatasetRow({
   fsp_name,
   path,
   label,
-  items,
-  dataLinkUrl
+  items
 }: CartDatasetRowProps) {
   const { addToCart, removeFromCart, removeManyFromCart } = useCartContext();
   const [isOpen, setIsOpen] = useState(false);
@@ -47,10 +46,14 @@ export default function CartDatasetRow({
   const handleToggleOpen = async () => {
     const nextOpen = !isOpen;
     setIsOpen(nextOpen);
-    if (nextOpen && channels === undefined && !loadingChannels && dataLinkUrl) {
+    if (!nextOpen) {
+      return;
+    }
+    const dataUrl = getFileURL(fsp_name, path);
+    if (channels === undefined && !loadingChannels) {
       setLoadingChannels(true);
       try {
-        setChannels(await getOmeZarrChannels(dataLinkUrl));
+        setChannels(await getOmeZarrChannels(dataUrl));
       } catch (error) {
         toast.error(
           error instanceof Error ? error.message : 'Failed to load channels'
@@ -60,10 +63,10 @@ export default function CartDatasetRow({
         setLoadingChannels(false);
       }
     }
-    if (nextOpen && metadata === null && !loadingMeta && dataLinkUrl) {
+    if (metadata === null && !loadingMeta) {
       setLoadingMeta(true);
       try {
-        setMetadata(await getOmeZarrMetadata(dataLinkUrl));
+        setMetadata(await getOmeZarrMetadata(dataUrl));
       } catch {
         // Metadata is a nice-to-have here; ignore fetch failures.
       } finally {
@@ -108,8 +111,7 @@ export default function CartDatasetRow({
     <div className="border-b border-surface py-2">
       <div className="flex items-center justify-between gap-2">
         <button
-          className="flex items-center gap-2 flex-1 min-w-0 text-left disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={!dataLinkUrl}
+          className="flex items-center gap-2 flex-1 min-w-0 text-left"
           onClick={() => void handleToggleOpen()}
           type="button"
         >
@@ -135,38 +137,32 @@ export default function CartDatasetRow({
         {path}
       </Link>
 
-      {dataLinkUrl ? (
-        <Collapse open={isOpen}>
-          <div className="pl-6 flex flex-col gap-2 pt-2">
-            {metadata ? <ZarrAxisTable metadata={metadata} /> : null}
-            <div className="flex flex-col gap-1">
-              <Typography className="text-foreground/70 text-xs font-semibold">
-                Optional: select channels to create per-channel layers
+      <Collapse open={isOpen}>
+        <div className="pl-6 flex flex-col gap-2 pt-2">
+          {metadata ? <ZarrAxisTable metadata={metadata} /> : null}
+          <div className="flex flex-col gap-1">
+            <Typography className="text-foreground/70 text-xs font-semibold">
+              Optional: select channels to create per-channel layers
+            </Typography>
+            {loadingChannels ? (
+              <Typography className="text-foreground/70 text-sm">
+                Loading channels...
               </Typography>
-              {loadingChannels ? (
-                <Typography className="text-foreground/70 text-sm">
-                  Loading channels...
-                </Typography>
-              ) : (
-                (channels ?? []).map((channel, index) => (
-                  <FgCheckbox
-                    checked={checkedChannels.has(channel)}
-                    key={channel}
-                    label={channel}
-                    onChange={e =>
-                      void handleToggleChannel(channel, index, e.target.checked)
-                    }
-                  />
-                ))
-              )}
-            </div>
+            ) : (
+              (channels ?? []).map((channel, index) => (
+                <FgCheckbox
+                  checked={checkedChannels.has(channel)}
+                  key={channel}
+                  label={channel}
+                  onChange={e =>
+                    void handleToggleChannel(channel, index, e.target.checked)
+                  }
+                />
+              ))
+            )}
           </div>
-        </Collapse>
-      ) : (
-        <Typography className="text-foreground/70 text-sm pl-6">
-          Channels load after the View is created.
-        </Typography>
-      )}
+        </div>
+      </Collapse>
     </div>
   );
 }
