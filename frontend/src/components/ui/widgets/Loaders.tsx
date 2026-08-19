@@ -73,14 +73,17 @@ function SidebarItemSkeleton({
 
 function TableRowSkeleton({
   gridColsClass,
+  gridColsStyle,
   numberOfCols = 4
 }: {
-  readonly gridColsClass: string;
+  readonly gridColsClass?: string;
+  readonly gridColsStyle?: string;
   readonly numberOfCols?: number;
 }) {
   return (
     <div
-      className={`grid ${gridColsClass} justify-items-start gap-4 px-4 py-4 animate-pulse`}
+      className={`grid ${gridColsClass ?? ''} justify-items-start gap-4 px-4 py-4 animate-pulse`}
+      style={gridColsStyle ? { gridTemplateColumns: gridColsStyle } : undefined}
     >
       {Array.from({ length: numberOfCols }).map((_, index) => (
         <div className="w-full h-4 bg-surface rounded" key={index} />

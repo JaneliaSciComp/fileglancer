@@ -66,7 +66,13 @@ function TableProbe({
 }) {
   // ponytail: TableProbe is already a component, so call the hook directly
   // rather than nesting renderHook inside a component under render().
-  const columns = useNGViewsColumns(onRename, onDelete, 'https://ng.example/');
+  const columns = useNGViewsColumns(
+    onRename,
+    onDelete,
+    'https://ng.example/',
+    320,
+    () => {}
+  );
   const table = useReactTable({
     data: [view],
     columns,
