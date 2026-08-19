@@ -18,10 +18,11 @@ const view: View = {
   layers: []
 };
 
-// Dataset A has an existing Data Link (channel expansion enabled) and TWO
-// cart entries (a base entry + an already-checked "GFP" channel entry), to
-// exercise the multi-entry "Remove" batch path.
-// Dataset B has no Data Link (channel expansion disabled + hint).
+// Dataset A has TWO cart entries (a base entry + an already-checked "GFP"
+// channel entry), to exercise the multi-entry "Remove" batch path.
+// Dataset B is a plain single-entry dataset - both expand identically now
+// that metadata is fetched from the internal /api/content URL rather than
+// a Data Link.
 const cartABase: CartItem = {
   fsp_name: 'fsp1',
   path: '/a',
@@ -92,20 +93,6 @@ vi.mock('@/omezarr-helper', () => ({
   getResolvedScales: () => [1, 0.65, 0.65],
   translateUnitToNeuroglancer: (unit?: string) => unit ?? ''
 }));
-vi.mock('@/queries/proxiedPathQueries', () => ({
-  useAllProxiedPathsQuery: () => ({
-    data: [
-      {
-        fsp_name: 'fsp1',
-        path: '/a',
-        url: 'https://data.example/a',
-        sharing_key: 'k1'
-      }
-    ],
-    error: null,
-    isPending: false
-  })
-}));
 vi.mock('@/components/ui/Views/CreateViewButton', () => ({
   default: ({ label }: { label?: string }) => (
     <button type="button">{label ?? 'Create View'}</button>
@@ -140,18 +127,20 @@ describe('Layer Cart tab', () => {
     expect(screen.getByText('Dataset B')).toBeInTheDocument();
   });
 
-  it('lazy-loads and shows channels when expanding a dataset with a Data Link', async () => {
+  it('lazy-loads and shows channels when expanding a dataset', async () => {
     const user = await renderCartTab();
     await user.click(screen.getByRole('button', { name: 'Dataset A' }));
 
     await waitFor(() => {
-      expect(getOmeZarrChannels).toHaveBeenCalledWith('https://data.example/a');
+      expect(getOmeZarrChannels).toHaveBeenCalledWith(
+        expect.stringContaining('/api/content/fsp1/a')
+      );
     });
     expect(await screen.findByText('DAPI')).toBeInTheDocument();
     expect(screen.getByText('GFP')).toBeInTheDocument();
   });
 
-  it('lazy-loads and shows the axis table when expanding a dataset with a Data Link', async () => {
+  it('lazy-loads and shows the axis table when expanding a dataset', async () => {
     getOmeZarrMetadata.mockResolvedValueOnce({
       shapes: [[3, 2048, 2048]],
       arr: { chunks: [1, 512, 512] },
@@ -172,7 +161,9 @@ describe('Layer Cart tab', () => {
     await user.click(screen.getByRole('button', { name: /Dataset A/ }));
 
     await waitFor(() => {
-      expect(getOmeZarrMetadata).toHaveBeenCalledWith('https://data.example/a');
+      expect(getOmeZarrMetadata).toHaveBeenCalledWith(
+        expect.stringContaining('/api/content/fsp1/a')
+      );
     });
     expect(await screen.findByText('Chunk Size')).toBeInTheDocument();
   });
@@ -193,14 +184,17 @@ describe('Layer Cart tab', () => {
     expect(screen.queryByText(/×/)).not.toBeInTheDocument();
   });
 
-  it('disables expansion and shows a hint for a dataset with no Data Link', async () => {
-    await renderCartTab();
+  it('expands a dataset that has no Data Link (metadata fetched via /api/content)', async () => {
+    const user = await renderCartTab();
     const expandButton = screen.getByRole('button', { name: 'Dataset B' });
-    expect(expandButton).toBeDisabled();
-    expect(
-      screen.getByText(/channels load after the view is created/i)
-    ).toBeInTheDocument();
-    expect(getOmeZarrChannels).not.toHaveBeenCalled();
+    expect(expandButton).not.toBeDisabled();
+    await user.click(expandButton);
+
+    await waitFor(() => {
+      expect(getOmeZarrChannels).toHaveBeenCalledWith(
+        expect.stringContaining('/api/content/fsp2/b')
+      );
+    });
   });
 
   it('toggling a channel checkbox adds a channel-specific CartItem', async () => {
