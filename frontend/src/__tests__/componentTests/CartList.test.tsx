@@ -28,9 +28,6 @@ vi.mock('@/contexts/CartContext', () => ({
     clearCart
   })
 }));
-vi.mock('@/queries/proxiedPathQueries', () => ({
-  useAllProxiedPathsQuery: () => ({ data: [] })
-}));
 vi.mock('@/components/ui/Views/CartDatasetRow', () => ({
   default: ({ label }: { label: string }) => (
     <div data-testid="row">{label}</div>
