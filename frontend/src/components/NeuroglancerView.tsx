@@ -82,8 +82,8 @@ export default function NeuroglancerView() {
       className="flex h-full w-full flex-col bg-background"
       ref={containerRef}
     >
-      <div className="flex shrink-0 flex-col gap-1 border-b border-surface px-4 py-2">
-        <div className="flex items-center gap-1 text-foreground/70">
+      <div className="flex shrink-0 items-center justify-between gap-4 border-b border-surface px-4 py-2">
+        <div className="flex min-w-0 items-center gap-1 text-foreground/70">
           <FgLink size="sm" to="/ngviews">
             NG Views
           </FgLink>
@@ -92,40 +92,32 @@ export default function NeuroglancerView() {
             {title}
           </Typography>
         </div>
-        <div className="flex items-center justify-between gap-4">
-          <Typography
-            className="truncate text-foreground font-semibold"
-            type="h6"
+        <div className="flex shrink-0 items-center gap-2">
+          <FgButton onClick={() => void handleCopy()} variant="ghost">
+            <FgIcon icon={HiOutlineDuplicate} size="sm" /> Copy link
+          </FgButton>
+          <FgButton
+            onClick={() =>
+              downloadTextFile(
+                JSON.stringify(ngState, null, 2),
+                `${title}.json`
+              )
+            }
+            variant="ghost"
           >
-            {title}
-          </Typography>
-          <div className="flex shrink-0 items-center gap-2">
-            <FgButton onClick={() => void handleCopy()} variant="ghost">
-              <FgIcon icon={HiOutlineDuplicate} size="sm" /> Copy link
-            </FgButton>
-            <FgButton
-              onClick={() =>
-                downloadTextFile(
-                  JSON.stringify(ngState, null, 2),
-                  `${title}.json`
-                )
-              }
-              variant="ghost"
-            >
-              <FgIcon icon={HiOutlineDownload} size="sm" /> Download JSON
-            </FgButton>
-            <FgButton
-              onClick={() =>
-                window.open(externalUrl, '_blank', 'noopener,noreferrer')
-              }
-              variant="ghost"
-            >
-              <FgIcon icon={HiOutlineExternalLink} size="sm" /> Open external
-            </FgButton>
-            <FgButton onClick={handleFullscreen} variant="ghost">
-              <FgIcon icon={HiOutlineArrowsExpand} size="sm" /> Fullscreen
-            </FgButton>
-          </div>
+            <FgIcon icon={HiOutlineDownload} size="sm" /> Download JSON
+          </FgButton>
+          <FgButton
+            onClick={() =>
+              window.open(externalUrl, '_blank', 'noopener,noreferrer')
+            }
+            variant="ghost"
+          >
+            <FgIcon icon={HiOutlineExternalLink} size="sm" /> Open external
+          </FgButton>
+          <FgButton onClick={handleFullscreen} variant="ghost">
+            <FgIcon icon={HiOutlineArrowsExpand} size="sm" /> Fullscreen
+          </FgButton>
         </div>
       </div>
       <iframe
