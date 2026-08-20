@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router';
 import type { ReactNode } from 'react';
 
 import { useCartCheckout } from '@/hooks/useCartCheckout';
+import { useCartDimensionCheck } from '@/hooks/useCartDimensionCheck';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useAllProxiedPathsQuery } from '@/queries/proxiedPathQueries';
 import { datasetKey } from '@/utils/pathHandling';
@@ -35,6 +36,8 @@ export function useCreateViewFlow() {
   const [pending, setPending] = useState(false);
   const [name, setName] = useState('');
   const [request, setRequest] = useState<PendingRequest | null>(null);
+
+  const { hasMismatch } = useCartDimensionCheck(request?.datasets ?? []);
 
   const runCheckout = async () => {
     if (!request) {
@@ -124,6 +127,17 @@ export function useCreateViewFlow() {
               />
             </div>
           </>
+        ) : null}
+
+        {hasMismatch ? (
+          <div className="flex flex-col gap-1">
+            <Typography className="text-warning-dark dark:text-warning-light font-semibold">
+              Some layers have dimensions that differ from the first layer.
+            </Typography>
+            <Typography className="text-foreground">
+              Expand each dataset in the Layer Cart to see its full dimensions.
+            </Typography>
+          </div>
         ) : null}
 
         <div className="flex gap-4">
