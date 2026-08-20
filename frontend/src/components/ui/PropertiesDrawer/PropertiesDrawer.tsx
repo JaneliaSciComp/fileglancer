@@ -169,7 +169,7 @@ export default function PropertiesDrawer({
   const tooltipTriggerClasses = 'max-w-[calc(100%-2rem)] truncate';
 
   return (
-    <div data-tour="properties-drawer">
+    <div className="h-full" data-tour="properties-drawer">
       <Card className="overflow-auto w-full h-full max-h-full p-3 rounded-none shadow-none flex flex-col border-0">
         <div className="flex items-center justify-between gap-4 mb-1 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
