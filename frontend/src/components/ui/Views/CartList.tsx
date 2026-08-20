@@ -7,6 +7,7 @@ import CartDatasetRow from '@/components/ui/Views/CartDatasetRow';
 import CreateViewButton from '@/components/ui/Views/CreateViewButton';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import { useCartContext } from '@/contexts/CartContext';
+import { useCartDimensionCheck } from '@/hooks/useCartDimensionCheck';
 import { datasetKey } from '@/utils/pathHandling';
 import type { CartItem } from '@/contexts/CartContext';
 
@@ -48,6 +49,7 @@ export default function CartList() {
   const navigate = useNavigate();
 
   const cartGroups = useMemo(() => groupCartByDataset(cart), [cart]);
+  const { mismatchedKeys } = useCartDimensionCheck(cart);
 
   const handleClearCart = async () => {
     try {
@@ -73,6 +75,7 @@ export default function CartList() {
           items={group.items}
           key={datasetKey(group.fsp_name, group.path)}
           label={group.label}
+          mismatch={mismatchedKeys.has(datasetKey(group.fsp_name, group.path))}
           path={group.path}
         />
       ))}
