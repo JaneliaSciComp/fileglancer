@@ -98,6 +98,9 @@ vi.mock('@/components/ui/Views/CreateViewButton', () => ({
     <button type="button">{label ?? 'Create View'}</button>
   )
 }));
+vi.mock('@/hooks/useCartDimensionCheck', () => ({
+  useCartDimensionCheck: () => ({ mismatchedKeys: new Set(), hasMismatch: false })
+}));
 
 import CartList from '@/components/ui/Views/CartList';
 
