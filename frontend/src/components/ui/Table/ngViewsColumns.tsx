@@ -178,9 +178,12 @@ export function useNGViewsColumns(
           return (
             <div className="flex items-center justify-start truncate w-full h-full text-left">
               <FgTooltip label={label} triggerClasses={TRIGGER_CLASSES}>
-                <Typography className="text-foreground truncate text-left select-all">
+                <Link
+                  className="text-primary truncate text-left hover:underline"
+                  to={`/view/${item.read_key}`}
+                >
                   {label}
-                </Typography>
+                </Link>
               </FgTooltip>
             </div>
           );
