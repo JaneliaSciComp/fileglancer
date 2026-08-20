@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Typography } from '@material-tailwind/react';
+import { useNavigate } from 'react-router';
 import type { UseQueryResult } from '@tanstack/react-query';
 
 import zarrLogo from '@/assets/zarr.jpg';
@@ -13,6 +14,7 @@ import type {
   PendingToolKey
 } from '@/hooks/useZarrMetadata';
 import useDataToolLinks from '@/hooks/useDataToolLinks';
+import { useCreateViewFlow } from '@/hooks/useCreateViewFlow';
 import { Metadata, getDatasetWarnings } from '@/omezarr-helper';
 
 type ZarrPreviewProps = {
@@ -59,6 +61,18 @@ export default function ZarrPreview({
     pendingToolKey,
     setPendingToolKey
   );
+
+  const navigate = useNavigate();
+  const { startCreateView, dialog } = useCreateViewFlow();
+
+  const datasetLabel = path.split('/').filter(Boolean).pop() || path;
+  const handleCreateView = () => {
+    startCreateView(
+      [{ fsp_name: fspName, path, label: datasetLabel }],
+      datasetLabel,
+      view => navigate(`/view/${view.read_key}`)
+    );
+  };
 
   return (
     <div className="min-w-full p-4 shadow-sm rounded-md bg-primary-light/30">
@@ -113,6 +127,7 @@ export default function ZarrPreview({
               compact={mainPanelWidth <= 1000}
               dataLinkUrl={openWithToolUrls.copy || undefined}
               fspName={fspName}
+              onCreateView={handleCreateView}
               onToolClick={handleToolClick}
               path={path}
               showCopiedTooltip={showCopiedTooltip}
@@ -146,6 +161,7 @@ export default function ZarrPreview({
           </div>
         ) : null}
       </div>
+      {dialog}
     </div>
   );
 }
