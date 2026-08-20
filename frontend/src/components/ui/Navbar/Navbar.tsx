@@ -81,7 +81,7 @@ function NavList() {
     { icon: HiOutlineShare, title: 'Data Links', href: '/links' },
     {
       icon: HiOutlineEye,
-      title: 'NG Views',
+      title: 'Views',
       href: '/ngviews'
     },
     {
