@@ -136,7 +136,7 @@ export default function DataToolLinks({
           <div className="flex flex-col items-center w-16">
             <FgTooltip
               as="button"
-              label="Create a Neuroglancer view of this dataset"
+              label="Create a view of this dataset"
               onClick={() => onCreateView()}
               triggerClasses={CIRCLE_CLASSES}
             >
