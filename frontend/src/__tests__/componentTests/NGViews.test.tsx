@@ -53,7 +53,7 @@ describe('NGViews page', () => {
         <NGViews />
       </MemoryRouter>
     );
-    expect(screen.getByText('Neuroglancer Views')).toBeInTheDocument();
+    expect(screen.getByText('Views')).toBeInTheDocument();
     expect(screen.getByText('Seeded View')).toBeInTheDocument();
   });
 });
