@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { Collapse, IconButton, Typography } from '@material-tailwind/react';
 import { HiChevronRight, HiOutlineTrash } from 'react-icons/hi';
+import { HiExclamationTriangle } from 'react-icons/hi2';
 import toast from 'react-hot-toast';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgCheckbox from '@/components/designSystem/atoms/formElements/FgCheckbox';
+import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import ZarrAxisTable from '@/components/ui/BrowsePage/ZarrAxisTable';
 import { useCartContext } from '@/contexts/CartContext';
 import { getOmeZarrChannels, getOmeZarrMetadata } from '@/omezarr-helper';
@@ -19,6 +21,7 @@ interface CartDatasetRowProps {
   readonly path: string;
   readonly label: string;
   readonly items: CartItem[];
+  readonly mismatch?: boolean;
 }
 
 // ponytail: two-level dataset->channel tree via MT Collapse (no generic
@@ -30,7 +33,8 @@ export default function CartDatasetRow({
   fsp_name,
   path,
   label,
-  items
+  items,
+  mismatch
 }: CartDatasetRowProps) {
   const { addToCart, removeFromCart, removeManyFromCart } = useCartContext();
   const [isOpen, setIsOpen] = useState(false);
@@ -121,6 +125,15 @@ export default function CartDatasetRow({
             size="sm"
           />
           <Typography className="text-foreground truncate">{label}</Typography>
+          {mismatch ? (
+            <FgTooltip label="Dimensions differ from the first layer in this view">
+              <FgIcon
+                className="text-warning shrink-0"
+                icon={HiExclamationTriangle}
+                size="sm"
+              />
+            </FgTooltip>
+          ) : null}
         </button>
         <IconButton
           aria-label="Remove dataset"
