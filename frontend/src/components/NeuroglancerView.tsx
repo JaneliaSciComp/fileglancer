@@ -85,7 +85,7 @@ export default function NeuroglancerView() {
       <div className="flex shrink-0 items-center justify-between gap-4 border-b border-surface px-4 py-2">
         <div className="flex min-w-0 items-center gap-1 text-foreground/70">
           <FgLink size="sm" to="/ngviews">
-            NG Views
+            Views
           </FgLink>
           <Typography variant="small">/</Typography>
           <Typography className="truncate" variant="small">

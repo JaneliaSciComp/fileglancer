@@ -84,16 +84,16 @@ export default function NGViews() {
     <>
       <div className="w-full">
         <Typography className="mb-2 text-foreground font-bold" type="h5">
-          Neuroglancer Views
+          Views
         </Typography>
         <Typography className="mb-4 text-foreground">
-          Your saved Neuroglancer Views.
+          Your saved Views.
         </Typography>
 
         <TableCard
           columns={columns}
           data={allViewsQuery.data || []}
-          dataType="NG views"
+          dataType="views"
           errorState={allViewsQuery.error}
           gridColsStyle={gridColsStyle}
           loadingState={allViewsQuery.isPending}
