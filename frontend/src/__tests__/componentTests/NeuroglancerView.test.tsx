@@ -77,14 +77,14 @@ describe('NeuroglancerView', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows a breadcrumb linking back to the NG Views list', () => {
+  it('shows a breadcrumb linking back to the Views list', () => {
     useViewStateByReadKey.mockReturnValue({
       data: { title: 'My View', layers: [{ name: 'L0' }] },
       isPending: false,
       isError: false
     });
     render(<NeuroglancerView />);
-    const crumbLink = screen.getByRole('link', { name: /ng views/i });
+    const crumbLink = screen.getByRole('link', { name: /^views$/i });
     expect(crumbLink).toHaveAttribute('href', '/ngviews');
   });
 
