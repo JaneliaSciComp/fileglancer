@@ -5,10 +5,12 @@ import { useNavigate } from 'react-router';
 import type { ReactNode } from 'react';
 
 import { useCartCheckout } from '@/hooks/useCartCheckout';
+import { useCartDimensionCheck } from '@/hooks/useCartDimensionCheck';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useAllProxiedPathsQuery } from '@/queries/proxiedPathQueries';
 import { datasetKey } from '@/utils/pathHandling';
 import FgButton from '@/components/designSystem/atoms/FgButton';
+import FgCheckbox from '@/components/designSystem/atoms/formElements/FgCheckbox';
 import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
 import FgSwitch from '@/components/designSystem/atoms/formElements/FgSwitch';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
@@ -34,7 +36,10 @@ export function useCreateViewFlow() {
 
   const [pending, setPending] = useState(false);
   const [name, setName] = useState('');
+  const [acknowledged, setAcknowledged] = useState(false);
   const [request, setRequest] = useState<PendingRequest | null>(null);
+
+  const { hasMismatch } = useCartDimensionCheck(request?.datasets ?? []);
 
   const runCheckout = async () => {
     if (!request) {
@@ -79,6 +84,7 @@ export function useCreateViewFlow() {
       areDataLinksAutomatic && dataLinkSubpathMode !== 'custom';
 
     setName(defaultName);
+    setAcknowledged(false);
     setRequest({
       datasets,
       onCreated,
@@ -126,9 +132,24 @@ export function useCreateViewFlow() {
           </>
         ) : null}
 
+        {hasMismatch ? (
+          <div className="flex flex-col gap-2">
+            <Typography className="text-warning font-semibold">
+              Some layers have dimensions that differ from the first layer.
+            </Typography>
+            <FgCheckbox
+              checked={acknowledged}
+              label="I understand I'm creating a view with mismatched dimensions."
+              onChange={e => setAcknowledged(e.target.checked)}
+            />
+          </div>
+        ) : null}
+
         <div className="flex gap-4">
           <FgButton
-            disabled={pending || name.trim() === ''}
+            disabled={
+              pending || name.trim() === '' || (hasMismatch && !acknowledged)
+            }
             loading={pending}
             loadingText="Creating..."
             onClick={() => void runCheckout()}
