@@ -1,4 +1,7 @@
-import { getResolvedScales, translateUnitToNeuroglancer } from '@/omezarr-helper';
+import {
+  getResolvedScales,
+  translateUnitToNeuroglancer
+} from '@/omezarr-helper';
 
 import type { Metadata } from '@/omezarr-helper';
 
@@ -21,6 +24,9 @@ export function getDimensionSignature(
   try {
     scales = getResolvedScales(multiscale);
   } catch {
+    return null;
+  }
+  if (scales.length === 0) {
     return null;
   }
   return {
