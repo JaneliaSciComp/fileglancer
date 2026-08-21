@@ -29,6 +29,28 @@ vi.mock('@/queries/proxiedPathQueries', () => ({
     ]
   })
 }));
+vi.mock('@/contexts/PreferencesContext', () => ({
+  usePreferencesContext: () => ({ pathPreference: ['linux_path'] })
+}));
+vi.mock('@/contexts/ZonesAndFspMapContext', () => ({
+  useZoneAndFspMapContext: () => ({
+    zonesAndFspQuery: {
+      // key format is `fsp_<name>` (see makeMapKey)
+      data: {
+        fsp_nrs: {
+          zone: 'z',
+          name: 'nrs',
+          group: '',
+          storage: '',
+          mount_path: '/nrs',
+          linux_path: '/nrs',
+          mac_path: null,
+          windows_path: null
+        }
+      }
+    }
+  })
+}));
 
 const view: View = {
   short_key: 'k1',
@@ -116,10 +138,11 @@ describe('useNGViewsColumns', () => {
         <TableProbe onDelete={vi.fn()} onRename={vi.fn()} />
       </MemoryRouter>
     );
-    const link = screen.getByText('dudman/reg.zarr/g1_r0');
+    // Sources show the full path (file share path + subpath), not just the subpath.
+    const link = screen.getByText('/nrs/dudman/reg.zarr/g1_r0');
     expect(link).toBeInTheDocument();
     expect(link.closest('a')).toHaveAttribute('href');
-    expect(screen.getByText('dudman/reg.zarr/g1_r1')).toBeInTheDocument();
+    expect(screen.getByText('/nrs/dudman/reg.zarr/g1_r1')).toBeInTheDocument();
   });
 
   it('fires onRename and onDelete from the actions menu', async () => {

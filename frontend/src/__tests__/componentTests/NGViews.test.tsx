@@ -43,6 +43,12 @@ vi.mock('@/queries/proxiedPathQueries', () => ({
 vi.mock('@/components/ui/Views/CreateViewButton', () => ({
   default: () => <button type="button">Create View</button>
 }));
+vi.mock('@/contexts/PreferencesContext', () => ({
+  usePreferencesContext: () => ({ pathPreference: ['linux_path'] })
+}));
+vi.mock('@/contexts/ZonesAndFspMapContext', () => ({
+  useZoneAndFspMapContext: () => ({ zonesAndFspQuery: { data: {} } })
+}));
 
 import NGViews from '@/components/NGViews';
 
