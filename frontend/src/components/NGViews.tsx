@@ -22,7 +22,7 @@ export default function NGViews() {
   // Sources column is user-resizable via a drag handle in its header. Width
   // lives here (not in the column def) so a re-render on drag actually
   // re-flows the CSS grid template.
-  const [sourcesColWidth, setSourcesColWidth] = useState(320);
+  const [sourcesColWidth, setSourcesColWidth] = useState(260);
   const clampSourcesWidth = useCallback(
     (w: number) => Math.max(120, Math.min(900, w)),
     []
@@ -78,7 +78,7 @@ export default function NGViews() {
   // Fixed pixel tracks for every column except Sources (user-resizable).
   // Fixed (not fr) so the row has a deterministic width — that's what lets
   // the outer overflow-x-auto scroll when Sources grows past the viewport.
-  const gridColsStyle = `220px 80px ${sourcesColWidth}px 160px 180px 80px`;
+  const gridColsStyle = `160px 80px ${sourcesColWidth}px 160px 160px 56px`;
 
   return (
     <>
