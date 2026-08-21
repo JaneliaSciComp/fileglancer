@@ -6,13 +6,22 @@ import type { ColumnDef } from '@tanstack/react-table';
 import toast from 'react-hot-toast';
 
 import type { View } from '@/queries/viewQueries';
-import { downloadTextFile, formatDateString, makeBrowseLink } from '@/utils';
+import {
+  downloadTextFile,
+  formatDateString,
+  getPreferredPathForDisplay,
+  makeBrowseLink,
+  makeMapKey
+} from '@/utils';
 import { constructNeuroglancerUrl } from '@/utils/neuroglancerUrl';
 import { copyToClipboard } from '@/utils/copyText';
 import { useAllProxiedPathsQuery } from '@/queries/proxiedPathQueries';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
+import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import FgTooltip from '../widgets/FgTooltip';
 import CardActionsMenu from '@/components/ui/Menus/CardActionsMenu';
 import type { MenuItem } from '@/components/ui/Menus/FgMenuItems';
+import type { FileSharePath } from '@/shared.types';
 
 const TRIGGER_CLASSES = 'h-min max-w-full';
 
@@ -159,6 +168,8 @@ export function useNGViewsColumns(
   // are in this (current-user-scoped) query. Layers whose Data Link is missing
   // or broken simply don't resolve to a browse link.
   const proxiedPathsQuery = useAllProxiedPathsQuery();
+  const { pathPreference } = usePreferencesContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const pathById = useMemo(() => {
     const map = new Map<number, { fsp_name: string; path: string }>();
     for (const p of proxiedPathsQuery.data ?? []) {
@@ -250,17 +261,25 @@ export function useNGViewsColumns(
           }
           return (
             <div className="flex flex-col justify-center gap-0.5 h-full w-full min-w-0 text-left">
-              {sources.map(src => (
-                <Link
-                  className="block max-w-full truncate text-primary text-xs text-left hover:underline"
-                  key={`${src.fsp_name}::${src.path}`}
-                  onClick={e => e.stopPropagation()}
-                  title={src.path}
-                  to={makeBrowseLink(src.fsp_name, src.path)}
-                >
-                  {src.path}
-                </Link>
-              ))}
+              {sources.map(src => {
+                const fsp = zonesAndFspQuery.data?.[
+                  makeMapKey('fsp', src.fsp_name)
+                ] as FileSharePath | undefined;
+                const fullPath =
+                  getPreferredPathForDisplay(pathPreference, fsp, src.path) ||
+                  src.path;
+                return (
+                  <Link
+                    className="block max-w-full truncate text-primary text-xs text-left hover:underline"
+                    key={`${src.fsp_name}::${src.path}`}
+                    onClick={e => e.stopPropagation()}
+                    title={fullPath}
+                    to={makeBrowseLink(src.fsp_name, src.path)}
+                  >
+                    {fullPath}
+                  </Link>
+                );
+              })}
             </div>
           );
         },
@@ -307,6 +326,15 @@ export function useNGViewsColumns(
         enableSorting: false
       }
     ],
-    [onRename, onDelete, baseUrl, pathById, sourcesColWidth, onSourcesResize]
+    [
+      onRename,
+      onDelete,
+      baseUrl,
+      pathById,
+      sourcesColWidth,
+      onSourcesResize,
+      pathPreference,
+      zonesAndFspQuery.data
+    ]
   );
 }
