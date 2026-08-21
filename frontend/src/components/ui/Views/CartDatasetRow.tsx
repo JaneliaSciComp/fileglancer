@@ -111,6 +111,12 @@ export default function CartDatasetRow({
     }
   };
 
+  // A plain (non-OME) Zarr array has no multiscale axes and no channels, so its
+  // expanded body would otherwise be empty. Track whether there is anything to
+  // show so we can render an explicit "nothing here" message instead.
+  const hasOmeContent =
+    !!metadata?.multiscales?.[0]?.axes?.length || (channels?.length ?? 0) > 0;
+
   return (
     <div className="border-b border-surface py-2">
       <div className="flex items-center justify-between gap-2">
@@ -152,28 +158,34 @@ export default function CartDatasetRow({
 
       <Collapse open={isOpen}>
         <div className="pl-6 flex flex-col gap-2 pt-2">
-          {metadata ? <ZarrAxisTable metadata={metadata} /> : null}
-          <div className="flex flex-col gap-1">
-            <Typography className="text-foreground/70 text-xs font-semibold">
-              Optional: select channels to create per-channel layers
+          {loadingMeta || loadingChannels ? (
+            <Typography className="text-foreground/70 text-sm">
+              Loading...
             </Typography>
-            {loadingChannels ? (
-              <Typography className="text-foreground/70 text-sm">
-                Loading channels...
-              </Typography>
-            ) : (
-              (channels ?? []).map((channel, index) => (
-                <FgCheckbox
-                  checked={checkedChannels.has(channel)}
-                  key={channel}
-                  label={channel}
-                  onChange={e =>
-                    void handleToggleChannel(channel, index, e.target.checked)
-                  }
-                />
-              ))
-            )}
-          </div>
+          ) : !hasOmeContent ? (
+            <Typography className="text-foreground/70 text-sm">
+              No OME-Zarr metadata to display.
+            </Typography>
+          ) : (
+            <>
+              {metadata ? <ZarrAxisTable metadata={metadata} /> : null}
+              <div className="flex flex-col gap-1">
+                <Typography className="text-foreground/70 text-xs font-semibold">
+                  Optional: select channels to create per-channel layers
+                </Typography>
+                {(channels ?? []).map((channel, index) => (
+                  <FgCheckbox
+                    checked={checkedChannels.has(channel)}
+                    key={channel}
+                    label={channel}
+                    onChange={e =>
+                      void handleToggleChannel(channel, index, e.target.checked)
+                    }
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </Collapse>
     </div>
