@@ -99,7 +99,10 @@ vi.mock('@/components/ui/Views/CreateViewButton', () => ({
   )
 }));
 vi.mock('@/hooks/useCartDimensionCheck', () => ({
-  useCartDimensionCheck: () => ({ mismatchedKeys: new Set(), hasMismatch: false })
+  useCartDimensionCheck: () => ({
+    mismatchedKeys: new Set(),
+    hasMismatch: false
+  })
 }));
 
 import CartList from '@/components/ui/Views/CartList';
@@ -185,6 +188,19 @@ describe('Layer Cart tab', () => {
     // Channels still render fine; no dims string is shown for this dataset.
     expect(await screen.findByText('DAPI')).toBeInTheDocument();
     expect(screen.queryByText(/×/)).not.toBeInTheDocument();
+  });
+
+  it('shows a "no OME-Zarr metadata" message for a plain (non-OME) array', async () => {
+    // Plain Zarr array: no channels and getOmeZarrMetadata throws (no
+    // multiscale group), so the expanded body has nothing to show.
+    getOmeZarrChannels.mockResolvedValueOnce([]);
+    getOmeZarrMetadata.mockRejectedValueOnce(new Error('not ome-zarr'));
+    const user = await renderCartTab();
+    await user.click(screen.getByRole('button', { name: 'Dataset B' }));
+
+    expect(
+      await screen.findByText('No OME-Zarr metadata to display.')
+    ).toBeInTheDocument();
   });
 
   it('expands a dataset that has no Data Link (metadata fetched via /api/content)', async () => {
