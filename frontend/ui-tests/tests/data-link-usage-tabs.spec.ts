@@ -29,8 +29,10 @@ async function openDataLinkUsageDialog(page: Page, dirName: string) {
   await expect(dataLinkToggle).toBeVisible({ timeout: 10000 });
   await dataLinkToggle.click();
 
-  // Confirm data link creation in the dialog
-  const confirmButton = page.getByRole('button', {
+  // Confirm data link creation in the dialog. Scope to the dialog: the zarr
+  // preview also has a "Create a view" button, so a page-wide /create/ match
+  // is ambiguous.
+  const confirmButton = page.getByRole('dialog').getByRole('button', {
     name: /confirm|create|yes/i
   });
   await expect(confirmButton).toBeVisible({ timeout: 5000 });
