@@ -20,7 +20,10 @@ vi.mock('@/queries/proxiedPathQueries', () => ({
 }));
 vi.mock('react-router', () => ({ useNavigate: () => vi.fn() }));
 vi.mock('@/hooks/useCartDimensionCheck', () => ({
-  useCartDimensionCheck: () => ({ mismatchedKeys: new Set(), hasMismatch: false })
+  useCartDimensionCheck: () => ({
+    mismatchedKeys: new Set(),
+    hasMismatch: false
+  })
 }));
 
 import { useCreateViewFlow } from '@/hooks/useCreateViewFlow';

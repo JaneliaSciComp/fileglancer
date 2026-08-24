@@ -23,7 +23,10 @@ vi.mock('@/contexts/CartContext', () => ({
   useCartContext: () => ({ clearCart: vi.fn().mockResolvedValue(undefined) })
 }));
 vi.mock('@/hooks/useCartDimensionCheck', () => ({
-  useCartDimensionCheck: () => ({ mismatchedKeys: new Set(), hasMismatch: false })
+  useCartDimensionCheck: () => ({
+    mismatchedKeys: new Set(),
+    hasMismatch: false
+  })
 }));
 
 import CreateViewButton from '@/components/ui/Views/CreateViewButton';
