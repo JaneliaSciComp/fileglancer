@@ -442,9 +442,7 @@ function Table<TData>({
           <div
             className={`shrink-0 grid ${gridColsClass ?? ''} gap-4 px-4 py-2 bg-surface/30 ${gridColsStyle ? 'min-w-max' : ''}`}
             style={
-              gridColsStyle
-                ? { gridTemplateColumns: gridColsStyle }
-                : undefined
+              gridColsStyle ? { gridTemplateColumns: gridColsStyle } : undefined
             }
           >
             {table
