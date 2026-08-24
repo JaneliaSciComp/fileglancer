@@ -12,14 +12,39 @@ const sig = (
 
 describe('signaturesMatch', () => {
   it('matches identical axes and scales', () => {
-    const a = sig([['x', 'micrometer'], ['y', 'micrometer']], [0.1, 0.1]);
-    const b = sig([['x', 'micrometer'], ['y', 'micrometer']], [0.1, 0.1]);
+    const a = sig(
+      [
+        ['x', 'micrometer'],
+        ['y', 'micrometer']
+      ],
+      [0.1, 0.1]
+    );
+    const b = sig(
+      [
+        ['x', 'micrometer'],
+        ['y', 'micrometer']
+      ],
+      [0.1, 0.1]
+    );
     expect(signaturesMatch(a, b)).toBe(true);
   });
 
   it('mismatches when axis names/order differ', () => {
-    const a = sig([['x', 'um'], ['y', 'um'], ['z', 'um']], [1, 1, 1]);
-    const b = sig([['x', 'um'], ['y', 'um']], [1, 1]);
+    const a = sig(
+      [
+        ['x', 'um'],
+        ['y', 'um'],
+        ['z', 'um']
+      ],
+      [1, 1, 1]
+    );
+    const b = sig(
+      [
+        ['x', 'um'],
+        ['y', 'um']
+      ],
+      [1, 1]
+    );
     expect(signaturesMatch(a, b)).toBe(false);
   });
 
