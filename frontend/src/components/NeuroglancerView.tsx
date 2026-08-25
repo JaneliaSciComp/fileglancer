@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { useParams } from 'react-router';
-import { Typography } from '@material-tailwind/react';
+import type { IconType } from 'react-icons';
+import { Link, useParams } from 'react-router';
+import { IconButton, Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 import {
   HiOutlineDuplicate,
@@ -14,9 +15,27 @@ import { useInternalNeuroglancerBaseUrl } from '@/hooks/useDefaultNeuroglancerBa
 import { constructNeuroglancerUrl } from '@/utils/neuroglancerUrl';
 import { downloadTextFile } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
-import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgLink from '@/components/designSystem/atoms/FgLink';
+import LogoSvg from '@/components/ui/Navbar/LogoSvg';
+import ProfileMenu from '@/components/ui/Navbar/ProfileMenu';
+import FgTooltip from '@/components/ui/widgets/FgTooltip';
+
+type ToolbarIconButtonProps = {
+  readonly label: string;
+  readonly icon: IconType;
+  readonly onClick: () => void;
+};
+
+function ToolbarIconButton({ label, icon, onClick }: ToolbarIconButtonProps) {
+  return (
+    <FgTooltip label={label}>
+      <IconButton onClick={onClick} size="sm" variant="ghost">
+        <FgIcon icon={icon} size="lg" />
+      </IconButton>
+    </FgTooltip>
+  );
+}
 
 export default function NeuroglancerView() {
   const { readKey } = useParams();
@@ -83,41 +102,51 @@ export default function NeuroglancerView() {
       ref={containerRef}
     >
       <div className="flex shrink-0 items-center justify-between gap-4 border-b border-surface px-4 py-2">
-        <div className="flex min-w-0 items-center gap-1 text-foreground/70">
-          <FgLink size="sm" to="/ngviews">
-            Views
-          </FgLink>
-          <Typography variant="small">/</Typography>
-          <Typography className="truncate" variant="small">
-            {title}
-          </Typography>
+        <div className="flex min-w-0 items-center gap-3">
+          <Link aria-label="Browse files" to="/browse">
+            <LogoSvg />
+          </Link>
+          <div className="flex min-w-0 items-center gap-1 text-foreground/70">
+            <FgLink className="font-semibold" to="/ngviews">
+              Views
+            </FgLink>
+            <Typography>/</Typography>
+            <Typography className="truncate">{title}</Typography>
+          </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <FgButton onClick={() => void handleCopy()} variant="ghost">
-            <FgIcon icon={HiOutlineDuplicate} size="sm" /> Copy link
-          </FgButton>
-          <FgButton
-            onClick={() =>
-              downloadTextFile(
-                JSON.stringify(ngState, null, 2),
-                `${title}.json`
-              )
-            }
-            variant="ghost"
-          >
-            <FgIcon icon={HiOutlineDownload} size="sm" /> Download JSON
-          </FgButton>
-          <FgButton
-            onClick={() =>
-              window.open(externalUrl, '_blank', 'noopener,noreferrer')
-            }
-            variant="ghost"
-          >
-            <FgIcon icon={HiOutlineExternalLink} size="sm" /> Open external
-          </FgButton>
-          <FgButton onClick={handleFullscreen} variant="ghost">
-            <FgIcon icon={HiOutlineArrowsExpand} size="sm" /> Fullscreen
-          </FgButton>
+        <div className="flex shrink-0 items-center gap-4">
+          <div className="flex items-center gap-1">
+            <ToolbarIconButton
+              icon={HiOutlineDuplicate}
+              label="Copy link"
+              onClick={() => void handleCopy()}
+            />
+            <ToolbarIconButton
+              icon={HiOutlineDownload}
+              label="Download JSON"
+              onClick={() =>
+                downloadTextFile(
+                  JSON.stringify(ngState, null, 2),
+                  `${title}.json`
+                )
+              }
+            />
+            <ToolbarIconButton
+              icon={HiOutlineExternalLink}
+              label="Open in Neuroglancer"
+              onClick={() =>
+                window.open(externalUrl, '_blank', 'noopener,noreferrer')
+              }
+            />
+            <ToolbarIconButton
+              icon={HiOutlineArrowsExpand}
+              label="Fullscreen"
+              onClick={handleFullscreen}
+            />
+          </div>
+          <FgTooltip label="Profile & settings">
+            <ProfileMenu />
+          </FgTooltip>
         </div>
       </div>
       <iframe
