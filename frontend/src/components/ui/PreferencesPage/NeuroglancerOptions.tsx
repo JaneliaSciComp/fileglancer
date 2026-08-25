@@ -1,4 +1,3 @@
-import { Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
 import FgSwitch from '@/components/designSystem/atoms/formElements/FgSwitch';
