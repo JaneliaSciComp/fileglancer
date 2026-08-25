@@ -1,7 +1,8 @@
 /* eslint-disable react/jsx-max-depth */
 // Disable max depth because of many context providers
 
-import { Outlet, useParams } from 'react-router';
+import { useEffect } from 'react';
+import { Outlet, useParams, useMatch } from 'react-router';
 import { Toaster } from 'react-hot-toast';
 import { ErrorBoundary } from 'react-error-boundary';
 import 'shepherd.js/dist/css/shepherd.css';
@@ -31,6 +32,17 @@ const MainLayoutContent = () => {
   const { showWarningOverlay, checkHealth, nextRetrySeconds } =
     useServerHealthContext();
   const bare = isConnectLoginPopup();
+  // The embedded neuroglancer viewer renders its own collapsed top bar, so
+  // suppress the global navbar there.
+  const isViewer = useMatch('/view/:readKey');
+
+  // Restore persisted theme on load. Lives here (always mounted) rather than in
+  // the navbar so dark mode applies on routes that hide the navbar (the viewer).
+  useEffect(() => {
+    if (localStorage.getItem('theme') === 'dark') {
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
 
   return (
     <>
@@ -42,7 +54,7 @@ const MainLayoutContent = () => {
         }}
       />
       <div className="flex flex-col h-full w-full overflow-y-hidden bg-background text-foreground box-border">
-        {!bare ? (
+        {!bare && !isViewer ? (
           <div className="flex-shrink-0 w-full">
             <FileglancerNavbar />
             <Notifications />
