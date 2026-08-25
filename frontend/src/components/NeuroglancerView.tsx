@@ -30,7 +30,12 @@ type ToolbarIconButtonProps = {
 function ToolbarIconButton({ label, icon, onClick }: ToolbarIconButtonProps) {
   return (
     <FgTooltip label={label}>
-      <IconButton onClick={onClick} size="sm" variant="ghost">
+      <IconButton
+        aria-label={label}
+        onClick={onClick}
+        size="sm"
+        variant="ghost"
+      >
         <FgIcon icon={icon} size="lg" />
       </IconButton>
     </FgTooltip>
