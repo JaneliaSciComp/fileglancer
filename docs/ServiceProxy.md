@@ -29,7 +29,7 @@ Leave it empty to disable; the direct `http://<node>:<port>` URL is then publish
 
 ## Reverse proxy configuration
 
-Fileglancer does not proxy the traffic itself. It exposes `GET /api/apps/resolve`, which reads the `Host` header and answers `204` with `X-Fg-Upstream: <host>:<port>`, or `403`. The reverse proxy resolves each request through it and connects to the upstream directly, so no proxied bytes pass through the application server.
+Fileglancer does not proxy the traffic itself. It exposes `GET /api/apps/resolve`, which reads the `Host` header and answers `204` with `X-Fg-Upstream: <host>:<port>` and `X-Fg-Upstream-Scheme: http|https`, or `403`. The reverse proxy resolves each request through it and connects to the upstream directly, so no proxied bytes pass through the application server.
 
 Add a server block for the wildcard zone. This assumes a `map $http_upgrade $connection_upgrade` block already exists at the http level:
 
@@ -52,11 +52,18 @@ server {
   location / {
     auth_request     /_fg_resolve;
     auth_request_set $upstream $upstream_http_x_fg_upstream;
+    auth_request_set $upscheme $upstream_http_x_fg_upstream_scheme;
 
     # Required because proxy_pass targets a variable. Use whatever resolver the
     # host actually runs; 127.0.0.53 is systemd-resolved's stub.
     resolver 127.0.0.53 valid=30s;
-    proxy_pass http://$upstream;
+    proxy_pass $upscheme://$upstream;
+
+    # An app that terminates TLS does so with a certificate it generated on the
+    # compute node, so there is no trust anchor to verify against. See "TLS to
+    # the app host" below. Leave proxy_ssl_name at its default.
+    proxy_ssl_verify      off;
+    proxy_ssl_server_name on;
 
     proxy_set_header Host              $host;
     proxy_set_header X-Real-IP         $remote_addr;
@@ -79,14 +86,25 @@ Also add this to the **main** server block, so the resolve endpoint is not reach
   location = /api/apps/resolve { return 404; }
 ```
 
-Four details are load-bearing:
+Five details are load-bearing:
 
 - **`internal;`** on the `/_fg_resolve` location makes it reachable only from nginx's own `auth_request` subrequest, never from a client. Together with the `return 404` in the main server block, it is what keeps the unauthenticated resolve endpoint off the network. Do not remove either.
 - **`proxy_set_header Host $host`** passes the app subdomain through unchanged, so the app sees `Host` and `Origin` as the same value. This is what makes JupyterLab's WebSocket origin check pass without per-app configuration.
 - **`resolver`** is mandatory. Without it nginx refuses to start when `proxy_pass` targets a variable.
 - **`proxy_buffering off`** and the long `proxy_read_timeout` suit long-lived WebSocket and streaming sessions, such as the remote desktop app.
+- **`proxy_pass $upscheme://$upstream`**, rather than a hardcoded `http://`, is what lets an app that serves HTTPS be reached at all. Sending a plaintext request to a TLS listener does not silently lose encryption — the app rejects it — so hardcoding the scheme breaks those apps outright.
 
 The existing HTTP-to-HTTPS redirect block is typically `default_server` with `server_name _`, in which case it already covers the new subdomains.
+
+## TLS to the app host
+
+The hop from the browser to the reverse proxy is always HTTPS. The hop from the proxy to the compute node is whatever the service itself published: Fileglancer reports the scheme from the service's own URL file and the proxy dials it with that. An app that fronts itself with a TLS terminator — Caddy, stunnel, its own `--certfile` — is reached over HTTPS; an app that serves plain HTTP is reached over HTTP, and nothing is required of it.
+
+**This is opportunistic encryption, and it authenticates nothing.** `proxy_ssl_verify` is `off` because the certificates in question are generated on the compute node at launch and signed by nobody: there is no trust anchor to check them against, and the node's name and port change every launch, so there is nothing stable to pin either. What it buys is that the service's token stops crossing the node network in cleartext. What it does not buy is any assurance that the thing answering on that host and port is the service — the upstream is read from a file the user's own job wrote, so the proxy could not make that claim regardless of certificates.
+
+Leave `proxy_ssl_name` at its default, which is the host from `proxy_pass`. Apps that generate their own certificate name it after the compute node, so overriding this to `$host` (the `job-<id>` subdomain) would send an SNI value no app's certificate carries.
+
+To see how much traffic is still cleartext, read the `plaintext` figure in the aggregate log line described below. It counts alongside `hit` and `miss` rather than instead of them, so it reads as a fraction of the total.
 
 ## Verification
 
@@ -106,4 +124,4 @@ If an app rejects the proxied origin, fix it in that app's manifest (most server
 - Per-job subdomains make a running service much cheaper to *find* — `https://job-<small number>.<zone>/` instead of port-scanning compute nodes — and the proxy vhost is reachable from wherever the Fileglancer HTTPS host is. The service's own token is still the only credential, but weigh this before exposing the vhost on a wide network.
 - The resolve endpoint is called once per proxied HTTP request, so a single page load of an app like JupyterLab generates dozens. Successful resolutions are cached in-process for 10 seconds, which collapses that burst to roughly one database read per service per 10 seconds per worker. Refusals are deliberately not cached, so a service starts resolving the moment it publishes its URL. The endpoint is excluded from the per-request access log for the same reason and reports running totals once a minute instead — grep for `service proxy resolve totals` to see hits, misses and refusals by reason.
 - That 10-second cache is also the window in which a job that has just stopped can still be proxied. Compute-node ports get recycled, so the window is kept short deliberately; if a port is reused within it, a client can briefly reach the new occupant, which will reject it for lack of that service's own token.
-- A service that manages its own URL (`auto_url` unset) should write its URL file exactly once. The cached upstream is refreshed only while someone has the job's detail page open, so a URL that changes mid-run can go stale.
+- A service that manages its own URL (`auto_url` unset) should write its URL file exactly once, and should write the scheme it actually serves. Both the upstream and its scheme are taken from that file: publishing `http://` for a listener that speaks TLS, or the reverse, produces a hop that fails rather than one that merely works unencrypted. The cached upstream is refreshed only while someone has the job's detail page open, so a URL that changes mid-run can go stale.
