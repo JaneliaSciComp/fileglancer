@@ -6,6 +6,7 @@ from fileglancer.apps.serviceproxy import (
     build_proxied_service_url,
     job_id_from_host,
     upstream_from_service_url,
+    upstream_scheme_from_service_url,
 )
 
 DOMAIN = "services.example.org"
@@ -253,3 +254,33 @@ def test_networks_still_refuse_loopback_inside_an_allowed_range():
     must not make the app server's own loopback dialable."""
     assert upstream_from_service_url(
         "http://127.0.0.1:8989/", allowed_networks=("127.0.0.0/8",)) is None
+
+
+# --- upstream_scheme_from_service_url ---
+
+@pytest.mark.parametrize("url,expected", [
+    ("https://node01:41235/lab", "https"),
+    ("HTTPS://node01:41235/lab", "https"),   # urlsplit lowercases the scheme
+    ("http://node01:41235/lab", "http"),
+])
+def test_scheme_follows_the_published_url(url, expected):
+    """A service that fronts itself with TLS is dialed over TLS. Two shipped
+    apps do exactly this, publishing an https URL from a Caddy sidecar."""
+    assert upstream_scheme_from_service_url(url) == expected
+
+
+@pytest.mark.parametrize("url", [
+    "",
+    None,
+    "not a url",
+    "ftp://node01:41235/",
+    "//node01:41235/",
+])
+def test_scheme_falls_back_to_plaintext(url):
+    """Anything unrecognized yields http, which is the safe direction: plaintext
+    to a plaintext listener is what the proxy has always done, whereas guessing
+    https at one turns a working service into a failed handshake. None of these
+    can reach this function in practice — read_service_url_file refuses a URL
+    that does not start with http:// or https:// — so this pins the fallback
+    rather than describing a live case."""
+    assert upstream_scheme_from_service_url(url) == "http"

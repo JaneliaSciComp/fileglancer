@@ -201,6 +201,25 @@ def test_resolve_returns_upstream(app_factory):
     assert resp.headers["x-fg-upstream"] == "node01:41235"
 
 
+@pytest.mark.parametrize("url,scheme", [
+    ("http://node01:41235/lab?token=abc", "http"),
+    ("https://node01:41235/lab?token=abc", "https"),
+])
+def test_resolve_reports_the_published_scheme(app_factory, url, scheme):
+    """An app that terminates TLS itself must not be dialed as cleartext.
+
+    Two shipped apps front themselves with Caddy and publish an https URL; a
+    plaintext request at their TLS listener is answered with a 400, so dropping
+    the scheme here breaks them outright rather than merely leaving the hop
+    unencrypted."""
+    app, db_url = app_factory(PROXY_DOMAIN)
+    job_id = _seed_running_service_with_url(db_url, url=url)
+    resp = _resolve(app, f"job-{job_id}.{PROXY_DOMAIN}")
+    assert resp.status_code == 204
+    assert resp.headers["x-fg-upstream"] == "node01:41235"
+    assert resp.headers["x-fg-upstream-scheme"] == scheme
+
+
 def test_resolve_rejects_finished_job(app_factory):
     """Compute-node ports get recycled. A stale subdomain must not be proxied to
     whatever service now holds that port on that node."""
@@ -368,7 +387,34 @@ def test_resolve_serves_repeats_from_the_cache(app_factory):
     second = _resolve(app, host)
     assert second.status_code == 204
     assert second.headers["x-fg-upstream"] == "node01:41235"
+    assert apps.resolve_counts() == {"miss": 1, "hit": 1, "plaintext": 2}
+
+
+def test_resolve_cache_does_not_downgrade_an_https_upstream(app_factory):
+    """The scheme has to be cached with the upstream, not derived per miss.
+
+    Hits outnumber misses by design, so a scheme resolved on the miss path
+    alone would leave an HTTPS service being dialed as cleartext for the rest
+    of the TTL, and flapping between the two as entries expire."""
+    app, db_url = app_factory(PROXY_DOMAIN)
+    job_id = _seed_running_service_with_url(
+        db_url, url="https://node01:41235/lab?token=abc")
+    host = f"job-{job_id}.{PROXY_DOMAIN}"
+
+    assert _resolve(app, host).headers["x-fg-upstream-scheme"] == "https"
+    second = _resolve(app, host)
+    assert second.headers["x-fg-upstream-scheme"] == "https"
     assert apps.resolve_counts() == {"miss": 1, "hit": 1}
+
+
+def test_resolve_counts_a_plaintext_hop_beside_the_hit(app_factory):
+    """'plaintext' is counted in addition to the hit or miss, not instead of it,
+    so the aggregate line reads as a fraction of the total rather than
+    redefining labels an operator already knows."""
+    app, db_url = app_factory(PROXY_DOMAIN)
+    job_id = _seed_running_service_with_url(db_url)
+    _resolve(app, f"job-{job_id}.{PROXY_DOMAIN}")
+    assert apps.resolve_counts() == {"miss": 1, "plaintext": 1}
 
 
 def test_resolve_does_not_cache_refusals(app_factory):

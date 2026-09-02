@@ -2719,6 +2719,25 @@ def create_app(settings):
             return _convert_job(db_job, service_url=proxied or service_url,
                                 files=files, phase=phase)
 
+    def _resolve_ok(upstream: str, scheme: str) -> Response:
+        """Build the 204 the reverse proxy reads, and count a plaintext hop.
+
+        The scheme is its own header rather than a prefix on X-Fg-Upstream so a
+        reverse proxy configured before this existed keeps working: it ignores
+        the header it does not know and dials http, exactly as it did before.
+        Folding the scheme into the existing header would instead have it build
+        `proxy_pass http://https://host:port`.
+
+        Counting happens here so the cached and uncached paths cannot disagree
+        about it.
+        """
+        if scheme != 'https':
+            apps_module.record_resolve("plaintext")
+        return Response(status_code=204, headers={
+            "X-Fg-Upstream": upstream,
+            "X-Fg-Upstream-Scheme": scheme,
+        })
+
     @app.get("/api/apps/resolve", include_in_schema=False)
     async def resolve_service_upstream(request: Request):
         """Map a service proxy hostname to its upstream, for the reverse proxy.
@@ -2730,8 +2749,10 @@ def create_app(settings):
         that the job's detail page already shows, and the reverse proxy marks its
         location `internal` so it is not reachable from outside.
 
-        Returns 204 with X-Fg-Upstream on success and 403 for everything else, so
-        auth_request denies the request.
+        Returns 204 with X-Fg-Upstream and X-Fg-Upstream-Scheme on success, and
+        403 for everything else, so auth_request denies the request. The scheme
+        is whatever the service published: an app that terminates TLS itself is
+        dialed over HTTPS instead of being downgraded to cleartext.
 
         Successful resolutions are cached for a few seconds, which is also the
         window in which a job that has just stopped can still be proxied. See
@@ -2749,11 +2770,10 @@ def create_app(settings):
         # cache and keep the database out of the hot path. Only hits are cached;
         # a service that has not published its URL yet must be able to start
         # resolving the moment it does.
-        upstream = apps_module.cached_upstream(job_id)
-        if upstream is not None:
+        cached = apps_module.cached_upstream(job_id)
+        if cached is not None:
             apps_module.record_resolve("hit")
-            return Response(status_code=204,
-                            headers={"X-Fg-Upstream": upstream})
+            return _resolve_ok(*cached)
 
         with db.get_db_session(settings.db_url) as session:
             db_job = db.get_job_by_id(session, job_id)
@@ -2762,8 +2782,9 @@ def create_app(settings):
                     or db_job.status != 'RUNNING'):
                 apps_module.record_resolve("refused_not_running")
                 raise HTTPException(status_code=403, detail="No running service for this host")
+            service_url = db_job.service_url
             upstream = apps_module.upstream_from_service_url(
-                db_job.service_url,
+                service_url,
                 allowed_zone=settings.apps.service_proxy_upstream_zone,
                 allowed_networks=tuple(settings.apps.service_proxy_upstream_networks))
 
@@ -2771,9 +2792,12 @@ def create_app(settings):
             apps_module.record_resolve("refused_no_upstream")
             raise HTTPException(status_code=403, detail="No usable upstream for this host")
 
-        apps_module.cache_upstream(job_id, upstream)
+        # Read only after the authority has been accepted: the scheme says
+        # nothing about whether the host is safe to dial.
+        scheme = apps_module.upstream_scheme_from_service_url(service_url)
+        apps_module.cache_upstream(job_id, upstream, scheme)
         apps_module.record_resolve("miss")
-        return Response(status_code=204, headers={"X-Fg-Upstream": upstream})
+        return _resolve_ok(upstream, scheme)
 
     @app.patch("/api/jobs/{job_id}", response_model=Job,
                description="Rename a job")
