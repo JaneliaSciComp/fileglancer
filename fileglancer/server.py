@@ -390,7 +390,7 @@ _SERVICE_UNAVAILABLE_HTML = """<!DOCTYPE html>
   h1 { font-size: 1.5rem; margin: 0 0 1rem; }
   p { margin: 0 0 1rem; }
   ul { margin: 0; padding-left: 1.25rem; }
-  .muted { opacity: 0.7; font-size: 0.9rem; }
+  .muted { margin-top: 1.5rem; opacity: 0.7; font-size: 0.9rem; }
 </style>
 </head>
 <body>
