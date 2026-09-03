@@ -292,7 +292,7 @@ def test_service_unavailable_page_is_servable_without_auth(app_factory):
     resp = TestClient(app).get("/api/apps/service-unavailable")
     assert resp.status_code == 503
     assert resp.headers["content-type"].startswith("text/html")
-    assert "isn't running" in resp.text
+    assert "503 Service Unavailable" in resp.text
     # Self-contained: the proxy would refuse a subresource fetched from here.
     assert "src=" not in resp.text and "<link" not in resp.text
 

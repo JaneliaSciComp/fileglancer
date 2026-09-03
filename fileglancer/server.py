@@ -395,7 +395,7 @@ _SERVICE_UNAVAILABLE_HTML = """<!DOCTYPE html>
 </head>
 <body>
 <main>
-  <h1>This service isn't running</h1>
+  <h1>503 Service Unavailable</h1>
   <p>The app that was served at this address is no longer available. Services
      are reachable only while their job is running.</p>
   <ul>
