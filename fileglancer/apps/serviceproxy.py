@@ -2,11 +2,14 @@
 
 A service job publishes ``http://<node>:<port><suffix>`` to its work directory.
 When a proxy domain is configured, Fileglancer republishes that as
-``https://job-<id>.<proxy_domain><suffix>`` and tells the reverse proxy which
-upstream the hostname maps to. These functions are the whole translation layer
-between the two forms, kept pure so they can be tested without a database.
+``https://job-<id>-<mac>.<proxy_domain><suffix>`` and tells the reverse proxy
+which upstream the hostname maps to. These functions are the whole translation
+layer between the two forms, kept pure so they can be tested without a database.
 """
 
+import base64
+import hashlib
+import hmac
 import ipaddress
 import re
 import time
@@ -28,45 +31,82 @@ _UPSTREAM_RE = re.compile(r'^([A-Za-z0-9.-]+):(\d{1,5})$')
 # aim the proxy at the web host itself rather than at a compute node.
 _LOCAL_NAMES = frozenset({'localhost'})
 
+# Job ids are a small global sequence, so a bare job-<id> label would let anyone
+# who can reach the proxy sweep job-1..job-500 and find every running service on
+# the instance — and reach any of them that does not enforce its own token. The
+# label therefore carries a MAC over the id, keyed by the server's session
+# secret. Signing rather than storing a random key keeps the id in the hostname,
+# so resolution stays one indexed read with no extra column, and the MAC is
+# checked before the database is touched at all.
+#
+# Eight base32 characters is 40 bits. Guessing is online-only — a wrong label is
+# a 403 from the reverse proxy, and there is nothing to attack offline — so at
+# 10k requests/second a sweep of the space takes decades. Rotating
+# session_secret_key invalidates live service URLs, which is the same blast
+# radius as the session revocation that rotation already causes.
+_MAC_CHARS = 8
+
+
+def _service_mac(job_id: int, secret: str) -> str:
+    """The MAC for a job's proxy hostname label."""
+    digest = hmac.new(secret.encode('utf-8'),
+                      f'job:{job_id}'.encode('utf-8'),
+                      hashlib.sha256).digest()
+    # base32 rather than hex: same DNS-safe alphabet cost, 25% fewer characters
+    # per bit. Lowercased because hostnames are compared case-insensitively.
+    return base64.b32encode(digest).decode('ascii').lower()[:_MAC_CHARS]
+
+
+def service_host_label(job_id: int, secret: str) -> str:
+    """The leftmost hostname label for a job's proxy URL, e.g. ``job-12-k7m2q9xr``."""
+    return f'job-{job_id}-{_service_mac(job_id, secret)}'
+
 
 def build_proxied_service_url(service_url: Optional[str], job_id: int,
-                              proxy_domain: str) -> Optional[str]:
+                              proxy_domain: str, secret: str) -> Optional[str]:
     """Rewrite a published service URL to its HTTPS proxy form.
 
     Path, query and fragment are carried over verbatim: the query string holds
     the service's own access token, which remains the only credential.
 
-    Returns None when there is nothing to rewrite or no proxy domain is
-    configured, in which case the caller should publish the URL unchanged.
+    Returns None when there is nothing to rewrite, no proxy domain is
+    configured, or no secret is available to sign the hostname with, in which
+    case the caller should publish the URL unchanged.
     """
-    if not service_url or not proxy_domain:
+    if not service_url or not proxy_domain or not secret:
         return None
     parts = urlsplit(service_url)
     return urlunsplit((
         'https',
-        f'job-{job_id}.{proxy_domain}',
+        f'{service_host_label(job_id, secret)}.{proxy_domain}',
         parts.path,
         parts.query,
         parts.fragment,
     ))
 
 
-def job_id_from_host(host: Optional[str], proxy_domain: str) -> Optional[int]:
+def job_id_from_host(host: Optional[str], proxy_domain: str,
+                     secret: str) -> Optional[int]:
     """Extract the job id from a proxy hostname, or None if it isn't one.
 
     Matches the whole hostname, so neither a longer suffix
-    (``job-1.services.example.org.evil``) nor an extra label
-    (``x.job-1.services.example.org``) is accepted.
+    (``job-1-k7m2q9xr.services.example.org.evil``) nor an extra label
+    (``x.job-1-k7m2q9xr.services.example.org``) is accepted, and the label's MAC
+    must verify against the id it carries.
     """
-    if not host or not proxy_domain:
+    if not host or not proxy_domain or not secret:
         return None
     # $host in nginx normally omits the port, but a client can send one.
     hostname = host.split(':', 1)[0].strip().lower()
     match = re.fullmatch(
-        r'job-(\d{1,9})\.' + re.escape(proxy_domain.lower()), hostname)
+        r'job-(\d{1,9})-([a-z2-7]{%d})\.' % _MAC_CHARS
+        + re.escape(proxy_domain.lower()), hostname)
     if match is None:
         return None
-    return int(match.group(1))
+    job_id = int(match.group(1))
+    if not hmac.compare_digest(match.group(2), _service_mac(job_id, secret)):
+        return None
+    return job_id
 
 
 def _is_ip_literal(host: str) -> bool:

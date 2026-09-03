@@ -23,6 +23,12 @@ from fileglancer.database import (
 
 OWNER = "alice"
 PROXY_DOMAIN = "services.example.org"
+SECRET = "test-session-secret"
+
+
+def _host(job_id):
+    """The signed proxy hostname for a job, as the API would publish it."""
+    return f"{apps.service_host_label(job_id, SECRET)}.{PROXY_DOMAIN}"
 
 
 @pytest.fixture
@@ -54,6 +60,7 @@ def settings_factory(temp_dir):
             db_url=db_url,
             file_share_mounts=[],
             cli_mode=True,
+            session_secret_key=SECRET,
             apps=AppsSettings(service_proxy_domain=proxy_domain,
                               service_proxy_upstream_zone=upstream_zone),
         ), db_url
@@ -196,7 +203,7 @@ def _seed_running_service_with_url(db_url, url="http://node01:41235/lab?token=ab
 def test_resolve_returns_upstream(app_factory):
     app, db_url = app_factory(PROXY_DOMAIN)
     job_id = _seed_running_service_with_url(db_url)
-    resp = _resolve(app, f"job-{job_id}.{PROXY_DOMAIN}")
+    resp = _resolve(app, _host(job_id))
     assert resp.status_code == 204
     assert resp.headers["x-fg-upstream"] == "node01:41235"
 
@@ -212,7 +219,7 @@ def test_resolve_rejects_finished_job(app_factory):
         session.commit()
     finally:
         session.close()
-    resp = _resolve(app, f"job-{job_id}.{PROXY_DOMAIN}")
+    resp = _resolve(app, _host(job_id))
     assert resp.status_code == 403
     assert "x-fg-upstream" not in resp.headers
 
@@ -225,24 +232,26 @@ def test_resolve_rejects_non_service_job(app_factory):
         set_job_service_url(session, job_id, "http://node01:41235/")
     finally:
         session.close()
-    assert _resolve(app, f"job-{job_id}.{PROXY_DOMAIN}").status_code == 403
+    assert _resolve(app, _host(job_id)).status_code == 403
 
 
 def test_resolve_rejects_job_without_cached_url(app_factory):
     app, db_url = app_factory(PROXY_DOMAIN)
     job_id = _seed_service_job(db_url)
-    assert _resolve(app, f"job-{job_id}.{PROXY_DOMAIN}").status_code == 403
+    assert _resolve(app, _host(job_id)).status_code == 403
 
 
 def test_resolve_rejects_unknown_job(app_factory):
     app, db_url = app_factory(PROXY_DOMAIN)
-    assert _resolve(app, f"job-999999.{PROXY_DOMAIN}").status_code == 403
+    assert _resolve(app, _host(999999)).status_code == 403
 
 
 @pytest.mark.parametrize("host", [
     "fileglancer.example.org",
     "job-1.evil.example.org",
     "job-abc.services.example.org",
+    "job-1.services.example.org",          # unsigned: the old, guessable form
+    "job-1-aaaaaaaa.services.example.org", # wrong MAC
 ])
 def test_resolve_rejects_bad_hosts(app_factory, host):
     app, db_url = app_factory(PROXY_DOMAIN)
@@ -254,7 +263,7 @@ def test_resolve_disabled_when_no_proxy_domain(app_factory):
     """With the feature off, the endpoint refuses everything."""
     app, db_url = app_factory("")
     job_id = _seed_running_service_with_url(db_url)
-    assert _resolve(app, f"job-{job_id}.{PROXY_DOMAIN}").status_code == 403
+    assert _resolve(app, _host(job_id)).status_code == 403
 
 
 # --- proxied URL publication ---
@@ -283,7 +292,7 @@ def test_job_detail_publishes_proxied_url(app_factory, monkeypatch):
         app, job_id, "http://node01:41235/lab?token=abc", monkeypatch)
     assert resp.status_code == 200
     assert resp.json()["service_url"] == \
-        f"https://job-{job_id}.{PROXY_DOMAIN}/lab?token=abc"
+        f"https://{_host(job_id)}/lab?token=abc"
 
 
 def test_job_detail_publishes_raw_url_when_proxy_disabled(app_factory, monkeypatch):
@@ -315,7 +324,7 @@ def test_resolve_rejects_malformed_cached_url(app_factory):
     app, db_url = app_factory(PROXY_DOMAIN)
     job_id = _seed_running_service_with_url(
         db_url, url="http://evil.example.org:80\r\nX-Injected: 1/")
-    resp = _resolve(app, f"job-{job_id}.{PROXY_DOMAIN}")
+    resp = _resolve(app, _host(job_id))
     assert resp.status_code == 403
     assert "x-fg-upstream" not in resp.headers
 
@@ -325,7 +334,7 @@ def test_resolve_rejects_upstream_outside_suffix(app_factory):
     the helper."""
     app, db_url = app_factory(PROXY_DOMAIN, upstream_zone=".nodes.example.org")
     job_id = _seed_running_service_with_url(db_url, url="http://127.0.0.1:8989/")
-    resp = _resolve(app, f"job-{job_id}.{PROXY_DOMAIN}")
+    resp = _resolve(app, _host(job_id))
     assert resp.status_code == 403
     assert "x-fg-upstream" not in resp.headers
 
@@ -338,7 +347,7 @@ def test_publish_then_resolve_roundtrip(app_factory, monkeypatch):
     job_id = _seed_service_job(db_url)
     published = _get_job_with_worker_url(
         app, job_id, "http://node01:41235/lab?token=abc", monkeypatch).json()["service_url"]
-    assert published == f"https://job-{job_id}.{PROXY_DOMAIN}/lab?token=abc"
+    assert published == f"https://{_host(job_id)}/lab?token=abc"
     resp = _resolve(app, urlsplit(published).netloc)
     assert resp.status_code == 204
     assert resp.headers["x-fg-upstream"] == "node01:41235"
@@ -355,7 +364,7 @@ def test_resolve_serves_repeats_from_the_cache(app_factory):
     in which a stopped job can still be proxied, which is why it is short."""
     app, db_url = app_factory(PROXY_DOMAIN)
     job_id = _seed_running_service_with_url(db_url)
-    host = f"job-{job_id}.{PROXY_DOMAIN}"
+    host = _host(job_id)
 
     assert _resolve(app, host).status_code == 204
     session = get_db_session(db_url)
@@ -376,7 +385,7 @@ def test_resolve_does_not_cache_refusals(app_factory):
     moment it does, so a miss cannot be remembered."""
     app, db_url = app_factory(PROXY_DOMAIN)
     job_id = _seed_service_job(db_url)
-    host = f"job-{job_id}.{PROXY_DOMAIN}"
+    host = _host(job_id)
 
     assert _resolve(app, host).status_code == 403
     session = get_db_session(db_url)
@@ -395,7 +404,7 @@ def test_resolve_counts_refusals_by_reason(app_factory):
     job_id = _seed_service_job(db_url)
 
     _resolve(app, "not-a-proxy-host.example.org")
-    _resolve(app, f"job-{job_id}.{PROXY_DOMAIN}")
+    _resolve(app, _host(job_id))
 
     assert apps.resolve_counts() == {
         "refused_bad_host": 1, "refused_no_upstream": 1}

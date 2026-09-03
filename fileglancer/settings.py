@@ -286,6 +286,22 @@ class Settings(BaseSettings):
         )
     
     @model_validator(mode='after')
+    def validate_service_proxy_needs_a_session_secret(self):
+        """The service proxy signs its hostnames with session_secret_key.
+
+        An unset key is generated at random per process, so under
+        `uvicorn --workers N` each worker would sign with a different key and
+        most proxied requests would be refused. Fail at startup instead, where
+        the cause is obvious.
+        """
+        if self.apps.service_proxy_domain and not self.session_secret_key:
+            raise ValueError(
+                "apps.service_proxy_domain requires session_secret_key to be "
+                "set: service proxy hostnames are signed with it, and a "
+                "per-process random key breaks resolution across workers")
+        return self
+
+    @model_validator(mode='after')
     def set_jira_browse_url(self):
         if self.jira_browse_url is None:
             self.jira_browse_url = f"{self.atlassian_url}/browse"

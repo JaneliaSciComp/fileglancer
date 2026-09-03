@@ -197,10 +197,11 @@ session_cookie_secure: true
 #                               # Wildcard DNS zone serving per-job HTTPS
 #                               # subdomains for running services. When set, a
 #                               # service is published at
-#                               # https://job-<id>.<zone>/ instead of its own
-#                               # http://<node>:<port>/ URL. Needs a wildcard
-#                               # certificate for the zone and a reverse proxy
-#                               # resolving upstreams via /api/apps/resolve;
+#                               # https://job-<id>-<mac>.<zone>/ instead of its
+#                               # own http://<node>:<port>/ URL. Needs a wildcard
+#                               # certificate for the zone, a reverse proxy
+#                               # resolving upstreams via /api/apps/resolve, and
+#                               # session_secret_key (which signs the hostname);
 #                               # see docs/ServiceProxy.md. Empty = direct URL.
 #   service_proxy_upstream_zone: nodes.example.org
 #                               # DNS zone the proxy is allowed to dial, i.e.

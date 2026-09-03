@@ -1,6 +1,12 @@
 # HTTPS Proxy for App Services
 
-Running app services (`type: service`) bind a port on a compute node and publish `http://<node>:<port>/...`. Set `apps.service_proxy_domain` to republish them over HTTPS at a per-job subdomain instead.
+Running app services (`type: service`) bind a port on a compute node and publish `http://<node>:<port>/...`. Set `apps.service_proxy_domain` to republish them over HTTPS at a per-job subdomain instead:
+
+```
+https://job-12-k7m2q9xr.services.example.org/lab?token=8f2c...
+```
+
+The `job-<id>-<mac>` label is signed with `session_secret_key`. Job ids are a small global sequence, so an unsigned `job-12` label would let anyone who can reach the proxy sweep `job-1`..`job-500` and find — and, for any service that does not enforce its own token, reach — every running service on the instance. The MAC is 8 base32 characters (40 bits); guessing it is online-only against a reverse proxy that answers 403, so a sweep of that space takes decades at 10k requests/second.
 
 Design rationale: `docs/superpowers/specs/2026-08-28-app-service-https-proxy-design.md`.
 
@@ -21,11 +27,14 @@ Design rationale: `docs/superpowers/specs/2026-08-28-app-service-https-proxy-des
 ## Fileglancer configuration
 
 ```yaml
+session_secret_key: "<a long random string>"
 apps:
   service_proxy_domain: "services.example.org"
 ```
 
-Leave it empty to disable; the direct `http://<node>:<port>` URL is then published unchanged.
+Leave `service_proxy_domain` empty to disable; the direct `http://<node>:<port>` URL is then published unchanged.
+
+`session_secret_key` is required when the proxy domain is set, and the server refuses to start without it. An unset key is generated at random per process, so under `uvicorn --workers N` each worker would sign hostnames with a different key and most proxied requests would be refused. Rotating it invalidates live service URLs, on top of the session revocation rotation already causes.
 
 ## Reverse proxy configuration
 
@@ -36,7 +45,7 @@ Add a server block for the wildcard zone. This assumes a `map $http_upgrade $con
 ```nginx
 server {
   listen 443 ssl http2;
-  server_name ~^job-\d+\.services\.example\.org$;
+  server_name ~^job-\d+-[a-z2-7]+\.services\.example\.org$;
 
   ssl_certificate     /etc/nginx/certs/services-wildcard.crt;
   ssl_certificate_key /etc/nginx/certs/services-wildcard.key;
@@ -103,7 +112,7 @@ If an app rejects the proxied origin, fix it in that app's manifest (most server
 ## Residual risks
 
 - Set `apps.service_proxy_upstream_zone` to the DNS zone your compute nodes live in, e.g. `nodes.example.org`. Without it the proxy will dial any host the Fileglancer host can reach, because the upstream comes from a file the user's job wrote. Loopback, the unspecified address, link-local (including cloud instance metadata), multicast and reserved addresses are always refused, since those are what reach the Fileglancer host itself. Private and public node addresses are allowed — an address on a routable interface is already reachable directly by any cluster user. Matching is on whole DNS labels, so a leading dot is optional and a sibling zone like `evil-nodes.example.org` does not qualify. The zone applies to hostnames only: a service that publishes the node's IP instead of its name is still accepted, so setting a zone will not break one. To confine those, set `apps.service_proxy_upstream_networks` to the CIDR networks your nodes occupy, e.g. `10.20.0.0/16`. The two settings divide the space between them — the zone governs upstreams published as names, the networks govern upstreams published as addresses — and each is empty by default, meaning no restriction on that form. Bad CIDR entries are refused at startup rather than at request time, since a typo there would otherwise reject every address upstream while looking configured.
-- Per-job subdomains make a running service much cheaper to *find* — `https://job-<small number>.<zone>/` instead of port-scanning compute nodes — and the proxy vhost is reachable from wherever the Fileglancer HTTPS host is. The service's own token is still the only credential, but weigh this before exposing the vhost on a wide network.
+- The signed hostname is not a substitute for a service enforcing its own token. It is unguessable, but a hostname leaks where a query string does not: plaintext SNI on the wire, DNS resolvers, and the proxy's own access log. Treat it as what makes enumeration infeasible, and `${FG_SERVICE_TOKEN}` as the credential. An app with no authentication of its own (TensorBoard, for one) is protected only by the label.
 - The resolve endpoint is called once per proxied HTTP request, so a single page load of an app like JupyterLab generates dozens. Successful resolutions are cached in-process for 10 seconds, which collapses that burst to roughly one database read per service per 10 seconds per worker. Refusals are deliberately not cached, so a service starts resolving the moment it publishes its URL. The endpoint is excluded from the per-request access log for the same reason and reports running totals once a minute instead — grep for `service proxy resolve totals` to see hits, misses and refusals by reason.
 - That 10-second cache is also the window in which a job that has just stopped can still be proxied. Compute-node ports get recycled, so the window is kept short deliberately; if a port is reused within it, a client can briefly reach the new occupant, which will reject it for lack of that service's own token.
 - A service that manages its own URL (`auto_url` unset) should write its URL file exactly once. The cached upstream is refreshed only while someone has the job's detail page open, so a URL that changes mid-run can go stale.

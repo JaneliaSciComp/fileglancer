@@ -53,5 +53,6 @@ from fileglancer.apps.serviceproxy import (  # noqa: F401
     record_resolve,
     reset_resolve_metrics,
     resolve_counts,
+    service_host_label,
     upstream_from_service_url,
 )

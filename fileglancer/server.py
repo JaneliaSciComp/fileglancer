@@ -2715,7 +2715,8 @@ def create_app(settings):
             # The cached value stays raw — it is the proxy's upstream. Only what
             # goes back to the browser is rewritten.
             proxied = apps_module.build_proxied_service_url(
-                service_url, job_id, settings.apps.service_proxy_domain)
+                service_url, job_id, settings.apps.service_proxy_domain,
+                settings.session_secret_key)
             return _convert_job(db_job, service_url=proxied or service_url,
                                 files=files, phase=phase)
 
@@ -2740,7 +2741,8 @@ def create_app(settings):
         """
         proxy_domain = settings.apps.service_proxy_domain
         job_id = apps_module.job_id_from_host(
-            request.headers.get('host'), proxy_domain)
+            request.headers.get('host'), proxy_domain,
+            settings.session_secret_key)
         if job_id is None:
             apps_module.record_resolve("refused_bad_host")
             raise HTTPException(status_code=403, detail="Not a service proxy host")
