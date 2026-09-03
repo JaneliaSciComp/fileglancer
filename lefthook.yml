@@ -6,7 +6,10 @@ pre-push:
   jobs:
     - name: Run Prettier check; fix if check fails
       root: frontend/
-      run: pixi run ./prettier-check-and-fix.sh
+      # Invoked through bash explicitly: on Windows, pixi hands the script to
+      # the OS to execute and gets `os error 193` (not a valid Win32
+      # application), so the hook could never run there.
+      run: pixi run bash ./prettier-check-and-fix.sh
 
     - name: Run ESLint check
       root: frontend/

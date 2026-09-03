@@ -58,7 +58,7 @@ def _service_mac(job_id: int, secret: str) -> str:
 
 
 def service_host_label(job_id: int, secret: str) -> str:
-    """The leftmost hostname label for a job's proxy URL, e.g. ``job-12-k7m2q9xr``."""
+    """The leftmost hostname label for a job's proxy URL, e.g. ``job-12-k7m2qhxr``."""
     return f'job-{job_id}-{_service_mac(job_id, secret)}'
 
 
@@ -90,8 +90,8 @@ def job_id_from_host(host: Optional[str], proxy_domain: str,
     """Extract the job id from a proxy hostname, or None if it isn't one.
 
     Matches the whole hostname, so neither a longer suffix
-    (``job-1-k7m2q9xr.services.example.org.evil``) nor an extra label
-    (``x.job-1-k7m2q9xr.services.example.org``) is accepted, and the label's MAC
+    (``job-1-k7m2qhxr.services.example.org.evil``) nor an extra label
+    (``x.job-1-k7m2qhxr.services.example.org``) is accepted, and the label's MAC
     must verify against the id it carries.
     """
     if not host or not proxy_domain or not secret:
@@ -254,6 +254,29 @@ def upstream_from_service_url(service_url: Optional[str],
     return netloc
 
 
+def upstream_scheme_from_service_url(service_url: Optional[str]) -> str:
+    """Return the scheme the reverse proxy should dial an upstream with.
+
+    Only meaningful for a URL ``upstream_from_service_url`` has already
+    accepted; on its own this says nothing about whether the authority is safe
+    to dial, so the resolve endpoint calls the two in that order.
+
+    Anything that is not exactly ``https`` yields ``http``, including a URL that
+    fails to parse. That is the safe direction: plaintext to a plaintext
+    listener is what the proxy has always done, whereas guessing ``https`` at
+    one turns a working service into a failed handshake. Nothing needs refusing
+    here either — ``read_service_url_file`` rejects a URL that is not
+    ``http://`` or ``https://`` before it can reach the database.
+    """
+    if not service_url:
+        return 'http'
+    try:
+        scheme = urlsplit(service_url).scheme
+    except ValueError:
+        return 'http'
+    return 'https' if scheme.lower() == 'https' else 'http'
+
+
 # --- Resolution cache and counters ---
 #
 # The reverse proxy calls the resolve endpoint once per proxied HTTP request, so
@@ -264,6 +287,9 @@ def upstream_from_service_url(service_url: Optional[str],
 # Only successful resolutions are cached. A miss for a service that has not
 # published its URL yet must stay a miss, or clicking "Open Service" the moment a
 # service comes up would fail for the whole TTL.
+#
+# An entry holds both the upstream and the scheme to dial it with, since the
+# reverse proxy needs both and only one of them is in the hostname.
 #
 # The TTL is deliberately short. It is the window during which a job that has
 # stopped can still be proxied, and the RUNNING check it bypasses exists because
@@ -281,14 +307,20 @@ _resolve_counts = Counter()
 _resolve_last_logged = 0.0
 
 
-def cached_upstream(job_id: int) -> Optional[str]:
-    """Return a recently resolved upstream for a job, or None to consult the DB."""
+def cached_upstream(job_id: int) -> Optional[tuple]:
+    """Return a recently resolved ``(upstream, scheme)``, or None to consult the DB."""
     return _resolve_cache.get(job_id)
 
 
-def cache_upstream(job_id: int, upstream: str) -> None:
-    """Remember a successful resolution for the cache's short TTL."""
-    _resolve_cache[job_id] = upstream
+def cache_upstream(job_id: int, upstream: str, scheme: str) -> None:
+    """Remember a successful resolution for the cache's short TTL.
+
+    The scheme is stored with the upstream rather than recomputed per hit.
+    Hits outnumber misses by design, so a scheme derived on the miss path alone
+    would leave an HTTPS service being dialed as plaintext for the rest of the
+    TTL — and flapping between the two as entries expire.
+    """
+    _resolve_cache[job_id] = (upstream, scheme)
 
 
 def record_resolve(outcome: str) -> None:
@@ -298,7 +330,9 @@ def record_resolve(outcome: str) -> None:
     every minute says the same thing as hundreds of individual lines, and says it
     in a form an operator can actually read. Outcomes are coarse on purpose —
     'hit', 'miss', and a refusal reason — so the line stays useful without
-    naming any specific job.
+    naming any specific job. 'plaintext' is counted in addition to a hit or a
+    miss, not instead of one, so it reads as a fraction of the total: how much
+    of the proxied traffic is still unencrypted on the hop to the app host.
     """
     global _resolve_last_logged
     _resolve_counts[outcome] += 1
