@@ -2757,10 +2757,13 @@ def create_app(settings):
                         f"Could not resolve or cache the service URL for job {job_id}",
                         exc_info=True)
             # The cached value stays raw — it is the proxy's upstream. Only what
-            # goes back to the browser is rewritten.
-            proxied = apps_module.build_proxied_service_url(
-                service_url, job_id, settings.apps.service_proxy_domain,
-                settings.session_secret_key)
+            # goes back to the browser is rewritten, and only for an app that
+            # has not opted out of being republished.
+            proxied = None
+            if db_job.service_proxy:
+                proxied = apps_module.build_proxied_service_url(
+                    service_url, job_id, settings.apps.service_proxy_domain,
+                    settings.session_secret_key)
             return _convert_job(db_job, service_url=proxied or service_url,
                                 files=files, phase=phase)
 
@@ -2776,7 +2779,8 @@ def create_app(settings):
         location `internal` so it is not reachable from outside.
 
         Returns 204 with X-Fg-Upstream on success and 403 for everything else, so
-        auth_request denies the request.
+        auth_request denies the request. An app whose manifest sets
+        service_proxy: false is refused here too, not merely left unpublished.
 
         Successful resolutions are cached for a few seconds, which is also the
         window in which a job that has just stopped can still be proxied. See
@@ -2808,6 +2812,12 @@ def create_app(settings):
                     or db_job.status != 'RUNNING'):
                 apps_module.record_resolve("refused_not_running")
                 raise HTTPException(status_code=403, detail="No running service for this host")
+            # Refused here as well as suppressed at publish time: the label is
+            # unguessable, but an app that opted out should not be reachable
+            # through the proxy even by someone who has the hostname.
+            if not db_job.service_proxy:
+                apps_module.record_resolve("refused_proxy_disabled")
+                raise HTTPException(status_code=403, detail="This service is not published through the proxy")
             upstream = apps_module.upstream_from_service_url(
                 db_job.service_url,
                 allowed_zone=settings.apps.service_proxy_upstream_zone,

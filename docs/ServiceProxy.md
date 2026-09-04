@@ -36,6 +36,12 @@ Leave `service_proxy_domain` empty to disable; the direct `http://<node>:<port>`
 
 `session_secret_key` is required when the proxy domain is set, and the server refuses to start without it. An unset key is generated at random per process, so under `uvicorn --workers N` each worker would sign hostnames with a different key and most proxied requests would be refused. Rotating it invalidates live service URLs, on top of the session revocation rotation already causes.
 
+## Apps that opt out
+
+An individual service can decline to be republished by setting `service_proxy: false` on its entry point. Its direct `http://<node>:<port>` URL is published instead, and the resolve endpoint refuses its hostname, so it cannot be reached through the proxy even by someone who can derive the signed label. Refusals are counted as `refused_proxy_disabled` in the aggregate resolve log line.
+
+The flag is snapshotted onto the job row at submit time, so editing the manifest does not change the decision for a job that is already running. It exists for services that cannot work behind the proxy at all — one whose OAuth callback is registered against a fixed host and port, say — and not as a performance or preference switch. An app that opts out gives up transport encryption on every hop, including the one from the user's browser, so it should not be sent credentials worth protecting.
+
 ## Reverse proxy configuration
 
 Fileglancer does not proxy the traffic itself. It exposes `GET /api/apps/resolve`, which reads the `Host` header and answers `204` with `X-Fg-Upstream: <host>:<port>`, or `403`. The reverse proxy resolves each request through it and connects to the upstream directly, so no proxied bytes pass through the application server.
