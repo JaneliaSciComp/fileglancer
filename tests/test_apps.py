@@ -1022,6 +1022,8 @@ class TestServiceUrlPublisher:
                                     capture_output=True, text=True, timeout=30)
             assert result.returncode == 0, result.stderr
             assert url_file.read_text() == f"http://h1:{port}/?access_token=deadbeef"
+            # The URL carries the access token: never group/world readable.
+            assert url_file.stat().st_mode & 0o077 == 0
         finally:
             srv.close()
 
@@ -1041,6 +1043,56 @@ class TestServiceUrlPublisher:
                                 capture_output=True, text=True, timeout=30)
         assert not url_file.exists()
         assert "never opened" in result.stderr
+
+
+class TestPrivateStateDir:
+    """~/.fileglancer holds service tokens and private clones: owner-only."""
+
+    def _chain(self, leaf):
+        """leaf and every ancestor up to (and including) .fileglancer."""
+        chain = [leaf]
+        while chain[-1].name != ".fileglancer":
+            chain.append(chain[-1].parent)
+        return chain
+
+    @pytest.mark.parametrize("subpath", [
+        ".fileglancer/jobs/1-demo-run",          # job work dir
+        ".fileglancer/apps/org/demo",            # repo clone
+        ".fileglancer/apps/org/demo/.snapshots",  # pinned checkouts
+    ])
+    def test_locks_down_the_whole_chain(self, tmp_path, subpath):
+        from fileglancer.apps.jobfiles import ensure_private_dir
+
+        # tmp_path stands in for $HOME: its mode must survive the walk upward.
+        os.chmod(tmp_path, 0o755)
+        leaf = tmp_path / subpath
+        ensure_private_dir(leaf)
+        for path in self._chain(leaf):
+            assert path.stat().st_mode & 0o077 == 0, path
+        assert tmp_path.stat().st_mode & 0o777 == 0o755
+
+    def test_fixes_an_already_world_readable_tree(self, tmp_path):
+        from fileglancer.apps.jobfiles import ensure_private_dir
+
+        leaf = tmp_path / ".fileglancer" / "jobs" / "1-demo-run"
+        leaf.mkdir(parents=True)
+        for path in self._chain(leaf):
+            os.chmod(path, 0o755)
+        ensure_private_dir(leaf)
+        for path in self._chain(leaf):
+            assert path.stat().st_mode & 0o077 == 0, path
+
+    def test_outside_the_state_dir_locks_the_leaf_only(self, tmp_path):
+        """A relocated cache base (as in tests) still gets a private leaf."""
+        from fileglancer.apps.jobfiles import ensure_private_dir
+
+        leaf = tmp_path / "somewhere" / "else"
+        ensure_private_dir(leaf)
+        assert leaf.stat().st_mode & 0o077 == 0
+        # The walk stops immediately: an unrelated parent keeps its mode.
+        os.chmod(tmp_path / "somewhere", 0o755)
+        ensure_private_dir(leaf)
+        assert (tmp_path / "somewhere").stat().st_mode & 0o777 == 0o755
 
 
 class TestServicePhase:

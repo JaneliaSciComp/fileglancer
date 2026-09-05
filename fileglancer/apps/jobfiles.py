@@ -33,6 +33,36 @@ def _build_work_dir(job_id: int, app_name: str, entry_point_id: str,
 
 # --- Job File Access ---
 
+_STATE_DIRNAME = ".fileglancer"
+
+
+def ensure_private_dir(path: Path) -> None:
+    """Create a directory under ``~/.fileglancer`` that only its owner can enter.
+
+    Fileglancer's state directory holds things no other user should see: a
+    service job's access token (in ``service_url``, and routinely echoed into
+    ``stdout.log`` by the service itself) and clones of app repositories, which
+    may be private. The directory mode is what keeps them secret — the default
+    0755 on a shared filesystem publishes them, and with the token the ability
+    to act as that user, to everyone on the site.
+
+    Every level from ``path`` up to and including ``~/.fileglancer`` is locked
+    down, so the state root stays private however it was first created and
+    subtrees made before this was enforced are covered too. Nothing above the
+    state root is touched.
+
+    Must run as the owner of the tree (in the user worker, or as the user in CLI
+    mode). Chmod rather than ``mkdir(mode=...)``: that mode is masked by the
+    umask, and ignored entirely when the directory already exists.
+    """
+    path.mkdir(parents=True, exist_ok=True)
+    os.chmod(path, 0o700)
+    for parent in path.parents:
+        if _STATE_DIRNAME not in parent.parts:
+            break  # above ~/.fileglancer (or outside it): not ours to touch
+        os.chmod(parent, 0o700)
+
+
 def _resolve_work_dir(db_job: db.JobDB) -> Path:
     """Resolve a job's work directory to an absolute path."""
     if db_job.work_dir:

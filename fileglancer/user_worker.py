@@ -1013,6 +1013,7 @@ def _get_executor(request: dict):
 def _action_submit(request: dict, ctx: WorkerContext) -> dict:
     """Create work dir, symlink repo, submit job via py-cluster-api."""
     from cluster_api import ResourceSpec
+    from fileglancer.apps.jobfiles import ensure_private_dir
 
     executor = _get_executor(request)
 
@@ -1021,7 +1022,7 @@ def _action_submit(request: dict, ctx: WorkerContext) -> dict:
     fsps = _file_share_paths_from_request(request)
 
     work_dir = Path(request["work_dir"])
-    work_dir.mkdir(parents=True, exist_ok=True)
+    ensure_private_dir(work_dir)
 
     cached_repo_dir = request["cached_repo_dir"]
     repo_link = work_dir / "repo"
