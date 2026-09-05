@@ -168,6 +168,15 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
         data_dir = Path.home() / '.local' / 'share' / 'fileglancer'
         data_dir.mkdir(parents=True, exist_ok=True)
         db_path = data_dir / 'fileglancer.db'
+        # The database holds session ids and service URLs, both of which are
+        # live credentials, so it must not be readable by other users on a
+        # shared home. The directory mode is what covers SQLite's -wal and -shm
+        # sidecars too; the file mode is set as well so a copy of it stays
+        # private. Both run unconditionally, to fix an install created before
+        # this or under a laxer umask.
+        os.chmod(data_dir, 0o700)
+        db_path.touch(mode=0o600, exist_ok=True)
+        os.chmod(db_path, 0o600)
         os.environ['FGC_DB_URL'] = f'sqlite:///{db_path}'
         logger.debug(f"Setting FGC_DB_URL=sqlite:///{db_path}")
 
