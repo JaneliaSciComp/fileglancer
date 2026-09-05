@@ -1082,6 +1082,36 @@ class TestPrivateStateDir:
         for path in self._chain(leaf):
             assert path.stat().st_mode & 0o077 == 0, path
 
+    def test_an_unfixable_ancestor_warns_instead_of_failing(self, tmp_path,
+                                                            monkeypatch):
+        """A state root owned by someone else must not break job submission."""
+        from fileglancer.apps import jobfiles
+
+        real_chmod = os.chmod
+
+        def fake_chmod(target, mode):
+            if os.path.basename(target) == ".fileglancer":
+                raise PermissionError(1, "Operation not permitted")
+            real_chmod(target, mode)
+
+        monkeypatch.setattr(jobfiles.os, "chmod", fake_chmod)
+        leaf = tmp_path / ".fileglancer" / "jobs" / "1-demo-run"
+        jobfiles.ensure_private_dir(leaf)
+        assert leaf.stat().st_mode & 0o077 == 0
+        assert leaf.parent.stat().st_mode & 0o077 == 0
+
+    def test_an_unlockable_leaf_raises_a_readable_error(self, tmp_path,
+                                                        monkeypatch):
+        from fileglancer.apps import jobfiles
+
+        def fake_chmod(target, mode):
+            raise PermissionError(1, "Operation not permitted")
+
+        monkeypatch.setattr(jobfiles.os, "chmod", fake_chmod)
+        leaf = tmp_path / ".fileglancer" / "jobs" / "1-demo-run"
+        with pytest.raises(PermissionError, match="not safe to write job"):
+            jobfiles.ensure_private_dir(leaf)
+
     def test_outside_the_state_dir_locks_the_leaf_only(self, tmp_path):
         """A relocated cache base (as in tests) still gets a private leaf."""
         from fileglancer.apps.jobfiles import ensure_private_dir

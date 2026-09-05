@@ -7,6 +7,8 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
+from loguru import logger
+
 from fileglancer import database as db
 from fileglancer.settings import get_settings
 
@@ -49,18 +51,36 @@ def ensure_private_dir(path: Path) -> None:
     Every level from ``path`` up to and including ``~/.fileglancer`` is locked
     down, so the state root stays private however it was first created and
     subtrees made before this was enforced are covered too. Nothing above the
-    state root is touched.
+    state root is touched. An ancestor that cannot be chmod'ed (owned by another
+    uid) is warned about rather than raised, since the leaf is private either
+    way; failing to lock the leaf itself does raise.
 
     Must run as the owner of the tree (in the user worker, or as the user in CLI
     mode). Chmod rather than ``mkdir(mode=...)``: that mode is masked by the
     umask, and ignored entirely when the directory already exists.
     """
     path.mkdir(parents=True, exist_ok=True)
-    os.chmod(path, 0o700)
+    try:
+        os.chmod(path, 0o700)
+    except OSError as e:
+        raise PermissionError(
+            f"Cannot make {path} private, so it is not safe to write job "
+            f"credentials there: {e}"
+        ) from e
     for parent in path.parents:
         if _STATE_DIRNAME not in parent.parts:
             break  # above ~/.fileglancer (or outside it): not ours to touch
-        os.chmod(parent, 0o700)
+        try:
+            os.chmod(parent, 0o700)
+        except OSError as e:
+            # A state root owned by someone else is not ours to repair, and the
+            # directory we just locked is the one that holds the secrets. Say so
+            # and stop, rather than failing the caller over an ancestor.
+            logger.warning(
+                f"Could not make {parent} private ({e}); anything directly "
+                f"inside it stays readable by other users"
+            )
+            break
 
 
 def _resolve_work_dir(db_job: db.JobDB) -> Path:
