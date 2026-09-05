@@ -357,6 +357,14 @@ def _poll_local_jobs(session, jobs_to_poll: list) -> bool:
     exit code to ``{work_dir}/exit_code`` via an EXIT trap.
 
     Returns True if there are still active jobs, False otherwise.
+
+    ponytail: single-user only. This runs in the server process and reads the
+    work directory directly, but work directories are 0700 and owned by the job's
+    user (see ensure_private_dir), so the server can only poll jobs it owns
+    itself -- a job belonging to anyone else would never leave PENDING. That is
+    why the config template restricts ``executor: local`` to single-user
+    deployments. To lift it, move these two reads into a worker action, the way
+    read_job_file already does, and poll through the owning user's worker.
     """
     still_active = False
 
