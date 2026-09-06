@@ -64,8 +64,8 @@ def ensure_private_dir(path: Path) -> None:
         os.chmod(path, 0o700)
     except OSError as e:
         raise PermissionError(
-            f"Cannot make {path} private, so it is not safe to write job "
-            f"credentials there: {e}"
+            f"Cannot make {path} private, so it is not safe to write sensitive "
+            f"Fileglancer state there: {e}"
         ) from e
     for parent in path.parents:
         if _STATE_DIRNAME not in parent.parts:
