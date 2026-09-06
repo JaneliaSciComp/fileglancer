@@ -1000,7 +1000,9 @@ class TestServiceUrlPublisher:
         assert result.returncode == 0, result.stderr
         assert "SERVICE_URL_PATH" in snippet and "3600" in snippet
 
-    def test_publishes_tokenized_url_only_once_port_is_up(self, tmp_path):
+    @pytest.mark.parametrize("preexisting", [False, True])
+    def test_publishes_tokenized_url_only_once_port_is_up(self, tmp_path,
+                                                          preexisting):
         import socket
         # Bind a real port so the probe's TCP connect succeeds.
         srv = socket.socket()
@@ -1010,6 +1012,11 @@ class TestServiceUrlPublisher:
         srv.listen()
         try:
             url_file = tmp_path / "service_url"
+            if preexisting:
+                # Redirection keeps the mode of a file that already exists, so
+                # the umask alone would leave this one readable.
+                url_file.touch()
+                os.chmod(url_file, 0o644)
             env = (
                 f'export FG_HOSTNAME=h1 FG_SERVICE_PORT={port} '
                 f'FG_SERVICE_TOKEN=deadbeef SERVICE_URL_PATH={url_file}\n'
@@ -1109,7 +1116,7 @@ class TestPrivateStateDir:
 
         monkeypatch.setattr(jobfiles.os, "chmod", fake_chmod)
         leaf = tmp_path / ".fileglancer" / "jobs" / "1-demo-run"
-        with pytest.raises(PermissionError, match="not safe to write job"):
+        with pytest.raises(PermissionError, match="not safe to write sensitive"):
             jobfiles.ensure_private_dir(leaf)
 
     def test_outside_the_state_dir_locks_the_leaf_only(self, tmp_path):

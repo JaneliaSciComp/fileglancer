@@ -6,6 +6,7 @@ _ensure_repo_cache/_repo_cache_base monkeypatches, everything below that
 """
 
 import asyncio
+import os
 import shutil
 import subprocess
 
@@ -85,6 +86,21 @@ def test_snapshot_of_current_head(repo_setup):
     # Idempotent: asking for the same sha finds the existing snapshot.
     snap_dir2, sha2 = asyncio.run(m.ensure_repo_snapshot(REPO_URL, sha=sha))
     assert (snap_dir2, sha2) == (snap_dir, sha)
+
+
+def test_existing_snapshot_tree_is_locked_down_on_the_hot_path(repo_setup):
+    """Launching a pinned app reaches neither _ensure_repo_cache nor
+    _create_snapshot, so the hot path is the only chance to make a snapshot tree
+    left world-readable by an older release private again."""
+    _, clone = repo_setup
+    snap_dir, sha = asyncio.run(m.ensure_repo_snapshot(REPO_URL))
+    snapshots = snap_dir.parent
+    os.chmod(snapshots, 0o755)
+
+    snap_dir2, _ = asyncio.run(m.ensure_repo_snapshot(REPO_URL, sha=sha))
+
+    assert snap_dir2 == snap_dir
+    assert snapshots.stat().st_mode & 0o077 == 0
 
 
 def test_snapshot_immutable_when_branch_moves(repo_setup):

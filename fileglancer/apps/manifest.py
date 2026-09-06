@@ -483,6 +483,10 @@ async def ensure_repo_snapshot(url: str, sha: str | None = None,
         if (snapshot_dir / ".git").exists():
             with suppress(OSError):
                 os.utime(snapshot_dir)
+            # Launching a pinned app reaches neither _ensure_repo_cache nor
+            # _create_snapshot, so for a user whose snapshots all predate this
+            # it is the only place the tree gets locked down.
+            ensure_private_dir(snapshot_dir.parent)
             return snapshot_dir, sha
 
     repo_dir = await _ensure_repo_cache(url, pull=pull)

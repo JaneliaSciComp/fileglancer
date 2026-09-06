@@ -533,11 +533,13 @@ def _build_service_url_publisher(suffix: str = "") -> str:
         "(",
         "  for _ in $(seq 1 3600); do",
         '    if (exec 3<>"/dev/tcp/127.0.0.1/$FG_SERVICE_PORT") 2>/dev/null; then',
-        # umask in a subshell: the URL usually carries the service's access
-        # token, so the file is 0600 regardless of the user's umask. The work
-        # directory's own 0700 is the real barrier (see ensure_private_dir);
-        # this keeps the secret covered if the file outlives that directory.
-        f'      (umask 077; printf \'http://%s:%s%s\' "$FG_HOSTNAME" "$FG_SERVICE_PORT" "{suffix}" > "$SERVICE_URL_PATH")',
+        # The URL usually carries the service's access token, so the file is
+        # 0600 whatever the user's umask: the umask covers creating it, and the
+        # chmod covers a redirect into a file that somehow already exists, since
+        # that keeps the mode it was created with. The work directory's own 0700
+        # is the real barrier (see ensure_private_dir); this keeps the secret
+        # covered if the file outlives that directory.
+        f'      (umask 077; printf \'http://%s:%s%s\' "$FG_HOSTNAME" "$FG_SERVICE_PORT" "{suffix}" > "$SERVICE_URL_PATH" && chmod 600 "$SERVICE_URL_PATH")',
         "      exit 0",
         "    fi",
         "    sleep 1",
