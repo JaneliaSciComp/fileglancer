@@ -85,6 +85,37 @@ def build_proxied_service_url(service_url: Optional[str], job_id: int,
     ))
 
 
+def service_url_origin(service_url: Optional[str]) -> Optional[str]:
+    """The ``scheme://host:port`` prefix of a published service URL.
+
+    This is the only part of the URL worth persisting. The path and query carry
+    the service's own access token, and nothing reads them back out of the
+    database: the column's one consumer is /api/apps/resolve, which keeps the
+    authority and discards the rest. Storing the whole URL would leave a live
+    credential somewhere the work directory's 0700 cannot reach, since a
+    multi-user deployment's database is MySQL, with its own dumps and backups.
+
+    The scheme is kept because urlsplit needs one to find an authority at all: a
+    bare ``host:port`` parses as a scheme plus path, leaving netloc empty, and
+    upstream_from_service_url reads netloc.
+
+    Returns None when there is no authority to keep, and for an authority
+    carrying userinfo -- that is a credential too, and upstream_from_service_url
+    refuses such an authority anyway, so dropping the row loses nothing. Note
+    that urlsplit strips CR/LF, so a header-injection attempt is not preserved
+    here; what remains is still refused downstream by the upstream gate.
+    """
+    if not service_url:
+        return None
+    try:
+        parts = urlsplit(service_url)
+    except ValueError:
+        return None
+    if not parts.scheme or not parts.netloc or '@' in parts.netloc:
+        return None
+    return urlunsplit((parts.scheme, parts.netloc, '', '', ''))
+
+
 def job_id_from_host(host: Optional[str], proxy_domain: str,
                      secret: str) -> Optional[int]:
     """Extract the job id from a proxy hostname, or None if it isn't one.

@@ -1208,11 +1208,21 @@ def get_job_by_id(session: Session, job_id: int) -> Optional[JobDB]:
 
 
 def set_job_service_url(session: Session, job_id: int, service_url: str) -> None:
-    """Cache a job's published service URL on its row."""
+    """Cache the origin of a job's published service URL on its row.
+
+    Only the origin is stored: the rest of the URL carries the service's access
+    token, and the column's one reader wants the authority. Normalizing here
+    rather than at the call site keeps the token out of the column no matter who
+    writes it. Imported inside the function because fileglancer.apps imports
+    this module, so a module-level import would close a cycle.
+    """
+    from fileglancer.apps.serviceproxy import service_url_origin
+
+    origin = service_url_origin(service_url)
     job = session.query(JobDB).filter_by(id=job_id).first()
-    if job is None or job.service_url == service_url:
+    if job is None or job.service_url == origin:
         return
-    job.service_url = service_url
+    job.service_url = origin
     session.commit()
 
 

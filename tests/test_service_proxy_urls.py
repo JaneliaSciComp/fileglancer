@@ -9,6 +9,7 @@ from fileglancer.apps.serviceproxy import (
     build_proxied_service_url,
     job_id_from_host,
     service_host_label,
+    service_url_origin,
     upstream_from_service_url,
 )
 
@@ -128,6 +129,39 @@ def test_job_id_from_host_rejects_absurd_job_id():
     turning a bogus hostname into a 500 with a traceback instead of a refusal."""
     assert job_id_from_host(
         f"job-{'9' * 5000}-{'a' * _MAC_CHARS}.{DOMAIN}", DOMAIN, SECRET) is None
+
+
+# --- service_url_origin ---
+
+@pytest.mark.parametrize("url,expected", [
+    # The token lives in the query string, which is the point of all this.
+    ("http://node01:41235/lab?token=abc", "http://node01:41235"),
+    ("http://node01:41235", "http://node01:41235"),
+    ("https://node01:8443/x/y?a=1#f", "https://node01:8443"),
+    # No authority to keep.
+    ("garbage", None),
+    ("node01:41235", None),
+    ("", None),
+    (None, None),
+    # Userinfo is a credential too, and the upstream gate refuses it anyway.
+    ("https://user:pw@node01:8443/x", None),
+])
+def test_origin_keeps_only_scheme_and_authority(url, expected):
+    assert service_url_origin(url) == expected
+
+
+def test_origin_survives_the_upstream_gate_unchanged():
+    """Storing the origin must not change what the proxy resolves to."""
+    url = "http://node01:41235/lab?token=abc"
+    assert upstream_from_service_url(service_url_origin(url)) == \
+        upstream_from_service_url(url) == "node01:41235"
+
+
+def test_origin_of_a_header_injection_attempt_is_still_refused():
+    """urlsplit drops the CR/LF, so the raw bytes never reach the column; what
+    is left must still fail the upstream gate rather than become dialable."""
+    origin = service_url_origin("http://evil.example.org:80\r\nX-Injected: 1/")
+    assert upstream_from_service_url(origin) is None
 
 
 # --- upstream_from_service_url ---
