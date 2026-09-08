@@ -1089,6 +1089,24 @@ class TestPrivateStateDir:
         for path in self._chain(leaf):
             assert path.stat().st_mode & 0o077 == 0, path
 
+    def test_the_walk_stops_at_the_innermost_state_root(self, tmp_path):
+        """A ``.fileglancer`` component further up the path is not the root."""
+        from fileglancer.apps.jobfiles import ensure_private_dir
+
+        outer_state = tmp_path / ".fileglancer"
+        leaf = outer_state / "shared" / ".fileglancer" / "jobs" / "1-demo-run"
+        leaf.mkdir(parents=True)
+        os.chmod(outer_state, 0o755)
+        os.chmod(outer_state / "shared", 0o755)
+
+        ensure_private_dir(leaf)
+
+        for path in self._chain(leaf):
+            assert path.stat().st_mode & 0o077 == 0, path
+        # Everything above that root belongs to whoever put it there.
+        assert (outer_state / "shared").stat().st_mode & 0o777 == 0o755
+        assert outer_state.stat().st_mode & 0o777 == 0o755
+
     def test_an_unfixable_ancestor_warns_instead_of_failing(self, tmp_path,
                                                             monkeypatch):
         """A state root owned by someone else must not break job submission."""

@@ -48,12 +48,12 @@ def ensure_private_dir(path: Path) -> None:
     0755 on a shared filesystem publishes them, and with the token the ability
     to act as that user, to everyone on the site.
 
-    Every level from ``path`` up to and including ``~/.fileglancer`` is locked
-    down, so the state root stays private however it was first created and
-    subtrees made before this was enforced are covered too. Nothing above the
-    state root is touched. An ancestor that cannot be chmod'ed (owned by another
-    uid) is warned about rather than raised, since the leaf is private either
-    way; failing to lock the leaf itself does raise.
+    Every level from ``path`` up to and including the state root is locked down,
+    so that root stays private however it was first created and subtrees made
+    before this was enforced are covered too. Nothing above it is touched. An
+    ancestor that cannot be chmod'ed (owned by another uid) is warned about
+    rather than raised, since the leaf is private either way; failing to lock
+    the leaf itself does raise.
 
     Must run as the owner of the tree (in the user worker, or as the user in CLI
     mode). Chmod rather than ``mkdir(mode=...)``: that mode is masked by the
@@ -67,9 +67,16 @@ def ensure_private_dir(path: Path) -> None:
             f"Cannot make {path} private, so it is not safe to write sensitive "
             f"Fileglancer state there: {e}"
         ) from e
+    # The state root is the innermost ``.fileglancer`` above the leaf. Found
+    # lexically, not by resolving the path: a relocated state directory (a
+    # symlinked ``~/.fileglancer``) resolves to somewhere with no
+    # ``.fileglancer`` component at all, and its real tree still wants locking.
+    state_root = next(
+        (p for p in path.parents if p.name == _STATE_DIRNAME), None
+    )
+    if state_root is None:
+        return  # not under a state directory, so there is nothing above to fix
     for parent in path.parents:
-        if _STATE_DIRNAME not in parent.parts:
-            break  # above ~/.fileglancer (or outside it): not ours to touch
         try:
             os.chmod(parent, 0o700)
         except OSError as e:
@@ -81,6 +88,8 @@ def ensure_private_dir(path: Path) -> None:
                 f"inside it stays readable by other users"
             )
             break
+        if parent == state_root:
+            break  # never ascend past the state root
 
 
 def _resolve_work_dir(db_job: db.JobDB) -> Path:
