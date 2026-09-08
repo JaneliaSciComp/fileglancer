@@ -345,7 +345,13 @@ async def _ensure_repo_cache(url: str, pull: bool = False,
     euid = os.geteuid() if hasattr(os, "geteuid") else "n/a"
     logger.debug(f"ensure_repo running in-process as euid={euid}")
     cache_base = _repo_cache_base()
-    repo_dir = (cache_base / owner / repo / branch).resolve()
+    # Kept alongside the resolved path because the two are not interchangeable:
+    # containment and git want the real location, while the permission walk
+    # needs to still see the .fileglancer component that resolve() collapses
+    # away when any part of the path (a relocated state directory, an
+    # automounted home) is a symlink.
+    lexical_repo_dir = cache_base / owner / repo / branch
+    repo_dir = lexical_repo_dir.resolve()
     repo_dir.relative_to(cache_base.resolve())
     lock = _get_repo_lock(owner, repo, branch)
 
@@ -353,7 +359,7 @@ async def _ensure_repo_cache(url: str, pull: bool = False,
         # Before the cache-hit check, not just on the clone path: this is the
         # call every user reaches, so it is what locks down a state directory
         # left world-readable by an earlier version.
-        ensure_private_dir(repo_dir.parent)
+        ensure_private_dir(lexical_repo_dir.parent)
         if repo_dir.exists():
             logger.debug(f"Repo cache hit: {owner}/{repo} ({branch})")
             if pull:
