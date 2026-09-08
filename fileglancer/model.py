@@ -585,6 +585,18 @@ class AppEntryPoint(BaseModel):
         ),
         default=None,
     )
+    service_proxy: bool = Field(
+        description=(
+            "For service entry points only: whether Fileglancer may republish "
+            "this service at an HTTPS proxy URL when the server has a service "
+            "proxy configured. Set it to false only when the service cannot "
+            "work behind the proxy at all, e.g. it pins an OAuth callback to a "
+            "fixed host and port. Users then reach it at the direct "
+            "http://host:port URL, with no transport encryption on any hop, so "
+            "nothing sensitive should be sent to a service that opts out."
+        ),
+        default=True,
+    )
     requirements: List[str] = Field(
         description="Required tools for this entry point, e.g. ['apptainer']. Merged with manifest-level requirements.",
         default=[],
@@ -720,6 +732,12 @@ class AppEntryPoint(BaseModel):
             raise ValueError("auto_url is only valid for service entry points (type: service)")
         if self.service_url_suffix is not None and not self.auto_url:
             raise ValueError("service_url_suffix requires auto_url to be set")
+        # Checked by value rather than by model_fields_set, like the parameter
+        # validators above: manifests round-trip through model_dump, which
+        # writes the True default onto every entry point, so only an explicit
+        # false is distinguishable — and only false means anything here.
+        if not self.service_proxy and self.type != "service":
+            raise ValueError("service_proxy is only valid for service entry points (type: service)")
         return self
 
 
