@@ -953,6 +953,32 @@ class TestServiceAutoUrl:
                           type="job", auto_url=True)
 
 
+class TestServiceProxyOptOut:
+    """service_proxy lets a service that cannot work behind the HTTPS proxy keep
+    its direct URL. It defaults on, so opting out is always explicit."""
+
+    def test_defaults_true(self):
+        ep = AppEntryPoint(id="t", name="T", command="echo", type="service")
+        assert ep.service_proxy is True
+
+    def test_can_be_disabled_on_a_service(self):
+        ep = AppEntryPoint(id="t", name="T", command="echo",
+                           type="service", service_proxy=False)
+        assert ep.service_proxy is False
+
+    def test_rejected_on_a_job(self):
+        with pytest.raises(ValidationError, match="service_proxy is only valid for service"):
+            AppEntryPoint(id="t", name="T", command="echo",
+                          type="job", service_proxy=False)
+
+    def test_default_survives_a_job_entry_point(self):
+        """The True default is written onto every entry point by model_dump, so
+        the validator must key on the value being false, not on the field being
+        set — otherwise a round-tripped job manifest fails to revalidate."""
+        ep = AppEntryPoint(id="t", name="T", command="echo", type="job")
+        assert AppEntryPoint(**ep.model_dump()).service_proxy is True
+
+
 class TestServiceUrlSuffix:
     """service_url_suffix is a restricted template validated for shell-safety."""
 

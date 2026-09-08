@@ -100,13 +100,15 @@ def app_factory(settings_factory):
     fileglancer.database._migrations_run = False
 
 
-def _seed_service_job(db_url, status="RUNNING", entry_point_type="service"):
+def _seed_service_job(db_url, status="RUNNING", entry_point_type="service",
+                      service_proxy=True):
     session = get_db_session(db_url)
     try:
         job = create_job(
             session, OWNER, "https://github.com/owner/repo",
             "My App", "serve", "Server", {},
             entry_point_type=entry_point_type,
+            service_proxy=service_proxy,
         )
         job.status = status
         session.commit()
@@ -193,8 +195,9 @@ def _resolve(app, host):
     return TestClient(app).get("/api/apps/resolve", headers={"Host": host})
 
 
-def _seed_running_service_with_url(db_url, url="http://node01:41235/lab?token=abc"):
-    job_id = _seed_service_job(db_url)
+def _seed_running_service_with_url(db_url, url="http://node01:41235/lab?token=abc",
+                                   service_proxy=True):
+    job_id = _seed_service_job(db_url, service_proxy=service_proxy)
     session = get_db_session(db_url)
     try:
         set_job_service_url(session, job_id, url)
@@ -317,6 +320,28 @@ def test_job_detail_publishes_raw_url_when_proxy_disabled(app_factory, monkeypat
     resp = _get_job_with_worker_url(
         app, job_id, "http://node01:41235/lab?token=abc", monkeypatch)
     assert resp.json()["service_url"] == "http://node01:41235/lab?token=abc"
+
+
+def test_job_detail_publishes_raw_url_when_the_app_opts_out(app_factory, monkeypatch):
+    """An app that sets service_proxy: false keeps its direct URL even on a
+    server where the proxy is configured and every other app is republished."""
+    app, db_url = app_factory(PROXY_DOMAIN)
+    job_id = _seed_service_job(db_url, service_proxy=False)
+    resp = _get_job_with_worker_url(
+        app, job_id, "http://node01:41235/lab?token=abc", monkeypatch)
+    assert resp.status_code == 200
+    assert resp.json()["service_url"] == "http://node01:41235/lab?token=abc"
+
+
+def test_resolve_refuses_an_app_that_opted_out(app_factory):
+    """Suppressing the published URL is not enough on its own: the hostname is
+    derivable by anyone holding the signing key, and an opted-out app must not
+    be reachable through the proxy even by someone who has it."""
+    app, db_url = app_factory(PROXY_DOMAIN)
+    job_id = _seed_running_service_with_url(db_url, service_proxy=False)
+    resp = _resolve(app, _host(job_id))
+    assert resp.status_code == 403
+    assert apps.resolve_counts() == {"refused_proxy_disabled": 1}
 
 
 def test_job_detail_caches_the_raw_origin_not_the_proxied_url(app_factory, monkeypatch):

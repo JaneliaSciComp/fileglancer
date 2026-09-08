@@ -10,7 +10,7 @@ fileglancer.apps.serviceproxy.service_url_origin, inlined here so the migration
 stays self-contained.
 
 Revision ID: e4d1b7a92c58
-Revises: c3e9b7f41a28
+Revises: a9c3e05f1b47
 Create Date: 2026-09-08 00:00:00.000000
 
 """
@@ -22,7 +22,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'e4d1b7a92c58'
-down_revision = 'c3e9b7f41a28'
+down_revision = 'a9c3e05f1b47'
 branch_labels = None
 depends_on = None
 

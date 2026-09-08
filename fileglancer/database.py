@@ -5,6 +5,7 @@ import os
 from functools import lru_cache
 
 from sqlalchemy import create_engine, Boolean, Column, String, Integer, DateTime, JSON, UniqueConstraint, func
+from sqlalchemy import true as sa_true
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.pool import StaticPool
@@ -201,6 +202,12 @@ class JobDB(Base):
     # indexed read, instead of a per-user worker RPC and an NFS stat on every
     # proxied request. NULL until the job publishes a URL and it is first read.
     service_url = Column(String, nullable=True)
+    # Whether this service may be republished at the HTTPS proxy URL. Taken
+    # from the entry point's service_proxy flag and snapshotted at submit time,
+    # so editing the manifest cannot change the decision under a job that is
+    # already running. False publishes the direct http://host:port URL instead
+    # and makes the resolve endpoint refuse the job's proxy hostname.
+    service_proxy = Column(Boolean, nullable=False, server_default=sa_true())
     # Commit whose code this job executed (the code repo's SHA when the
     # manifest declares a separate repo_url, else the app repo's SHA). NULL for
     # jobs submitted before commit pinning existed.
@@ -1146,6 +1153,7 @@ def create_job(session: Session, username: str, app_url: str, app_name: str,
                requirements: Optional[List[str]] = None,
                commit_sha: Optional[str] = None,
                code_repo_url: Optional[str] = None,
+               service_proxy: bool = True,
                clean_env: bool = False) -> JobDB:
     """Create a new job record"""
     now = datetime.now(UTC)
@@ -1174,6 +1182,7 @@ def create_job(session: Session, username: str, app_url: str, app_name: str,
         requirements=requirements,
         commit_sha=commit_sha,
         code_repo_url=code_repo_url,
+        service_proxy=service_proxy,
         status="PENDING",
         created_at=now,
         status_updated_at=now,

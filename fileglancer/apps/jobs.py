@@ -873,6 +873,7 @@ async def submit_job(
             requirements=effective_requirements,
             commit_sha=executed_sha,
             code_repo_url=executed_repo_url,
+            service_proxy=entry_point.service_proxy,
         )
         job_id = db_job.id
 
