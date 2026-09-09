@@ -226,7 +226,12 @@ session_cookie_secure: true
 # See: https://github.com/JaneliaSciComp/py-cluster-api
 #
 cluster:
-  executor: local            # "local" or "lsf"
+  executor: local            # "local" or "lsf". "local" is for single-user
+                             # deployments (dev, CLI mode) only: its poll loop
+                             # reads job state from the work directory in the
+                             # server process, and work directories are private
+                             # to the user who owns the job. A multi-user
+                             # deployment must use "lsf".
 #   job_name_prefix: fg        # Prefix for cluster job names. REQUIRED for job
 #                              # reconnection after server restarts. Without this,
 #                              # active jobs will not be re-tracked and will

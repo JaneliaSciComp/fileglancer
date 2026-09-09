@@ -135,7 +135,8 @@ def test_set_job_service_url_persists(app_factory):
 
     session = get_db_session(db_url)
     try:
-        assert get_job_by_id(session, job_id).service_url == "http://node01:41235/lab?token=abc"
+        # Only the origin: the token in the query string is never stored.
+        assert get_job_by_id(session, job_id).service_url == "http://node01:41235"
     finally:
         session.close()
 
@@ -177,11 +178,13 @@ def test_get_job_caches_service_url(app_factory, monkeypatch):
     app.dependency_overrides.clear()
 
     assert resp.status_code == 200
+    # The browser gets the tokenized URL from the fresh worker read...
     assert resp.json()["service_url"] == "http://node01:41235/lab?token=abc"
 
     session = get_db_session(db_url)
     try:
-        assert get_job_by_id(session, job_id).service_url == "http://node01:41235/lab?token=abc"
+        # ...while the row keeps only what the proxy needs to dial.
+        assert get_job_by_id(session, job_id).service_url == "http://node01:41235"
     finally:
         session.close()
 
@@ -341,18 +344,21 @@ def test_resolve_refuses_an_app_that_opted_out(app_factory):
     assert apps.resolve_counts() == {"refused_proxy_disabled": 1}
 
 
-def test_job_detail_caches_the_raw_url_not_the_proxied_one(app_factory, monkeypatch):
-    """The cached value is the upstream, so it must stay in its raw form."""
+def test_job_detail_caches_the_raw_origin_not_the_proxied_url(app_factory, monkeypatch):
+    """The cached value is the upstream, so it stays in its raw form rather than
+    the proxied one — but only the origin of it, since the token in the query
+    string is a credential and the resolver never looks past the authority."""
     app, db_url = app_factory(PROXY_DOMAIN)
     job_id = _seed_service_job(db_url)
     _get_job_with_worker_url(
         app, job_id, "http://node01:41235/lab?token=abc", monkeypatch)
     session = get_db_session(db_url)
     try:
-        assert get_job_by_id(session, job_id).service_url == \
-            "http://node01:41235/lab?token=abc"
+        cached = get_job_by_id(session, job_id).service_url
     finally:
         session.close()
+    assert cached == "http://node01:41235"
+    assert "token" not in cached and _host(job_id) not in cached
 
 
 def test_resolve_rejects_malformed_cached_url(app_factory):

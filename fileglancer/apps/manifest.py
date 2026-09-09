@@ -14,6 +14,7 @@ from loguru import logger
 
 from fileglancer import database as db
 from fileglancer.apps.adapters import try_adapt
+from fileglancer.apps.jobfiles import ensure_private_dir
 # GitHub URL parsing/canonicalization lives in fileglancer.giturls (which has no
 # fileglancer deps) so the database layer can reuse it without an import cycle.
 # Re-exported for the apps module's internal callers and existing imports.
@@ -344,11 +345,21 @@ async def _ensure_repo_cache(url: str, pull: bool = False,
     euid = os.geteuid() if hasattr(os, "geteuid") else "n/a"
     logger.debug(f"ensure_repo running in-process as euid={euid}")
     cache_base = _repo_cache_base()
-    repo_dir = (cache_base / owner / repo / branch).resolve()
+    # Kept alongside the resolved path because the two are not interchangeable:
+    # containment and git want the real location, while the permission walk
+    # needs to still see the .fileglancer component that resolve() collapses
+    # away when any part of the path (a relocated state directory, an
+    # automounted home) is a symlink.
+    lexical_repo_dir = cache_base / owner / repo / branch
+    repo_dir = lexical_repo_dir.resolve()
     repo_dir.relative_to(cache_base.resolve())
     lock = _get_repo_lock(owner, repo, branch)
 
     async with lock:
+        # Before the cache-hit check, not just on the clone path: this is the
+        # call every user reaches, so it is what locks down a state directory
+        # left world-readable by an earlier version.
+        ensure_private_dir(lexical_repo_dir.parent)
         if repo_dir.exists():
             logger.debug(f"Repo cache hit: {owner}/{repo} ({branch})")
             if pull:
@@ -367,7 +378,6 @@ async def _ensure_repo_cache(url: str, pull: bool = False,
                 )
         else:
             logger.info(f"Cloning {owner}/{repo} ({branch}) into {repo_dir}")
-            repo_dir.parent.mkdir(parents=True, exist_ok=True)
             await _clone_repo(owner, repo, branch, repo_dir)
 
     return repo_dir
@@ -418,7 +428,7 @@ async def _create_snapshot(owner: str, repo: str, repo_dir: Path, sha: str,
                 f"pin it to the current revision. ({e})"
             )
 
-    snapshot_dir.parent.mkdir(parents=True, exist_ok=True)
+    ensure_private_dir(snapshot_dir.parent)
     tmp_dir = snapshot_dir.parent / f".tmp-{sha}"
     shutil.rmtree(tmp_dir, ignore_errors=True)
     try:
@@ -479,6 +489,10 @@ async def ensure_repo_snapshot(url: str, sha: str | None = None,
         if (snapshot_dir / ".git").exists():
             with suppress(OSError):
                 os.utime(snapshot_dir)
+            # Launching a pinned app reaches neither _ensure_repo_cache nor
+            # _create_snapshot, so for a user whose snapshots all predate this
+            # it is the only place the tree gets locked down.
+            ensure_private_dir(snapshot_dir.parent)
             return snapshot_dir, sha
 
     repo_dir = await _ensure_repo_cache(url, pull=pull)

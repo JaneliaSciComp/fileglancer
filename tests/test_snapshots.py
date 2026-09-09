@@ -6,10 +6,13 @@ _ensure_repo_cache/_repo_cache_base monkeypatches, everything below that
 """
 
 import asyncio
+import os
 import shutil
 import subprocess
 
 import pytest
+
+from conftest import requires_symlinks
 
 import fileglancer.apps.manifest as m
 
@@ -85,6 +88,51 @@ def test_snapshot_of_current_head(repo_setup):
     # Idempotent: asking for the same sha finds the existing snapshot.
     snap_dir2, sha2 = asyncio.run(m.ensure_repo_snapshot(REPO_URL, sha=sha))
     assert (snap_dir2, sha2) == (snap_dir, sha)
+
+
+@requires_symlinks
+def test_repo_cache_locks_a_symlinked_state_root(tmp_path, monkeypatch):
+    """The permission walk has to see the lexical path.
+
+    resolve() collapses the .fileglancer component away whenever part of the
+    path is a symlink -- a state directory relocated to keep multi-GB SIFs off a
+    home quota, or an automounted home -- and the walk would then stop at the
+    repo directory instead of repairing the state root.
+    """
+    real_state = tmp_path / "nrs" / "fg-state"
+    (real_state / "apps").mkdir(parents=True)
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / ".fileglancer").symlink_to(real_state)
+    cache_base = home / ".fileglancer" / "apps"
+    monkeypatch.setattr(m, "_repo_cache_base", lambda username=None: cache_base)
+    monkeypatch.setattr(m, "_repo_locks", {})
+    # Seed the clone so this is a cache hit and no git runs.
+    (cache_base / "owner" / "repo" / "main").mkdir(parents=True)
+    os.chmod(real_state, 0o755)
+    os.chmod(real_state / "apps", 0o755)
+
+    asyncio.run(m._ensure_repo_cache(REPO_URL, pull=False))
+
+    assert (real_state / "apps").stat().st_mode & 0o077 == 0
+    assert real_state.stat().st_mode & 0o077 == 0, "state root not repaired"
+    # The walk stops at the state root: the home it lives in is not ours.
+    assert home.stat().st_mode & 0o700 == 0o700
+
+
+def test_existing_snapshot_tree_is_locked_down_on_the_hot_path(repo_setup):
+    """Launching a pinned app reaches neither _ensure_repo_cache nor
+    _create_snapshot, so the hot path is the only chance to make a snapshot tree
+    left world-readable by an older release private again."""
+    _, clone = repo_setup
+    snap_dir, sha = asyncio.run(m.ensure_repo_snapshot(REPO_URL))
+    snapshots = snap_dir.parent
+    os.chmod(snapshots, 0o755)
+
+    snap_dir2, _ = asyncio.run(m.ensure_repo_snapshot(REPO_URL, sha=sha))
+
+    assert snap_dir2 == snap_dir
+    assert snapshots.stat().st_mode & 0o077 == 0
 
 
 def test_snapshot_immutable_when_branch_moves(repo_setup):

@@ -7,6 +7,8 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
+from loguru import logger
+
 from fileglancer import database as db
 from fileglancer.settings import get_settings
 
@@ -32,6 +34,63 @@ def _build_work_dir(job_id: int, app_name: str, entry_point_id: str,
 
 
 # --- Job File Access ---
+
+_STATE_DIRNAME = ".fileglancer"
+
+
+def ensure_private_dir(path: Path) -> None:
+    """Create a directory under ``~/.fileglancer`` that only its owner can enter.
+
+    Fileglancer's state directory holds things no other user should see: a
+    service job's access token (in ``service_url``, and routinely echoed into
+    ``stdout.log`` by the service itself) and clones of app repositories, which
+    may be private. The directory mode is what keeps them secret — the default
+    0755 on a shared filesystem publishes them, and with the token the ability
+    to act as that user, to everyone on the site.
+
+    Every level from ``path`` up to and including the state root is locked down,
+    so that root stays private however it was first created and subtrees made
+    before this was enforced are covered too. Nothing above it is touched. An
+    ancestor that cannot be chmod'ed (owned by another uid) is warned about
+    rather than raised, since the leaf is private either way; failing to lock
+    the leaf itself does raise.
+
+    Must run as the owner of the tree (in the user worker, or as the user in CLI
+    mode). Chmod rather than ``mkdir(mode=...)``: that mode is masked by the
+    umask, and ignored entirely when the directory already exists.
+    """
+    path.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(path, 0o700)
+    except OSError as e:
+        raise PermissionError(
+            f"Cannot make {path} private, so it is not safe to write sensitive "
+            f"Fileglancer state there: {e}"
+        ) from e
+    # The state root is the innermost ``.fileglancer`` above the leaf. Found
+    # lexically, not by resolving the path: a relocated state directory (a
+    # symlinked ``~/.fileglancer``) resolves to somewhere with no
+    # ``.fileglancer`` component at all, and its real tree still wants locking.
+    state_root = next(
+        (p for p in path.parents if p.name == _STATE_DIRNAME), None
+    )
+    if state_root is None:
+        return  # not under a state directory, so there is nothing above to fix
+    for parent in path.parents:
+        try:
+            os.chmod(parent, 0o700)
+        except OSError as e:
+            # A state root owned by someone else is not ours to repair, and the
+            # directory we just locked is the one that holds the secrets. Say so
+            # and stop, rather than failing the caller over an ancestor.
+            logger.warning(
+                f"Could not make {parent} private ({e}); anything directly "
+                f"inside it stays readable by other users"
+            )
+            break
+        if parent == state_root:
+            break  # never ascend past the state root
+
 
 def _resolve_work_dir(db_job: db.JobDB) -> Path:
     """Resolve a job's work directory to an absolute path."""

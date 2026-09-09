@@ -357,6 +357,14 @@ def _poll_local_jobs(session, jobs_to_poll: list) -> bool:
     exit code to ``{work_dir}/exit_code`` via an EXIT trap.
 
     Returns True if there are still active jobs, False otherwise.
+
+    ponytail: single-user only. This runs in the server process and reads the
+    work directory directly, but work directories are 0700 and owned by the job's
+    user (see ensure_private_dir), so the server can only poll jobs it owns
+    itself -- a job belonging to anyone else would never leave PENDING. That is
+    why the config template restricts ``executor: local`` to single-user
+    deployments. To lift it, move these two reads into a worker action, the way
+    read_job_file already does, and poll through the owning user's worker.
     """
     still_active = False
 
@@ -525,7 +533,13 @@ def _build_service_url_publisher(suffix: str = "") -> str:
         "(",
         "  for _ in $(seq 1 3600); do",
         '    if (exec 3<>"/dev/tcp/127.0.0.1/$FG_SERVICE_PORT") 2>/dev/null; then',
-        f'      printf \'http://%s:%s%s\' "$FG_HOSTNAME" "$FG_SERVICE_PORT" "{suffix}" > "$SERVICE_URL_PATH"',
+        # The URL usually carries the service's access token, so the file is
+        # 0600 whatever the user's umask: the umask covers creating it, and the
+        # chmod covers a redirect into a file that somehow already exists, since
+        # that keeps the mode it was created with. The work directory's own 0700
+        # is the real barrier (see ensure_private_dir); this keeps the secret
+        # covered if the file outlives that directory.
+        f'      (umask 077; printf \'http://%s:%s%s\' "$FG_HOSTNAME" "$FG_SERVICE_PORT" "{suffix}" > "$SERVICE_URL_PATH" && chmod 600 "$SERVICE_URL_PATH")',
         "      exit 0",
         "    fi",
         "    sleep 1",

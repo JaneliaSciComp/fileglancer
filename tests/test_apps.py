@@ -1026,7 +1026,9 @@ class TestServiceUrlPublisher:
         assert result.returncode == 0, result.stderr
         assert "SERVICE_URL_PATH" in snippet and "3600" in snippet
 
-    def test_publishes_tokenized_url_only_once_port_is_up(self, tmp_path):
+    @pytest.mark.parametrize("preexisting", [False, True])
+    def test_publishes_tokenized_url_only_once_port_is_up(self, tmp_path,
+                                                          preexisting):
         import socket
         # Bind a real port so the probe's TCP connect succeeds.
         srv = socket.socket()
@@ -1036,6 +1038,11 @@ class TestServiceUrlPublisher:
         srv.listen()
         try:
             url_file = tmp_path / "service_url"
+            if preexisting:
+                # Redirection keeps the mode of a file that already exists, so
+                # the umask alone would leave this one readable.
+                url_file.touch()
+                os.chmod(url_file, 0o644)
             env = (
                 f'export FG_HOSTNAME=h1 FG_SERVICE_PORT={port} '
                 f'FG_SERVICE_TOKEN=deadbeef SERVICE_URL_PATH={url_file}\n'
@@ -1048,6 +1055,8 @@ class TestServiceUrlPublisher:
                                     capture_output=True, text=True, timeout=30)
             assert result.returncode == 0, result.stderr
             assert url_file.read_text() == f"http://h1:{port}/?access_token=deadbeef"
+            # The URL carries the access token: never group/world readable.
+            assert url_file.stat().st_mode & 0o077 == 0
         finally:
             srv.close()
 
@@ -1067,6 +1076,104 @@ class TestServiceUrlPublisher:
                                 capture_output=True, text=True, timeout=30)
         assert not url_file.exists()
         assert "never opened" in result.stderr
+
+
+class TestPrivateStateDir:
+    """~/.fileglancer holds service tokens and private clones: owner-only."""
+
+    def _chain(self, leaf):
+        """leaf and every ancestor up to (and including) .fileglancer."""
+        chain = [leaf]
+        while chain[-1].name != ".fileglancer":
+            chain.append(chain[-1].parent)
+        return chain
+
+    @pytest.mark.parametrize("subpath", [
+        ".fileglancer/jobs/1-demo-run",          # job work dir
+        ".fileglancer/apps/org/demo",            # repo clone
+        ".fileglancer/apps/org/demo/.snapshots",  # pinned checkouts
+    ])
+    def test_locks_down_the_whole_chain(self, tmp_path, subpath):
+        from fileglancer.apps.jobfiles import ensure_private_dir
+
+        # tmp_path stands in for $HOME: its mode must survive the walk upward.
+        os.chmod(tmp_path, 0o755)
+        leaf = tmp_path / subpath
+        ensure_private_dir(leaf)
+        for path in self._chain(leaf):
+            assert path.stat().st_mode & 0o077 == 0, path
+        assert tmp_path.stat().st_mode & 0o777 == 0o755
+
+    def test_fixes_an_already_world_readable_tree(self, tmp_path):
+        from fileglancer.apps.jobfiles import ensure_private_dir
+
+        leaf = tmp_path / ".fileglancer" / "jobs" / "1-demo-run"
+        leaf.mkdir(parents=True)
+        for path in self._chain(leaf):
+            os.chmod(path, 0o755)
+        ensure_private_dir(leaf)
+        for path in self._chain(leaf):
+            assert path.stat().st_mode & 0o077 == 0, path
+
+    def test_the_walk_stops_at_the_innermost_state_root(self, tmp_path):
+        """A ``.fileglancer`` component further up the path is not the root."""
+        from fileglancer.apps.jobfiles import ensure_private_dir
+
+        outer_state = tmp_path / ".fileglancer"
+        leaf = outer_state / "shared" / ".fileglancer" / "jobs" / "1-demo-run"
+        leaf.mkdir(parents=True)
+        os.chmod(outer_state, 0o755)
+        os.chmod(outer_state / "shared", 0o755)
+
+        ensure_private_dir(leaf)
+
+        for path in self._chain(leaf):
+            assert path.stat().st_mode & 0o077 == 0, path
+        # Everything above that root belongs to whoever put it there.
+        assert (outer_state / "shared").stat().st_mode & 0o777 == 0o755
+        assert outer_state.stat().st_mode & 0o777 == 0o755
+
+    def test_an_unfixable_ancestor_warns_instead_of_failing(self, tmp_path,
+                                                            monkeypatch):
+        """A state root owned by someone else must not break job submission."""
+        from fileglancer.apps import jobfiles
+
+        real_chmod = os.chmod
+
+        def fake_chmod(target, mode):
+            if os.path.basename(target) == ".fileglancer":
+                raise PermissionError(1, "Operation not permitted")
+            real_chmod(target, mode)
+
+        monkeypatch.setattr(jobfiles.os, "chmod", fake_chmod)
+        leaf = tmp_path / ".fileglancer" / "jobs" / "1-demo-run"
+        jobfiles.ensure_private_dir(leaf)
+        assert leaf.stat().st_mode & 0o077 == 0
+        assert leaf.parent.stat().st_mode & 0o077 == 0
+
+    def test_an_unlockable_leaf_raises_a_readable_error(self, tmp_path,
+                                                        monkeypatch):
+        from fileglancer.apps import jobfiles
+
+        def fake_chmod(target, mode):
+            raise PermissionError(1, "Operation not permitted")
+
+        monkeypatch.setattr(jobfiles.os, "chmod", fake_chmod)
+        leaf = tmp_path / ".fileglancer" / "jobs" / "1-demo-run"
+        with pytest.raises(PermissionError, match="not safe to write sensitive"):
+            jobfiles.ensure_private_dir(leaf)
+
+    def test_outside_the_state_dir_locks_the_leaf_only(self, tmp_path):
+        """A relocated cache base (as in tests) still gets a private leaf."""
+        from fileglancer.apps.jobfiles import ensure_private_dir
+
+        leaf = tmp_path / "somewhere" / "else"
+        ensure_private_dir(leaf)
+        assert leaf.stat().st_mode & 0o077 == 0
+        # The walk stops immediately: an unrelated parent keeps its mode.
+        os.chmod(tmp_path / "somewhere", 0o755)
+        ensure_private_dir(leaf)
+        assert (tmp_path / "somewhere").stat().st_mode & 0o777 == 0o755
 
 
 class TestServicePhase:
