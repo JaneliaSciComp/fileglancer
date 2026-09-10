@@ -188,7 +188,7 @@ class View(BaseModel):
     read_key: str = Field(description="Key that opens this View read-only")
     name: str = Field(description="Display name of the View")
     ng_state: Dict = Field(description="The Neuroglancer state JSON")
-    sharing_mode: str = Field(description="'private' or 'read'")
+    sharing_mode: Literal['private', 'read'] = Field(description="'private' or 'read'")
     owner: str = Field(description="Username of the View owner")
     created_at: datetime = Field(description="When this View was created")
     updated_at: datetime = Field(description="When this View was last updated")
@@ -197,6 +197,30 @@ class View(BaseModel):
 
 class ViewResponse(BaseModel):
     views: List[View] = Field(description="A list of Neuroglancer Views")
+
+
+class ViewLayerInput(BaseModel):
+    """One layer in a create-View request. `sharing_key` names the Data Link
+    that backs this layer (resolved to an internal id server-side); null for a
+    layer with no Fileglancer Data Link (e.g. an external URL layer)."""
+    sharing_key: Optional[str] = Field(default=None, description="Data Link sharing key backing this layer")
+    layer_index: int = Field(description="Position of this layer within the View")
+    channel: Optional[str] = Field(default=None, description="Channel identifier, if this layer is one channel")
+    opts: Optional[Dict] = Field(default=None, description="Per-layer options")
+
+
+class ViewCreateRequest(BaseModel):
+    """Request body for creating a View. The client builds `ng_state`."""
+    name: str = Field(description="Display name of the View")
+    ng_state: Dict = Field(description="The Neuroglancer state JSON")
+    sharing_mode: Literal['private', 'read'] = Field(default='read', description="'private' or 'read'")
+    layers: List[ViewLayerInput] = Field(default_factory=list, description="Layers backing this View")
+
+
+class ViewUpdateRequest(BaseModel):
+    """Request body for an owner update (rename / restate)."""
+    name: Optional[str] = Field(default=None, description="New display name")
+    ng_state: Optional[Dict] = Field(default=None, description="Replacement Neuroglancer state JSON")
 
 
 class ExternalBucket(BaseModel):
