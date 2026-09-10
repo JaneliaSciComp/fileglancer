@@ -4,9 +4,10 @@ from datetime import datetime, timedelta, UTC
 import os
 from functools import lru_cache
 
-from sqlalchemy import create_engine, Boolean, Column, String, Integer, DateTime, JSON, UniqueConstraint, func
+from sqlalchemy import create_engine, Boolean, Column, String, Integer, DateTime, JSON, UniqueConstraint, ForeignKey, func
 from sqlalchemy import true as sa_true
-from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from sqlalchemy import false as sa_false
+from sqlalchemy.orm import sessionmaker, declarative_base, relationship, Session
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.pool import StaticPool
 from typing import Optional, Dict, List, Tuple
@@ -21,6 +22,7 @@ from fileglancer.utils import slugify_path
 # Constants
 SHARING_KEY_LENGTH = 12
 NEUROGLANCER_SHORT_KEY_LENGTH = 12
+VIEW_KEY_LENGTH = 12
 
 # Global flag to track if migrations have been run
 _migrations_run = False
@@ -127,6 +129,45 @@ class NeuroglancerStateDB(Base):
     state = Column(JSON, nullable=False)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+
+
+class ViewDB(Base):
+    """Database model for a Neuroglancer View (state + sharing keys)."""
+    __tablename__ = 'views'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    short_key = Column(String, nullable=False, unique=True, index=True)
+    read_key = Column(String, nullable=False, unique=True, index=True)
+    # ponytail: edit_key reserved, unused until the edit stack
+    edit_key = Column(String, nullable=False, unique=True, index=True)
+    name = Column(String, nullable=False)
+    ng_state = Column(JSON, nullable=False)
+    sharing_mode = Column(String, nullable=False, server_default='read')
+    owner = Column(String, nullable=False, index=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+
+    layers = relationship(
+        'ViewLayerDB',
+        back_populates='view',
+        cascade='all, delete-orphan',
+        order_by='ViewLayerDB.layer_index',
+    )
+
+
+class ViewLayerDB(Base):
+    """Join row: one dataset/channel layer of a View, backed by a Data Link."""
+    __tablename__ = 'view_layers'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    view_id = Column(Integer, ForeignKey('views.id'), nullable=False, index=True)
+    data_link_id = Column(Integer, ForeignKey('proxied_paths.id'), nullable=True, index=True)
+    layer_index = Column(Integer, nullable=False)
+    channel = Column(String, nullable=True)
+    opts = Column(JSON, nullable=True)
+    broken = Column(Boolean, nullable=False, server_default=sa_false())
+
+    view = relationship('ViewDB', back_populates='layers')
 
 
 class TicketDB(Base):
@@ -941,6 +982,117 @@ def delete_neuroglancer_state(session: Session, username: str, short_key: str) -
     ).delete()
     session.commit()
     return deleted
+
+
+def _generate_unique_view_key(session: Session) -> str:
+    """Generate a short key unique across all View keys (short/read/edit)."""
+    for _ in range(10):
+        candidate = secrets.token_urlsafe(VIEW_KEY_LENGTH)
+        clash = session.query(ViewDB).filter(
+            (ViewDB.short_key == candidate)
+            | (ViewDB.read_key == candidate)
+            | (ViewDB.edit_key == candidate)
+        ).first()
+        if not clash:
+            return candidate
+    raise RuntimeError("Failed to generate a unique View key")
+
+
+def create_view(
+    session: Session,
+    username: str,
+    name: str,
+    ng_state: Dict,
+    layers: List[Dict],
+    sharing_mode: str = 'read',
+) -> ViewDB:
+    """Create a View plus its ViewLayer rows. Returns the persisted ViewDB.
+
+    Each layer dict: {data_link_id, layer_index, channel, opts}.
+    """
+    now = datetime.now(UTC)
+    view = ViewDB(
+        short_key=_generate_unique_view_key(session),
+        read_key=_generate_unique_view_key(session),
+        edit_key=_generate_unique_view_key(session),
+        name=name,
+        ng_state=ng_state,
+        sharing_mode=sharing_mode,
+        owner=username,
+        created_at=now,
+        updated_at=now,
+    )
+    for layer in layers:
+        view.layers.append(ViewLayerDB(
+            data_link_id=layer.get('data_link_id'),
+            layer_index=layer['layer_index'],
+            channel=layer.get('channel'),
+            opts=layer.get('opts'),
+        ))
+    session.add(view)
+    session.commit()
+    return view
+
+
+def get_view_by_short_key(session: Session, short_key: str) -> Optional[ViewDB]:
+    """Get an owned View by its short key."""
+    return session.query(ViewDB).filter_by(short_key=short_key).first()
+
+
+def get_view_by_read_key(session: Session, read_key: str) -> Optional[ViewDB]:
+    """Resolve a View by its read key (read-only share access)."""
+    return session.query(ViewDB).filter_by(read_key=read_key).first()
+
+
+def get_views(session: Session, username: str) -> List[ViewDB]:
+    """Get all Views owned by a user, newest first."""
+    return (
+        session.query(ViewDB)
+        .filter_by(owner=username)
+        .order_by(ViewDB.created_at.desc())
+        .all()
+    )
+
+
+def update_view(
+    session: Session,
+    username: str,
+    short_key: str,
+    name: Optional[str] = None,
+    ng_state: Optional[Dict] = None,
+) -> Optional[ViewDB]:
+    """Update an owned View's name and/or state. Returns None if not owned/found."""
+    view = session.query(ViewDB).filter_by(short_key=short_key, owner=username).first()
+    if not view:
+        return None
+    if name is not None:
+        view.name = name
+    if ng_state is not None:
+        view.ng_state = ng_state
+    view.updated_at = datetime.now(UTC)
+    session.commit()
+    return view
+
+
+def delete_view(session: Session, username: str, short_key: str) -> int:
+    """Delete an owned View (cascades to its layers). Returns rows deleted."""
+    view = session.query(ViewDB).filter_by(short_key=short_key, owner=username).first()
+    if not view:
+        return 0
+    session.delete(view)
+    session.commit()
+    return 1
+
+
+def get_views_for_data_link(session: Session, data_link_id: int) -> List[ViewDB]:
+    """Distinct Views that have at least one layer backed by this Data Link."""
+    return (
+        session.query(ViewDB)
+        .join(ViewLayerDB, ViewLayerDB.view_id == ViewDB.id)
+        .filter(ViewLayerDB.data_link_id == data_link_id)
+        .distinct()
+        .all()
+    )
 
 
 def get_tickets(session: Session, username: str, fsp_name: str = None, path: str = None) -> List[TicketDB]:

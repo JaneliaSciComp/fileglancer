@@ -322,6 +322,93 @@ def test_delete_proxied_path(db_session, fsp):
     assert deleted_path is None
 
 
+def test_create_and_get_view(db_session):
+    layers = [
+        {"data_link_id": None, "layer_index": 0, "channel": "Ch0", "opts": {"color": "red"}},
+        {"data_link_id": None, "layer_index": 1, "channel": None, "opts": None},
+    ]
+    view = create_view(
+        db_session,
+        username="testuser",
+        name="seed6 overlay",
+        ng_state={"layers": []},
+        layers=layers,
+        sharing_mode="read",
+    )
+    assert view.short_key is not None
+    assert view.read_key is not None
+    assert view.edit_key is not None
+    assert view.short_key != view.read_key != view.edit_key
+    assert view.owner == "testuser"
+    assert view.sharing_mode == "read"
+
+    fetched = get_view_by_short_key(db_session, view.short_key)
+    assert fetched is not None
+    assert fetched.name == "seed6 overlay"
+    assert len(fetched.layers) == 2
+    assert {l.layer_index for l in fetched.layers} == {0, 1}
+    assert fetched.layers[0].channel == "Ch0"
+    assert fetched.layers[0].broken is False
+
+
+def test_get_views_and_read_key(db_session):
+    v1 = create_view(db_session, "u", "one", {"layers": []}, [], "read")
+    v2 = create_view(db_session, "u", "two", {"layers": []}, [], "private")
+    create_view(db_session, "other", "three", {"layers": []}, [], "read")
+
+    mine = get_views(db_session, "u")
+    assert [v.name for v in mine] == ["two", "one"]  # newest first
+
+    assert get_view_by_read_key(db_session, v1.read_key).short_key == v1.short_key
+    assert get_view_by_read_key(db_session, "nope") is None
+    assert v2.sharing_mode == "private"
+
+
+def test_update_and_delete_view(db_session):
+    layers = [{"data_link_id": None, "layer_index": 0, "channel": None, "opts": None}]
+    v = create_view(db_session, "u", "before", {"layers": [1]}, layers, "read")
+    view_id = v.id
+    updated = update_view(db_session, "u", v.short_key, name="after", ng_state={"layers": [2]})
+    assert updated.name == "after"
+    assert updated.ng_state == {"layers": [2]}
+    assert update_view(db_session, "wronguser", v.short_key, name="x") is None
+
+    assert db_session.query(ViewLayerDB).filter_by(view_id=view_id).count() == 1  # layer exists pre-delete
+    assert delete_view(db_session, "u", v.short_key) == 1
+    assert get_view_by_short_key(db_session, v.short_key) is None
+    assert db_session.query(ViewLayerDB).filter_by(view_id=view_id).count() == 0  # cascade removed the join row
+
+
+def test_get_views_for_data_link(db_session):
+    layers = [
+        {"data_link_id": 42, "layer_index": 0, "channel": None, "opts": None},
+        {"data_link_id": 42, "layer_index": 1, "channel": "Ch1", "opts": None},
+    ]
+    v = create_view(db_session, "u", "linked", {"layers": []}, layers, "read")
+    create_view(db_session, "u", "unlinked", {"layers": []}, [], "read")
+
+    dependents = get_views_for_data_link(db_session, 42)
+    assert [d.short_key for d in dependents] == [v.short_key]  # distinct: one entry despite two matching layers
+    assert get_views_for_data_link(db_session, 999) == []
+
+
+def test_view_pydantic_from_orm(db_session):
+    from fileglancer.model import View
+    layers = [{"data_link_id": 7, "layer_index": 0, "channel": "Ch0", "opts": None}]
+    view_db = create_view(db_session, "u", "demo", {"layers": []}, layers, "read")
+
+    model = View.model_validate(view_db)
+    assert model.short_key == view_db.short_key
+    assert model.read_key == view_db.read_key
+    assert model.name == "demo"
+    assert model.sharing_mode == "read"
+    assert len(model.layers) == 1
+    assert model.layers[0].channel == "Ch0"
+    assert model.layers[0].broken is False
+    # edit_key must NOT be exposed in read-only scope
+    assert not hasattr(model, "edit_key")
+
+
 def test_create_proxied_path_for_file(db_session, fsp):
     """Regression: create_proxied_path should succeed for a file path (not 500 on os.listdir)."""
     username = "testuser"
