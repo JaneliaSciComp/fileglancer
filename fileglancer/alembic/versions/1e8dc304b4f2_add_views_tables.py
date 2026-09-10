@@ -1,7 +1,7 @@
 """add views tables
 
 Revision ID: 1e8dc304b4f2
-Revises: e7b2a9c4f130
+Revises: e4d1b7a92c58
 Create Date: 2026-08-07 10:59:17.090843
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '1e8dc304b4f2'
-down_revision = 'e7b2a9c4f130'
+down_revision = 'e4d1b7a92c58'
 branch_labels = None
 depends_on = None
 
