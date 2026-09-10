@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router';
 
 import CartDatasetRow from '@/components/ui/Views/CartDatasetRow';
 import CreateViewButton from '@/components/ui/Views/CreateViewButton';
@@ -46,6 +47,7 @@ function groupCartByDataset(cart: CartItem[]): CartGroup[] {
 export default function CartList() {
   const { cart, clearCart } = useCartContext();
   const allProxiedPathsQuery = useAllProxiedPathsQuery();
+  const navigate = useNavigate();
 
   const cartGroups = useMemo(() => groupCartByDataset(cart), [cart]);
   const dataLinkUrlByDataset = useMemo(() => {
@@ -91,6 +93,16 @@ export default function CartList() {
           datasets={cart}
           defaultName="New View"
           label="Create View"
+          onCreated={view => {
+            // Fire-and-forget: the View already exists, so a cart-clear
+            // failure (a separate network mutation) must not block
+            // navigation. Worst case is a stale cart item, which is
+            // low-stakes and independently retryable via "Clear cart".
+            clearCart().catch(() => {
+              toast.error('View created, but the cart could not be cleared');
+            });
+            navigate(`/view/${view.read_key}`);
+          }}
         />
         <FgButton
           color="error"

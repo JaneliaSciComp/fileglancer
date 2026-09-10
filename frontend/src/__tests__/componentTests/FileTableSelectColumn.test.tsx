@@ -34,6 +34,24 @@ vi.mock('react-router', async () => {
   };
 });
 
+// FileBrowser renders a "View in Neuroglancer" item that depends on
+// useCreateViewFlow, which needs a ViewsProvider this test's render tree
+// doesn't set up. This suite only cares about the select column, so stub
+// the hook rather than wiring up ViewsProvider.
+vi.mock('@/hooks/useCreateViewFlow', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/hooks/useCreateViewFlow')>();
+  return {
+    ...actual,
+    useCreateViewFlow: () => ({
+      startCreateView: vi.fn(),
+      dialog: null,
+      open: false,
+      pending: false
+    })
+  };
+});
+
 describe('FileTable select column', () => {
   it('renders a "Select all" header checkbox that toggles on click', async () => {
     server.use(

@@ -785,12 +785,57 @@ async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
 }
 
 /**
+ * Open a plain Zarr array (not an OME-Zarr multiscale group) with auto-detected
+ * storage version and emit a single-layer Neuroglancer state. Used by the Views
+ * checkout when a cart dataset is a bare array, so each added directory still
+ * becomes one layer.
+ */
+/**
+ * Guess a Neuroglancer layer type for a plain array from its name and dtype.
+ * Label/segmentation volumes are integer-typed and usually named seg/label/mask;
+ * everything else is treated as an image. This only sets the default so the
+ * layer resolves without Neuroglancer's "new layer" type picker — the user can
+ * still switch the type in the viewer.
+ */
+function guessPlainLayerType(dataUrl: string, dtype: string): LayerType {
+  const name = getLayerName(dataUrl).toLowerCase();
+  const isInteger = /^(u?int)/.test(dtype);
+  if (isInteger && /seg|label|mask/.test(name)) {
+    return 'segmentation';
+  }
+  return 'image';
+}
+
+async function generateStateForPlainZarr(dataUrl: string): Promise<string> {
+  // Probe the storage version (needed for the |zarrN: source suffix): try v2
+  // first (most fileglancer data), then v3. If neither opens, this throws and
+  // the caller skips the dataset.
+  let zarrVersion: 2 | 3 = 2;
+  let arr;
+  try {
+    arr = await getZarrArray(dataUrl, 2);
+  } catch {
+    arr = await getZarrArray(dataUrl, 3);
+    zarrVersion = 3;
+  }
+  const layerType = guessPlainLayerType(dataUrl, String(arr.dtype));
+  return generateNeuroglancerStateForZarrArray(dataUrl, zarrVersion, layerType);
+}
+
+/**
  * Get the channel labels for an OME-Zarr dataset: from `omero.channels[].label`
  * when present, else synthesized `Channel 0..n-1` from the `c` axis length,
  * else `[]` when there is no channel axis.
  */
 async function getOmeZarrChannels(dataUrl: string): Promise<string[]> {
-  const metadata = await getOmeZarrMetadata(dataUrl);
+  let metadata;
+  try {
+    metadata = await getOmeZarrMetadata(dataUrl);
+  } catch {
+    // Plain array / no multiscale group: no channels to enumerate. Return []
+    // instead of throwing so the cart row shows its no-channel hint.
+    return [];
+  }
   const multiscale = metadata.multiscales?.[0];
   if (!multiscale) {
     return [];
@@ -953,6 +998,7 @@ export {
   getOmeZarrChannels,
   getOmeZarrThumbnail,
   generateNeuroglancerStateForDataURL,
+  generateStateForPlainZarr,
   generateNeuroglancerStateForZarrArray,
   generateNeuroglancerStateForOmeZarr,
   translateUnitToNeuroglancer,

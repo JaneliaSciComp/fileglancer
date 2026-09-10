@@ -2,6 +2,7 @@ import type { MouseEvent } from 'react';
 import { Typography } from '@material-tailwind/react';
 import { useHotkey } from '@tanstack/react-hotkeys';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router';
 
 import Crumbs from './Crumbs';
 import MetadataHint from './MetadataHint';
@@ -20,6 +21,7 @@ import useN5Metadata from '@/hooks/useN5Metadata';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useCartContext } from '@/contexts/CartContext';
+import { useCreateViewFlow } from '@/hooks/useCreateViewFlow';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
 import { useHandleDownload } from '@/hooks/useHandleDownload';
 import { useHandleView } from '@/hooks/useHandleView';
@@ -64,6 +66,8 @@ export default function FileBrowser({
   const { folderPreferenceMap, handleContextMenuFavorite } =
     usePreferencesContext();
   const { addToCart } = useCartContext();
+  const navigate = useNavigate();
+  const { startCreateView, dialog } = useCreateViewFlow();
   const { displayFiles } = useHideDotFiles();
   const { handleDownload } = useHandleDownload();
   const { handleView } = useHandleView();
@@ -220,6 +224,29 @@ export default function FileBrowser({
           !fileBrowserState.selectedFiles[0]?.is_symlink
       },
       {
+        name: 'View in Neuroglancer',
+        action: () => {
+          const file = fileBrowserState.selectedFiles[0];
+          if (!file) {
+            return;
+          }
+          startCreateView(
+            [
+              {
+                fsp_name: fileQuery.data?.currentFileSharePath?.name ?? '',
+                path: file.path,
+                label: file.name
+              }
+            ],
+            file.name,
+            view => navigate(`/view/${view.read_key}`)
+          );
+        },
+        shouldShow:
+          fileBrowserState.selectedFiles[0]?.is_dir &&
+          !fileBrowserState.selectedFiles[0]?.is_symlink
+      },
+      {
         name: 'Rename',
         action: () => {
           setShowRenameDialog(true);
@@ -368,6 +395,7 @@ export default function FileBrowser({
         />
       ) : null}
       <SelectionBar />
+      {dialog}
     </>
   );
 }
