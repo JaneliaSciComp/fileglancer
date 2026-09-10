@@ -131,6 +131,9 @@ class UserPreference(BaseModel):
 
 class ProxiedPath(BaseModel):
     """A proxied path which is used to share a file system path via a URL"""
+    id: int = Field(
+        description="Database id of the Data Link; matches ViewLayer.data_link_id"
+    )
     username: str = Field(
         description="The username of the user who owns this proxied path"
     )
