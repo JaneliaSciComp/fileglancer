@@ -22,6 +22,10 @@ const { copyToClipboard } = vi.hoisted(() => ({
 }));
 vi.mock('@/utils/copyText', () => ({ copyToClipboard }));
 
+vi.mock('@/components/ui/Navbar/ProfileMenu', () => ({
+  default: () => <div data-testid="profile-menu" />
+}));
+
 import NeuroglancerView from '@/components/NeuroglancerView';
 
 describe('NeuroglancerView', () => {
@@ -73,18 +77,18 @@ describe('NeuroglancerView', () => {
       screen.getByRole('button', { name: /download json/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /open external/i })
+      screen.getByRole('button', { name: /open in neuroglancer/i })
     ).toBeInTheDocument();
   });
 
-  it('shows a breadcrumb linking back to the NG Views list', () => {
+  it('shows a breadcrumb linking back to the Views list', () => {
     useViewStateByReadKey.mockReturnValue({
       data: { title: 'My View', layers: [{ name: 'L0' }] },
       isPending: false,
       isError: false
     });
     render(<NeuroglancerView />);
-    const crumbLink = screen.getByRole('link', { name: /ng views/i });
+    const crumbLink = screen.getByRole('link', { name: /^views$/i });
     expect(crumbLink).toHaveAttribute('href', '/ngviews');
   });
 

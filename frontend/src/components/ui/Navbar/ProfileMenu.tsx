@@ -4,7 +4,9 @@ import {
   HiOutlineUserCircle,
   HiOutlineBell,
   HiOutlineKey,
-  HiOutlineCode
+  HiOutlineCode,
+  HiOutlineMoon,
+  HiOutlineSun
 } from 'react-icons/hi';
 import { HiOutlineAdjustmentsHorizontal } from 'react-icons/hi2';
 import { Link } from 'react-router';
@@ -12,10 +14,12 @@ import { Link } from 'react-router';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import { useProfileContext } from '@/contexts/ProfileContext';
 import { useAuthContext } from '@/contexts/AuthContext';
+import useTheme from '@/hooks/useTheme';
 
 export default function ProfileMenu() {
   const { profile } = useProfileContext();
   const { logout, authStatus } = useAuthContext();
+  const { isDark, toggleTheme } = useTheme();
   const sshKeysEnabled = import.meta.env.VITE_ENABLE_SSH_KEYS === 'true';
 
   const handleLogout = async () => {
@@ -69,6 +73,16 @@ export default function ProfileMenu() {
             >
               <FgIcon className="mr-2" icon={HiOutlineBell} />
               Notifications
+            </Menu.Item>
+            <Menu.Item
+              className="text-foreground hover:!text-foreground focus:!text-foreground hover:bg-hover-gradient hover:dark:bg-hover-gradient-dark focus:bg-hover-gradient focus:dark:bg-hover-gradient-dark"
+              onClick={toggleTheme}
+            >
+              <FgIcon
+                className="mr-2"
+                icon={isDark ? HiOutlineSun : HiOutlineMoon}
+              />
+              {isDark ? 'Light theme' : 'Dark theme'}
             </Menu.Item>
             {sshKeysEnabled ? (
               <Menu.Item

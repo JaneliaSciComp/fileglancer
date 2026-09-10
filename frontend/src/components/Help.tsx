@@ -47,6 +47,13 @@ function getHelpLinks(version: string | undefined): HelpLink[] {
         : 'https://github.com/JaneliaSciComp/fileglancer/releases'
     },
     {
+      icon: TbBrandGithub,
+      title: 'GitHub Repository',
+      description:
+        'Browse the source code, report issues, and contribute on GitHub',
+      url: 'https://github.com/JaneliaSciComp/fileglancer'
+    },
+    {
       icon: SiClickup,
       title: 'Submit Tickets',
       description: 'Report bugs or request features through a ClickUp form',
