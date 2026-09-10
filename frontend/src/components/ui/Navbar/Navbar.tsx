@@ -10,7 +10,7 @@ import {
 import { Link } from 'react-router';
 import type { IconType } from 'react-icons';
 import {
-  HiOutlineInformationCircle,
+  HiOutlineQuestionMarkCircle,
   HiOutlineMoon,
   HiOutlineMenu,
   HiOutlineX,
@@ -91,7 +91,7 @@ function NavList() {
       badge: activeJobCount
     },
     { icon: HiOutlineBriefcase, title: 'Tasks', href: '/jobs' },
-    { icon: HiOutlineInformationCircle, title: 'Help', href: '/help' }
+    { icon: HiOutlineQuestionMarkCircle, title: 'Help', href: '/help' }
   ];
 
   const filteredLinks = links.filter(link => {
