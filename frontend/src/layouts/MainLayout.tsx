@@ -11,6 +11,7 @@ import '@/components/tours/shepherd-overrides.css';
 import { ZonesAndFspMapContextProvider } from '@/contexts/ZonesAndFspMapContext';
 import { FileBrowserContextProvider } from '@/contexts/FileBrowserContext';
 import { PreferencesProvider } from '@/contexts/PreferencesContext';
+import { CartProvider } from '@/contexts/CartContext';
 import { OpenFavoritesProvider } from '@/contexts/OpenFavoritesContext';
 import { TicketProvider } from '@/contexts/TicketsContext';
 import { ProxiedPathProvider } from '@/contexts/ProxiedPathContext';
@@ -74,17 +75,19 @@ export const MainLayout = () => {
           <OpenFavoritesProvider>
             <FileBrowserContextProvider filePath={filePath} fspName={fspName}>
               <PreferencesProvider>
-                <ExternalBucketProvider>
-                  <ProxiedPathProvider>
-                    <ProfileContextProvider>
-                      <NotificationProvider>
-                        <TicketProvider>
-                          <MainLayoutContent />
-                        </TicketProvider>
-                      </NotificationProvider>
-                    </ProfileContextProvider>
-                  </ProxiedPathProvider>
-                </ExternalBucketProvider>
+                <CartProvider>
+                  <ExternalBucketProvider>
+                    <ProxiedPathProvider>
+                      <ProfileContextProvider>
+                        <NotificationProvider>
+                          <TicketProvider>
+                            <MainLayoutContent />
+                          </TicketProvider>
+                        </NotificationProvider>
+                      </ProfileContextProvider>
+                    </ProxiedPathProvider>
+                  </ExternalBucketProvider>
+                </CartProvider>
               </PreferencesProvider>
             </FileBrowserContextProvider>
           </OpenFavoritesProvider>

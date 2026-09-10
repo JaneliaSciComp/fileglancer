@@ -33,6 +33,7 @@ export type CartItem = {
   fsp_name: string;
   path: string;
   channel?: string;
+  channelIndex?: number;
   label: string;
 };
 
