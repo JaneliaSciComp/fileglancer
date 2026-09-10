@@ -36,7 +36,7 @@ dependencies = [
     "pydantic ==2.13.5",
     "pydantic-settings ==2.15.0",
     "python-jose ==3.5.0",
-    "cryptography ==48.0.1",
+    "cryptography ==50.0.0",
     "sqlalchemy ==2.0.52",
     "packaging ==26.3",
     "uvicorn ==0.38.0",
@@ -50,7 +50,7 @@ fileglancer = "fileglancer.cli:cli"
 [project.optional-dependencies]
 test = [
     "coverage ==7.16.0",
-    "pytest ==8.4.2",
+    "pytest ==9.0.3",
     "pytest-asyncio ==1.4.0",
     "pytest-cov ==7.1.0",
     "pytest-html ==4.2.0",
