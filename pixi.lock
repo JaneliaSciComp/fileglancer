@@ -4103,6 +4103,7 @@ packages:
   - liblapacke 3.11.0   11*_openblas
   - mkl <2027
   license: BSD-3-Clause
+  license_family: BSD
   purls: []
   run_exports:
     weak:
@@ -4120,6 +4121,7 @@ packages:
   - liblapack  3.11.0   11*_openblas
   - liblapacke 3.11.0   11*_openblas
   license: BSD-3-Clause
+  license_family: BSD
   purls: []
   run_exports:
     weak:
@@ -4268,6 +4270,7 @@ packages:
   - libcblas   3.11.0   11*_openblas
   - liblapacke 3.11.0   11*_openblas
   license: BSD-3-Clause
+  license_family: BSD
   purls: []
   run_exports:
     weak:
@@ -6074,6 +6077,7 @@ packages:
   - liblapacke 3.11.0   11*_openblas
   - mkl <2027
   license: BSD-3-Clause
+  license_family: BSD
   purls: []
   run_exports:
     weak:
@@ -6091,6 +6095,7 @@ packages:
   - liblapack  3.11.0   11*_openblas
   - liblapacke 3.11.0   11*_openblas
   license: BSD-3-Clause
+  license_family: BSD
   purls: []
   run_exports:
     weak:
@@ -6243,6 +6248,7 @@ packages:
   - libcblas   3.11.0   11*_openblas
   - liblapacke 3.11.0   11*_openblas
   license: BSD-3-Clause
+  license_family: BSD
   purls: []
   run_exports:
     weak:
@@ -10774,6 +10780,7 @@ packages:
   - liblapacke 3.11.0   11*_openblas
   - mkl <2027
   license: BSD-3-Clause
+  license_family: BSD
   purls: []
   run_exports:
     weak:
@@ -10791,6 +10798,7 @@ packages:
   - liblapack  3.11.0   11*_openblas
   - liblapacke 3.11.0   11*_openblas
   license: BSD-3-Clause
+  license_family: BSD
   purls: []
   run_exports:
     weak:
@@ -10912,6 +10920,7 @@ packages:
   - libcblas   3.11.0   11*_openblas
   - liblapacke 3.11.0   11*_openblas
   license: BSD-3-Clause
+  license_family: BSD
   purls: []
   run_exports:
     weak:
@@ -10967,6 +10976,7 @@ packages:
   constrains:
   - openblas >=0.3.34,<0.3.35.0a0
   license: BSD-3-Clause
+  license_family: BSD
   purls: []
   run_exports:
     weak:
@@ -12594,6 +12604,7 @@ packages:
   - liblapacke 3.11.0   11*_openblas
   - mkl <2027
   license: BSD-3-Clause
+  license_family: BSD
   purls: []
   run_exports:
     weak:
@@ -12611,6 +12622,7 @@ packages:
   - liblapack  3.11.0   11*_openblas
   - liblapacke 3.11.0   11*_openblas
   license: BSD-3-Clause
+  license_family: BSD
   purls: []
   run_exports:
     weak:
@@ -12732,6 +12744,7 @@ packages:
   - libcblas   3.11.0   11*_openblas
   - liblapacke 3.11.0   11*_openblas
   license: BSD-3-Clause
+  license_family: BSD
   purls: []
   run_exports:
     weak:
@@ -12787,6 +12800,7 @@ packages:
   constrains:
   - openblas >=0.3.34,<0.3.35.0a0
   license: BSD-3-Clause
+  license_family: BSD
   purls: []
   run_exports:
     weak:

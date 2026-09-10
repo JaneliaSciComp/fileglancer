@@ -106,7 +106,7 @@ test-storybook = { cmd = "cd frontend && npm run test:storybook", default-enviro
 
 [tool.pixi.feature.test.dependencies]
 coverage = ">=7.10.6,<8"
-pytest = ">=9.0.3,<10"
+pytest = ">=9.1.1,<10"
 pytest-asyncio = ">=1.1.0,<2"
 pytest-cov = ">=7.0.0,<8"
 pytest-jupyter = ">=0.10.1,<0.11"
@@ -196,7 +196,7 @@ psycopg2-binary = ">=2.9.10,<3"
 pydantic = ">=2.10.6,<3"
 pydantic-settings = ">=2.11.0,<3"
 python-jose = ">=3.5.0,<4"
-cryptography = ">=50.0.0,<51"
+cryptography = ">=50.0.1,<51"
 sqlalchemy = ">=2.0.44,<3"
 packaging = ">=24.0"
 uvicorn = ">=0.38.0,<0.39"
