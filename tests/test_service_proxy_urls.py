@@ -58,6 +58,34 @@ def test_build_returns_none_for_empty_service_url():
     assert build_proxied_service_url(None, 1, DOMAIN, SECRET) is None
 
 
+@pytest.mark.parametrize("userinfo", [
+    "user:pass",           # ordinary username:password
+    "user",                # no colon -- username only
+    ":pass",               # no username
+    "user:pa:ss",          # password containing a literal colon
+    "user%40x:p%25w",      # percent-encoded characters, preserved verbatim
+])
+def test_build_preserves_userinfo(userinfo):
+    """HTTP Basic Auth credentials embedded in the published service_url are
+    forwarded verbatim to the browser-facing URL -- carried through exactly
+    like path/query/fragment, not decoded/re-encoded."""
+    assert build_proxied_service_url(
+        f"http://{userinfo}@node01:41235/lab", 9, DOMAIN, SECRET
+    ) == f"https://{userinfo}@{_host(9)}/lab"
+
+
+def test_build_drops_userinfo_containing_control_characters():
+    """Unlike upstream_from_service_url (which discards userinfo unconditionally
+    since nginx never sees it), this function's output can end up rendered
+    for a browser, so control characters are refused here -- but only the
+    credential is dropped, not the whole URL. Uses a NUL byte rather than
+    CR/LF: urlsplit itself already strips \\t\\r\\n before this ever runs, so
+    only other C0/DEL control characters would actually reach this check."""
+    assert build_proxied_service_url(
+        "http://user:pw\x00evil@node01:41235/lab", 9, DOMAIN, SECRET
+    ) == f"https://{_host(9)}/lab"
+
+
 # --- service_host_label ---
 
 def test_host_label_is_short_and_dns_safe():
@@ -175,9 +203,22 @@ def test_upstream_accepts_fqdn():
         "node01.cluster.example.org:8080"
 
 
+def test_upstream_strips_userinfo():
+    """Userinfo (HTTP Basic Auth credentials) never becomes part of nginx's
+    proxy_pass target -- it's discarded, not merely tolerated."""
+    assert upstream_from_service_url("http://user:pw@node01:41235/") == "node01:41235"
+
+
+def test_upstream_strips_userinfo_containing_crlf():
+    """Proves userinfo is discarded wholesale rather than shape-checked: even
+    content that would be a header-injection attempt in the host:port part
+    is harmless here, since it's never referenced again once split off."""
+    assert upstream_from_service_url(
+        "http://user:pw\r\nX-Evil: 1@node01:41235/") == "node01:41235"
+
+
 @pytest.mark.parametrize("url", [
     "http://node01/lab",                     # no port: nothing to proxy to
-    "http://user:pw@node01:41235/",          # userinfo
     "http://node01:41235x/",                 # non-numeric port
     "http://node01:99999/",                  # port out of range
     "http://node01:0/",                      # port 0

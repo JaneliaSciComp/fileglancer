@@ -5,6 +5,12 @@ When a proxy domain is configured, Fileglancer republishes that as
 ``https://job-<id>-<mac>.<proxy_domain><suffix>`` and tells the reverse proxy
 which upstream the hostname maps to. These functions are the whole translation
 layer between the two forms, kept pure so they can be tested without a database.
+
+A published ``service_url`` may also carry HTTP Basic Auth userinfo (e.g.
+``http://user:pass@node:port/``), for a service that enforces its own such
+credential rather than a query-string token. ``build_proxied_service_url``
+forwards it to the browser-facing URL; ``upstream_from_service_url`` discards
+it, since nginx's ``proxy_pass`` target is only ever a bare ``host:port``.
 """
 
 import base64
@@ -15,7 +21,7 @@ import re
 import time
 from collections import Counter
 from functools import lru_cache
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Tuple
 from urllib.parse import urlsplit, urlunsplit
 
 from cachetools import TTLCache
@@ -23,8 +29,11 @@ from loguru import logger
 
 # An upstream nginx can hand to proxy_pass: hostname and explicit port, nothing
 # else. Deliberately strict — the value is interpolated into a proxy_pass
-# directive, so userinfo, whitespace, CR/LF and bracketed IPv6 literals are all
-# rejected rather than escaped.
+# directive, so whitespace, CR/LF and bracketed IPv6 literals are all rejected
+# rather than escaped. Operates on the host:port remainder only -- userinfo,
+# if present, is split off by the caller (_split_userinfo) before this pattern
+# runs and is never validated here, since it never reaches this string's
+# consumer (nginx's proxy_pass).
 _UPSTREAM_RE = re.compile(r'^([A-Za-z0-9.-]+):(\d{1,5})$')
 
 # Hostnames that always name the local machine, so an upstream naming one would
@@ -62,12 +71,43 @@ def service_host_label(job_id: int, secret: str) -> str:
     return f'job-{job_id}-{_service_mac(job_id, secret)}'
 
 
+def _split_userinfo(netloc: str) -> Tuple[str, str]:
+    """Split a netloc into (userinfo, hostport); userinfo is '' when absent.
+
+    A literal '@' inside userinfo must be percent-encoded per RFC 3986, so the
+    LAST unencoded '@' is always the correct separator -- the same rule
+    urlsplit's own .username/.password/.hostname properties rely on
+    internally.
+    """
+    userinfo, _sep, hostport = netloc.rpartition('@')
+    return userinfo, hostport
+
+
+# Userinfo is opaque and forwarded verbatim to the browser-facing URL (see
+# build_proxied_service_url), so unlike the host:port remainder it gets one
+# narrow check of its own: no control characters, since this is the one place
+# the value could end up rendered in an HTML href or similar browser context.
+# In practice tab/CR/LF never reach this check at all -- urlsplit itself
+# strips those from the whole URL before parsing -- so this mainly guards
+# against other C0 controls and DEL.
+_USERINFO_CONTROL_CHARS_RE = re.compile(r'[\x00-\x1f\x7f]')
+
+
+def _is_safe_userinfo(userinfo: str) -> bool:
+    """Whether userinfo is free of control characters."""
+    return _USERINFO_CONTROL_CHARS_RE.search(userinfo) is None
+
+
 def build_proxied_service_url(service_url: Optional[str], job_id: int,
                               proxy_domain: str, secret: str) -> Optional[str]:
     """Rewrite a published service URL to its HTTPS proxy form.
 
-    Path, query and fragment are carried over verbatim: the query string holds
-    the service's own access token, which remains the only credential.
+    Path, query and fragment are carried over verbatim: the query string may
+    hold the service's own access token. Userinfo (HTTP Basic Auth
+    credentials), if present, is also carried over verbatim -- unless it
+    contains control characters, in which case it is dropped and the rest of
+    the URL is still returned, since losing auto-auth is a much smaller
+    problem than refusing to publish the job's link at all.
 
     Returns None when there is nothing to rewrite, no proxy domain is
     configured, or no secret is available to sign the hostname with, in which
@@ -76,9 +116,12 @@ def build_proxied_service_url(service_url: Optional[str], job_id: int,
     if not service_url or not proxy_domain or not secret:
         return None
     parts = urlsplit(service_url)
+    userinfo, _hostport = _split_userinfo(parts.netloc)
+    host_label = f'{service_host_label(job_id, secret)}.{proxy_domain}'
+    netloc = f'{userinfo}@{host_label}' if userinfo and _is_safe_userinfo(userinfo) else host_label
     return urlunsplit((
         'https',
-        f'{service_host_label(job_id, secret)}.{proxy_domain}',
+        netloc,
         parts.path,
         parts.query,
         parts.fragment,
@@ -251,17 +294,21 @@ def upstream_from_service_url(service_url: Optional[str],
                               allowed_networks: Iterable[str] = ()) -> Optional[str]:
     """Extract a ``host:port`` upstream from a published service URL.
 
-    Returns None unless the authority is exactly a hostname and an in-range
-    port. The netloc regex is a header-injection gate — it constrains the
-    authority's shape only, since the result is interpolated into the reverse
-    proxy's ``proxy_pass`` target. The destination itself (where the proxy
-    actually dials) is bounded separately: hosts that reach the Fileglancer host
-    itself are rejected; ``allowed_zone``, when set, confines upstreams
-    published as hostnames to one DNS zone; and ``allowed_networks``, when
-    set, confines upstreams published as addresses to those CIDRs. The two
-    allowlists divide the space rather than overlapping, since a bare address
-    has no zone and a name has no address without a DNS lookup. All of this
-    matters because the source string is a file written by the user's own job.
+    Returns None unless the authority, once any userinfo is discarded, is
+    exactly a hostname and an in-range port. Userinfo (HTTP Basic Auth
+    credentials) is never validated here -- it's split off and discarded
+    before the shape check runs, since it never becomes part of nginx's
+    ``proxy_pass`` target either way. The netloc regex is a header-injection
+    gate — it constrains the authority's shape only, since the result is
+    interpolated into the reverse proxy's ``proxy_pass`` target. The
+    destination itself (where the proxy actually dials) is bounded
+    separately: hosts that reach the Fileglancer host itself are rejected;
+    ``allowed_zone``, when set, confines upstreams published as hostnames to
+    one DNS zone; and ``allowed_networks``, when set, confines upstreams
+    published as addresses to those CIDRs. The two allowlists divide the
+    space rather than overlapping, since a bare address has no zone and a
+    name has no address without a DNS lookup. All of this matters because the
+    source string is a file written by the user's own job.
     """
     if not service_url:
         return None
@@ -269,7 +316,8 @@ def upstream_from_service_url(service_url: Optional[str],
         netloc = urlsplit(service_url).netloc
     except ValueError:
         return None
-    match = _UPSTREAM_RE.fullmatch(netloc)
+    _userinfo, hostport = _split_userinfo(netloc)
+    match = _UPSTREAM_RE.fullmatch(hostport)
     if match is None:
         return None
     port = int(match.group(2))
@@ -282,7 +330,7 @@ def upstream_from_service_url(service_url: Optional[str],
         return None
     if not _host_in_networks(host, allowed_networks):
         return None
-    return netloc
+    return hostport
 
 
 # --- Resolution cache and counters ---

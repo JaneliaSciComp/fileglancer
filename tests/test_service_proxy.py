@@ -396,6 +396,24 @@ def test_publish_then_resolve_roundtrip(app_factory, monkeypatch):
     assert resp.headers["x-fg-upstream"] == "node01:41235"
 
 
+def test_publish_then_resolve_roundtrip_with_userinfo(app_factory, monkeypatch):
+    """HTTP Basic Auth credentials embedded in the published service_url must
+    reach the browser-facing URL but never reach nginx's proxy_pass target:
+    the two consumers split the same raw service_url independently."""
+    app, db_url = app_factory(PROXY_DOMAIN)
+    job_id = _seed_service_job(db_url)
+    published = _get_job_with_worker_url(
+        app, job_id, "http://classroom:sometoken@node01:41235/", monkeypatch
+    ).json()["service_url"]
+    assert published == f"https://classroom:sometoken@{_host(job_id)}/"
+    # A real client never sends userinfo in the Host header (it's stripped
+    # before the request is made) -- .hostname strips both userinfo and port,
+    # matching the actual value nginx would forward.
+    resp = _resolve(app, urlsplit(published).hostname)
+    assert resp.status_code == 204
+    assert resp.headers["x-fg-upstream"] == "node01:41235"
+
+
 # --- resolution cache and counters ---
 
 def test_resolve_serves_repeats_from_the_cache(app_factory):
