@@ -15,7 +15,7 @@ Core features:
 See the [documentation](https://janeliascicomp.github.io/fileglancer-docs/) for more information.
 
 <p align="center">
-<img alt="Fileglancer screenshot" width="800" src="https://github.com/user-attachments/assets/e17079a6-66ca-4064-8568-7770c5af33d5" />
+<img width="1381" height="892" alt="fileglancer landing page screenshot" src="https://github.com/user-attachments/assets/16afea20-8162-4757-a86a-6378d9e229df" />
 </p>
 
 ## Installation
