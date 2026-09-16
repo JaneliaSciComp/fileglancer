@@ -14,11 +14,18 @@ import FgCheckbox from '@/components/designSystem/atoms/formElements/FgCheckbox'
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import ZarrAxisTable from '@/components/ui/BrowsePage/ZarrAxisTable';
 import { useCartContext } from '@/contexts/CartContext';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
+import useZoneAndFileSharePathMapQuery from '@/queries/zoneAndFileSharePathMapQuery';
 import { getOmeZarrChannels, getOmeZarrMetadata } from '@/omezarr-helper';
 import type { Metadata } from '@/omezarr-helper';
-import { makeBrowseLink } from '@/utils';
+import {
+  getPreferredPathForDisplay,
+  makeBrowseLink,
+  makeMapKey
+} from '@/utils';
 import { getFileURL } from '@/utils/pathHandling';
 import type { CartItem } from '@/contexts/CartContext';
+import type { FileSharePath } from '@/shared.types';
 import type { DatasetKind } from '@/utils/viewCheckout';
 
 interface CartDatasetRowProps {
@@ -62,6 +69,16 @@ export default function CartDatasetRow({
   kind
 }: CartDatasetRowProps) {
   const { addToCart, removeFromCart, removeManyFromCart } = useCartContext();
+  const { pathPreference } = usePreferencesContext();
+  const zonesAndFspQuery = useZoneAndFileSharePathMapQuery();
+  const fsp = zonesAndFspQuery.data?.[makeMapKey('fsp', fsp_name)] as
+    | FileSharePath
+    | undefined;
+  // Full filesystem path (FSP mount + subpath); falls back to the bare
+  // subpath until the FSP map has loaded.
+  const displayPath = fsp
+    ? getPreferredPathForDisplay(pathPreference, fsp, path)
+    : path;
   const [isOpen, setIsOpen] = useState(false);
   const [channels, setChannels] = useState<string[] | undefined>(undefined);
   const [loadingChannels, setLoadingChannels] = useState(false);
@@ -189,7 +206,7 @@ export default function CartDatasetRow({
         className="block pl-6 text-primary text-xs truncate hover:underline"
         to={makeBrowseLink(fsp_name, path)}
       >
-        {path}
+        {displayPath}
       </Link>
 
       <Collapse open={isOpen}>

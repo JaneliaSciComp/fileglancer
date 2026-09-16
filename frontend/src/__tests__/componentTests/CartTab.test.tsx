@@ -106,6 +106,14 @@ const { useCartDimensionCheck } = vi.hoisted(() => ({
   }))
 }));
 vi.mock('@/hooks/useCartDimensionCheck', () => ({ useCartDimensionCheck }));
+vi.mock('@/contexts/PreferencesContext', () => ({
+  usePreferencesContext: () => ({ pathPreference: ['linux_path'] })
+}));
+vi.mock('@/queries/zoneAndFileSharePathMapQuery', () => ({
+  default: () => ({
+    data: { fsp_fsp1: { name: 'fsp1', linux_path: '/mnt/one' } }
+  })
+}));
 
 import CartList from '@/components/ui/Views/CartList';
 import { datasetKey } from '@/utils/pathHandling';
@@ -134,6 +142,14 @@ describe('Layer Cart tab', () => {
     await renderCartTab();
     expect(screen.getByText('Dataset A')).toBeInTheDocument();
     expect(screen.getByText('Dataset B')).toBeInTheDocument();
+  });
+
+  it('links each dataset by its full path (FSP mount + subpath)', async () => {
+    await renderCartTab();
+    const link = screen.getByRole('link', { name: '/mnt/one/a' });
+    expect(link).toHaveAttribute('href', '/browse/fsp1/a');
+    // fsp2 is not in the FSP map yet: fall back to the bare subpath.
+    expect(screen.getByRole('link', { name: '/b' })).toBeInTheDocument();
   });
 
   it('lazy-loads and shows channels when expanding a dataset', async () => {
