@@ -67,6 +67,7 @@ export const viewQueryKeys = {
   list: () => ['views', 'list'] as const,
   forDataLink: (sharingKey: string) =>
     ['views', 'forDataLink', sharingKey] as const,
+  forDataLinkAll: () => ['views', 'forDataLink'] as const,
   state: (readKey: string) => ['views', 'state', readKey] as const
 };
 
@@ -253,6 +254,12 @@ export function useUpdateViewMutation(): UseMutationResult<
     onSuccess: (view, variables) => {
       queryClient.invalidateQueries({
         queryKey: viewQueryKeys.list()
+      });
+      // Prefix-matches every sharing key's forDataLink query, so AppearsInViews
+      // and the Data Link delete dialog's dependentViewsQuery pick up the new
+      // name too (name/ng_state changes both land here, unlike the state key).
+      queryClient.invalidateQueries({
+        queryKey: viewQueryKeys.forDataLinkAll()
       });
       // A name-only rename must not touch the state query: the embedded
       // viewer's active viewQueryKeys.state(readKey) query would refetch,
