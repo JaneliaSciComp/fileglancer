@@ -49,7 +49,7 @@ export default function CartList() {
   const navigate = useNavigate();
 
   const cartGroups = useMemo(() => groupCartByDataset(cart), [cart]);
-  const { mismatchedKeys } = useCartDimensionCheck(cart);
+  const { mismatchedKeys, kindByKey } = useCartDimensionCheck(cart);
 
   const handleClearCart = async () => {
     try {
@@ -74,6 +74,9 @@ export default function CartList() {
           fsp_name={group.fsp_name}
           items={group.items}
           key={datasetKey(group.fsp_name, group.path)}
+          kind={
+            kindByKey.get(datasetKey(group.fsp_name, group.path)) ?? 'loading'
+          }
           label={group.label}
           mismatch={mismatchedKeys.has(datasetKey(group.fsp_name, group.path))}
           path={group.path}
