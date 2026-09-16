@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { Collapse, IconButton, Typography } from '@material-tailwind/react';
-import { HiChevronRight, HiOutlineTrash } from 'react-icons/hi';
-import { HiExclamationTriangle } from 'react-icons/hi2';
+import {
+  HiChevronRight,
+  HiOutlineCheckCircle,
+  HiOutlineTrash
+} from 'react-icons/hi';
+import { HiExclamationTriangle, HiOutlineXCircle } from 'react-icons/hi2';
 import toast from 'react-hot-toast';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
@@ -15,6 +19,7 @@ import type { Metadata } from '@/omezarr-helper';
 import { makeBrowseLink } from '@/utils';
 import { getFileURL } from '@/utils/pathHandling';
 import type { CartItem } from '@/contexts/CartContext';
+import type { DatasetKind } from '@/utils/viewCheckout';
 
 interface CartDatasetRowProps {
   readonly fsp_name: string;
@@ -22,7 +27,26 @@ interface CartDatasetRowProps {
   readonly label: string;
   readonly items: CartItem[];
   readonly mismatch?: boolean;
+  readonly kind: DatasetKind | 'loading';
 }
+
+const LAYER_STATUS = {
+  ome: {
+    icon: HiOutlineCheckCircle,
+    color: 'success',
+    label: 'Will load as a Neuroglancer layer'
+  },
+  array: {
+    icon: HiOutlineCheckCircle,
+    color: 'success',
+    label: 'Will load as a Neuroglancer layer'
+  },
+  unsupported: {
+    icon: HiOutlineXCircle,
+    color: 'error',
+    label: 'Will not load as a Neuroglancer layer'
+  }
+} as const;
 
 // ponytail: two-level dataset->channel tree via MT Collapse (no generic
 // TreeView exists). Metadata/channels are fetched from the internal
@@ -34,7 +58,8 @@ export default function CartDatasetRow({
   path,
   label,
   items,
-  mismatch
+  mismatch,
+  kind
 }: CartDatasetRowProps) {
   const { addToCart, removeFromCart, removeManyFromCart } = useCartContext();
   const [isOpen, setIsOpen] = useState(false);
@@ -131,6 +156,17 @@ export default function CartDatasetRow({
             size="sm"
           />
           <Typography className="text-foreground truncate">{label}</Typography>
+          {kind !== 'loading' ? (
+            <FgTooltip label={LAYER_STATUS[kind].label}>
+              <FgIcon
+                className="shrink-0"
+                color={LAYER_STATUS[kind].color}
+                icon={LAYER_STATUS[kind].icon}
+                label={LAYER_STATUS[kind].label}
+                size="sm"
+              />
+            </FgTooltip>
+          ) : null}
           {mismatch ? (
             <FgTooltip label="Dimensions differ from the first layer in this view">
               <FgIcon
