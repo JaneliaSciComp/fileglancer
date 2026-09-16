@@ -12,11 +12,13 @@ const { useViewStateByReadKey } = vi.hoisted(() => ({
 const useViewsQuery = vi.hoisted(() => vi.fn(() => ({ data: [] as View[] })));
 const mutateAsync = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@/queries/viewQueries', () => ({
-  useViewStateByReadKey,
-  useViewsQuery
+  useViewStateByReadKey
 }));
 vi.mock('@/contexts/ViewsContext', () => ({
-  useViewsContext: () => ({ updateViewMutation: { mutateAsync } })
+  useViewsContext: () => ({
+    allViewsQuery: useViewsQuery(),
+    updateViewMutation: { mutateAsync }
+  })
 }));
 vi.mock('@/hooks/useDefaultNeuroglancerBaseUrl', () => ({
   useInternalNeuroglancerBaseUrl: () => 'https://ng.example/'

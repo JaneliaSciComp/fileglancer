@@ -204,7 +204,10 @@ change the label to "Copy link to share". Success toast becomes "View link copie
 ### Item 13: Views table actions menu copy
 
 **Decision:** "Open in Neuroglancer" → "Open View"; "Copy Neuroglancer link" →
-"Copy View link to share"; its success toast → "View link copied". No behaviour change.
+"Copy View link to share"; its success toast → "View link copied". The action now
+copies the short View link (`/view/<read_key>`), matching the embedded viewer's
+share button and the Open View target; the external Neuroglancer URL remains
+reachable from the embedded viewer's Open in Neuroglancer button.
 
 ## Copy rules (all branches)
 

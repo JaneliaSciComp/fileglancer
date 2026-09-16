@@ -36,6 +36,14 @@ describe('InlineNameEditor', () => {
     expect(screen.getByText('Old')).toBeInTheDocument();
   });
 
+  it('disables Cancel while a save is in flight', async () => {
+    const onSave = vi.fn(() => new Promise<void>(() => {})); // never resolves
+    render(<InlineNameEditor label="view name" onSave={onSave} value="Old" />);
+    await userEvent.click(screen.getByLabelText('Edit view name'));
+    await userEvent.click(screen.getByLabelText('Save view name'));
+    expect(screen.getByLabelText('Cancel rename')).toBeDisabled();
+  });
+
   it('stays in edit mode when save rejects', async () => {
     const onSave = vi.fn().mockRejectedValue(new Error('nope'));
     render(<InlineNameEditor label="view name" onSave={onSave} value="Old" />);

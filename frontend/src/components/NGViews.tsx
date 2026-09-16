@@ -8,13 +8,11 @@ import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
 import { useViewsContext } from '@/contexts/ViewsContext';
-import { useDefaultNeuroglancerBaseUrl } from '@/hooks/useDefaultNeuroglancerBaseUrl';
 import type { View } from '@/queries/viewQueries';
 
 export default function NGViews() {
   const { allViewsQuery, updateViewMutation, deleteViewMutation } =
     useViewsContext();
-  const baseUrl = useDefaultNeuroglancerBaseUrl();
 
   const [renameItem, setRenameItem] = useState<View | undefined>(undefined);
   const [renameValue, setRenameValue] = useState('');
@@ -70,7 +68,6 @@ export default function NGViews() {
   const columns = useNGViewsColumns(
     handleOpenRename,
     setDeleteItem,
-    baseUrl,
     sourcesColWidth,
     handleSourcesResize
   );

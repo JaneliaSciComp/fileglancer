@@ -90,13 +90,7 @@ function TableProbe({
 }) {
   // ponytail: TableProbe is already a component, so call the hook directly
   // rather than nesting renderHook inside a component under render().
-  const columns = useNGViewsColumns(
-    onRename,
-    onDelete,
-    'https://ng.example/',
-    320,
-    () => {}
-  );
+  const columns = useNGViewsColumns(onRename, onDelete, 320, () => {});
   const table = useReactTable({
     data: [viewProp],
     columns,
@@ -320,14 +314,7 @@ describe('useNGViewsColumns', () => {
 
   it('navigates to the embedded viewer when "Open View" is clicked', async () => {
     const user = userEvent.setup();
-    render(
-      <ActionsCell
-        baseUrl="https://ng.example/"
-        item={view}
-        onDelete={vi.fn()}
-        onRename={vi.fn()}
-      />
-    );
+    render(<ActionsCell item={view} onDelete={vi.fn()} onRename={vi.fn()} />);
     const trigger = screen.getByRole('button');
 
     await user.click(trigger);
@@ -335,8 +322,9 @@ describe('useNGViewsColumns', () => {
     expect(navigate).toHaveBeenCalledWith(`/view/${view.read_key}`);
   });
 
-  it('copies the link under "Copy View link to share" and toasts "View link copied"', async () => {
+  it('copies the short View link under "Copy View link to share" and toasts "View link copied"', async () => {
     const user = userEvent.setup();
+    const { copyToClipboard } = await import('@/utils/copyText');
     render(
       <MemoryRouter>
         <TableProbe onDelete={vi.fn()} onRename={vi.fn()} />
@@ -348,6 +336,9 @@ describe('useNGViewsColumns', () => {
     await user.click(await screen.findByText('Copy View link to share'));
     await waitFor(() =>
       expect(toast.success).toHaveBeenCalledWith('View link copied')
+    );
+    expect(copyToClipboard).toHaveBeenCalledWith(
+      expect.stringMatching(new RegExp(`/view/${view.read_key}$`))
     );
   });
 });
