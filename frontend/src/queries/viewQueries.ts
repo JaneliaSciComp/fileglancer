@@ -250,10 +250,19 @@ export function useUpdateViewMutation(): UseMutationResult<
       const view = await sendRequestAndThrowForNotOk(url, 'PUT', body);
       return view as View;
     },
-    onSuccess: () => {
+    onSuccess: (view, variables) => {
       queryClient.invalidateQueries({
-        queryKey: viewQueryKeys.all
+        queryKey: viewQueryKeys.list()
       });
+      // A name-only rename must not touch the state query: the embedded
+      // viewer's active viewQueryKeys.state(readKey) query would refetch,
+      // changing the iframe src and reloading Neuroglancer (losing the
+      // user's camera/layers). Only ng_state changes warrant that refetch.
+      if (variables.ng_state !== undefined) {
+        queryClient.invalidateQueries({
+          queryKey: viewQueryKeys.state(view.read_key)
+        });
+      }
     }
   });
 }
