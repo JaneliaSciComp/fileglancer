@@ -77,7 +77,7 @@ the page.
 Per unique source, if any of its layers is `broken`, render a broken-link icon
 (`MdLinkOff` from `react-icons/md`, already bundled) in front of the path with tooltip
 text: "The data link for this source no longer exists, so it won't appear in this
-view." The path stays a browse link because the files themselves still exist.
+View." The path stays a browse link because the files themselves still exist.
 
 ### Item 4: show dependent Views immediately in the delete dialog
 

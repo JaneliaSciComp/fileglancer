@@ -13,6 +13,7 @@ import {
   makeBrowseLink,
   makeMapKey
 } from '@/utils';
+import { datasetKey } from '@/utils/pathHandling';
 import { constructNeuroglancerUrl } from '@/utils/neuroglancerUrl';
 import { copyToClipboard } from '@/utils/copyText';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
@@ -227,10 +228,10 @@ export function useNGViewsColumns(
             { fsp_name: string; path: string; broken: boolean }
           >();
           for (const layer of row.original.layers) {
-            if (!layer.fsp_name || !layer.path) {
+            if (layer.fsp_name === null || layer.path === null) {
               continue; // pre-migration broken layer: source unknown
             }
-            const key = `${layer.fsp_name}::${layer.path}`;
+            const key = datasetKey(layer.fsp_name, layer.path);
             const existing = bySource.get(key);
             if (existing) {
               existing.broken = existing.broken || layer.broken;
@@ -267,12 +268,12 @@ export function useNGViewsColumns(
                 return (
                   <div
                     className="flex items-center gap-1 min-w-0"
-                    key={`${src.fsp_name}::${src.path}`}
+                    key={datasetKey(src.fsp_name, src.path)}
                   >
                     {src.broken ? (
-                      <FgTooltip label="The data link for this source no longer exists, so it won't appear in this view.">
+                      <FgTooltip label="The data link for this source no longer exists, so it won't appear in this View.">
                         <FgIcon
-                          className="text-error shrink-0"
+                          color="error"
                           icon={MdLinkOff}
                           label="Data link missing"
                           size="sm"
