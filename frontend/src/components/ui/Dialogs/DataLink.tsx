@@ -395,7 +395,7 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
             <BtnContainer>
               <FgButton
                 color="error"
-                disabled={props.pending}
+                disabled={props.pending || dependentViewsQuery.isPending}
                 loading={props.pending}
                 loadingText="Deleting..."
                 onClick={async () => {
