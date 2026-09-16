@@ -271,7 +271,7 @@ export function useNGViewsColumns(
                     key={datasetKey(src.fsp_name, src.path)}
                   >
                     {src.broken ? (
-                      <FgTooltip label="The data link for this source no longer exists, so it won't appear in this View.">
+                      <FgTooltip label="Data link deleted; source no longer appears in View">
                         <FgIcon
                           color="error"
                           icon={MdLinkOff}

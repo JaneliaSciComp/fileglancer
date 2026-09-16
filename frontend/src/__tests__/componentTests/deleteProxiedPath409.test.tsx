@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { viewQueryKeys } from '@/queries/viewQueries';
 
 const sendFetchRequest = vi.fn();
 vi.mock('@/utils', () => ({
@@ -26,14 +27,18 @@ const fakeResponse = (status: number, body: unknown) =>
     json: async () => body
   }) as unknown as Response;
 
+let client: QueryClient;
+
 function wrapper({ children }: { children: ReactNode }) {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false } }
-  });
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
-beforeEach(() => sendFetchRequest.mockReset());
+beforeEach(() => {
+  sendFetchRequest.mockReset();
+  client = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+});
 
 describe('useDeleteProxiedPathMutation 409 handling', () => {
   it('throws DependentViewsError carrying the dependent views on 409', async () => {
@@ -71,6 +76,20 @@ describe('useDeleteProxiedPathMutation 409 handling', () => {
         expect.stringContaining('confirm=true'),
         'DELETE'
       )
+    );
+  });
+
+  it('invalidates the Views queries on success so broken sources show up', async () => {
+    sendFetchRequest.mockResolvedValue(
+      fakeResponse(200, { message: 'deleted' })
+    );
+    client.setQueryData(viewQueryKeys.list(), []);
+    const { result } = renderHook(() => useDeleteProxiedPathMutation(), {
+      wrapper
+    });
+    await result.current.mutateAsync({ sharing_key: 'k1', confirm: true });
+    expect(client.getQueryState(viewQueryKeys.list())?.isInvalidated).toBe(
+      true
     );
   });
 });
