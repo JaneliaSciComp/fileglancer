@@ -196,11 +196,13 @@ describe('probeDataset', () => {
     expect(await probeDataset('u')).toEqual({ kind: 'array' });
   });
 
-  it('reports unsupported when neither loads', async () => {
+  it('reports unsupported when neither loads, carrying both failure causes', async () => {
     (getOmeZarrMetadata as any).mockRejectedValueOnce(new Error('no ome'));
     (generateStateForPlainZarr as any).mockRejectedValueOnce(
       new Error('no array')
     );
-    expect(await probeDataset('u')).toEqual({ kind: 'unsupported' });
+    const probe = await probeDataset('u');
+    expect(probe).toMatchObject({ kind: 'unsupported' });
+    expect((probe as { errors: unknown[] }).errors).toHaveLength(2);
   });
 });

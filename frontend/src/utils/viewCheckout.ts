@@ -12,19 +12,19 @@ export type DatasetKind = 'ome' | 'array' | 'unsupported';
 export type DatasetProbe =
   | { kind: 'ome'; metadata: Metadata }
   | { kind: 'array' }
-  | { kind: 'unsupported' };
+  | { kind: 'unsupported'; errors: unknown[] };
 
 // Single source of truth for "what will this dataset become in Neuroglancer":
 // the cart indicator and checkout both call this, so they cannot disagree.
 export async function probeDataset(url: string): Promise<DatasetProbe> {
   try {
     return { kind: 'ome', metadata: await getOmeZarrMetadata(url) };
-  } catch {
+  } catch (omeError) {
     try {
       await generateStateForPlainZarr(url);
       return { kind: 'array' };
-    } catch {
-      return { kind: 'unsupported' };
+    } catch (plainError) {
+      return { kind: 'unsupported', errors: [omeError, plainError] };
     }
   }
 }
@@ -59,7 +59,10 @@ async function generateStateForDataset(
 ): Promise<NgState | null> {
   const probe = await probeDataset(ds.url);
   if (probe.kind === 'unsupported') {
-    log.error(`Not a Zarr dataset, skipping cart entry: ${ds.url}`);
+    log.error(
+      `Failed to generate Neuroglancer state for ${ds.url}`,
+      ...probe.errors
+    );
     return null;
   }
   if (probe.kind === 'array') {
