@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router';
 import { IconButton, Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 import {
-  HiOutlineDuplicate,
+  HiOutlineShare,
   HiOutlineDownload,
   HiOutlineExternalLink,
   HiOutlineArrowsExpand
@@ -88,7 +88,7 @@ export default function NeuroglancerView() {
     const shortLink = `${window.location.origin}/view/${readKey}`;
     const result = await copyToClipboard(shortLink);
     if (result.success) {
-      toast.success('Neuroglancer link copied');
+      toast.success('View link copied');
     } else {
       toast.error(`Failed to copy: ${result.error}`);
     }
@@ -122,8 +122,8 @@ export default function NeuroglancerView() {
         <div className="flex shrink-0 items-center gap-4">
           <div className="flex items-center gap-1">
             <ToolbarIconButton
-              icon={HiOutlineDuplicate}
-              label="Copy link"
+              icon={HiOutlineShare}
+              label="Copy link to share"
               onClick={() => void handleCopy()}
             />
             <ToolbarIconButton
