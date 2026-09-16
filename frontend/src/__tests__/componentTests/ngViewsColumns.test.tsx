@@ -60,8 +60,8 @@ const view: View = {
       channel: null,
       opts: null,
       broken: false,
-      fsp_name: 'fspA',
-      path: '/a/one.zarr'
+      fsp_name: 'nrs',
+      path: 'dudman/one.zarr'
     },
     {
       layer_index: 1,
@@ -69,8 +69,8 @@ const view: View = {
       channel: null,
       opts: null,
       broken: true,
-      fsp_name: 'fspA',
-      path: '/a/two.zarr'
+      fsp_name: 'nrs',
+      path: 'dudman/two.zarr'
     }
   ]
 };
@@ -136,11 +136,12 @@ describe('useNGViewsColumns', () => {
         <TableProbe onDelete={vi.fn()} onRename={vi.fn()} />
       </MemoryRouter>
     );
-    // Sources come straight from each layer's fsp_name/path.
-    const link = screen.getByText('/a/one.zarr');
+    // Sources come straight from each layer's fsp_name/path, displayed with
+    // the FSP's mount path prefixed (see zonesAndFspQuery mock: nrs -> /nrs).
+    const link = screen.getByText('/nrs/dudman/one.zarr');
     expect(link).toBeInTheDocument();
     expect(link.closest('a')).toHaveAttribute('href');
-    expect(screen.getByText('/a/two.zarr')).toBeInTheDocument();
+    expect(screen.getByText('/nrs/dudman/two.zarr')).toBeInTheDocument();
   });
 
   it('keeps the path and shows a broken-link icon for layers whose Data Link is gone', () => {
@@ -169,8 +170,8 @@ describe('useNGViewsColumns', () => {
           channel: 'ch0',
           opts: null,
           broken: false,
-          fsp_name: 'fspA',
-          path: '/a/shared.zarr'
+          fsp_name: 'nrs',
+          path: 'dudman/shared.zarr'
         },
         {
           layer_index: 1,
@@ -178,8 +179,8 @@ describe('useNGViewsColumns', () => {
           channel: 'ch1',
           opts: null,
           broken: true,
-          fsp_name: 'fspA',
-          path: '/a/shared.zarr'
+          fsp_name: 'nrs',
+          path: 'dudman/shared.zarr'
         }
       ]
     };
@@ -225,6 +226,34 @@ describe('useNGViewsColumns', () => {
     expect(
       screen.queryByLabelText('Data link missing')
     ).not.toBeInTheDocument();
+  });
+
+  it('renders a link to the FSP root and the broken icon for an empty path', () => {
+    // Empty string path means a Data Link at the FSP root (backend normalizes
+    // "." to ""), which is a known source and must not be treated like null.
+    const rootPathView: View = {
+      ...view,
+      layers: [
+        {
+          layer_index: 0,
+          data_link_id: null,
+          channel: null,
+          opts: null,
+          broken: true,
+          fsp_name: 'nrs',
+          path: ''
+        }
+      ]
+    };
+    render(
+      <MemoryRouter>
+        <TableProbe onDelete={vi.fn()} onRename={vi.fn()} view={rootPathView} />
+      </MemoryRouter>
+    );
+    expect(screen.queryByText('—')).not.toBeInTheDocument();
+    const link = screen.getByText('/nrs');
+    expect(link.closest('a')).toHaveAttribute('href', '/browse/nrs');
+    expect(screen.getByLabelText('Data link missing')).toBeInTheDocument();
   });
 
   it('fires onRename and onDelete from the actions menu', async () => {
