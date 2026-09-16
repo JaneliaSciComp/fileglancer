@@ -271,13 +271,12 @@ export function useNGViewsColumns(
                   >
                     {src.broken ? (
                       <FgTooltip label="The data link for this source no longer exists, so it won't appear in this view.">
-                        <span aria-label="Data link missing" role="img">
-                          <FgIcon
-                            className="text-error shrink-0"
-                            icon={MdLinkOff}
-                            size="sm"
-                          />
-                        </span>
+                        <FgIcon
+                          className="text-error shrink-0"
+                          icon={MdLinkOff}
+                          label="Data link missing"
+                          size="sm"
+                        />
                       </FgTooltip>
                     ) : null}
                     <Link
