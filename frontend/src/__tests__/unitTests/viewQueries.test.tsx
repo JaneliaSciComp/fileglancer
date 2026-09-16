@@ -89,6 +89,9 @@ describe('viewQueries', () => {
       expect(invalidateQueries).toHaveBeenCalledWith({
         queryKey: viewQueryKeys.list()
       });
+      expect(invalidateQueries).toHaveBeenCalledWith({
+        queryKey: viewQueryKeys.forDataLinkAll()
+      });
       expect(invalidateQueries).not.toHaveBeenCalledWith({
         queryKey: viewQueryKeys.state('r1')
       });
