@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Dialog, IconButton } from '@material-tailwind/react';
+import type { DialogContentProps } from '@material-tailwind/react';
 import { HiX } from 'react-icons/hi';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
@@ -9,18 +10,23 @@ type FgDialogProps = {
   readonly onClose: () => void;
   readonly children: ReactNode;
   readonly className?: string;
+  readonly initialFocus?: DialogContentProps['initialFocus'];
 };
 
 export default function FgDialog({
   open,
   onClose,
   children,
-  className = ''
+  className = '',
+  initialFocus
 }: FgDialogProps) {
   return (
     <Dialog onOpenChange={() => onClose()} open={open}>
       <Dialog.Overlay>
-        <Dialog.Content className={`p-6 bg-surface-light ${className}`}>
+        <Dialog.Content
+          className={`p-6 bg-surface-light ${className}`}
+          initialFocus={initialFocus}
+        >
           <IconButton
             className="absolute right-4 top-4 text-secondary hover:text-background rounded-full"
             color="secondary"

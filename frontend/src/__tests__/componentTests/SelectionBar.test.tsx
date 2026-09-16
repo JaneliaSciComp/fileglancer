@@ -5,7 +5,6 @@ import toast from 'react-hot-toast';
 
 const clearChecked = vi.fn();
 const addToCart = vi.fn().mockResolvedValue(undefined);
-const clearCart = vi.fn().mockResolvedValue(undefined);
 const navigate = vi.hoisted(() => vi.fn());
 
 vi.mock('react-router', () => ({ useNavigate: () => navigate }));
@@ -25,7 +24,7 @@ vi.mock('@/contexts/FileBrowserContext', () => ({
 }));
 
 vi.mock('@/contexts/CartContext', () => ({
-  useCartContext: () => ({ addToCart, clearCart })
+  useCartContext: () => ({ addToCart })
 }));
 
 import SelectionBar from '@/components/ui/BrowsePage/SelectionBar';
@@ -33,7 +32,6 @@ import SelectionBar from '@/components/ui/BrowsePage/SelectionBar';
 beforeEach(() => {
   clearChecked.mockClear();
   addToCart.mockClear();
-  clearCart.mockClear();
   navigate.mockClear();
   vi.mocked(toast.success).mockClear();
   vi.mocked(toast.error).mockClear();
