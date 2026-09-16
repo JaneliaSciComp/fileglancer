@@ -420,7 +420,7 @@ In `ngViewsColumns.tsx`:
                     key={`${src.fsp_name}::${src.path}`}
                   >
                     {src.broken ? (
-                      <FgTooltip label="The data link for this source no longer exists, so it won't appear in this View.">
+                      <FgTooltip label="Data link deleted; source no longer appears in View">
                         <span aria-label="Data link missing" role="img">
                           <FgIcon
                             color="error"

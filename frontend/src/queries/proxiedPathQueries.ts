@@ -13,6 +13,7 @@ import {
   sendRequestAndThrowForNotOk,
   throwResponseNotOkError
 } from './queryUtils';
+import { viewQueryKeys } from './viewQueries';
 
 /**
  * Raw API response structure from /api/proxied-path endpoints
@@ -312,6 +313,9 @@ export function useDeleteProxiedPathMutation(): UseMutationResult<
       queryClient.invalidateQueries({
         queryKey: proxiedPathQueryKeys.all
       });
+      // Deleting a Data Link marks dependent View layers broken; refetch so
+      // the Views table shows the broken-link icon without a page reload.
+      queryClient.invalidateQueries({ queryKey: viewQueryKeys.all });
     },
     // On error, rollback
     onError: (_err, _variables, context) => {
