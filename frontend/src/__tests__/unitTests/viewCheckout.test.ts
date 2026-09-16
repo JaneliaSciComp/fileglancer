@@ -14,7 +14,7 @@ import {
   generateNeuroglancerStateForOmeZarr,
   generateStateForPlainZarr
 } from '@/omezarr-helper';
-import { buildViewState } from '@/utils/viewCheckout';
+import { buildViewState, probeDataset } from '@/utils/viewCheckout';
 
 const md = { multiscales: [{}], arr: {}, zarrVersion: 2 };
 
@@ -180,5 +180,27 @@ describe('buildViewState', () => {
     expect(layers).toHaveLength(2);
     expect(layers[0].localPosition).toEqual([0]);
     expect(layers[1].localPosition).toEqual([2]);
+  });
+});
+
+describe('probeDataset', () => {
+  it('reports ome when OME metadata loads', async () => {
+    const metadata = { multiscales: [{}], zarrVersion: 3 };
+    (getOmeZarrMetadata as any).mockResolvedValueOnce(metadata);
+    expect(await probeDataset('u')).toEqual({ kind: 'ome', metadata });
+  });
+
+  it('falls back to array when only a plain Zarr array loads', async () => {
+    (getOmeZarrMetadata as any).mockRejectedValueOnce(new Error('no ome'));
+    (generateStateForPlainZarr as any).mockResolvedValueOnce('%7B%7D');
+    expect(await probeDataset('u')).toEqual({ kind: 'array' });
+  });
+
+  it('reports unsupported when neither loads', async () => {
+    (getOmeZarrMetadata as any).mockRejectedValueOnce(new Error('no ome'));
+    (generateStateForPlainZarr as any).mockRejectedValueOnce(
+      new Error('no array')
+    );
+    expect(await probeDataset('u')).toEqual({ kind: 'unsupported' });
   });
 });
