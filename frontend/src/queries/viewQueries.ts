@@ -19,6 +19,8 @@ export type ViewLayer = {
   channel: string | null;
   opts: Record<string, unknown> | null;
   broken: boolean;
+  fsp_name: string | null;
+  path: string | null;
 };
 
 export type View = {
