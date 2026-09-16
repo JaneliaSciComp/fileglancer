@@ -1,19 +1,15 @@
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router';
 
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { useCartContext } from '@/contexts/CartContext';
-import CreateViewButton from '@/components/ui/Views/CreateViewButton';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import type { CartItem } from '@/contexts/CartContext';
 
-// ponytail: bar carries the two net-new cart actions + clear. Multi-select
-// Share/Download/"More" (design §6) generalize existing single-file actions
-// — deferred; add when a concrete need lands.
+// ponytail: bar carries "add to cart" + clear only. Creating a View goes
+// through the cart so the user sees per-dataset layer status first.
 export default function SelectionBar() {
   const { fileBrowserState, clearChecked, fileQuery } = useFileBrowserContext();
   const { addToCart } = useCartContext();
-  const navigate = useNavigate();
 
   const { checkedFiles } = fileBrowserState;
 
@@ -51,12 +47,6 @@ export default function SelectionBar() {
       <FgButton onClick={() => void handleAddToCart()}>
         Add {checkedFiles.length} to cart
       </FgButton>
-      <CreateViewButton
-        datasets={selectionDatasets}
-        defaultName="New View"
-        label="New View from selection"
-        onCreated={view => navigate(`/view/${view.read_key}`)}
-      />
       <FgButton onClick={clearChecked} variant="ghost">
         Clear
       </FgButton>
