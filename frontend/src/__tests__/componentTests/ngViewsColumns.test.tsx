@@ -21,14 +21,6 @@ import {
 import type { View } from '@/queries/viewQueries';
 import { formatDateString } from '@/utils';
 
-vi.mock('@/queries/proxiedPathQueries', () => ({
-  useAllProxiedPathsQuery: () => ({
-    data: [
-      { id: 1, fsp_name: 'nrs', path: 'dudman/reg.zarr/g1_r0' },
-      { id: 2, fsp_name: 'nrs', path: 'dudman/reg.zarr/g1_r1' }
-    ]
-  })
-}));
 vi.mock('@/contexts/PreferencesContext', () => ({
   usePreferencesContext: () => ({ pathPreference: ['linux_path'] })
 }));
@@ -67,14 +59,18 @@ const view: View = {
       data_link_id: 1,
       channel: null,
       opts: null,
-      broken: false
+      broken: false,
+      fsp_name: 'fspA',
+      path: '/a/one.zarr'
     },
     {
       layer_index: 1,
-      data_link_id: 2,
-      channel: 'ch0',
+      data_link_id: null,
+      channel: null,
       opts: null,
-      broken: false
+      broken: true,
+      fsp_name: 'fspA',
+      path: '/a/two.zarr'
     }
   ]
 };
@@ -138,11 +134,27 @@ describe('useNGViewsColumns', () => {
         <TableProbe onDelete={vi.fn()} onRename={vi.fn()} />
       </MemoryRouter>
     );
-    // Sources show the full path (file share path + subpath), not just the subpath.
-    const link = screen.getByText('/nrs/dudman/reg.zarr/g1_r0');
+    // Sources come straight from each layer's fsp_name/path.
+    const link = screen.getByText('/a/one.zarr');
     expect(link).toBeInTheDocument();
     expect(link.closest('a')).toHaveAttribute('href');
-    expect(screen.getByText('/nrs/dudman/reg.zarr/g1_r1')).toBeInTheDocument();
+    expect(screen.getByText('/a/two.zarr')).toBeInTheDocument();
+  });
+
+  it('keeps the path and shows a broken-link icon for layers whose Data Link is gone', () => {
+    render(
+      <MemoryRouter>
+        <TableProbe onDelete={vi.fn()} onRename={vi.fn()} />
+      </MemoryRouter>
+    );
+    const brokenLink = screen.getByRole('link', { name: /two\.zarr/ });
+    expect(brokenLink).toHaveAttribute(
+      'href',
+      expect.stringContaining('two.zarr')
+    );
+    expect(screen.getByLabelText('Data link missing')).toBeInTheDocument();
+    // the intact source has no broken icon
+    expect(screen.getAllByLabelText('Data link missing')).toHaveLength(1);
   });
 
   it('fires onRename and onDelete from the actions menu', async () => {
