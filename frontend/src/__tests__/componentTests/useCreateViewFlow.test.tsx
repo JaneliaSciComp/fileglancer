@@ -83,6 +83,20 @@ describe('useCreateViewFlow', () => {
     );
   });
 
+  it('focuses and selects the default name so typing replaces it', async () => {
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+
+    act(() => {
+      apiRef.current!.startCreateView(datasets, 'New View');
+    });
+
+    const input = await screen.findByLabelText('View name');
+    expect(input).toHaveFocus();
+    expect((input as HTMLInputElement).selectionStart).toBe(0);
+    expect((input as HTMLInputElement).selectionEnd).toBe('New View'.length);
+  });
+
   it('opens the dialog with data-link consent copy when links are not automatic, and waits for Continue', async () => {
     automatic = false;
     const apiRef: { current: FlowApi | null } = { current: null };
