@@ -15,13 +15,14 @@ import {
 } from '@/utils';
 import { constructNeuroglancerUrl } from '@/utils/neuroglancerUrl';
 import { copyToClipboard } from '@/utils/copyText';
-import { useAllProxiedPathsQuery } from '@/queries/proxiedPathQueries';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import FgTooltip from '../widgets/FgTooltip';
+import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import CardActionsMenu from '@/components/ui/Menus/CardActionsMenu';
 import type { MenuItem } from '@/components/ui/Menus/FgMenuItems';
 import type { FileSharePath } from '@/shared.types';
+import { MdLinkOff } from 'react-icons/md';
 
 const TRIGGER_CLASSES = 'h-min max-w-full';
 
@@ -164,19 +165,8 @@ export function useNGViewsColumns(
   sourcesColWidth: number,
   onSourcesResize: (next: number) => void
 ): ColumnDef<View>[] {
-  // Views listed here are the current user's own, so their backing Data Links
-  // are in this (current-user-scoped) query. Layers whose Data Link is missing
-  // or broken simply don't resolve to a browse link.
-  const proxiedPathsQuery = useAllProxiedPathsQuery();
   const { pathPreference } = usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
-  const pathById = useMemo(() => {
-    const map = new Map<number, { fsp_name: string; path: string }>();
-    for (const p of proxiedPathsQuery.data ?? []) {
-      map.set(p.id, { fsp_name: p.fsp_name, path: p.path });
-    }
-    return map;
-  }, [proxiedPathsQuery.data]);
 
   return useMemo(
     () => [
@@ -231,22 +221,28 @@ export function useNGViewsColumns(
         ),
         cell: ({ row }) => {
           // De-dupe: per-channel layers of one dataset share a source path.
-          const seen = new Set<string>();
-          const sources: { fsp_name: string; path: string }[] = [];
+          // A source is broken if any of its layers lost its Data Link.
+          const bySource = new Map<
+            string,
+            { fsp_name: string; path: string; broken: boolean }
+          >();
           for (const layer of row.original.layers) {
-            const src =
-              layer.data_link_id !== null
-                ? pathById.get(layer.data_link_id)
-                : undefined;
-            if (!src) {
-              continue;
+            if (!layer.fsp_name || !layer.path) {
+              continue; // pre-migration broken layer: source unknown
             }
-            const key = `${src.fsp_name}::${src.path}`;
-            if (!seen.has(key)) {
-              seen.add(key);
-              sources.push(src);
+            const key = `${layer.fsp_name}::${layer.path}`;
+            const existing = bySource.get(key);
+            if (existing) {
+              existing.broken = existing.broken || layer.broken;
+            } else {
+              bySource.set(key, {
+                fsp_name: layer.fsp_name,
+                path: layer.path,
+                broken: layer.broken
+              });
             }
           }
+          const sources = [...bySource.values()];
           if (sources.length === 0) {
             return (
               <div className="flex items-center justify-start h-full w-full text-left">
@@ -269,15 +265,30 @@ export function useNGViewsColumns(
                   getPreferredPathForDisplay(pathPreference, fsp, src.path) ||
                   src.path;
                 return (
-                  <Link
-                    className="block max-w-full truncate text-primary text-xs text-left hover:underline"
+                  <div
+                    className="flex items-center gap-1 min-w-0"
                     key={`${src.fsp_name}::${src.path}`}
-                    onClick={e => e.stopPropagation()}
-                    title={fullPath}
-                    to={makeBrowseLink(src.fsp_name, src.path)}
                   >
-                    {fullPath}
-                  </Link>
+                    {src.broken ? (
+                      <FgTooltip label="The data link for this source no longer exists, so it won't appear in this view.">
+                        <span aria-label="Data link missing" role="img">
+                          <FgIcon
+                            className="text-error shrink-0"
+                            icon={MdLinkOff}
+                            size="sm"
+                          />
+                        </span>
+                      </FgTooltip>
+                    ) : null}
+                    <Link
+                      className="block max-w-full truncate text-primary text-xs text-left hover:underline"
+                      onClick={e => e.stopPropagation()}
+                      title={fullPath}
+                      to={makeBrowseLink(src.fsp_name, src.path)}
+                    >
+                      {fullPath}
+                    </Link>
+                  </div>
                 );
               })}
             </div>
@@ -330,7 +341,6 @@ export function useNGViewsColumns(
       onRename,
       onDelete,
       baseUrl,
-      pathById,
       sourcesColWidth,
       onSourcesResize,
       pathPreference,
