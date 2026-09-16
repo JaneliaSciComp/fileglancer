@@ -5,9 +5,9 @@ import toast from 'react-hot-toast';
 
 const clearChecked = vi.fn();
 const addToCart = vi.fn().mockResolvedValue(undefined);
-const navigate = vi.hoisted(() => vi.fn());
+const openDrawer = vi.hoisted(() => vi.fn());
 
-vi.mock('react-router', () => ({ useNavigate: () => navigate }));
+vi.mock('react-router', () => ({ useOutletContext: () => ({ openDrawer }) }));
 
 const twoCheckedFiles = [
   { name: 'a.txt', path: '/dir/a.txt' },
@@ -32,7 +32,7 @@ import SelectionBar from '@/components/ui/BrowsePage/SelectionBar';
 beforeEach(() => {
   clearChecked.mockClear();
   addToCart.mockClear();
-  navigate.mockClear();
+  openDrawer.mockClear();
   vi.mocked(toast.success).mockClear();
   vi.mocked(toast.error).mockClear();
   checkedFiles = twoCheckedFiles;
@@ -74,6 +74,20 @@ describe('SelectionBar', () => {
     render(<SelectionBar />);
     await user.click(screen.getByRole('button', { name: /clear/i }));
     expect(clearChecked).toHaveBeenCalled();
+  });
+
+  it('opens the cart drawer after adding the selection', async () => {
+    render(<SelectionBar />);
+    await userEvent.click(screen.getByText('Add 2 to cart'));
+    expect(addToCart).toHaveBeenCalled();
+    expect(openDrawer).toHaveBeenCalledWith('cart');
+  });
+
+  it('does not open the drawer when adding fails', async () => {
+    addToCart.mockRejectedValueOnce(new Error('nope'));
+    render(<SelectionBar />);
+    await userEvent.click(screen.getByText('Add 2 to cart'));
+    expect(openDrawer).not.toHaveBeenCalled();
   });
 });
 

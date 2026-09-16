@@ -1,15 +1,19 @@
 import toast from 'react-hot-toast';
+import { useOutletContext } from 'react-router';
 
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { useCartContext } from '@/contexts/CartContext';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import type { CartItem } from '@/contexts/CartContext';
+import type { OutletContextType } from '@/layouts/BrowseLayout';
 
 // ponytail: bar carries "add to cart" + clear only. Creating a View goes
 // through the cart so the user sees per-dataset layer status first.
 export default function SelectionBar() {
   const { fileBrowserState, clearChecked, fileQuery } = useFileBrowserContext();
   const { addToCart } = useCartContext();
+  // ponytail: optional — component tests render without a router outlet.
+  const outlet = useOutletContext<OutletContextType | undefined>();
 
   const { checkedFiles } = fileBrowserState;
 
@@ -27,15 +31,12 @@ export default function SelectionBar() {
   const handleAddToCart = async () => {
     try {
       await addToCart(selectionDatasets);
-      toast.success(
-        `Added ${checkedFiles.length} items to the Neuroglancer cart`
-      );
+      toast.success(`Added ${checkedFiles.length} items to the cart`);
+      outlet?.openDrawer('cart');
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      toast.error(
-        `Error adding items to the Neuroglancer cart: ${errorMessage}`
-      );
+      toast.error(`Error adding items to the cart: ${errorMessage}`);
     }
   };
 
