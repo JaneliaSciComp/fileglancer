@@ -22,6 +22,7 @@ import {
 import type { FileSharePath } from '@/shared.types';
 import type { PendingToolKey } from '@/hooks/useZarrMetadata';
 import { DependentViewsError } from '@/queries/proxiedPathQueries';
+import { useViewsForDataLinkQuery } from '@/queries/viewQueries';
 import FgDialog from './FgDialog';
 import TextWithFilePath from './TextWithFilePath';
 import DataLinkOptions, {
@@ -198,6 +199,19 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
     { short_key: string; name: string }[] | null
   >(null);
 
+  // Pre-fetch dependent Views so the warning is visible on open and the
+  // delete is a single confirming click. `dependentViews` (set from a 409)
+  // remains as the fallback for a View created between fetch and click.
+  const dependentViewsQuery = useViewsForDataLinkQuery(
+    props.action === 'delete' ? props.proxiedPath.sharing_key : undefined
+  );
+  const knownDependents =
+    dependentViews ??
+    (dependentViewsQuery.data ?? []).map(v => ({
+      short_key: v.short_key,
+      name: v.name
+    }));
+
   const customSubpathError = useMemo(
     () =>
       dataLinkSubpathMode === 'custom'
@@ -363,14 +377,14 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               be able to use it to view these data. You can create a new data
               link at any time.
             </Typography>
-            {dependentViews && dependentViews.length > 0 ? (
-              <div className="flex flex-col gap-2 bg-surface/30 p-2 rounded">
-                <Typography className="text-foreground font-semibold">
+            {knownDependents.length > 0 ? (
+              <div className="flex flex-col gap-2 border-l-4 border-warning bg-surface/30 p-3 rounded">
+                <Typography className="text-warning font-semibold">
                   These Views you own use this data link and will be marked
                   broken:
                 </Typography>
                 <ul className="list-disc pl-5">
-                  {dependentViews.map(v => (
+                  {knownDependents.map(v => (
                     <li className="text-foreground text-sm" key={v.short_key}>
                       {v.name || v.short_key}
                     </li>
@@ -385,21 +399,11 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
                 loading={props.pending}
                 loadingText="Deleting..."
                 onClick={async () => {
-                  if (dependentViews) {
-                    // Second click: user confirmed despite dependent Views.
-                    try {
-                      await props.handleDeleteDataLink(props.proxiedPath, true);
-                      props.setShowDataLinkDialog(false);
-                    } catch (error) {
-                      if (error instanceof DependentViewsError) {
-                        setDependentViews(error.views);
-                      }
-                      // other errors are already toasted in handleDeleteDataLink
-                    }
-                    return;
-                  }
                   try {
-                    await props.handleDeleteDataLink(props.proxiedPath, false);
+                    await props.handleDeleteDataLink(
+                      props.proxiedPath,
+                      knownDependents.length > 0
+                    );
                     props.setShowDataLinkDialog(false);
                   } catch (error) {
                     if (error instanceof DependentViewsError) {
@@ -409,7 +413,7 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
                   }
                 }}
               >
-                {dependentViews ? 'Delete anyway' : 'Delete'}
+                Delete
               </FgButton>
               <CancelBtn setShowDataLinkDialog={props.setShowDataLinkDialog} />
             </BtnContainer>
