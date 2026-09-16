@@ -34,9 +34,12 @@ def _origin(service_url):
         parts = urlsplit(service_url)
     except ValueError:
         return None
-    if not parts.scheme or not parts.netloc or '@' in parts.netloc:
+    if not parts.scheme or not parts.netloc:
         return None
-    return urlunsplit((parts.scheme, parts.netloc, '', '', ''))
+    _userinfo, _sep, hostport = parts.netloc.rpartition('@')
+    if not hostport:
+        return None
+    return urlunsplit((parts.scheme, hostport, '', '', ''))
 
 
 def _strip_stored_credentials(conn):

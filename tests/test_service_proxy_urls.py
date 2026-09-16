@@ -171,8 +171,9 @@ def test_job_id_from_host_rejects_absurd_job_id():
     ("node01:41235", None),
     ("", None),
     (None, None),
-    # Userinfo is a credential too, and the upstream gate refuses it anyway.
-    ("https://user:pw@node01:8443/x", None),
+    # Userinfo is a credential too, and this column's one reader discards it
+    # anyway -- keep the host:port, drop just the userinfo.
+    ("https://user:pw@node01:8443/x", "https://node01:8443"),
 ])
 def test_origin_keeps_only_scheme_and_authority(url, expected):
     assert service_url_origin(url) == expected
@@ -183,6 +184,16 @@ def test_origin_survives_the_upstream_gate_unchanged():
     url = "http://node01:41235/lab?token=abc"
     assert upstream_from_service_url(service_url_origin(url)) == \
         upstream_from_service_url(url) == "node01:41235"
+
+
+def test_origin_never_stores_userinfo():
+    """The stored origin must never carry the credential, even though the
+    upstream gate would discard it anyway -- nothing should be trusted to
+    keep a secret out of the database except this function."""
+    origin = service_url_origin("http://classroom:sometoken@node01:41235/")
+    assert origin == "http://node01:41235"
+    assert "classroom" not in origin and "sometoken" not in origin
+    assert upstream_from_service_url(origin) == "node01:41235"
 
 
 def test_origin_of_a_header_injection_attempt_is_still_refused():
