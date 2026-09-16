@@ -23,8 +23,6 @@ import { getPreferredPathForDisplay } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { useCartContext } from '@/contexts/CartContext';
-import { areZarrMetadataFilesPresent } from '@/queries/zarrQueries';
-import { detectN5 } from '@/queries/n5Queries';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useTicketContext } from '@/contexts/TicketsContext';
 import { useProxiedPathContext } from '@/contexts/ProxiedPathContext';
@@ -112,17 +110,10 @@ export default function PropertiesDrawer({
   const { addToCart } = useCartContext();
 
   // "Add current dataset" adds the directory being browsed to the Layer Cart
-  // (the row-menu action only covers subdirectories). Enabled only for
-  // OME-Zarr / N5 datasets, the same paths Neuroglancer can open.
+  // (the row-menu action only covers subdirectories). Any directory can be
+  // added; the cart row's status icon says whether it will load as a layer.
   const currentFsp = fileQuery.data?.currentFileSharePath;
   const currentItem = fileQuery.data?.currentFileOrFolder;
-  const currentDirName = currentItem?.name ?? '';
-  const currentDirIsDataset =
-    Boolean(currentFsp && currentItem?.is_dir) &&
-    (areZarrMetadataFilesPresent(fileQuery.data?.files ?? []) ||
-      detectN5(fileQuery.data?.files ?? []) ||
-      currentDirName.endsWith('.zarr') ||
-      currentDirName.endsWith('.n5'));
 
   const handleAddCurrentDirToCart = async () => {
     if (!currentFsp || !currentItem) {
@@ -180,7 +171,7 @@ export default function PropertiesDrawer({
               <FgButton
                 className="!py-1 !px-2 text-xs shrink-0"
                 color="secondary"
-                disabled={!currentDirIsDataset}
+                disabled={!currentFsp || !currentItem?.is_dir}
                 onClick={() => void handleAddCurrentDirToCart()}
                 variant="solid"
               >
