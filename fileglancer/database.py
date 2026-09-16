@@ -1085,17 +1085,21 @@ def delete_view(session: Session, username: str, short_key: str) -> int:
 
 
 def get_views_for_data_link(session: Session, data_link_id: int, owner: Optional[str] = None) -> List[ViewDB]:
-    """Distinct Views that have at least one layer backed by this Data Link.
+    """Views that have at least one layer backed by this Data Link.
     If `owner` is given, restrict to Views owned by that user (used to avoid
-    disclosing other users' Views when guarding a Data Link deletion)."""
-    query = (
-        session.query(ViewDB)
-        .join(ViewLayerDB, ViewLayerDB.view_id == ViewDB.id)
+    disclosing other users' Views when guarding a Data Link deletion).
+
+    Uses an IN-subquery instead of JOIN + DISTINCT: Postgres cannot DISTINCT
+    over the `json` column `views.ng_state` ("could not identify an equality
+    operator for type json"), and IN de-duplicates by construction."""
+    layer_view_ids = (
+        session.query(ViewLayerDB.view_id)
         .filter(ViewLayerDB.data_link_id == data_link_id)
     )
+    query = session.query(ViewDB).filter(ViewDB.id.in_(layer_view_ids))
     if owner is not None:
         query = query.filter(ViewDB.owner == owner)
-    return query.distinct().all()
+    return query.all()
 
 
 def mark_view_layers_broken(session: Session, data_link_id: int) -> int:
