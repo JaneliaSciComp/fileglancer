@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import type { ReactNode } from 'react';
+import toast from 'react-hot-toast';
 
 const { useViewStateByReadKey } = vi.hoisted(() => ({
   useViewStateByReadKey: vi.fn()
@@ -101,7 +102,7 @@ describe('NeuroglancerView', () => {
     expect(screen.getAllByText('Untitled View').length).toBeGreaterThan(0);
   });
 
-  it('copies the canonical short link (not the external URL) when "Copy link" is clicked', async () => {
+  it('copies the canonical short link (not the external URL) when "Copy link to share" is clicked', async () => {
     const user = userEvent.setup();
     useViewStateByReadKey.mockReturnValue({
       data: { title: 'My View', layers: [{ name: 'L0' }] },
@@ -109,12 +110,15 @@ describe('NeuroglancerView', () => {
       isError: false
     });
     render(<NeuroglancerView />);
-    await user.click(screen.getByRole('button', { name: /copy link/i }));
+    await user.click(
+      screen.getByRole('button', { name: 'Copy link to share' })
+    );
     expect(copyToClipboard).toHaveBeenCalledWith(
       `${window.location.origin}/view/rk1`
     );
     expect(copyToClipboard).not.toHaveBeenCalledWith(
       expect.stringContaining('https://ng.example/')
     );
+    expect(toast.success).toHaveBeenCalledWith('View link copied');
   });
 });
