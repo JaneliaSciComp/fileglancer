@@ -57,19 +57,19 @@ export function ActionsCell({
   // viewer instead of opening the external Neuroglancer URL.
   const menuItems: MenuItem<ViewRowActionProps>[] = [
     {
-      name: 'Open in Neuroglancer',
+      name: 'Open View',
       action: ({ item }) => {
         navigate(`/view/${item.read_key}`);
       }
     },
     {
-      name: 'Copy Neuroglancer link',
+      name: 'Copy View link to share',
       action: async ({ item, baseUrl }) => {
         const result = await copyToClipboard(
           constructNeuroglancerUrl(item.ng_state, baseUrl)
         );
         if (result.success) {
-          toast.success('Neuroglancer link copied');
+          toast.success('View link copied');
         } else {
           toast.error(`Failed to copy: ${result.error}`);
         }
