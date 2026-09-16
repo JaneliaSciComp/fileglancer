@@ -10,6 +10,7 @@ import FileBrowser from '@/components/ui/BrowsePage/FileBrowser';
 import type { FileOrFolder } from '@/shared.types';
 
 const addToCart = vi.fn();
+const openDrawer = vi.fn();
 
 vi.mock('@/contexts/CartContext', async importOriginal => {
   const actual =
@@ -26,21 +27,11 @@ vi.mock('@/contexts/CartContext', async importOriginal => {
   };
 });
 
-// FileBrowser also renders a "View in Neuroglancer" item that depends on
-// useCreateViewFlow, which in turn needs a ViewsProvider this test's render
-// tree doesn't set up. This suite only cares about the cart item, so stub
-// the hook rather than wiring up ViewsProvider.
-vi.mock('@/hooks/useCreateViewFlow', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/hooks/useCreateViewFlow')>();
+vi.mock('react-router', async importOriginal => {
+  const actual = await importOriginal<typeof import('react-router')>();
   return {
     ...actual,
-    useCreateViewFlow: () => ({
-      startCreateView: vi.fn(),
-      dialog: null,
-      open: false,
-      pending: false
-    })
+    useOutletContext: () => ({ openDrawer })
   };
 });
 
@@ -84,10 +75,11 @@ function renderFileBrowser() {
   );
 }
 
-describe('FileBrowser row context menu - Add to Neuroglancer cart', () => {
+describe('FileBrowser row context menu - Add to cart', () => {
   beforeEach(() => {
     addToCart.mockClear();
     addToCart.mockResolvedValue(undefined);
+    openDrawer.mockClear();
     vi.mocked(toast.success).mockClear();
     vi.mocked(toast.error).mockClear();
 
@@ -133,15 +125,14 @@ describe('FileBrowser row context menu - Add to Neuroglancer cart', () => {
     const menuButton = await screen.findByText('menu-subfolder');
     await user.click(menuButton);
 
-    const cartItem = await screen.findByText('Add to Neuroglancer cart');
+    const cartItem = await screen.findByText('Add to cart');
     await user.click(cartItem);
 
     expect(addToCart).toHaveBeenCalledWith([
       { fsp_name: 'test_fsp', path: 'my_folder/subfolder', label: 'subfolder' }
     ]);
-    expect(toast.success).toHaveBeenCalledWith(
-      'Added "subfolder" to the Neuroglancer cart'
-    );
+    expect(toast.success).toHaveBeenCalledWith('Added "subfolder" to the cart');
+    expect(openDrawer).toHaveBeenCalledWith('cart');
   });
 
   it('toasts an error and does not toast success when addToCart rejects', async () => {
@@ -152,12 +143,12 @@ describe('FileBrowser row context menu - Add to Neuroglancer cart', () => {
     const menuButton = await screen.findByText('menu-subfolder');
     await user.click(menuButton);
 
-    const cartItem = await screen.findByText('Add to Neuroglancer cart');
+    const cartItem = await screen.findByText('Add to cart');
     await user.click(cartItem);
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
-        'Error adding "subfolder" to the Neuroglancer cart: preference update failed'
+        'Error adding "subfolder" to the cart: preference update failed'
       );
     });
     expect(toast.success).not.toHaveBeenCalled();
@@ -173,9 +164,7 @@ describe('FileBrowser row context menu - Add to Neuroglancer cart', () => {
     await waitFor(() => {
       expect(screen.getByText('Download')).toBeInTheDocument();
     });
-    expect(
-      screen.queryByText('Add to Neuroglancer cart')
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Add to cart')).not.toBeInTheDocument();
     expect(addToCart).not.toHaveBeenCalled();
   });
 
@@ -189,9 +178,17 @@ describe('FileBrowser row context menu - Add to Neuroglancer cart', () => {
     await waitFor(() => {
       expect(screen.getByText('Rename')).toBeInTheDocument();
     });
-    expect(
-      screen.queryByText('Add to Neuroglancer cart')
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Add to cart')).not.toBeInTheDocument();
     expect(addToCart).not.toHaveBeenCalled();
+  });
+
+  it('no longer offers "View in Neuroglancer"', async () => {
+    const user = userEvent.setup();
+    renderFileBrowser();
+
+    const menuButton = await screen.findByText('menu-subfolder');
+    await user.click(menuButton);
+
+    expect(screen.queryByText('View in Neuroglancer')).not.toBeInTheDocument();
   });
 });
