@@ -2,23 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import toast from 'react-hot-toast';
-import type { View } from '@/queries/viewQueries';
 
 const clearChecked = vi.fn();
 const addToCart = vi.fn().mockResolvedValue(undefined);
 const clearCart = vi.fn().mockResolvedValue(undefined);
 const navigate = vi.hoisted(() => vi.fn());
-const createdView: View = vi.hoisted(() => ({
-  short_key: 'v1',
-  read_key: 'rk1',
-  name: 'New View',
-  ng_state: {},
-  sharing_mode: 'read',
-  owner: 'me',
-  created_at: '2026-08-01T00:00:00Z',
-  updated_at: '2026-08-01T00:00:00Z',
-  layers: []
-}));
 
 vi.mock('react-router', () => ({ useNavigate: () => navigate }));
 
@@ -38,14 +26,6 @@ vi.mock('@/contexts/FileBrowserContext', () => ({
 
 vi.mock('@/contexts/CartContext', () => ({
   useCartContext: () => ({ addToCart, clearCart })
-}));
-
-vi.mock('@/components/ui/Views/CreateViewButton', () => ({
-  default: ({ onCreated }: { onCreated?: (view: View) => void }) => (
-    <button onClick={() => onCreated?.(createdView)} type="button">
-      New View from selection
-    </button>
-  )
 }));
 
 import SelectionBar from '@/components/ui/BrowsePage/SelectionBar';
@@ -85,26 +65,10 @@ describe('SelectionBar', () => {
     expect(toast.success).not.toHaveBeenCalled();
   });
 
-  it('renders the create-View action wired to the selection', () => {
+  it('does not offer a create-view shortcut; the cart is the only path', () => {
     render(<SelectionBar />);
-    expect(
-      screen.getByRole('button', { name: /new view from selection/i })
-    ).toBeInTheDocument();
-  });
-
-  it('navigates to the embedded viewer when a View is created, without clearing the cart', async () => {
-    const user = userEvent.setup();
-    render(<SelectionBar />);
-
-    await user.click(
-      screen.getByRole('button', { name: /new view from selection/i })
-    );
-
-    expect(navigate).toHaveBeenCalledWith('/view/rk1');
-    // Datasets here come from fileBrowserState.checkedFiles, not the cart -
-    // a View created from a file-browser selection must never wipe an
-    // unrelated Layer Cart.
-    expect(clearCart).not.toHaveBeenCalled();
+    expect(screen.queryByText(/New View/)).not.toBeInTheDocument();
+    expect(screen.getByText('Add 2 to cart')).toBeInTheDocument();
   });
 
   it('clears the selection when Clear is clicked', async () => {
