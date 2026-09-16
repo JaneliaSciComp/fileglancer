@@ -11,7 +11,7 @@ import { default as log } from '@/logger';
 export type DatasetKind = 'ome' | 'array' | 'unsupported';
 export type DatasetProbe =
   | { kind: 'ome'; metadata: Metadata }
-  | { kind: 'array' }
+  | { kind: 'array'; state: string }
   | { kind: 'unsupported'; errors: unknown[] };
 
 // Single source of truth for "what will this dataset become in Neuroglancer":
@@ -21,8 +21,8 @@ export async function probeDataset(url: string): Promise<DatasetProbe> {
     return { kind: 'ome', metadata: await getOmeZarrMetadata(url) };
   } catch (omeError) {
     try {
-      await generateStateForPlainZarr(url);
-      return { kind: 'array' };
+      const state = await generateStateForPlainZarr(url);
+      return { kind: 'array', state };
     } catch (plainError) {
       return { kind: 'unsupported', errors: [omeError, plainError] };
     }
@@ -65,26 +65,31 @@ async function generateStateForDataset(
     );
     return null;
   }
-  if (probe.kind === 'array') {
-    return decodeState(await generateStateForPlainZarr(ds.url));
+  try {
+    if (probe.kind === 'array') {
+      return decodeState(probe.state);
+    }
+    const { metadata } = probe;
+    const multiscale = metadata.multiscales?.[0];
+    // ponytail: default layerType 'image' — the thumbnail-edge heuristic used
+    // for the single-dir preview needs a rendered thumbnail we don't have here.
+    const encoded = multiscale
+      ? generateNeuroglancerStateForOmeZarr(
+          ds.url,
+          metadata.zarrVersion,
+          'image',
+          multiscale,
+          metadata.arr,
+          metadata.labels,
+          metadata.omero,
+          ds.channel !== undefined
+        )
+      : generateNeuroglancerStateForDataURL(ds.url, metadata.zarrVersion);
+    return decodeState(encoded);
+  } catch (error) {
+    log.error(`Failed to generate Neuroglancer state for ${ds.url}`, error);
+    return null;
   }
-  const { metadata } = probe;
-  const multiscale = metadata.multiscales?.[0];
-  // ponytail: default layerType 'image' — the thumbnail-edge heuristic used
-  // for the single-dir preview needs a rendered thumbnail we don't have here.
-  const encoded = multiscale
-    ? generateNeuroglancerStateForOmeZarr(
-        ds.url,
-        metadata.zarrVersion,
-        'image',
-        multiscale,
-        metadata.arr,
-        metadata.labels,
-        metadata.omero,
-        ds.channel !== undefined
-      )
-    : generateNeuroglancerStateForDataURL(ds.url, metadata.zarrVersion);
-  return decodeState(encoded);
 }
 
 // With a channel selection, checkout forces the per-channel layer path, so

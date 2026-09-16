@@ -13,7 +13,7 @@ export default function SelectionBar() {
   const { fileBrowserState, clearChecked, fileQuery } = useFileBrowserContext();
   const { addToCart } = useCartContext();
   // ponytail: optional — component tests render without a router outlet.
-  const outlet = useOutletContext<OutletContextType | undefined>();
+  const outlet = useOutletContext<OutletContextType | null | undefined>();
 
   const { checkedFiles } = fileBrowserState;
 

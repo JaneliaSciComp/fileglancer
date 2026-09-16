@@ -98,15 +98,17 @@ vi.mock('@/components/ui/Views/CreateViewButton', () => ({
     <button type="button">{label ?? 'Create View'}</button>
   )
 }));
-vi.mock('@/hooks/useCartDimensionCheck', () => ({
-  useCartDimensionCheck: () => ({
+const { useCartDimensionCheck } = vi.hoisted(() => ({
+  useCartDimensionCheck: vi.fn(() => ({
     mismatchedKeys: new Set(),
     hasMismatch: false,
     kindByKey: new Map()
-  })
+  }))
 }));
+vi.mock('@/hooks/useCartDimensionCheck', () => ({ useCartDimensionCheck }));
 
 import CartList from '@/components/ui/Views/CartList';
+import { datasetKey } from '@/utils/pathHandling';
 
 beforeEach(() => {
   addToCart.mockClear();
@@ -253,6 +255,28 @@ describe('Layer Cart tab', () => {
     ]);
     // The bug being regression-tested: no per-item loop calling single-remove.
     expect(removeFromCart).not.toHaveBeenCalled();
+  });
+
+  it('shows the real per-dataset layer-status indicator for ome and unsupported kinds', async () => {
+    useCartDimensionCheck.mockReturnValueOnce({
+      mismatchedKeys: new Set(),
+      hasMismatch: false,
+      kindByKey: new Map([
+        [datasetKey('fsp1', '/a'), 'ome'],
+        [datasetKey('fsp2', '/b'), 'unsupported']
+      ])
+    });
+    await renderCartTab();
+    expect(
+      screen.getByLabelText('Will load as a Neuroglancer layer', {
+        selector: 'span'
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Will not load as a Neuroglancer layer', {
+        selector: 'span'
+      })
+    ).toBeInTheDocument();
   });
 
   it('shows the Create View control and a Clear cart button', async () => {
