@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { useQueries } from '@tanstack/react-query';
-import { getOmeZarrMetadata } from '@/omezarr-helper';
-import type { Metadata } from '@/omezarr-helper';
 import { datasetKey, getFileURL } from '@/utils/pathHandling';
+import { probeDataset } from '@/utils/viewCheckout';
+import type { DatasetKind, DatasetProbe } from '@/utils/viewCheckout';
 import {
   getDimensionSignature,
   signaturesMatch
@@ -12,6 +12,7 @@ import type { CartItem } from '@/contexts/CartContext';
 export type CartDimensionCheck = {
   mismatchedKeys: Set<string>;
   hasMismatch: boolean;
+  kindByKey: Map<string, DatasetKind | 'loading'>;
 };
 
 // One entry per unique dataset, preserving first-added order (order[0] is the
@@ -34,24 +35,27 @@ export function useCartDimensionCheck(items: CartItem[]): CartDimensionCheck {
 
   const results = useQueries({
     queries: datasets.map(ds => ({
-      queryKey: ['zarr', 'dims', ds.fsp_name, ds.path],
-      queryFn: async (): Promise<Metadata> =>
-        getOmeZarrMetadata(getFileURL(ds.fsp_name, ds.path)),
+      queryKey: ['zarr', 'probe', ds.fsp_name, ds.path],
+      queryFn: (): Promise<DatasetProbe> =>
+        probeDataset(getFileURL(ds.fsp_name, ds.path)),
       staleTime: 5 * 60 * 1000,
       retry: false
     }))
   });
 
   // useQueries returns fresh array refs each render; key the memo on which
-  // datasets have resolved data so it recomputes as metadata lands.
-  const resolvedKey = results.map(r => (r.data ? 1 : 0)).join(',');
+  // datasets have resolved so it recomputes as probes land.
+  const resolvedKey = results.map(r => r.data?.kind ?? '-').join(',');
 
   return useMemo(() => {
-    // Signature per dataset, or null when loading/errored/no-multiscale.
-    // Fail open: a null signature never produces a warning.
-    const signatures = datasets.map((_, i) => {
-      const data = results[i]?.data;
-      return data ? getDimensionSignature(data) : null;
+    const kindByKey = new Map<string, DatasetKind | 'loading'>();
+    const signatures = datasets.map((ds, i) => {
+      const probe = results[i]?.data;
+      kindByKey.set(ds.key, probe?.kind ?? 'loading');
+      // Fail open: only OME datasets have a signature; null never warns.
+      return probe?.kind === 'ome'
+        ? getDimensionSignature(probe.metadata)
+        : null;
     });
 
     const reference = signatures[0];
@@ -64,7 +68,7 @@ export function useCartDimensionCheck(items: CartItem[]): CartDimensionCheck {
         }
       }
     }
-    return { mismatchedKeys, hasMismatch: mismatchedKeys.size > 0 };
+    return { mismatchedKeys, hasMismatch: mismatchedKeys.size > 0, kindByKey };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datasets, resolvedKey]);
 }

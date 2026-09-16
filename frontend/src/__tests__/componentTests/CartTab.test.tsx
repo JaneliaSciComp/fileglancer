@@ -101,7 +101,8 @@ vi.mock('@/components/ui/Views/CreateViewButton', () => ({
 vi.mock('@/hooks/useCartDimensionCheck', () => ({
   useCartDimensionCheck: () => ({
     mismatchedKeys: new Set(),
-    hasMismatch: false
+    hasMismatch: false,
+    kindByKey: new Map()
   })
 }));
 

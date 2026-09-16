@@ -4,8 +4,30 @@ import {
   generateNeuroglancerStateForDataURL,
   generateStateForPlainZarr
 } from '@/omezarr-helper';
+import type { Metadata } from '@/omezarr-helper';
 import type { ViewLayerInput } from '@/queries/viewQueries';
 import { default as log } from '@/logger';
+
+export type DatasetKind = 'ome' | 'array' | 'unsupported';
+export type DatasetProbe =
+  | { kind: 'ome'; metadata: Metadata }
+  | { kind: 'array' }
+  | { kind: 'unsupported' };
+
+// Single source of truth for "what will this dataset become in Neuroglancer":
+// the cart indicator and checkout both call this, so they cannot disagree.
+export async function probeDataset(url: string): Promise<DatasetProbe> {
+  try {
+    return { kind: 'ome', metadata: await getOmeZarrMetadata(url) };
+  } catch {
+    try {
+      await generateStateForPlainZarr(url);
+      return { kind: 'array' };
+    } catch {
+      return { kind: 'unsupported' };
+    }
+  }
+}
 
 export type ResolvedCheckoutDataset = {
   url: string;
@@ -35,40 +57,31 @@ function decodeState(encoded: string | null): NgState | null {
 async function generateStateForDataset(
   ds: ResolvedCheckoutDataset
 ): Promise<NgState | null> {
-  try {
-    const metadata = await getOmeZarrMetadata(ds.url);
-    const multiscale = metadata.multiscales?.[0];
-    // ponytail: default layerType 'image' — the thumbnail-edge heuristic used
-    // for the single-dir preview needs a rendered thumbnail we don't have here.
-    const encoded = multiscale
-      ? generateNeuroglancerStateForOmeZarr(
-          ds.url,
-          metadata.zarrVersion,
-          'image',
-          multiscale,
-          metadata.arr,
-          metadata.labels,
-          metadata.omero,
-          ds.channel !== undefined
-        )
-      : generateNeuroglancerStateForDataURL(ds.url, metadata.zarrVersion);
-    return decodeState(encoded);
-  } catch (omeError) {
-    // Not an OME-Zarr multiscale group. Try it as a plain Zarr array before
-    // giving up, so a manually-added array directory still becomes one layer.
-    try {
-      return decodeState(await generateStateForPlainZarr(ds.url));
-    } catch (plainError) {
-      // Genuinely broken (moved/deleted, not a Zarr array) — skip this one
-      // cart entry, keep the rest.
-      log.error(
-        `Failed to generate Neuroglancer state for ${ds.url}`,
-        omeError,
-        plainError
-      );
-      return null;
-    }
+  const probe = await probeDataset(ds.url);
+  if (probe.kind === 'unsupported') {
+    log.error(`Not a Zarr dataset, skipping cart entry: ${ds.url}`);
+    return null;
   }
+  if (probe.kind === 'array') {
+    return decodeState(await generateStateForPlainZarr(ds.url));
+  }
+  const { metadata } = probe;
+  const multiscale = metadata.multiscales?.[0];
+  // ponytail: default layerType 'image' — the thumbnail-edge heuristic used
+  // for the single-dir preview needs a rendered thumbnail we don't have here.
+  const encoded = multiscale
+    ? generateNeuroglancerStateForOmeZarr(
+        ds.url,
+        metadata.zarrVersion,
+        'image',
+        multiscale,
+        metadata.arr,
+        metadata.labels,
+        metadata.omero,
+        ds.channel !== undefined
+      )
+    : generateNeuroglancerStateForDataURL(ds.url, metadata.zarrVersion);
+  return decodeState(encoded);
 }
 
 // With a channel selection, checkout forces the per-channel layer path, so
