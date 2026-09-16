@@ -1,17 +1,22 @@
-import { describe, test, expect, vi } from 'vitest';
+import { describe, test, it, expect, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, renderHook, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 
 import FileglancerNavbar from '@/components/ui/Navbar/Navbar';
+import type { CartItem } from '@/queries/preferencesQueries';
 
 vi.mock('@/hooks/useActiveJobCount', () => ({
   useActiveJobCount: vi.fn(() => 0)
 }));
 
-vi.mock('@/hooks/useCartCount', () => ({
-  useCartCount: () => 0
+let cartData: CartItem[] = [];
+
+vi.mock('@/contexts/PreferencesContext', () => ({
+  usePreferencesContext: () => ({
+    preferenceQuery: { data: { neuroglancerCart: cartData } }
+  })
 }));
 
 vi.mock('@/utils/fathom', () => ({
@@ -27,6 +32,7 @@ vi.mock('@/components/ui/widgets/FgTooltip', () => ({
 }));
 
 import { useActiveJobCount } from '@/hooks/useActiveJobCount';
+import { useCartCount } from '@/hooks/useCartCount';
 
 const mockedUseActiveJobCount = vi.mocked(useActiveJobCount);
 
@@ -72,5 +78,32 @@ describe('Navbar badge', () => {
     renderNavbar();
 
     expect(screen.getByText('9+')).toBeInTheDocument();
+  });
+});
+
+describe('useCartCount', () => {
+  it('counts datasets, not channel entries', () => {
+    cartData = [
+      { fsp_name: 'f', path: '/a.zarr', label: 'a' },
+      {
+        fsp_name: 'f',
+        path: '/a.zarr',
+        label: 'DAPI',
+        channel: 'DAPI',
+        channelIndex: 0
+      },
+      {
+        fsp_name: 'f',
+        path: '/a.zarr',
+        label: 'GFP',
+        channel: 'GFP',
+        channelIndex: 1
+      },
+      { fsp_name: 'f', path: '/b.zarr', label: 'b' }
+    ];
+
+    const { result } = renderHook(() => useCartCount());
+
+    expect(result.current).toBe(2);
   });
 });
