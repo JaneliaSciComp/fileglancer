@@ -44,10 +44,7 @@ vi.mock('@/components/ui/Views/CartDatasetRow', () => ({
         <span aria-label="Will load as a Neuroglancer layer" role="img" />
       ) : null}
       {kind === 'unsupported' ? (
-        <span
-          aria-label="Will not load as a Neuroglancer layer"
-          role="img"
-        />
+        <span aria-label="Will not load as a Neuroglancer layer" role="img" />
       ) : null}
     </div>
   )
@@ -149,5 +146,20 @@ describe('CartList', () => {
     expect(
       screen.getByLabelText('Will not load as a Neuroglancer layer')
     ).toBeInTheDocument();
+  });
+
+  it('shows no layer-status indicator while a dataset is still loading', () => {
+    mockDimensionCheck({
+      mismatchedKeys: new Set(),
+      hasMismatch: false,
+      kindByKey: new Map() // no entry for cartA's dataset key: still loading
+    });
+    renderCart([cartA]);
+    expect(
+      screen.queryByLabelText('Will load as a Neuroglancer layer')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Will not load as a Neuroglancer layer')
+    ).not.toBeInTheDocument();
   });
 });
