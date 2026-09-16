@@ -10,7 +10,7 @@ import {
   HiOutlineArrowsExpand
 } from 'react-icons/hi';
 
-import { useViewStateByReadKey, useViewsQuery } from '@/queries/viewQueries';
+import { useViewStateByReadKey } from '@/queries/viewQueries';
 import { useViewsContext } from '@/contexts/ViewsContext';
 import { useInternalNeuroglancerBaseUrl } from '@/hooks/useDefaultNeuroglancerBaseUrl';
 import { constructNeuroglancerUrl } from '@/utils/neuroglancerUrl';
@@ -50,9 +50,8 @@ export default function NeuroglancerView() {
   // The public read_key endpoint returns only ng_state. Ownership, name and
   // short_key come from the owner's own Views list (cached app-wide); a miss
   // means "not mine" and the title renders read-only.
-  const viewsQuery = useViewsQuery();
-  const ownedView = viewsQuery.data?.find(v => v.read_key === readKey);
-  const { updateViewMutation } = useViewsContext();
+  const { allViewsQuery, updateViewMutation } = useViewsContext();
+  const ownedView = allViewsQuery.data?.find(v => v.read_key === readKey);
   const baseUrl = useInternalNeuroglancerBaseUrl();
   const containerRef = useRef<HTMLDivElement>(null);
   const ngState = stateQuery.data;
@@ -126,7 +125,7 @@ export default function NeuroglancerView() {
             <Typography>/</Typography>
             {ownedView ? (
               <InlineNameEditor
-                className="text-foreground truncate"
+                className="truncate"
                 label="view name"
                 onSave={async name => {
                   try {

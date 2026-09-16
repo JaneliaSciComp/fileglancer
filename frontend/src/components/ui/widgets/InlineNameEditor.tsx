@@ -106,6 +106,7 @@ export default function InlineNameEditor({
         <IconButton
           aria-label="Cancel rename"
           className="text-foreground hover:text-primary flex-shrink-0"
+          disabled={saving}
           onClick={() => setEditing(false)}
           size="sm"
           variant="ghost"

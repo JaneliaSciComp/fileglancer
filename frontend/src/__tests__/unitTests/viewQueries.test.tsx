@@ -13,7 +13,11 @@ vi.mock('@/utils', () => ({
   buildUrl: (...args: Parameters<typeof buildUrl>) => buildUrl(...args)
 }));
 
-import { useViewsQuery, viewQueryKeys } from '@/queries/viewQueries';
+import {
+  useViewsQuery,
+  useUpdateViewMutation,
+  viewQueryKeys
+} from '@/queries/viewQueries';
 
 function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({
@@ -60,5 +64,58 @@ describe('viewQueries', () => {
     const { result } = renderHook(() => useViewsQuery(), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual([]);
+  });
+
+  describe('useUpdateViewMutation invalidation', () => {
+    // A name-only rename must not invalidate the state query: the embedded
+    // viewer's active viewQueryKeys.state(readKey) query would refetch,
+    // changing the iframe src and reloading Neuroglancer.
+    it('invalidates only the list on a name-only rename', async () => {
+      sendFetchRequest.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ short_key: 'k1', read_key: 'r1', name: 'New' })
+      });
+      const client = new QueryClient({
+        defaultOptions: { queries: { retry: false } }
+      });
+      const invalidateQueries = vi.spyOn(client, 'invalidateQueries');
+      const { result } = renderHook(() => useUpdateViewMutation(), {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        )
+      });
+      await result.current.mutateAsync({ short_key: 'k1', name: 'New' });
+      expect(invalidateQueries).toHaveBeenCalledWith({
+        queryKey: viewQueryKeys.list()
+      });
+      expect(invalidateQueries).not.toHaveBeenCalledWith({
+        queryKey: viewQueryKeys.state('r1')
+      });
+    });
+
+    it('also invalidates the state query when ng_state changes', async () => {
+      sendFetchRequest.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ short_key: 'k1', read_key: 'r1', name: 'New' })
+      });
+      const client = new QueryClient({
+        defaultOptions: { queries: { retry: false } }
+      });
+      const invalidateQueries = vi.spyOn(client, 'invalidateQueries');
+      const { result } = renderHook(() => useUpdateViewMutation(), {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        )
+      });
+      await result.current.mutateAsync({ short_key: 'k1', ng_state: {} });
+      expect(invalidateQueries).toHaveBeenCalledWith({
+        queryKey: viewQueryKeys.list()
+      });
+      expect(invalidateQueries).toHaveBeenCalledWith({
+        queryKey: viewQueryKeys.state('r1')
+      });
+    });
   });
 });
