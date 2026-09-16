@@ -6,7 +6,7 @@ import {
   HiOutlineCheckCircle,
   HiOutlineTrash
 } from 'react-icons/hi';
-import { HiExclamationTriangle, HiOutlineXCircle } from 'react-icons/hi2';
+import { HiExclamationTriangle } from 'react-icons/hi2';
 import toast from 'react-hot-toast';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
@@ -49,8 +49,8 @@ const LAYER_STATUS = {
     label: 'Will load as a Neuroglancer layer'
   },
   unsupported: {
-    icon: HiOutlineXCircle,
-    color: 'error',
+    icon: HiExclamationTriangle,
+    color: 'warning',
     label: 'Will not load as a Neuroglancer layer'
   }
 } as const;

@@ -14,6 +14,7 @@ import {
   makeMapKey
 } from '@/utils';
 import { datasetKey } from '@/utils/pathHandling';
+import { isUnsupportedLayer } from '@/utils/viewCheckout';
 import { constructNeuroglancerUrl } from '@/utils/neuroglancerUrl';
 import { copyToClipboard } from '@/utils/copyText';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
@@ -24,6 +25,7 @@ import CardActionsMenu from '@/components/ui/Menus/CardActionsMenu';
 import type { MenuItem } from '@/components/ui/Menus/FgMenuItems';
 import type { FileSharePath } from '@/shared.types';
 import { MdLinkOff } from 'react-icons/md';
+import { HiExclamationTriangle } from 'react-icons/hi2';
 
 const TRIGGER_CLASSES = 'h-min max-w-full';
 
@@ -199,7 +201,8 @@ export function useNGViewsColumns(
       {
         id: 'layers',
         header: 'Layers',
-        accessorFn: row => row.layers.length,
+        accessorFn: row =>
+          row.layers.filter(layer => !isUnsupportedLayer(layer)).length,
         cell: ({ getValue }) => (
           <div className="flex items-center justify-start h-full text-left">
             <Typography className="text-foreground text-left" variant="small">
@@ -222,10 +225,16 @@ export function useNGViewsColumns(
         ),
         cell: ({ row }) => {
           // De-dupe: per-channel layers of one dataset share a source path.
-          // A source is broken if any of its layers lost its Data Link.
+          // A source is broken if any of its layers lost its Data Link, and
+          // unsupported if every layer of it produced no Neuroglancer layer.
           const bySource = new Map<
             string,
-            { fsp_name: string; path: string; broken: boolean }
+            {
+              fsp_name: string;
+              path: string;
+              broken: boolean;
+              unsupported: boolean;
+            }
           >();
           for (const layer of row.original.layers) {
             if (layer.fsp_name === null || layer.path === null) {
@@ -233,13 +242,16 @@ export function useNGViewsColumns(
             }
             const key = datasetKey(layer.fsp_name, layer.path);
             const existing = bySource.get(key);
+            const unsupported = isUnsupportedLayer(layer);
             if (existing) {
               existing.broken = existing.broken || layer.broken;
+              existing.unsupported = existing.unsupported && unsupported;
             } else {
               bySource.set(key, {
                 fsp_name: layer.fsp_name,
                 path: layer.path,
-                broken: layer.broken
+                broken: layer.broken,
+                unsupported
               });
             }
           }
@@ -276,6 +288,15 @@ export function useNGViewsColumns(
                           color="error"
                           icon={MdLinkOff}
                           label="Data link missing"
+                          size="sm"
+                        />
+                      </FgTooltip>
+                    ) : src.unsupported ? (
+                      <FgTooltip label="Will not load as a Neuroglancer layer">
+                        <FgIcon
+                          color="warning"
+                          icon={HiExclamationTriangle}
+                          label="Will not load as a Neuroglancer layer"
                           size="sm"
                         />
                       </FgTooltip>
