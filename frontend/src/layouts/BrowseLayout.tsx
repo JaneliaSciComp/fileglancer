@@ -21,6 +21,7 @@ export type OutletContextType = {
   showConvertFileDialog: boolean;
   propertiesDrawerMode: 'properties' | 'cart';
   selectDrawerMode: (mode: 'properties' | 'cart') => void;
+  openDrawer: (mode: 'properties' | 'cart') => void;
 };
 
 export const BrowsePageLayout = () => {
@@ -35,7 +36,8 @@ export const BrowsePageLayout = () => {
     showSidebar,
     toggleSidebar,
     propertiesDrawerMode,
-    selectDrawerMode
+    selectDrawerMode,
+    openDrawer
   } = useLayoutPrefs();
 
   const outletContextValue: OutletContextType = {
@@ -48,7 +50,8 @@ export const BrowsePageLayout = () => {
     showSidebar: showSidebar,
     showConvertFileDialog: showConvertFileDialog,
     propertiesDrawerMode: propertiesDrawerMode,
-    selectDrawerMode: selectDrawerMode
+    selectDrawerMode: selectDrawerMode,
+    openDrawer: openDrawer
   };
 
   return (
