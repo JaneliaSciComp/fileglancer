@@ -1,7 +1,7 @@
 import { Button } from '@material-tailwind/react';
 import type { ButtonProps } from '@material-tailwind/react';
 import { useNavigate } from 'react-router';
-import { useShepherd } from 'react-shepherd';
+import Shepherd from 'shepherd.js';
 import type { Tour } from 'shepherd.js';
 import { tourSteps, backButton, exitButton } from './tourSteps';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
@@ -33,7 +33,6 @@ export default function StartTour({
   ...buttonProps
 }: StartTourProps) {
   const navigate = useNavigate();
-  const shepherd = useShepherd();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
 
   // Check if running on Janelia filesystem
@@ -205,7 +204,7 @@ export default function StartTour({
           {
             text: 'Take Another Tour',
             action: function (this: any) {
-              const currentTour = shepherd.activeTour as Tour;
+              const currentTour = Shepherd.activeTour as Tour;
               // Re-setup workflow buttons to ensure they work when returning
               setupWorkflowButtons(currentTour);
               // Show the workflow selection step
@@ -231,7 +230,7 @@ export default function StartTour({
       {
         text: 'Navigation',
         action: async function (this: any) {
-          const currentTour = shepherd.activeTour as Tour;
+          const currentTour = Shepherd.activeTour as Tour;
           navigate('/browse');
           await waitForElement('[data-tour="navigation-input"]');
           setupNavigationInputStep(currentTour);
@@ -243,7 +242,7 @@ export default function StartTour({
       {
         text: 'Data Links',
         action: async function (this: any) {
-          const currentTour = shepherd.activeTour as Tour;
+          const currentTour = Shepherd.activeTour as Tour;
           if (isJaneliaFilesystem) {
             navigate(
               '/browse/nrs_opendata/ome-zarr-examples/fused-timeseries.zarr'
@@ -271,7 +270,7 @@ export default function StartTour({
     workflowButtons.push({
       text: 'Neuroglancer Links',
       action: async function (this: any) {
-        const currentTour = shepherd.activeTour as Tour;
+        const currentTour = Shepherd.activeTour as Tour;
         navigate('/nglinks');
         await waitForElement('[data-tour="nglinks-page"]');
         setupCompletionButtons(currentTour);
@@ -284,7 +283,7 @@ export default function StartTour({
       workflowButtons.push({
         text: 'File Conversion',
         action: async function (this: any) {
-          const currentTour = shepherd.activeTour as Tour;
+          const currentTour = Shepherd.activeTour as Tour;
           if (isJaneliaFilesystem) {
             navigate(
               '/browse/nrs_opendata/ome-zarr-examples/fused-timeseries.zarr'
@@ -310,7 +309,7 @@ export default function StartTour({
     workflowButtons.push({
       text: 'Exit',
       action: function (this: any) {
-        const currentTour = shepherd.activeTour as Tour;
+        const currentTour = Shepherd.activeTour as Tour;
         currentTour.cancel();
       },
       classes: 'shepherd-button-secondary'
@@ -321,9 +320,9 @@ export default function StartTour({
 
   const handleStartTour = () => {
     // Get or create the tour instance
-    let tour = shepherd.activeTour as Tour | undefined;
+    let tour = Shepherd.activeTour as Tour | undefined;
     if (!tour) {
-      tour = new shepherd.Tour({
+      tour = new Shepherd.Tour({
         useModalOverlay: true,
         defaultStepOptions: {
           classes: 'shepherd-theme-default',
@@ -335,7 +334,7 @@ export default function StartTour({
           modalOverlayOpeningRadius: 4
         }
       });
-      shepherd.activeTour = tour;
+      Shepherd.activeTour = tour;
     }
 
     // Add steps if not already added
