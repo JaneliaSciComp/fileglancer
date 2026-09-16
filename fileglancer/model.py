@@ -180,6 +180,14 @@ class ViewLayer(BaseModel):
     )
     channel: Optional[str] = Field(default=None, description="Channel identifier, if this layer is one channel")
     opts: Optional[Dict] = Field(default=None, description="Per-layer options")
+    fsp_name: Optional[str] = Field(
+        default=None,
+        description="File share path name of this layer's source; kept when the Data Link is deleted",
+    )
+    path: Optional[str] = Field(
+        default=None,
+        description="Path (relative to the FSP mount) of this layer's source; kept when the Data Link is deleted",
+    )
     broken: bool = Field(default=False, description="True if the backing Data Link was deleted")
 
 

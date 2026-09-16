@@ -165,6 +165,10 @@ class ViewLayerDB(Base):
     layer_index = Column(Integer, nullable=False)
     channel = Column(String, nullable=True)
     opts = Column(JSON, nullable=True)
+    # Source of this layer, kept even after the Data Link is deleted so a
+    # broken View can be shown (and later restored) by path.
+    fsp_name = Column(String, nullable=True)
+    path = Column(String, nullable=True)
     broken = Column(Boolean, nullable=False, server_default=sa_false())
 
     view = relationship('ViewDB', back_populates='layers')
@@ -1008,7 +1012,7 @@ def create_view(
 ) -> ViewDB:
     """Create a View plus its ViewLayer rows. Returns the persisted ViewDB.
 
-    Each layer dict: {data_link_id, layer_index, channel, opts}.
+    Each layer dict: {data_link_id, layer_index, channel, opts, fsp_name, path}.
     """
     now = datetime.now(UTC)
     view = ViewDB(
@@ -1028,6 +1032,8 @@ def create_view(
             layer_index=layer['layer_index'],
             channel=layer.get('channel'),
             opts=layer.get('opts'),
+            fsp_name=layer.get('fsp_name'),
+            path=layer.get('path'),
         ))
     session.add(view)
     session.commit()
