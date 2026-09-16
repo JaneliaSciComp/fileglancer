@@ -256,6 +256,44 @@ describe('useNGViewsColumns', () => {
     expect(screen.getByLabelText('Data link missing')).toBeInTheDocument();
   });
 
+  it('lists an unsupported source with a warning icon and excludes it from the layer count', () => {
+    const unsupportedView: View = {
+      ...view,
+      layers: [
+        view.layers[0],
+        {
+          layer_index: 1,
+          data_link_id: 2,
+          channel: null,
+          opts: { unsupported: true },
+          broken: false,
+          fsp_name: 'nrs',
+          path: 'dudman/plain-dir'
+        }
+      ]
+    };
+    render(
+      <MemoryRouter>
+        <TableProbe
+          onDelete={vi.fn()}
+          onRename={vi.fn()}
+          view={unsupportedView}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('1')).toBeInTheDocument(); // layer count
+    expect(screen.getByRole('link', { name: /plain-dir/ })).toBeInTheDocument();
+    // FgTooltip repeats the label on its trigger; target the icon span.
+    expect(
+      screen.getByLabelText('Will not load as a Neuroglancer layer', {
+        selector: 'span'
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Data link missing')
+    ).not.toBeInTheDocument();
+  });
+
   it('fires onRename and onDelete from the actions menu', async () => {
     const user = userEvent.setup();
     const onRename = vi.fn();

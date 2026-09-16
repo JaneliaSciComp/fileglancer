@@ -5,10 +5,17 @@ import {
   generateStateForPlainZarr
 } from '@/omezarr-helper';
 import type { Metadata } from '@/omezarr-helper';
-import type { ViewLayerInput } from '@/queries/viewQueries';
+import type { ViewLayer, ViewLayerInput } from '@/queries/viewQueries';
 import { default as log } from '@/logger';
 
 export type DatasetKind = 'ome' | 'array' | 'unsupported';
+
+// A dataset that produced no Neuroglancer layer is still recorded as a
+// ViewLayer (so the Views table can list it as a source), flagged via opts.
+export const UNSUPPORTED_LAYER_OPTS = { unsupported: true } as const;
+export function isUnsupportedLayer(layer: Pick<ViewLayer, 'opts'>): boolean {
+  return layer.opts?.unsupported === true;
+}
 export type DatasetProbe =
   | { kind: 'ome'; metadata: Metadata }
   | { kind: 'array'; state: string }
@@ -114,11 +121,13 @@ export async function buildViewState(
 ): Promise<{ ng_state: Record<string, unknown>; layers: ViewLayerInput[] }> {
   const combinedLayers: NgLayer[] = [];
   const viewLayers: ViewLayerInput[] = [];
+  const unsupported: ResolvedCheckoutDataset[] = [];
   let base: NgState | null = null;
 
   for (const ds of datasets) {
     const state = await generateStateForDataset(ds);
     if (!state) {
+      unsupported.push(ds);
       continue;
     }
     if (!base) {
@@ -134,6 +143,17 @@ export async function buildViewState(
         opts: null
       });
     }
+  }
+
+  // Unsupported datasets get indices past the real layers: unique, and they
+  // never point into ng_state.layers.
+  for (const ds of unsupported) {
+    viewLayers.push({
+      sharing_key: ds.sharing_key,
+      layer_index: viewLayers.length,
+      channel: ds.channel ?? null,
+      opts: { ...UNSUPPORTED_LAYER_OPTS }
+    });
   }
 
   const first = combinedLayers[0];
