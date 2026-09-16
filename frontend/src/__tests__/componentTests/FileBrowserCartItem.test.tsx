@@ -152,6 +152,7 @@ describe('FileBrowser row context menu - Add to cart', () => {
       );
     });
     expect(toast.success).not.toHaveBeenCalled();
+    expect(openDrawer).not.toHaveBeenCalled();
   });
 
   it('does not show the item for a plain file', async () => {

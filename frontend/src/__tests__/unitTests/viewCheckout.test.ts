@@ -107,6 +107,23 @@ describe('buildViewState', () => {
     ]);
   });
 
+  it('skips a dataset whose OME generation throws after a successful probe', async () => {
+    // The probe succeeds (OME metadata loads), but state generation itself
+    // throws (e.g. a malformed multiscale) — that dataset should be skipped,
+    // not abort the whole checkout.
+    (generateNeuroglancerStateForOmeZarr as any).mockImplementationOnce(() => {
+      throw new Error('bad multiscale');
+    });
+    const { ng_state, layers } = await buildViewState([
+      { url: 'a', sharing_key: 'ka', fsp_name: 'f', path: '/a', label: 'A' },
+      { url: 'b', sharing_key: 'kb', fsp_name: 'f', path: '/b', label: 'B' }
+    ]);
+    expect((ng_state as any).layers).toHaveLength(1);
+    expect(layers).toEqual([
+      { sharing_key: 'kb', layer_index: 0, channel: null, opts: null }
+    ]);
+  });
+
   it('selects the layer at the requested channel index', async () => {
     (generateNeuroglancerStateForOmeZarr as any).mockReturnValue(
       encoded({
@@ -193,7 +210,7 @@ describe('probeDataset', () => {
   it('falls back to array when only a plain Zarr array loads', async () => {
     (getOmeZarrMetadata as any).mockRejectedValueOnce(new Error('no ome'));
     (generateStateForPlainZarr as any).mockResolvedValueOnce('%7B%7D');
-    expect(await probeDataset('u')).toEqual({ kind: 'array' });
+    expect(await probeDataset('u')).toEqual({ kind: 'array', state: '%7B%7D' });
   });
 
   it('reports unsupported when neither loads, carrying both failure causes', async () => {

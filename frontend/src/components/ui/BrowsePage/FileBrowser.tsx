@@ -66,7 +66,7 @@ export default function FileBrowser({
   const { folderPreferenceMap, handleContextMenuFavorite } =
     usePreferencesContext();
   const { addToCart } = useCartContext();
-  const outlet = useOutletContext<OutletContextType | undefined>();
+  const outlet = useOutletContext<OutletContextType | null | undefined>();
   const { displayFiles } = useHideDotFiles();
   const { handleDownload } = useHandleDownload();
   const { handleView } = useHandleView();
