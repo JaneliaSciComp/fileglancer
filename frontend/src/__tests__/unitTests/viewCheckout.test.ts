@@ -90,9 +90,10 @@ describe('buildViewState', () => {
     ]);
   });
 
-  it('skips a dataset only when it is neither OME-Zarr nor a plain array', async () => {
-    // OME metadata throws AND plain-array generation throws (genuinely broken /
-    // moved / not a Zarr array) → drop just that entry, keep the rest.
+  it('records an unsupported dataset as a layer-less source, keeping the rest', async () => {
+    // OME metadata throws AND plain-array generation throws (plain directory /
+    // moved / not a Zarr array) → no NG layer, but still a ViewLayer flagged
+    // unsupported so the Views table can list it as a source.
     (getOmeZarrMetadata as any).mockRejectedValueOnce(new Error('gone'));
     (generateStateForPlainZarr as any).mockRejectedValueOnce(
       new Error('also gone')
@@ -103,7 +104,13 @@ describe('buildViewState', () => {
     ]);
     expect((ng_state as any).layers).toHaveLength(1);
     expect(layers).toEqual([
-      { sharing_key: 'kb', layer_index: 0, channel: null, opts: null }
+      { sharing_key: 'kb', layer_index: 0, channel: null, opts: null },
+      {
+        sharing_key: 'ka',
+        layer_index: 1,
+        channel: null,
+        opts: { unsupported: true }
+      }
     ]);
   });
 
@@ -119,9 +126,16 @@ describe('buildViewState', () => {
       { url: 'b', sharing_key: 'kb', fsp_name: 'f', path: '/b', label: 'B' }
     ]);
     expect((ng_state as any).layers).toHaveLength(1);
-    expect(layers).toEqual([
-      { sharing_key: 'kb', layer_index: 0, channel: null, opts: null }
-    ]);
+    expect(layers[0]).toEqual({
+      sharing_key: 'kb',
+      layer_index: 0,
+      channel: null,
+      opts: null
+    });
+    expect(layers[1]).toMatchObject({
+      sharing_key: 'ka',
+      opts: { unsupported: true }
+    });
   });
 
   it('selects the layer at the requested channel index', async () => {
