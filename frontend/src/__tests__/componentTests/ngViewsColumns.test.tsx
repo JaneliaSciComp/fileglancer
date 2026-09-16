@@ -77,10 +77,12 @@ const view: View = {
 
 function TableProbe({
   onRename,
-  onDelete
+  onDelete,
+  view: viewProp = view
 }: {
   onRename: (v: View) => void;
   onDelete: (v: View) => void;
+  view?: View;
 }) {
   // ponytail: TableProbe is already a component, so call the hook directly
   // rather than nesting renderHook inside a component under render().
@@ -92,7 +94,7 @@ function TableProbe({
     () => {}
   );
   const table = useReactTable({
-    data: [view],
+    data: [viewProp],
     columns,
     getCoreRowModel: getCoreRowModel()
   });
@@ -155,6 +157,74 @@ describe('useNGViewsColumns', () => {
     expect(screen.getByLabelText('Data link missing')).toBeInTheDocument();
     // the intact source has no broken icon
     expect(screen.getAllByLabelText('Data link missing')).toHaveLength(1);
+  });
+
+  it('merges broken state across layers sharing one source', () => {
+    const mixedBrokenView: View = {
+      ...view,
+      layers: [
+        {
+          layer_index: 0,
+          data_link_id: 1,
+          channel: 'ch0',
+          opts: null,
+          broken: false,
+          fsp_name: 'fspA',
+          path: '/a/shared.zarr'
+        },
+        {
+          layer_index: 1,
+          data_link_id: null,
+          channel: 'ch1',
+          opts: null,
+          broken: true,
+          fsp_name: 'fspA',
+          path: '/a/shared.zarr'
+        }
+      ]
+    };
+    render(
+      <MemoryRouter>
+        <TableProbe
+          onDelete={vi.fn()}
+          onRename={vi.fn()}
+          view={mixedBrokenView}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getAllByRole('link', { name: /shared\.zarr/ })).toHaveLength(
+      1
+    );
+    expect(screen.getByLabelText('Data link missing')).toBeInTheDocument();
+  });
+
+  it('shows an em dash and no links when no layer has a resolvable source', () => {
+    const noSourceView: View = {
+      ...view,
+      layers: [
+        {
+          layer_index: 0,
+          data_link_id: null,
+          channel: null,
+          opts: null,
+          broken: true,
+          fsp_name: null,
+          path: null
+        }
+      ]
+    };
+    render(
+      <MemoryRouter>
+        <TableProbe onDelete={vi.fn()} onRename={vi.fn()} view={noSourceView} />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /zarr/ })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Data link missing')
+    ).not.toBeInTheDocument();
   });
 
   it('fires onRename and onDelete from the actions menu', async () => {
