@@ -102,7 +102,9 @@ export function useCreateViewFlow() {
         </Typography>
         <FgInput
           aria-label="View name"
+          autoFocus
           onChange={e => setName(e.target.value)}
+          onFocus={e => e.target.select()}
           value={name}
         />
 
