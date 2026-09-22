@@ -413,6 +413,25 @@ def test_mark_view_layers_broken(db_session):
     assert get_view_by_short_key(db_session, v.short_key) is not None
 
 
+def test_view_layers_keep_source_after_broken(db_session):
+    layers = [
+        {"data_link_id": 5, "layer_index": 0, "channel": None, "opts": None,
+         "fsp_name": "scratch", "path": "/data/img.zarr"},
+    ]
+    v = create_view(db_session, "u", "src", {"layers": []}, layers, "read")
+    layer = get_view_by_short_key(db_session, v.short_key).layers[0]
+    assert layer.fsp_name == "scratch"
+    assert layer.path == "/data/img.zarr"
+
+    mark_view_layers_broken(db_session, 5)
+    db_session.refresh(v)
+    layer = v.layers[0]
+    assert layer.broken is True and layer.data_link_id is None
+    # Source survives the break so a broken View can be restored later.
+    assert layer.fsp_name == "scratch"
+    assert layer.path == "/data/img.zarr"
+
+
 def test_get_views_for_data_link_owner_filter(db_session):
     layer = [{"data_link_id": 11, "layer_index": 0, "channel": None, "opts": None}]
     mine = create_view(db_session, "me", "mine", {"layers": []}, layer, "read")

@@ -21,14 +21,6 @@ import {
 import type { View } from '@/queries/viewQueries';
 import { formatDateString } from '@/utils';
 
-vi.mock('@/queries/proxiedPathQueries', () => ({
-  useAllProxiedPathsQuery: () => ({
-    data: [
-      { id: 1, fsp_name: 'nrs', path: 'dudman/reg.zarr/g1_r0' },
-      { id: 2, fsp_name: 'nrs', path: 'dudman/reg.zarr/g1_r1' }
-    ]
-  })
-}));
 vi.mock('@/contexts/PreferencesContext', () => ({
   usePreferencesContext: () => ({ pathPreference: ['linux_path'] })
 }));
@@ -67,24 +59,30 @@ const view: View = {
       data_link_id: 1,
       channel: null,
       opts: null,
-      broken: false
+      broken: false,
+      fsp_name: 'nrs',
+      path: 'dudman/one.zarr'
     },
     {
       layer_index: 1,
-      data_link_id: 2,
-      channel: 'ch0',
+      data_link_id: null,
+      channel: null,
       opts: null,
-      broken: false
+      broken: true,
+      fsp_name: 'nrs',
+      path: 'dudman/two.zarr'
     }
   ]
 };
 
 function TableProbe({
   onRename,
-  onDelete
+  onDelete,
+  view: viewProp = view
 }: {
   onRename: (v: View) => void;
   onDelete: (v: View) => void;
+  view?: View;
 }) {
   // ponytail: TableProbe is already a component, so call the hook directly
   // rather than nesting renderHook inside a component under render().
@@ -96,7 +94,7 @@ function TableProbe({
     () => {}
   );
   const table = useReactTable({
-    data: [view],
+    data: [viewProp],
     columns,
     getCoreRowModel: getCoreRowModel()
   });
@@ -138,11 +136,124 @@ describe('useNGViewsColumns', () => {
         <TableProbe onDelete={vi.fn()} onRename={vi.fn()} />
       </MemoryRouter>
     );
-    // Sources show the full path (file share path + subpath), not just the subpath.
-    const link = screen.getByText('/nrs/dudman/reg.zarr/g1_r0');
+    // Sources come straight from each layer's fsp_name/path, displayed with
+    // the FSP's mount path prefixed (see zonesAndFspQuery mock: nrs -> /nrs).
+    const link = screen.getByText('/nrs/dudman/one.zarr');
     expect(link).toBeInTheDocument();
     expect(link.closest('a')).toHaveAttribute('href');
-    expect(screen.getByText('/nrs/dudman/reg.zarr/g1_r1')).toBeInTheDocument();
+    expect(screen.getByText('/nrs/dudman/two.zarr')).toBeInTheDocument();
+  });
+
+  it('keeps the path and shows a broken-link icon for layers whose Data Link is gone', () => {
+    render(
+      <MemoryRouter>
+        <TableProbe onDelete={vi.fn()} onRename={vi.fn()} />
+      </MemoryRouter>
+    );
+    const brokenLink = screen.getByRole('link', { name: /two\.zarr/ });
+    expect(brokenLink).toHaveAttribute(
+      'href',
+      expect.stringContaining('two.zarr')
+    );
+    expect(screen.getByLabelText('Data link missing')).toBeInTheDocument();
+    // the intact source has no broken icon
+    expect(screen.getAllByLabelText('Data link missing')).toHaveLength(1);
+  });
+
+  it('merges broken state across layers sharing one source', () => {
+    const mixedBrokenView: View = {
+      ...view,
+      layers: [
+        {
+          layer_index: 0,
+          data_link_id: 1,
+          channel: 'ch0',
+          opts: null,
+          broken: false,
+          fsp_name: 'nrs',
+          path: 'dudman/shared.zarr'
+        },
+        {
+          layer_index: 1,
+          data_link_id: null,
+          channel: 'ch1',
+          opts: null,
+          broken: true,
+          fsp_name: 'nrs',
+          path: 'dudman/shared.zarr'
+        }
+      ]
+    };
+    render(
+      <MemoryRouter>
+        <TableProbe
+          onDelete={vi.fn()}
+          onRename={vi.fn()}
+          view={mixedBrokenView}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getAllByRole('link', { name: /shared\.zarr/ })).toHaveLength(
+      1
+    );
+    expect(screen.getByLabelText('Data link missing')).toBeInTheDocument();
+  });
+
+  it('shows an em dash and no links when no layer has a resolvable source', () => {
+    const noSourceView: View = {
+      ...view,
+      layers: [
+        {
+          layer_index: 0,
+          data_link_id: null,
+          channel: null,
+          opts: null,
+          broken: true,
+          fsp_name: null,
+          path: null
+        }
+      ]
+    };
+    render(
+      <MemoryRouter>
+        <TableProbe onDelete={vi.fn()} onRename={vi.fn()} view={noSourceView} />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /zarr/ })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Data link missing')
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders a link to the FSP root and the broken icon for an empty path', () => {
+    // Empty string path means a Data Link at the FSP root (backend normalizes
+    // "." to ""), which is a known source and must not be treated like null.
+    const rootPathView: View = {
+      ...view,
+      layers: [
+        {
+          layer_index: 0,
+          data_link_id: null,
+          channel: null,
+          opts: null,
+          broken: true,
+          fsp_name: 'nrs',
+          path: ''
+        }
+      ]
+    };
+    render(
+      <MemoryRouter>
+        <TableProbe onDelete={vi.fn()} onRename={vi.fn()} view={rootPathView} />
+      </MemoryRouter>
+    );
+    expect(screen.queryByText('—')).not.toBeInTheDocument();
+    const link = screen.getByText('/nrs');
+    expect(link.closest('a')).toHaveAttribute('href', '/browse/nrs');
+    expect(screen.getByLabelText('Data link missing')).toBeInTheDocument();
   });
 
   it('fires onRename and onDelete from the actions menu', async () => {
