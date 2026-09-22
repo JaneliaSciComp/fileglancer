@@ -142,11 +142,17 @@ def service_url_origin(service_url: Optional[str]) -> Optional[str]:
     bare ``host:port`` parses as a scheme plus path, leaving netloc empty, and
     upstream_from_service_url reads netloc.
 
-    Returns None when there is no authority to keep, and for an authority
-    carrying userinfo -- that is a credential too, and upstream_from_service_url
-    refuses such an authority anyway, so dropping the row loses nothing. Note
-    that urlsplit strips CR/LF, so a header-injection attempt is not preserved
-    here; what remains is still refused downstream by the upstream gate.
+    Userinfo, if present, is dropped rather than the whole authority: it is a
+    credential too, and this column's one reader (upstream_from_service_url)
+    already discards it before using the result, so keeping it here would
+    store a live credential for no consumer. Dropping only the userinfo
+    rather than refusing the URL outright matters because a service that
+    authenticates via userinfo (see build_proxied_service_url) would
+    otherwise never get an upstream to resolve to.
+
+    Returns None when there is no authority to keep. Note that urlsplit
+    strips CR/LF, so a header-injection attempt is not preserved here; what
+    remains is still refused downstream by the upstream gate.
     """
     if not service_url:
         return None
@@ -154,9 +160,12 @@ def service_url_origin(service_url: Optional[str]) -> Optional[str]:
         parts = urlsplit(service_url)
     except ValueError:
         return None
-    if not parts.scheme or not parts.netloc or '@' in parts.netloc:
+    if not parts.scheme or not parts.netloc:
         return None
-    return urlunsplit((parts.scheme, parts.netloc, '', '', ''))
+    _userinfo, hostport = _split_userinfo(parts.netloc)
+    if not hostport:
+        return None
+    return urlunsplit((parts.scheme, hostport, '', '', ''))
 
 
 def job_id_from_host(host: Optional[str], proxy_domain: str,

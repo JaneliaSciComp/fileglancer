@@ -88,7 +88,7 @@ def test_upgrade_strips_the_token_and_nulls_unusable_rows(engine):
             1: "http://node01:41235",   # token dropped
             2: "http://node02:8080",    # already an origin, untouched
             3: None,                    # no authority to keep
-            4: None,                    # userinfo is a credential too
+            4: "https://node03:8443",   # userinfo dropped, host:port kept
             5: None,
         }
 
