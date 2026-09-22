@@ -98,14 +98,25 @@ vi.mock('@/components/ui/Views/CreateViewButton', () => ({
     <button type="button">{label ?? 'Create View'}</button>
   )
 }));
-vi.mock('@/hooks/useCartDimensionCheck', () => ({
-  useCartDimensionCheck: () => ({
+const { useCartDimensionCheck } = vi.hoisted(() => ({
+  useCartDimensionCheck: vi.fn(() => ({
     mismatchedKeys: new Set(),
-    hasMismatch: false
+    hasMismatch: false,
+    kindByKey: new Map()
+  }))
+}));
+vi.mock('@/hooks/useCartDimensionCheck', () => ({ useCartDimensionCheck }));
+vi.mock('@/contexts/PreferencesContext', () => ({
+  usePreferencesContext: () => ({ pathPreference: ['linux_path'] })
+}));
+vi.mock('@/queries/zoneAndFileSharePathMapQuery', () => ({
+  default: () => ({
+    data: { fsp_fsp1: { name: 'fsp1', linux_path: '/mnt/one' } }
   })
 }));
 
 import CartList from '@/components/ui/Views/CartList';
+import { datasetKey } from '@/utils/pathHandling';
 
 beforeEach(() => {
   addToCart.mockClear();
@@ -131,6 +142,14 @@ describe('Layer Cart tab', () => {
     await renderCartTab();
     expect(screen.getByText('Dataset A')).toBeInTheDocument();
     expect(screen.getByText('Dataset B')).toBeInTheDocument();
+  });
+
+  it('links each dataset by its full path (FSP mount + subpath)', async () => {
+    await renderCartTab();
+    const link = screen.getByRole('link', { name: '/mnt/one/a' });
+    expect(link).toHaveAttribute('href', '/browse/fsp1/a');
+    // fsp2 is not in the FSP map yet: fall back to the bare subpath.
+    expect(screen.getByRole('link', { name: '/b' })).toBeInTheDocument();
   });
 
   it('lazy-loads and shows channels when expanding a dataset', async () => {
@@ -252,6 +271,28 @@ describe('Layer Cart tab', () => {
     ]);
     // The bug being regression-tested: no per-item loop calling single-remove.
     expect(removeFromCart).not.toHaveBeenCalled();
+  });
+
+  it('shows the real per-dataset layer-status indicator for ome and unsupported kinds', async () => {
+    useCartDimensionCheck.mockReturnValueOnce({
+      mismatchedKeys: new Set(),
+      hasMismatch: false,
+      kindByKey: new Map([
+        [datasetKey('fsp1', '/a'), 'ome'],
+        [datasetKey('fsp2', '/b'), 'unsupported']
+      ])
+    });
+    await renderCartTab();
+    expect(
+      screen.getByLabelText('Will load as a Neuroglancer layer', {
+        selector: 'span'
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Will not load as a Neuroglancer layer', {
+        selector: 'span'
+      })
+    ).toBeInTheDocument();
   });
 
   it('shows the Create View control and a Clear cart button', async () => {

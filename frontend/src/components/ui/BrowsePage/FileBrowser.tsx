@@ -2,7 +2,7 @@ import type { MouseEvent } from 'react';
 import { Typography } from '@material-tailwind/react';
 import { useHotkey } from '@tanstack/react-hotkeys';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router';
+import { useOutletContext } from 'react-router';
 
 import Crumbs from './Crumbs';
 import MetadataHint from './MetadataHint';
@@ -21,7 +21,7 @@ import useN5Metadata from '@/hooks/useN5Metadata';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useCartContext } from '@/contexts/CartContext';
-import { useCreateViewFlow } from '@/hooks/useCreateViewFlow';
+import type { OutletContextType } from '@/layouts/BrowseLayout';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
 import { useHandleDownload } from '@/hooks/useHandleDownload';
 import { useHandleView } from '@/hooks/useHandleView';
@@ -66,8 +66,7 @@ export default function FileBrowser({
   const { folderPreferenceMap, handleContextMenuFavorite } =
     usePreferencesContext();
   const { addToCart } = useCartContext();
-  const navigate = useNavigate();
-  const { startCreateView, dialog } = useCreateViewFlow();
+  const outlet = useOutletContext<OutletContextType | null | undefined>();
   const { displayFiles } = useHideDotFiles();
   const { handleDownload } = useHandleDownload();
   const { handleView } = useHandleView();
@@ -196,7 +195,7 @@ export default function FileBrowser({
           !fileBrowserState.selectedFiles[0]?.is_symlink
       },
       {
-        name: 'Add to Neuroglancer cart',
+        name: 'Add to cart',
         action: async () => {
           const file = fileBrowserState.selectedFiles[0];
           if (!file) {
@@ -210,37 +209,15 @@ export default function FileBrowser({
                 label: file.name
               }
             ]);
-            toast.success(`Added "${file.name}" to the Neuroglancer cart`);
+            toast.success(`Added "${file.name}" to the cart`);
+            outlet?.openDrawer('cart');
           } catch (error) {
             const errorMessage =
               error instanceof Error ? error.message : String(error);
             toast.error(
-              `Error adding "${file.name}" to the Neuroglancer cart: ${errorMessage}`
+              `Error adding "${file.name}" to the cart: ${errorMessage}`
             );
           }
-        },
-        shouldShow:
-          fileBrowserState.selectedFiles[0]?.is_dir &&
-          !fileBrowserState.selectedFiles[0]?.is_symlink
-      },
-      {
-        name: 'View in Neuroglancer',
-        action: () => {
-          const file = fileBrowserState.selectedFiles[0];
-          if (!file) {
-            return;
-          }
-          startCreateView(
-            [
-              {
-                fsp_name: fileQuery.data?.currentFileSharePath?.name ?? '',
-                path: file.path,
-                label: file.name
-              }
-            ],
-            file.name,
-            view => navigate(`/view/${view.read_key}`)
-          );
         },
         shouldShow:
           fileBrowserState.selectedFiles[0]?.is_dir &&
@@ -395,7 +372,6 @@ export default function FileBrowser({
         />
       ) : null}
       <SelectionBar />
-      {dialog}
     </>
   );
 }

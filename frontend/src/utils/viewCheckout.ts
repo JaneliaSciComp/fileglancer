@@ -4,8 +4,37 @@ import {
   generateNeuroglancerStateForDataURL,
   generateStateForPlainZarr
 } from '@/omezarr-helper';
-import type { ViewLayerInput } from '@/queries/viewQueries';
+import type { Metadata } from '@/omezarr-helper';
+import type { ViewLayer, ViewLayerInput } from '@/queries/viewQueries';
 import { default as log } from '@/logger';
+
+export type DatasetKind = 'ome' | 'array' | 'unsupported';
+
+// A dataset that produced no Neuroglancer layer is still recorded as a
+// ViewLayer (so the Views table can list it as a source), flagged via opts.
+export const UNSUPPORTED_LAYER_OPTS = { unsupported: true } as const;
+export function isUnsupportedLayer(layer: Pick<ViewLayer, 'opts'>): boolean {
+  return layer.opts?.unsupported === true;
+}
+export type DatasetProbe =
+  | { kind: 'ome'; metadata: Metadata }
+  | { kind: 'array'; state: string }
+  | { kind: 'unsupported'; errors: unknown[] };
+
+// Single source of truth for "what will this dataset become in Neuroglancer":
+// the cart indicator and checkout both call this, so they cannot disagree.
+export async function probeDataset(url: string): Promise<DatasetProbe> {
+  try {
+    return { kind: 'ome', metadata: await getOmeZarrMetadata(url) };
+  } catch (omeError) {
+    try {
+      const state = await generateStateForPlainZarr(url);
+      return { kind: 'array', state };
+    } catch (plainError) {
+      return { kind: 'unsupported', errors: [omeError, plainError] };
+    }
+  }
+}
 
 export type ResolvedCheckoutDataset = {
   url: string;
@@ -35,8 +64,19 @@ function decodeState(encoded: string | null): NgState | null {
 async function generateStateForDataset(
   ds: ResolvedCheckoutDataset
 ): Promise<NgState | null> {
+  const probe = await probeDataset(ds.url);
+  if (probe.kind === 'unsupported') {
+    log.error(
+      `Failed to generate Neuroglancer state for ${ds.url}`,
+      ...probe.errors
+    );
+    return null;
+  }
   try {
-    const metadata = await getOmeZarrMetadata(ds.url);
+    if (probe.kind === 'array') {
+      return decodeState(probe.state);
+    }
+    const { metadata } = probe;
     const multiscale = metadata.multiscales?.[0];
     // ponytail: default layerType 'image' — the thumbnail-edge heuristic used
     // for the single-dir preview needs a rendered thumbnail we don't have here.
@@ -53,21 +93,9 @@ async function generateStateForDataset(
         )
       : generateNeuroglancerStateForDataURL(ds.url, metadata.zarrVersion);
     return decodeState(encoded);
-  } catch (omeError) {
-    // Not an OME-Zarr multiscale group. Try it as a plain Zarr array before
-    // giving up, so a manually-added array directory still becomes one layer.
-    try {
-      return decodeState(await generateStateForPlainZarr(ds.url));
-    } catch (plainError) {
-      // Genuinely broken (moved/deleted, not a Zarr array) — skip this one
-      // cart entry, keep the rest.
-      log.error(
-        `Failed to generate Neuroglancer state for ${ds.url}`,
-        omeError,
-        plainError
-      );
-      return null;
-    }
+  } catch (error) {
+    log.error(`Failed to generate Neuroglancer state for ${ds.url}`, error);
+    return null;
   }
 }
 
@@ -93,11 +121,13 @@ export async function buildViewState(
 ): Promise<{ ng_state: Record<string, unknown>; layers: ViewLayerInput[] }> {
   const combinedLayers: NgLayer[] = [];
   const viewLayers: ViewLayerInput[] = [];
+  const unsupported: ResolvedCheckoutDataset[] = [];
   let base: NgState | null = null;
 
   for (const ds of datasets) {
     const state = await generateStateForDataset(ds);
     if (!state) {
+      unsupported.push(ds);
       continue;
     }
     if (!base) {
@@ -113,6 +143,17 @@ export async function buildViewState(
         opts: null
       });
     }
+  }
+
+  // Unsupported datasets get indices past the real layers: unique, and they
+  // never point into ng_state.layers.
+  for (const ds of unsupported) {
+    viewLayers.push({
+      sharing_key: ds.sharing_key,
+      layer_index: viewLayers.length,
+      channel: ds.channel ?? null,
+      opts: { ...UNSUPPORTED_LAYER_OPTS }
+    });
   }
 
   const first = combinedLayers[0];

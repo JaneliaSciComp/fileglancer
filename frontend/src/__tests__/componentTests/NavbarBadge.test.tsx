@@ -10,10 +10,6 @@ vi.mock('@/hooks/useActiveJobCount', () => ({
   useActiveJobCount: vi.fn(() => 0)
 }));
 
-vi.mock('@/hooks/useCartCount', () => ({
-  useCartCount: () => 0
-}));
-
 vi.mock('@/utils/fathom', () => ({
   trackEvent: vi.fn()
 }));
