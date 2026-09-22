@@ -1334,6 +1334,18 @@ def create_app(settings):
             return _convert_proxied_path(path, settings.external_proxy_url)
 
 
+    @app.get("/api/proxied-path/{sharing_key}/views", response_model=ViewResponse,
+             description="List Neuroglancer Views that depend on this Data Link")
+    async def get_views_for_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path"),
+                                         username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            pp = db.get_proxied_path_by_sharing_key(session, sharing_key)
+            if not pp or pp.username != username:
+                raise HTTPException(status_code=404, detail="Proxied path not found")
+            views = db.get_views_for_data_link(session, pp.id, owner=username)
+            return ViewResponse(views=[View.model_validate(v) for v in views])
+
+
     @app.put("/api/proxied-path/{sharing_key}", description="Update a proxied path by sharing key")
     async def update_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path"),
                                   fsp_name: Optional[str] = Query(default=None, description="The name of the file share path that this proxied path is associated with"),
@@ -1365,11 +1377,25 @@ def create_app(settings):
 
     @app.delete("/api/proxied-path/{sharing_key}", description="Delete a proxied path by sharing key")
     async def delete_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path"),
+                                  confirm: bool = Query(False, description="Confirm deletion even though it breaks the caller's own Views"),
                                   username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
-            deleted = db.delete_proxied_path(session, username, sharing_key)
-            if deleted == 0:
+            pp = db.get_proxied_path_by_sharing_key(session, sharing_key)
+            if not pp or pp.username != username:
                 raise HTTPException(status_code=404, detail="Proxied path not found")
+            # Disclose only the caller's OWN dependent Views (never leak others').
+            own_dependents = db.get_views_for_data_link(session, pp.id, owner=username)
+            if own_dependents and not confirm:
+                # ponytail: JSONResponse (not HTTPException) so the structured detail
+                # survives the app-wide handler at server.py:~614 that stringifies dict details.
+                return JSONResponse(status_code=409, content={"detail": {
+                    "message": "This data link backs Neuroglancer Views you own; they will be marked broken.",
+                    "dependent_views": [{"short_key": v.short_key, "name": v.name} for v in own_dependents],
+                }})
+            # Mark ALL layers on this link broken (any owner) for referential integrity,
+            # so other users' Views degrade gracefully without disclosing them here.
+            db.mark_view_layers_broken(session, pp.id)
+            db.delete_proxied_path(session, username, sharing_key)
             return {"message": f"Proxied path {sharing_key} deleted for user {username}"}
 
 
@@ -1395,6 +1421,21 @@ def create_app(settings):
             if entry.short_name != short_name:
                 raise HTTPException(status_code=404, detail="Neuroglancer state not found")
             return JSONResponse(content=entry.state, headers={"Cache-Control": "no-store"})
+
+
+    # ponytail: sharing_mode is not enforced here — every View is readable by its
+    # read_key (bearer token). A future PR adds "public" (unauthenticated/listed)
+    # vs owner-only semantics; until then sharing_mode is a stored label only.
+    @app.get("/ngview/{key}", name="get_view_state", include_in_schema=False)
+    async def get_view_state(key: str = Path(..., description="A View's read key")):
+        with db.get_db_session(settings.db_url) as session:
+            view = db.get_view_by_read_key(session, key)
+            if not view:
+                raise HTTPException(status_code=404, detail="View not found")
+            # Title is the View's name (single source of truth); inject it so the
+            # embedded viewer titles from the current name and survives renames.
+            state = {**view.ng_state, "title": view.name}
+            return JSONResponse(content=state, headers={"Cache-Control": "no-store"})
 
 
     @app.get("/api/neuroglancer/nglinks", response_model=NeuroglancerShortLinkResponse,
@@ -1490,6 +1531,69 @@ def create_app(settings):
                                    _link_virtual_prefix(link, prefix, f"{sharing_key}/"),
                                    continuation_token, delimiter, encoding_type,
                                    fetch_owner, max_keys, prefix, start_after)
+
+    @app.post("/api/neuroglancer/views", response_model=View,
+              description="Create a Neuroglancer View from a client-built state and layer list")
+    async def create_view_endpoint(payload: ViewCreateRequest,
+                                   username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            layers = []
+            for layer in payload.layers:
+                data_link_id = None
+                if layer.sharing_key:
+                    pp = db.get_proxied_path_by_sharing_key(session, layer.sharing_key)
+                    if not pp:
+                        raise HTTPException(status_code=400,
+                                            detail=f"Unknown data link sharing key: {layer.sharing_key}")
+                    data_link_id = pp.id
+                layers.append({
+                    "data_link_id": data_link_id,
+                    "layer_index": layer.layer_index,
+                    "channel": layer.channel,
+                    "opts": layer.opts,
+                })
+            view = db.create_view(session, username, payload.name, payload.ng_state,
+                                  layers, payload.sharing_mode)
+            return View.model_validate(view)
+
+    @app.get("/api/neuroglancer/views", response_model=ViewResponse,
+             description="List the current user's Neuroglancer Views")
+    async def list_views_endpoint(username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            views = db.get_views(session, username)
+            return ViewResponse(views=[View.model_validate(v) for v in views])
+
+    @app.get("/api/neuroglancer/views/{short_key}", response_model=View,
+             description="Get one of the current user's Neuroglancer Views")
+    async def get_view_endpoint(short_key: str = Path(..., description="The View's short key"),
+                                username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            view = db.get_view_by_short_key(session, short_key)
+            if not view or view.owner != username:
+                raise HTTPException(status_code=404, detail="View not found")
+            return View.model_validate(view)
+
+    @app.put("/api/neuroglancer/views/{short_key}", response_model=View,
+             description="Update (rename / restate) one of the current user's Views")
+    async def update_view_endpoint(payload: ViewUpdateRequest,
+                                   short_key: str = Path(..., description="The View's short key"),
+                                   username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            view = db.update_view(session, username, short_key,
+                                  name=payload.name, ng_state=payload.ng_state)
+            if not view:
+                raise HTTPException(status_code=404, detail="View not found")
+            return View.model_validate(view)
+
+    @app.delete("/api/neuroglancer/views/{short_key}",
+                description="Delete one of the current user's Views")
+    async def delete_view_endpoint(short_key: str = Path(..., description="The View's short key"),
+                                   username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            deleted = db.delete_view(session, username, short_key)
+            if deleted == 0:
+                raise HTTPException(status_code=404, detail="View not found")
+            return {"message": f"View {short_key} deleted"}
 
 
     @app.get("/files/{sharing_key}/{path:path}")

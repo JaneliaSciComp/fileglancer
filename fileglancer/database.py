@@ -1035,7 +1035,7 @@ def create_view(
 
 
 def get_view_by_short_key(session: Session, short_key: str) -> Optional[ViewDB]:
-    """Get an owned View by its short key."""
+    """Get a View by its short key. No owner filter — callers scope ownership."""
     return session.query(ViewDB).filter_by(short_key=short_key).first()
 
 
@@ -1084,15 +1084,30 @@ def delete_view(session: Session, username: str, short_key: str) -> int:
     return 1
 
 
-def get_views_for_data_link(session: Session, data_link_id: int) -> List[ViewDB]:
-    """Distinct Views that have at least one layer backed by this Data Link."""
-    return (
+def get_views_for_data_link(session: Session, data_link_id: int, owner: Optional[str] = None) -> List[ViewDB]:
+    """Distinct Views that have at least one layer backed by this Data Link.
+    If `owner` is given, restrict to Views owned by that user (used to avoid
+    disclosing other users' Views when guarding a Data Link deletion)."""
+    query = (
         session.query(ViewDB)
         .join(ViewLayerDB, ViewLayerDB.view_id == ViewDB.id)
         .filter(ViewLayerDB.data_link_id == data_link_id)
-        .distinct()
-        .all()
     )
+    if owner is not None:
+        query = query.filter(ViewDB.owner == owner)
+    return query.distinct().all()
+
+
+def mark_view_layers_broken(session: Session, data_link_id: int) -> int:
+    """Detach a Data Link from all View layers that use it: null the
+    data_link_id and set broken=True. Returns the number of layers updated.
+    Leaves the Views themselves intact (degraded)."""
+    layers = session.query(ViewLayerDB).filter_by(data_link_id=data_link_id).all()
+    for layer in layers:
+        layer.data_link_id = None
+        layer.broken = True
+    session.commit()
+    return len(layers)
 
 
 def get_tickets(session: Session, username: str, fsp_name: str = None, path: str = None) -> List[TicketDB]:
