@@ -33,7 +33,7 @@ import SSHKeys from '@/components/SSHKeys';
 import ApiTokens from '@/components/ApiTokens';
 import ErrorFallback from '@/components/ErrorFallback';
 import NGViews from '@/components/NGViews';
-import { ViewsProvider } from '@/contexts/ViewsContext';
+import NeuroglancerView from '@/components/NeuroglancerView';
 
 function RequireAuth({ children }: { readonly children: ReactNode }) {
   const { loading, authStatus } = useAuthContext();
@@ -123,9 +123,7 @@ const AppComponent = () => {
             <Route
               element={
                 <RequireAuth>
-                  <ViewsProvider>
-                    <NGViews />
-                  </ViewsProvider>
+                  <NGViews />
                 </RequireAuth>
               }
               path="ngviews"
@@ -223,6 +221,14 @@ const AppComponent = () => {
             />
             <Route element={<AppLaunch />} path="relaunch/:owner/:repo" />
           </Route>
+          <Route
+            element={
+              <RequireAuth>
+                <NeuroglancerView />
+              </RequireAuth>
+            }
+            path="view/:readKey"
+          />
         </Route>
       </Routes>
     </BrowserRouter>

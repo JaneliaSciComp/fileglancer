@@ -12,6 +12,7 @@ import { ZonesAndFspMapContextProvider } from '@/contexts/ZonesAndFspMapContext'
 import { FileBrowserContextProvider } from '@/contexts/FileBrowserContext';
 import { PreferencesProvider } from '@/contexts/PreferencesContext';
 import { CartProvider } from '@/contexts/CartContext';
+import { ViewsProvider } from '@/contexts/ViewsContext';
 import { OpenFavoritesProvider } from '@/contexts/OpenFavoritesContext';
 import { TicketProvider } from '@/contexts/TicketsContext';
 import { ProxiedPathProvider } from '@/contexts/ProxiedPathContext';
@@ -76,17 +77,19 @@ export const MainLayout = () => {
             <FileBrowserContextProvider filePath={filePath} fspName={fspName}>
               <PreferencesProvider>
                 <CartProvider>
-                  <ExternalBucketProvider>
-                    <ProxiedPathProvider>
-                      <ProfileContextProvider>
-                        <NotificationProvider>
-                          <TicketProvider>
-                            <MainLayoutContent />
-                          </TicketProvider>
-                        </NotificationProvider>
-                      </ProfileContextProvider>
-                    </ProxiedPathProvider>
-                  </ExternalBucketProvider>
+                  <ViewsProvider>
+                    <ExternalBucketProvider>
+                      <ProxiedPathProvider>
+                        <ProfileContextProvider>
+                          <NotificationProvider>
+                            <TicketProvider>
+                              <MainLayoutContent />
+                            </TicketProvider>
+                          </NotificationProvider>
+                        </ProfileContextProvider>
+                      </ProxiedPathProvider>
+                    </ExternalBucketProvider>
+                  </ViewsProvider>
                 </CartProvider>
               </PreferencesProvider>
             </FileBrowserContextProvider>

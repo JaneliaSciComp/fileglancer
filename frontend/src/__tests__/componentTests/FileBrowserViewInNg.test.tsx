@@ -2,41 +2,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import toast from 'react-hot-toast';
 
 import { render } from '../test-utils';
 import { server } from '@/__tests__/mocks/node';
 import FileBrowser from '@/components/ui/BrowsePage/FileBrowser';
 import type { FileOrFolder } from '@/shared.types';
 
-const addToCart = vi.fn();
+const startCreateView = vi.fn();
 
-vi.mock('@/contexts/CartContext', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/contexts/CartContext')>();
-  return {
-    ...actual,
-    useCartContext: () => ({
-      cart: [],
-      cartCount: 0,
-      addToCart,
-      removeFromCart: vi.fn(),
-      clearCart: vi.fn()
-    })
-  };
-});
-
-// FileBrowser also renders a "View in Neuroglancer" item that depends on
-// useCreateViewFlow, which in turn needs a ViewsProvider this test's render
-// tree doesn't set up. This suite only cares about the cart item, so stub
-// the hook rather than wiring up ViewsProvider.
 vi.mock('@/hooks/useCreateViewFlow', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/hooks/useCreateViewFlow')>();
   return {
     ...actual,
     useCreateViewFlow: () => ({
-      startCreateView: vi.fn(),
+      startCreateView,
       dialog: null,
       open: false,
       pending: false
@@ -84,12 +64,9 @@ function renderFileBrowser() {
   );
 }
 
-describe('FileBrowser row context menu - Add to Neuroglancer cart', () => {
+describe('FileBrowser row context menu - View in Neuroglancer', () => {
   beforeEach(() => {
-    addToCart.mockClear();
-    addToCart.mockResolvedValue(undefined);
-    vi.mocked(toast.success).mockClear();
-    vi.mocked(toast.error).mockClear();
+    startCreateView.mockClear();
 
     server.use(
       http.get('/api/files/:fspName', ({ params, request }) => {
@@ -126,41 +103,23 @@ describe('FileBrowser row context menu - Add to Neuroglancer cart', () => {
     );
   });
 
-  it('adds a folder to the cart and toasts success', async () => {
+  it('calls startCreateView with a single-dataset CartItem for the clicked folder', async () => {
     const user = userEvent.setup();
     renderFileBrowser();
 
     const menuButton = await screen.findByText('menu-subfolder');
     await user.click(menuButton);
 
-    const cartItem = await screen.findByText('Add to Neuroglancer cart');
-    await user.click(cartItem);
+    const viewItem = await screen.findByText('View in Neuroglancer');
+    await user.click(viewItem);
 
-    expect(addToCart).toHaveBeenCalledWith([
+    expect(startCreateView).toHaveBeenCalledTimes(1);
+    const [datasets, name, onCreated] = startCreateView.mock.calls[0];
+    expect(datasets).toEqual([
       { fsp_name: 'test_fsp', path: 'my_folder/subfolder', label: 'subfolder' }
     ]);
-    expect(toast.success).toHaveBeenCalledWith(
-      'Added "subfolder" to the Neuroglancer cart'
-    );
-  });
-
-  it('toasts an error and does not toast success when addToCart rejects', async () => {
-    addToCart.mockRejectedValueOnce(new Error('preference update failed'));
-    const user = userEvent.setup();
-    renderFileBrowser();
-
-    const menuButton = await screen.findByText('menu-subfolder');
-    await user.click(menuButton);
-
-    const cartItem = await screen.findByText('Add to Neuroglancer cart');
-    await user.click(cartItem);
-
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith(
-        'Error adding "subfolder" to the Neuroglancer cart: preference update failed'
-      );
-    });
-    expect(toast.success).not.toHaveBeenCalled();
+    expect(name).toBe('subfolder');
+    expect(typeof onCreated).toBe('function');
   });
 
   it('does not show the item for a plain file', async () => {
@@ -173,10 +132,8 @@ describe('FileBrowser row context menu - Add to Neuroglancer cart', () => {
     await waitFor(() => {
       expect(screen.getByText('Download')).toBeInTheDocument();
     });
-    expect(
-      screen.queryByText('Add to Neuroglancer cart')
-    ).not.toBeInTheDocument();
-    expect(addToCart).not.toHaveBeenCalled();
+    expect(screen.queryByText('View in Neuroglancer')).not.toBeInTheDocument();
+    expect(startCreateView).not.toHaveBeenCalled();
   });
 
   it('does not show the item for a symlinked folder', async () => {
@@ -189,9 +146,7 @@ describe('FileBrowser row context menu - Add to Neuroglancer cart', () => {
     await waitFor(() => {
       expect(screen.getByText('Rename')).toBeInTheDocument();
     });
-    expect(
-      screen.queryByText('Add to Neuroglancer cart')
-    ).not.toBeInTheDocument();
-    expect(addToCart).not.toHaveBeenCalled();
+    expect(screen.queryByText('View in Neuroglancer')).not.toBeInTheDocument();
+    expect(startCreateView).not.toHaveBeenCalled();
   });
 });

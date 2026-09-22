@@ -1,4 +1,5 @@
 import { Typography } from '@material-tailwind/react';
+import { Link } from 'react-router';
 
 import { useViewsForDataLinkQuery } from '@/queries/viewQueries';
 
@@ -24,13 +25,15 @@ export default function AppearsInViews({ sharingKey }: AppearsInViewsProps) {
       <Typography className="text-foreground font-semibold" type="small">
         Appears in {views.length} View{views.length === 1 ? '' : 's'}
       </Typography>
-      {/* ponytail: names only, not links — PR 6 makes View names
-      navigable to the embedded viewer; a link to nowhere now is worse
-      than plain text. */}
       <ul className="list-disc pl-5">
         {views.map(v => (
-          <li className="text-foreground text-sm truncate" key={v.short_key}>
-            {v.name || v.short_key}
+          <li className="text-sm truncate" key={v.short_key}>
+            <Link
+              className="text-primary hover:underline"
+              to={`/view/${v.read_key}`}
+            >
+              {v.name || v.short_key}
+            </Link>
           </li>
         ))}
       </ul>
