@@ -25,7 +25,8 @@ const navigateToZarrDir = async (
 
 const createLinkWithDirectoryNameOnlyFormat = async (page: any) => {
   // Change data link format to "Directory name only" in the dialog
-  const advancedSettingsAccordion = page.getByRole('button', {
+  const dialog = page.getByRole('dialog');
+  const advancedSettingsAccordion = dialog.getByRole('button', {
     name: /advanced settings/i
   });
   await advancedSettingsAccordion.click();
@@ -33,7 +34,7 @@ const createLinkWithDirectoryNameOnlyFormat = async (page: any) => {
   await nameOnlyInput.click();
   await expect(nameOnlyInput).toBeChecked();
   // Confirm in dialog
-  const confirmButton = page.getByRole('button', {
+  const confirmButton = dialog.getByRole('button', {
     name: /confirm|create|yes/i
   });
   await expect(confirmButton).toBeVisible({ timeout: 5000 });
@@ -64,11 +65,12 @@ test.describe('Data Link Operations', () => {
     // Wait for zarr metadata to load
     await expect(page.getByText('zarr.json')).toBeVisible();
 
+    const dialog = page.getByRole('dialog');
     const dataLinkToggle = page.getByRole('checkbox', { name: /data link/i });
-    const confirmButton = page.getByRole('button', {
+    const confirmButton = dialog.getByRole('button', {
       name: /confirm|create|yes/i
     });
-    const confirmDeleteButton = page.getByRole('button', {
+    const confirmDeleteButton = dialog.getByRole('button', {
       name: /delete/i
     });
 
@@ -79,7 +81,7 @@ test.describe('Data Link Operations', () => {
       await expect(confirmButton).toBeVisible();
 
       // Check that the data link format is set to "Transparent path" in the dialog
-      const advancedSettingsAccordion = page.getByRole('button', {
+      const advancedSettingsAccordion = dialog.getByRole('button', {
         name: /advanced settings/i
       });
       await advancedSettingsAccordion.click();

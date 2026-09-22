@@ -1,7 +1,7 @@
 import { Typography } from '@material-tailwind/react';
 import { Link } from 'react-router';
 import fallback_logo from '@/assets/fallback_logo.png';
-import { HiOutlineClipboardCopy } from 'react-icons/hi';
+import { HiOutlineClipboardCopy, HiOutlinePlusCircle } from 'react-icons/hi';
 import { HiOutlineEllipsisHorizontalCircle } from 'react-icons/hi2';
 
 import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
@@ -64,6 +64,7 @@ export default function DataToolLinks({
   compact = false,
   dataLinkUrl,
   fspName,
+  onCreateView,
   onToolClick,
   path,
   showCopiedTooltip,
@@ -73,6 +74,7 @@ export default function DataToolLinks({
   readonly compact?: boolean;
   readonly dataLinkUrl?: string;
   readonly fspName?: string;
+  readonly onCreateView?: () => void;
   readonly onToolClick: (toolKey: PendingToolKey) => Promise<void>;
   readonly path?: string;
   readonly showCopiedTooltip: boolean;
@@ -129,6 +131,20 @@ export default function DataToolLinks({
           </FgTooltip>
           <span className={LABEL_CLASSES}>Copy</span>
         </div>
+
+        {onCreateView ? (
+          <div className="flex flex-col items-center w-16">
+            <FgTooltip
+              as="button"
+              label="Create a view of this dataset"
+              onClick={() => onCreateView()}
+              triggerClasses={CIRCLE_CLASSES}
+            >
+              <FgIcon className="text-foreground" icon={HiOutlinePlusCircle} />
+            </FgTooltip>
+            <span className={LABEL_CLASSES}>Create view</span>
+          </div>
+        ) : null}
 
         {dataLinkUrl && fspName && path ? (
           <div className="flex flex-col items-center w-16">

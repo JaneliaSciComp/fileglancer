@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 
@@ -19,6 +19,18 @@ export default function NGViews() {
   const [renameItem, setRenameItem] = useState<View | undefined>(undefined);
   const [renameValue, setRenameValue] = useState('');
   const [deleteItem, setDeleteItem] = useState<View | undefined>(undefined);
+  // Sources column is user-resizable via a drag handle in its header. Width
+  // lives here (not in the column def) so a re-render on drag actually
+  // re-flows the CSS grid template.
+  const [sourcesColWidth, setSourcesColWidth] = useState(260);
+  const clampSourcesWidth = useCallback(
+    (w: number) => Math.max(120, Math.min(900, w)),
+    []
+  );
+  const handleSourcesResize = useCallback(
+    (next: number) => setSourcesColWidth(clampSourcesWidth(next)),
+    [clampSourcesWidth]
+  );
 
   const handleOpenRename = (item: View) => {
     setRenameItem(item);
@@ -55,24 +67,35 @@ export default function NGViews() {
     }
   };
 
-  const columns = useNGViewsColumns(handleOpenRename, setDeleteItem, baseUrl);
+  const columns = useNGViewsColumns(
+    handleOpenRename,
+    setDeleteItem,
+    baseUrl,
+    sourcesColWidth,
+    handleSourcesResize
+  );
+
+  // Fixed pixel tracks for every column except Sources (user-resizable).
+  // Fixed (not fr) so the row has a deterministic width — that's what lets
+  // the outer overflow-x-auto scroll when Sources grows past the viewport.
+  const gridColsStyle = `160px 80px ${sourcesColWidth}px 160px 160px 56px`;
 
   return (
     <>
       <div className="w-full">
         <Typography className="mb-2 text-foreground font-bold" type="h5">
-          Neuroglancer Views
+          Views
         </Typography>
         <Typography className="mb-4 text-foreground">
-          Your saved Neuroglancer Views.
+          Your saved Views.
         </Typography>
 
         <TableCard
           columns={columns}
           data={allViewsQuery.data || []}
-          dataType="NG views"
+          dataType="views"
           errorState={allViewsQuery.error}
-          gridColsClass="grid-cols-[2fr_0.6fr_1fr_1fr_0.6fr]"
+          gridColsStyle={gridColsStyle}
           loadingState={allViewsQuery.isPending}
         />
       </div>

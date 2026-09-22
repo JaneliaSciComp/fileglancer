@@ -2,15 +2,18 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { Collapse, IconButton, Typography } from '@material-tailwind/react';
 import { HiChevronRight, HiOutlineTrash } from 'react-icons/hi';
+import { HiExclamationTriangle } from 'react-icons/hi2';
 import toast from 'react-hot-toast';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgCheckbox from '@/components/designSystem/atoms/formElements/FgCheckbox';
+import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import ZarrAxisTable from '@/components/ui/BrowsePage/ZarrAxisTable';
 import { useCartContext } from '@/contexts/CartContext';
 import { getOmeZarrChannels, getOmeZarrMetadata } from '@/omezarr-helper';
 import type { Metadata } from '@/omezarr-helper';
 import { makeBrowseLink } from '@/utils';
+import { getFileURL } from '@/utils/pathHandling';
 import type { CartItem } from '@/contexts/CartContext';
 
 interface CartDatasetRowProps {
@@ -18,20 +21,20 @@ interface CartDatasetRowProps {
   readonly path: string;
   readonly label: string;
   readonly items: CartItem[];
-  readonly dataLinkUrl: string | undefined;
+  readonly mismatch?: boolean;
 }
 
 // ponytail: two-level dataset->channel tree via MT Collapse (no generic
-// TreeView exists). Channel URL comes from an existing Data Link; if a
-// dataset has no link yet, expansion is disabled with a hint rather than
-// creating a link just to browse channels. Non-Zarr/N5 datasets simply fail
-// getOmeZarrChannels gracefully (toast) instead of a hard pre-check.
+// TreeView exists). Metadata/channels are fetched from the internal
+// /api/content URL (credentialed), so no Data Link is required to inspect
+// dimensions or pick channels. Non-Zarr/N5 datasets fail gracefully in
+// getOmeZarrChannels (toast) instead of a hard pre-check.
 export default function CartDatasetRow({
   fsp_name,
   path,
   label,
   items,
-  dataLinkUrl
+  mismatch
 }: CartDatasetRowProps) {
   const { addToCart, removeFromCart, removeManyFromCart } = useCartContext();
   const [isOpen, setIsOpen] = useState(false);
@@ -47,10 +50,14 @@ export default function CartDatasetRow({
   const handleToggleOpen = async () => {
     const nextOpen = !isOpen;
     setIsOpen(nextOpen);
-    if (nextOpen && channels === undefined && !loadingChannels && dataLinkUrl) {
+    if (!nextOpen) {
+      return;
+    }
+    const dataUrl = getFileURL(fsp_name, path);
+    if (channels === undefined && !loadingChannels) {
       setLoadingChannels(true);
       try {
-        setChannels(await getOmeZarrChannels(dataLinkUrl));
+        setChannels(await getOmeZarrChannels(dataUrl));
       } catch (error) {
         toast.error(
           error instanceof Error ? error.message : 'Failed to load channels'
@@ -60,10 +67,10 @@ export default function CartDatasetRow({
         setLoadingChannels(false);
       }
     }
-    if (nextOpen && metadata === null && !loadingMeta && dataLinkUrl) {
+    if (metadata === null && !loadingMeta) {
       setLoadingMeta(true);
       try {
-        setMetadata(await getOmeZarrMetadata(dataLinkUrl));
+        setMetadata(await getOmeZarrMetadata(dataUrl));
       } catch {
         // Metadata is a nice-to-have here; ignore fetch failures.
       } finally {
@@ -104,12 +111,17 @@ export default function CartDatasetRow({
     }
   };
 
+  // A plain (non-OME) Zarr array has no multiscale axes and no channels, so its
+  // expanded body would otherwise be empty. Track whether there is anything to
+  // show so we can render an explicit "nothing here" message instead.
+  const hasOmeContent =
+    !!metadata?.multiscales?.[0]?.axes?.length || (channels?.length ?? 0) > 0;
+
   return (
     <div className="border-b border-surface py-2">
       <div className="flex items-center justify-between gap-2">
         <button
-          className="flex items-center gap-2 flex-1 min-w-0 text-left disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={!dataLinkUrl}
+          className="flex items-center gap-2 flex-1 min-w-0 text-left"
           onClick={() => void handleToggleOpen()}
           type="button"
         >
@@ -119,6 +131,15 @@ export default function CartDatasetRow({
             size="sm"
           />
           <Typography className="text-foreground truncate">{label}</Typography>
+          {mismatch ? (
+            <FgTooltip label="Dimensions differ from the first layer in this view">
+              <FgIcon
+                className="text-warning shrink-0"
+                icon={HiExclamationTriangle}
+                size="sm"
+              />
+            </FgTooltip>
+          ) : null}
         </button>
         <IconButton
           aria-label="Remove dataset"
@@ -135,20 +156,24 @@ export default function CartDatasetRow({
         {path}
       </Link>
 
-      {dataLinkUrl ? (
-        <Collapse open={isOpen}>
-          <div className="pl-6 flex flex-col gap-2 pt-2">
-            {metadata ? <ZarrAxisTable metadata={metadata} /> : null}
-            <div className="flex flex-col gap-1">
-              <Typography className="text-foreground/70 text-xs font-semibold">
-                Optional: select channels to create per-channel layers
-              </Typography>
-              {loadingChannels ? (
-                <Typography className="text-foreground/70 text-sm">
-                  Loading channels...
+      <Collapse open={isOpen}>
+        <div className="pl-6 flex flex-col gap-2 pt-2">
+          {loadingMeta || loadingChannels ? (
+            <Typography className="text-foreground/70 text-sm">
+              Loading...
+            </Typography>
+          ) : !hasOmeContent ? (
+            <Typography className="text-foreground/70 text-sm">
+              No OME-Zarr metadata to display.
+            </Typography>
+          ) : (
+            <>
+              {metadata ? <ZarrAxisTable metadata={metadata} /> : null}
+              <div className="flex flex-col gap-1">
+                <Typography className="text-foreground/70 text-xs font-semibold">
+                  Optional: select channels to create per-channel layers
                 </Typography>
-              ) : (
-                (channels ?? []).map((channel, index) => (
+                {(channels ?? []).map((channel, index) => (
                   <FgCheckbox
                     checked={checkedChannels.has(channel)}
                     key={channel}
@@ -157,16 +182,12 @@ export default function CartDatasetRow({
                       void handleToggleChannel(channel, index, e.target.checked)
                     }
                   />
-                ))
-              )}
-            </div>
-          </div>
-        </Collapse>
-      ) : (
-        <Typography className="text-foreground/70 text-sm pl-6">
-          Channels load after the View is created.
-        </Typography>
-      )}
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </Collapse>
     </div>
   );
 }

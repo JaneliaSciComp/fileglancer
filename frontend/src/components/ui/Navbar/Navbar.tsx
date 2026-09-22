@@ -11,11 +11,9 @@ import { Link } from 'react-router';
 import type { IconType } from 'react-icons';
 import {
   HiOutlineQuestionMarkCircle,
-  HiOutlineMoon,
   HiOutlineMenu,
   HiOutlineX,
   HiOutlineShare,
-  HiOutlineSun,
   HiOutlineEye
 } from 'react-icons/hi';
 import {
@@ -23,12 +21,11 @@ import {
   HiOutlineBriefcase,
   HiOutlineRocketLaunch
 } from 'react-icons/hi2';
-import { TbBrandGithub } from 'react-icons/tb';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
+import LogoSvg from '@/components/ui/Navbar/LogoSvg';
 import ProfileMenu from '@/components/ui/Navbar/ProfileMenu';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
-import useTheme from '@/hooks/useTheme';
 import { useActiveJobCount } from '@/hooks/useActiveJobCount';
 import { trackEvent } from '@/utils/fathom';
 
@@ -38,38 +35,6 @@ type NavLink = {
   href: string;
   badge?: number;
 };
-
-// Logo SVG component to reduce JSX nesting depth
-function LogoSvg() {
-  return (
-    <svg
-      className="icon-large short:icon-small text-primary"
-      fill="currentColor"
-      stroke="currentColor"
-      version="1.1"
-      viewBox="0 0 18 24"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="M 16.49997,21 V 9 h -5.25 c -1.24218,0 -2.25,-1.00781 -2.25,-2.25 V 1.5 h -6 c -0.82968,0 -1.5,0.67032 -1.5,1.5 v 18 c 0,0.82969 0.67032,1.5 1.5,1.5 h 12 c 0.82969,0 1.5,-0.67031 1.5,-1.5 z M 16.47657,7.5 C 16.44377,7.36875 16.37817,7.24688 16.27969,7.15313 L 10.84688,1.72032 C 10.74848,1.62192 10.63125,1.55625 10.5,1.52344 V 6.75 c 0,0.4125 0.3375,0.75 0.75,0.75 z M 0,3 C 0,1.34532 1.34532,0 3,0 h 7.31719 c 0.59531,0 1.16719,0.23907 1.58906,0.66094 l 5.43282,5.42813 C 17.76094,6.51094 18,7.08282 18,7.67813 V 21 c 0,1.65469 -1.34531,3 -3,3 H 3 C 1.34532,24 0,22.65469 0,21 Z"
-        stroke="currentColor"
-        strokeWidth="0.046875"
-      />
-      <g transform="matrix(0.61810071,0,0,0.61810071,-80.271649,-148.50575)">
-        <path
-          d="m 144.45891,267.17308 c 1.6569,0 3,-1.3431 3,-3 0,-1.6569 -1.3431,-3 -3,-3 -1.6569,0 -3,1.3431 -3,3 0,1.6569 1.3431,3 3,3 z"
-          stroke="currentColor"
-        />
-        <path
-          clipRule="evenodd"
-          d="m 133.78232,263.61978 c 1.48725,-4.47099 5.7045,-7.6967 10.67709,-7.6967 4.9703,0 9.1859,3.22271 10.675,7.6905 0.1204,0.361 0.1205,0.7517 4e-4,1.1128 -1.4873,4.471 -5.7045,7.6967 -10.6771,7.6967 -4.97033,0 -9.18596,-3.2227 -10.67506,-7.6905 -0.12034,-0.361 -0.12046,-0.7517 -3.3e-4,-1.1128 z m 15.92659,0.5533 c 0,2.8995 -2.3505,5.25 -5.25,5.25 -2.8995,0 -5.25,-2.3505 -5.25,-5.25 0,-2.8995 2.3505,-5.25 5.25,-5.25 2.8995,0 5.25,2.3505 5.25,5.25 z"
-          fillRule="evenodd"
-          stroke="currentColor"
-        />
-      </g>
-    </svg>
-  );
-}
 
 // Links list component
 function NavList() {
@@ -81,7 +46,7 @@ function NavList() {
     { icon: HiOutlineShare, title: 'Data Links', href: '/links' },
     {
       icon: HiOutlineEye,
-      title: 'NG Views',
+      title: 'Views',
       href: '/ngviews'
     },
     {
@@ -150,20 +115,13 @@ function NavList() {
 // Composed navbar
 export default function FileglancerNavbar() {
   const [openNav, setOpenNav] = useState(false);
-  const { toggleTheme, isLightTheme, setIsLightTheme } = useTheme();
 
   useEffect(() => {
     window.addEventListener(
       'resize',
       () => window.innerWidth >= 960 && setOpenNav(false)
     );
-    // Set theme from local storage
-    const theme = localStorage.getItem('theme');
-    if (theme === 'dark') {
-      setIsLightTheme(false);
-      document.documentElement.classList.add('dark');
-    }
-  }, [setIsLightTheme]);
+  }, []);
 
   return (
     <>
@@ -193,53 +151,8 @@ export default function FileglancerNavbar() {
           </List>
         </div>
 
-        {/* Theme toggle and profile dropdown menu */}
+        {/* Profile dropdown menu */}
         <div className="flex items-center gap-1">
-          <FgTooltip label="GitHub">
-            <IconButton
-              as={Link}
-              className="text-foreground hover:!text-foreground focus:!text-foreground hover:bg-hover-gradient hover:dark:bg-hover-gradient-dark focus:bg-hover-gradient focus:dark:bg-hover-gradient-dark"
-              color="secondary"
-              onClick={() => trackEvent({ eventId: 'navbar_github_click' })}
-              rel="noopener noreferrer"
-              size="sm"
-              target="_blank"
-              to="https://github.com/JaneliaSciComp/fileglancer"
-              variant="ghost"
-            >
-              <FgIcon
-                className="short:icon-default"
-                icon={TbBrandGithub}
-                size="lg"
-              />
-            </IconButton>
-          </FgTooltip>
-          <FgTooltip label="Toggle light/dark themes">
-            <IconButton
-              className="text-foreground hover:!text-foreground focus:!text-foreground hover:bg-hover-gradient hover:dark:bg-hover-gradient-dark focus:bg-hover-gradient focus:dark:bg-hover-gradient-dark"
-              color="secondary"
-              onClick={() => {
-                trackEvent({ eventId: 'navbar_theme_toggle_click' });
-                toggleTheme();
-              }}
-              size="sm"
-              variant="ghost"
-            >
-              {isLightTheme ? (
-                <FgIcon
-                  className="stroke-2 short:icon-default"
-                  icon={HiOutlineSun}
-                  size="lg"
-                />
-              ) : (
-                <FgIcon
-                  className="stroke-2 short:icon-default"
-                  icon={HiOutlineMoon}
-                  size="lg"
-                />
-              )}
-            </IconButton>
-          </FgTooltip>
           <FgTooltip label="Profile & settings">
             <ProfileMenu />
           </FgTooltip>

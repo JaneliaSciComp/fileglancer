@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 
 // MainLayout composes ~a dozen context providers unrelated to this test;
 // stub them all as passthroughs so we can assert on the one thing that
-// changed: the navbar is no longer skipped for /view/:readKey.
+// changed: the navbar is now skipped for /view/:readKey.
 // vi.mock factories are hoisted above imports, so the shared stub must be
 // created via vi.hoisted rather than a plain top-level const.
 const { passthrough } = vi.hoisted(() => ({
@@ -69,7 +69,7 @@ vi.mock('@/contexts/ViewersContext', () => ({ ViewersProvider: passthrough }));
 import { MainLayout } from '@/layouts/MainLayout';
 
 describe('MainLayout', () => {
-  it('renders the navbar on the embedded viewer route (/view/:readKey)', () => {
+  it('suppresses the navbar on the embedded viewer route (/view/:readKey)', () => {
     render(
       <MemoryRouter initialEntries={['/view/abc123']}>
         <Routes>
@@ -79,7 +79,7 @@ describe('MainLayout', () => {
         </Routes>
       </MemoryRouter>
     );
-    expect(screen.getByTestId('navbar')).toBeInTheDocument();
+    expect(screen.queryByTestId('navbar')).not.toBeInTheDocument();
   });
 
   it('still renders the navbar on an ordinary route', () => {
