@@ -193,8 +193,7 @@ export default function StartTour({
       'nav-properties',
       'datalinks-janelia-preferences',
       'datalinks-general-preferences',
-      'conversion-jobs',
-      'nglinks-table'
+      'conversion-jobs'
     ];
 
     completionStepIds.forEach(stepId => {
@@ -267,17 +266,6 @@ export default function StartTour({
         }
       }
     ];
-
-    workflowButtons.push({
-      text: 'Neuroglancer Links',
-      action: async function (this: any) {
-        const currentTour = shepherd.activeTour as Tour;
-        navigate('/nglinks');
-        await waitForElement('[data-tour="nglinks-page"]');
-        setupCompletionButtons(currentTour);
-        currentTour.show('nglinks-start');
-      }
-    });
 
     // Only add File Conversion option if tasks are enabled
     if (tasksEnabled) {

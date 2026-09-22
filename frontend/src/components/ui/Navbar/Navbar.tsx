@@ -79,7 +79,11 @@ function NavList() {
   const links: NavLink[] = [
     { icon: HiOutlineFolder, title: 'Browse Files', href: '/browse' },
     { icon: HiOutlineShare, title: 'Data Links', href: '/links' },
-    { icon: HiOutlineEye, title: 'NG Links', href: '/nglinks' },
+    {
+      icon: HiOutlineEye,
+      title: 'NG Views',
+      href: '/ngviews'
+    },
     {
       icon: HiOutlineRocketLaunch,
       title: 'Apps',

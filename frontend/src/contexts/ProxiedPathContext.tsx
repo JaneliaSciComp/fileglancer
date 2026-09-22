@@ -10,6 +10,7 @@ import {
 } from '@/queries/proxiedPathQueries';
 
 export type ProxiedPath = {
+  id: number;
   username: string;
   sharing_key: string;
   sharing_name: string;
