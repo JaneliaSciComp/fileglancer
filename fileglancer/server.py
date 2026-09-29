@@ -1636,6 +1636,8 @@ def create_app(settings):
             view = db.get_view_by_short_key(session, short_key)
             if not view or not _can_edit_view(view, username):
                 raise HTTPException(status_code=404, detail="View not found")
+            if payload.ng_state is not None and not isinstance(payload.ng_state.get('layers', []), list):
+                raise HTTPException(status_code=400, detail="ng_state.layers must be a list")
             view = db.update_view(session, view, name=payload.name,
                                   ng_state=payload.ng_state, proxy_url=_proxy_url(settings))
             return View.model_validate(view)
