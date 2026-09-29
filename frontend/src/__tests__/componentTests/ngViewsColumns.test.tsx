@@ -8,7 +8,16 @@ import {
   flexRender
 } from '@tanstack/react-table';
 
-import { useNGViewsColumns } from '@/components/ui/Table/ngViewsColumns';
+const navigate = vi.hoisted(() => vi.fn());
+vi.mock('react-router', async importOriginal => {
+  const actual = await importOriginal<typeof import('react-router')>();
+  return { ...actual, useNavigate: () => navigate };
+});
+
+import {
+  useNGViewsColumns,
+  ActionsCell
+} from '@/components/ui/Table/ngViewsColumns';
 import type { View } from '@/queries/viewQueries';
 import { formatDateString } from '@/utils';
 
@@ -125,5 +134,22 @@ describe('useNGViewsColumns', () => {
     await user.click(trigger);
     await user.click(await screen.findByText('Delete'));
     expect(onDelete).toHaveBeenCalledWith(view);
+  });
+
+  it('navigates to the embedded viewer when "Open in Neuroglancer" is clicked', async () => {
+    const user = userEvent.setup();
+    render(
+      <ActionsCell
+        baseUrl="https://ng.example/"
+        item={view}
+        onDelete={vi.fn()}
+        onRename={vi.fn()}
+      />
+    );
+    const trigger = screen.getByRole('button');
+
+    await user.click(trigger);
+    await user.click(await screen.findByText('Open in Neuroglancer'));
+    expect(navigate).toHaveBeenCalledWith(`/view/${view.read_key}`);
   });
 });
