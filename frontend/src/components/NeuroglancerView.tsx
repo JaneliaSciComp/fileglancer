@@ -4,13 +4,14 @@ import { Link, useParams } from 'react-router';
 import { IconButton, Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 import {
-  HiOutlineDuplicate,
+  HiOutlineShare,
   HiOutlineDownload,
   HiOutlineExternalLink,
   HiOutlineArrowsExpand
 } from 'react-icons/hi';
 
 import { useViewStateByReadKey } from '@/queries/viewQueries';
+import { useViewsContext } from '@/contexts/ViewsContext';
 import { useInternalNeuroglancerBaseUrl } from '@/hooks/useDefaultNeuroglancerBaseUrl';
 import { constructNeuroglancerUrl } from '@/utils/neuroglancerUrl';
 import { downloadTextFile } from '@/utils';
@@ -20,6 +21,7 @@ import FgLink from '@/components/designSystem/atoms/FgLink';
 import LogoSvg from '@/components/ui/Navbar/LogoSvg';
 import ProfileMenu from '@/components/ui/Navbar/ProfileMenu';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
+import InlineNameEditor from '@/components/ui/widgets/InlineNameEditor';
 
 type ToolbarIconButtonProps = {
   readonly label: string;
@@ -45,6 +47,11 @@ function ToolbarIconButton({ label, icon, onClick }: ToolbarIconButtonProps) {
 export default function NeuroglancerView() {
   const { readKey } = useParams();
   const stateQuery = useViewStateByReadKey(readKey);
+  // The public read_key endpoint returns only ng_state. Ownership, name and
+  // short_key come from the owner's own Views list (cached app-wide); a miss
+  // means "not mine" and the title renders read-only.
+  const { allViewsQuery, updateViewMutation } = useViewsContext();
+  const ownedView = allViewsQuery.data?.find(v => v.read_key === readKey);
   const baseUrl = useInternalNeuroglancerBaseUrl();
   const containerRef = useRef<HTMLDivElement>(null);
   const ngState = stateQuery.data;
@@ -81,14 +88,14 @@ export default function NeuroglancerView() {
     );
   }
 
-  const title = (ngState.title as string) || 'Untitled View';
+  const title = ownedView?.name || (ngState.title as string) || 'Untitled View';
   const externalUrl = constructNeuroglancerUrl(ngState, baseUrl);
 
   const handleCopy = async () => {
     const shortLink = `${window.location.origin}/view/${readKey}`;
     const result = await copyToClipboard(shortLink);
     if (result.success) {
-      toast.success('Neuroglancer link copied');
+      toast.success('View link copied');
     } else {
       toast.error(`Failed to copy: ${result.error}`);
     }
@@ -116,14 +123,37 @@ export default function NeuroglancerView() {
               Views
             </FgLink>
             <Typography>/</Typography>
-            <Typography className="truncate">{title}</Typography>
+            {ownedView ? (
+              <InlineNameEditor
+                className="truncate"
+                label="view name"
+                onSave={async name => {
+                  try {
+                    await updateViewMutation.mutateAsync({
+                      short_key: ownedView.short_key,
+                      name
+                    });
+                    toast.success('View renamed');
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error ? error.message : 'Rename failed'
+                    );
+                    throw error;
+                  }
+                }}
+                typographyType="p"
+                value={title}
+              />
+            ) : (
+              <Typography className="truncate">{title}</Typography>
+            )}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-4">
           <div className="flex items-center gap-1">
             <ToolbarIconButton
-              icon={HiOutlineDuplicate}
-              label="Copy link"
+              icon={HiOutlineShare}
+              label="Copy link to share"
               onClick={() => void handleCopy()}
             />
             <ToolbarIconButton
