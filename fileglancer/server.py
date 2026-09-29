@@ -259,6 +259,18 @@ def _normalize_proxied_path(path: str) -> str:
     return path
 
 
+def _can_edit_view(view: db.ViewDB, username: str) -> bool:
+    """The one edit-authorization rule for Views. Owner-only today; shareable
+    edit links (the reserved edit_key) extend this function rather than
+    adding checks per route."""
+    return view.owner == username
+
+
+def _proxy_url(settings) -> Optional[str]:
+    """Data Link base URL as a plain string, or None when unconfigured."""
+    return str(settings.external_proxy_url).rstrip('/') if settings.external_proxy_url else None
+
+
 def _convert_ticket(db_ticket: db.TicketDB) -> Ticket:
     return Ticket(
         username=db_ticket.username,
@@ -1592,10 +1604,11 @@ def create_app(settings):
                                    short_key: str = Path(..., description="The View's short key"),
                                    username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
-            view = db.update_view(session, username, short_key,
-                                  name=payload.name, ng_state=payload.ng_state)
-            if not view:
+            view = db.get_view_by_short_key(session, short_key)
+            if not view or not _can_edit_view(view, username):
                 raise HTTPException(status_code=404, detail="View not found")
+            view = db.update_view(session, view, name=payload.name,
+                                  ng_state=payload.ng_state, proxy_url=_proxy_url(settings))
             return View.model_validate(view)
 
     @app.delete("/api/neuroglancer/views/{short_key}",

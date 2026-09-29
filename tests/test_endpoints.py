@@ -2208,3 +2208,24 @@ def test_delete_data_link_no_dependents_still_works(test_client, temp_dir):
     resp = test_client.delete(f"/api/proxied-path/{sk}")
     assert resp.status_code == 200
     assert test_client.get(f"/api/proxied-path/{sk}").status_code == 404
+
+
+def test_put_ng_state_rebuilds_layers(test_client, temp_dir):
+    a = _make_proxied_path(test_client, temp_dir, "ra")
+    b = _make_proxied_path(test_client, temp_dir, "rb")
+    url_a = test_client.get(f"/api/proxied-path/{a}").json()["url"]
+    url_b = test_client.get(f"/api/proxied-path/{b}").json()["url"]
+    created = test_client.post("/api/neuroglancer/views", json={
+        "name": "edit me",
+        "ng_state": {"layers": [{"name": "a", "source": url_a + "|zarr2:"}]},
+        "layers": [{"layer_index": 0, "sharing_key": a}]}).json()
+
+    resp = test_client.put(f"/api/neuroglancer/views/{created['short_key']}", json={
+        "ng_state": {"title": "edit me", "layers": [
+            {"name": "b", "source": url_b + "|zarr2:"},
+            {"name": "a", "source": url_a + "|zarr2:"}]}})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert "title" not in body["ng_state"]
+    assert [(l["layer_index"], l["sharing_key"]) for l in body["layers"]] == [(0, b), (1, a)]
+    assert body["layers"][0]["path"] == "rb"
