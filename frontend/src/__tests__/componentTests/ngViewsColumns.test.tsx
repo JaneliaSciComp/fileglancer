@@ -65,7 +65,9 @@ const view: View = {
       opts: null,
       broken: false,
       fsp_name: 'nrs',
-      path: 'dudman/one.zarr'
+      path: 'dudman/one.zarr',
+      sharing_key: null,
+      url_prefix: null
     },
     {
       layer_index: 1,
@@ -74,7 +76,9 @@ const view: View = {
       opts: null,
       broken: true,
       fsp_name: 'nrs',
-      path: 'dudman/two.zarr'
+      path: 'dudman/two.zarr',
+      sharing_key: null,
+      url_prefix: null
     }
   ]
 };
@@ -169,7 +173,9 @@ describe('useNGViewsColumns', () => {
           opts: null,
           broken: false,
           fsp_name: 'nrs',
-          path: 'dudman/shared.zarr'
+          path: 'dudman/shared.zarr',
+          sharing_key: null,
+          url_prefix: null
         },
         {
           layer_index: 1,
@@ -178,7 +184,9 @@ describe('useNGViewsColumns', () => {
           opts: null,
           broken: true,
           fsp_name: 'nrs',
-          path: 'dudman/shared.zarr'
+          path: 'dudman/shared.zarr',
+          sharing_key: null,
+          url_prefix: null
         }
       ]
     };
@@ -208,7 +216,9 @@ describe('useNGViewsColumns', () => {
           opts: null,
           broken: true,
           fsp_name: null,
-          path: null
+          path: null,
+          sharing_key: null,
+          url_prefix: null
         }
       ]
     };
@@ -239,7 +249,9 @@ describe('useNGViewsColumns', () => {
           opts: null,
           broken: true,
           fsp_name: 'nrs',
-          path: ''
+          path: '',
+          sharing_key: null,
+          url_prefix: null
         }
       ]
     };
@@ -266,7 +278,9 @@ describe('useNGViewsColumns', () => {
           opts: { unsupported: true },
           broken: false,
           fsp_name: 'nrs',
-          path: 'dudman/plain-dir'
+          path: 'dudman/plain-dir',
+          sharing_key: null,
+          url_prefix: null
         }
       ]
     };

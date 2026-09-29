@@ -13,7 +13,7 @@ import {
   sendRequestAndThrowForNotOk,
   throwResponseNotOkError
 } from './queryUtils';
-import { viewQueryKeys } from './viewQueries';
+import { toastRelinked, viewQueryKeys, type ViewSummary } from './viewQueries';
 
 /**
  * Raw API response structure from /api/proxied-path endpoints
@@ -180,6 +180,10 @@ export function useProxiedPathByFspAndPathQuery(
   });
 }
 
+export type CreatedProxiedPath = ProxiedPath & {
+  relinked_views?: ViewSummary[];
+};
+
 /**
  * Mutation hook for creating a new proxied path
  *
@@ -188,7 +192,7 @@ export function useProxiedPathByFspAndPathQuery(
  * mutation.mutate({ fsp_name: 'my-fsp', path: '/data/file.zarr' });
  */
 export function useCreateProxiedPathMutation(): UseMutationResult<
-  ProxiedPath,
+  CreatedProxiedPath,
   Error,
   CreateProxiedPathPayload,
   { previousPaths?: ProxiedPath[] }
@@ -206,7 +210,7 @@ export function useCreateProxiedPathMutation(): UseMutationResult<
       }
       const url = buildUrl('/api/proxied-path', null, queryParams);
       const proxiedPath = await sendRequestAndThrowForNotOk(url, 'POST');
-      return proxiedPath as ProxiedPath;
+      return proxiedPath as CreatedProxiedPath;
     },
     // Optimistic update for all proxied paths list
     onMutate: async (newPath: CreateProxiedPathPayload) => {
@@ -221,7 +225,7 @@ export function useCreateProxiedPathMutation(): UseMutationResult<
       return { previousPaths };
     },
     // On success, update both the list and the specific proxied path detail
-    onSuccess: (newProxiedPath: ProxiedPath) => {
+    onSuccess: (newProxiedPath: CreatedProxiedPath) => {
       // Update the detail query for this specific proxied path
       queryClient.setQueryData(
         proxiedPathQueryKeys.detail(
@@ -239,6 +243,7 @@ export function useCreateProxiedPathMutation(): UseMutationResult<
       // dataset (server side); refetch so the Views table drops the
       // broken-link icon without a page reload.
       queryClient.invalidateQueries({ queryKey: viewQueryKeys.all });
+      toastRelinked(newProxiedPath.relinked_views ?? []);
     },
     // On error, rollback
     onError: (_err, _variables, context) => {
