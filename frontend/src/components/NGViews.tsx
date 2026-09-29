@@ -5,6 +5,9 @@ import toast from 'react-hot-toast';
 import { TableCard } from '@/components/ui/Table/TableCard';
 import { useNGViewsColumns } from '@/components/ui/Table/ngViewsColumns';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
+import RelinkDialog, {
+  type RelinkTarget
+} from '@/components/ui/Dialogs/RelinkDialog';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
 import { useViewsContext } from '@/contexts/ViewsContext';
@@ -20,6 +23,7 @@ export default function NGViews() {
   // Sources column is user-resizable via a drag handle in its header. Width
   // lives here (not in the column def) so a re-render on drag actually
   // re-flows the CSS grid template.
+  const [relinkTarget, setRelinkTarget] = useState<RelinkTarget | null>(null);
   const [sourcesColWidth, setSourcesColWidth] = useState(260);
   const clampSourcesWidth = useCallback(
     (w: number) => Math.max(120, Math.min(900, w)),
@@ -69,7 +73,8 @@ export default function NGViews() {
     handleOpenRename,
     setDeleteItem,
     sourcesColWidth,
-    handleSourcesResize
+    handleSourcesResize,
+    setRelinkTarget
   );
 
   // Fixed pixel tracks for every column except Sources (user-resizable).
@@ -154,6 +159,13 @@ export default function NGViews() {
             </FgButton>
           </div>
         </FgDialog>
+      ) : null}
+
+      {relinkTarget ? (
+        <RelinkDialog
+          onClose={() => setRelinkTarget(null)}
+          target={relinkTarget}
+        />
       ) : null}
     </>
   );
