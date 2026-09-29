@@ -1032,6 +1032,20 @@ def test_relinkable_matches_fsp_root_path(db_session, fsp):
     assert [x.short_key for x in get_relinkable_views(db_session, "u", fsp.name, "")] == [v.short_key]
 
 
+
+def test_relink_matches_legacy_dot_fsp_root_path(db_session, fsp):
+    # Rows written before path normalization stored the FSP root as ".".
+    old = _pp(db_session, fsp, "")
+    v = create_view(db_session, "u", "legacy", {"layers": [{"name": "r", "source": _src(old)}]},
+                    [_row(old, 0, path=".")], "read")
+    _break(db_session, old)
+    new = _pp(db_session, fsp, "")
+    views = get_relinkable_views(db_session, "u", fsp.name, "")
+    assert [x.short_key for x in views] == [v.short_key]
+    assert [x.short_key for x in relink_broken_layers(db_session, views, new)] == [v.short_key]
+    db_session.refresh(v)
+    assert v.layers[0].broken is False and v.layers[0].sharing_key == new.sharing_key
+
 def test_relinkable_is_owner_scoped_and_skips_unrecoverable(db_session, fsp):
     old = _pp(db_session, fsp, "s.zarr")
     create_view(db_session, "other", "theirs", {"layers": [{"source": _src(old)}]}, [_row(old, 0)], "read")
