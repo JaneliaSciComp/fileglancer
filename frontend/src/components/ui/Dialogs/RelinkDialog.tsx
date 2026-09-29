@@ -96,7 +96,11 @@ export default function RelinkDialog({
         </Typography>
         <div className="flex gap-4">
           <FgButton
-            disabled={pending || !zonesAndFspQuery.isSuccess}
+            disabled={
+              pending ||
+              !allProxiedPathsQuery.isSuccess ||
+              !zonesAndFspQuery.isSuccess
+            }
             onClick={() => void run()}
           >
             {existing ? 'Relink using existing Data Link' : 'Create Data Link'}

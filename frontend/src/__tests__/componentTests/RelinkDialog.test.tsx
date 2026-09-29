@@ -26,6 +26,12 @@ const link = (path: string) => ({
   url_prefix: 'img.zarr'
 });
 
+async function enabledButton(name: string) {
+  const btn = await screen.findByRole('button', { name });
+  await waitFor(() => expect(btn).toBeEnabled());
+  return btn;
+}
+
 describe('RelinkDialog', () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -46,11 +52,7 @@ describe('RelinkDialog', () => {
       initialEntries: ['/browse']
     });
     expect(await screen.findByText('/test/a/img.zarr')).toBeInTheDocument();
-    const createBtn = await screen.findByRole('button', {
-      name: 'Create Data Link'
-    });
-    await waitFor(() => expect(createBtn).toBeEnabled());
-    await userEvent.setup().click(createBtn);
+    await userEvent.setup().click(await enabledButton('Create Data Link'));
     // Default subpath mode is full_path: FSP linux_path + dataset path
     await waitFor(() => expect(urlPrefix).toBe('test/fsp/a/img.zarr'));
     expect(toast.success).toHaveBeenCalledWith('Relinked 1 broken View');
@@ -68,17 +70,17 @@ describe('RelinkDialog', () => {
         return HttpResponse.json({ views: [{ short_key: 'v', name: 'V' }] });
       })
     );
-    render(<RelinkDialog onClose={vi.fn()} target={target} />, {
+    const onClose = vi.fn();
+    render(<RelinkDialog onClose={onClose} target={target} />, {
       initialEntries: ['/browse']
     });
-    await userEvent.setup().click(
-      await screen.findByRole('button', {
-        name: 'Relink using existing Data Link'
-      })
-    );
+    await userEvent
+      .setup()
+      .click(await enabledButton('Relink using existing Data Link'));
     await waitFor(() =>
       expect(relinkedWith).toEqual({ sharing_key: 'existing' })
     );
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
   it('finds an existing FSP-root link', async () => {
@@ -111,13 +113,25 @@ describe('RelinkDialog', () => {
     render(<RelinkDialog onClose={onClose} target={target} />, {
       initialEntries: ['/browse']
     });
-    const createBtn = await screen.findByRole('button', {
-      name: 'Create Data Link'
-    });
-    await waitFor(() => expect(createBtn).toBeEnabled());
-    await userEvent.setup().click(createBtn);
+    await userEvent.setup().click(await enabledButton('Create Data Link'));
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(onClose).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('disables the action until Data Links have loaded', async () => {
+    server.use(
+      http.get('/api/proxied-path', () =>
+        HttpResponse.json({ error: 'boom' }, { status: 500 })
+      )
+    );
+    render(<RelinkDialog onClose={vi.fn()} target={target} />, {
+      initialEntries: ['/browse']
+    });
+    const btn = await screen.findByRole('button', {
+      name: 'Create Data Link'
+    });
+    await new Promise(r => setTimeout(r, 200));
+    expect(btn).toBeDisabled();
   });
 });
