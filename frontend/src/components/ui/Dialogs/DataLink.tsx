@@ -22,7 +22,10 @@ import {
 import type { FileSharePath } from '@/shared.types';
 import type { PendingToolKey } from '@/hooks/useZarrMetadata';
 import { DependentViewsError } from '@/queries/proxiedPathQueries';
-import { useViewsForDataLinkQuery } from '@/queries/viewQueries';
+import {
+  useRelinkableViewsQuery,
+  useViewsForDataLinkQuery
+} from '@/queries/viewQueries';
 import FgDialog from './FgDialog';
 import TextWithFilePath from './TextWithFilePath';
 import DataLinkOptions, {
@@ -212,6 +215,16 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
       name: v.name
     }));
 
+  // Creating a link relinks the caller's broken Views on this dataset (server
+  // side, always). In consent mode, say so before they click.
+  const relinkableQuery = useRelinkableViewsQuery(
+    props.action === 'create' && !localAreDataLinksAutomatic && fspName
+      ? fspName
+      : undefined,
+    normalizedFilePath
+  );
+  const relinkable = relinkableQuery.data ?? [];
+
   const customSubpathError = useMemo(
     () =>
       dataLinkSubpathMode === 'custom'
@@ -304,6 +317,20 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               If you share the data link with internal collaborators, they will
               be able to view these data.
             </Typography>
+            {relinkable.length > 0 ? (
+              <div className="flex flex-col gap-2 border-l-4 border-info bg-surface/30 p-3 rounded">
+                <Typography className="text-info font-semibold">
+                  Creating this link will also repair these broken Views:
+                </Typography>
+                <ul className="list-disc pl-5">
+                  {relinkable.map(v => (
+                    <li className="text-foreground text-sm" key={v.short_key}>
+                      {v.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <div className="flex flex-col gap-2">
               <Typography className="font-semibold text-foreground">
                 Don't ask me this again:

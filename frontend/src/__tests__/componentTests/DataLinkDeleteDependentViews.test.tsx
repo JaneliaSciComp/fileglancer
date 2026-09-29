@@ -23,7 +23,8 @@ vi.mock('@/contexts/ZonesAndFspMapContext', () => ({
 const viewsForDataLink = vi.hoisted(() => vi.fn());
 vi.mock('@/queries/viewQueries', async importOriginal => ({
   ...(await importOriginal<typeof import('@/queries/viewQueries')>()),
-  useViewsForDataLinkQuery: viewsForDataLink
+  useViewsForDataLinkQuery: viewsForDataLink,
+  useRelinkableViewsQuery: () => ({ data: [] })
 }));
 
 import DataLinkDialog from '@/components/ui/Dialogs/DataLink';
