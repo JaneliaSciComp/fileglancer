@@ -1618,7 +1618,8 @@ def create_app(settings):
             pp = db.get_proxied_path_by_sharing_key(session, payload.sharing_key)
             if not pp or pp.username != username:
                 raise HTTPException(status_code=404, detail="Data link not found")
-            views = db.get_relinkable_views(session, username, pp.fsp_name, pp.path)
+            views = [v for v in db.get_relinkable_views(session, username, pp.fsp_name, pp.path)
+                     if _can_edit_view(v, username)]
             changed = db.relink_broken_layers(session, views, pp)
             return ViewSummaryResponse(views=[ViewSummary(short_key=v.short_key, name=v.name) for v in changed])
 
