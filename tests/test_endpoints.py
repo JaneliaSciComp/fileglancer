@@ -2354,3 +2354,27 @@ def test_update_link_after_cache_hit_persists(test_client, temp_dir):
     db._get_sharing_key_cache().clear()
     assert test_client.get(f"/api/proxied-path/{sk}").json()["sharing_name"] == "renamed"
 
+
+def test_put_view_by_non_owner_404(test_client, temp_dir):
+    from fileglancer import database as db
+    db_url = f"sqlite:///{os.path.join(temp_dir, 'test.db')}"
+    with db.get_db_session(db_url) as session:
+        theirs = db.create_view(session, "otheruser", "theirs", {"layers": []}, [])
+        key = theirs.short_key
+    resp = test_client.put(f"/api/neuroglancer/views/{key}",
+                           json={"name": "hijacked", "ng_state": {"layers": [], "x": 1}})
+    assert resp.status_code == 404
+    with db.get_db_session(db_url) as session:
+        view = db.get_view_by_short_key(session, key)
+        assert view.name == "theirs" and view.ng_state == {"layers": []}
+
+
+def test_relink_rejects_link_caller_does_not_own(test_client, temp_dir):
+    from fileglancer import database as db
+    os.makedirs(os.path.join(temp_dir, "notmine"), exist_ok=True)
+    with db.get_db_session(f"sqlite:///{os.path.join(temp_dir, 'test.db')}") as session:
+        sk = db.create_proxied_path(session, "otheruser", "notmine", "tempdir", "notmine",
+                                    url_prefix="notmine").sharing_key
+    resp = test_client.post("/api/neuroglancer/views/relink", json={"sharing_key": sk})
+    assert resp.status_code == 404
+
