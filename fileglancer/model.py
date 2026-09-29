@@ -188,6 +188,14 @@ class ViewLayer(BaseModel):
         default=None,
         description="Path (relative to the FSP mount) of this layer's source; kept when the Data Link is deleted",
     )
+    sharing_key: Optional[str] = Field(
+        default=None,
+        description="Sharing key of the Data Link this layer was built against; kept when the link is deleted",
+    )
+    url_prefix: Optional[str] = Field(
+        default=None,
+        description="URL prefix of that Data Link; kept when the link is deleted",
+    )
     broken: bool = Field(default=False, description="True if the backing Data Link was deleted")
 
 

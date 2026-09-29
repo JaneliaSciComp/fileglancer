@@ -1549,6 +1549,8 @@ def create_app(settings):
                 data_link_id = None
                 fsp_name = None
                 path = None
+                sharing_key = None
+                url_prefix = None
                 if layer.sharing_key:
                     pp = db.get_proxied_path_by_sharing_key(session, layer.sharing_key)
                     if not pp:
@@ -1557,6 +1559,8 @@ def create_app(settings):
                     data_link_id = pp.id
                     fsp_name = pp.fsp_name
                     path = pp.path
+                    sharing_key = pp.sharing_key
+                    url_prefix = pp.url_prefix
                 layers.append({
                     "data_link_id": data_link_id,
                     "layer_index": layer.layer_index,
@@ -1564,6 +1568,8 @@ def create_app(settings):
                     "opts": layer.opts,
                     "fsp_name": fsp_name,
                     "path": path,
+                    "sharing_key": sharing_key,
+                    "url_prefix": url_prefix,
                 })
             view = db.create_view(session, username, payload.name, payload.ng_state,
                                   layers, payload.sharing_mode)
