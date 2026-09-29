@@ -699,12 +699,25 @@ def get_proxied_path_by_sharing_key(session: Session, sharing_key: str) -> Optio
 
     # Only cache valid results (not None)
     if proxied_path is not None:
-        cache[sharing_key] = proxied_path
+        _cache_detached(session, proxied_path)
         logger.debug(f"Cached result for sharing key: {sharing_key}, cache size: {len(cache)}")
     else:
         logger.trace(f"Not caching None result for sharing key: {sharing_key}")
 
     return proxied_path
+
+
+def _cache_detached(session: Session, proxied_path: ProxiedPathDB) -> None:
+    """Cache a loaded, detached copy of proxied_path.
+
+    The cache outlives the request session. An instance still attached to it
+    would be expired by that session's next commit (expire_on_commit) and then
+    raise DetachedInstanceError on every later cache hit, so the cached
+    instance is always refreshed and expunged. Callers get it read-only; code
+    that edits a link must re-query it in its own session."""
+    session.refresh(proxied_path)
+    session.expunge(proxied_path)
+    _get_sharing_key_cache()[proxied_path.sharing_key] = proxied_path
 
 
 def _invalidate_sharing_key_cache(sharing_key: str):
@@ -861,10 +874,8 @@ def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_
     session.add(proxied_path)
     session.commit()
 
-    # Cache the new proxied path
-    cache = _get_sharing_key_cache()
-    cache[sharing_key] = proxied_path
-    logger.debug(f"Cached new proxied path for sharing key: {sharing_key}, cache size: {len(cache)}")
+    _cache_detached(session, proxied_path)
+    logger.debug(f"Cached new proxied path for sharing key: {sharing_key}")
     return proxied_path
 
 
@@ -876,7 +887,9 @@ def update_proxied_path(session: Session,
                         new_path: Optional[str] = None,
                         new_fsp_name: Optional[str] = None) -> ProxiedPathDB:
     """Update a proxied path"""
-    proxied_path = get_proxied_path_by_sharing_key(session, sharing_key)
+    # Query in this session, not via the cache: the cached instance is
+    # detached, so edits to it would never be flushed.
+    proxied_path = session.query(ProxiedPathDB).filter_by(sharing_key=sharing_key).first()
     if not proxied_path:
         raise ValueError(f"Proxied path with sharing key {sharing_key} not found")
 
@@ -898,10 +911,8 @@ def update_proxied_path(session: Session,
 
     session.commit()
 
-    # Update cache with the modified object
-    cache = _get_sharing_key_cache()
-    cache[sharing_key] = proxied_path
-    logger.debug(f"Updated cache entry for sharing key: {sharing_key}, cache size: {len(cache)}")
+    _cache_detached(session, proxied_path)
+    logger.debug(f"Updated cache entry for sharing key: {sharing_key}")
     return proxied_path
 
 
