@@ -25,7 +25,8 @@ vi.mock('@/contexts/CartContext', () => ({
 vi.mock('@/hooks/useCartDimensionCheck', () => ({
   useCartDimensionCheck: () => ({
     mismatchedKeys: new Set(),
-    hasMismatch: false
+    hasMismatch: false,
+    kindByKey: new Map()
   })
 }));
 
