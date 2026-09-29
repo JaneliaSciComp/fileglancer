@@ -235,6 +235,10 @@ export function useCreateProxiedPathMutation(): UseMutationResult<
       queryClient.invalidateQueries({
         queryKey: proxiedPathQueryKeys.all
       });
+      // Creating a Data Link relinks the caller's broken Views on that
+      // dataset (server side); refetch so the Views table drops the
+      // broken-link icon without a page reload.
+      queryClient.invalidateQueries({ queryKey: viewQueryKeys.all });
     },
     // On error, rollback
     onError: (_err, _variables, context) => {

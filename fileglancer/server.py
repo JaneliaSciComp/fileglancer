@@ -1277,7 +1277,7 @@ def create_app(settings):
             return {"message": f"Neuroglancer link {short_key} deleted"}
 
 
-    @app.post("/api/proxied-path", response_model=ProxiedPath,
+    @app.post("/api/proxied-path", response_model=ProxiedPathCreateResponse,
               description="Create a new proxied path")
     async def create_proxied_path(fsp_name: str = Query(..., description="The name of the file share path that this proxied path is associated with"),
                                   path: str = Query(..., description="The path relative to the file share path mount point"),
@@ -1308,10 +1308,16 @@ def create_app(settings):
         with db.get_db_session(settings.db_url) as session:
             try:
                 new_path = db.create_proxied_path(session, username, sharing_name, fsp_name, path, url_prefix=url_prefix)
-                return _convert_proxied_path(new_path, settings.external_proxy_url)
             except ValueError as e:
                 logger.error(f"Error creating proxied path: {e}")
                 raise HTTPException(status_code=400, detail=str(e))
+            # A new link to a dataset repairs the caller's own broken Views on it.
+            views = db.get_relinkable_views(session, username, new_path.fsp_name, new_path.path)
+            relinked = db.relink_broken_layers(session, views, new_path)
+            return ProxiedPathCreateResponse(
+                **_convert_proxied_path(new_path, settings.external_proxy_url).model_dump(),
+                relinked_views=[ViewSummary(short_key=v.short_key, name=v.name) for v in relinked],
+            )
 
 
     @app.get("/api/proxied-path", response_model=ProxiedPathResponse,
@@ -1587,6 +1593,28 @@ def create_app(settings):
         with db.get_db_session(settings.db_url) as session:
             views = db.get_views(session, username)
             return ViewResponse(views=[View.model_validate(v) for v in views])
+
+    @app.get("/api/neuroglancer/views/relinkable", response_model=ViewSummaryResponse,
+             description="The caller's broken Views that a Data Link to this dataset would repair")
+    async def relinkable_views_endpoint(fsp_name: str = Query(..., description="File share path name"),
+                                        path: str = Query(..., description="Path relative to the file share path"),
+                                        username: str = Depends(get_current_user)):
+        path = _normalize_proxied_path(path)
+        with db.get_db_session(settings.db_url) as session:
+            views = db.get_relinkable_views(session, username, fsp_name, path)
+            return ViewSummaryResponse(views=[ViewSummary(short_key=v.short_key, name=v.name) for v in views])
+
+    @app.post("/api/neuroglancer/views/relink", response_model=ViewSummaryResponse,
+              description="Relink the caller's broken Views onto one of the caller's Data Links")
+    async def relink_views_endpoint(payload: RelinkRequest,
+                                    username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            pp = db.get_proxied_path_by_sharing_key(session, payload.sharing_key)
+            if not pp or pp.username != username:
+                raise HTTPException(status_code=404, detail="Data link not found")
+            views = db.get_relinkable_views(session, username, pp.fsp_name, pp.path)
+            changed = db.relink_broken_layers(session, views, pp)
+            return ViewSummaryResponse(views=[ViewSummary(short_key=v.short_key, name=v.name) for v in changed])
 
     @app.get("/api/neuroglancer/views/{short_key}", response_model=View,
              description="Get one of the current user's Neuroglancer Views")

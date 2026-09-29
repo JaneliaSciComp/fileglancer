@@ -1,3 +1,4 @@
+import copy
 import secrets
 import hashlib
 from datetime import datetime, timedelta, UTC
@@ -16,7 +17,7 @@ from cachetools import LRUCache, TTLCache
 
 from fileglancer.giturls import canonical_github_url
 from fileglancer.model import FileSharePath
-from fileglancer.ngstate import data_link_segment, default_url_prefix, layer_sharing_key, layer_uses_segment
+from fileglancer.ngstate import data_link_segment, default_url_prefix, layer_sharing_key, layer_uses_segment, rewrite_layer_segment
 from fileglancer.settings import get_settings
 from fileglancer.utils import slugify_path
 
@@ -1173,6 +1174,58 @@ def get_views_for_data_link(session: Session, data_link_id: int, owner: Optional
     if owner is not None:
         query = query.filter(ViewDB.owner == owner)
     return query.all()
+
+
+def get_relinkable_views(session: Session, owner: str, fsp_name: str, path: str) -> List[ViewDB]:
+    """The owner's Views with a broken layer on this dataset that can be
+    relinked (its dead Data Link key and prefix are known)."""
+    layer_view_ids = (
+        session.query(ViewLayerDB.view_id)
+        .filter(ViewLayerDB.broken.is_(True),
+                ViewLayerDB.sharing_key.isnot(None),
+                ViewLayerDB.url_prefix.isnot(None),
+                ViewLayerDB.fsp_name == fsp_name,
+                ViewLayerDB.path == path)
+    )
+    return (
+        session.query(ViewDB)
+        .filter(ViewDB.id.in_(layer_view_ids), ViewDB.owner == owner)
+        .order_by(ViewDB.created_at.desc())
+        .all()
+    )
+
+
+def relink_broken_layers(session: Session, views: List[ViewDB], proxied_path: ProxiedPathDB) -> List[ViewDB]:
+    """Point each View's relinkable broken layers on proxied_path's dataset at
+    proxied_path: rewrite /{old_key}/{old_prefix} in every ng_state source and
+    re-attach the rows. The caller chooses `views` (owner-scoped today; an
+    edit-link session would pass just the View being edited). Commits."""
+    pp = proxied_path
+    new_segment = data_link_segment(pp.sharing_key, pp.url_prefix)
+    changed = []
+    for view in views:
+        rows = [l for l in view.layers
+                if l.broken and l.sharing_key and l.url_prefix is not None
+                and l.fsp_name == pp.fsp_name and l.path == pp.path]
+        if not rows:
+            continue
+        state = copy.deepcopy(view.ng_state)
+        if 'layers' in state:
+            for old_segment in {data_link_segment(l.sharing_key, l.url_prefix) for l in rows}:
+                state['layers'] = [
+                    rewrite_layer_segment(ng, old_segment, new_segment) if isinstance(ng, dict) else ng
+                    for ng in (state.get('layers') or [])
+                ]
+        for row in rows:
+            row.sharing_key = pp.sharing_key
+            row.url_prefix = pp.url_prefix
+            row.data_link_id = pp.id
+            row.broken = False
+        view.ng_state = state  # reassign: plain JSON columns don't track in-place edits
+        view.updated_at = datetime.now(UTC)
+        changed.append(view)
+    session.commit()
+    return changed
 
 
 def mark_view_layers_broken(session: Session, data_link_id: int) -> int:
