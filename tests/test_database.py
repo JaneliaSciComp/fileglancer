@@ -984,3 +984,59 @@ def test_rename_only_update_leaves_layers(db_session, fsp):
     v = create_view(db_session, "u", "keep", {"layers": []}, [_row(a, 0)], "read")
     update_view(db_session, v, name="renamed", proxy_url=PROXY)
     assert len(v.layers) == 1 and v.layers[0].sharing_key == a.sharing_key
+
+
+def _break(db_session, pp, username="u"):
+    mark_view_layers_broken(db_session, pp.id)
+    delete_proxied_path(db_session, username, pp.sharing_key)
+
+
+def test_relink_rewrites_every_layer_using_the_key(db_session, fsp):
+    old = _pp(db_session, fsp, "img.zarr")
+    state = {"layers": [
+        {"name": "ch0", "source": _src(old)},
+        {"name": "ch1", "source": _src(old)},
+        {"name": "labels", "source": {"url": f"{PROXY}/{old.sharing_key}/{old.url_prefix}/labels/cells|zarr2:"}},
+    ]}
+    v = create_view(db_session, "u", "multi", state, [_row(old, 0), _row(old, 1), _row(old, 2)], "read")
+    _break(db_session, old)
+
+    new = _pp(db_session, fsp, "img.zarr")
+    views = get_relinkable_views(db_session, "u", fsp.name, "img.zarr")
+    assert [x.short_key for x in views] == [v.short_key]
+    changed = relink_broken_layers(db_session, views, new)
+    assert [x.short_key for x in changed] == [v.short_key]
+
+    db_session.refresh(v)
+    assert all(l.broken is False and l.data_link_id == new.id and l.sharing_key == new.sharing_key for l in v.layers)
+    urls = [l["source"] if isinstance(l["source"], str) else l["source"]["url"] for l in v.ng_state["layers"]]
+    assert all(f"/{new.sharing_key}/img.zarr" in u and old.sharing_key not in u for u in urls)
+    assert get_relinkable_views(db_session, "u", fsp.name, "img.zarr") == []
+
+
+def test_relink_rewrites_custom_prefix_with_slash(db_session, fsp):
+    old = _pp(db_session, fsp, "deep/img.zarr", url_prefix="custom/prefix")
+    v = create_view(db_session, "u", "c", {"layers": [{"name": "i", "source": _src(old)}]}, [_row(old, 0)], "read")
+    _break(db_session, old)
+    new = _pp(db_session, fsp, "deep/img.zarr")
+    relink_broken_layers(db_session, get_relinkable_views(db_session, "u", fsp.name, "deep/img.zarr"), new)
+    db_session.refresh(v)
+    assert v.ng_state["layers"][0]["source"] == f"{PROXY}/{new.sharing_key}/img.zarr|zarr2:"
+
+
+def test_relinkable_matches_fsp_root_path(db_session, fsp):
+    old = _pp(db_session, fsp, "")
+    assert old.url_prefix == fsp.name
+    v = create_view(db_session, "u", "root", {"layers": [{"name": "r", "source": _src(old)}]}, [_row(old, 0)], "read")
+    _break(db_session, old)
+    assert [x.short_key for x in get_relinkable_views(db_session, "u", fsp.name, "")] == [v.short_key]
+
+
+def test_relinkable_is_owner_scoped_and_skips_unrecoverable(db_session, fsp):
+    old = _pp(db_session, fsp, "s.zarr")
+    create_view(db_session, "other", "theirs", {"layers": [{"source": _src(old)}]}, [_row(old, 0)], "read")
+    create_view(db_session, "u", "no-prefix", {"layers": []},
+                [_row(old, 0, url_prefix=None)], "read")
+    _break(db_session, old)
+    assert get_relinkable_views(db_session, "u", fsp.name, "s.zarr") == []
+    assert len(get_relinkable_views(db_session, "other", fsp.name, "s.zarr")) == 1
