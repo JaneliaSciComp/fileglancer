@@ -2359,3 +2359,43 @@ def test_relinkable_route_not_shadowed_by_short_key(test_client):
     # GET /views/{short_key} must not swallow /views/relinkable
     resp = test_client.get("/api/neuroglancer/views/relinkable?fsp_name=tempdir&path=x")
     assert resp.status_code == 200
+
+
+def test_cached_link_survives_view_save_after_cache_miss(test_client, temp_dir):
+    # Regression: a cache miss inside a request that later commits (View save)
+    # used to cache an instance that the commit expired, so every later lookup
+    # of the link raised DetachedInstanceError.
+    from fileglancer import database as db
+    sk = _make_proxied_path(test_client, temp_dir, "cache1")
+    view = _view_on_link(test_client, sk, "v")
+    url = test_client.get(f"/api/proxied-path/{sk}").json()["url"]
+    db._get_sharing_key_cache().clear()  # restart / eviction / another worker
+    resp = test_client.put(f"/api/neuroglancer/views/{view['short_key']}",
+                           json={"ng_state": {"layers": [{"name": "i", "source": url + "|zarr2:"}]}})
+    assert resp.status_code == 200, resp.text
+    resp = test_client.get(f"/api/proxied-path/{sk}")
+    assert resp.status_code == 200, resp.text
+    assert test_client.put(f"/api/neuroglancer/views/{view['short_key']}",
+                           json={"name": "again"}).status_code == 200
+
+
+def test_cached_link_survives_relink_after_cache_miss(test_client, temp_dir):
+    from fileglancer import database as db
+    sk = _make_proxied_path(test_client, temp_dir, "cache2")
+    db._get_sharing_key_cache().clear()
+    resp = test_client.post("/api/neuroglancer/views/relink", json={"sharing_key": sk})
+    assert resp.status_code == 200, resp.text
+    resp = test_client.get(f"/api/proxied-path/{sk}")
+    assert resp.status_code == 200, resp.text
+
+
+def test_update_link_after_cache_hit_persists(test_client, temp_dir):
+    # The cached instance is detached; an update must still reach the DB.
+    from fileglancer import database as db
+    sk = _make_proxied_path(test_client, temp_dir, "cache3")
+    test_client.get(f"/api/proxied-path/{sk}")  # warm the cache
+    resp = test_client.put(f"/api/proxied-path/{sk}?sharing_name=renamed")
+    assert resp.status_code == 200, resp.text
+    db._get_sharing_key_cache().clear()
+    assert test_client.get(f"/api/proxied-path/{sk}").json()["sharing_name"] == "renamed"
+
