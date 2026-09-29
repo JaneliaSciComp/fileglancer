@@ -2423,3 +2423,11 @@ def test_relink_rejects_link_caller_does_not_own(test_client, temp_dir):
     resp = test_client.post("/api/neuroglancer/views/relink", json={"sharing_key": sk})
     assert resp.status_code == 404
 
+
+def test_put_view_rejects_non_list_layers(test_client):
+    view = test_client.post("/api/neuroglancer/views", json={
+        "name": "v", "ng_state": {"layers": []}, "layers": []}).json()
+    resp = test_client.put(f"/api/neuroglancer/views/{view['short_key']}",
+                           json={"ng_state": {"layers": {"0": {"name": "i"}}}})
+    assert resp.status_code == 400
+    assert "ng_state.layers must be a list" in resp.text
