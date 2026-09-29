@@ -1187,6 +1187,11 @@ def get_views_for_data_link(session: Session, data_link_id: int, owner: Optional
     return query.all()
 
 
+def _path_aliases(path: str) -> List[str]:
+    """Stored spellings of a normalized path: legacy rows wrote the FSP root as "."."""
+    return ["", "."] if path == "" else [path]
+
+
 def get_relinkable_views(session: Session, owner: str, fsp_name: str, path: str) -> List[ViewDB]:
     """The owner's Views with a broken layer on this dataset that can be
     relinked (its dead Data Link key and prefix are known)."""
@@ -1196,7 +1201,7 @@ def get_relinkable_views(session: Session, owner: str, fsp_name: str, path: str)
                 ViewLayerDB.sharing_key.isnot(None),
                 ViewLayerDB.url_prefix.isnot(None),
                 ViewLayerDB.fsp_name == fsp_name,
-                ViewLayerDB.path == path)
+                ViewLayerDB.path.in_(_path_aliases(path)))
     )
     return (
         session.query(ViewDB)
@@ -1217,7 +1222,7 @@ def relink_broken_layers(session: Session, views: List[ViewDB], proxied_path: Pr
     for view in views:
         rows = [l for l in view.layers
                 if l.broken and l.sharing_key and l.url_prefix is not None
-                and l.fsp_name == pp.fsp_name and l.path == pp.path]
+                and l.fsp_name == pp.fsp_name and l.path in _path_aliases(pp.path)]
         if not rows:
             continue
         state = copy.deepcopy(view.ng_state)
