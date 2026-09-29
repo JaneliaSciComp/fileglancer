@@ -15,6 +15,7 @@ vi.mock('@/utils', () => ({
 }));
 
 import {
+  useCreateProxiedPathMutation,
   useDeleteProxiedPathMutation,
   DependentViewsError
 } from '@/queries/proxiedPathQueries';
@@ -88,6 +89,28 @@ describe('useDeleteProxiedPathMutation 409 handling', () => {
       wrapper
     });
     await result.current.mutateAsync({ sharing_key: 'k1', confirm: true });
+    expect(client.getQueryState(viewQueryKeys.list())?.isInvalidated).toBe(
+      true
+    );
+  });
+});
+
+describe('useCreateProxiedPathMutation', () => {
+  it('invalidates the Views queries on success so relinked sources refresh', async () => {
+    sendFetchRequest.mockResolvedValue(
+      fakeResponse(200, {
+        sharing_key: 'k2',
+        fsp_name: 'nrs',
+        path: 'a.zarr',
+        url: 'http://x/files/k2/a.zarr',
+        relinked_views: [{ short_key: 'v1', name: 'V' }]
+      })
+    );
+    client.setQueryData(viewQueryKeys.list(), []);
+    const { result } = renderHook(() => useCreateProxiedPathMutation(), {
+      wrapper
+    });
+    await result.current.mutateAsync({ fsp_name: 'nrs', path: 'a.zarr' });
     expect(client.getQueryState(viewQueryKeys.list())?.isInvalidated).toBe(
       true
     );
