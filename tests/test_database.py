@@ -884,3 +884,17 @@ def test_view_request_models_validate_sharing_mode():
     with pytest.raises(ValidationError):
         ViewCreateRequest(name="d", ng_state={}, sharing_mode="public")
 
+
+
+def test_create_view_stores_data_link_identity(db_session):
+    layers = [{"data_link_id": 3, "layer_index": 0, "channel": None, "opts": None,
+               "fsp_name": "nrs", "path": "a/img.zarr",
+               "sharing_key": "KEY", "url_prefix": "img.zarr"}]
+    v = create_view(db_session, "u", "ident", {"layers": []}, layers, "read")
+    layer = get_view_by_short_key(db_session, v.short_key).layers[0]
+    assert (layer.sharing_key, layer.url_prefix) == ("KEY", "img.zarr")
+
+    mark_view_layers_broken(db_session, 3)
+    db_session.refresh(v)
+    # identity survives the break — it is what relink needs
+    assert (v.layers[0].sharing_key, v.layers[0].url_prefix) == ("KEY", "img.zarr")

@@ -169,6 +169,10 @@ class ViewLayerDB(Base):
     # broken View can be shown (and later restored) by path.
     fsp_name = Column(String, nullable=True)
     path = Column(String, nullable=True)
+    # Data Link this layer was built against; kept after the link is deleted
+    # so the layer can be relinked (its ng_state URLs carry /{key}/{prefix}).
+    sharing_key = Column(String, nullable=True)
+    url_prefix = Column(String, nullable=True)
     broken = Column(Boolean, nullable=False, server_default=sa_false())
 
     view = relationship('ViewDB', back_populates='layers')
@@ -1012,7 +1016,7 @@ def create_view(
 ) -> ViewDB:
     """Create a View plus its ViewLayer rows. Returns the persisted ViewDB.
 
-    Each layer dict: {data_link_id, layer_index, channel, opts, fsp_name, path}.
+    Each layer dict: {data_link_id, layer_index, channel, opts, fsp_name, path, sharing_key, url_prefix}.
     """
     now = datetime.now(UTC)
     view = ViewDB(
@@ -1034,6 +1038,8 @@ def create_view(
             opts=layer.get('opts'),
             fsp_name=layer.get('fsp_name'),
             path=layer.get('path'),
+            sharing_key=layer.get('sharing_key'),
+            url_prefix=layer.get('url_prefix'),
         ))
     session.add(view)
     session.commit()

@@ -2176,6 +2176,8 @@ def test_dependent_views_endpoint(test_client, temp_dir):
     layer = resp.json()["views"][0]["layers"][0]
     assert layer["fsp_name"] == "tempdir"
     assert layer["path"] == "dl1"
+    assert layer["sharing_key"] == sk
+    assert layer["url_prefix"] == "dl1"
 
 
 def test_delete_data_link_blocks_then_confirms_marks_broken(test_client, temp_dir):
