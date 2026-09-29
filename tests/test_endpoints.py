@@ -2088,6 +2088,7 @@ def test_views_crud(test_client):
     assert created["read_key"] and created["short_key"]
     assert "edit_key" not in created          # never exposed
     assert len(created["layers"]) == 1 and created["layers"][0]["channel"] == "Ch0"
+    assert created["layers"][0]["fsp_name"] is None and created["layers"][0]["path"] is None
     short_key = created["short_key"]
 
     # list
@@ -2172,6 +2173,9 @@ def test_dependent_views_endpoint(test_client, temp_dir):
     resp = test_client.get(f"/api/proxied-path/{sk}/views")
     assert resp.status_code == 200
     assert [v["name"] for v in resp.json()["views"]] == ["uses dl1"]
+    layer = resp.json()["views"][0]["layers"][0]
+    assert layer["fsp_name"] == "tempdir"
+    assert layer["path"] == "dl1"
 
 
 def test_delete_data_link_blocks_then_confirms_marks_broken(test_client, temp_dir):
@@ -2192,6 +2196,9 @@ def test_delete_data_link_blocks_then_confirms_marks_broken(test_client, temp_di
     view = test_client.get(f"/api/neuroglancer/views/{created['short_key']}").json()
     assert view["layers"][0]["broken"] is True
     assert view["layers"][0]["data_link_id"] is None
+    # source survives the deletion
+    assert view["layers"][0]["fsp_name"] is not None
+    assert view["layers"][0]["path"] is not None
 
 
 def test_delete_data_link_no_dependents_still_works(test_client, temp_dir):

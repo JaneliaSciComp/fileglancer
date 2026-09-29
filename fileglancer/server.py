@@ -1541,17 +1541,23 @@ def create_app(settings):
             layers = []
             for layer in payload.layers:
                 data_link_id = None
+                fsp_name = None
+                path = None
                 if layer.sharing_key:
                     pp = db.get_proxied_path_by_sharing_key(session, layer.sharing_key)
                     if not pp:
                         raise HTTPException(status_code=400,
                                             detail=f"Unknown data link sharing key: {layer.sharing_key}")
                     data_link_id = pp.id
+                    fsp_name = pp.fsp_name
+                    path = pp.path
                 layers.append({
                     "data_link_id": data_link_id,
                     "layer_index": layer.layer_index,
                     "channel": layer.channel,
                     "opts": layer.opts,
+                    "fsp_name": fsp_name,
+                    "path": path,
                 })
             view = db.create_view(session, username, payload.name, payload.ng_state,
                                   layers, payload.sharing_mode)
