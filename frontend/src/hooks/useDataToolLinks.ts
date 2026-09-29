@@ -21,6 +21,33 @@ import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
 
 const VALID_URL_PREFIX_RE = /^[A-Za-z0-9\-._~/!@$&'()*+,;:=%]+$/;
 
+/**
+ * The url_prefix a new Data Link gets from the user's subpath-mode preference
+ * when no custom prefix is supplied. `path` is already FSP-root-normalized.
+ */
+export function defaultUrlPrefix(
+  mode: 'name' | 'full_path' | 'custom',
+  path: string,
+  fspName: string,
+  linuxPath: string | null | undefined
+): string {
+  switch (mode) {
+    case 'full_path':
+      return escapePathForUrl(
+        normalizePosixStylePath(
+          linuxPath ? joinPaths(linuxPath, path) : path || fspName
+        )
+      );
+    case 'custom':
+      return path.split('/').pop() || fspName;
+    case 'name':
+    default:
+      // basename of "" is "" — fall back to the FSP name for FSP-root
+      // links so the URL still has a meaningful trailing segment.
+      return escapePathForUrl(path.split('/').pop() || fspName);
+  }
+}
+
 export function validateUrlPrefix(value: string): string | null {
   if (!value || !value.trim()) {
     return 'Data link name must not be empty';
@@ -121,30 +148,14 @@ export default function useDataToolLinks(
     const fspName = fileQuery.data.currentFileSharePath.name;
 
     try {
-      let urlPrefix: string;
-      if (urlPrefixOverride !== undefined) {
-        urlPrefix = urlPrefixOverride;
-      } else {
-        const linuxPath = fileQuery.data.currentFileSharePath.linux_path;
-        switch (dataLinkSubpathMode) {
-          case 'full_path':
-            urlPrefix = escapePathForUrl(
-              normalizePosixStylePath(
-                linuxPath ? joinPaths(linuxPath, path) : path || fspName
-              )
-            );
-            break;
-          case 'custom':
-            urlPrefix = path.split('/').pop() || fspName;
-            break;
-          case 'name':
-          default:
-            // basename of "" is "" — fall back to the FSP name for FSP-root
-            // links so the URL still has a meaningful trailing segment.
-            urlPrefix = escapePathForUrl(path.split('/').pop() || fspName);
-            break;
-        }
-      }
+      const urlPrefix =
+        urlPrefixOverride ??
+        defaultUrlPrefix(
+          dataLinkSubpathMode,
+          path,
+          fspName,
+          fileQuery.data.currentFileSharePath.linux_path
+        );
 
       const validationError = validateUrlPrefix(urlPrefix);
       if (validationError) {
