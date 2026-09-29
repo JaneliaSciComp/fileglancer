@@ -74,7 +74,7 @@ type DataType =
   | 'data links'
   | 'tasks'
   | 'NG links'
-  | 'NG views'
+  | 'views'
   | 'jobs'
   | 'apps'
   | 'shared apps';
@@ -84,7 +84,12 @@ type TableProps<TData> = {
   readonly data: TData[];
   readonly dataType: DataType;
   readonly errorState: Error | unknown;
-  readonly gridColsClass: string;
+  // Static Tailwind grid-cols-[...] class OR a dynamic gridTemplateColumns
+  // inline style value (used when a column is user-resizable, since Tailwind
+  // JIT can't emit arbitrary-width classes at runtime). Exactly one of the
+  // two should be set; if both are given, gridColsStyle wins.
+  readonly gridColsClass?: string;
+  readonly gridColsStyle?: string;
   readonly loadingState: boolean;
   readonly headerActions?: ReactNode;
   readonly initialPageSize?: number;
@@ -146,12 +151,12 @@ function HeaderIcons<TData, TValue>({
 }) {
   return (
     <div
-      className={`flex flex-col ${
+      className={`flex flex-col w-full h-full ${
         header.column.getCanSort() ? 'cursor-pointer' : ''
       }`}
       onClick={header.column.getToggleSortingHandler()}
     >
-      <div className="flex items-center gap-2 font-semibold select-none group/sort">
+      <div className="flex items-center gap-2 w-full h-full font-semibold select-none group/sort">
         {flexRender(header.column.columnDef.header, header.getContext())}
         <SortIcons header={header} />
       </div>
@@ -306,14 +311,17 @@ function TableHeader({
 
 function TableRow({
   gridColsClass,
+  gridColsStyle,
   children
 }: {
-  readonly gridColsClass: string;
+  readonly gridColsClass?: string;
+  readonly gridColsStyle?: string;
   readonly children: ReactNode;
 }) {
   return (
     <div
-      className={`grid ${gridColsClass} min-h-16 justify-items-start gap-4 px-4 border-b border-surface last:border-0`}
+      className={`grid ${gridColsClass ?? ''} min-h-16 justify-items-start gap-4 px-4 border-b border-surface last:border-0 ${gridColsStyle ? 'min-w-max' : ''}`}
+      style={gridColsStyle ? { gridTemplateColumns: gridColsStyle } : undefined}
     >
       {children}
     </div>
@@ -324,6 +332,7 @@ function Table<TData>({
   columns,
   data,
   gridColsClass,
+  gridColsStyle,
   loadingState,
   errorState,
   dataType,
@@ -429,59 +438,71 @@ function Table<TData>({
           setGlobalFilter={handleInputChange}
           table={table}
         />
-        <div
-          className={`shrink-0 grid ${gridColsClass} gap-4 px-4 py-2 bg-surface/30`}
-        >
-          {table
-            .getHeaderGroups()
-            .map(headerGroup =>
-              headerGroup.headers.map(header =>
-                header.isPlaceholder ? null : (
-                  <HeaderIcons header={header} key={header.id} />
+        <div className="overflow-x-auto">
+          <div
+            className={`shrink-0 grid ${gridColsClass ?? ''} gap-4 px-4 py-2 bg-surface/30 ${gridColsStyle ? 'min-w-max' : ''}`}
+            style={
+              gridColsStyle ? { gridTemplateColumns: gridColsStyle } : undefined
+            }
+          >
+            {table
+              .getHeaderGroups()
+              .map(headerGroup =>
+                headerGroup.headers.map(header =>
+                  header.isPlaceholder ? null : (
+                    <HeaderIcons header={header} key={header.id} />
+                  )
                 )
-              )
-            )}
-        </div>
-        {/* Body */}
-        {loadingState ? (
-          <TableRowSkeleton gridColsClass={gridColsClass} />
-        ) : data && data.length > 0 ? (
-          table.getRowModel().rows.length > 0 ? (
-            <div className="max-h-full" id="table-body">
-              {table.getRowModel().rows.map(row => (
-                <TableRow gridColsClass={gridColsClass} key={row.id}>
-                  {row.getVisibleCells().map(cell => (
-                    <Fragment key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </Fragment>
-                  ))}
-                </TableRow>
-              ))}
+              )}
+          </div>
+          {/* Body */}
+          {loadingState ? (
+            <TableRowSkeleton
+              gridColsClass={gridColsClass}
+              gridColsStyle={gridColsStyle}
+            />
+          ) : data && data.length > 0 ? (
+            table.getRowModel().rows.length > 0 ? (
+              <div className="max-h-full" id="table-body">
+                {table.getRowModel().rows.map(row => (
+                  <TableRow
+                    gridColsClass={gridColsClass}
+                    gridColsStyle={gridColsStyle}
+                    key={row.id}
+                  >
+                    {row.getVisibleCells().map(cell => (
+                      <Fragment key={cell.id}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </Fragment>
+                    ))}
+                  </TableRow>
+                ))}
+              </div>
+            ) : (
+              <div className="px-4 py-8 text-center text-foreground">
+                {dataType
+                  ? `No ${dataType} match your query`
+                  : 'No data matches your query'}
+              </div>
+            )
+          ) : errorState ? (
+            <div className="px-4 py-8 text-center text-error">
+              Error loading data:{' '}
+              {errorState instanceof Error
+                ? errorState.message
+                : String(errorState)}
             </div>
-          ) : (
+          ) : !data || data.length === 0 ? (
             <div className="px-4 py-8 text-center text-foreground">
               {dataType
-                ? `No ${dataType} match your query`
-                : 'No data matches your query'}
+                ? `You have not created any ${dataType} yet`
+                : 'No data available'}
             </div>
-          )
-        ) : errorState ? (
-          <div className="px-4 py-8 text-center text-error">
-            Error loading data:{' '}
-            {errorState instanceof Error
-              ? errorState.message
-              : String(errorState)}
-          </div>
-        ) : !data || data.length === 0 ? (
-          <div className="px-4 py-8 text-center text-foreground">
-            {dataType
-              ? `You have not created any ${dataType} yet`
-              : 'No data available'}
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
       {showContextMenu ? (
         <ContextMenu
@@ -500,6 +521,7 @@ function TableCard<TData>({
   columns,
   data,
   gridColsClass,
+  gridColsStyle,
   loadingState,
   errorState,
   dataType,
@@ -514,6 +536,7 @@ function TableCard<TData>({
         dataType={dataType}
         errorState={errorState}
         gridColsClass={gridColsClass}
+        gridColsStyle={gridColsStyle}
         headerActions={headerActions}
         initialPageSize={initialPageSize}
         loadingState={loadingState}

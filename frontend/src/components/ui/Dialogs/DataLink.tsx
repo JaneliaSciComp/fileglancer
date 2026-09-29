@@ -366,8 +366,8 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
             {dependentViews && dependentViews.length > 0 ? (
               <div className="flex flex-col gap-2 bg-surface/30 p-2 rounded">
                 <Typography className="text-foreground font-semibold">
-                  These Neuroglancer Views you own use this data link and will
-                  be marked broken:
+                  These Views you own use this data link and will be marked
+                  broken:
                 </Typography>
                 <ul className="list-disc pl-5">
                   {dependentViews.map(v => (
