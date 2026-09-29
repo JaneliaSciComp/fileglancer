@@ -2070,3 +2070,132 @@ def test_bucket_root_lists_names_with_spaces(test_client, temp_dir):
         response = test_client.get(f"/files/{keys[0]}")
         assert response.status_code == 200
         assert response.text == "spaced"
+
+
+def test_views_crud(test_client):
+    # create
+    resp = test_client.post("/api/neuroglancer/views", json={
+        "name": "seed6 overlay",
+        "ng_state": {"layers": [{"name": "img"}]},
+        "sharing_mode": "read",
+        "layers": [{"layer_index": 0, "channel": "Ch0"}],
+    })
+    assert resp.status_code == 200, resp.text
+    created = resp.json()
+    assert created["name"] == "seed6 overlay"
+    assert created["sharing_mode"] == "read"
+    assert created["owner"] == "testuser"
+    assert created["read_key"] and created["short_key"]
+    assert "edit_key" not in created          # never exposed
+    assert len(created["layers"]) == 1 and created["layers"][0]["channel"] == "Ch0"
+    short_key = created["short_key"]
+
+    # list
+    resp = test_client.get("/api/neuroglancer/views")
+    assert resp.status_code == 200
+    names = [v["name"] for v in resp.json()["views"]]
+    assert "seed6 overlay" in names
+
+    # get one
+    resp = test_client.get(f"/api/neuroglancer/views/{short_key}")
+    assert resp.status_code == 200
+    assert resp.json()["short_key"] == short_key
+
+    # update (rename)
+    resp = test_client.put(f"/api/neuroglancer/views/{short_key}", json={"name": "renamed"})
+    assert resp.status_code == 200
+    assert resp.json()["name"] == "renamed"
+
+    # delete
+    resp = test_client.delete(f"/api/neuroglancer/views/{short_key}")
+    assert resp.status_code == 200
+    assert test_client.get(f"/api/neuroglancer/views/{short_key}").status_code == 404
+
+
+def test_view_get_and_update_missing_returns_404(test_client):
+    assert test_client.get("/api/neuroglancer/views/nope").status_code == 404
+    assert test_client.put("/api/neuroglancer/views/nope", json={"name": "x"}).status_code == 404
+    assert test_client.delete("/api/neuroglancer/views/nope").status_code == 404
+
+
+def test_view_create_with_unknown_sharing_key_400(test_client):
+    resp = test_client.post("/api/neuroglancer/views", json={
+        "name": "bad",
+        "ng_state": {},
+        "layers": [{"layer_index": 0, "sharing_key": "does-not-exist"}],
+    })
+    assert resp.status_code == 400
+
+
+def test_ngview_serves_state_by_read_key(test_client):
+    resp = test_client.post("/api/neuroglancer/views", json={
+        "name": "readable",
+        "ng_state": {"layers": [{"name": "img"}], "position": [1, 2, 3]},
+        "sharing_mode": "read",
+    })
+    assert resp.status_code == 200, resp.text
+    created = resp.json()
+    read_key = created["read_key"]
+
+    # public read endpoint serves the stored ng_state verbatim
+    resp = test_client.get(f"/ngview/{read_key}")
+    assert resp.status_code == 200
+    assert resp.json() == {"layers": [{"name": "img"}], "position": [1, 2, 3], "title": "readable"}
+    assert resp.headers.get("cache-control") == "no-store"
+
+    # Rename updates the served title (name is the single source of truth)
+    resp = test_client.put(f"/api/neuroglancer/views/{created['short_key']}", json={"name": "renamed view"})
+    assert resp.status_code == 200
+    resp = test_client.get(f"/ngview/{read_key}")
+    assert resp.status_code == 200
+    assert resp.json()["title"] == "renamed view"
+
+    # the short_key is NOT a valid read key
+    assert test_client.get(f"/ngview/{created['short_key']}").status_code == 404
+    # unknown key 404s
+    assert test_client.get("/ngview/nope").status_code == 404
+
+
+def _make_proxied_path(test_client, test_app_temp_dir, subdir):
+    # The test FSP "tempdir" is mounted at test_app_temp_dir; create a real dir.
+    os.makedirs(os.path.join(test_app_temp_dir, subdir), exist_ok=True)
+    resp = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path={subdir}")
+    assert resp.status_code == 200, resp.text
+    return resp.json()["sharing_key"]
+
+
+def test_dependent_views_endpoint(test_client, temp_dir):
+    sk = _make_proxied_path(test_client, temp_dir, "dl1")
+    test_client.post("/api/neuroglancer/views", json={
+        "name": "uses dl1", "ng_state": {}, "layers": [{"layer_index": 0, "sharing_key": sk}]})
+
+    resp = test_client.get(f"/api/proxied-path/{sk}/views")
+    assert resp.status_code == 200
+    assert [v["name"] for v in resp.json()["views"]] == ["uses dl1"]
+
+
+def test_delete_data_link_blocks_then_confirms_marks_broken(test_client, temp_dir):
+    sk = _make_proxied_path(test_client, temp_dir, "dl2")
+    created = test_client.post("/api/neuroglancer/views", json={
+        "name": "v", "ng_state": {}, "layers": [{"layer_index": 0, "sharing_key": sk}]}).json()
+
+    # no confirm + own dependents -> 409 listing the caller's own view
+    resp = test_client.delete(f"/api/proxied-path/{sk}")
+    assert resp.status_code == 409
+    detail = resp.json()["detail"]
+    assert detail["dependent_views"][0]["short_key"] == created["short_key"]
+
+    # confirm=true -> link gone, view survives with its layer marked broken
+    resp = test_client.delete(f"/api/proxied-path/{sk}?confirm=true")
+    assert resp.status_code == 200
+    assert test_client.get(f"/api/proxied-path/{sk}").status_code == 404
+    view = test_client.get(f"/api/neuroglancer/views/{created['short_key']}").json()
+    assert view["layers"][0]["broken"] is True
+    assert view["layers"][0]["data_link_id"] is None
+
+
+def test_delete_data_link_no_dependents_still_works(test_client, temp_dir):
+    sk = _make_proxied_path(test_client, temp_dir, "dl4")
+    resp = test_client.delete(f"/api/proxied-path/{sk}")
+    assert resp.status_code == 200
+    assert test_client.get(f"/api/proxied-path/{sk}").status_code == 404

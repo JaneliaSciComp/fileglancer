@@ -392,6 +392,40 @@ def test_get_views_for_data_link(db_session):
     assert get_views_for_data_link(db_session, 999) == []
 
 
+def test_mark_view_layers_broken(db_session):
+    layers = [
+        {"data_link_id": 7, "layer_index": 0, "channel": None, "opts": None},
+        {"data_link_id": 7, "layer_index": 1, "channel": "Ch1", "opts": None},
+        {"data_link_id": 8, "layer_index": 2, "channel": None, "opts": None},
+    ]
+    v = create_view(db_session, "u", "mixed", {"layers": []}, layers, "read")
+
+    updated = mark_view_layers_broken(db_session, 7)
+    assert updated == 2
+
+    db_session.refresh(v)
+    by_index = {l.layer_index: l for l in v.layers}
+    assert by_index[0].data_link_id is None and by_index[0].broken is True
+    assert by_index[1].data_link_id is None and by_index[1].broken is True
+    # the data_link_id=8 layer is untouched
+    assert by_index[2].data_link_id == 8 and by_index[2].broken is False
+    # the View itself still exists
+    assert get_view_by_short_key(db_session, v.short_key) is not None
+
+
+def test_get_views_for_data_link_owner_filter(db_session):
+    layer = [{"data_link_id": 11, "layer_index": 0, "channel": None, "opts": None}]
+    mine = create_view(db_session, "me", "mine", {"layers": []}, layer, "read")
+    create_view(db_session, "other", "theirs", {"layers": []}, layer, "read")
+
+    # unfiltered: both owners' views
+    all_deps = get_views_for_data_link(db_session, 11)
+    assert {v.owner for v in all_deps} == {"me", "other"}
+    # owner-scoped: only mine
+    mine_only = get_views_for_data_link(db_session, 11, owner="me")
+    assert [v.short_key for v in mine_only] == [mine.short_key]
+
+
 def test_view_pydantic_from_orm(db_session):
     from fileglancer.model import View
     layers = [{"data_link_id": 7, "layer_index": 0, "channel": "Ch0", "opts": None}]
@@ -807,4 +841,27 @@ class TestFindBestFspMatch:
             lambda f: [f.mount_path],
         )
         assert result is None
+
+
+def test_view_request_models_validate_sharing_mode():
+    from pydantic import ValidationError
+    from fileglancer.model import ViewCreateRequest, ViewLayerInput
+
+    req = ViewCreateRequest(
+        name="demo",
+        ng_state={"layers": []},
+        sharing_mode="read",
+        layers=[ViewLayerInput(sharing_key="abc", layer_index=0)],
+    )
+    assert req.sharing_mode == "read"
+    assert req.layers[0].sharing_key == "abc"
+    assert req.layers[0].channel is None
+
+    # default sharing_mode
+    assert ViewCreateRequest(name="d", ng_state={}).sharing_mode == "read"
+
+    # invalid sharing_mode is rejected at the boundary
+    import pytest
+    with pytest.raises(ValidationError):
+        ViewCreateRequest(name="d", ng_state={}, sharing_mode="public")
 
