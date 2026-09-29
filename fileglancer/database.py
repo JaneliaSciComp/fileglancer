@@ -16,6 +16,7 @@ from cachetools import LRUCache, TTLCache
 
 from fileglancer.giturls import canonical_github_url
 from fileglancer.model import FileSharePath
+from fileglancer.ngstate import data_link_segment, default_url_prefix, layer_sharing_key, layer_uses_segment
 from fileglancer.settings import get_settings
 from fileglancer.utils import slugify_path
 
@@ -1069,22 +1070,82 @@ def get_views(session: Session, username: str) -> List[ViewDB]:
 
 def update_view(
     session: Session,
-    username: str,
-    short_key: str,
+    view: ViewDB,
     name: Optional[str] = None,
     ng_state: Optional[Dict] = None,
-) -> Optional[ViewDB]:
-    """Update an owned View's name and/or state. Returns None if not owned/found."""
-    view = session.query(ViewDB).filter_by(short_key=short_key, owner=username).first()
-    if not view:
-        return None
+    proxy_url: Optional[str] = None,
+) -> ViewDB:
+    """Update a View's name and/or state. Authorization is the caller's job
+    (server._can_edit_view). A new ng_state rebuilds view_layers from its
+    sources when the Data Link base URL is known."""
     if name is not None:
         view.name = name
     if ng_state is not None:
-        view.ng_state = ng_state
+        # /ngview injects the name as "title"; the name column is the source of truth.
+        view.ng_state = {k: v for k, v in ng_state.items() if k != 'title'}
+        if proxy_url:
+            reconcile_view_layers(session, view, proxy_url)
     view.updated_at = datetime.now(UTC)
     session.commit()
     return view
+
+
+def reconcile_view_layers(session: Session, view: ViewDB, proxy_url: str) -> None:
+    """Rebuild view.layers so row i describes ng_state.layers[i].
+
+    Rows are matched to NG layers by the Data Link key in their sources, so
+    reorders/removals in Neuroglancer's own UI keep the bookkeeping right.
+    Dead keys keep their broken row (fsp_name/path/url_prefix) so the layer can
+    still be relinked; unsupported rows (never in ng_state) are carried past
+    the real layers. Does not commit."""
+    old = list(view.layers)
+    unsupported = [l for l in old if (l.opts or {}).get('unsupported')]
+    keyed: Dict[str, List[ViewLayerDB]] = {}
+    legacy: List[ViewLayerDB] = []  # broken before keys were recorded
+    for l in old:
+        if l in unsupported:
+            continue
+        if l.sharing_key:
+            keyed.setdefault(l.sharing_key, []).append(l)
+        elif l.broken and l.fsp_name is not None and l.path is not None:
+            legacy.append(l)
+
+    rows: List[Dict] = []
+    for i, ng_layer in enumerate(view.ng_state.get('layers') or []):
+        key = layer_sharing_key(ng_layer, proxy_url) if isinstance(ng_layer, dict) else None
+        prev = keyed[key].pop(0) if key and keyed.get(key) else None
+        pp = get_proxied_path_by_sharing_key(session, key) if key else None
+        if pp:
+            row = dict(sharing_key=key, url_prefix=pp.url_prefix, data_link_id=pp.id,
+                       fsp_name=pp.fsp_name, path=pp.path, broken=False)
+        elif key:
+            url_prefix = prev.url_prefix if prev else None
+            if prev is None and legacy:
+                prev = legacy.pop(0)
+                guess = default_url_prefix(prev.fsp_name, prev.path)
+                url_prefix = guess if layer_uses_segment(ng_layer, data_link_segment(key, guess)) else None
+            row = dict(sharing_key=key, url_prefix=url_prefix, data_link_id=None,
+                       fsp_name=prev.fsp_name if prev else None,
+                       path=prev.path if prev else None, broken=True)
+        else:
+            row = dict(sharing_key=None, url_prefix=None, data_link_id=None,
+                       fsp_name=None, path=None, broken=False)
+        row.update(layer_index=i,
+                   channel=prev.channel if prev else None,
+                   opts=prev.opts if prev else None)
+        rows.append(row)
+
+    base = len(rows)
+    for j, l in enumerate(unsupported):
+        rows.append(dict(sharing_key=l.sharing_key, url_prefix=l.url_prefix,
+                         data_link_id=l.data_link_id, fsp_name=l.fsp_name, path=l.path,
+                         broken=l.broken, channel=l.channel, opts=l.opts,
+                         layer_index=base + j))
+
+    view.layers.clear()  # delete-orphan cascade removes the old rows
+    session.flush()
+    for row in rows:
+        view.layers.append(ViewLayerDB(**row))
 
 
 def delete_view(session: Session, username: str, short_key: str) -> int:
