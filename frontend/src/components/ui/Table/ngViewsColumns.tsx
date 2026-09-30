@@ -1,11 +1,12 @@
 import { useMemo, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Typography } from '@material-tailwind/react';
+import { IconButton, Typography } from '@material-tailwind/react';
 import type { ColumnDef } from '@tanstack/react-table';
 import toast from 'react-hot-toast';
 
-import type { View } from '@/queries/viewQueries';
+import { isRelinkableLayer, type View } from '@/queries/viewQueries';
+import type { RelinkTarget } from '@/components/ui/Dialogs/RelinkDialog';
 import {
   downloadTextFile,
   formatDateString,
@@ -161,7 +162,8 @@ export function useNGViewsColumns(
   onRename: (item: View) => void,
   onDelete: (item: View) => void,
   sourcesColWidth: number,
-  onSourcesResize: (next: number) => void
+  onSourcesResize: (next: number) => void,
+  onRelink: (target: RelinkTarget) => void
 ): ColumnDef<View>[] {
   const { pathPreference } = usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
@@ -228,6 +230,7 @@ export function useNGViewsColumns(
               fsp_name: string;
               path: string;
               broken: boolean;
+              relinkable: boolean;
               unsupported: boolean;
             }
           >();
@@ -240,12 +243,15 @@ export function useNGViewsColumns(
             const unsupported = isUnsupportedLayer(layer);
             if (existing) {
               existing.broken = existing.broken || layer.broken;
+              existing.relinkable =
+                existing.relinkable || isRelinkableLayer(layer);
               existing.unsupported = existing.unsupported && unsupported;
             } else {
               bySource.set(key, {
                 fsp_name: layer.fsp_name,
                 path: layer.path,
                 broken: layer.broken,
+                relinkable: isRelinkableLayer(layer),
                 unsupported
               });
             }
@@ -264,7 +270,7 @@ export function useNGViewsColumns(
             );
           }
           return (
-            <div className="flex flex-col justify-center gap-0.5 h-full w-full min-w-0 text-left">
+            <div className="flex flex-col justify-center h-full w-full min-w-0 py-2 text-left">
               {sources.map(src => {
                 const fsp = zonesAndFspQuery.data?.[
                   makeMapKey('fsp', src.fsp_name)
@@ -274,11 +280,32 @@ export function useNGViewsColumns(
                   src.path;
                 return (
                   <div
-                    className="flex items-center gap-1 min-w-0"
+                    // Fixed row height so a Relink button doesn't
+                    // push its source apart from the others
+                    className="flex items-center gap-1 min-w-0 h-6"
                     key={datasetKey(src.fsp_name, src.path)}
                   >
-                    {src.broken ? (
-                      <FgTooltip label="Data link deleted; source no longer appears in View">
+                    {src.broken && src.relinkable ? (
+                      <FgTooltip label="Data link deleted — click to relink">
+                        <IconButton
+                          aria-label={`Relink ${fullPath}`}
+                          className="min-w-0 min-h-0 p-0.5"
+                          onClick={e => {
+                            e.stopPropagation();
+                            onRelink({
+                              fsp_name: src.fsp_name,
+                              path: src.path,
+                              displayPath: fullPath
+                            });
+                          }}
+                          size="sm"
+                          variant="ghost"
+                        >
+                          <FgIcon color="error" icon={MdLinkOff} size="sm" />
+                        </IconButton>
+                      </FgTooltip>
+                    ) : src.broken ? (
+                      <FgTooltip label="Can't relink — recreate this View">
                         <FgIcon
                           color="error"
                           icon={MdLinkOff}
@@ -355,6 +382,7 @@ export function useNGViewsColumns(
     [
       onRename,
       onDelete,
+      onRelink,
       sourcesColWidth,
       onSourcesResize,
       pathPreference,

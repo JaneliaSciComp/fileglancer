@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import {
   useQuery,
   useMutation,
@@ -21,7 +22,32 @@ export type ViewLayer = {
   broken: boolean;
   fsp_name: string | null;
   path: string | null;
+  sharing_key: string | null;
+  url_prefix: string | null;
 };
+
+export type ViewSummary = { short_key: string; name: string };
+
+type ViewSummaryResponse = { views?: ViewSummary[] };
+
+/** A broken layer can be relinked once its dead Data Link key and prefix are known. */
+export function isRelinkableLayer(
+  layer: Pick<ViewLayer, 'broken' | 'sharing_key' | 'url_prefix'>
+): boolean {
+  return (
+    layer.broken && layer.sharing_key !== null && layer.url_prefix !== null
+  );
+}
+
+/** Shared by Data Link creation and explicit relink. */
+export function toastRelinked(views: ViewSummary[]): void {
+  if (views.length === 0) {
+    return;
+  }
+  toast.success(
+    `Relinked ${views.length} broken View${views.length === 1 ? '' : 's'}`
+  );
+}
 
 export type View = {
   short_key: string;
@@ -68,6 +94,8 @@ export const viewQueryKeys = {
   forDataLink: (sharingKey: string) =>
     ['views', 'forDataLink', sharingKey] as const,
   forDataLinkAll: () => ['views', 'forDataLink'] as const,
+  relinkable: (fspName: string, path: string) =>
+    ['views', 'relinkable', fspName, path] as const,
   state: (readKey: string) => ['views', 'state', readKey] as const
 };
 
@@ -178,6 +206,50 @@ export function useViewsForDataLinkQuery(
     queryKey: viewQueryKeys.forDataLink(sharingKey ?? ''),
     queryFn: ({ signal }) => fetchViewsForDataLink(sharingKey!, signal),
     enabled: !!sharingKey
+  });
+}
+
+export function useRelinkableViewsQuery(
+  fspName?: string,
+  path?: string
+): UseQueryResult<ViewSummary[], Error> {
+  return useQuery<ViewSummary[], Error>({
+    queryKey: viewQueryKeys.relinkable(fspName ?? '', path ?? ''),
+    queryFn: async () => {
+      const url = buildUrl('/api/neuroglancer/views/relinkable', null, {
+        fsp_name: fspName!,
+        path: path!
+      });
+      const data = (await sendRequestAndThrowForNotOk(
+        url,
+        'GET'
+      )) as ViewSummaryResponse;
+      return data.views ?? [];
+    },
+    // path '' is the FSP root, so test for undefined, not falsiness
+    enabled: fspName !== undefined && path !== undefined
+  });
+}
+
+export function useRelinkViewsMutation(): UseMutationResult<
+  ViewSummary[],
+  Error,
+  string
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (sharingKey: string) => {
+      const data = (await sendRequestAndThrowForNotOk(
+        '/api/neuroglancer/views/relink',
+        'POST',
+        { sharing_key: sharingKey }
+      )) as ViewSummaryResponse;
+      return data.views ?? [];
+    },
+    onSuccess: views => {
+      toastRelinked(views);
+      queryClient.invalidateQueries({ queryKey: viewQueryKeys.all });
+    }
   });
 }
 
