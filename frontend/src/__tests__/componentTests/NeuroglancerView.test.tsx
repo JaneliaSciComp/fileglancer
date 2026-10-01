@@ -56,6 +56,34 @@ vi.mock('@/components/ui/widgets/FgTooltip', () => ({
   default: ({ children }: { children: ReactNode }) => <>{children}</>
 }));
 
+vi.mock('@/components/ui/Views/ViewBrokenBanner', () => ({
+  default: ({
+    onRelink
+  }: {
+    onRelink: (t: {
+      fsp_name: string;
+      path: string;
+      displayPath: string;
+    }) => void;
+  }) => (
+    <button
+      onClick={() =>
+        onRelink({ fsp_name: 'fsp', path: 'a.zarr', displayPath: 'a.zarr' })
+      }
+      type="button"
+    >
+      banner relink
+    </button>
+  )
+}));
+vi.mock('@/components/ui/Dialogs/RelinkDialog', () => ({
+  default: ({ onRelinked }: { onRelinked?: () => void }) => (
+    <button onClick={() => onRelinked?.()} type="button">
+      dialog relinked
+    </button>
+  )
+}));
+
 import NeuroglancerView from '@/components/NeuroglancerView';
 
 const OWNED = {
@@ -320,5 +348,47 @@ describe('NeuroglancerView', () => {
     const dirty = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(dirty);
     expect(dirty.defaultPrevented).toBe(true);
+  });
+
+  it('pushes the relinked state into the viewer', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    const relinked = { layers: [{ name: 'L0', source: 'new' }] };
+    const refetch = vi.fn().mockResolvedValue({ data: relinked });
+    useViewStateByReadKey.mockReturnValue({
+      data: { layers: [{ name: 'L0' }] },
+      isPending: false,
+      isError: false,
+      refetch
+    });
+    const setState = vi.spyOn(bridgeRef.current!.bridge, 'setState');
+    render(<NeuroglancerView />);
+    await userEvent.click(screen.getByText('banner relink'));
+    await userEvent.click(screen.getByText('dialog relinked'));
+    await waitFor(() => expect(setState).toHaveBeenCalledWith(relinked));
+  });
+
+  it('reloads the iframe with the relinked state when editing is unavailable', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    bridgeRef.current!.bridge.status = 'unavailable';
+    const relinked = { layers: [{ name: 'L0', source: 'new' }] };
+    useViewStateByReadKey.mockReturnValue({
+      data: { layers: [{ name: 'L0' }] },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn().mockResolvedValue({ data: relinked })
+    });
+    render(<NeuroglancerView />);
+    await userEvent.click(screen.getByText('banner relink'));
+    await userEvent.click(screen.getByText('dialog relinked'));
+    await waitFor(() =>
+      expect(
+        (screen.getByTitle(/neuroglancer/i) as HTMLIFrameElement).src
+      ).toContain(encodeURIComponent(JSON.stringify(relinked)))
+    );
+  });
+
+  it('shows no broken banner to a non-owner', () => {
+    renderViewer();
+    expect(screen.queryByText('banner relink')).toBeNull();
   });
 });

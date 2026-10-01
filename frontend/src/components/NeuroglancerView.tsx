@@ -25,6 +25,9 @@ import LogoSvg from '@/components/ui/Navbar/LogoSvg';
 import ProfileMenu from '@/components/ui/Navbar/ProfileMenu';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import InlineNameEditor from '@/components/ui/widgets/InlineNameEditor';
+import RelinkDialog from '@/components/ui/Dialogs/RelinkDialog';
+import type { RelinkTarget } from '@/components/ui/Dialogs/RelinkDialog';
+import ViewBrokenBanner from '@/components/ui/Views/ViewBrokenBanner';
 import ViewSaveBar from '@/components/ui/Views/ViewSaveBar';
 
 type ToolbarIconButtonProps = {
@@ -69,6 +72,7 @@ export default function NeuroglancerView() {
   if (ngState && iframeSrc === null) {
     setIframeSrc(constructNeuroglancerUrl(ngState, baseUrl));
   }
+  const [relinkTarget, setRelinkTarget] = useState<RelinkTarget | null>(null);
 
   const { dirty } = editState;
   useEffect(() => {
@@ -148,6 +152,20 @@ export default function NeuroglancerView() {
       toast.success('View saved');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Save failed');
+    }
+  };
+
+  const handleRelinked = async () => {
+    // The relink rewrote the saved state server-side; show it.
+    const { data } = await stateQuery.refetch();
+    if (!data) {
+      return;
+    }
+    if (bridge.status === 'ready') {
+      bridge.setState(data);
+      editState.rebaseline();
+    } else {
+      setIframeSrc(constructNeuroglancerUrl(data, baseUrl));
     }
   };
 
@@ -236,12 +254,26 @@ export default function NeuroglancerView() {
           status={bridge.status}
         />
       ) : null}
+      {canEdit && ownedView ? (
+        <ViewBrokenBanner
+          disabled={dirty}
+          layers={ownedView.layers}
+          onRelink={setRelinkTarget}
+        />
+      ) : null}
       <iframe
         className="flex-1 w-full border-0"
         ref={setIframe}
         src={iframeSrc ?? externalUrl}
         title="Neuroglancer viewer"
       />
+      {relinkTarget ? (
+        <RelinkDialog
+          onClose={() => setRelinkTarget(null)}
+          onRelinked={() => void handleRelinked()}
+          target={relinkTarget}
+        />
+      ) : null}
     </div>
   );
 }
