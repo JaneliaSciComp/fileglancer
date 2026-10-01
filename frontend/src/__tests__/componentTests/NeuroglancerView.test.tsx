@@ -31,8 +31,11 @@ vi.mock('@/contexts/ViewsContext', () => ({
     updateViewMutation: { mutateAsync }
   })
 }));
+const ngBase = vi.hoisted(() => ({
+  current: 'https://ng.example/' as string | null
+}));
 vi.mock('@/hooks/useDefaultNeuroglancerBaseUrl', () => ({
-  useInternalNeuroglancerBaseUrl: () => 'https://ng.example/'
+  useInternalNeuroglancerBaseUrl: () => ngBase.current
 }));
 vi.mock('react-router', () => ({
   useParams: () => ({ readKey: 'rk1' }),
@@ -112,6 +115,7 @@ describe('NeuroglancerView', () => {
     copyToClipboard.mockReset();
     copyToClipboard.mockResolvedValue({ success: true });
     useViewsQuery.mockReturnValue({ data: [] });
+    ngBase.current = 'https://ng.example/';
     mutateAsync.mockReset();
     mutateAsync.mockResolvedValue(undefined);
     bridgeRef.current = makeFakeBridge({ layers: [{ name: 'L0' }] });
@@ -390,5 +394,37 @@ describe('NeuroglancerView', () => {
   it('shows no broken banner to a non-owner', () => {
     renderViewer();
     expect(screen.queryByText('banner relink')).toBeNull();
+  });
+
+  it('waits for the configured Neuroglancer before loading the iframe', () => {
+    ngBase.current = null; // viewers config still loading
+    const { rerender } = renderViewer();
+    expect(screen.queryByTitle(/neuroglancer/i)).toBeNull();
+    ngBase.current = 'https://ng.example/';
+    rerender(<NeuroglancerView />);
+    expect(
+      (screen.getByTitle(/neuroglancer/i) as HTMLIFrameElement).src
+    ).toContain('https://ng.example/#!');
+  });
+
+  it('does not warn a non-owner before leaving', async () => {
+    renderViewer();
+    act(() => bridgeRef.current!.interact());
+    bridgeRef.current!.change({ layers: [], layout: '4panel' });
+    await new Promise(r => setTimeout(r, 400));
+    const leave = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(leave);
+    expect(leave.defaultPrevented).toBe(false);
+  });
+
+  it('keeps the viewer when a background refetch fails', () => {
+    const { rerender } = renderViewer({ title: 'My View' });
+    useViewStateByReadKey.mockReturnValue({
+      data: { title: 'My View', layers: [{ name: 'L0' }] },
+      isPending: false,
+      isError: true
+    });
+    rerender(<NeuroglancerView />);
+    expect(screen.getByTitle(/neuroglancer/i)).toBeInTheDocument();
   });
 });

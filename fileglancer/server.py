@@ -3237,8 +3237,9 @@ def create_app(settings):
             # ponytail: dev-only GET passthrough of NG's static assets, no
             # streaming or caching; production serves NG from its reverse proxy.
             # `path` is decoded, so reject anything httpx would resolve outside
-            # the configured prefix (dot segments) or into a query/fragment.
-            if any(seg in ("..", ".") for seg in path.split("/")) or "?" in path or "#" in path:
+            # the configured prefix (dot segments) or into a query/fragment. No
+            # '%' either: a still-encoded %2e%2e would be resolved upstream.
+            if any(seg in ("..", ".") for seg in path.split("/")) or any(c in path for c in "?#%"):
                 raise HTTPException(status_code=400, detail="Invalid file path")
             try:
                 async with _ng_http_client() as client:

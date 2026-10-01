@@ -75,3 +75,31 @@ def test_stays_under_configured_prefix(tmp_path, monkeypatch):
                  "/neuroglancer/a%3Fq=1", "/neuroglancer/a%23frag"):
         assert client.get(path).status_code == 400, path
     assert seen == []
+
+
+def test_rejects_double_encoded_dot_segments(tmp_path, monkeypatch):
+    # uvicorn decodes the path once, so a client's %252e%252e reaches the route
+    # as %2e%2e, which the upstream would decode and resolve. TestClient decodes
+    # twice and can't produce this, so drive the ASGI app with the scope directly.
+    import asyncio
+
+    seen = _mock_upstream(monkeypatch, lambda r: httpx.Response(200, text="upstream"))
+    settings = Settings(db_url=f"sqlite:///{tmp_path / 't.db'}", file_share_mounts=[],
+                        cli_mode=True, neuroglancer_url="https://ng.example/neuroglancer")
+    app = create_app(settings)
+    scope = {"type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1",
+             "method": "GET", "scheme": "http", "path": "/neuroglancer/%2e%2e/api/secret",
+             "raw_path": b"/neuroglancer/%252e%252e/api/secret", "root_path": "",
+             "query_string": b"", "headers": [(b"host", b"testserver")],
+             "client": ("127.0.0.1", 1), "server": ("testserver", 80)}
+    sent = []
+
+    async def receive():
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message):
+        sent.append(message)
+
+    asyncio.run(app(scope, receive, send))
+    assert sent[0]["status"] == 400
+    assert seen == []
