@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 
 import { useViewEditState } from '@/hooks/useViewEditState';
 import { makeFakeBridge } from '@/__tests__/mocks/fakeNeuroglancer';
+import type { BridgeStatus } from '@/hooks/useNeuroglancerViewer';
 
 const settle = () =>
   act(() => {
@@ -89,5 +90,55 @@ describe('useViewEditState', () => {
       useViewEditState({ ...fake.bridge, status: 'unavailable' })
     );
     expect(subscribe).not.toHaveBeenCalled();
+  });
+
+  describe('when Neuroglancer reloads in the iframe', () => {
+    function dirtyThenReload() {
+      const fake = makeFakeBridge({ layout: 'xy' });
+      const onChangesLost = vi.fn();
+      const { result, rerender } = renderHook(
+        ({ status }) =>
+          useViewEditState({ ...fake.bridge, status }, onChangesLost),
+        { initialProps: { status: 'ready' as BridgeStatus } }
+      );
+      act(() => fake.interact());
+      fake.change({ layout: '4panel' });
+      settle();
+      expect(result.current.dirty).toBe(true);
+      rerender({ status: 'loading' });
+      return { fake, onChangesLost, result, rerender };
+    }
+
+    it('reports possibly lost changes and hides them while reloading', () => {
+      const { onChangesLost, result } = dirtyThenReload();
+      expect(onChangesLost).toHaveBeenCalledTimes(1);
+      expect(result.current.dirty).toBe(false);
+    });
+
+    it('keeps edits that survived the reload unsaved', () => {
+      const { result, rerender } = dirtyThenReload();
+      // NG restores its own URL hash on reload, so the edit can survive.
+      rerender({ status: 'ready' });
+      expect(result.current.dirty).toBe(true);
+    });
+
+    it('is clean when the reload restored the saved state', () => {
+      const { fake, result, rerender } = dirtyThenReload();
+      fake.change({ layout: 'xy' });
+      rerender({ status: 'ready' });
+      expect(result.current.dirty).toBe(false);
+    });
+
+    it('says nothing when there were no unsaved changes', () => {
+      const fake = makeFakeBridge({ layout: 'xy' });
+      const onChangesLost = vi.fn();
+      const { rerender } = renderHook(
+        ({ status }) =>
+          useViewEditState({ ...fake.bridge, status }, onChangesLost),
+        { initialProps: { status: 'ready' as BridgeStatus } }
+      );
+      rerender({ status: 'loading' });
+      expect(onChangesLost).not.toHaveBeenCalled();
+    });
   });
 });
