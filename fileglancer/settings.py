@@ -143,6 +143,11 @@ class Settings(BaseSettings):
     # The external URL of the proxy server for accessing proxied paths.
     # Maps to the /files/ end points of the fileglancer-central app.
     external_proxy_url: Optional[HttpUrl] = None
+    # Dev-only: serve an external Neuroglancer (e.g. Janelia's fork) at the
+    # same-origin path /neuroglancer/ so View editing can be tested locally.
+    # Point Neuroglancer's instance_template_url in the viewers config at it.
+    # Production serves its Neuroglancer from the reverse proxy instead.
+    neuroglancer_url: Optional[str] = None
 
     # Maximum size of the sharing key LRU cache
     sharing_key_cache_size: int = 1000
