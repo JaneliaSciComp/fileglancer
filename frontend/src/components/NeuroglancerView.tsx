@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { IconType } from 'react-icons';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { IconButton, Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 import {
@@ -26,6 +26,7 @@ import ProfileMenu from '@/components/ui/Navbar/ProfileMenu';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import InlineNameEditor from '@/components/ui/widgets/InlineNameEditor';
 import RelinkDialog from '@/components/ui/Dialogs/RelinkDialog';
+import UnsavedChangesDialog from '@/components/ui/Dialogs/UnsavedChangesDialog';
 import type { RelinkTarget } from '@/components/ui/Dialogs/RelinkDialog';
 import ViewBrokenBanner from '@/components/ui/Views/ViewBrokenBanner';
 import ViewSaveBar from '@/components/ui/Views/ViewSaveBar';
@@ -51,11 +52,26 @@ function ToolbarIconButton({ label, icon, onClick }: ToolbarIconButtonProps) {
   );
 }
 
+type NgState = Record<string, unknown>;
+
+/** An action the owner confirmed past the unsaved-changes dialog. */
+type PendingAction = {
+  readonly message: string;
+  /** Gets the saved state: the one just saved, or the last saved one. */
+  readonly run: (state: NgState) => void;
+};
+
+const LEAVE_MESSAGE =
+  'This View has unsaved changes. Leaving this page discards them.';
+const EXPORT_MESSAGE =
+  "This View has unsaved changes. Without saving, this uses the last saved version, which doesn't include them.";
+
 const warnChangesLost = () =>
   toast.error('Neuroglancer reloaded, so unsaved changes may have been lost');
 
 export default function NeuroglancerView() {
   const { readKey } = useParams();
+  const navigate = useNavigate();
   const stateQuery = useViewStateByReadKey(readKey);
   // The public read_key endpoint returns only ng_state. Ownership, name and
   // short_key come from the owner's own Views list (cached app-wide); a miss
@@ -76,6 +92,9 @@ export default function NeuroglancerView() {
     setIframeSrc(constructNeuroglancerUrl(ngState, baseUrl));
   }
   const [relinkTarget, setRelinkTarget] = useState<RelinkTarget | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(
+    null
+  );
 
   const { dirty } = editState;
   useEffect(() => {
@@ -85,9 +104,41 @@ export default function NeuroglancerView() {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
     };
+    // BrowserRouter has no useBlocker, so catch in-app link clicks (logo,
+    // breadcrumb, profile menu) before React Router's Link handles them.
+    // ponytail: same-origin <a> clicks only; browser back/forward and
+    // programmatic navigation still leave without asking.
+    const onLinkClick = (e: MouseEvent) => {
+      if (
+        e.defaultPrevented ||
+        e.button !== 0 ||
+        e.metaKey ||
+        e.ctrlKey ||
+        e.shiftKey ||
+        e.altKey
+      ) {
+        return;
+      }
+      const link = (e.target as Element | null)?.closest?.('a[href]');
+      if (
+        !(link instanceof HTMLAnchorElement) ||
+        (link.target && link.target !== '_self') ||
+        link.hasAttribute('download') ||
+        link.origin !== window.location.origin
+      ) {
+        return;
+      }
+      e.preventDefault();
+      const to = link.pathname + link.search + link.hash;
+      setPendingAction({ message: LEAVE_MESSAGE, run: () => navigate(to) });
+    };
     window.addEventListener('beforeunload', onBeforeUnload);
-    return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [dirty, canEdit]);
+    document.addEventListener('click', onLinkClick, true);
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      document.removeEventListener('click', onLinkClick, true);
+    };
+  }, [dirty, canEdit, navigate]);
 
   // Reflect the full state into the app's own URL hash so copy-pasting the
   // current page URL is a full-state shareable link, matching Neuroglancer's
@@ -125,6 +176,15 @@ export default function NeuroglancerView() {
   const title = ownedView?.name || (ngState.title as string) || 'Untitled View';
   const externalUrl = constructNeuroglancerUrl(ngState, baseUrl);
 
+  // Owner with unsaved edits: ask first. Otherwise run on the saved state.
+  const confirmUnsaved = (run: (state: NgState) => void) => {
+    if (canEdit && dirty) {
+      setPendingAction({ message: EXPORT_MESSAGE, run });
+    } else {
+      run(ngState);
+    }
+  };
+
   const handleCopy = async () => {
     const shortLink = `${window.location.origin}/view/${readKey}`;
     const result = await copyToClipboard(shortLink);
@@ -142,9 +202,10 @@ export default function NeuroglancerView() {
     void containerRef.current?.requestFullscreen?.();
   };
 
-  const handleSave = async () => {
+  /** Resolves to the state that was saved, or null if the save failed. */
+  const handleSave = async (): Promise<NgState | null> => {
     if (!ownedView) {
-      return;
+      return null;
     }
     try {
       // Inside the try: throws if Neuroglancer is mid-reload.
@@ -155,8 +216,18 @@ export default function NeuroglancerView() {
       });
       editState.markSaved(sent);
       toast.success('View saved');
+      return sent;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Save failed');
+      return null;
+    }
+  };
+
+  const saveThenRun = async (action: PendingAction) => {
+    const sent = await handleSave();
+    if (sent) {
+      setPendingAction(null);
+      action.run(sent);
     }
   };
 
@@ -220,15 +291,17 @@ export default function NeuroglancerView() {
             <ToolbarIconButton
               icon={HiOutlineShare}
               label="Copy link to share"
-              onClick={() => void handleCopy()}
+              onClick={() => confirmUnsaved(() => void handleCopy())}
             />
             <ToolbarIconButton
               icon={HiOutlineDownload}
               label="Download JSON"
               onClick={() =>
-                downloadTextFile(
-                  JSON.stringify(ngState, null, 2),
-                  `${title}.json`
+                confirmUnsaved(state =>
+                  downloadTextFile(
+                    JSON.stringify(state, null, 2),
+                    `${title}.json`
+                  )
                 )
               }
             />
@@ -236,7 +309,13 @@ export default function NeuroglancerView() {
               icon={HiOutlineExternalLink}
               label="Open in Neuroglancer"
               onClick={() =>
-                window.open(externalUrl, '_blank', 'noopener,noreferrer')
+                confirmUnsaved(state =>
+                  window.open(
+                    constructNeuroglancerUrl(state, baseUrl),
+                    '_blank',
+                    'noopener,noreferrer'
+                  )
+                )
               }
             />
             <ToolbarIconButton
@@ -272,6 +351,18 @@ export default function NeuroglancerView() {
         src={iframeSrc ?? externalUrl}
         title="Neuroglancer viewer"
       />
+      {pendingAction ? (
+        <UnsavedChangesDialog
+          message={pendingAction.message}
+          onClose={() => setPendingAction(null)}
+          onContinue={() => {
+            setPendingAction(null);
+            pendingAction.run(ngState);
+          }}
+          onSave={() => void saveThenRun(pendingAction)}
+          saving={updateViewMutation.isPending}
+        />
+      ) : null}
       {relinkTarget ? (
         <RelinkDialog
           onClose={() => setRelinkTarget(null)}

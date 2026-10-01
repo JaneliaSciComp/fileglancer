@@ -37,8 +37,10 @@ const ngBase = vi.hoisted(() => ({
 vi.mock('@/hooks/useDefaultNeuroglancerBaseUrl', () => ({
   useInternalNeuroglancerBaseUrl: () => ngBase.current
 }));
+const navigate = vi.hoisted(() => vi.fn());
 vi.mock('react-router', () => ({
   useParams: () => ({ readKey: 'rk1' }),
+  useNavigate: () => navigate,
   Link: ({ to, children }: { to: string; children: ReactNode }) =>
     createElement('a', { href: to }, children)
 }));
@@ -47,6 +49,11 @@ const { copyToClipboard } = vi.hoisted(() => ({
   copyToClipboard: vi.fn()
 }));
 vi.mock('@/utils/copyText', () => ({ copyToClipboard }));
+const downloadTextFile = vi.hoisted(() => vi.fn());
+vi.mock('@/utils', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/utils')>()),
+  downloadTextFile
+}));
 
 vi.mock('@/components/ui/Navbar/ProfileMenu', () => ({
   default: () => <div data-testid="profile-menu" />
@@ -117,6 +124,8 @@ describe('NeuroglancerView', () => {
     useViewsQuery.mockReturnValue({ data: [] });
     ngBase.current = 'https://ng.example/';
     mutateAsync.mockReset();
+    navigate.mockReset();
+    downloadTextFile.mockReset();
     mutateAsync.mockResolvedValue(undefined);
     bridgeRef.current = makeFakeBridge({ layers: [{ name: 'L0' }] });
     window.history.replaceState(null, '', '/');
@@ -440,5 +449,139 @@ describe('NeuroglancerView', () => {
       'Neuroglancer reloaded, so unsaved changes may have been lost'
     );
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+  });
+
+  describe('with unsaved changes', () => {
+    const SAVED = { layers: [{ name: 'L0' }] };
+    const LIVE = { layers: [{ name: 'L0' }], layout: '4panel' };
+
+    async function renderDirty(views: View[] = [OWNED]) {
+      useViewsQuery.mockReturnValue({ data: views });
+      useViewStateByReadKey.mockReturnValue({
+        data: SAVED,
+        isPending: false,
+        isError: false
+      });
+      render(<NeuroglancerView />);
+      act(() => bridgeRef.current!.interact());
+      bridgeRef.current!.change(LIVE);
+      await new Promise(r => setTimeout(r, 400));
+    }
+
+    it('asks before following an in-app link, and can leave without saving', async () => {
+      await renderDirty();
+      await userEvent.click(screen.getByRole('link', { name: /^views$/i }));
+      expect(navigate).not.toHaveBeenCalled();
+      expect(
+        await screen.findByText(/leaving this page discards them/i)
+      ).toBeInTheDocument();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Continue without saving' })
+      );
+      expect(navigate).toHaveBeenCalledWith('/ngviews');
+      expect(mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('saves before following the link', async () => {
+      await renderDirty();
+      await userEvent.click(screen.getByRole('link', { name: /^views$/i }));
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Save and continue' })
+      );
+      expect(mutateAsync).toHaveBeenCalledWith({
+        short_key: 'sk1',
+        ng_state: LIVE
+      });
+      expect(navigate).toHaveBeenCalledWith('/ngviews');
+    });
+
+    it('stays on the page when that save fails', async () => {
+      mutateAsync.mockRejectedValueOnce(new Error('Server error'));
+      await renderDirty();
+      await userEvent.click(screen.getByRole('link', { name: /^views$/i }));
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Save and continue' })
+      );
+      expect(toast.error).toHaveBeenCalledWith('Server error');
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('cancel stays on the page', async () => {
+      await renderDirty();
+      await userEvent.click(screen.getByRole('link', { name: /^views$/i }));
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Cancel' })
+      );
+      expect(navigate).not.toHaveBeenCalled();
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('button', { name: 'Continue without saving' })
+        ).toBeNull()
+      );
+    });
+
+    it('asks before Download JSON; continuing downloads the saved View', async () => {
+      await renderDirty();
+      await userEvent.click(
+        screen.getByRole('button', { name: /download json/i })
+      );
+      expect(downloadTextFile).not.toHaveBeenCalled();
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Continue without saving' })
+      );
+      expect(downloadTextFile).toHaveBeenCalledWith(
+        JSON.stringify(SAVED, null, 2),
+        'Mine.json'
+      );
+    });
+
+    it('saving first downloads what was saved', async () => {
+      await renderDirty();
+      await userEvent.click(
+        screen.getByRole('button', { name: /download json/i })
+      );
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Save and continue' })
+      );
+      expect(downloadTextFile).toHaveBeenCalledWith(
+        JSON.stringify(LIVE, null, 2),
+        'Mine.json'
+      );
+    });
+
+    it('asks before Open in Neuroglancer and Copy link', async () => {
+      const open = vi.spyOn(window, 'open').mockReturnValue(null);
+      await renderDirty();
+      await userEvent.click(
+        screen.getByRole('button', { name: /open in neuroglancer/i })
+      );
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Continue without saving' })
+      );
+      expect(open).toHaveBeenCalledWith(
+        expect.stringContaining(encodeURIComponent(JSON.stringify(SAVED))),
+        '_blank',
+        'noopener,noreferrer'
+      );
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Copy link to share' })
+      );
+      expect(copyToClipboard).not.toHaveBeenCalled();
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Continue without saving' })
+      );
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        `${window.location.origin}/view/rk1`
+      );
+      open.mockRestore();
+    });
+
+    it('lets a non-owner export without asking', async () => {
+      await renderDirty([]);
+      await userEvent.click(
+        screen.getByRole('button', { name: /download json/i })
+      );
+      expect(downloadTextFile).toHaveBeenCalledTimes(1);
+    });
   });
 });
