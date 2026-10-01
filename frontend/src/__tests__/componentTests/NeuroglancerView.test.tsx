@@ -1,16 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import type { ReactNode } from 'react';
 import toast from 'react-hot-toast';
 import type { View } from '@/queries/viewQueries';
+import { makeFakeBridge } from '@/__tests__/mocks/fakeNeuroglancer';
 
 const { useViewStateByReadKey } = vi.hoisted(() => ({
   useViewStateByReadKey: vi.fn()
 }));
 const useViewsQuery = vi.hoisted(() => vi.fn(() => ({ data: [] as View[] })));
 const mutateAsync = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const { bridgeRef } = vi.hoisted(() => ({
+  bridgeRef: {
+    current: null as null | ReturnType<
+      typeof import('@/__tests__/mocks/fakeNeuroglancer').makeFakeBridge
+    >
+  }
+}));
+vi.mock('@/hooks/useNeuroglancerViewer', () => ({
+  useNeuroglancerViewer: () => bridgeRef.current!.bridge
+}));
 vi.mock('@/queries/viewQueries', () => ({
   useViewStateByReadKey
 }));
@@ -47,6 +58,18 @@ vi.mock('@/components/ui/widgets/FgTooltip', () => ({
 
 import NeuroglancerView from '@/components/NeuroglancerView';
 
+const OWNED = {
+  short_key: 'sk1',
+  read_key: 'rk1',
+  name: 'Mine',
+  ng_state: {},
+  sharing_mode: 'read',
+  owner: 'me',
+  created_at: '',
+  updated_at: '',
+  layers: []
+} as unknown as View;
+
 function renderViewer(options: { title?: string } = {}) {
   useViewStateByReadKey.mockReturnValue({
     data: { title: options.title, layers: [{ name: 'L0' }] },
@@ -61,7 +84,9 @@ describe('NeuroglancerView', () => {
     copyToClipboard.mockReset();
     copyToClipboard.mockResolvedValue({ success: true });
     useViewsQuery.mockReturnValue({ data: [] });
-    mutateAsync.mockClear();
+    mutateAsync.mockReset();
+    mutateAsync.mockResolvedValue(undefined);
+    bridgeRef.current = makeFakeBridge({ layers: [{ name: 'L0' }] });
     window.history.replaceState(null, '', '/');
   });
 
@@ -167,21 +192,7 @@ describe('NeuroglancerView', () => {
   });
 
   it('shows the owned View name with a rename control', async () => {
-    useViewsQuery.mockReturnValue({
-      data: [
-        {
-          short_key: 'sk1',
-          read_key: 'rk1',
-          name: 'Mine',
-          ng_state: {},
-          sharing_mode: 'read',
-          owner: 'me',
-          created_at: '',
-          updated_at: '',
-          layers: []
-        }
-      ]
-    });
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
     renderViewer();
     expect(await screen.findByText('Mine')).toBeInTheDocument();
     await userEvent.click(screen.getByLabelText('Edit view name'));
@@ -198,5 +209,116 @@ describe('NeuroglancerView', () => {
     renderViewer({ title: 'Theirs' });
     expect(screen.getByText('Theirs')).toBeInTheDocument();
     expect(screen.queryByLabelText('Edit view name')).not.toBeInTheDocument();
+  });
+
+  it('shows the Save bar to the owner once the View has unsaved changes', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    act(() => bridgeRef.current!.interact());
+    bridgeRef.current!.change({ layers: [{ name: 'L0' }], layout: '4panel' });
+    expect(
+      await screen.findByText(
+        'Unsaved changes — saving updates this View for everyone with its link.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('saves the live viewer state', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    act(() => bridgeRef.current!.interact());
+    bridgeRef.current!.change({ layers: [{ name: 'L0' }], layout: '4panel' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    expect(mutateAsync).toHaveBeenCalledWith({
+      short_key: 'sk1',
+      ng_state: { layers: [{ name: 'L0' }], layout: '4panel' }
+    });
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
+    );
+    expect(toast.success).toHaveBeenCalledWith('View saved');
+  });
+
+  it('keeps unsaved changes when Save fails', async () => {
+    mutateAsync.mockRejectedValueOnce(new Error('Server error'));
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    act(() => bridgeRef.current!.interact());
+    bridgeRef.current!.change({ layers: [{ name: 'L0' }], layout: '4panel' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    expect(toast.error).toHaveBeenCalledWith('Server error');
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+  });
+
+  it('discard restores the saved state', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    const setState = vi.spyOn(bridgeRef.current!.bridge, 'setState');
+    renderViewer();
+    act(() => bridgeRef.current!.interact());
+    bridgeRef.current!.change({ layers: [{ name: 'L0' }], layout: '4panel' });
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Discard' })
+    );
+    expect(setState).toHaveBeenCalledWith({ layers: [{ name: 'L0' }] });
+  });
+
+  it('never shows the Save bar to a non-owner', async () => {
+    useViewsQuery.mockReturnValue({ data: [] });
+    renderViewer();
+    act(() => bridgeRef.current!.interact());
+    bridgeRef.current!.change({ layers: [], layout: '4panel' });
+    await new Promise(r => setTimeout(r, 400));
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+  });
+
+  it('tells the owner when editing is unavailable', () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    bridgeRef.current!.bridge.status = 'unavailable';
+    renderViewer();
+    expect(
+      screen.getByText(
+        "Editing isn't available with this Neuroglancer deployment"
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('does not tell a non-owner that editing is unavailable', () => {
+    bridgeRef.current!.bridge.status = 'unavailable';
+    renderViewer();
+    expect(
+      screen.queryByText(
+        "Editing isn't available with this Neuroglancer deployment"
+      )
+    ).toBeNull();
+  });
+
+  it('does not reload the iframe when the saved state refetches', () => {
+    const { rerender } = renderViewer({ title: 'My View' });
+    const iframe = screen.getByTitle(/neuroglancer/i) as HTMLIFrameElement;
+    const src = iframe.src;
+    useViewStateByReadKey.mockReturnValue({
+      data: { title: 'My View', layers: [{ name: 'L0' }, { name: 'L1' }] },
+      isPending: false,
+      isError: false
+    });
+    rerender(<NeuroglancerView />);
+    expect((screen.getByTitle(/neuroglancer/i) as HTMLIFrameElement).src).toBe(
+      src
+    );
+  });
+
+  it('warns before leaving with unsaved changes', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    const clean = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(clean);
+    expect(clean.defaultPrevented).toBe(false);
+    act(() => bridgeRef.current!.interact());
+    bridgeRef.current!.change({ layers: [], layout: '4panel' });
+    await screen.findByRole('button', { name: 'Save' });
+    const dirty = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(dirty);
+    expect(dirty.defaultPrevented).toBe(true);
   });
 });

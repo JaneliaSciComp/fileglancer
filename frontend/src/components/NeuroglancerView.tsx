@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { IconType } from 'react-icons';
 import { Link, useParams } from 'react-router';
 import { IconButton, Typography } from '@material-tailwind/react';
@@ -13,6 +13,9 @@ import {
 import { useViewStateByReadKey } from '@/queries/viewQueries';
 import { useViewsContext } from '@/contexts/ViewsContext';
 import { useInternalNeuroglancerBaseUrl } from '@/hooks/useDefaultNeuroglancerBaseUrl';
+import { useCanEditView } from '@/hooks/useCanEditView';
+import { useNeuroglancerViewer } from '@/hooks/useNeuroglancerViewer';
+import { useViewEditState } from '@/hooks/useViewEditState';
 import { constructNeuroglancerUrl } from '@/utils/neuroglancerUrl';
 import { downloadTextFile } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
@@ -22,6 +25,7 @@ import LogoSvg from '@/components/ui/Navbar/LogoSvg';
 import ProfileMenu from '@/components/ui/Navbar/ProfileMenu';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import InlineNameEditor from '@/components/ui/widgets/InlineNameEditor';
+import ViewSaveBar from '@/components/ui/Views/ViewSaveBar';
 
 type ToolbarIconButtonProps = {
   readonly label: string;
@@ -50,11 +54,33 @@ export default function NeuroglancerView() {
   // The public read_key endpoint returns only ng_state. Ownership, name and
   // short_key come from the owner's own Views list (cached app-wide); a miss
   // means "not mine" and the title renders read-only.
-  const { allViewsQuery, updateViewMutation } = useViewsContext();
-  const ownedView = allViewsQuery.data?.find(v => v.read_key === readKey);
+  const { updateViewMutation } = useViewsContext();
+  const { canEdit, view: ownedView } = useCanEditView(readKey);
   const baseUrl = useInternalNeuroglancerBaseUrl();
   const containerRef = useRef<HTMLDivElement>(null);
+  const [iframe, setIframe] = useState<HTMLIFrameElement | null>(null);
+  const bridge = useNeuroglancerViewer(iframe);
+  const editState = useViewEditState(bridge);
   const ngState = stateQuery.data;
+
+  // Set once from the first loaded state: later refetches (rename, Save)
+  // must not reload Neuroglancer. Changes after load go through the bridge.
+  const [iframeSrc, setIframeSrc] = useState<string | null>(null);
+  if (ngState && iframeSrc === null) {
+    setIframeSrc(constructNeuroglancerUrl(ngState, baseUrl));
+  }
+
+  const { dirty } = editState;
+  useEffect(() => {
+    if (!dirty) {
+      return;
+    }
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
 
   // Reflect the full state into the app's own URL hash so copy-pasting the
   // current page URL is a full-state shareable link, matching Neuroglancer's
@@ -106,6 +132,23 @@ export default function NeuroglancerView() {
     // to this component (excluding the app navbar) rather than the whole
     // route; no custom fullscreen state machine.
     void containerRef.current?.requestFullscreen?.();
+  };
+
+  const handleSave = async () => {
+    if (!ownedView) {
+      return;
+    }
+    const sent = bridge.getState();
+    try {
+      await updateViewMutation.mutateAsync({
+        short_key: ownedView.short_key,
+        ng_state: sent
+      });
+      editState.markSaved(sent);
+      toast.success('View saved');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Save failed');
+    }
   };
 
   return (
@@ -184,9 +227,19 @@ export default function NeuroglancerView() {
           </FgTooltip>
         </div>
       </div>
+      {canEdit ? (
+        <ViewSaveBar
+          dirty={dirty}
+          onDiscard={editState.discard}
+          onSave={() => void handleSave()}
+          saving={updateViewMutation.isPending}
+          status={bridge.status}
+        />
+      ) : null}
       <iframe
         className="flex-1 w-full border-0"
-        src={externalUrl}
+        ref={setIframe}
+        src={iframeSrc ?? externalUrl}
         title="Neuroglancer viewer"
       />
     </div>
