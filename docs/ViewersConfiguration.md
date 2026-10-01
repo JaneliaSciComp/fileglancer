@@ -120,6 +120,13 @@ When a deployment overrides Neuroglancer's URL with `instance_template_url` (for
 
 This choice is a per-user preference (`viewerUrlSources`); it does not change the deployment configuration and only affects the user who sets it. The option only appears when the deployment actually overrides the Neuroglancer URL — if the configured URL already equals the manifest default, there is nothing to switch between and no control is shown.
 
+The embedded View viewer (`/view/<read_key>`) uses the deployment-configured
+Neuroglancer URL (it ignores this per-user preference). Owners can edit and
+save a View there only when that Neuroglancer is served from the same origin as
+Fileglancer; otherwise the viewer is read-only with a note. See
+[Development.md](Development.md#testing-view-editing-locally) for testing
+locally.
+
 ### Add a custom viewer
 
 To add a new viewer, create a capability manifest YAML file, host it at a URL, and reference it in the config:
