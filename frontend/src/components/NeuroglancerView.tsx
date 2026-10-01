@@ -69,14 +69,14 @@ export default function NeuroglancerView() {
   // Set once from the first loaded state: later refetches (rename, Save)
   // must not reload Neuroglancer. Changes after load go through the bridge.
   const [iframeSrc, setIframeSrc] = useState<string | null>(null);
-  if (ngState && iframeSrc === null) {
+  if (ngState && baseUrl && iframeSrc === null) {
     setIframeSrc(constructNeuroglancerUrl(ngState, baseUrl));
   }
   const [relinkTarget, setRelinkTarget] = useState<RelinkTarget | null>(null);
 
   const { dirty } = editState;
   useEffect(() => {
-    if (!dirty) {
+    if (!dirty || !canEdit) {
       return;
     }
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -84,9 +84,9 @@ export default function NeuroglancerView() {
     };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [dirty]);
+  }, [dirty, canEdit]);
 
-  if (stateQuery.isPending) {
+  if (stateQuery.isPending || !baseUrl) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <Typography className="text-foreground">Loading View…</Typography>
@@ -94,8 +94,8 @@ export default function NeuroglancerView() {
     );
   }
 
-  const ngState = stateQuery.data;
-  if (stateQuery.isError || !ngState) {
+  // A failed background refetch keeps the cached state (and any unsaved edits).
+  if (!ngState) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <Typography className="text-foreground">View not found</Typography>

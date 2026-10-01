@@ -43,10 +43,15 @@ export function useDefaultNeuroglancerBaseUrl(): string {
  * sends X-Frame-Options and won't render in an iframe; the configured/internal
  * deployment is same-origin/frameable. Portable: no hardcoded URL — falls back
  * to DEFAULT_NEUROGLANCER_BASE_URL only where no internal NG is configured.
+ * Null until the viewers config has loaded, so callers don't settle on the
+ * fallback while the configured URL is still on its way.
  */
-export function useInternalNeuroglancerBaseUrl(): string {
-  const { validViewers } = useViewersContext();
+export function useInternalNeuroglancerBaseUrl(): string | null {
+  const { validViewers, isInitialized } = useViewersContext();
   return useMemo(() => {
+    if (!isInitialized) {
+      return null;
+    }
     const neuroglancer = validViewers.find(v => v.key === 'neuroglancer');
     if (neuroglancer) {
       return (
@@ -55,5 +60,5 @@ export function useInternalNeuroglancerBaseUrl(): string {
       );
     }
     return DEFAULT_NEUROGLANCER_BASE_URL;
-  }, [validViewers]);
+  }, [validViewers, isInitialized]);
 }
