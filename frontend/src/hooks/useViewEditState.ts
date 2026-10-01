@@ -21,25 +21,38 @@ const COMPARE_THROTTLE_MS = 300;
  * NG's own load-time changes (e.g. setting the position) don't count.
  * ponytail: the interaction gate is a heuristic; an NG-internal change after
  * the first click shows as dirty.
+ *
+ * If Neuroglancer reloads inside the iframe while dirty, `onChangesLost` fires
+ * and the edits are compared against the saved baseline again once it is
+ * ready: NG restores its own URL hash, so they may have survived.
  */
-export function useViewEditState(bridge: NeuroglancerBridge): ViewEditState {
+export function useViewEditState(
+  bridge: NeuroglancerBridge,
+  onChangesLost?: () => void
+): ViewEditState {
   const { status, getState, setState, subscribe, onInteraction } = bridge;
-  const [dirty, setDirty] = useState(false);
+  const [dirty, setDirtyState] = useState(false);
+  const dirtyRef = useRef(false);
   const baseline = useRef('');
   const interacted = useRef(false);
+
+  const setDirty = useCallback((next: boolean) => {
+    dirtyRef.current = next;
+    setDirtyState(next);
+  }, []);
 
   const rebaseline = useCallback(() => {
     baseline.current = JSON.stringify(getState());
     interacted.current = false;
     setDirty(false);
-  }, [getState]);
+  }, [getState, setDirty]);
 
   const markSaved = useCallback(
     (sent: NgState) => {
       baseline.current = JSON.stringify(sent);
       setDirty(JSON.stringify(getState()) !== baseline.current);
     },
-    [getState]
+    [getState, setDirty]
   );
 
   const discard = useCallback(() => {
@@ -48,10 +61,24 @@ export function useViewEditState(bridge: NeuroglancerBridge): ViewEditState {
   }, [setState, rebaseline]);
 
   useEffect(() => {
+    if (status !== 'ready' && dirtyRef.current) {
+      setDirty(false);
+      onChangesLost?.();
+    }
+  }, [status, setDirty, onChangesLost]);
+
+  useEffect(() => {
     if (status !== 'ready') {
       return;
     }
-    rebaseline();
+    if (baseline.current === '') {
+      rebaseline();
+    } else {
+      // Ready again after a reload: compare with the saved baseline, and
+      // skip the gate so the gate can't absorb surviving edits.
+      interacted.current = true;
+      setDirty(JSON.stringify(getState()) !== baseline.current);
+    }
     let timer: ReturnType<typeof setTimeout> | undefined;
     const compare = () => {
       timer = undefined;
@@ -73,7 +100,7 @@ export function useViewEditState(bridge: NeuroglancerBridge): ViewEditState {
       offInput();
       clearTimeout(timer);
     };
-  }, [status, getState, subscribe, onInteraction, rebaseline]);
+  }, [status, getState, subscribe, onInteraction, rebaseline, setDirty]);
 
   return { dirty, discard, markSaved, rebaseline };
 }

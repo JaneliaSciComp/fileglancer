@@ -51,6 +51,9 @@ function ToolbarIconButton({ label, icon, onClick }: ToolbarIconButtonProps) {
   );
 }
 
+const warnChangesLost = () =>
+  toast.error('Neuroglancer reloaded, so unsaved changes may have been lost');
+
 export default function NeuroglancerView() {
   const { readKey } = useParams();
   const stateQuery = useViewStateByReadKey(readKey);
@@ -63,7 +66,7 @@ export default function NeuroglancerView() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [iframe, setIframe] = useState<HTMLIFrameElement | null>(null);
   const bridge = useNeuroglancerViewer(iframe);
-  const editState = useViewEditState(bridge);
+  const editState = useViewEditState(bridge, warnChangesLost);
   const ngState = stateQuery.data;
 
   // Set once from the first loaded state: later refetches (rename, Save)
@@ -143,8 +146,9 @@ export default function NeuroglancerView() {
     if (!ownedView) {
       return;
     }
-    const sent = bridge.getState();
     try {
+      // Inside the try: throws if Neuroglancer is mid-reload.
+      const sent = bridge.getState();
       await updateViewMutation.mutateAsync({
         short_key: ownedView.short_key,
         ng_state: sent

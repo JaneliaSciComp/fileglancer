@@ -427,4 +427,18 @@ describe('NeuroglancerView', () => {
     rerender(<NeuroglancerView />);
     expect(screen.getByTitle(/neuroglancer/i)).toBeInTheDocument();
   });
+
+  it('tells the owner when Neuroglancer reloads with unsaved changes', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    const { rerender } = renderViewer();
+    act(() => bridgeRef.current!.interact());
+    bridgeRef.current!.change({ layers: [{ name: 'L0' }], layout: '4panel' });
+    await screen.findByRole('button', { name: 'Save' });
+    bridgeRef.current!.bridge.status = 'loading';
+    rerender(<NeuroglancerView />);
+    expect(toast.error).toHaveBeenCalledWith(
+      'Neuroglancer reloaded, so unsaved changes may have been lost'
+    );
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+  });
 });
