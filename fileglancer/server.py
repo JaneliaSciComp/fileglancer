@@ -1348,17 +1348,17 @@ def create_app(settings):
         if path is not None or fsp_name is not None:
             with db.get_db_session(settings.db_url) as session:
                 existing = db.get_proxied_path_by_sharing_key(session, sharing_key)
+                if existing:
+                    validate_fsp = fsp_name or existing.fsp_name
+                    validate_path = path or existing.path
+                    conflicts = db.get_proxied_paths(session, username, validate_fsp, validate_path)
+                    if any(p.sharing_key != sharing_key for p in conflicts):
+                        raise HTTPException(status_code=409, detail="A data link already exists for this path")
             if existing:
-                validate_fsp = fsp_name or existing.fsp_name
-                validate_path = path or existing.path
                 validation = await _worker_exec(username, "validate_proxied_path",
                                                 fsp_name=validate_fsp, path=validate_path)
                 if "error" in validation:
                     raise HTTPException(status_code=400, detail=validation["error"])
-                with db.get_db_session(settings.db_url) as session:
-                    conflicts = db.get_proxied_paths(session, username, validate_fsp, validate_path)
-                if any(p.sharing_key != sharing_key for p in conflicts):
-                    raise HTTPException(status_code=409, detail="A data link already exists for this path")
 
         with db.get_db_session(settings.db_url) as session:
             try:
