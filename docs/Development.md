@@ -254,25 +254,33 @@ pixi run test-ui
 You can also run these in UI debug mode using:
 
 ```bash
-pixi run test-ui -- --ui --debug
+pixi run test-ui -- -- --ui --debug
 ```
+
+If you are working on a remote machine (for example, over SSH or VS Code Remote-SSH), the UI mode window cannot open. Serve it over HTTP instead:
+
+```bash
+pixi run test-ui -- -- --ui-host=0.0.0.0 --ui-port=8080
+```
+
+Then forward port 8080 to your local machine and open http://localhost:8080 in your browser. In VS Code Remote-SSH, use the **Ports** panel (**Forward a Port**, then `8080`). Over plain SSH, connect with `ssh -L 8080:localhost:8080 <user>@<host>`.
 
 If you are unable to use the UI mode, record a trace for inspecting in the [Playwright trace viewer](https://playwright.dev/docs/trace-viewer-intro):
 
 ```bash
-pixi run test-ui -- --trace on
+pixi run test-ui -- -- --trace on
 ```
 
 To run only a specific test:
 
 ```bash
-pixi run test-ui -- --<optional-flag> tests/fgzones.spec.ts
+pixi run test-ui -- -- --<optional-flag> tests/fgzones.spec.ts
 ```
 
 You can also use the name of the test:
 
 ```bash
-pixi run test-ui -- -g "the test description"
+pixi run test-ui -- -- -g "the test description"
 ```
 
 ## Other documentation

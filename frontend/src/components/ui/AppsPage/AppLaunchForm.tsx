@@ -93,6 +93,10 @@ function ParameterField({
   // (e.g. Windows backslashes) while the stored value stays in server format.
   // Manual edits clear the override so the input shows exactly what was typed.
   const [fileDisplayPath, setFileDisplayPath] = useState<string | null>(null);
+  // For number fields, keep the raw typed text so intermediate states like
+  // "0.0" (on the way to "0.01") aren't re-rendered as "0". The draft is only
+  // shown while it still parses to the stored value, so external resets win.
+  const [numberDraft, setNumberDraft] = useState<string | null>(null);
 
   const baseInputClass =
     'w-full p-2 text-foreground border rounded-sm focus:outline-none bg-background border-primary-light focus:border-primary';
@@ -123,6 +127,7 @@ function ParameterField({
           min={param.min}
           onChange={e => {
             const val = e.target.value;
+            setNumberDraft(val);
             if (val === '') {
               onChange(undefined);
             } else {
@@ -134,7 +139,13 @@ function ParameterField({
           placeholder={param.name}
           step={param.type === 'integer' ? 1 : 'any'}
           type="number"
-          value={value !== undefined && value !== null ? String(value) : ''}
+          value={
+            numberDraft !== null && Number(numberDraft) === value
+              ? numberDraft
+              : value !== undefined && value !== null
+                ? String(value)
+                : ''
+          }
         />
       );
 
