@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router';
-import { ButtonGroup, IconButton } from '@material-tailwind/react';
+import { Badge, ButtonGroup, IconButton } from '@material-tailwind/react';
 import {
   HiRefresh,
   HiEye,
@@ -9,11 +9,14 @@ import {
   HiOutlineClipboardCopy,
   HiHome,
   HiOutlineStar,
-  HiStar
+  HiStar,
+  HiOutlineInformationCircle,
+  HiOutlineShoppingCart
 } from 'react-icons/hi';
 import { GoSidebarCollapse, GoSidebarExpand } from 'react-icons/go';
 
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
+import { useCartCount } from '@/hooks/useCartCount';
 import NavigationButton from './NavigationButton';
 import NewFolderButton from './NewFolderButton';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
@@ -31,19 +34,22 @@ import { useRefreshFileBrowser } from '@/hooks/useRefreshFileBrowser';
 
 type ToolbarProps = {
   readonly showPropertiesDrawer: boolean;
-  readonly togglePropertiesDrawer: () => void;
+  readonly propertiesDrawerMode: 'properties' | 'cart';
+  readonly selectDrawerMode: (mode: 'properties' | 'cart') => void;
   readonly showSidebar: boolean;
   readonly toggleSidebar: () => void;
 };
 
 export default function Toolbar({
   showPropertiesDrawer,
-  togglePropertiesDrawer,
+  propertiesDrawerMode,
+  selectDrawerMode,
   showSidebar,
   toggleSidebar
 }: ToolbarProps) {
   const { fileQuery } = useFileBrowserContext();
   const { refreshFileBrowser } = useRefreshFileBrowser();
+  const cartCount = useCartCount();
 
   const { currentFileSharePath, currentFileOrFolder } = fileQuery.data || {};
   const { profile } = useProfileContext();
@@ -128,12 +134,6 @@ export default function Toolbar({
     } catch (error) {
       toast.error(`Failed to copy path. Error: ${error}`);
     }
-  };
-
-  const handleTogglePropertiesDrawer = (
-    e: React.MouseEvent<HTMLButtonElement>
-  ) => {
-    togglePropertiesDrawer();
   };
 
   return (
@@ -222,18 +222,41 @@ export default function Toolbar({
           ) : null}
         </ButtonGroup>
 
-        {/* Show/hide properties drawer */}
-        <FgTooltip
-          as={IconButton}
-          icon={showPropertiesDrawer ? GoSidebarCollapse : GoSidebarExpand}
-          label={
-            showPropertiesDrawer
-              ? 'Hide file properties'
-              : 'View file properties'
-          }
-          onClick={handleTogglePropertiesDrawer}
-          triggerClasses={triggerClasses}
-        />
+        {/* Right drawer: file properties (info) or Layer Cart */}
+        <div className="flex items-center gap-1">
+          <FgTooltip
+            as={IconButton}
+            icon={HiOutlineInformationCircle}
+            label="View file properties"
+            onClick={() => selectDrawerMode('properties')}
+            triggerClasses={`${triggerClasses} ${
+              showPropertiesDrawer && propertiesDrawerMode === 'properties'
+                ? '!bg-primary !text-primary-foreground'
+                : ''
+            }`}
+          />
+          {/* Cart badge mirrors the count badge style used in the navbar. */}
+          <Badge color="secondary" overlap="circular" placement="top-end">
+            <Badge.Content>
+              <FgTooltip
+                as={IconButton}
+                icon={HiOutlineShoppingCart}
+                label="View Layer Cart"
+                onClick={() => selectDrawerMode('cart')}
+                triggerClasses={`${triggerClasses} ${
+                  showPropertiesDrawer && propertiesDrawerMode === 'cart'
+                    ? '!bg-primary !text-primary-foreground'
+                    : ''
+                }`}
+              />
+            </Badge.Content>
+            {cartCount > 0 ? (
+              <Badge.Indicator className="p-0 pointer-events-none text-[10px] min-w-4 min-h-4">
+                {cartCount > 9 ? '9+' : cartCount}
+              </Badge.Indicator>
+            ) : null}
+          </Badge>
+        </div>
       </div>
     </div>
   );

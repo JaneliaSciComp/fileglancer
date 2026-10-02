@@ -25,7 +25,9 @@ export default function Browse() {
     showPermissionsDialog,
     showPropertiesDrawer,
     showSidebar,
-    showConvertFileDialog
+    showConvertFileDialog,
+    propertiesDrawerMode,
+    selectDrawerMode
   } = useOutletContext<OutletContextType>();
 
   const { fspName } = useFileBrowserContext();
@@ -106,9 +108,10 @@ export default function Browse() {
       tabIndex={0}
     >
       <Toolbar
+        propertiesDrawerMode={propertiesDrawerMode}
+        selectDrawerMode={selectDrawerMode}
         showPropertiesDrawer={showPropertiesDrawer}
         showSidebar={showSidebar}
-        togglePropertiesDrawer={togglePropertiesDrawer}
         toggleSidebar={toggleSidebar}
       />
       <div
