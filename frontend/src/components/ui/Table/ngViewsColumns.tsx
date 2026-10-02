@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { Typography } from '@material-tailwind/react';
 import type { ColumnDef } from '@tanstack/react-table';
 import toast from 'react-hot-toast';
@@ -27,7 +27,7 @@ type ViewRowActionProps = {
   onDelete: (item: View) => void;
 };
 
-function ActionsCell({
+export function ActionsCell({
   item,
   baseUrl,
   onRename,
@@ -38,17 +38,14 @@ function ActionsCell({
   readonly onRename: (item: View) => void;
   readonly onDelete: (item: View) => void;
 }) {
-  // ponytail: "Open" opens the external Neuroglancer URL for now; PR 6 repoints
-  // it to the embedded /ngview/:read_key viewer.
+  const navigate = useNavigate();
+  // ponytail: "Open" now navigates client-side to the embedded /view/:read_key
+  // viewer instead of opening the external Neuroglancer URL.
   const menuItems: MenuItem<ViewRowActionProps>[] = [
     {
       name: 'Open in Neuroglancer',
-      action: ({ item, baseUrl }) => {
-        window.open(
-          constructNeuroglancerUrl(item.ng_state, baseUrl),
-          '_blank',
-          'noopener,noreferrer'
-        );
+      action: ({ item }) => {
+        navigate(`/view/${item.read_key}`);
       }
     },
     {
