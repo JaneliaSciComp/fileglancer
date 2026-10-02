@@ -628,7 +628,8 @@ def get_proxied_paths(session: Session, username: str, fsp_name: str = None, pat
     query = session.query(ProxiedPathDB).filter_by(username=username)
     if fsp_name:
         query = query.filter_by(fsp_name=fsp_name)
-    if path:
+    # "" is a real path (the FSP root), so only skip the filter when unset
+    if path is not None:
         query = query.filter_by(path=path)
     return query.all()
 

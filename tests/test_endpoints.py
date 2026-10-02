@@ -496,6 +496,20 @@ def test_delete_proxied_path(test_client):
     assert response.status_code == 404
 
 
+def test_proxied_path_at_fsp_root_is_distinct_from_subfolder_links(test_client):
+    """An FSP-root link (path "") must not match the FSP's other links, so
+    it can be created and looked up on its own."""
+    response = test_client.post("/api/proxied-path?fsp_name=tempdir&path=test_proxied_path")
+    assert response.status_code == 200
+
+    response = test_client.post("/api/proxied-path?fsp_name=tempdir&path=.")
+    assert response.status_code == 200
+
+    response = test_client.get("/api/proxied-path?fsp_name=tempdir&path=.")
+    paths = response.json()["paths"]
+    assert [p["path"] for p in paths] == [""]
+
+
 def test_get_external_buckets(test_client):
     """Test getting external buckets"""
     response = test_client.get("/api/external-buckets")
