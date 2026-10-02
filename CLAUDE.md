@@ -64,9 +64,9 @@ View the app at http://localhost:7878
 | `pixi run -e test test-backend` | Run backend tests with pytest and coverage |
 | `pixi run test-frontend` | Run frontend unit tests with Vitest |
 | `pixi run test-ui` | Run Playwright E2E tests |
-| `pixi run test-ui -- --ui --debug` | Run E2E tests in debug UI mode |
-| `pixi run test-ui -- tests/specific.spec.ts` | Run specific E2E test file |
-| `pixi run test-ui -- -g "test description"` | Run E2E tests matching description |
+| `pixi run test-ui -- -- --ui --debug` | Run E2E tests in debug UI mode |
+| `pixi run test-ui -- -- tests/specific.spec.ts` | Run specific E2E test file |
+| `pixi run test-ui -- -- -g "test description"` | Run E2E tests matching description |
 
 ### Code Quality
 
