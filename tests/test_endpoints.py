@@ -496,6 +496,21 @@ def test_delete_proxied_path(test_client):
     assert response.status_code == 404
 
 
+def test_create_duplicate_proxied_path_returns_409(test_client):
+    """A second data link for the same user, FSP, and path is rejected, even
+    with a different url_prefix, instead of failing with a 500."""
+    path = "test_proxied_path"
+    response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path={path}")
+    assert response.status_code == 200
+
+    response = test_client.post(f"/api/proxied-path?fsp_name=tempdir&path={path}&url_prefix=other")
+    assert response.status_code == 409
+    assert "already exists" in response.json()["error"]
+
+    response = test_client.get(f"/api/proxied-path?fsp_name=tempdir&path={path}")
+    assert len(response.json()["paths"]) == 1
+
+
 def test_proxied_path_at_fsp_root_is_distinct_from_subfolder_links(test_client):
     """An FSP-root link (path "") must not match the FSP's other links, so
     it can be created and looked up on its own."""
@@ -508,6 +523,22 @@ def test_proxied_path_at_fsp_root_is_distinct_from_subfolder_links(test_client):
     response = test_client.get("/api/proxied-path?fsp_name=tempdir&path=.")
     paths = response.json()["paths"]
     assert [p["path"] for p in paths] == [""]
+
+
+def test_update_proxied_path_onto_existing_path_returns_409(test_client):
+    """Moving a data link onto a path that already has one is rejected."""
+    response = test_client.post("/api/proxied-path?fsp_name=tempdir&path=test_proxied_path")
+    assert response.status_code == 200
+    response = test_client.post("/api/proxied-path?fsp_name=tempdir&path=new_test_proxied_path")
+    assert response.status_code == 200
+    sharing_key = response.json()["sharing_key"]
+
+    response = test_client.put(f"/api/proxied-path/{sharing_key}?fsp_name=tempdir&path=test_proxied_path")
+    assert response.status_code == 409
+    assert "already exists" in response.json()["error"]
+
+    response = test_client.get(f"/api/proxied-path/{sharing_key}")
+    assert response.json()["path"] == "new_test_proxied_path"
 
 
 def test_get_external_buckets(test_client):

@@ -1293,6 +1293,8 @@ def create_app(settings):
             raise HTTPException(status_code=400, detail=validation["error"])
 
         with db.get_db_session(settings.db_url) as session:
+            if db.get_proxied_paths(session, username, fsp_name, path):
+                raise HTTPException(status_code=409, detail="A data link already exists for this path")
             try:
                 new_path = db.create_proxied_path(session, username, sharing_name, fsp_name, path, url_prefix=url_prefix)
                 return _convert_proxied_path(new_path, settings.external_proxy_url)
@@ -1353,6 +1355,10 @@ def create_app(settings):
                                                 fsp_name=validate_fsp, path=validate_path)
                 if "error" in validation:
                     raise HTTPException(status_code=400, detail=validation["error"])
+                with db.get_db_session(settings.db_url) as session:
+                    conflicts = db.get_proxied_paths(session, username, validate_fsp, validate_path)
+                if any(p.sharing_key != sharing_key for p in conflicts):
+                    raise HTTPException(status_code=409, detail="A data link already exists for this path")
 
         with db.get_db_session(settings.db_url) as session:
             try:
