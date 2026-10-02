@@ -20,6 +20,7 @@ import type { FileOrFolder } from '@/shared.types';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { makeBrowseLink } from '@/utils/index';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
+import FgCheckbox from '@/components/designSystem/atoms/formElements/FgCheckbox';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgLink from '@/components/designSystem/atoms/FgLink';
 import { SortIcons } from '@/components/ui/Table/TableCard';
@@ -76,8 +77,12 @@ export default function Table({
     handleLeftClick,
     fetchNextPage,
     hasNextPage,
-    isFetchingNextPage
+    isFetchingNextPage,
+    toggleChecked,
+    checkPaths,
+    clearChecked
   } = useFileBrowserContext();
+  const checkedPaths = fileBrowserState.checkedPaths;
   const navigate = useNavigate();
   const [sorting, setSorting] = useState<SortingState>([]);
   const tableRef = useRef<HTMLDivElement>(null);
@@ -117,6 +122,40 @@ export default function Table({
 
   const columns = useMemo<ColumnDef<FileOrFolder>[]>(
     () => [
+      {
+        id: 'select',
+        header: () => {
+          const allChecked =
+            data.length > 0 && data.every(f => checkedPaths.has(f.path));
+          return (
+            <FgCheckbox
+              checked={allChecked}
+              hideLabel
+              label="Select all"
+              onChange={() =>
+                allChecked ? clearChecked() : checkPaths(data.map(f => f.path))
+              }
+              onClick={e => e.stopPropagation()}
+            />
+          );
+        },
+        cell: ({ row }) => {
+          const file = row.original;
+          return (
+            <FgCheckbox
+              checked={checkedPaths.has(file.path)}
+              hideLabel
+              label={`Select ${file.name}`}
+              onChange={() => toggleChecked(file.path)}
+              onClick={e => e.stopPropagation()}
+            />
+          );
+        },
+        size: 44,
+        minSize: 44,
+        enableSorting: false,
+        enableResizing: false
+      },
       {
         accessorKey: 'name',
         header: 'Name',
@@ -213,7 +252,16 @@ export default function Table({
         enableSorting: false
       }
     ],
-    [fileQuery.data?.currentFileSharePath, handleContextMenuClick]
+    [
+      fileQuery.data?.currentFileSharePath,
+      handleContextMenuClick,
+      data,
+      checkedPaths,
+      toggleChecked,
+      checkPaths,
+      clearChecked
+    ]
+    // ponytail: columns rebuild on each check toggle (checkedPaths in deps). Fine for typical dir sizes; move check state into TanStack table `meta` if a huge-listing perf issue shows up.
   );
 
   // Clear sort when sorting becomes disabled (more pages still loading)
@@ -437,7 +485,7 @@ export default function Table({
           const isSelected = selectedFileNames.has(row.original.name);
           return (
             <div
-              className={`grid cursor-pointer hover:bg-surface dark:hover:bg-surface-light ${isSelected ? 'bg-primary-light/20 outline outline-1 outline-primary' : virtualRow.index % 2 === 0 ? 'bg-surface-light dark:bg-surface/50' : ''}`}
+              className={`grid cursor-pointer hover:bg-surface dark:hover:bg-surface-light ${isSelected ? 'bg-primary-light/20 outline outline-1 outline-primary z-10' : virtualRow.index % 2 === 0 ? 'bg-surface-light dark:bg-surface/50' : ''}`}
               data-index={virtualRow.index}
               key={row.id}
               onClick={() =>
