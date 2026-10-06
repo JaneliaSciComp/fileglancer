@@ -87,8 +87,11 @@ export default function NeuroglancerView() {
 
   // Set once from the first loaded state: later refetches (rename, Save)
   // must not reload Neuroglancer. Changes after load go through the bridge.
+  // Wait out the mount refetch: a cached state can predate a Save made just
+  // before leaving this page.
   const [iframeSrc, setIframeSrc] = useState<string | null>(null);
-  if (ngState && baseUrl && iframeSrc === null) {
+  const awaitingFreshState = iframeSrc === null && stateQuery.isFetching;
+  if (ngState && baseUrl && iframeSrc === null && !stateQuery.isFetching) {
     setIframeSrc(constructNeuroglancerUrl(ngState, baseUrl));
   }
   const [relinkTarget, setRelinkTarget] = useState<RelinkTarget | null>(null);
@@ -156,7 +159,7 @@ export default function NeuroglancerView() {
     );
   }, [ngState]);
 
-  if (stateQuery.isPending || !baseUrl) {
+  if (stateQuery.isPending || !baseUrl || awaitingFreshState) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <Typography className="text-foreground">Loading View…</Typography>

@@ -334,6 +334,31 @@ describe('NeuroglancerView', () => {
     ).toBeNull();
   });
 
+  it('loads the iframe from the refetched state, not a stale cached one', () => {
+    // Reopening a View after "Save and continue" left the page: the cache
+    // still holds the old state while the mount refetch is in flight.
+    useViewStateByReadKey.mockReturnValue({
+      data: { layers: [{ name: 'old' }] },
+      isPending: false,
+      isFetching: true,
+      isError: false
+    });
+    const { rerender } = render(<NeuroglancerView />);
+    expect(screen.queryByTitle(/neuroglancer/i)).toBeNull();
+    useViewStateByReadKey.mockReturnValue({
+      data: { layers: [{ name: 'saved' }] },
+      isPending: false,
+      isFetching: false,
+      isError: false
+    });
+    rerender(<NeuroglancerView />);
+    const src = decodeURIComponent(
+      (screen.getByTitle(/neuroglancer/i) as HTMLIFrameElement).src
+    );
+    expect(src).toContain('"saved"');
+    expect(src).not.toContain('"old"');
+  });
+
   it('does not reload the iframe when the saved state refetches', () => {
     const { rerender } = renderViewer({ title: 'My View' });
     const iframe = screen.getByTitle(/neuroglancer/i) as HTMLIFrameElement;
