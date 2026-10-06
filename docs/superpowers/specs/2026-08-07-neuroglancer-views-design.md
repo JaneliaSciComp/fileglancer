@@ -147,17 +147,29 @@ the backend only stores it — no server-side NG state generation.
 | `PUT /api/neuroglancer/views/{short_key}` | Owner rename / metadata update. |
 | `DELETE /api/neuroglancer/views/{short_key}` | Delete an owned View. |
 | `GET /ngview/{key}` | Resolve a View by **read_key**; serve `ng_state` JSON for the NG iframe (mirrors `/ng/{short_key}`, `Cache-Control: no-store`). |
-| `GET /api/proxied-path/{sharing_key}/views` | Dependent Views for a Data Link (powers the delete dialog + "Appears in N Views"). |
+| `GET /api/proxied-path/{sharing_key}/views` | The **caller's own** dependent Views for a Data Link (powers the delete dialog + "Appears in N Views"). Owner-scoped — never lists other users' Views. |
 
-Data Link deletion (`DELETE /api/proxied-path/{sharing_key}`) gains a mode
-parameter — `mark_broken` or `cascade`:
+Data Link deletion (`DELETE /api/proxied-path/{sharing_key}`) takes a
+`confirm` boolean and **never cascade-deletes Views** (decided against
+cross-user data loss):
 
-- `mark_broken`: null `data_link_id` and set `broken = true` on each dependent
-  `view_layer`, then delete the link. Views survive, degraded.
-- `cascade`: delete the dependent Views (and their layers), then delete the link.
+- If the caller has **their own** dependent Views and `confirm` is false →
+  **409** with the list of *the caller's own* Views that will break (no other
+  user's Views are ever disclosed).
+- On `confirm=true` (or when the caller has no own dependents) → null
+  `data_link_id` + set `broken = true` on **all** layers on that link (any
+  owner, for referential integrity — other users' Views degrade gracefully and
+  surface as broken when opened), then delete the link.
 
-The frontend queries dependents first and drives the choice through one dialog
-(see §7).
+`sharing_mode` is **not enforced** in this PR — every View is readable by its
+`read_key` (bearer token); `'private'` is a stored label only. A future PR adds
+`'public'` (unauthenticated / listed) viewing and real per-mode enforcement.
+Other users learn a shared Data Link broke lazily (the proxied path 404s / the
+layer's `broken` flag); a **follow-up** may surface a broken indicator in their
+Data Links table.
+
+The frontend queries the caller's own dependents first and drives the confirm
+through one dialog (see §7).
 
 Read-key sessions never write to the database. Owner CRUD above is
 authenticated as the owner and is not an "edit link" — it is basic management,
@@ -222,8 +234,10 @@ and stays in read-only scope.
   their local tweaks — client-side only, never written to the DB.
 - **Selection granularity**: dataset + channel (two levels). Channels load
   lazily on expand. Maps onto the existing channel-per-layer code.
-- **Data Link deletion**: one dialog — list dependent Views, user picks
-  {mark broken | delete those Views}, or Cancel.
+- **Data Link deletion**: one dialog — list the caller's **own** dependent
+  Views that will break, user picks {Confirm (mark my Views broken) | Cancel}.
+  No cascade-delete; no cross-user disclosure (revised from an earlier
+  mark-broken/delete/cascade design — see §5).
 - **Scratch View lifetime**: client-only until saved.
 
 ## 8. The `gh stack` — six bottom-up PRs
@@ -249,9 +263,9 @@ persist-on-change, the amber edit banner, the In-View Data Panel, and
 ## 9. Testing
 
 - **Backend** (`pixi run -e test test-backend`): model + migration round-trip;
-  Views CRUD; `GET /ngview/{key}` read-key resolution and 404s; dependent-views
-  query; both Data Link delete modes (mark-broken nulls the link + flags layers;
-  cascade removes Views).
+  Views CRUD; `GET /ngview/{key}` read-key resolution and 404s; owner-scoped
+  dependent-views query; Data Link delete confirm-guard (409 lists only the
+  caller's own Views; confirm marks all layers on the link broken + deletes it).
 - **Frontend unit** (`pixi run test-frontend`): `viewQueries` / `CartContext`
   reducers; Export menu URL construction; multi-select selection logic;
   consent-gate branching on `areDataLinksAutomatic`.
