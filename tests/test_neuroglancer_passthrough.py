@@ -26,7 +26,8 @@ def _mock_upstream(monkeypatch, handler):
 
 def test_no_passthrough_when_unset(tmp_path, monkeypatch):
     seen = _mock_upstream(monkeypatch, lambda r: httpx.Response(200, text="upstream"))
-    resp = _client(tmp_path).get("/neuroglancer/")
+    # Explicit None: a local config.yaml may set neuroglancer_url.
+    resp = _client(tmp_path, neuroglancer_url=None).get("/neuroglancer/")
     assert seen == []
     assert resp.text != "upstream"
 
