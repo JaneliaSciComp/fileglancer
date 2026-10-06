@@ -7,11 +7,14 @@ import type { CartItem } from '@/queries/preferencesQueries';
 
 export type { CartItem };
 
+type CartRemoval = { path: string; channel?: string };
+
 type CartContextType = {
   cart: CartItem[];
   cartCount: number;
   addToCart: (items: CartItem[]) => Promise<void>;
   removeFromCart: (path: string, channel?: string) => Promise<void>;
+  removeManyFromCart: (removals: CartRemoval[]) => Promise<void>;
   clearCart: () => Promise<void>;
 };
 
@@ -79,6 +82,19 @@ export const CartProvider = ({
     [cart, persist]
   );
 
+  // Batch removal: filters once against a single `cart` snapshot, unlike
+  // calling removeFromCart in a loop (each awaited call would close over the
+  // same pre-loop `cart`/`persist` and overwrite the previous removal).
+  const removeManyFromCart = useCallback(
+    async (removals: CartRemoval[]) => {
+      const keys = new Set(removals.map(r => `${r.path}::${r.channel ?? ''}`));
+      await persist(
+        cart.filter(i => !keys.has(`${i.path}::${i.channel ?? ''}`))
+      );
+    },
+    [cart, persist]
+  );
+
   const clearCart = useCallback(() => persist([]), [persist]);
 
   const value: CartContextType = {
@@ -86,6 +102,7 @@ export const CartProvider = ({
     cartCount: cart.length,
     addToCart,
     removeFromCart,
+    removeManyFromCart,
     clearCart
   };
 
