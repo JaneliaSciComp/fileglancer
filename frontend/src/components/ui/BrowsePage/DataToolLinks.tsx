@@ -1,7 +1,7 @@
 import { Typography } from '@material-tailwind/react';
 import { Link } from 'react-router';
 import fallback_logo from '@/assets/fallback_logo.png';
-import { HiOutlineClipboardCopy, HiOutlinePlusCircle } from 'react-icons/hi';
+import { HiOutlineClipboardCopy, HiOutlineShoppingCart } from 'react-icons/hi';
 import { HiOutlineEllipsisHorizontalCircle } from 'react-icons/hi2';
 
 import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
@@ -64,7 +64,7 @@ export default function DataToolLinks({
   compact = false,
   dataLinkUrl,
   fspName,
-  onCreateView,
+  onAddToCart,
   onToolClick,
   path,
   showCopiedTooltip,
@@ -74,7 +74,7 @@ export default function DataToolLinks({
   readonly compact?: boolean;
   readonly dataLinkUrl?: string;
   readonly fspName?: string;
-  readonly onCreateView?: () => void;
+  readonly onAddToCart?: () => void;
   readonly onToolClick: (toolKey: PendingToolKey) => Promise<void>;
   readonly path?: string;
   readonly showCopiedTooltip: boolean;
@@ -132,17 +132,20 @@ export default function DataToolLinks({
           <span className={LABEL_CLASSES}>Copy</span>
         </div>
 
-        {onCreateView ? (
+        {onAddToCart ? (
           <div className="flex flex-col items-center w-16">
             <FgTooltip
               as="button"
-              label="Create a view of this dataset"
-              onClick={() => onCreateView()}
+              label="Add this dataset to the Layer Cart"
+              onClick={() => onAddToCart()}
               triggerClasses={CIRCLE_CLASSES}
             >
-              <FgIcon className="text-foreground" icon={HiOutlinePlusCircle} />
+              <FgIcon
+                className="text-foreground"
+                icon={HiOutlineShoppingCart}
+              />
             </FgTooltip>
-            <span className={LABEL_CLASSES}>Create view</span>
+            <span className={LABEL_CLASSES}>Add to cart</span>
           </div>
         ) : null}
 
