@@ -167,7 +167,7 @@ describe('CartList', () => {
     mockDimensionCheck({
       mismatchedKeys: new Set(),
       hasMismatch: true,
-      kindByKey: new Map()
+      kindByKey: new Map([[datasetKey('f', '/a'), 'loading']])
     });
     const action = vi.fn(() => <button type="button">Add to this View</button>);
     cart = [cartA];
@@ -179,6 +179,26 @@ describe('CartList', () => {
     expect(
       screen.getByRole('button', { name: /clear cart/i })
     ).toBeInTheDocument();
-    expect(action).toHaveBeenCalledWith({ cart: [cartA], hasMismatch: true });
+    expect(action).toHaveBeenCalledWith({
+      cart: [cartA],
+      hasMismatch: true,
+      checking: true
+    });
+  });
+
+  it('reports checking false once every dataset is probed', () => {
+    mockDimensionCheck({
+      mismatchedKeys: new Set(),
+      hasMismatch: false,
+      kindByKey: new Map([[datasetKey('f', '/a'), 'ome' as DatasetKind]])
+    });
+    const action = vi.fn(() => null);
+    cart = [cartA];
+    render(<CartList action={action} />);
+    expect(action).toHaveBeenCalledWith({
+      cart: [cartA],
+      hasMismatch: false,
+      checking: false
+    });
   });
 });

@@ -50,6 +50,8 @@ type CartListProps = {
   readonly action?: (ctx: {
     cart: CartItem[];
     hasMismatch: boolean;
+    /** Some dataset is still being probed, so hasMismatch isn't final. */
+    checking: boolean;
   }) => ReactNode;
 };
 
@@ -60,6 +62,10 @@ export default function CartList({ action }: CartListProps) {
   const cartGroups = useMemo(() => groupCartByDataset(cart), [cart]);
   const { mismatchedKeys, hasMismatch, kindByKey } =
     useCartDimensionCheck(cart);
+  const checking = cartGroups.some(
+    g =>
+      (kindByKey.get(datasetKey(g.fsp_name, g.path)) ?? 'loading') === 'loading'
+  );
 
   const handleClearCart = async () => {
     try {
@@ -94,7 +100,7 @@ export default function CartList({ action }: CartListProps) {
       ))}
       <div className="flex gap-3">
         {action ? (
-          action({ cart, hasMismatch })
+          action({ cart, hasMismatch, checking })
         ) : (
           <CreateViewButton
             datasets={cart}
