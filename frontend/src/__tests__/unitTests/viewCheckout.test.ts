@@ -259,11 +259,10 @@ describe('appendLayers', () => {
   });
 
   it('de-duplicates names against existing and added layers', () => {
-    const merged = appendLayers({ layers: [{ name: 'a' }, { name: 'a (2)' }] }, [
-      { name: 'a' },
-      { name: 'a' },
-      { name: 'b' }
-    ]);
+    const merged = appendLayers(
+      { layers: [{ name: 'a' }, { name: 'a (2)' }] },
+      [{ name: 'a' }, { name: 'a' }, { name: 'b' }]
+    );
     expect(merged.layers?.map(l => l.name)).toEqual([
       'a',
       'a (2)',
@@ -276,16 +275,9 @@ describe('appendLayers', () => {
   it('archives added layers from index 4 on and leaves existing layers alone', () => {
     const merged = appendLayers(
       {
-        layers: [
-          { name: 'a', archived: true },
-          { name: 'b' },
-          { name: 'c' }
-        ]
+        layers: [{ name: 'a', archived: true }, { name: 'b' }, { name: 'c' }]
       },
-      [
-        { name: 'd', archived: true },
-        { name: 'e' }
-      ]
+      [{ name: 'd', archived: true }, { name: 'e' }]
     );
     expect(merged.layers?.map(l => l.archived)).toEqual([
       true,

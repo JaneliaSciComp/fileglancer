@@ -157,11 +157,15 @@ describe('useCreateViewFlow', () => {
     });
     expect(await screen.findByText('Add to this View')).toBeInTheDocument();
     expect(screen.queryByLabelText('View name')).toBeNull();
-    expect(screen.getByText(/this will create 1 data link\./i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/this will create 1 data link\./i)
+    ).toBeInTheDocument();
     expect(add).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
     await waitFor(() => expect(add).toHaveBeenCalledWith(datasets));
-    await waitFor(() => expect(screen.queryByText('Add to this View')).toBeNull());
+    await waitFor(() =>
+      expect(screen.queryByText('Add to this View')).toBeNull()
+    );
   });
 
   it('keeps the dialog open and shows the error when adding fails', async () => {
@@ -173,7 +177,9 @@ describe('useCreateViewFlow', () => {
     act(() => {
       apiRef.current!.startAddToView(datasets, false, add);
     });
-    await userEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Continue' })
+    );
     await waitFor(() => expect(errorSpy).toHaveBeenCalledWith('link failed'));
     expect(screen.getByText('Add to this View')).toBeInTheDocument();
     errorSpy.mockRestore();

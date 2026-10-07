@@ -176,7 +176,9 @@ describe('CartList', () => {
       screen.getByRole('button', { name: 'Add to this View' })
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /create view/i })).toBeNull();
-    expect(screen.getByRole('button', { name: /clear cart/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /clear cart/i })
+    ).toBeInTheDocument();
     expect(action).toHaveBeenCalledWith({ cart: [cartA], hasMismatch: true });
   });
 });
