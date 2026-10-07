@@ -162,4 +162,21 @@ describe('CartList', () => {
       screen.queryByLabelText('Will not load as a Neuroglancer layer')
     ).not.toBeInTheDocument();
   });
+
+  it('renders a custom action in place of Create View', () => {
+    mockDimensionCheck({
+      mismatchedKeys: new Set(),
+      hasMismatch: true,
+      kindByKey: new Map()
+    });
+    const action = vi.fn(() => <button type="button">Add to this View</button>);
+    cart = [cartA];
+    render(<CartList action={action} />);
+    expect(
+      screen.getByRole('button', { name: 'Add to this View' })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /create view/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /clear cart/i })).toBeInTheDocument();
+    expect(action).toHaveBeenCalledWith({ cart: [cartA], hasMismatch: true });
+  });
 });
