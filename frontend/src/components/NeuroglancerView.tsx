@@ -3,6 +3,8 @@ import type { IconType } from 'react-icons';
 import { Link, useNavigate, useParams } from 'react-router';
 import { IconButton, Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+import { PiDotsSixVerticalBold } from 'react-icons/pi';
 import {
   HiOutlineShare,
   HiOutlineDownload,
@@ -63,6 +65,9 @@ function ToolbarIconButton({
 
 type NgState = Record<string, unknown>;
 
+// Fits the sidebar's tabs beside its close button.
+const SIDEBAR_MIN_WIDTH_PX = 300;
+
 /** An action the owner confirmed past the unsaved-changes dialog. */
 type PendingAction = {
   readonly message: string;
@@ -100,6 +105,23 @@ export default function NeuroglancerView() {
   // before leaving this page.
   const [iframeSrc, setIframeSrc] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // react-resizable-panels sizes in percent; convert the sidebar's pixel
+  // minimum (room for its tabs and close button) from the group's width.
+  const [panelsEl, setPanelsEl] = useState<HTMLDivElement | null>(null);
+  const [panelsWidth, setPanelsWidth] = useState(0);
+  useEffect(() => {
+    if (!panelsEl) {
+      return;
+    }
+    const observer = new ResizeObserver(([entry]) =>
+      setPanelsWidth(entry.contentRect.width)
+    );
+    observer.observe(panelsEl);
+    return () => observer.disconnect();
+  }, [panelsEl]);
+  const sidebarMinSize = panelsWidth
+    ? Math.min(50, (SIDEBAR_MIN_WIDTH_PX / panelsWidth) * 100)
+    : 15;
   const awaitingFreshState = iframeSrc === null && stateQuery.isFetching;
   if (ngState && baseUrl && iframeSrc === null && !stateQuery.isFetching) {
     setIframeSrc(constructNeuroglancerUrl(ngState, baseUrl));
@@ -370,22 +392,43 @@ export default function NeuroglancerView() {
           onRelink={setRelinkTarget}
         />
       ) : null}
-      <div className="flex min-h-0 flex-1">
-        {canAddData && sidebarOpen ? (
-          <ViewerSidebar
-            bridge={bridge}
-            onAddSources={editState.addSources}
-            onClose={() => setSidebarOpen(false)}
-            onEdited={editState.markEdited}
-            viewLayers={ownedView?.layers ?? []}
-          />
-        ) : null}
-        <iframe
-          className="h-full min-w-0 flex-1 border-0"
-          ref={setIframe}
-          src={iframeSrc ?? externalUrl}
-          title="Neuroglancer viewer"
-        />
+      {/* The iframe's Panel keeps its place when the sidebar toggles, so
+          Neuroglancer never reloads. */}
+      <div className="flex min-h-0 flex-1" ref={setPanelsEl}>
+        <PanelGroup autoSaveId="viewer-sidebar" direction="horizontal">
+          {canAddData && sidebarOpen ? (
+            <>
+              <Panel
+                defaultSize={Math.max(25, sidebarMinSize)}
+                id="viewer-sidebar"
+                minSize={sidebarMinSize}
+                order={1}
+              >
+                <ViewerSidebar
+                  bridge={bridge}
+                  onAddSources={editState.addSources}
+                  onClose={() => setSidebarOpen(false)}
+                  onEdited={editState.markEdited}
+                  viewLayers={ownedView?.layers ?? []}
+                />
+              </Panel>
+              <PanelResizeHandle className="group relative w-3 bg-surface border-r border-surface hover:border-secondary/60">
+                <FgIcon
+                  className="stroke-2 absolute -right-1 top-1/2 stroke-surface-foreground pointer-events-none"
+                  icon={PiDotsSixVerticalBold}
+                />
+              </PanelResizeHandle>
+            </>
+          ) : null}
+          <Panel id="viewer" order={2}>
+            <iframe
+              className="h-full w-full border-0"
+              ref={setIframe}
+              src={iframeSrc ?? externalUrl}
+              title="Neuroglancer viewer"
+            />
+          </Panel>
+        </PanelGroup>
       </div>
       {pendingAction ? (
         <UnsavedChangesDialog
