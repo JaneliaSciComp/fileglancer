@@ -75,6 +75,13 @@ export default function useLayoutPrefs() {
   };
   // ponytail: mode is ephemeral (resets to 'properties' on reload). Persisting it would touch the layout-preference schema for a cosmetic default — skip until asked.
 
+  // Non-toggling: used by "add to cart" so the cart becomes visible even if
+  // it was already the selected mode.
+  const openDrawer = (mode: 'properties' | 'cart') => {
+    setPropertiesDrawerMode(mode);
+    setShowPropertiesDrawer(true);
+  };
+
   // Initialize layouts from saved preferences (only once on mount)
   useEffect(() => {
     if (preferenceQuery.isPending || hasInitializedRef.current) {
@@ -264,6 +271,7 @@ export default function useLayoutPrefs() {
     showSidebar,
     toggleSidebar,
     propertiesDrawerMode,
-    selectDrawerMode
+    selectDrawerMode,
+    openDrawer
   };
 }

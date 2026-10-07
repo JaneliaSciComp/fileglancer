@@ -3,6 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { CartItem } from '@/contexts/CartContext';
 import type { View } from '@/queries/viewQueries';
+import type { DatasetKind } from '@/utils/viewCheckout';
+import { datasetKey } from '@/utils/pathHandling';
 
 const cartA: CartItem = { fsp_name: 'f', path: '/a', label: 'Dataset A' };
 const cartB: CartItem = { fsp_name: 'f', path: '/b', label: 'Dataset B' };
@@ -29,8 +31,22 @@ vi.mock('@/contexts/CartContext', () => ({
   })
 }));
 vi.mock('@/components/ui/Views/CartDatasetRow', () => ({
-  default: ({ label }: { label: string }) => (
-    <div data-testid="row">{label}</div>
+  default: ({
+    label,
+    kind
+  }: {
+    label: string;
+    kind: DatasetKind | 'loading';
+  }) => (
+    <div data-testid="row">
+      {label}
+      {kind === 'ome' || kind === 'array' ? (
+        <span aria-label="Will load as a Neuroglancer layer" role="img" />
+      ) : null}
+      {kind === 'unsupported' ? (
+        <span aria-label="Will not load as a Neuroglancer layer" role="img" />
+      ) : null}
+    </div>
   )
 }));
 vi.mock('@/components/ui/Views/CreateViewButton', () => ({
@@ -46,18 +62,34 @@ vi.mock('@/components/ui/Views/CreateViewButton', () => ({
     </button>
   )
 }));
+const dimensionCheck = vi.hoisted(() => vi.fn());
 vi.mock('@/hooks/useCartDimensionCheck', () => ({
-  useCartDimensionCheck: () => ({
-    mismatchedKeys: new Set(),
-    hasMismatch: false
-  })
+  useCartDimensionCheck: () => dimensionCheck()
 }));
 
 import CartList from '@/components/ui/Views/CartList';
 
+function mockDimensionCheck(value: {
+  mismatchedKeys: Set<string>;
+  hasMismatch: boolean;
+  kindByKey: Map<string, DatasetKind | 'loading'>;
+}) {
+  dimensionCheck.mockReturnValue(value);
+}
+
+function renderCart(items: CartItem[]) {
+  cart = items;
+  return render(<CartList />);
+}
+
 beforeEach(() => {
   navigate.mockClear();
   clearCart.mockReset().mockResolvedValue(undefined);
+  mockDimensionCheck({
+    mismatchedKeys: new Set(),
+    hasMismatch: false,
+    kindByKey: new Map()
+  });
 });
 
 describe('CartList', () => {
@@ -91,5 +123,43 @@ describe('CartList', () => {
     // SelectionBar/FileBrowser - is the one caller that should clear it
     // after a successful checkout.
     await waitFor(() => expect(clearCart).toHaveBeenCalled());
+  });
+
+  it('marks datasets that will and will not load as Neuroglancer layers', () => {
+    mockDimensionCheck({
+      mismatchedKeys: new Set(),
+      hasMismatch: false,
+      kindByKey: new Map([
+        [datasetKey('f', '/ok.zarr'), 'ome'],
+        [datasetKey('f', '/plain.zarr'), 'array'],
+        [datasetKey('f', '/nope'), 'unsupported']
+      ])
+    });
+    renderCart([
+      { fsp_name: 'f', path: '/ok.zarr', label: 'ok' },
+      { fsp_name: 'f', path: '/plain.zarr', label: 'plain' },
+      { fsp_name: 'f', path: '/nope', label: 'nope' }
+    ]);
+    expect(
+      screen.getAllByLabelText('Will load as a Neuroglancer layer')
+    ).toHaveLength(2);
+    expect(
+      screen.getByLabelText('Will not load as a Neuroglancer layer')
+    ).toBeInTheDocument();
+  });
+
+  it('shows no layer-status indicator while a dataset is still loading', () => {
+    mockDimensionCheck({
+      mismatchedKeys: new Set(),
+      hasMismatch: false,
+      kindByKey: new Map() // no entry for cartA's dataset key: still loading
+    });
+    renderCart([cartA]);
+    expect(
+      screen.queryByLabelText('Will load as a Neuroglancer layer')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Will not load as a Neuroglancer layer')
+    ).not.toBeInTheDocument();
   });
 });

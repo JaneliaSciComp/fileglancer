@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router';
@@ -38,6 +38,7 @@ export function useCreateViewFlow() {
   const [name, setName] = useState('');
   const [acknowledged, setAcknowledged] = useState(false);
   const [request, setRequest] = useState<PendingRequest | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const { hasMismatch } = useCartDimensionCheck(request?.datasets ?? []);
 
@@ -95,7 +96,11 @@ export function useCreateViewFlow() {
 
   const open = request !== null;
   const dialog: ReactNode = request ? (
-    <FgDialog onClose={() => setRequest(null)} open={open}>
+    <FgDialog
+      initialFocus={nameInputRef}
+      onClose={() => setRequest(null)}
+      open={open}
+    >
       <div className="flex flex-col gap-2 my-4">
         <Typography className="text-foreground font-semibold">
           Create View
@@ -103,6 +108,8 @@ export function useCreateViewFlow() {
         <FgInput
           aria-label="View name"
           onChange={e => setName(e.target.value)}
+          onFocus={e => e.target.select()}
+          ref={nameInputRef}
           value={name}
         />
 
