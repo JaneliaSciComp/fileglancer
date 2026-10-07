@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
-import { IconButton, Typography } from '@material-tailwind/react';
+import { useMemo, useState } from 'react';
+import { IconButton, Tabs } from '@material-tailwind/react';
 import { HiX } from 'react-icons/hi';
 
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import CartList from '@/components/ui/Views/CartList';
+import SidebarFileBrowser from '@/components/ui/Views/SidebarFileBrowser';
 import { useAddToView } from '@/hooks/useAddToView';
 import { useCreateViewFlow } from '@/hooks/useCreateViewFlow';
 import { isUnsupportedLayer } from '@/utils/viewCheckout';
@@ -36,6 +37,7 @@ export default function ViewerSidebar({
     onAddSources
   });
   const { startAddToView, dialog, pending } = useCreateViewFlow();
+  const [tab, setTab] = useState('add');
   const viewSources = useMemo(
     () =>
       [...viewLayers]
@@ -48,15 +50,31 @@ export default function ViewerSidebar({
     [viewLayers]
   );
 
+  // Both tabs stay mounted (MT's Tabs.Panel unmounts inactive panels) so
+  // switching keeps the browser's folder and checks.
   return (
-    <aside
-      aria-label="Layer Cart sidebar"
-      className="flex w-80 shrink-0 flex-col gap-3 overflow-y-auto border-r border-surface p-3"
-    >
-      <div className="flex items-center justify-between">
-        <Typography className="font-semibold text-foreground">
-          Layer Cart
-        </Typography>
+    <aside aria-label="Layer Cart sidebar" className="flex h-full flex-col">
+      <div className="flex shrink-0 items-center gap-2 bg-surface pr-2 dark:bg-surface-light">
+        {/* Content-width triggers, as in the Properties panel: MT measures
+            the indicator only on window resize, so triggers that stretch
+            with the panel, or wrap when it narrows, would leave it behind. */}
+        <Tabs className="min-w-0 flex-1" onValueChange={setTab} value={tab}>
+          <Tabs.List className="justify-start items-stretch shrink-0 min-w-fit w-full py-2 bg-surface dark:bg-surface-light">
+            <Tabs.Trigger
+              className="!text-foreground h-full whitespace-nowrap"
+              value="add"
+            >
+              Add data
+            </Tabs.Trigger>
+            <Tabs.Trigger
+              className="!text-foreground h-full whitespace-nowrap"
+              value="cart"
+            >
+              Layer Cart
+            </Tabs.Trigger>
+            <Tabs.TriggerIndicator className="h-full" />
+          </Tabs.List>
+        </Tabs>
         <IconButton
           aria-label="Close sidebar"
           onClick={onClose}
@@ -66,20 +84,33 @@ export default function ViewerSidebar({
           <FgIcon icon={HiX} />
         </IconButton>
       </div>
-      <CartList
-        action={({ cart, hasMismatch, checking }) => (
-          <FgButton
-            // The mismatch check isn't final until every dataset is probed.
-            disabled={pending || checking}
-            loading={pending}
-            loadingText="Adding..."
-            onClick={() => startAddToView(cart, hasMismatch, addToView)}
-          >
-            Add to this View
-          </FgButton>
-        )}
-        viewSources={viewSources}
-      />
+      <div
+        aria-label="Add data"
+        className={`min-h-0 flex-1 flex-col overflow-y-auto p-3 ${tab === 'add' ? 'flex' : 'hidden'}`}
+        role="tabpanel"
+      >
+        <SidebarFileBrowser />
+      </div>
+      <div
+        aria-label="Layer Cart"
+        className={`min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 ${tab === 'cart' ? 'flex' : 'hidden'}`}
+        role="tabpanel"
+      >
+        <CartList
+          action={({ cart, hasMismatch, checking }) => (
+            <FgButton
+              // The mismatch check isn't final until every dataset is probed.
+              disabled={pending || checking}
+              loading={pending}
+              loadingText="Adding..."
+              onClick={() => startAddToView(cart, hasMismatch, addToView)}
+            >
+              Add to this View
+            </FgButton>
+          )}
+          viewSources={viewSources}
+        />
+      </div>
       {dialog}
     </aside>
   );
