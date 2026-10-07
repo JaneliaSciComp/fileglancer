@@ -86,6 +86,27 @@ vi.mock('@/components/ui/Views/ViewBrokenBanner', () => ({
     </button>
   )
 }));
+vi.mock('@/components/ui/Views/ViewerSidebar', () => ({
+  default: ({
+    bridge,
+    onEdited
+  }: {
+    bridge: { setState: (s: Record<string, unknown>) => void };
+    onEdited: () => void;
+  }) => (
+    <aside aria-label="Layer Cart sidebar">
+      <button
+        onClick={() => {
+          bridge.setState({ layers: [{ name: 'L0' }, { name: 'added' }] });
+          onEdited();
+        }}
+        type="button"
+      >
+        fake add
+      </button>
+    </aside>
+  )
+}));
 vi.mock('@/components/ui/Dialogs/RelinkDialog', () => ({
   default: ({ onRelinked }: { onRelinked?: () => void }) => (
     <button onClick={() => onRelinked?.()} type="button">
@@ -608,5 +629,54 @@ describe('NeuroglancerView', () => {
       );
       expect(downloadTextFile).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('lets the owner open and close the Add data sidebar', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    const toggle = screen.getByRole('button', { name: 'Add data' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(toggle);
+    expect(
+      screen.getByRole('complementary', { name: 'Layer Cart sidebar' })
+    ).toBeInTheDocument();
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(toggle);
+    expect(screen.queryByRole('complementary')).toBeNull();
+  });
+
+  it('toggling the sidebar keeps the same iframe', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    const iframe = screen.getByTitle(/neuroglancer/i) as HTMLIFrameElement;
+    const src = iframe.src;
+    await userEvent.click(screen.getByRole('button', { name: 'Add data' }));
+    expect(screen.getByTitle(/neuroglancer/i)).toBe(iframe);
+    await userEvent.click(screen.getByRole('button', { name: 'Add data' }));
+    expect(screen.getByTitle(/neuroglancer/i)).toBe(iframe);
+    expect(iframe.src).toBe(src);
+  });
+
+  it('shows the Save bar after adding from the sidebar', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    await userEvent.click(screen.getByRole('button', { name: 'Add data' }));
+    // No in-viewer interaction first: the add alone must count as an edit.
+    await userEvent.click(screen.getByRole('button', { name: 'fake add' }));
+    expect(
+      await screen.findByRole('button', { name: 'Save' })
+    ).toBeInTheDocument();
+  });
+
+  it('hides Add data from a non-owner', () => {
+    renderViewer();
+    expect(screen.queryByRole('button', { name: 'Add data' })).toBeNull();
+  });
+
+  it('hides Add data when editing is unavailable', () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    bridgeRef.current!.bridge.status = 'unavailable';
+    renderViewer();
+    expect(screen.queryByRole('button', { name: 'Add data' })).toBeNull();
   });
 });
