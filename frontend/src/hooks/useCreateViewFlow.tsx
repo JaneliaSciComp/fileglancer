@@ -19,10 +19,12 @@ import type { View } from '@/queries/viewQueries';
 
 type PendingRequest = {
   datasets: CartItem[];
-  onCreated?: (view: View) => void;
   newLinkCount: number;
   needsLinkConsent: boolean;
-};
+} & (
+  | { mode: 'create'; onCreated?: (view: View) => void }
+  | { mode: 'add'; add: (datasets: CartItem[]) => Promise<void> }
+);
 
 export function useCreateViewFlow() {
   const { checkout } = useCartCheckout();
@@ -42,18 +44,22 @@ export function useCreateViewFlow() {
 
   const { hasMismatch } = useCartDimensionCheck(request?.datasets ?? []);
 
-  const runCheckout = async () => {
+  const runRequest = async () => {
     if (!request) {
       return;
     }
     setPending(true);
     try {
-      const view = await checkout(request.datasets, name);
-      toast.success(`Created View "${name}"`);
-      if (request.onCreated) {
-        request.onCreated(view);
+      if (request.mode === 'add') {
+        await request.add(request.datasets);
       } else {
-        navigate('/ngviews');
+        const view = await checkout(request.datasets, name);
+        toast.success(`Created View "${name}"`);
+        if (request.onCreated) {
+          request.onCreated(view);
+        } else {
+          navigate('/ngviews');
+        }
       }
       setRequest(null);
     } catch (error) {
@@ -61,6 +67,23 @@ export function useCreateViewFlow() {
     } finally {
       setPending(false);
     }
+  };
+
+  const linkConsent = (datasets: CartItem[]) => {
+    const existingKeys = new Set(
+      (allProxiedPathsQuery.data ?? []).map(p => datasetKey(p.fsp_name, p.path))
+    );
+    const newLinkCount = new Set(
+      datasets
+        .map(ds => datasetKey(ds.fsp_name, ds.path))
+        .filter(key => !existingKeys.has(key))
+    ).size;
+    const autoLinksCoverThis =
+      areDataLinksAutomatic && dataLinkSubpathMode !== 'custom';
+    return {
+      newLinkCount,
+      needsLinkConsent: !autoLinksCoverThis && newLinkCount > 0
+    };
   };
 
   const startCreateView = (
@@ -72,46 +95,61 @@ export function useCreateViewFlow() {
       toast.error('Nothing to add');
       return;
     }
-    const existingKeys = new Set(
-      (allProxiedPathsQuery.data ?? []).map(p => datasetKey(p.fsp_name, p.path))
-    );
-    const newLinkCount = new Set(
-      datasets
-        .map(ds => datasetKey(ds.fsp_name, ds.path))
-        .filter(key => !existingKeys.has(key))
-    ).size;
-
-    const autoLinksCoverThis =
-      areDataLinksAutomatic && dataLinkSubpathMode !== 'custom';
-
     setName(defaultName);
     setAcknowledged(false);
     setRequest({
       datasets,
-      onCreated,
-      newLinkCount,
-      needsLinkConsent: !autoLinksCoverThis && newLinkCount > 0
+      ...linkConsent(datasets),
+      mode: 'create',
+      onCreated
     });
   };
 
+  const startAddToView = (
+    datasets: CartItem[],
+    hasMismatch: boolean,
+    add: (datasets: CartItem[]) => Promise<void>
+  ) => {
+    if (datasets.length === 0) {
+      toast.error('Nothing to add');
+      return;
+    }
+    const consent = linkConsent(datasets);
+    if (!consent.needsLinkConsent && !hasMismatch) {
+      // Nothing to ask, and unlike Create View there's no name to pick.
+      setPending(true);
+      add(datasets)
+        .catch(error =>
+          toast.error(error instanceof Error ? error.message : 'Add failed')
+        )
+        .finally(() => setPending(false));
+      return;
+    }
+    setAcknowledged(false);
+    setRequest({ datasets, ...consent, mode: 'add', add });
+  };
+
   const open = request !== null;
+  const creating = request?.mode === 'create';
   const dialog: ReactNode = request ? (
     <FgDialog
-      initialFocus={nameInputRef}
+      initialFocus={creating ? nameInputRef : undefined}
       onClose={() => setRequest(null)}
       open={open}
     >
       <div className="flex flex-col gap-2 my-4">
         <Typography className="text-foreground font-semibold">
-          Create View
+          {creating ? 'Create View' : 'Add to this View'}
         </Typography>
-        <FgInput
-          aria-label="View name"
-          onChange={e => setName(e.target.value)}
-          onFocus={e => e.target.select()}
-          ref={nameInputRef}
-          value={name}
-        />
+        {creating ? (
+          <FgInput
+            aria-label="View name"
+            onChange={e => setName(e.target.value)}
+            onFocus={e => e.target.select()}
+            ref={nameInputRef}
+            value={name}
+          />
+        ) : null}
 
         {request.needsLinkConsent ? (
           <>
@@ -120,7 +158,8 @@ export function useCreateViewFlow() {
             </Typography>
             <Typography className="text-foreground">
               This will create {request.newLinkCount} data link
-              {request.newLinkCount === 1 ? '' : 's'} and 1 View. If you share
+              {request.newLinkCount === 1 ? '' : 's'}
+              {creating ? ' and 1 View' : ''}. If you share
               the data link(s) with internal collaborators, they will be able to
               view these data.
             </Typography>
@@ -146,7 +185,11 @@ export function useCreateViewFlow() {
             </Typography>
             <FgCheckbox
               checked={acknowledged}
-              label="I understand I'm creating a view with mismatched dimensions."
+              label={
+                creating
+                  ? "I understand I'm creating a view with mismatched dimensions."
+                  : "I understand I'm adding layers with mismatched dimensions."
+              }
               onChange={e => setAcknowledged(e.target.checked)}
             />
           </div>
@@ -155,13 +198,15 @@ export function useCreateViewFlow() {
         <div className="flex gap-4">
           <FgButton
             disabled={
-              pending || name.trim() === '' || (hasMismatch && !acknowledged)
+              pending ||
+              (creating && name.trim() === '') ||
+              (hasMismatch && !acknowledged)
             }
             loading={pending}
-            loadingText="Creating..."
-            onClick={() => void runCheckout()}
+            loadingText={creating ? 'Creating...' : 'Adding...'}
+            onClick={() => void runRequest()}
           >
-            {request.needsLinkConsent ? 'Continue' : 'Create'}
+            {request.needsLinkConsent ? 'Continue' : creating ? 'Create' : 'Add'}
           </FgButton>
           <FgButton
             disabled={pending}
@@ -175,5 +220,5 @@ export function useCreateViewFlow() {
     </FgDialog>
   ) : null;
 
-  return { startCreateView, dialog, pending };
+  return { startCreateView, startAddToView, dialog, pending };
 }
