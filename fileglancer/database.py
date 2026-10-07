@@ -1,3 +1,4 @@
+import copy
 import secrets
 import hashlib
 from datetime import datetime, timedelta, UTC
@@ -16,6 +17,7 @@ from cachetools import LRUCache, TTLCache
 
 from fileglancer.giturls import canonical_github_url
 from fileglancer.model import FileSharePath
+from fileglancer.ngstate import data_link_segment, default_url_prefix, layer_sharing_key, layer_uses_segment, rewrite_layer_segment
 from fileglancer.settings import get_settings
 from fileglancer.utils import slugify_path
 
@@ -169,6 +171,10 @@ class ViewLayerDB(Base):
     # broken View can be shown (and later restored) by path.
     fsp_name = Column(String, nullable=True)
     path = Column(String, nullable=True)
+    # Data Link this layer was built against; kept after the link is deleted
+    # so the layer can be relinked (its ng_state URLs carry /{key}/{prefix}).
+    sharing_key = Column(String, nullable=True)
+    url_prefix = Column(String, nullable=True)
     broken = Column(Boolean, nullable=False, server_default=sa_false())
 
     view = relationship('ViewDB', back_populates='layers')
@@ -694,12 +700,25 @@ def get_proxied_path_by_sharing_key(session: Session, sharing_key: str) -> Optio
 
     # Only cache valid results (not None)
     if proxied_path is not None:
-        cache[sharing_key] = proxied_path
+        _cache_detached(session, proxied_path)
         logger.debug(f"Cached result for sharing key: {sharing_key}, cache size: {len(cache)}")
     else:
         logger.trace(f"Not caching None result for sharing key: {sharing_key}")
 
     return proxied_path
+
+
+def _cache_detached(session: Session, proxied_path: ProxiedPathDB) -> None:
+    """Cache a loaded, detached copy of proxied_path.
+
+    The cache outlives the request session. An instance still attached to it
+    would be expired by that session's next commit (expire_on_commit) and then
+    raise DetachedInstanceError on every later cache hit, so the cached
+    instance is always refreshed and expunged. Callers get it read-only; code
+    that edits a link must re-query it in its own session."""
+    session.refresh(proxied_path)
+    session.expunge(proxied_path)
+    _get_sharing_key_cache()[proxied_path.sharing_key] = proxied_path
 
 
 def _invalidate_sharing_key_cache(sharing_key: str):
@@ -856,10 +875,8 @@ def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_
     session.add(proxied_path)
     session.commit()
 
-    # Cache the new proxied path
-    cache = _get_sharing_key_cache()
-    cache[sharing_key] = proxied_path
-    logger.debug(f"Cached new proxied path for sharing key: {sharing_key}, cache size: {len(cache)}")
+    _cache_detached(session, proxied_path)
+    logger.debug(f"Cached new proxied path for sharing key: {sharing_key}")
     return proxied_path
 
 
@@ -871,7 +888,9 @@ def update_proxied_path(session: Session,
                         new_path: Optional[str] = None,
                         new_fsp_name: Optional[str] = None) -> ProxiedPathDB:
     """Update a proxied path"""
-    proxied_path = get_proxied_path_by_sharing_key(session, sharing_key)
+    # Query in this session, not via the cache: the cached instance is
+    # detached, so edits to it would never be flushed.
+    proxied_path = session.query(ProxiedPathDB).filter_by(sharing_key=sharing_key).first()
     if not proxied_path:
         raise ValueError(f"Proxied path with sharing key {sharing_key} not found")
 
@@ -893,10 +912,8 @@ def update_proxied_path(session: Session,
 
     session.commit()
 
-    # Update cache with the modified object
-    cache = _get_sharing_key_cache()
-    cache[sharing_key] = proxied_path
-    logger.debug(f"Updated cache entry for sharing key: {sharing_key}, cache size: {len(cache)}")
+    _cache_detached(session, proxied_path)
+    logger.debug(f"Updated cache entry for sharing key: {sharing_key}")
     return proxied_path
 
 
@@ -1013,7 +1030,7 @@ def create_view(
 ) -> ViewDB:
     """Create a View plus its ViewLayer rows. Returns the persisted ViewDB.
 
-    Each layer dict: {data_link_id, layer_index, channel, opts, fsp_name, path}.
+    Each layer dict: {data_link_id, layer_index, channel, opts, fsp_name, path, sharing_key, url_prefix}.
     """
     now = datetime.now(UTC)
     view = ViewDB(
@@ -1035,6 +1052,8 @@ def create_view(
             opts=layer.get('opts'),
             fsp_name=layer.get('fsp_name'),
             path=layer.get('path'),
+            sharing_key=layer.get('sharing_key'),
+            url_prefix=layer.get('url_prefix'),
         ))
     session.add(view)
     session.commit()
@@ -1063,22 +1082,82 @@ def get_views(session: Session, username: str) -> List[ViewDB]:
 
 def update_view(
     session: Session,
-    username: str,
-    short_key: str,
+    view: ViewDB,
     name: Optional[str] = None,
     ng_state: Optional[Dict] = None,
-) -> Optional[ViewDB]:
-    """Update an owned View's name and/or state. Returns None if not owned/found."""
-    view = session.query(ViewDB).filter_by(short_key=short_key, owner=username).first()
-    if not view:
-        return None
+    proxy_url: Optional[str] = None,
+) -> ViewDB:
+    """Update a View's name and/or state. Authorization is the caller's job
+    (server._can_edit_view). A new ng_state rebuilds view_layers from its
+    sources when the Data Link base URL is known."""
     if name is not None:
         view.name = name
     if ng_state is not None:
-        view.ng_state = ng_state
+        # /ngview injects the name as "title"; the name column is the source of truth.
+        view.ng_state = {k: v for k, v in ng_state.items() if k != 'title'}
+        if proxy_url:
+            reconcile_view_layers(session, view, proxy_url)
     view.updated_at = datetime.now(UTC)
     session.commit()
     return view
+
+
+def reconcile_view_layers(session: Session, view: ViewDB, proxy_url: str) -> None:
+    """Rebuild view.layers so row i describes ng_state.layers[i].
+
+    Rows are matched to NG layers by the Data Link key in their sources, so
+    reorders/removals in Neuroglancer's own UI keep the bookkeeping right.
+    Dead keys keep their broken row (fsp_name/path/url_prefix) so the layer can
+    still be relinked; unsupported rows (never in ng_state) are carried past
+    the real layers. Does not commit."""
+    old = list(view.layers)
+    unsupported = [l for l in old if (l.opts or {}).get('unsupported')]
+    keyed: Dict[str, List[ViewLayerDB]] = {}
+    legacy: List[ViewLayerDB] = []  # broken before keys were recorded
+    for l in old:
+        if l in unsupported:
+            continue
+        if l.sharing_key:
+            keyed.setdefault(l.sharing_key, []).append(l)
+        elif l.broken and l.fsp_name is not None and l.path is not None:
+            legacy.append(l)
+
+    rows: List[Dict] = []
+    for i, ng_layer in enumerate(view.ng_state.get('layers') or []):
+        key = layer_sharing_key(ng_layer, proxy_url) if isinstance(ng_layer, dict) else None
+        prev = keyed[key].pop(0) if key and keyed.get(key) else None
+        pp = get_proxied_path_by_sharing_key(session, key) if key else None
+        if pp:
+            row = dict(sharing_key=key, url_prefix=pp.url_prefix, data_link_id=pp.id,
+                       fsp_name=pp.fsp_name, path=pp.path, broken=False)
+        elif key:
+            url_prefix = prev.url_prefix if prev else None
+            if prev is None and legacy:
+                prev = legacy.pop(0)
+                guess = default_url_prefix(prev.fsp_name, prev.path)
+                url_prefix = guess if layer_uses_segment(ng_layer, data_link_segment(key, guess)) else None
+            row = dict(sharing_key=key, url_prefix=url_prefix, data_link_id=None,
+                       fsp_name=prev.fsp_name if prev else None,
+                       path=prev.path if prev else None, broken=True)
+        else:
+            row = dict(sharing_key=None, url_prefix=None, data_link_id=None,
+                       fsp_name=None, path=None, broken=False)
+        row.update(layer_index=i,
+                   channel=prev.channel if prev else None,
+                   opts=prev.opts if prev else None)
+        rows.append(row)
+
+    base = len(rows)
+    for j, l in enumerate(unsupported):
+        rows.append(dict(sharing_key=l.sharing_key, url_prefix=l.url_prefix,
+                         data_link_id=l.data_link_id, fsp_name=l.fsp_name, path=l.path,
+                         broken=l.broken, channel=l.channel, opts=l.opts,
+                         layer_index=base + j))
+
+    view.layers.clear()  # delete-orphan cascade removes the old rows
+    session.flush()
+    for row in rows:
+        view.layers.append(ViewLayerDB(**row))
 
 
 def delete_view(session: Session, username: str, short_key: str) -> int:
@@ -1107,6 +1186,63 @@ def get_views_for_data_link(session: Session, data_link_id: int, owner: Optional
     if owner is not None:
         query = query.filter(ViewDB.owner == owner)
     return query.all()
+
+
+def _path_aliases(path: str) -> List[str]:
+    """Stored spellings of a normalized path: legacy rows wrote the FSP root as "."."""
+    return ["", "."] if path == "" else [path]
+
+
+def get_relinkable_views(session: Session, owner: str, fsp_name: str, path: str) -> List[ViewDB]:
+    """The owner's Views with a broken layer on this dataset that can be
+    relinked (its dead Data Link key and prefix are known)."""
+    layer_view_ids = (
+        session.query(ViewLayerDB.view_id)
+        .filter(ViewLayerDB.broken.is_(True),
+                ViewLayerDB.sharing_key.isnot(None),
+                ViewLayerDB.url_prefix.isnot(None),
+                ViewLayerDB.fsp_name == fsp_name,
+                ViewLayerDB.path.in_(_path_aliases(path)))
+    )
+    return (
+        session.query(ViewDB)
+        .filter(ViewDB.id.in_(layer_view_ids), ViewDB.owner == owner)
+        .order_by(ViewDB.created_at.desc())
+        .all()
+    )
+
+
+def relink_broken_layers(session: Session, views: List[ViewDB], proxied_path: ProxiedPathDB) -> List[ViewDB]:
+    """Point each View's relinkable broken layers on proxied_path's dataset at
+    proxied_path: rewrite /{old_key}/{old_prefix} in every ng_state source and
+    re-attach the rows. The caller chooses `views` (owner-scoped today; an
+    edit-link session would pass just the View being edited). Commits."""
+    pp = proxied_path
+    new_segment = data_link_segment(pp.sharing_key, pp.url_prefix)
+    changed = []
+    for view in views:
+        rows = [l for l in view.layers
+                if l.broken and l.sharing_key and l.url_prefix is not None
+                and l.fsp_name == pp.fsp_name and l.path in _path_aliases(pp.path)]
+        if not rows:
+            continue
+        state = copy.deepcopy(view.ng_state)
+        if 'layers' in state:
+            for old_segment in {data_link_segment(l.sharing_key, l.url_prefix) for l in rows}:
+                state['layers'] = [
+                    rewrite_layer_segment(ng, old_segment, new_segment) if isinstance(ng, dict) else ng
+                    for ng in (state.get('layers') or [])
+                ]
+        for row in rows:
+            row.sharing_key = pp.sharing_key
+            row.url_prefix = pp.url_prefix
+            row.data_link_id = pp.id
+            row.broken = False
+        view.ng_state = state  # reassign: plain JSON columns don't track in-place edits
+        view.updated_at = datetime.now(UTC)
+        changed.append(view)
+    session.commit()
+    return changed
 
 
 def mark_view_layers_broken(session: Session, data_link_id: int) -> int:

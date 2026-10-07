@@ -163,6 +163,13 @@ class ProxiedPath(BaseModel):
         default=None
     )
 
+class ProxiedPathCreateResponse(ProxiedPath):
+    relinked_views: List["ViewSummary"] = Field(
+        default_factory=list,
+        description="The caller's broken Views that creating this Data Link repaired",
+    )
+
+
 class ProxiedPathResponse(BaseModel):
     paths: List[ProxiedPath] = Field(
         description="A list of proxied paths"
@@ -187,6 +194,14 @@ class ViewLayer(BaseModel):
     path: Optional[str] = Field(
         default=None,
         description="Path (relative to the FSP mount) of this layer's source; kept when the Data Link is deleted",
+    )
+    sharing_key: Optional[str] = Field(
+        default=None,
+        description="Sharing key of the Data Link this layer was built against; kept when the link is deleted",
+    )
+    url_prefix: Optional[str] = Field(
+        default=None,
+        description="URL prefix of that Data Link; kept when the link is deleted",
     )
     broken: bool = Field(default=False, description="True if the backing Data Link was deleted")
 
@@ -232,6 +247,20 @@ class ViewUpdateRequest(BaseModel):
     """Request body for an owner update (rename / restate)."""
     name: Optional[str] = Field(default=None, description="New display name")
     ng_state: Optional[Dict] = Field(default=None, description="Replacement Neuroglancer state JSON")
+
+
+class ViewSummary(BaseModel):
+    short_key: str = Field(description="The View's short key")
+    name: str = Field(description="Display name of the View")
+
+
+class ViewSummaryResponse(BaseModel):
+    views: List[ViewSummary] = Field(description="A list of View summaries")
+
+
+class RelinkRequest(BaseModel):
+    """Relink the caller's broken Views onto one of the caller's Data Links."""
+    sharing_key: str = Field(description="Sharing key of the Data Link to relink onto")
 
 
 class ExternalBucket(BaseModel):
