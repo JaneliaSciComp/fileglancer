@@ -323,6 +323,27 @@ describe('DataToolLinks - Expected Behavior', () => {
       expect(copyButton).toBeInTheDocument();
     });
 
+    it('offers Add to cart instead of creating a View', async () => {
+      const onAddToCart = vi.fn();
+      render(
+        <ViewersProvider>
+          <DataToolLinks
+            onAddToCart={onAddToCart}
+            onToolClick={vi.fn()}
+            showCopiedTooltip={false}
+            title="Test Tools"
+            urls={mockOpenWithToolUrls}
+          />
+        </ViewersProvider>,
+        { initialEntries: ['/browse/test_fsp/test_file'] }
+      );
+
+      expect(screen.getByText('Add to cart')).toBeInTheDocument();
+      expect(screen.queryByText(/create view/i)).toBeNull();
+      screen.getAllByLabelText('Add this dataset to the Layer Cart')[0].click();
+      expect(onAddToCart).toHaveBeenCalled();
+    });
+
     it('should call onToolClick when copy icon is clicked', async () => {
       const onToolClick = vi.fn(async () => {});
       renderDataToolLinks(undefined, onToolClick);
