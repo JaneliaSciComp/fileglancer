@@ -3,14 +3,18 @@ import toast from 'react-hot-toast';
 
 import { useCartContext } from '@/contexts/CartContext';
 import { useCartCheckout } from '@/hooks/useCartCheckout';
+import { isRelinkableLayer } from '@/queries/viewQueries';
 import {
   appendLayers,
   buildViewState,
-  isUnsupportedLayer
+  dataLinkSegment,
+  isUnsupportedLayer,
+  rewriteDataLinkSegment
 } from '@/utils/viewCheckout';
 import { datasetKey } from '@/utils/pathHandling';
 import type { CartItem } from '@/contexts/CartContext';
 import type { NeuroglancerBridge } from '@/hooks/useNeuroglancerViewer';
+import type { ViewLayer } from '@/queries/viewQueries';
 import type { NgLayer } from '@/utils/viewCheckout';
 
 /**
@@ -22,8 +26,16 @@ import type { NgLayer } from '@/utils/viewCheckout';
  */
 export function useAddToView(
   bridge: NeuroglancerBridge,
-  onEdited: () => void,
-  onAddSources: (sharingKeys: string[]) => void
+  {
+    viewLayers,
+    onEdited,
+    onAddSources
+  }: {
+    /** The View's saved layer rows, to find its broken sources. */
+    readonly viewLayers: ViewLayer[];
+    readonly onEdited: () => void;
+    readonly onAddSources: (sharingKeys: string[]) => void;
+  }
 ): (items: CartItem[]) => Promise<void> {
   const { resolveCartDatasets } = useCartCheckout();
   const { removeManyFromCart } = useCartContext();
@@ -39,6 +51,9 @@ export function useAddToView(
 
   return useCallback(
     async (items: CartItem[]) => {
+      // Snapshot before resolving: creating a Data Link relinks this View's
+      // broken layers on that dataset server-side and refetches the rows.
+      const broken = viewLayers.filter(isRelinkableLayer);
       const resolved = await resolveCartDatasets(items);
       const { ng_state, layers } = await buildViewState(resolved);
       const added = (ng_state.layers ?? []) as NgLayer[];
@@ -56,10 +71,32 @@ export function useAddToView(
           'The viewer closed or reloaded while adding. Nothing was added.'
         );
       }
-      if (added.length > 0) {
-        // Read the state after the slow probing, so camera moves made while
-        // waiting are kept.
-        bridge.setState(appendLayers(bridge.getState(), added));
+      // Read the state after the slow probing, so camera moves made while
+      // waiting are kept.
+      let current = bridge.getState();
+      // Save sends this local state, so it must carry the server's relink:
+      // point the View's broken layers on an added dataset at its live
+      // Data Link, or the Save re-breaks them.
+      let relinked = false;
+      for (const row of broken) {
+        const ds = resolved.find(
+          d =>
+            row.fsp_name !== null &&
+            row.path !== null &&
+            datasetKey(d.fsp_name, d.path) ===
+              datasetKey(row.fsp_name, row.path)
+        );
+        if (ds && ds.sharing_key !== row.sharing_key) {
+          current = rewriteDataLinkSegment(
+            current,
+            dataLinkSegment(row.sharing_key, row.url_prefix),
+            dataLinkSegment(ds.sharing_key, ds.url_prefix)
+          );
+          relinked = true;
+        }
+      }
+      if (added.length > 0 || relinked) {
+        bridge.setState(appendLayers(current, added));
         onEdited();
       }
       if (unsupportedKeys.length > 0) {
@@ -85,6 +122,13 @@ export function useAddToView(
         `Added ${count} dataset${count === 1 ? '' : 's'}. Save to keep ${count === 1 ? 'it' : 'them'}.${skipped}`
       );
     },
-    [resolveCartDatasets, removeManyFromCart, bridge, onEdited, onAddSources]
+    [
+      resolveCartDatasets,
+      removeManyFromCart,
+      bridge,
+      viewLayers,
+      onEdited,
+      onAddSources
+    ]
   );
 }

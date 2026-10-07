@@ -77,6 +77,7 @@ export function useCartCheckout() {
         return {
           url: link.url,
           sharing_key: link.sharing_key,
+          url_prefix: link.url_prefix,
           fsp_name: ds.fsp_name,
           path: ds.path,
           channel: ds.channel,
