@@ -46,8 +46,8 @@ export type ResolvedCheckoutDataset = {
   label: string;
 };
 
-type NgLayer = Record<string, unknown> & { name?: string };
-type NgState = Record<string, unknown> & { layers?: NgLayer[] };
+export type NgLayer = Record<string, unknown> & { name?: string };
+export type NgState = Record<string, unknown> & { layers?: NgLayer[] };
 
 function decodeState(encoded: string | null): NgState | null {
   if (!encoded) {
@@ -164,4 +164,34 @@ export async function buildViewState(
     layout: (base?.layout as string) ?? '4panel-alt'
   };
   return { ng_state, layers: viewLayers };
+}
+
+// NG requires unique layer names: `name`, else `name (2)`, `name (3)`, …
+function uniqueName(name: string, taken: Set<string>): string {
+  if (!taken.has(name)) {
+    return name;
+  }
+  let n = 2;
+  while (taken.has(`${name} (${n})`)) {
+    n++;
+  }
+  return `${name} (${n})`;
+}
+
+// Adds layers to an existing View's state. The View keeps its dimensions,
+// layout and selected layer. Added layers from index 4 on start archived,
+// the same rule as checkout.
+export function appendLayers(current: NgState, added: NgLayer[]): NgState {
+  const layers = [...(current.layers ?? [])];
+  const taken = new Set(
+    layers
+      .map(l => l.name)
+      .filter((n): n is string => typeof n === 'string')
+  );
+  for (const layer of added) {
+    const name = uniqueName(layer.name ?? 'layer', taken);
+    taken.add(name);
+    layers.push({ ...layer, name, archived: layers.length >= 4 });
+  }
+  return { ...current, layers };
 }
