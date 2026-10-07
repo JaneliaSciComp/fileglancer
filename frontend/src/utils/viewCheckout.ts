@@ -184,9 +184,7 @@ function uniqueName(name: string, taken: Set<string>): string {
 export function appendLayers(current: NgState, added: NgLayer[]): NgState {
   const layers = [...(current.layers ?? [])];
   const taken = new Set(
-    layers
-      .map(l => l.name)
-      .filter((n): n is string => typeof n === 'string')
+    layers.map(l => l.name).filter((n): n is string => typeof n === 'string')
   );
   for (const layer of added) {
     const name = uniqueName(layer.name ?? 'layer', taken);

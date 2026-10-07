@@ -90,8 +90,16 @@ describe('useCartCheckout', () => {
       { fsp_name: 'f', path: '/b', label: 'B' }
     ]);
     expect(resolved).toEqual([
-      expect.objectContaining({ path: '/a', channel: 'DAPI', sharing_key: 'ka' }),
-      expect.objectContaining({ path: '/b', sharing_key: 'kb', url: 'http://b' })
+      expect.objectContaining({
+        path: '/a',
+        channel: 'DAPI',
+        sharing_key: 'ka'
+      }),
+      expect.objectContaining({
+        path: '/b',
+        sharing_key: 'kb',
+        url: 'http://b'
+      })
     ]);
     expect(createProxied).toHaveBeenCalledTimes(1);
     expect(buildViewState).not.toHaveBeenCalled();
