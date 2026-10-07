@@ -272,6 +272,15 @@ describe('appendLayers', () => {
     ]);
   });
 
+  it("treats NG's per-channel split layers as taking the name", () => {
+    // NG split an earlier `img.zarr` layer into `img.zarr <channel>` layers.
+    const merged = appendLayers(
+      { layers: [{ name: 'img.zarr DAPI' }, { name: 'img.zarr (2) DAPI' }] },
+      [{ name: 'img.zarr' }]
+    );
+    expect(merged.layers?.[2].name).toBe('img.zarr (3)');
+  });
+
   it('archives added layers from index 4 on and leaves existing layers alone', () => {
     const merged = appendLayers(
       {
