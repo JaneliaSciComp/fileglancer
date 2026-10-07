@@ -377,6 +377,7 @@ export default function NeuroglancerView() {
             onAddSources={editState.addSources}
             onClose={() => setSidebarOpen(false)}
             onEdited={editState.markEdited}
+            viewLayers={ownedView?.layers ?? []}
           />
         ) : null}
         <iframe

@@ -7,9 +7,12 @@ import CartList from '@/components/ui/Views/CartList';
 import { useAddToView } from '@/hooks/useAddToView';
 import { useCreateViewFlow } from '@/hooks/useCreateViewFlow';
 import type { NeuroglancerBridge } from '@/hooks/useNeuroglancerViewer';
+import type { ViewLayer } from '@/queries/viewQueries';
 
 type ViewerSidebarProps = {
   readonly bridge: NeuroglancerBridge;
+  /** The View's saved layer rows. */
+  readonly viewLayers: ViewLayer[];
   /** Called after layers were added to the viewer's state. */
   readonly onEdited: () => void;
   /** Called with the Data Links of datasets that can't load as layers. */
@@ -20,11 +23,16 @@ type ViewerSidebarProps = {
 /** The owner's "Add data" panel beside the embedded viewer. */
 export default function ViewerSidebar({
   bridge,
+  viewLayers,
   onEdited,
   onAddSources,
   onClose
 }: ViewerSidebarProps) {
-  const addToView = useAddToView(bridge, onEdited, onAddSources);
+  const addToView = useAddToView(bridge, {
+    viewLayers,
+    onEdited,
+    onAddSources
+  });
   const { startAddToView, dialog, pending } = useCreateViewFlow();
 
   return (
