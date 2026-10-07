@@ -3,6 +3,12 @@
 import { http, HttpResponse } from 'msw';
 
 export const handlers = [
+  http.get('/api/neuroglancer/views/relinkable', () =>
+    HttpResponse.json({ views: [] }, { status: 200 })
+  ),
+  http.post('/api/neuroglancer/views/relink', () =>
+    HttpResponse.json({ views: [] }, { status: 200 })
+  ),
   // Proxied paths
   http.get('/api/proxied-path', ({ request }) => {
     const url = new URL(request.url);

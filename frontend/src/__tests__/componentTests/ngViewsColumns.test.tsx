@@ -23,6 +23,7 @@ import {
   ActionsCell
 } from '@/components/ui/Table/ngViewsColumns';
 import type { View } from '@/queries/viewQueries';
+import type { RelinkTarget } from '@/components/ui/Dialogs/RelinkDialog';
 import { formatDateString } from '@/utils';
 
 vi.mock('@/contexts/PreferencesContext', () => ({
@@ -65,7 +66,9 @@ const view: View = {
       opts: null,
       broken: false,
       fsp_name: 'nrs',
-      path: 'dudman/one.zarr'
+      path: 'dudman/one.zarr',
+      sharing_key: null,
+      url_prefix: null
     },
     {
       layer_index: 1,
@@ -74,7 +77,9 @@ const view: View = {
       opts: null,
       broken: true,
       fsp_name: 'nrs',
-      path: 'dudman/two.zarr'
+      path: 'dudman/two.zarr',
+      sharing_key: null,
+      url_prefix: null
     }
   ]
 };
@@ -82,15 +87,23 @@ const view: View = {
 function TableProbe({
   onRename,
   onDelete,
+  onRelink = () => {},
   view: viewProp = view
 }: {
   onRename: (v: View) => void;
   onDelete: (v: View) => void;
+  onRelink?: (t: RelinkTarget) => void;
   view?: View;
 }) {
   // ponytail: TableProbe is already a component, so call the hook directly
   // rather than nesting renderHook inside a component under render().
-  const columns = useNGViewsColumns(onRename, onDelete, 320, () => {});
+  const columns = useNGViewsColumns(
+    onRename,
+    onDelete,
+    320,
+    () => {},
+    onRelink
+  );
   const table = useReactTable({
     data: [viewProp],
     columns,
@@ -169,7 +182,9 @@ describe('useNGViewsColumns', () => {
           opts: null,
           broken: false,
           fsp_name: 'nrs',
-          path: 'dudman/shared.zarr'
+          path: 'dudman/shared.zarr',
+          sharing_key: null,
+          url_prefix: null
         },
         {
           layer_index: 1,
@@ -178,7 +193,9 @@ describe('useNGViewsColumns', () => {
           opts: null,
           broken: true,
           fsp_name: 'nrs',
-          path: 'dudman/shared.zarr'
+          path: 'dudman/shared.zarr',
+          sharing_key: null,
+          url_prefix: null
         }
       ]
     };
@@ -208,7 +225,9 @@ describe('useNGViewsColumns', () => {
           opts: null,
           broken: true,
           fsp_name: null,
-          path: null
+          path: null,
+          sharing_key: null,
+          url_prefix: null
         }
       ]
     };
@@ -239,7 +258,9 @@ describe('useNGViewsColumns', () => {
           opts: null,
           broken: true,
           fsp_name: 'nrs',
-          path: ''
+          path: '',
+          sharing_key: null,
+          url_prefix: null
         }
       ]
     };
@@ -266,7 +287,9 @@ describe('useNGViewsColumns', () => {
           opts: { unsupported: true },
           broken: false,
           fsp_name: 'nrs',
-          path: 'dudman/plain-dir'
+          path: 'dudman/plain-dir',
+          sharing_key: null,
+          url_prefix: null
         }
       ]
     };
@@ -340,5 +363,70 @@ describe('useNGViewsColumns', () => {
     expect(copyToClipboard).toHaveBeenCalledWith(
       expect.stringMatching(new RegExp(`/view/${view.read_key}$`))
     );
+  });
+});
+
+function renderTable(v: View, onRelink = vi.fn()) {
+  render(
+    <MemoryRouter>
+      <TableProbe
+        onDelete={vi.fn()}
+        onRelink={onRelink}
+        onRename={vi.fn()}
+        view={v}
+      />
+    </MemoryRouter>
+  );
+}
+
+describe('useNGViewsColumns relink', () => {
+  it('renders a Relink button for a relinkable broken source', async () => {
+    const onRelink = vi.fn();
+    const relinkable: View = {
+      ...view,
+      layers: [
+        { ...view.layers[1], sharing_key: 'dead', url_prefix: 'two.zarr' }
+      ]
+    };
+    renderTable(relinkable, onRelink);
+    await userEvent
+      .setup()
+      .click(
+        screen.getByRole('button', { name: 'Relink /nrs/dudman/two.zarr' })
+      );
+    expect(onRelink).toHaveBeenCalledWith({
+      fsp_name: 'nrs',
+      path: 'dudman/two.zarr',
+      displayPath: '/nrs/dudman/two.zarr'
+    });
+  });
+
+  it('treats a source as relinkable if any of its broken layers is', () => {
+    const mixed: View = {
+      ...view,
+      layers: [
+        { ...view.layers[1], layer_index: 0 },
+        {
+          ...view.layers[1],
+          layer_index: 1,
+          sharing_key: 'dead',
+          url_prefix: 'two.zarr'
+        }
+      ]
+    };
+    renderTable(mixed);
+    expect(
+      screen.getByRole('button', { name: 'Relink /nrs/dudman/two.zarr' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps a plain icon for an unrecoverable broken source', () => {
+    renderTable(view); // view.layers[1]: broken, no key
+    expect(
+      screen.queryByRole('button', { name: /^Relink / })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getAllByLabelText("Can't relink — recreate this View").length
+    ).toBeGreaterThan(0);
   });
 });
