@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 
 import { useCartContext } from '@/contexts/CartContext';
@@ -25,6 +25,15 @@ export function useAddToView(
 ): (items: CartItem[]) => Promise<void> {
   const { resolveCartDatasets } = useCartCheckout();
   const { removeManyFromCart } = useCartContext();
+  // The sidebar unmounts when NG reloads (the bridge leaves `ready`). An add
+  // still in flight then holds the dead viewer, so it must stop.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   return useCallback(
     async (items: CartItem[]) => {
@@ -43,8 +52,13 @@ export function useAddToView(
           .map(ds => datasetKey(ds.fsp_name, ds.path))
       );
 
+      if (!mounted.current) {
+        throw new Error(
+          'The viewer closed or reloaded while adding. Nothing was added.'
+        );
+      }
       // Read the state after the slow probing, so camera moves made while
-      // waiting are kept. Throws if Neuroglancer is mid-reload.
+      // waiting are kept.
       bridge.setState(appendLayers(bridge.getState(), added));
       onEdited();
 

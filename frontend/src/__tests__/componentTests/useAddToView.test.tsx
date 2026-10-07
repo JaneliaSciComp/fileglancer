@@ -139,4 +139,26 @@ describe('useAddToView', () => {
     expect(setState).not.toHaveBeenCalled();
     expect(removeManyFromCart).not.toHaveBeenCalled();
   });
+
+  it('changes nothing when the sidebar unmounts mid-add (NG reloaded)', async () => {
+    let resolve!: (v: unknown) => void;
+    resolveCartDatasets.mockReturnValue(new Promise(r => (resolve = r)));
+    buildViewState.mockResolvedValue({
+      ng_state: { layers: [{ name: 'ok' }] },
+      layers: [{ sharing_key: 'k1', layer_index: 0, channel: null, opts: null }]
+    });
+    const fake = makeFakeBridge({ layers: [{ name: 'old' }] });
+    const setState = vi.spyOn(fake.bridge, 'setState');
+    const onEdited = vi.fn();
+    const { result, unmount } = renderHook(() =>
+      useAddToView(fake.bridge, onEdited)
+    );
+    const pending = result.current([ok]);
+    unmount();
+    resolve([resolvedOf(ok, 'k1')]);
+    await expect(pending).rejects.toThrow('Nothing was added');
+    expect(setState).not.toHaveBeenCalled();
+    expect(onEdited).not.toHaveBeenCalled();
+    expect(removeManyFromCart).not.toHaveBeenCalled();
+  });
 });
