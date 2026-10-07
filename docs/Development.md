@@ -84,6 +84,33 @@ Fileglancer supports dynamic configuration of OME-Zarr viewers through `viewers.
 
 For detailed configuration options, examples, and documentation on adding custom viewers, see [ViewersConfiguration.md](ViewersConfiguration.md).
 
+### Testing View editing locally
+
+Owners can edit a View in the embedded viewer only when its Neuroglancer is
+served from the same origin as Fileglancer (the page reads the iframe's
+`window.viewer`). Otherwise the viewer shows "Editing isn't available with this
+Neuroglancer deployment" — the default for the CLI, which embeds
+`neuroglancer-demo.appspot.com`.
+
+To test editing locally against Janelia's Neuroglancer:
+
+1. Set `FGC_NEUROGLANCER_URL=https://fileglancer.int.janelia.org/neuroglancer`
+   in `.env` (or `neuroglancer_url:` in `config.yaml`). `/neuroglancer/*` is
+   then passed through to that URL.
+2. Point Neuroglancer at the passthrough in your viewers config
+   (`frontend/viewers.config.yaml` and `pixi run node-build`, or a runtime file
+   via `FGC_VIEWERS_CONFIG`):
+
+   ```yaml
+     - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/neuroglancer.yaml'
+       instance_template_url: 'http://localhost:7878/neuroglancer/#!{"layers":[{"name":"image","source":"{DATA_URL}","type":"image"}]}'
+   ```
+
+3. Restart `pixi run dev-launch`.
+
+Features of the fork that call endpoints outside `/neuroglancer/` on its own
+host won't work through the passthrough.
+
 
 ### Testing Configuration
 

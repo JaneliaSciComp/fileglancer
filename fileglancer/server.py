@@ -17,6 +17,7 @@ try:
 except ImportError:
     import tomli as tomllib
 
+import httpx
 import yaml
 from loguru import logger
 from pydantic import HttpUrl, ValidationError
@@ -243,6 +244,14 @@ def _validate_url_prefix(url_prefix: str) -> None:
     # which breaks key/path resolution when the link is opened.
     if any(seg in (".", "..") for seg in url_prefix.split('/')):
         raise HTTPException(status_code=400, detail="Data link name must not contain '.' or '..' segments")
+
+
+_NG_FORWARDED_HEADERS = ("content-type", "cache-control", "etag", "last-modified")
+
+
+def _ng_http_client() -> httpx.AsyncClient:
+    """Client for the dev /neuroglancer passthrough (patched in tests)."""
+    return httpx.AsyncClient(follow_redirects=True, timeout=httpx.Timeout(30, connect=5))
 
 
 def _normalize_proxied_path(path: str) -> str:
@@ -3214,6 +3223,32 @@ def create_app(settings):
     @app.get("/attributes.json", include_in_schema=False)
     async def serve_attributes_json():
         raise HTTPException(status_code=404, detail="Not found")
+
+    if settings.neuroglancer_url:
+        ng_upstream = settings.neuroglancer_url.rstrip('/')
+
+        @app.get("/neuroglancer", include_in_schema=False)
+        async def neuroglancer_root():
+            # NG's asset URLs are relative; they need the trailing slash.
+            return RedirectResponse(url="/neuroglancer/")
+
+        @app.get("/neuroglancer/{path:path}", include_in_schema=False)
+        async def neuroglancer_passthrough(path: str = ""):
+            # ponytail: dev-only GET passthrough of NG's static assets, no
+            # streaming or caching; production serves NG from its reverse proxy.
+            # `path` is decoded, so reject anything httpx would resolve outside
+            # the configured prefix (dot segments) or into a query/fragment. No
+            # '%' either: a still-encoded %2e%2e would be resolved upstream.
+            if any(seg in ("..", ".") for seg in path.split("/")) or any(c in path for c in "?#%"):
+                raise HTTPException(status_code=400, detail="Invalid file path")
+            try:
+                async with _ng_http_client() as client:
+                    r = await client.get(f"{ng_upstream}/{path}")
+            except httpx.HTTPError as e:
+                raise HTTPException(status_code=502,
+                                    detail=f"Could not reach Neuroglancer at {settings.neuroglancer_url}: {e}")
+            headers = {k: r.headers[k] for k in _NG_FORWARDED_HEADERS if k in r.headers}
+            return Response(content=r.content, status_code=r.status_code, headers=headers)
 
     # Serve SPA at /* for client-side routing
     # This must be the LAST route registered
