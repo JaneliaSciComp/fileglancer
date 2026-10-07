@@ -167,12 +167,18 @@ export async function buildViewState(
 }
 
 // NG requires unique layer names: `name`, else `name (2)`, `name (3)`, …
+// NG splits a multichannel OME-Zarr layer `name` into `name <channel>`
+// layers, so a name is also taken when one of its split layers exists.
+// ponytail: a different dataset named `name <something>` also counts as
+// taken; that only costs an unneeded ` (2)`.
 function uniqueName(name: string, taken: Set<string>): string {
-  if (!taken.has(name)) {
+  const isTaken = (n: string) =>
+    [...taken].some(t => t === n || t.startsWith(`${n} `));
+  if (!isTaken(name)) {
     return name;
   }
   let n = 2;
-  while (taken.has(`${name} (${n})`)) {
+  while (isTaken(`${name} (${n})`)) {
     n++;
   }
   return `${name} (${n})`;
