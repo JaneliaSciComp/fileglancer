@@ -3,6 +3,8 @@ import type { IconType } from 'react-icons';
 import { Link, useNavigate, useParams } from 'react-router';
 import { IconButton, Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+import { PiDotsSixVerticalBold } from 'react-icons/pi';
 import {
   HiOutlineShare,
   HiOutlineDownload,
@@ -63,6 +65,9 @@ function ToolbarIconButton({
 
 type NgState = Record<string, unknown>;
 
+// Fits the sidebar's tabs beside its close button.
+const SIDEBAR_MIN_WIDTH_PX = 300;
+
 /** An action the owner confirmed past the unsaved-changes dialog. */
 type PendingAction = {
   readonly message: string;
@@ -100,6 +105,26 @@ export default function NeuroglancerView() {
   // before leaving this page.
   const [iframeSrc, setIframeSrc] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // While resizing, the overlay covers the iframe: over the iframe, the
+  // pointer's moves go to Neuroglancer and the drag stalls.
+  const [resizing, setResizing] = useState(false);
+  // react-resizable-panels sizes in percent; convert the sidebar's pixel
+  // minimum (room for its tabs and close button) from the group's width.
+  const [panelsEl, setPanelsEl] = useState<HTMLDivElement | null>(null);
+  const [panelsWidth, setPanelsWidth] = useState(0);
+  useEffect(() => {
+    if (!panelsEl) {
+      return;
+    }
+    const observer = new ResizeObserver(([entry]) =>
+      setPanelsWidth(entry.contentRect.width)
+    );
+    observer.observe(panelsEl);
+    return () => observer.disconnect();
+  }, [panelsEl]);
+  const sidebarMinSize = panelsWidth
+    ? Math.min(50, (SIDEBAR_MIN_WIDTH_PX / panelsWidth) * 100)
+    : 15;
   const awaitingFreshState = iframeSrc === null && stateQuery.isFetching;
   if (ngState && baseUrl && iframeSrc === null && !stateQuery.isFetching) {
     setIframeSrc(constructNeuroglancerUrl(ngState, baseUrl));
@@ -354,22 +379,48 @@ export default function NeuroglancerView() {
           onRelink={setRelinkTarget}
         />
       ) : null}
-      <div className="flex min-h-0 flex-1">
-        {canAddData && sidebarOpen ? (
-          <ViewerSidebar
-            bridge={bridge}
-            onAddSources={editState.addSources}
-            onClose={() => setSidebarOpen(false)}
-            onEdited={editState.markEdited}
-            viewLayers={ownedView?.layers ?? []}
-          />
-        ) : null}
+      {/* The sidebar floats over Neuroglancer, so the iframe never resizes
+          or reloads when it toggles. The empty Panel lets clicks through. */}
+      <div className="relative min-h-0 flex-1" ref={setPanelsEl}>
         <iframe
-          className="h-full min-w-0 flex-1 border-0"
+          className="h-full w-full border-0"
           ref={setIframe}
           src={iframeSrc ?? externalUrl}
           title="Neuroglancer viewer"
         />
+        {canAddData && sidebarOpen ? (
+          <div
+            className={`absolute inset-0 ${resizing ? 'cursor-col-resize' : 'pointer-events-none'}`}
+          >
+            <PanelGroup autoSaveId="viewer-sidebar" direction="horizontal">
+              <Panel id="viewer-spacer" order={1} />
+              <PanelResizeHandle
+                onDragging={setResizing}
+                className="group pointer-events-auto relative w-3 bg-surface border-l border-surface hover:border-secondary/60"
+              >
+                <FgIcon
+                  className="stroke-2 absolute -left-1 top-1/2 stroke-surface-foreground pointer-events-none"
+                  icon={PiDotsSixVerticalBold}
+                />
+              </PanelResizeHandle>
+              <Panel
+                className="pointer-events-auto bg-background shadow-lg"
+                defaultSize={Math.max(25, sidebarMinSize)}
+                id="viewer-sidebar"
+                minSize={sidebarMinSize}
+                order={2}
+              >
+                <ViewerSidebar
+                  bridge={bridge}
+                  onAddSources={editState.addSources}
+                  onClose={() => setSidebarOpen(false)}
+                  onEdited={editState.markEdited}
+                  viewLayers={ownedView?.layers ?? []}
+                />
+              </Panel>
+            </PanelGroup>
+          </div>
+        ) : null}
       </div>
       {pendingAction ? (
         <UnsavedChangesDialog
