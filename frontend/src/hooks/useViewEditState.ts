@@ -8,6 +8,7 @@ export type ViewEditState = {
   dirty: boolean;
   discard: () => void;
   markSaved: (sent: NgState) => void;
+  markEdited: () => void;
   rebaseline: () => void;
 };
 
@@ -54,6 +55,13 @@ export function useViewEditState(
     },
     [getState, setDirty]
   );
+
+  // A change made from outside the viewer (adding layers from the sidebar)
+  // is the user's edit, the same as an in-viewer interaction.
+  const markEdited = useCallback(() => {
+    interacted.current = true;
+    setDirty(JSON.stringify(getState()) !== baseline.current);
+  }, [getState, setDirty]);
 
   const discard = useCallback(() => {
     setState(JSON.parse(baseline.current) as NgState);
@@ -102,5 +110,5 @@ export function useViewEditState(
     };
   }, [status, getState, subscribe, onInteraction, rebaseline, setDirty]);
 
-  return { dirty, discard, markSaved, rebaseline };
+  return { dirty, discard, markSaved, markEdited, rebaseline };
 }

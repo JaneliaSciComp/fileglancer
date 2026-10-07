@@ -141,4 +141,17 @@ describe('useViewEditState', () => {
       expect(onChangesLost).not.toHaveBeenCalled();
     });
   });
+
+  it('markEdited marks dirty without an in-viewer interaction', () => {
+    const fake = makeFakeBridge({ layers: [] });
+    const { result } = renderHook(() => useViewEditState(fake.bridge));
+    act(() => {
+      fake.bridge.setState({ layers: [{ name: 'added' }] });
+      result.current.markEdited();
+    });
+    expect(result.current.dirty).toBe(true);
+    // The throttled compare from setState's `changed` must not re-baseline it.
+    settle();
+    expect(result.current.dirty).toBe(true);
+  });
 });
