@@ -14,7 +14,11 @@ import {
   generateNeuroglancerStateForOmeZarr,
   generateStateForPlainZarr
 } from '@/omezarr-helper';
-import { buildViewState, probeDataset } from '@/utils/viewCheckout';
+import {
+  appendLayers,
+  buildViewState,
+  probeDataset
+} from '@/utils/viewCheckout';
 
 const md = { multiscales: [{}], arr: {}, zarrVersion: 2 };
 
@@ -235,5 +239,66 @@ describe('probeDataset', () => {
     const probe = await probeDataset('u');
     expect(probe).toMatchObject({ kind: 'unsupported' });
     expect((probe as { errors: unknown[] }).errors).toHaveLength(2);
+  });
+});
+
+describe('appendLayers', () => {
+  it("appends after the existing layers and keeps the View's own settings", () => {
+    const current = {
+      dimensions: { x: [1, 'm'] },
+      layout: 'xy',
+      selectedLayer: { visible: true, layer: 'a' },
+      layers: [{ name: 'a', source: 'zarr://a' }]
+    };
+    const merged = appendLayers(current, [{ name: 'b', source: 'zarr://b' }]);
+    expect(merged.dimensions).toEqual({ x: [1, 'm'] });
+    expect(merged.layout).toBe('xy');
+    expect(merged.selectedLayer).toEqual({ visible: true, layer: 'a' });
+    expect(merged.layers?.map(l => l.name)).toEqual(['a', 'b']);
+    expect(current.layers).toHaveLength(1); // input not mutated
+  });
+
+  it('de-duplicates names against existing and added layers', () => {
+    const merged = appendLayers({ layers: [{ name: 'a' }, { name: 'a (2)' }] }, [
+      { name: 'a' },
+      { name: 'a' },
+      { name: 'b' }
+    ]);
+    expect(merged.layers?.map(l => l.name)).toEqual([
+      'a',
+      'a (2)',
+      'a (3)',
+      'a (4)',
+      'b'
+    ]);
+  });
+
+  it('archives added layers from index 4 on and leaves existing layers alone', () => {
+    const merged = appendLayers(
+      {
+        layers: [
+          { name: 'a', archived: true },
+          { name: 'b' },
+          { name: 'c' }
+        ]
+      },
+      [
+        { name: 'd', archived: true },
+        { name: 'e' }
+      ]
+    );
+    expect(merged.layers?.map(l => l.archived)).toEqual([
+      true,
+      undefined,
+      undefined,
+      false,
+      true
+    ]);
+  });
+
+  it('handles a state without layers', () => {
+    expect(appendLayers({ layout: 'xy' }, [{ name: 'a' }]).layers).toEqual([
+      { name: 'a', archived: false }
+    ]);
   });
 });
