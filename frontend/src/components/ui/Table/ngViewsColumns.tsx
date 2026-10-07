@@ -15,7 +15,6 @@ import {
 } from '@/utils';
 import { datasetKey } from '@/utils/pathHandling';
 import { isUnsupportedLayer } from '@/utils/viewCheckout';
-import { constructNeuroglancerUrl } from '@/utils/neuroglancerUrl';
 import { copyToClipboard } from '@/utils/copyText';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
@@ -36,19 +35,16 @@ const SHARING_LABEL: Record<View['sharing_mode'], string> = {
 
 type ViewRowActionProps = {
   item: View;
-  baseUrl: string;
   onRename: (item: View) => void;
   onDelete: (item: View) => void;
 };
 
 export function ActionsCell({
   item,
-  baseUrl,
   onRename,
   onDelete
 }: {
   readonly item: View;
-  readonly baseUrl: string;
   readonly onRename: (item: View) => void;
   readonly onDelete: (item: View) => void;
 }) {
@@ -57,19 +53,19 @@ export function ActionsCell({
   // viewer instead of opening the external Neuroglancer URL.
   const menuItems: MenuItem<ViewRowActionProps>[] = [
     {
-      name: 'Open in Neuroglancer',
+      name: 'Open View',
       action: ({ item }) => {
         navigate(`/view/${item.read_key}`);
       }
     },
     {
-      name: 'Copy Neuroglancer link',
-      action: async ({ item, baseUrl }) => {
+      name: 'Copy View link to share',
+      action: async ({ item }) => {
         const result = await copyToClipboard(
-          constructNeuroglancerUrl(item.ng_state, baseUrl)
+          `${window.location.origin}/view/${item.read_key}`
         );
         if (result.success) {
-          toast.success('Neuroglancer link copied');
+          toast.success('View link copied');
         } else {
           toast.error(`Failed to copy: ${result.error}`);
         }
@@ -103,7 +99,7 @@ export function ActionsCell({
     <div className="min-w-0 flex items-center justify-start">
       <div onClick={e => e.stopPropagation()}>
         <CardActionsMenu<ViewRowActionProps>
-          actionProps={{ item, baseUrl, onRename, onDelete }}
+          actionProps={{ item, onRename, onDelete }}
           menuItems={menuItems}
         />
       </div>
@@ -164,7 +160,6 @@ function SourcesResizeHandle({
 export function useNGViewsColumns(
   onRename: (item: View) => void,
   onDelete: (item: View) => void,
-  baseUrl: string,
   sourcesColWidth: number,
   onSourcesResize: (next: number) => void
 ): ColumnDef<View>[] {
@@ -349,7 +344,6 @@ export function useNGViewsColumns(
         header: 'Actions',
         cell: ({ row }) => (
           <ActionsCell
-            baseUrl={baseUrl}
             item={row.original}
             onDelete={onDelete}
             onRename={onRename}
@@ -361,7 +355,6 @@ export function useNGViewsColumns(
     [
       onRename,
       onDelete,
-      baseUrl,
       sourcesColWidth,
       onSourcesResize,
       pathPreference,

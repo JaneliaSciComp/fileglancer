@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import userEvent from '@testing-library/user-event';
+import toast from 'react-hot-toast';
 import {
   useReactTable,
   getCoreRowModel,
@@ -13,6 +14,9 @@ vi.mock('react-router', async importOriginal => {
   const actual = await importOriginal<typeof import('react-router')>();
   return { ...actual, useNavigate: () => navigate };
 });
+vi.mock('@/utils/copyText', () => ({
+  copyToClipboard: vi.fn().mockResolvedValue({ success: true })
+}));
 
 import {
   useNGViewsColumns,
@@ -86,13 +90,7 @@ function TableProbe({
 }) {
   // ponytail: TableProbe is already a component, so call the hook directly
   // rather than nesting renderHook inside a component under render().
-  const columns = useNGViewsColumns(
-    onRename,
-    onDelete,
-    'https://ng.example/',
-    320,
-    () => {}
-  );
+  const columns = useNGViewsColumns(onRename, onDelete, 320, () => {});
   const table = useReactTable({
     data: [viewProp],
     columns,
@@ -314,20 +312,33 @@ describe('useNGViewsColumns', () => {
     expect(onDelete).toHaveBeenCalledWith(view);
   });
 
-  it('navigates to the embedded viewer when "Open in Neuroglancer" is clicked', async () => {
+  it('navigates to the embedded viewer when "Open View" is clicked', async () => {
     const user = userEvent.setup();
+    render(<ActionsCell item={view} onDelete={vi.fn()} onRename={vi.fn()} />);
+    const trigger = screen.getByRole('button');
+
+    await user.click(trigger);
+    await user.click(await screen.findByText('Open View'));
+    expect(navigate).toHaveBeenCalledWith(`/view/${view.read_key}`);
+  });
+
+  it('copies the short View link under "Copy View link to share" and toasts "View link copied"', async () => {
+    const user = userEvent.setup();
+    const { copyToClipboard } = await import('@/utils/copyText');
     render(
-      <ActionsCell
-        baseUrl="https://ng.example/"
-        item={view}
-        onDelete={vi.fn()}
-        onRename={vi.fn()}
-      />
+      <MemoryRouter>
+        <TableProbe onDelete={vi.fn()} onRename={vi.fn()} />
+      </MemoryRouter>
     );
     const trigger = screen.getByRole('button');
 
     await user.click(trigger);
-    await user.click(await screen.findByText('Open in Neuroglancer'));
-    expect(navigate).toHaveBeenCalledWith(`/view/${view.read_key}`);
+    await user.click(await screen.findByText('Copy View link to share'));
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith('View link copied')
+    );
+    expect(copyToClipboard).toHaveBeenCalledWith(
+      expect.stringMatching(new RegExp(`/view/${view.read_key}$`))
+    );
   });
 });
