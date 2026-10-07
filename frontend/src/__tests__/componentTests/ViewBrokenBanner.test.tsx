@@ -58,7 +58,7 @@ describe('ViewBrokenBanner', () => {
         onRelink={onRelink}
       />
     );
-    expect(screen.getByText('2 sources are broken')).toBeInTheDocument();
+    expect(screen.getByText('2 sources are broken:')).toBeInTheDocument();
     const buttons = screen.getAllByRole('button', { name: /^Relink / });
     expect(buttons).toHaveLength(2);
     await userEvent.click(buttons[0]);

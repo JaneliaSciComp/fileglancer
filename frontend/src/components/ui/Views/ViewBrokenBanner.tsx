@@ -56,18 +56,15 @@ export default function ViewBrokenBanner({
   }
 
   return (
-    <div className="flex shrink-0 flex-col gap-1 border-b border-error bg-error/10 px-4 py-1">
+    <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-error bg-error/10 px-4 py-1">
       <Typography className="text-foreground" variant="small">
         {sources.size === 1
-          ? '1 source is broken'
-          : `${sources.size} sources are broken`}
+          ? '1 source is broken:'
+          : `${sources.size} sources are broken:`}
       </Typography>
       {[...sources.entries()].map(([key, src]) => (
-        <div className="flex min-w-0 items-center gap-2" key={key}>
-          <Typography
-            className="truncate font-mono text-foreground"
-            variant="small"
-          >
+        <div className="flex min-w-0 items-center gap-3" key={key}>
+          <Typography className="truncate text-foreground" variant="small">
             {src.displayPath}
           </Typography>
           <FgTooltip
