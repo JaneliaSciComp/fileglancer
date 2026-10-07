@@ -39,8 +39,10 @@ export function useCartCheckout() {
   const createProxiedPath = useCreateProxiedPathMutation();
   const { createViewMutation } = useViewsContext();
 
-  const checkout = useCallback(
-    async (rawDatasets: CartItem[], name: string): Promise<View> => {
+  // Finds or creates one Data Link per dataset. Shared by checkout and
+  // "Add to this View".
+  const resolveCartDatasets = useCallback(
+    async (rawDatasets: CartItem[]): Promise<ResolvedCheckoutDataset[]> => {
       const datasets = dropShadowedBaseEntries(rawDatasets);
       const existing = new Map<string, ProxiedPath>(
         (allProxiedPathsQuery.data ?? []).map(p => [
@@ -65,7 +67,7 @@ export function useCartCheckout() {
         linkByKey.set(key, link);
       }
 
-      const resolved: ResolvedCheckoutDataset[] = datasets.map(ds => {
+      return datasets.map(ds => {
         const link = linkByKey.get(datasetKey(ds.fsp_name, ds.path));
         if (!link) {
           throw new Error(
@@ -82,12 +84,18 @@ export function useCartCheckout() {
           label: ds.label
         };
       });
+    },
+    [allProxiedPathsQuery.data, createProxiedPath]
+  );
 
+  const checkout = useCallback(
+    async (rawDatasets: CartItem[], name: string): Promise<View> => {
+      const resolved = await resolveCartDatasets(rawDatasets);
       const { ng_state, layers } = await buildViewState(resolved);
       return createViewMutation.mutateAsync({ name, ng_state, layers });
     },
-    [allProxiedPathsQuery.data, createProxiedPath, createViewMutation]
+    [resolveCartDatasets, createViewMutation]
   );
 
-  return { checkout };
+  return { checkout, resolveCartDatasets };
 }

@@ -81,4 +81,20 @@ describe('useCartCheckout', () => {
       expect.objectContaining({ fsp_name: 'f', path: '/a', channel: 'DAPI' })
     ]);
   });
+
+  it('resolves Data Links without building or creating a View', async () => {
+    const { result } = renderHook(() => useCartCheckout(), { wrapper });
+    const resolved = await result.current.resolveCartDatasets([
+      { fsp_name: 'f', path: '/a', label: 'A' },
+      { fsp_name: 'f', path: '/a', label: 'DAPI', channel: 'DAPI' },
+      { fsp_name: 'f', path: '/b', label: 'B' }
+    ]);
+    expect(resolved).toEqual([
+      expect.objectContaining({ path: '/a', channel: 'DAPI', sharing_key: 'ka' }),
+      expect.objectContaining({ path: '/b', sharing_key: 'kb', url: 'http://b' })
+    ]);
+    expect(createProxied).toHaveBeenCalledTimes(1);
+    expect(buildViewState).not.toHaveBeenCalled();
+    expect(createViewAsync).not.toHaveBeenCalled();
+  });
 });
