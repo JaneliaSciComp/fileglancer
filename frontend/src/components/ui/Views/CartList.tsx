@@ -10,6 +10,7 @@ import { useCartContext } from '@/contexts/CartContext';
 import { useCartDimensionCheck } from '@/hooks/useCartDimensionCheck';
 import { datasetKey } from '@/utils/pathHandling';
 import type { CartItem } from '@/contexts/CartContext';
+import type { ReactNode } from 'react';
 
 type CartGroup = {
   fsp_name: string;
@@ -44,12 +45,21 @@ function groupCartByDataset(cart: CartItem[]): CartGroup[] {
   return Array.from(groups.values());
 }
 
-export default function CartList() {
+type CartListProps = {
+  /** The cart's primary action beside "Clear cart". Default: Create View. */
+  readonly action?: (ctx: {
+    cart: CartItem[];
+    hasMismatch: boolean;
+  }) => ReactNode;
+};
+
+export default function CartList({ action }: CartListProps) {
   const { cart, clearCart } = useCartContext();
   const navigate = useNavigate();
 
   const cartGroups = useMemo(() => groupCartByDataset(cart), [cart]);
-  const { mismatchedKeys, kindByKey } = useCartDimensionCheck(cart);
+  const { mismatchedKeys, hasMismatch, kindByKey } =
+    useCartDimensionCheck(cart);
 
   const handleClearCart = async () => {
     try {
@@ -83,21 +93,25 @@ export default function CartList() {
         />
       ))}
       <div className="flex gap-3">
-        <CreateViewButton
-          datasets={cart}
-          defaultName="New View"
-          label="Create View"
-          onCreated={view => {
-            // Fire-and-forget: the View already exists, so a cart-clear
-            // failure (a separate network mutation) must not block
-            // navigation. Worst case is a stale cart item, which is
-            // low-stakes and independently retryable via "Clear cart".
-            clearCart().catch(() => {
-              toast.error('View created, but the cart could not be cleared');
-            });
-            navigate(`/view/${view.read_key}`);
-          }}
-        />
+        {action ? (
+          action({ cart, hasMismatch })
+        ) : (
+          <CreateViewButton
+            datasets={cart}
+            defaultName="New View"
+            label="Create View"
+            onCreated={view => {
+              // Fire-and-forget: the View already exists, so a cart-clear
+              // failure (a separate network mutation) must not block
+              // navigation. Worst case is a stale cart item, which is
+              // low-stakes and independently retryable via "Clear cart".
+              clearCart().catch(() => {
+                toast.error('View created, but the cart could not be cleared');
+              });
+              navigate(`/view/${view.read_key}`);
+            }}
+          />
+        )}
         <FgButton
           color="error"
           onClick={() => void handleClearCart()}
