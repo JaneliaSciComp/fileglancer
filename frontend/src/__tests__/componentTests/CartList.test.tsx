@@ -28,9 +28,6 @@ vi.mock('@/contexts/CartContext', () => ({
     clearCart
   })
 }));
-vi.mock('@/queries/proxiedPathQueries', () => ({
-  useAllProxiedPathsQuery: () => ({ data: [] })
-}));
 vi.mock('@/components/ui/Views/CartDatasetRow', () => ({
   default: ({ label }: { label: string }) => (
     <div data-testid="row">{label}</div>
@@ -48,6 +45,12 @@ vi.mock('@/components/ui/Views/CreateViewButton', () => ({
       {label ?? 'Create View'}
     </button>
   )
+}));
+vi.mock('@/hooks/useCartDimensionCheck', () => ({
+  useCartDimensionCheck: () => ({
+    mismatchedKeys: new Set(),
+    hasMismatch: false
+  })
 }));
 
 import CartList from '@/components/ui/Views/CartList';
