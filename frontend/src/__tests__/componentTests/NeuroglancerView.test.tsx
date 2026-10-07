@@ -89,12 +89,17 @@ vi.mock('@/components/ui/Views/ViewBrokenBanner', () => ({
 vi.mock('@/components/ui/Views/ViewerSidebar', () => ({
   default: ({
     bridge,
-    onEdited
+    onEdited,
+    onAddSources
   }: {
     bridge: { setState: (s: Record<string, unknown>) => void };
     onEdited: () => void;
+    onAddSources: (keys: string[]) => void;
   }) => (
     <aside aria-label="Layer Cart sidebar">
+      <button onClick={() => onAddSources(['plainKey'])} type="button">
+        fake add unsupported
+      </button>
       <button
         onClick={() => {
           bridge.setState({ layers: [{ name: 'L0' }, { name: 'added' }] });
@@ -666,6 +671,22 @@ describe('NeuroglancerView', () => {
     expect(
       await screen.findByRole('button', { name: 'Save' })
     ).toBeInTheDocument();
+  });
+
+  it('saves an unsupported dataset added from the sidebar as a source', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    await userEvent.click(screen.getByRole('button', { name: 'Add data' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'fake add unsupported' })
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    expect(mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        short_key: 'sk1',
+        unsupported_sharing_keys: ['plainKey']
+      })
+    );
   });
 
   it('hides Add data from a non-owner', () => {

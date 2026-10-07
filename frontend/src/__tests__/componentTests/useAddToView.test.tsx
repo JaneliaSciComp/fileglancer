@@ -37,8 +37,11 @@ beforeEach(() => {
 function setup() {
   const fake = makeFakeBridge({ layout: 'xy', layers: [{ name: 'old' }] });
   const onEdited = vi.fn();
-  const { result } = renderHook(() => useAddToView(fake.bridge, onEdited));
-  return { fake, onEdited, addToView: result.current };
+  const onAddSources = vi.fn();
+  const { result } = renderHook(() =>
+    useAddToView(fake.bridge, onEdited, onAddSources)
+  );
+  return { fake, onEdited, onAddSources, addToView: result.current };
 }
 
 describe('useAddToView', () => {
@@ -60,7 +63,7 @@ describe('useAddToView', () => {
     ]);
   });
 
-  it('keeps unsupported datasets in the cart', async () => {
+  it('records unsupported datasets as sources and empties the cart of them', async () => {
     resolveCartDatasets.mockResolvedValue([
       resolvedOf(ok, 'k1'),
       resolvedOf(nope, 'k2')
@@ -77,10 +80,12 @@ describe('useAddToView', () => {
         }
       ]
     });
-    const { addToView } = setup();
+    const { onAddSources, addToView } = setup();
     await addToView([ok, nope]);
+    expect(onAddSources).toHaveBeenCalledWith(['k2']);
     expect(removeManyFromCart).toHaveBeenCalledWith([
-      { path: '/ok.zarr', channel: undefined }
+      { path: '/ok.zarr', channel: undefined },
+      { path: '/nope', channel: undefined }
     ]);
   });
 
@@ -108,7 +113,7 @@ describe('useAddToView', () => {
     ]);
   });
 
-  it('changes nothing when no dataset loads', async () => {
+  it('leaves the viewer state alone when no dataset loads', async () => {
     resolveCartDatasets.mockResolvedValue([resolvedOf(nope, 'k2')]);
     buildViewState.mockResolvedValue({
       ng_state: { layers: [] },
@@ -121,14 +126,15 @@ describe('useAddToView', () => {
         }
       ]
     });
-    const { fake, onEdited, addToView } = setup();
+    const { fake, onEdited, onAddSources, addToView } = setup();
     const setState = vi.spyOn(fake.bridge, 'setState');
-    await expect(addToView([nope])).rejects.toThrow(
-      'None of these datasets load as Neuroglancer layers'
-    );
+    await addToView([nope]);
     expect(setState).not.toHaveBeenCalled();
     expect(onEdited).not.toHaveBeenCalled();
-    expect(removeManyFromCart).not.toHaveBeenCalled();
+    expect(onAddSources).toHaveBeenCalledWith(['k2']);
+    expect(removeManyFromCart).toHaveBeenCalledWith([
+      { path: '/nope', channel: undefined }
+    ]);
   });
 
   it('changes nothing when a Data Link cannot be created', async () => {
@@ -150,8 +156,9 @@ describe('useAddToView', () => {
     const fake = makeFakeBridge({ layers: [{ name: 'old' }] });
     const setState = vi.spyOn(fake.bridge, 'setState');
     const onEdited = vi.fn();
+    const onAddSources = vi.fn();
     const { result, unmount } = renderHook(() =>
-      useAddToView(fake.bridge, onEdited)
+      useAddToView(fake.bridge, onEdited, onAddSources)
     );
     const pending = result.current([ok]);
     unmount();
@@ -159,6 +166,7 @@ describe('useAddToView', () => {
     await expect(pending).rejects.toThrow('Nothing was added');
     expect(setState).not.toHaveBeenCalled();
     expect(onEdited).not.toHaveBeenCalled();
+    expect(onAddSources).not.toHaveBeenCalled();
     expect(removeManyFromCart).not.toHaveBeenCalled();
   });
 });

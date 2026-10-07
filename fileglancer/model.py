@@ -247,6 +247,10 @@ class ViewUpdateRequest(BaseModel):
     """Request body for an owner update (rename / restate)."""
     name: Optional[str] = Field(default=None, description="New display name")
     ng_state: Optional[Dict] = Field(default=None, description="Replacement Neuroglancer state JSON")
+    unsupported_sharing_keys: Optional[List[str]] = Field(
+        default=None,
+        description="Data Links of added datasets that can't load as Neuroglancer layers; "
+                    "recorded as unsupported sources")
 
 
 class ViewSummary(BaseModel):

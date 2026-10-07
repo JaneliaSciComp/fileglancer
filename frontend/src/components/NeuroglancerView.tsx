@@ -226,7 +226,10 @@ export default function NeuroglancerView() {
       const sent = bridge.getState();
       await updateViewMutation.mutateAsync({
         short_key: ownedView.short_key,
-        ng_state: sent
+        ng_state: sent,
+        ...(editState.pendingSources.length > 0 && {
+          unsupported_sharing_keys: editState.pendingSources
+        })
       });
       editState.markSaved(sent);
       toast.success('View saved');
@@ -371,6 +374,7 @@ export default function NeuroglancerView() {
         {canAddData && sidebarOpen ? (
           <ViewerSidebar
             bridge={bridge}
+            onAddSources={editState.addSources}
             onClose={() => setSidebarOpen(false)}
             onEdited={editState.markEdited}
           />

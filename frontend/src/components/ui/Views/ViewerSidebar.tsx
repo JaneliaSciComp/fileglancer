@@ -12,6 +12,8 @@ type ViewerSidebarProps = {
   readonly bridge: NeuroglancerBridge;
   /** Called after layers were added to the viewer's state. */
   readonly onEdited: () => void;
+  /** Called with the Data Links of datasets that can't load as layers. */
+  readonly onAddSources: (sharingKeys: string[]) => void;
   readonly onClose: () => void;
 };
 
@@ -19,9 +21,10 @@ type ViewerSidebarProps = {
 export default function ViewerSidebar({
   bridge,
   onEdited,
+  onAddSources,
   onClose
 }: ViewerSidebarProps) {
-  const addToView = useAddToView(bridge, onEdited);
+  const addToView = useAddToView(bridge, onEdited, onAddSources);
   const { startAddToView, dialog, pending } = useCreateViewFlow();
 
   return (
