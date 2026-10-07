@@ -43,9 +43,10 @@ export default function ViewerSidebar({
         </IconButton>
       </div>
       <CartList
-        action={({ cart, hasMismatch }) => (
+        action={({ cart, hasMismatch, checking }) => (
           <FgButton
-            disabled={pending}
+            // The mismatch check isn't final until every dataset is probed.
+            disabled={pending || checking}
             loading={pending}
             loadingText="Adding..."
             onClick={() => startAddToView(cart, hasMismatch, addToView)}
