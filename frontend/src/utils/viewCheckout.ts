@@ -39,6 +39,7 @@ export async function probeDataset(url: string): Promise<DatasetProbe> {
 export type ResolvedCheckoutDataset = {
   url: string;
   sharing_key: string;
+  url_prefix: string;
   fsp_name: string;
   path: string;
   channel?: string;
@@ -198,4 +199,55 @@ export function appendLayers(current: NgState, added: NgLayer[]): NgState {
     layers.push({ ...layer, name, archived: layers.length >= 4 });
   }
   return { ...current, layers };
+}
+
+// Python's quote(s, safe='/'), which the server uses in Data Link URLs.
+function quotePrefix(prefix: string): string {
+  return encodeURIComponent(prefix)
+    .replace(/[!'()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replace(/%2F/g, '/');
+}
+
+/** A Data Link's part of a source URL: `/{sharing_key}/{url_prefix}`. */
+export function dataLinkSegment(sharingKey: string, urlPrefix: string): string {
+  return `/${sharingKey}/${quotePrefix(urlPrefix)}`;
+}
+
+/**
+ * Points every layer source that uses `oldSegment` at `newSegment`, like the
+ * server's relink (ngstate.rewrite_layer_segment). A segment ends at `/`,
+ * `|`, `?`, `#` or the end, so `/K/img.zarr` never matches `/K/img.zarr2`.
+ */
+export function rewriteDataLinkSegment(
+  state: NgState,
+  oldSegment: string,
+  newSegment: string
+): NgState {
+  const escaped = oldSegment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`${escaped}(?=[/|?#]|$)`, 'g');
+  const fix = (source: unknown): unknown => {
+    if (typeof source === 'string') {
+      return source.replace(pattern, () => newSegment);
+    }
+    if (Array.isArray(source)) {
+      return source.map(fix);
+    }
+    if (
+      source &&
+      typeof source === 'object' &&
+      typeof (source as { url?: unknown }).url === 'string'
+    ) {
+      return { ...source, url: fix((source as { url: string }).url) };
+    }
+    return source;
+  };
+  if (!state.layers) {
+    return state;
+  }
+  return {
+    ...state,
+    layers: state.layers.map(l =>
+      'source' in l ? { ...l, source: fix(l.source) } : l
+    )
+  };
 }
