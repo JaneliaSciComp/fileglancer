@@ -23,7 +23,12 @@ type PendingRequest = {
   needsLinkConsent: boolean;
 } & (
   | { mode: 'create'; onCreated?: (view: View) => void }
-  | { mode: 'add'; add: (datasets: CartItem[]) => Promise<void> }
+  | {
+      mode: 'add';
+      add: (datasets: CartItem[]) => Promise<void>;
+      // Checked against the View's own datasets by the caller.
+      hasMismatch: boolean;
+    }
 );
 
 export function useCreateViewFlow() {
@@ -42,7 +47,9 @@ export function useCreateViewFlow() {
   const [request, setRequest] = useState<PendingRequest | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  const { hasMismatch } = useCartDimensionCheck(request?.datasets ?? []);
+  const cartCheck = useCartDimensionCheck(request?.datasets ?? []);
+  const hasMismatch =
+    request?.mode === 'add' ? request.hasMismatch : cartCheck.hasMismatch;
 
   const runRequest = async () => {
     if (!request) {
@@ -126,7 +133,7 @@ export function useCreateViewFlow() {
       return;
     }
     setAcknowledged(false);
-    setRequest({ datasets, ...consent, mode: 'add', add });
+    setRequest({ datasets, ...consent, mode: 'add', add, hasMismatch });
   };
 
   const open = request !== null;

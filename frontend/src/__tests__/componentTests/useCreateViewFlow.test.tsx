@@ -168,6 +168,28 @@ describe('useCreateViewFlow', () => {
     );
   });
 
+  it("asks to acknowledge a mismatch against the View's dimensions", async () => {
+    // The cart-only check (mocked) finds no mismatch; the caller's View check does.
+    const add = vi.fn().mockResolvedValue(undefined);
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+    act(() => {
+      apiRef.current!.startAddToView(datasets, true, add);
+    });
+    expect(
+      await screen.findByText(/differ from the first layer/i)
+    ).toBeInTheDocument();
+    const confirm = screen.getByRole('button', { name: 'Add' });
+    expect(confirm).toBeDisabled();
+    await userEvent.click(
+      screen.getByLabelText(
+        "I understand I'm adding layers with mismatched dimensions."
+      )
+    );
+    await userEvent.click(confirm);
+    await waitFor(() => expect(add).toHaveBeenCalledWith(datasets));
+  });
+
   it('keeps the dialog open and shows the error when adding fails', async () => {
     automatic = false;
     const add = vi.fn().mockRejectedValue(new Error('link failed'));

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { IconButton, Typography } from '@material-tailwind/react';
 import { HiX } from 'react-icons/hi';
 
@@ -6,6 +7,7 @@ import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import CartList from '@/components/ui/Views/CartList';
 import { useAddToView } from '@/hooks/useAddToView';
 import { useCreateViewFlow } from '@/hooks/useCreateViewFlow';
+import { isUnsupportedLayer } from '@/utils/viewCheckout';
 import type { NeuroglancerBridge } from '@/hooks/useNeuroglancerViewer';
 import type { ViewLayer } from '@/queries/viewQueries';
 
@@ -34,6 +36,17 @@ export default function ViewerSidebar({
     onAddSources
   });
   const { startAddToView, dialog, pending } = useCreateViewFlow();
+  const viewSources = useMemo(
+    () =>
+      [...viewLayers]
+        .sort((a, b) => a.layer_index - b.layer_index)
+        .flatMap(l =>
+          l.fsp_name !== null && l.path !== null && !isUnsupportedLayer(l)
+            ? [{ fsp_name: l.fsp_name, path: l.path }]
+            : []
+        ),
+    [viewLayers]
+  );
 
   return (
     <aside
@@ -65,6 +78,7 @@ export default function ViewerSidebar({
             Add to this View
           </FgButton>
         )}
+        viewSources={viewSources}
       />
       {dialog}
     </aside>

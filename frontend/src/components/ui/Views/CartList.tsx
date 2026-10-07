@@ -8,6 +8,7 @@ import CreateViewButton from '@/components/ui/Views/CreateViewButton';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import { useCartContext } from '@/contexts/CartContext';
 import { useCartDimensionCheck } from '@/hooks/useCartDimensionCheck';
+import type { DatasetRef } from '@/hooks/useCartDimensionCheck';
 import { datasetKey } from '@/utils/pathHandling';
 import type { CartItem } from '@/contexts/CartContext';
 import type { ReactNode } from 'react';
@@ -46,6 +47,8 @@ function groupCartByDataset(cart: CartItem[]): CartGroup[] {
 }
 
 type CartListProps = {
+  /** The open View's datasets, in layer order: the dimension reference. */
+  readonly viewSources?: DatasetRef[];
   /** The cart's primary action beside "Clear cart". Default: Create View. */
   readonly action?: (ctx: {
     cart: CartItem[];
@@ -55,13 +58,15 @@ type CartListProps = {
   }) => ReactNode;
 };
 
-export default function CartList({ action }: CartListProps) {
+export default function CartList({ action, viewSources }: CartListProps) {
   const { cart, clearCart } = useCartContext();
   const navigate = useNavigate();
 
   const cartGroups = useMemo(() => groupCartByDataset(cart), [cart]);
-  const { mismatchedKeys, hasMismatch, kindByKey } =
-    useCartDimensionCheck(cart);
+  const { mismatchedKeys, hasMismatch, kindByKey } = useCartDimensionCheck(
+    cart,
+    viewSources
+  );
   const checking = cartGroups.some(
     g =>
       (kindByKey.get(datasetKey(g.fsp_name, g.path)) ?? 'loading') === 'loading'
