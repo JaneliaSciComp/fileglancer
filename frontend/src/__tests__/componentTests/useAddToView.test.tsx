@@ -86,12 +86,19 @@ describe('useAddToView', () => {
 
   it('removes a shadowed base entry along with its channel entry', async () => {
     const base: CartItem = { fsp_name: 'f', path: '/ok.zarr', label: 'ok' };
-    const dapi: CartItem = { ...base, label: 'DAPI', channel: 'DAPI', channelIndex: 0 };
+    const dapi: CartItem = {
+      ...base,
+      label: 'DAPI',
+      channel: 'DAPI',
+      channelIndex: 0
+    };
     // Checkout drops the base entry, so only the channel entry resolves.
     resolveCartDatasets.mockResolvedValue([resolvedOf(dapi, 'k1')]);
     buildViewState.mockResolvedValue({
       ng_state: { layers: [{ name: 'DAPI' }] },
-      layers: [{ sharing_key: 'k1', layer_index: 0, channel: 'DAPI', opts: null }]
+      layers: [
+        { sharing_key: 'k1', layer_index: 0, channel: 'DAPI', opts: null }
+      ]
     });
     const { addToView } = setup();
     await addToView([base, dapi]);
@@ -117,7 +124,7 @@ describe('useAddToView', () => {
     const { fake, onEdited, addToView } = setup();
     const setState = vi.spyOn(fake.bridge, 'setState');
     await expect(addToView([nope])).rejects.toThrow(
-      "None of these datasets load as Neuroglancer layers"
+      'None of these datasets load as Neuroglancer layers'
     );
     expect(setState).not.toHaveBeenCalled();
     expect(onEdited).not.toHaveBeenCalled();
