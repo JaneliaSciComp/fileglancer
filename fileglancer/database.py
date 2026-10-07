@@ -1086,10 +1086,13 @@ def update_view(
     name: Optional[str] = None,
     ng_state: Optional[Dict] = None,
     proxy_url: Optional[str] = None,
+    unsupported: Optional[List[ProxiedPathDB]] = None,
 ) -> ViewDB:
     """Update a View's name and/or state. Authorization is the caller's job
     (server._can_edit_view). A new ng_state rebuilds view_layers from its
-    sources when the Data Link base URL is known."""
+    sources when the Data Link base URL is known. `unsupported` Data Links
+    (datasets with no Neuroglancer layer) are recorded as unsupported rows
+    past the real layers, once each."""
     if name is not None:
         view.name = name
     if ng_state is not None:
@@ -1097,6 +1100,17 @@ def update_view(
         view.ng_state = {k: v for k, v in ng_state.items() if k != 'title'}
         if proxy_url:
             reconcile_view_layers(session, view, proxy_url)
+    listed = {l.sharing_key for l in view.layers if (l.opts or {}).get('unsupported')}
+    next_index = max((l.layer_index for l in view.layers), default=-1) + 1
+    for pp in unsupported or []:
+        if pp.sharing_key in listed:
+            continue
+        listed.add(pp.sharing_key)
+        view.layers.append(ViewLayerDB(
+            sharing_key=pp.sharing_key, url_prefix=pp.url_prefix, data_link_id=pp.id,
+            fsp_name=pp.fsp_name, path=pp.path, opts={'unsupported': True},
+            layer_index=next_index))
+        next_index += 1
     view.updated_at = datetime.now(UTC)
     session.commit()
     return view

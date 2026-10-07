@@ -952,6 +952,19 @@ def test_reconcile_carries_unsupported_and_dead_key_rows(db_session, fsp):
     assert rows[2].opts == {"unsupported": True} and rows[2].layer_index == 2
 
 
+def test_update_view_records_unsupported_sources_once(db_session, fsp):
+    a, plain = _pp(db_session, fsp, "a.zarr"), _pp(db_session, fsp, "plain_dir")
+    state = {"layers": [{"name": "a", "source": _src(a)}]}
+    v = create_view(db_session, "u", "r", state, [_row(a, 0)], "read")
+
+    update_view(db_session, v, ng_state=state, proxy_url=PROXY, unsupported=[plain, plain])
+    update_view(db_session, v, ng_state=state, proxy_url=PROXY, unsupported=[plain])
+    rows = sorted(v.layers, key=lambda l: l.layer_index)
+    assert [(r.layer_index, r.sharing_key, r.opts) for r in rows] == [
+        (0, a.sharing_key, None), (1, plain.sharing_key, {"unsupported": True})]
+    assert (rows[1].data_link_id, rows[1].fsp_name, rows[1].path) == (plain.id, fsp.name, "plain_dir")
+
+
 def test_reconcile_adopts_legacy_broken_row(db_session, fsp):
     # A pre-migration broken row: fsp/path known, sharing_key unknown.
     state = {"layers": [{"name": "x", "source": f"{PROXY}/GONE/x.zarr|zarr2:"}]}

@@ -6,6 +6,9 @@ type NgState = Record<string, unknown>;
 
 export type ViewEditState = {
   dirty: boolean;
+  /** Data Links of added datasets with no NG layer, recorded on Save. */
+  pendingSources: string[];
+  addSources: (sharingKeys: string[]) => void;
   discard: () => void;
   markSaved: (sent: NgState) => void;
   markEdited: () => void;
@@ -33,6 +36,7 @@ export function useViewEditState(
 ): ViewEditState {
   const { status, getState, setState, subscribe, onInteraction } = bridge;
   const [dirty, setDirtyState] = useState(false);
+  const [pendingSources, setPendingSources] = useState<string[]>([]);
   const dirtyRef = useRef(false);
   const baseline = useRef('');
   const interacted = useRef(false);
@@ -51,6 +55,7 @@ export function useViewEditState(
   const markSaved = useCallback(
     (sent: NgState) => {
       baseline.current = JSON.stringify(sent);
+      setPendingSources([]);
       setDirty(JSON.stringify(getState()) !== baseline.current);
     },
     [getState, setDirty]
@@ -63,7 +68,13 @@ export function useViewEditState(
     setDirty(JSON.stringify(getState()) !== baseline.current);
   }, [getState, setDirty]);
 
+  // They aren't in NG's state, so they survive an NG reload.
+  const addSources = useCallback((sharingKeys: string[]) => {
+    setPendingSources(prev => [...new Set([...prev, ...sharingKeys])]);
+  }, []);
+
   const discard = useCallback(() => {
+    setPendingSources([]);
     setState(JSON.parse(baseline.current) as NgState);
     rebaseline();
   }, [setState, rebaseline]);
@@ -110,5 +121,13 @@ export function useViewEditState(
     };
   }, [status, getState, subscribe, onInteraction, rebaseline, setDirty]);
 
-  return { dirty, discard, markSaved, markEdited, rebaseline };
+  return {
+    dirty: dirty || pendingSources.length > 0,
+    pendingSources,
+    addSources,
+    discard,
+    markSaved,
+    markEdited,
+    rebaseline
+  };
 }

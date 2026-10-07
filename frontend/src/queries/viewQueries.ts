@@ -78,6 +78,7 @@ export type ViewCreateRequest = {
 export type ViewUpdateRequest = {
   name?: string;
   ng_state?: Record<string, unknown>;
+  unsupported_sharing_keys?: string[];
 };
 
 /**

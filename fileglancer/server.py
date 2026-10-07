@@ -1653,8 +1653,15 @@ def create_app(settings):
                 raise HTTPException(status_code=404, detail="View not found")
             if payload.ng_state is not None and not isinstance(payload.ng_state.get('layers', []), list):
                 raise HTTPException(status_code=400, detail="ng_state.layers must be a list")
+            unsupported = []
+            for key in payload.unsupported_sharing_keys or []:
+                pp = db.get_proxied_path_by_sharing_key(session, key)
+                if not pp:
+                    raise HTTPException(status_code=400, detail=f"Unknown data link sharing key: {key}")
+                unsupported.append(pp)
             view = db.update_view(session, view, name=payload.name,
-                                  ng_state=payload.ng_state, proxy_url=_proxy_url(settings))
+                                  ng_state=payload.ng_state, proxy_url=_proxy_url(settings),
+                                  unsupported=unsupported)
             return View.model_validate(view)
 
     @app.delete("/api/neuroglancer/views/{short_key}",
