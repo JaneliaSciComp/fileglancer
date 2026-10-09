@@ -21,7 +21,8 @@ vi.mock('@/contexts/ViewsContext', () => ({
     allViewsQuery: { data: [view], error: null, isPending: false },
     createViewMutation: { mutateAsync: vi.fn(), isPending: false },
     updateViewMutation: { mutateAsync: vi.fn(), isPending: false },
-    deleteViewMutation: { mutateAsync: vi.fn(), isPending: false }
+    deleteViewMutation: { mutateAsync: vi.fn(), isPending: false },
+    removeViewSourcesMutation: { mutateAsync: vi.fn(), isPending: false }
   })
 }));
 vi.mock('@/contexts/CartContext', () => ({
