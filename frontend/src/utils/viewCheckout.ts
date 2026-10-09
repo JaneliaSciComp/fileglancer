@@ -39,6 +39,7 @@ export async function probeDataset(url: string): Promise<DatasetProbe> {
 export type ResolvedCheckoutDataset = {
   url: string;
   sharing_key: string;
+  url_prefix: string;
   fsp_name: string;
   path: string;
   channel?: string;
@@ -46,8 +47,8 @@ export type ResolvedCheckoutDataset = {
   label: string;
 };
 
-type NgLayer = Record<string, unknown> & { name?: string };
-type NgState = Record<string, unknown> & { layers?: NgLayer[] };
+export type NgLayer = Record<string, unknown> & { name?: string };
+export type NgState = Record<string, unknown> & { layers?: NgLayer[] };
 
 function decodeState(encoded: string | null): NgState | null {
   if (!encoded) {
@@ -164,4 +165,89 @@ export async function buildViewState(
     layout: (base?.layout as string) ?? '4panel-alt'
   };
   return { ng_state, layers: viewLayers };
+}
+
+// NG requires unique layer names: `name`, else `name (2)`, `name (3)`, …
+// NG splits a multichannel OME-Zarr layer `name` into `name <channel>`
+// layers, so a name is also taken when one of its split layers exists.
+// ponytail: a different dataset named `name <something>` also counts as
+// taken; that only costs an unneeded ` (2)`.
+function uniqueName(name: string, taken: Set<string>): string {
+  const isTaken = (n: string) =>
+    [...taken].some(t => t === n || t.startsWith(`${n} `));
+  if (!isTaken(name)) {
+    return name;
+  }
+  let n = 2;
+  while (isTaken(`${name} (${n})`)) {
+    n++;
+  }
+  return `${name} (${n})`;
+}
+
+// Adds layers to an existing View's state. The View keeps its dimensions,
+// layout and selected layer. Added layers from index 4 on start archived,
+// the same rule as checkout.
+export function appendLayers(current: NgState, added: NgLayer[]): NgState {
+  const layers = [...(current.layers ?? [])];
+  const taken = new Set(
+    layers.map(l => l.name).filter((n): n is string => typeof n === 'string')
+  );
+  for (const layer of added) {
+    const name = uniqueName(layer.name ?? 'layer', taken);
+    taken.add(name);
+    layers.push({ ...layer, name, archived: layers.length >= 4 });
+  }
+  return { ...current, layers };
+}
+
+// Python's quote(s, safe='/'), which the server uses in Data Link URLs.
+function quotePrefix(prefix: string): string {
+  return encodeURIComponent(prefix)
+    .replace(/[!'()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replace(/%2F/g, '/');
+}
+
+/** A Data Link's part of a source URL: `/{sharing_key}/{url_prefix}`. */
+export function dataLinkSegment(sharingKey: string, urlPrefix: string): string {
+  return `/${sharingKey}/${quotePrefix(urlPrefix)}`;
+}
+
+/**
+ * Points every layer source that uses `oldSegment` at `newSegment`, like the
+ * server's relink (ngstate.rewrite_layer_segment). A segment ends at `/`,
+ * `|`, `?`, `#` or the end, so `/K/img.zarr` never matches `/K/img.zarr2`.
+ */
+export function rewriteDataLinkSegment(
+  state: NgState,
+  oldSegment: string,
+  newSegment: string
+): NgState {
+  const escaped = oldSegment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`${escaped}(?=[/|?#]|$)`, 'g');
+  const fix = (source: unknown): unknown => {
+    if (typeof source === 'string') {
+      return source.replace(pattern, () => newSegment);
+    }
+    if (Array.isArray(source)) {
+      return source.map(fix);
+    }
+    if (
+      source &&
+      typeof source === 'object' &&
+      typeof (source as { url?: unknown }).url === 'string'
+    ) {
+      return { ...source, url: fix((source as { url: string }).url) };
+    }
+    return source;
+  };
+  if (!state.layers) {
+    return state;
+  }
+  return {
+    ...state,
+    layers: state.layers.map(l =>
+      'source' in l ? { ...l, source: fix(l.source) } : l
+    )
+  };
 }

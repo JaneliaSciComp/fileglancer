@@ -141,4 +141,31 @@ describe('useViewEditState', () => {
       expect(onChangesLost).not.toHaveBeenCalled();
     });
   });
+
+  it('markEdited marks dirty without an in-viewer interaction', () => {
+    const fake = makeFakeBridge({ layers: [] });
+    const { result } = renderHook(() => useViewEditState(fake.bridge));
+    act(() => {
+      fake.bridge.setState({ layers: [{ name: 'added' }] });
+      result.current.markEdited();
+    });
+    expect(result.current.dirty).toBe(true);
+    // The throttled compare from setState's `changed` must not re-baseline it.
+    settle();
+    expect(result.current.dirty).toBe(true);
+  });
+
+  it('pending sources mark dirty until saved or discarded', () => {
+    const fake = makeFakeBridge({ layers: [] });
+    const { result } = renderHook(() => useViewEditState(fake.bridge));
+    act(() => result.current.addSources(['k1', 'k1']));
+    expect(result.current.pendingSources).toEqual(['k1']);
+    expect(result.current.dirty).toBe(true);
+    act(() => result.current.discard());
+    expect(result.current.dirty).toBe(false);
+    act(() => result.current.addSources(['k2']));
+    act(() => result.current.markSaved(fake.bridge.getState()));
+    expect(result.current.pendingSources).toEqual([]);
+    expect(result.current.dirty).toBe(false);
+  });
 });

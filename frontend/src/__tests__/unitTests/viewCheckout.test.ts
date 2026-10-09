@@ -14,7 +14,13 @@ import {
   generateNeuroglancerStateForOmeZarr,
   generateStateForPlainZarr
 } from '@/omezarr-helper';
-import { buildViewState, probeDataset } from '@/utils/viewCheckout';
+import {
+  appendLayers,
+  buildViewState,
+  dataLinkSegment,
+  rewriteDataLinkSegment,
+  probeDataset
+} from '@/utils/viewCheckout';
 
 const md = { multiscales: [{}], arr: {}, zarrVersion: 2 };
 
@@ -37,10 +43,18 @@ beforeEach(() => {
 describe('buildViewState', () => {
   it('concatenates layers across datasets and maps ViewLayerInput', async () => {
     const { ng_state, layers } = await buildViewState([
-      { url: 'a', sharing_key: 'ka', fsp_name: 'f', path: '/a', label: 'A' },
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        url_prefix: 'a',
+        fsp_name: 'f',
+        path: '/a',
+        label: 'A'
+      },
       {
         url: 'b',
         sharing_key: 'kb',
+        url_prefix: 'b',
         fsp_name: 'f',
         path: '/b',
         channel: 'GFP',
@@ -67,7 +81,14 @@ describe('buildViewState', () => {
         .generateNeuroglancerStateForDataURL as any
     ).mockReturnValue(encoded({ layers: [{ name: 'fallback' }] }));
     const { ng_state } = await buildViewState([
-      { url: 'a', sharing_key: 'ka', fsp_name: 'f', path: '/a', label: 'A' }
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        url_prefix: 'a',
+        fsp_name: 'f',
+        path: '/a',
+        label: 'A'
+      }
     ]);
     expect((ng_state as any).layers).toHaveLength(1);
   });
@@ -80,8 +101,22 @@ describe('buildViewState', () => {
       encoded({ layers: [{ name: `${url}-plain` }] })
     );
     const { ng_state, layers } = await buildViewState([
-      { url: 'a', sharing_key: 'ka', fsp_name: 'f', path: '/a', label: 'A' },
-      { url: 'b', sharing_key: 'kb', fsp_name: 'f', path: '/b', label: 'B' }
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        url_prefix: 'a',
+        fsp_name: 'f',
+        path: '/a',
+        label: 'A'
+      },
+      {
+        url: 'b',
+        sharing_key: 'kb',
+        url_prefix: 'b',
+        fsp_name: 'f',
+        path: '/b',
+        label: 'B'
+      }
     ]);
     expect((ng_state as any).layers).toHaveLength(2);
     expect(layers).toEqual([
@@ -99,8 +134,22 @@ describe('buildViewState', () => {
       new Error('also gone')
     );
     const { ng_state, layers } = await buildViewState([
-      { url: 'a', sharing_key: 'ka', fsp_name: 'f', path: '/a', label: 'A' },
-      { url: 'b', sharing_key: 'kb', fsp_name: 'f', path: '/b', label: 'B' }
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        url_prefix: 'a',
+        fsp_name: 'f',
+        path: '/a',
+        label: 'A'
+      },
+      {
+        url: 'b',
+        sharing_key: 'kb',
+        url_prefix: 'b',
+        fsp_name: 'f',
+        path: '/b',
+        label: 'B'
+      }
     ]);
     expect((ng_state as any).layers).toHaveLength(1);
     expect(layers).toEqual([
@@ -122,8 +171,22 @@ describe('buildViewState', () => {
       throw new Error('bad multiscale');
     });
     const { ng_state, layers } = await buildViewState([
-      { url: 'a', sharing_key: 'ka', fsp_name: 'f', path: '/a', label: 'A' },
-      { url: 'b', sharing_key: 'kb', fsp_name: 'f', path: '/b', label: 'B' }
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        url_prefix: 'a',
+        fsp_name: 'f',
+        path: '/a',
+        label: 'A'
+      },
+      {
+        url: 'b',
+        sharing_key: 'kb',
+        url_prefix: 'b',
+        fsp_name: 'f',
+        path: '/b',
+        label: 'B'
+      }
     ]);
     expect((ng_state as any).layers).toHaveLength(1);
     expect(layers[0]).toEqual({
@@ -151,6 +214,7 @@ describe('buildViewState', () => {
       {
         url: 'a',
         sharing_key: 'ka',
+        url_prefix: 'a',
         fsp_name: 'f',
         path: '/a',
         channel: 'GFP',
@@ -183,7 +247,14 @@ describe('buildViewState', () => {
     );
 
     const noChannel = await buildViewState([
-      { url: 'a', sharing_key: 'ka', fsp_name: 'f', path: '/a', label: 'A' }
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        url_prefix: 'a',
+        fsp_name: 'f',
+        path: '/a',
+        label: 'A'
+      }
     ]);
     expect((noChannel.ng_state as any).layers).toHaveLength(1);
 
@@ -191,6 +262,7 @@ describe('buildViewState', () => {
       {
         url: 'a',
         sharing_key: 'ka',
+        url_prefix: 'a',
         fsp_name: 'f',
         path: '/a',
         channel: 'Ch0',
@@ -200,6 +272,7 @@ describe('buildViewState', () => {
       {
         url: 'a',
         sharing_key: 'ka',
+        url_prefix: 'a',
         fsp_name: 'f',
         path: '/a',
         channel: 'Ch2',
@@ -235,5 +308,97 @@ describe('probeDataset', () => {
     const probe = await probeDataset('u');
     expect(probe).toMatchObject({ kind: 'unsupported' });
     expect((probe as { errors: unknown[] }).errors).toHaveLength(2);
+  });
+});
+
+describe('appendLayers', () => {
+  it("appends after the existing layers and keeps the View's own settings", () => {
+    const current = {
+      dimensions: { x: [1, 'm'] },
+      layout: 'xy',
+      selectedLayer: { visible: true, layer: 'a' },
+      layers: [{ name: 'a', source: 'zarr://a' }]
+    };
+    const merged = appendLayers(current, [{ name: 'b', source: 'zarr://b' }]);
+    expect(merged.dimensions).toEqual({ x: [1, 'm'] });
+    expect(merged.layout).toBe('xy');
+    expect(merged.selectedLayer).toEqual({ visible: true, layer: 'a' });
+    expect(merged.layers?.map(l => l.name)).toEqual(['a', 'b']);
+    expect(current.layers).toHaveLength(1); // input not mutated
+  });
+
+  it('de-duplicates names against existing and added layers', () => {
+    const merged = appendLayers(
+      { layers: [{ name: 'a' }, { name: 'a (2)' }] },
+      [{ name: 'a' }, { name: 'a' }, { name: 'b' }]
+    );
+    expect(merged.layers?.map(l => l.name)).toEqual([
+      'a',
+      'a (2)',
+      'a (3)',
+      'a (4)',
+      'b'
+    ]);
+  });
+
+  it("treats NG's per-channel split layers as taking the name", () => {
+    // NG split an earlier `img.zarr` layer into `img.zarr <channel>` layers.
+    const merged = appendLayers(
+      { layers: [{ name: 'img.zarr DAPI' }, { name: 'img.zarr (2) DAPI' }] },
+      [{ name: 'img.zarr' }]
+    );
+    expect(merged.layers?.[2].name).toBe('img.zarr (3)');
+  });
+
+  it('archives added layers from index 4 on and leaves existing layers alone', () => {
+    const merged = appendLayers(
+      {
+        layers: [{ name: 'a', archived: true }, { name: 'b' }, { name: 'c' }]
+      },
+      [{ name: 'd', archived: true }, { name: 'e' }]
+    );
+    expect(merged.layers?.map(l => l.archived)).toEqual([
+      true,
+      undefined,
+      undefined,
+      false,
+      true
+    ]);
+  });
+
+  it('handles a state without layers', () => {
+    expect(appendLayers({ layout: 'xy' }, [{ name: 'a' }]).layers).toEqual([
+      { name: 'a', archived: false }
+    ]);
+  });
+});
+
+describe('dataLinkSegment', () => {
+  it("quotes the prefix like the server's quote(prefix, safe='/')", () => {
+    expect(dataLinkSegment('K', "a b/c(1)!'*.zarr")).toBe(
+      '/K/a%20b/c%281%29%21%27%2A.zarr'
+    );
+  });
+});
+
+describe('rewriteDataLinkSegment', () => {
+  it('rewrites string, {url} and list sources, whole segments only', () => {
+    const state = {
+      layout: 'xy',
+      layers: [
+        { name: 'a', source: 'zarr://http://h/files/OLD/img.zarr/|zarr2:' },
+        { name: 'b', source: { url: 'http://h/files/OLD/img.zarr' } },
+        { name: 'c', source: ['http://h/files/OLD/img.zarr2'] },
+        { name: 'd' }
+      ]
+    };
+    const out = rewriteDataLinkSegment(state, '/OLD/img.zarr', '/NEW/img.zarr');
+    expect(out.layout).toBe('xy');
+    expect(out.layers?.map(l => l.source)).toEqual([
+      'zarr://http://h/files/NEW/img.zarr/|zarr2:',
+      { url: 'http://h/files/NEW/img.zarr' },
+      ['http://h/files/OLD/img.zarr2'],
+      undefined
+    ]);
   });
 });

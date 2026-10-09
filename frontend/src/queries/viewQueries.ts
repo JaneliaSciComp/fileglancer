@@ -31,9 +31,9 @@ export type ViewSummary = { short_key: string; name: string };
 type ViewSummaryResponse = { views?: ViewSummary[] };
 
 /** A broken layer can be relinked once its dead Data Link key and prefix are known. */
-export function isRelinkableLayer(
-  layer: Pick<ViewLayer, 'broken' | 'sharing_key' | 'url_prefix'>
-): boolean {
+export function isRelinkableLayer<
+  L extends Pick<ViewLayer, 'broken' | 'sharing_key' | 'url_prefix'>
+>(layer: L): layer is L & { sharing_key: string; url_prefix: string } {
   return (
     layer.broken && layer.sharing_key !== null && layer.url_prefix !== null
   );
@@ -78,6 +78,7 @@ export type ViewCreateRequest = {
 export type ViewUpdateRequest = {
   name?: string;
   ng_state?: Record<string, unknown>;
+  unsupported_sharing_keys?: string[];
 };
 
 /**

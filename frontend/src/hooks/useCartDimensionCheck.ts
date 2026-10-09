@@ -9,15 +9,20 @@ import {
 } from '@/utils/dimensionSignature';
 import type { CartItem } from '@/contexts/CartContext';
 
+const NO_SOURCES: DatasetRef[] = [];
+
 export type CartDimensionCheck = {
   mismatchedKeys: Set<string>;
   hasMismatch: boolean;
   kindByKey: Map<string, DatasetKind | 'loading'>;
 };
 
+/** A dataset already in the View, compared against the cart's datasets. */
+export type DatasetRef = { fsp_name: string; path: string };
+
 // One entry per unique dataset, preserving first-added order (order[0] is the
 // reference dataset for the mismatch comparison).
-function uniqueDatasets(items: CartItem[]) {
+function uniqueDatasets(items: DatasetRef[]) {
   const seen = new Set<string>();
   const out: { key: string; fsp_name: string; path: string }[] = [];
   for (const item of items) {
@@ -30,11 +35,24 @@ function uniqueDatasets(items: CartItem[]) {
   return out;
 }
 
-export function useCartDimensionCheck(items: CartItem[]): CartDimensionCheck {
+/**
+ * Flags cart datasets whose dimensions differ from the reference: the first
+ * of `viewSources` (the open View's datasets, in layer order) that has a
+ * signature, else the first cart dataset. A View's dimensions come from its
+ * first dataset at checkout.
+ * ponytail: viewSources are the saved rows, so a first layer removed but not
+ * yet saved still sets the reference.
+ */
+export function useCartDimensionCheck(
+  items: CartItem[],
+  viewSources: DatasetRef[] = NO_SOURCES
+): CartDimensionCheck {
   const datasets = useMemo(() => uniqueDatasets(items), [items]);
+  const refs = useMemo(() => uniqueDatasets(viewSources), [viewSources]);
+  const probed = useMemo(() => [...datasets, ...refs], [datasets, refs]);
 
   const results = useQueries({
-    queries: datasets.map(ds => ({
+    queries: probed.map(ds => ({
       queryKey: ['zarr', 'probe', ds.fsp_name, ds.path],
       queryFn: (): Promise<DatasetProbe> =>
         probeDataset(getFileURL(ds.fsp_name, ds.path)),
@@ -49,19 +67,24 @@ export function useCartDimensionCheck(items: CartItem[]): CartDimensionCheck {
 
   return useMemo(() => {
     const kindByKey = new Map<string, DatasetKind | 'loading'>();
-    const signatures = datasets.map((ds, i) => {
+    const signatures = probed.map((ds, i) => {
       const probe = results[i]?.data;
-      kindByKey.set(ds.key, probe?.kind ?? 'loading');
+      if (i < datasets.length) {
+        kindByKey.set(ds.key, probe?.kind ?? 'loading');
+      }
       // Fail open: only OME datasets have a signature; null never warns.
       return probe?.kind === 'ome'
         ? getDimensionSignature(probe.metadata)
         : null;
     });
 
-    const reference = signatures[0];
+    const viewReference = signatures.slice(datasets.length).find(Boolean);
+    const reference = viewReference ?? signatures[0];
     const mismatchedKeys = new Set<string>();
     if (reference) {
-      for (let i = 1; i < datasets.length; i++) {
+      // A View reference checks every cart dataset; otherwise the first cart
+      // dataset is the reference.
+      for (let i = viewReference ? 0 : 1; i < datasets.length; i++) {
         const sig = signatures[i];
         if (sig && !signaturesMatch(reference, sig)) {
           mismatchedKeys.add(datasets[i].key);
@@ -70,5 +93,5 @@ export function useCartDimensionCheck(items: CartItem[]): CartDimensionCheck {
     }
     return { mismatchedKeys, hasMismatch: mismatchedKeys.size > 0, kindByKey };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datasets, resolvedKey]);
+  }, [probed, resolvedKey]);
 }

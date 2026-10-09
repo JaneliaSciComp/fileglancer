@@ -135,4 +135,75 @@ describe('useCreateViewFlow', () => {
       screen.getByRole('textbox', { name: /view name/i })
     ).toBeInTheDocument();
   });
+
+  it('adds to the View without a dialog when there is nothing to ask', async () => {
+    const add = vi.fn().mockResolvedValue(undefined);
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+    act(() => {
+      apiRef.current!.startAddToView(datasets, false, add);
+    });
+    await waitFor(() => expect(add).toHaveBeenCalledWith(datasets));
+    expect(screen.queryByText('Add to this View')).toBeNull();
+  });
+
+  it('asks for Data Link consent before adding to the View', async () => {
+    automatic = false;
+    const add = vi.fn().mockResolvedValue(undefined);
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+    act(() => {
+      apiRef.current!.startAddToView(datasets, false, add);
+    });
+    expect(await screen.findByText('Add to this View')).toBeInTheDocument();
+    expect(screen.queryByLabelText('View name')).toBeNull();
+    expect(
+      screen.getByText(/this will create 1 data link\./i)
+    ).toBeInTheDocument();
+    expect(add).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await waitFor(() => expect(add).toHaveBeenCalledWith(datasets));
+    await waitFor(() =>
+      expect(screen.queryByText('Add to this View')).toBeNull()
+    );
+  });
+
+  it("asks to acknowledge a mismatch against the View's dimensions", async () => {
+    // The cart-only check (mocked) finds no mismatch; the caller's View check does.
+    const add = vi.fn().mockResolvedValue(undefined);
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+    act(() => {
+      apiRef.current!.startAddToView(datasets, true, add);
+    });
+    expect(
+      await screen.findByText(/differ from the first layer/i)
+    ).toBeInTheDocument();
+    const confirm = screen.getByRole('button', { name: 'Add' });
+    expect(confirm).toBeDisabled();
+    await userEvent.click(
+      screen.getByLabelText(
+        "I understand I'm adding layers with mismatched dimensions."
+      )
+    );
+    await userEvent.click(confirm);
+    await waitFor(() => expect(add).toHaveBeenCalledWith(datasets));
+  });
+
+  it('keeps the dialog open and shows the error when adding fails', async () => {
+    automatic = false;
+    const add = vi.fn().mockRejectedValue(new Error('link failed'));
+    const errorSpy = vi.spyOn(toast, 'error');
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+    act(() => {
+      apiRef.current!.startAddToView(datasets, false, add);
+    });
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Continue' })
+    );
+    await waitFor(() => expect(errorSpy).toHaveBeenCalledWith('link failed'));
+    expect(screen.getByText('Add to this View')).toBeInTheDocument();
+    errorSpy.mockRestore();
+  });
 });

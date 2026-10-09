@@ -7,7 +7,8 @@ import {
   HiOutlineShare,
   HiOutlineDownload,
   HiOutlineExternalLink,
-  HiOutlineArrowsExpand
+  HiOutlineArrowsExpand,
+  HiOutlinePlusCircle
 } from 'react-icons/hi';
 
 import { useViewStateByReadKey } from '@/queries/viewQueries';
@@ -30,18 +31,26 @@ import UnsavedChangesDialog from '@/components/ui/Dialogs/UnsavedChangesDialog';
 import type { RelinkTarget } from '@/components/ui/Dialogs/RelinkDialog';
 import ViewBrokenBanner from '@/components/ui/Views/ViewBrokenBanner';
 import ViewSaveBar from '@/components/ui/Views/ViewSaveBar';
+import ViewerSidebar from '@/components/ui/Views/ViewerSidebar';
 
 type ToolbarIconButtonProps = {
   readonly label: string;
   readonly icon: IconType;
   readonly onClick: () => void;
+  readonly pressed?: boolean;
 };
 
-function ToolbarIconButton({ label, icon, onClick }: ToolbarIconButtonProps) {
+function ToolbarIconButton({
+  label,
+  icon,
+  onClick,
+  pressed
+}: ToolbarIconButtonProps) {
   return (
     <FgTooltip label={label}>
       <IconButton
         aria-label={label}
+        aria-pressed={pressed}
         onClick={onClick}
         size="sm"
         variant="ghost"
@@ -90,6 +99,7 @@ export default function NeuroglancerView() {
   // Wait out the mount refetch: a cached state can predate a Save made just
   // before leaving this page.
   const [iframeSrc, setIframeSrc] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const awaitingFreshState = iframeSrc === null && stateQuery.isFetching;
   if (ngState && baseUrl && iframeSrc === null && !stateQuery.isFetching) {
     setIframeSrc(constructNeuroglancerUrl(ngState, baseUrl));
@@ -100,6 +110,7 @@ export default function NeuroglancerView() {
   );
 
   const { dirty } = editState;
+  const canAddData = canEdit && bridge.status === 'ready';
   useEffect(() => {
     if (!dirty || !canEdit) {
       return;
@@ -215,7 +226,10 @@ export default function NeuroglancerView() {
       const sent = bridge.getState();
       await updateViewMutation.mutateAsync({
         short_key: ownedView.short_key,
-        ng_state: sent
+        ng_state: sent,
+        ...(editState.pendingSources.length > 0 && {
+          unsupported_sharing_keys: editState.pendingSources
+        })
       });
       editState.markSaved(sent);
       toast.success('View saved');
@@ -291,6 +305,14 @@ export default function NeuroglancerView() {
         </div>
         <div className="flex shrink-0 items-center gap-4">
           <div className="flex items-center gap-1">
+            {canAddData ? (
+              <ToolbarIconButton
+                icon={HiOutlinePlusCircle}
+                label="Add data"
+                onClick={() => setSidebarOpen(open => !open)}
+                pressed={sidebarOpen}
+              />
+            ) : null}
             <ToolbarIconButton
               icon={HiOutlineShare}
               label="Copy link to share"
@@ -348,12 +370,23 @@ export default function NeuroglancerView() {
           onRelink={setRelinkTarget}
         />
       ) : null}
-      <iframe
-        className="flex-1 w-full border-0"
-        ref={setIframe}
-        src={iframeSrc ?? externalUrl}
-        title="Neuroglancer viewer"
-      />
+      <div className="flex min-h-0 flex-1">
+        {canAddData && sidebarOpen ? (
+          <ViewerSidebar
+            bridge={bridge}
+            onAddSources={editState.addSources}
+            onClose={() => setSidebarOpen(false)}
+            onEdited={editState.markEdited}
+            viewLayers={ownedView?.layers ?? []}
+          />
+        ) : null}
+        <iframe
+          className="h-full min-w-0 flex-1 border-0"
+          ref={setIframe}
+          src={iframeSrc ?? externalUrl}
+          title="Neuroglancer viewer"
+        />
+      </div>
       {pendingAction ? (
         <UnsavedChangesDialog
           message={pendingAction.message}
