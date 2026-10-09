@@ -5,7 +5,8 @@ import {
   useViewsQuery,
   useCreateViewMutation,
   useUpdateViewMutation,
-  useDeleteViewMutation
+  useDeleteViewMutation,
+  useRemoveViewSourcesMutation
 } from '@/queries/viewQueries';
 
 type ViewsContextType = {
@@ -13,6 +14,7 @@ type ViewsContextType = {
   createViewMutation: ReturnType<typeof useCreateViewMutation>;
   updateViewMutation: ReturnType<typeof useUpdateViewMutation>;
   deleteViewMutation: ReturnType<typeof useDeleteViewMutation>;
+  removeViewSourcesMutation: ReturnType<typeof useRemoveViewSourcesMutation>;
 };
 
 const ViewsContext = createContext<ViewsContextType | null>(null);
@@ -34,12 +36,14 @@ export const ViewsProvider = ({
   const createViewMutation = useCreateViewMutation();
   const updateViewMutation = useUpdateViewMutation();
   const deleteViewMutation = useDeleteViewMutation();
+  const removeViewSourcesMutation = useRemoveViewSourcesMutation();
 
   const value: ViewsContextType = {
     allViewsQuery,
     createViewMutation,
     updateViewMutation,
-    deleteViewMutation
+    deleteViewMutation,
+    removeViewSourcesMutation
   };
 
   return (
