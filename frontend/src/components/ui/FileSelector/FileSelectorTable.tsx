@@ -145,7 +145,14 @@ export default function FileSelectorTable({
 
   return (
     <div className="min-w-full bg-background select-none overflow-auto h-full">
-      <table className="w-full">
+      {/* Fixed layout so a long name truncates instead of widening its
+          column; the name column takes whatever width the others leave. */}
+      <table
+        className="w-full table-fixed"
+        style={{
+          minWidth: table.getTotalSize() + (checkedPaths ? 40 : 0)
+        }}
+      >
         <thead>
           {table.getHeaderGroups().map(headerGroup => (
             <tr className="border-b border-surface" key={headerGroup.id}>
@@ -154,7 +161,10 @@ export default function FileSelectorTable({
                 <th
                   className="text-left p-3 font-bold text-sm text-foreground"
                   key={header.id}
-                  style={{ width: header.getSize() }}
+                  style={{
+                    width:
+                      header.column.id === 'name' ? undefined : header.getSize()
+                  }}
                 >
                   {header.isPlaceholder ? null : (
                     <div
