@@ -111,6 +111,12 @@ To test editing locally against Janelia's Neuroglancer:
 Features of the fork that call endpoints outside `/neuroglancer/` on its own
 host won't work through the passthrough.
 
+The passthrough is for local development only. Deployed hosts serve
+`/neuroglancer/` from nginx, which answers before the request reaches the app,
+so `FGC_NEUROGLANCER_URL` does nothing there. See
+[ViewersConfiguration.md](ViewersConfiguration.md#serving-neuroglancer-for-view-editing)
+for the production and dev-host setups.
+
 
 ### Testing Configuration
 
