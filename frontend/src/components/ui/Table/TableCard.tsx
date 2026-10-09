@@ -320,7 +320,7 @@ function TableRow({
 }) {
   return (
     <div
-      className={`grid ${gridColsClass ?? ''} min-h-16 justify-items-start gap-4 px-4 border-b border-surface last:border-0 ${gridColsStyle ? 'min-w-max' : ''}`}
+      className={`grid ${gridColsClass ?? ''} min-h-16 justify-items-start gap-4 px-4 border-b border-surface last:border-0 ${gridColsStyle ? 'min-w-min' : ''}`}
       style={gridColsStyle ? { gridTemplateColumns: gridColsStyle } : undefined}
     >
       {children}
@@ -440,7 +440,7 @@ function Table<TData>({
         />
         <div className="overflow-x-auto">
           <div
-            className={`shrink-0 grid ${gridColsClass ?? ''} gap-4 px-4 py-2 bg-surface/30 ${gridColsStyle ? 'min-w-max' : ''}`}
+            className={`shrink-0 grid ${gridColsClass ?? ''} gap-4 px-4 py-2 bg-surface/30 ${gridColsStyle ? 'min-w-min' : ''}`}
             style={
               gridColsStyle ? { gridTemplateColumns: gridColsStyle } : undefined
             }

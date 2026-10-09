@@ -183,11 +183,11 @@ function SourcesResizeHandle({
   sourcesColWidth,
   onResize
 }: {
-  readonly sourcesColWidth: number;
+  readonly sourcesColWidth: number | null;
   readonly onResize: (next: number) => void;
 }) {
   const startX = useRef(0);
-  const startWidth = useRef(sourcesColWidth);
+  const startWidth = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
 
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
@@ -195,7 +195,11 @@ function SourcesResizeHandle({
     e.preventDefault();
     e.stopPropagation();
     startX.current = e.clientX;
-    startWidth.current = sourcesColWidth;
+    // Auto-sized until the first drag: start from the rendered width. The
+    // handle's parent is the header content, which spans the column.
+    startWidth.current =
+      sourcesColWidth ??
+      e.currentTarget.parentElement!.getBoundingClientRect().width;
     setIsDragging(true);
     const onMove = (ev: globalThis.MouseEvent) => {
       onResize(startWidth.current + (ev.clientX - startX.current));
@@ -228,7 +232,7 @@ function SourcesResizeHandle({
 export function useNGViewsColumns(
   onRename: (item: View) => void,
   onDelete: (item: View) => void,
-  sourcesColWidth: number,
+  sourcesColWidth: number | null,
   onSourcesResize: (next: number) => void,
   onRelink: (target: RelinkTarget) => void,
   onRemoveSource: (target: RemoveSourceTarget) => void,
