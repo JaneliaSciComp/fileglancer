@@ -80,7 +80,7 @@ export default function NGViews() {
   // Fixed pixel tracks for every column except Sources (user-resizable).
   // Fixed (not fr) so the row has a deterministic width — that's what lets
   // the outer overflow-x-auto scroll when Sources grows past the viewport.
-  const gridColsStyle = `160px 80px ${sourcesColWidth}px 160px 160px 56px`;
+  const gridColsStyle = `160px 100px ${sourcesColWidth}px 160px 160px 56px`;
 
   return (
     <>
