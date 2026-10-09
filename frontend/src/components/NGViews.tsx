@@ -37,7 +37,7 @@ export default function NGViews() {
   const [removeDatasetsItem, setRemoveDatasetsItem] = useState<
     View | undefined
   >(undefined);
-  const [sourcesColWidth, setSourcesColWidth] = useState(260);
+  const [sourcesColWidth, setSourcesColWidth] = useState(420);
   const clampSourcesWidth = useCallback(
     (w: number) => Math.max(120, Math.min(900, w)),
     []
@@ -116,7 +116,7 @@ export default function NGViews() {
   // Fixed pixel tracks for every column except Sources (user-resizable).
   // Fixed (not fr) so the row has a deterministic width — that's what lets
   // the outer overflow-x-auto scroll when Sources grows past the viewport.
-  const gridColsStyle = `160px 100px ${sourcesColWidth}px 160px 160px 56px`;
+  const gridColsStyle = `160px 100px ${sourcesColWidth}px 160px 56px`;
 
   return (
     <>

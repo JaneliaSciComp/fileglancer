@@ -29,11 +29,6 @@ import { HiExclamationTriangle } from 'react-icons/hi2';
 
 const TRIGGER_CLASSES = 'h-min max-w-full';
 
-const SHARING_LABEL: Record<View['sharing_mode'], string> = {
-  private: 'Private',
-  read: 'Shared (read link)'
-};
-
 export type ViewSource = {
   fsp_name: string;
   path: string;
@@ -398,18 +393,6 @@ export function useNGViewsColumns(
           );
         },
         enableSorting: false
-      },
-      {
-        accessorKey: 'sharing_mode',
-        header: 'Sharing',
-        cell: ({ row }) => (
-          <div className="flex items-center justify-start h-full text-left">
-            <Typography className="text-foreground text-left" variant="small">
-              {SHARING_LABEL[row.original.sharing_mode]}
-            </Typography>
-          </div>
-        ),
-        enableSorting: true
       },
       {
         accessorKey: 'updated_at',

@@ -134,7 +134,7 @@ function TableProbe({
 }
 
 describe('useNGViewsColumns', () => {
-  it('renders name, dataset count, sharing label and updated date', () => {
+  it('renders name, dataset count and updated date', () => {
     render(
       <MemoryRouter>
         <TableProbe onDelete={vi.fn()} onRename={vi.fn()} />
@@ -142,7 +142,6 @@ describe('useNGViewsColumns', () => {
     );
     expect(screen.getByText('My View')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument(); // dataset count
-    expect(screen.getByText(/shared/i)).toBeInTheDocument(); // sharing label
     expect(
       screen.getByText(formatDateString(view.updated_at))
     ).toBeInTheDocument(); // updated date
