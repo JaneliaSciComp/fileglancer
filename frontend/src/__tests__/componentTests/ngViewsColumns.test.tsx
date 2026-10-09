@@ -127,18 +127,31 @@ function TableProbe({
 }
 
 describe('useNGViewsColumns', () => {
-  it('renders name, layer count, sharing label and updated date', () => {
+  it('renders name, dataset count, sharing label and updated date', () => {
     render(
       <MemoryRouter>
         <TableProbe onDelete={vi.fn()} onRename={vi.fn()} />
       </MemoryRouter>
     );
     expect(screen.getByText('My View')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument(); // layer count
+    expect(screen.getByText('2')).toBeInTheDocument(); // dataset count
     expect(screen.getByText(/shared/i)).toBeInTheDocument(); // sharing label
     expect(
       screen.getByText(formatDateString(view.updated_at))
     ).toBeInTheDocument(); // updated date
+  });
+
+  it('counts per-channel layers of one dataset as one dataset', () => {
+    const channelView: View = {
+      ...view,
+      layers: [0, 1, 2].map(i => ({ ...view.layers[0], layer_index: i }))
+    };
+    render(
+      <MemoryRouter>
+        <TableProbe onDelete={vi.fn()} onRename={vi.fn()} view={channelView} />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('1')).toBeInTheDocument();
   });
 
   it('renders a browse link per layer source', () => {
@@ -275,7 +288,7 @@ describe('useNGViewsColumns', () => {
     expect(screen.getByLabelText('Data link missing')).toBeInTheDocument();
   });
 
-  it('lists an unsupported source with a warning icon and excludes it from the layer count', () => {
+  it('lists an unsupported source with a warning icon and excludes it from the dataset count', () => {
     const unsupportedView: View = {
       ...view,
       layers: [
@@ -302,7 +315,7 @@ describe('useNGViewsColumns', () => {
         />
       </MemoryRouter>
     );
-    expect(screen.getByText('1')).toBeInTheDocument(); // layer count
+    expect(screen.getByText('1')).toBeInTheDocument(); // dataset count
     expect(screen.getByRole('link', { name: /plain-dir/ })).toBeInTheDocument();
     // FgTooltip repeats the label on its trigger; target the icon span.
     expect(

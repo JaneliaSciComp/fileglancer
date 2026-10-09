@@ -196,10 +196,22 @@ export function useNGViewsColumns(
         enableSorting: true
       },
       {
-        id: 'layers',
-        header: 'Layers',
+        // Datasets, not NG layers: NG splits a multichannel layer per channel
+        // on load, so the saved layer count jumps on the next Save. Same
+        // de-dupe as Sources.
+        id: 'datasets',
+        header: 'Datasets',
         accessorFn: row =>
-          row.layers.filter(layer => !isUnsupportedLayer(layer)).length,
+          new Set(
+            row.layers
+              .filter(
+                layer =>
+                  !isUnsupportedLayer(layer) &&
+                  layer.fsp_name !== null &&
+                  layer.path !== null
+              )
+              .map(layer => datasetKey(layer.fsp_name!, layer.path!))
+          ).size,
         cell: ({ getValue }) => (
           <div className="flex items-center justify-start h-full text-left">
             <Typography className="text-foreground text-left" variant="small">
