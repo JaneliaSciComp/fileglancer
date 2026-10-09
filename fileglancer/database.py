@@ -1174,6 +1174,34 @@ def reconcile_view_layers(session: Session, view: ViewDB, proxy_url: str) -> Non
         view.layers.append(ViewLayerDB(**row))
 
 
+def remove_view_sources(session: Session, view: ViewDB, sources: List[Tuple[str, str]]) -> bool:
+    """Drop datasets, given as (fsp_name, path), from a View: every NG layer
+    whose source uses one of their Data Link segments, plus all their rows
+    (unsupported and broken included). Rows without a recorded key fall back
+    to their layer_index. Returns False when the View has none of them. Commits."""
+    wanted = {(fsp_name, alias) for fsp_name, path in sources for alias in _path_aliases(path)}
+    matching = [l for l in view.layers if (l.fsp_name, l.path) in wanted]
+    if not matching:
+        return False
+    segments = {data_link_segment(l.sharing_key, l.url_prefix)
+                for l in matching if l.sharing_key and l.url_prefix is not None}
+    legacy = {l.layer_index for l in matching
+              if not (l.sharing_key and l.url_prefix is not None) and not (l.opts or {}).get('unsupported')}
+    layers = view.ng_state.get('layers') or []
+    dropped = {i for i, ng in enumerate(layers)
+               if i in legacy or (isinstance(ng, dict) and any(layer_uses_segment(ng, s) for s in segments))}
+    if 'layers' in view.ng_state:
+        # reassign: plain JSON columns don't track in-place edits
+        view.ng_state = {**view.ng_state, 'layers': [ng for i, ng in enumerate(layers) if i not in dropped]}
+    for l in matching:
+        view.layers.remove(l)  # delete-orphan cascade removes the row
+    for l in view.layers:
+        l.layer_index -= sum(1 for i in dropped if i < l.layer_index)
+    view.updated_at = datetime.now(UTC)
+    session.commit()
+    return True
+
+
 def delete_view(session: Session, username: str, short_key: str) -> int:
     """Delete an owned View (cascades to its layers). Returns rows deleted."""
     view = session.query(ViewDB).filter_by(short_key=short_key, owner=username).first()
