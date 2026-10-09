@@ -220,7 +220,7 @@ function TableHeader({
   readonly headerActions?: ReactNode;
 }) {
   return (
-    <div className="shrink-0 flex flex-col md:flex-row md:items-center gap-2 py-4 px-4">
+    <div className="shrink-0 flex flex-col min-[901px]:flex-row min-[901px]:items-center gap-2 py-4 px-4">
       <div className="flex items-center gap-2">
         {/* https://tanstack.com/table/latest/docs/framework/react/examples/pagination */}
         <div className="flex items-center gap-2">
@@ -283,7 +283,7 @@ function TableHeader({
         </div>
       </div>
       {/* Global Search Input */}
-      <div className="grow py-2 md:px-4">
+      <div className="grow py-2 min-[901px]:px-4">
         <div className="relative">
           <DebouncedInput
             ref={inputRef}
