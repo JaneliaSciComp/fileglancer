@@ -23,6 +23,7 @@ import {
   ActionsCell
 } from '@/components/ui/Table/ngViewsColumns';
 import type { View } from '@/queries/viewQueries';
+import type { RemoveSourceTarget } from '@/components/ui/Table/ngViewsColumns';
 import type { RelinkTarget } from '@/components/ui/Dialogs/RelinkDialog';
 import { formatDateString } from '@/utils';
 
@@ -88,11 +89,15 @@ function TableProbe({
   onRename,
   onDelete,
   onRelink = () => {},
+  onRemoveSource = () => {},
+  onRemoveDatasets = () => {},
   view: viewProp = view
 }: {
   onRename: (v: View) => void;
   onDelete: (v: View) => void;
   onRelink?: (t: RelinkTarget) => void;
+  onRemoveSource?: (t: RemoveSourceTarget) => void;
+  onRemoveDatasets?: (v: View) => void;
   view?: View;
 }) {
   // ponytail: TableProbe is already a component, so call the hook directly
@@ -102,7 +107,9 @@ function TableProbe({
     onDelete,
     320,
     () => {},
-    onRelink
+    onRelink,
+    onRemoveSource,
+    onRemoveDatasets
   );
   const table = useReactTable({
     data: [viewProp],
@@ -127,18 +134,30 @@ function TableProbe({
 }
 
 describe('useNGViewsColumns', () => {
-  it('renders name, layer count, sharing label and updated date', () => {
+  it('renders name, dataset count and updated date', () => {
     render(
       <MemoryRouter>
         <TableProbe onDelete={vi.fn()} onRename={vi.fn()} />
       </MemoryRouter>
     );
     expect(screen.getByText('My View')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument(); // layer count
-    expect(screen.getByText(/shared/i)).toBeInTheDocument(); // sharing label
+    expect(screen.getByText('2')).toBeInTheDocument(); // dataset count
     expect(
       screen.getByText(formatDateString(view.updated_at))
     ).toBeInTheDocument(); // updated date
+  });
+
+  it('counts per-channel layers of one dataset as one dataset', () => {
+    const channelView: View = {
+      ...view,
+      layers: [0, 1, 2].map(i => ({ ...view.layers[0], layer_index: i }))
+    };
+    render(
+      <MemoryRouter>
+        <TableProbe onDelete={vi.fn()} onRename={vi.fn()} view={channelView} />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('1')).toBeInTheDocument();
   });
 
   it('renders a browse link per layer source', () => {
@@ -275,7 +294,7 @@ describe('useNGViewsColumns', () => {
     expect(screen.getByLabelText('Data link missing')).toBeInTheDocument();
   });
 
-  it('lists an unsupported source with a warning icon and excludes it from the layer count', () => {
+  it('lists an unsupported source with a remove button and excludes it from the dataset count', async () => {
     const unsupportedView: View = {
       ...view,
       layers: [
@@ -293,35 +312,48 @@ describe('useNGViewsColumns', () => {
         }
       ]
     };
+    const onRemoveSource = vi.fn();
     render(
       <MemoryRouter>
         <TableProbe
           onDelete={vi.fn()}
+          onRemoveSource={onRemoveSource}
           onRename={vi.fn()}
           view={unsupportedView}
         />
       </MemoryRouter>
     );
-    expect(screen.getByText('1')).toBeInTheDocument(); // layer count
+    expect(screen.getByText('1')).toBeInTheDocument(); // dataset count
     expect(screen.getByRole('link', { name: /plain-dir/ })).toBeInTheDocument();
-    // FgTooltip repeats the label on its trigger; target the icon span.
-    expect(
-      screen.getByLabelText('Will not load as a Neuroglancer layer', {
-        selector: 'span'
-      })
-    ).toBeInTheDocument();
     expect(
       screen.queryByLabelText('Data link missing')
     ).not.toBeInTheDocument();
+
+    await userEvent.setup().click(
+      screen.getByRole('button', {
+        name: 'Remove /nrs/dudman/plain-dir from View'
+      })
+    );
+    expect(onRemoveSource).toHaveBeenCalledWith({
+      view: unsupportedView,
+      fsp_name: 'nrs',
+      path: 'dudman/plain-dir',
+      displayPath: '/nrs/dudman/plain-dir'
+    });
   });
 
-  it('fires onRename and onDelete from the actions menu', async () => {
+  it('fires onRename, onRemoveDatasets and onDelete from the actions menu', async () => {
     const user = userEvent.setup();
     const onRename = vi.fn();
     const onDelete = vi.fn();
+    const onRemoveDatasets = vi.fn();
     render(
       <MemoryRouter>
-        <TableProbe onDelete={onDelete} onRename={onRename} />
+        <TableProbe
+          onDelete={onDelete}
+          onRemoveDatasets={onRemoveDatasets}
+          onRename={onRename}
+        />
       </MemoryRouter>
     );
     const trigger = screen.getByRole('button'); // the CardActionsMenu trigger
@@ -331,13 +363,24 @@ describe('useNGViewsColumns', () => {
     expect(onRename).toHaveBeenCalledWith(view);
 
     await user.click(trigger);
+    await user.click(await screen.findByText('Remove datasets'));
+    expect(onRemoveDatasets).toHaveBeenCalledWith(view);
+
+    await user.click(trigger);
     await user.click(await screen.findByText('Delete'));
     expect(onDelete).toHaveBeenCalledWith(view);
   });
 
   it('navigates to the embedded viewer when "Open View" is clicked', async () => {
     const user = userEvent.setup();
-    render(<ActionsCell item={view} onDelete={vi.fn()} onRename={vi.fn()} />);
+    render(
+      <ActionsCell
+        item={view}
+        onDelete={vi.fn()}
+        onRemoveDatasets={vi.fn()}
+        onRename={vi.fn()}
+      />
+    );
     const trigger = screen.getByRole('button');
 
     await user.click(trigger);

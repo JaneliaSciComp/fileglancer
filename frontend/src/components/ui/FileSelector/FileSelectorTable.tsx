@@ -16,6 +16,7 @@ import {
 import { TbFile } from 'react-icons/tb';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
+import FgCheckbox from '@/components/designSystem/atoms/formElements/FgCheckbox';
 import type { FileOrFolder, FileSharePath, Zone } from '@/shared.types';
 import type { FileSelectorLocation } from '@/hooks/useFileSelector';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
@@ -40,6 +41,9 @@ type FileSelectorTableProps = {
   readonly zonesData: Record<string, FileSharePath | Zone> | undefined;
   readonly onItemClick: (item: FileOrFolder) => void;
   readonly onItemDoubleClick: (item: FileOrFolder) => void;
+  /** When set, rows get checkboxes and checked rows show as selected. */
+  readonly checkedPaths?: ReadonlySet<string>;
+  readonly onToggleChecked?: (item: FileOrFolder) => void;
 };
 
 export default function FileSelectorTable({
@@ -48,7 +52,9 @@ export default function FileSelectorTable({
   selectedItem,
   zonesData,
   onItemClick,
-  onItemDoubleClick
+  onItemDoubleClick,
+  checkedPaths,
+  onToggleChecked
 }: FileSelectorTableProps) {
   const { pathPreference } = usePreferencesContext();
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -139,15 +145,26 @@ export default function FileSelectorTable({
 
   return (
     <div className="min-w-full bg-background select-none overflow-auto h-full">
-      <table className="w-full">
+      {/* Fixed layout so a long name truncates instead of widening its
+          column; the name column takes whatever width the others leave. */}
+      <table
+        className="w-full table-fixed"
+        style={{
+          minWidth: table.getTotalSize() + (checkedPaths ? 40 : 0)
+        }}
+      >
         <thead>
           {table.getHeaderGroups().map(headerGroup => (
             <tr className="border-b border-surface" key={headerGroup.id}>
+              {checkedPaths ? <th className="w-10" /> : null}
               {headerGroup.headers.map(header => (
                 <th
                   className="text-left p-3 font-bold text-sm text-foreground"
                   key={header.id}
-                  style={{ width: header.getSize() }}
+                  style={{
+                    width:
+                      header.column.id === 'name' ? undefined : header.getSize()
+                  }}
                 >
                   {header.isPlaceholder ? null : (
                     <div
@@ -173,7 +190,10 @@ export default function FileSelectorTable({
         <tbody>
           {table.getRowModel().rows.length === 0 ? (
             <tr>
-              <td className="p-3 text-center" colSpan={columns.length}>
+              <td
+                className="p-3 text-center"
+                colSpan={columns.length + (checkedPaths ? 1 : 0)}
+              >
                 <Typography className="text-foreground/60">
                   No items to display
                 </Typography>
@@ -181,7 +201,9 @@ export default function FileSelectorTable({
             </tr>
           ) : (
             table.getRowModel().rows.map((row, index) => {
-              const isSelected = selectedItem?.name === row.original.name;
+              const isSelected = checkedPaths
+                ? checkedPaths.has(row.original.path)
+                : selectedItem?.name === row.original.name;
               return (
                 <tr
                   className={`cursor-pointer hover:bg-surface dark:hover:bg-surface-light ${isSelected ? 'bg-primary-light/30 outline outline-1 outline-primary' : index % 2 === 0 ? 'bg-surface-light dark:bg-surface/50' : ''}`}
@@ -189,6 +211,22 @@ export default function FileSelectorTable({
                   onClick={() => onItemClick(row.original)}
                   onDoubleClick={() => onItemDoubleClick(row.original)}
                 >
+                  {checkedPaths ? (
+                    // Keep the row's own click (toggle) and double-click
+                    // (open) from also firing.
+                    <td
+                      className="w-10 p-3"
+                      onClick={e => e.stopPropagation()}
+                      onDoubleClick={e => e.stopPropagation()}
+                    >
+                      <FgCheckbox
+                        checked={checkedPaths.has(row.original.path)}
+                        hideLabel
+                        label={`Select ${row.original.name}`}
+                        onChange={() => onToggleChecked?.(row.original)}
+                      />
+                    </td>
+                  ) : null}
                   {row.getVisibleCells().map(cell => (
                     <td
                       className="p-3 text-foreground overflow-hidden"

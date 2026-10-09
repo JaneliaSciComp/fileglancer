@@ -124,8 +124,64 @@ The embedded View viewer (`/view/<read_key>`) uses the deployment-configured
 Neuroglancer URL (it ignores this per-user preference). Owners can edit and
 save a View there only when that Neuroglancer is served from the same origin as
 Fileglancer; otherwise the viewer is read-only with a note. See
-[Development.md](Development.md#testing-view-editing-locally) for testing
-locally.
+[Serving Neuroglancer for View editing](#serving-neuroglancer-for-view-editing)
+below, and [Development.md](Development.md#testing-view-editing-locally) for
+testing locally.
+
+### Serving Neuroglancer for View editing
+
+The View page reads the Neuroglancer iframe's `window.viewer` to save and
+restore state. Browsers allow that only when the iframe is same-origin with
+the page: same scheme, host, and port. `localhost` and `127.0.0.1` are
+different origins. When Neuroglancer is cross-origin, the viewer still renders
+but the save bar shows "Editing isn't available with this Neuroglancer
+deployment". That is the expected state for a CLI or PyPI install, which
+embeds `neuroglancer-demo.appspot.com`.
+
+To enable editing, serve Neuroglancer under the Fileglancer host's own
+`/neuroglancer/` path and point `instance_template_url` at that host:
+
+```yaml
+viewers:
+  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/neuroglancer.yaml'
+    instance_template_url: 'https://fileglancer.example.org/neuroglancer/#!{"layers":[{"name":"image","source":"{DATA_URL}","type":"image"}]}'
+```
+
+The host in that URL must match the address in the browser exactly, including
+`https`. How `/neuroglancer/` gets served depends on the environment:
+
+| Environment | How `/neuroglancer/` is served |
+|---|---|
+| Production | nginx serves a Neuroglancer build from disk (`location /neuroglancer/ { alias ...; }`). |
+| Dev or staging host without a build | nginx proxies the production host's `/neuroglancer/` under the dev origin. |
+| Local development | The app's `FGC_NEUROGLANCER_URL` passthrough proxies an external Neuroglancer. |
+
+The nginx block for a dev host:
+
+```nginx
+location /neuroglancer/ {
+  proxy_pass https://fileglancer.example.org/neuroglancer/;
+  proxy_set_header Host fileglancer.example.org;
+  proxy_ssl_server_name on;
+  proxy_hide_header Set-Cookie;
+  expires max;
+}
+```
+
+Reload nginx, then check that `curl -sk https://<dev-host>/neuroglancer/`
+returns a page titled `neuroglancer` rather than Fileglancer's own HTML.
+
+Behind a reverse proxy, `FGC_NEUROGLANCER_URL` has no effect: nginx answers
+`/neuroglancer/` before the request reaches the app. It is a local-development
+feature only, and it buffers each response in memory. Either way, features of
+a Neuroglancer fork that call endpoints outside `/neuroglancer/` on its own
+host won't work through a proxy.
+
+Keep the deployment's viewers config in a runtime file set with
+`FGC_VIEWERS_CONFIG`, not in `frontend/viewers.config.yaml`. Vite bundles
+`frontend/viewers.config.yaml` into the build whenever the file exists on
+disk, even though git ignores it, so a developer's local override can ship in
+a release build.
 
 ### Add a custom viewer
 

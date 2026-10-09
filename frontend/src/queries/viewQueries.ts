@@ -374,3 +374,29 @@ export function useDeleteViewMutation(): UseMutationResult<
     }
   });
 }
+
+/** Mutation hook for removing datasets (all their layers) from a View */
+export function useRemoveViewSourcesMutation(): UseMutationResult<
+  View,
+  Error,
+  { short_key: string; sources: { fsp_name: string; path: string }[] }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ short_key, sources }) => {
+      const viewUrl = buildUrl('/api/neuroglancer/views/', short_key, null);
+      const view = await sendRequestAndThrowForNotOk(
+        viewUrl + '/remove-sources',
+        'POST',
+        { sources }
+      );
+      return view as View;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: viewQueryKeys.all
+      });
+    }
+  });
+}

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { IconButton, Typography } from '@material-tailwind/react';
@@ -29,25 +29,86 @@ import { HiExclamationTriangle } from 'react-icons/hi2';
 
 const TRIGGER_CLASSES = 'h-min max-w-full';
 
-const SHARING_LABEL: Record<View['sharing_mode'], string> = {
-  private: 'Private',
-  read: 'Shared (read link)'
+export type ViewSource = {
+  fsp_name: string;
+  path: string;
+  broken: boolean;
+  relinkable: boolean;
+  unsupported: boolean;
+};
+
+/** A View's datasets, one per source path. Per-channel layers of one dataset
+ *  share a source path. A source is broken if any of its layers lost its Data
+ *  Link, and unsupported if every layer of it produced no Neuroglancer layer. */
+export function getViewSources(view: View): ViewSource[] {
+  const bySource = new Map<string, ViewSource>();
+  for (const layer of view.layers) {
+    if (layer.fsp_name === null || layer.path === null) {
+      continue; // pre-migration broken layer: source unknown
+    }
+    const key = datasetKey(layer.fsp_name, layer.path);
+    const existing = bySource.get(key);
+    const unsupported = isUnsupportedLayer(layer);
+    if (existing) {
+      existing.broken = existing.broken || layer.broken;
+      existing.relinkable = existing.relinkable || isRelinkableLayer(layer);
+      existing.unsupported = existing.unsupported && unsupported;
+    } else {
+      bySource.set(key, {
+        fsp_name: layer.fsp_name,
+        path: layer.path,
+        broken: layer.broken,
+        relinkable: isRelinkableLayer(layer),
+        unsupported
+      });
+    }
+  }
+  return [...bySource.values()];
+}
+
+/** Formats a source path per the user's path preference. */
+export function useSourceDisplayPath(): (
+  src: Pick<ViewSource, 'fsp_name' | 'path'>
+) => string {
+  const { pathPreference } = usePreferencesContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
+  return useCallback(
+    src => {
+      const fsp = zonesAndFspQuery.data?.[makeMapKey('fsp', src.fsp_name)] as
+        | FileSharePath
+        | undefined;
+      return (
+        getPreferredPathForDisplay(pathPreference, fsp, src.path) || src.path
+      );
+    },
+    [pathPreference, zonesAndFspQuery.data]
+  );
+}
+
+export type RemoveSourceTarget = {
+  view: View;
+  fsp_name: string;
+  path: string;
+  displayPath: string;
 };
 
 type ViewRowActionProps = {
   item: View;
   onRename: (item: View) => void;
   onDelete: (item: View) => void;
+  onRemoveDatasets: (item: View) => void;
 };
 
 export function ActionsCell({
   item,
   onRename,
-  onDelete
+  onDelete,
+  onRemoveDatasets
 }: {
   readonly item: View;
   readonly onRename: (item: View) => void;
   readonly onDelete: (item: View) => void;
+  readonly onRemoveDatasets: (item: View) => void;
 }) {
   const navigate = useNavigate();
   // ponytail: "Open" now navigates client-side to the embedded /view/:read_key
@@ -88,6 +149,12 @@ export function ActionsCell({
       }
     },
     {
+      name: 'Remove datasets',
+      action: ({ item, onRemoveDatasets }) => {
+        onRemoveDatasets(item);
+      }
+    },
+    {
       name: 'Delete',
       color: 'text-error',
       action: ({ item, onDelete }) => {
@@ -100,7 +167,7 @@ export function ActionsCell({
     <div className="min-w-0 flex items-center justify-start">
       <div onClick={e => e.stopPropagation()}>
         <CardActionsMenu<ViewRowActionProps>
-          actionProps={{ item, onRename, onDelete }}
+          actionProps={{ item, onRename, onDelete, onRemoveDatasets }}
           menuItems={menuItems}
         />
       </div>
@@ -116,11 +183,11 @@ function SourcesResizeHandle({
   sourcesColWidth,
   onResize
 }: {
-  readonly sourcesColWidth: number;
+  readonly sourcesColWidth: number | null;
   readonly onResize: (next: number) => void;
 }) {
   const startX = useRef(0);
-  const startWidth = useRef(sourcesColWidth);
+  const startWidth = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
 
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
@@ -128,7 +195,11 @@ function SourcesResizeHandle({
     e.preventDefault();
     e.stopPropagation();
     startX.current = e.clientX;
-    startWidth.current = sourcesColWidth;
+    // Auto-sized until the first drag: start from the rendered width. The
+    // handle's parent is the header content, which spans the column.
+    startWidth.current =
+      sourcesColWidth ??
+      e.currentTarget.parentElement!.getBoundingClientRect().width;
     setIsDragging(true);
     const onMove = (ev: globalThis.MouseEvent) => {
       onResize(startWidth.current + (ev.clientX - startX.current));
@@ -161,12 +232,13 @@ function SourcesResizeHandle({
 export function useNGViewsColumns(
   onRename: (item: View) => void,
   onDelete: (item: View) => void,
-  sourcesColWidth: number,
+  sourcesColWidth: number | null,
   onSourcesResize: (next: number) => void,
-  onRelink: (target: RelinkTarget) => void
+  onRelink: (target: RelinkTarget) => void,
+  onRemoveSource: (target: RemoveSourceTarget) => void,
+  onRemoveDatasets: (item: View) => void
 ): ColumnDef<View>[] {
-  const { pathPreference } = usePreferencesContext();
-  const { zonesAndFspQuery } = useZoneAndFspMapContext();
+  const displayPath = useSourceDisplayPath();
 
   return useMemo(
     () => [
@@ -180,7 +252,7 @@ export function useNGViewsColumns(
             <div className="flex items-center justify-start truncate w-full h-full text-left">
               <FgTooltip label={label} triggerClasses={TRIGGER_CLASSES}>
                 <Link
-                  className="text-primary truncate text-left hover:underline"
+                  className="block text-primary truncate text-left hover:underline"
                   to={`/view/${item.read_key}`}
                 >
                   {label}
@@ -196,10 +268,22 @@ export function useNGViewsColumns(
         enableSorting: true
       },
       {
-        id: 'layers',
-        header: 'Layers',
+        // Datasets, not NG layers: NG splits a multichannel layer per channel
+        // on load, so the saved layer count jumps on the next Save. Same
+        // de-dupe as Sources.
+        id: 'datasets',
+        header: 'Datasets',
         accessorFn: row =>
-          row.layers.filter(layer => !isUnsupportedLayer(layer)).length,
+          new Set(
+            row.layers
+              .filter(
+                layer =>
+                  !isUnsupportedLayer(layer) &&
+                  layer.fsp_name !== null &&
+                  layer.path !== null
+              )
+              .map(layer => datasetKey(layer.fsp_name!, layer.path!))
+          ).size,
         cell: ({ getValue }) => (
           <div className="flex items-center justify-start h-full text-left">
             <Typography className="text-foreground text-left" variant="small">
@@ -221,42 +305,7 @@ export function useNGViewsColumns(
           </div>
         ),
         cell: ({ row }) => {
-          // De-dupe: per-channel layers of one dataset share a source path.
-          // A source is broken if any of its layers lost its Data Link, and
-          // unsupported if every layer of it produced no Neuroglancer layer.
-          const bySource = new Map<
-            string,
-            {
-              fsp_name: string;
-              path: string;
-              broken: boolean;
-              relinkable: boolean;
-              unsupported: boolean;
-            }
-          >();
-          for (const layer of row.original.layers) {
-            if (layer.fsp_name === null || layer.path === null) {
-              continue; // pre-migration broken layer: source unknown
-            }
-            const key = datasetKey(layer.fsp_name, layer.path);
-            const existing = bySource.get(key);
-            const unsupported = isUnsupportedLayer(layer);
-            if (existing) {
-              existing.broken = existing.broken || layer.broken;
-              existing.relinkable =
-                existing.relinkable || isRelinkableLayer(layer);
-              existing.unsupported = existing.unsupported && unsupported;
-            } else {
-              bySource.set(key, {
-                fsp_name: layer.fsp_name,
-                path: layer.path,
-                broken: layer.broken,
-                relinkable: isRelinkableLayer(layer),
-                unsupported
-              });
-            }
-          }
-          const sources = [...bySource.values()];
+          const sources = getViewSources(row.original);
           if (sources.length === 0) {
             return (
               <div className="flex items-center justify-start h-full w-full text-left">
@@ -272,12 +321,7 @@ export function useNGViewsColumns(
           return (
             <div className="flex flex-col justify-center h-full w-full min-w-0 py-2 text-left">
               {sources.map(src => {
-                const fsp = zonesAndFspQuery.data?.[
-                  makeMapKey('fsp', src.fsp_name)
-                ] as FileSharePath | undefined;
-                const fullPath =
-                  getPreferredPathForDisplay(pathPreference, fsp, src.path) ||
-                  src.path;
+                const fullPath = displayPath(src);
                 return (
                   <div
                     // Fixed row height so a Relink button doesn't
@@ -314,13 +358,28 @@ export function useNGViewsColumns(
                         />
                       </FgTooltip>
                     ) : src.unsupported ? (
-                      <FgTooltip label="Will not load as a Neuroglancer layer">
-                        <FgIcon
-                          color="warning"
-                          icon={HiExclamationTriangle}
-                          label="Will not load as a Neuroglancer layer"
+                      <FgTooltip label="Will not load as a Neuroglancer layer — click to remove">
+                        <IconButton
+                          aria-label={`Remove ${fullPath} from View`}
+                          className="min-w-0 min-h-0 p-0.5"
+                          onClick={e => {
+                            e.stopPropagation();
+                            onRemoveSource({
+                              view: row.original,
+                              fsp_name: src.fsp_name,
+                              path: src.path,
+                              displayPath: fullPath
+                            });
+                          }}
                           size="sm"
-                        />
+                          variant="ghost"
+                        >
+                          <FgIcon
+                            color="warning"
+                            icon={HiExclamationTriangle}
+                            size="sm"
+                          />
+                        </IconButton>
                       </FgTooltip>
                     ) : null}
                     <Link
@@ -338,18 +397,6 @@ export function useNGViewsColumns(
           );
         },
         enableSorting: false
-      },
-      {
-        accessorKey: 'sharing_mode',
-        header: 'Sharing',
-        cell: ({ row }) => (
-          <div className="flex items-center justify-start h-full text-left">
-            <Typography className="text-foreground text-left" variant="small">
-              {SHARING_LABEL[row.original.sharing_mode]}
-            </Typography>
-          </div>
-        ),
-        enableSorting: true
       },
       {
         accessorKey: 'updated_at',
@@ -373,6 +420,7 @@ export function useNGViewsColumns(
           <ActionsCell
             item={row.original}
             onDelete={onDelete}
+            onRemoveDatasets={onRemoveDatasets}
             onRename={onRename}
           />
         ),
@@ -383,10 +431,11 @@ export function useNGViewsColumns(
       onRename,
       onDelete,
       onRelink,
+      onRemoveSource,
+      onRemoveDatasets,
       sourcesColWidth,
       onSourcesResize,
-      pathPreference,
-      zonesAndFspQuery.data
+      displayPath
     ]
   );
 }

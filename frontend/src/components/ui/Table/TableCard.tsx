@@ -220,7 +220,7 @@ function TableHeader({
   readonly headerActions?: ReactNode;
 }) {
   return (
-    <div className="shrink-0 flex flex-col md:flex-row md:items-center gap-2 py-4 px-4">
+    <div className="shrink-0 flex flex-col min-[901px]:flex-row min-[901px]:items-center gap-2 py-4 px-4">
       <div className="flex items-center gap-2">
         {/* https://tanstack.com/table/latest/docs/framework/react/examples/pagination */}
         <div className="flex items-center gap-2">
@@ -283,7 +283,7 @@ function TableHeader({
         </div>
       </div>
       {/* Global Search Input */}
-      <div className="grow py-2 md:px-4">
+      <div className="grow py-2 min-[901px]:px-4">
         <div className="relative">
           <DebouncedInput
             ref={inputRef}
@@ -320,7 +320,7 @@ function TableRow({
 }) {
   return (
     <div
-      className={`grid ${gridColsClass ?? ''} min-h-16 justify-items-start gap-4 px-4 border-b border-surface last:border-0 ${gridColsStyle ? 'min-w-max' : ''}`}
+      className={`grid ${gridColsClass ?? ''} min-h-16 justify-items-start gap-4 px-4 border-b border-surface last:border-0 ${gridColsStyle ? 'min-w-min' : ''}`}
       style={gridColsStyle ? { gridTemplateColumns: gridColsStyle } : undefined}
     >
       {children}
@@ -440,7 +440,7 @@ function Table<TData>({
         />
         <div className="overflow-x-auto">
           <div
-            className={`shrink-0 grid ${gridColsClass ?? ''} gap-4 px-4 py-2 bg-surface/30 ${gridColsStyle ? 'min-w-max' : ''}`}
+            className={`shrink-0 grid ${gridColsClass ?? ''} gap-4 px-4 py-2 bg-surface/30 ${gridColsStyle ? 'min-w-min' : ''}`}
             style={
               gridColsStyle ? { gridTemplateColumns: gridColsStyle } : undefined
             }
