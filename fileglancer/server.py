@@ -1664,6 +1664,19 @@ def create_app(settings):
                                   unsupported=unsupported)
             return View.model_validate(view)
 
+    @app.post("/api/neuroglancer/views/{short_key}/remove-sources", response_model=View,
+              description="Remove datasets (all their layers) from one of the current user's Views")
+    async def remove_view_sources_endpoint(payload: RemoveViewSourcesRequest,
+                                           short_key: str = Path(..., description="The View's short key"),
+                                           username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            view = db.get_view_by_short_key(session, short_key)
+            if not view or not _can_edit_view(view, username):
+                raise HTTPException(status_code=404, detail="View not found")
+            if not db.remove_view_sources(session, view, [(s.fsp_name, s.path) for s in payload.sources]):
+                raise HTTPException(status_code=404, detail="Source not found in View")
+            return View.model_validate(view)
+
     @app.delete("/api/neuroglancer/views/{short_key}",
                 description="Delete one of the current user's Views")
     async def delete_view_endpoint(short_key: str = Path(..., description="The View's short key"),
