@@ -992,6 +992,24 @@ def test_reconcile_tolerates_sourceless_layers(db_session, fsp):
     assert v.layers == []
 
 
+def test_remove_view_sources_drops_layers_and_rows(db_session, fsp):
+    a, b, plain = _pp(db_session, fsp, "a.zarr"), _pp(db_session, fsp, "b.zarr"), _pp(db_session, fsp, "plain_dir")
+    # a split per channel by Neuroglancer: two NG layers, two rows
+    state = {"layers": [{"name": "a c0", "source": _src(a)}, {"name": "b", "source": _src(b)},
+                        {"name": "a c1", "source": _src(a)}]}
+    v = create_view(db_session, "u", "rm", state,
+                    [_row(a, 0), _row(b, 1), _row(a, 2), _row(plain, 3, opts={"unsupported": True})], "read")
+
+    assert remove_view_sources(db_session, v, [(fsp.name, "a.zarr")])
+    assert [ng["name"] for ng in v.ng_state["layers"]] == ["b"]
+    assert [(l.layer_index, l.sharing_key) for l in sorted(v.layers, key=lambda l: l.layer_index)] == [
+        (0, b.sharing_key), (1, plain.sharing_key)]
+
+    assert remove_view_sources(db_session, v, [(fsp.name, "plain_dir"), (fsp.name, "b.zarr")])
+    assert v.layers == [] and v.ng_state["layers"] == []
+    assert not remove_view_sources(db_session, v, [(fsp.name, "missing.zarr")])
+
+
 def test_rename_only_update_leaves_layers(db_session, fsp):
     a = _pp(db_session, fsp, "a.zarr")
     v = create_view(db_session, "u", "keep", {"layers": []}, [_row(a, 0)], "read")

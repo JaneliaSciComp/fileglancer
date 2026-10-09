@@ -262,6 +262,16 @@ class ViewSummaryResponse(BaseModel):
     views: List[ViewSummary] = Field(description="A list of View summaries")
 
 
+class ViewSource(BaseModel):
+    fsp_name: str = Field(description="File share path name")
+    path: str = Field(description="Dataset path within the file share")
+
+
+class RemoveViewSourcesRequest(BaseModel):
+    """Datasets to remove (with all their layers) from a View."""
+    sources: List[ViewSource] = Field(min_length=1, description="Datasets to remove")
+
+
 class RelinkRequest(BaseModel):
     """Relink the caller's broken Views onto one of the caller's Data Links."""
     sharing_key: str = Field(description="Sharing key of the Data Link to relink onto")

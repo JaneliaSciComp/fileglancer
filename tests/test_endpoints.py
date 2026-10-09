@@ -2440,3 +2440,16 @@ def test_put_view_rejects_unknown_unsupported_key(test_client):
                            json={"ng_state": {"layers": []}, "unsupported_sharing_keys": ["NOPE"]})
     assert resp.status_code == 400
     assert "Unknown data link sharing key: NOPE" in resp.text
+
+
+def test_remove_view_sources(test_client, temp_dir):
+    sk = _make_proxied_path(test_client, temp_dir, "rm1")
+    view = _view_on_link(test_client, sk, "rm")
+    url = f"/api/neuroglancer/views/{view['short_key']}/remove-sources"
+    src = {"fsp_name": view["layers"][0]["fsp_name"], "path": view["layers"][0]["path"]}
+
+    resp = test_client.post(url, json={"sources": [src]})
+    assert resp.status_code == 200
+    assert resp.json()["layers"] == [] and resp.json()["ng_state"]["layers"] == []
+    assert test_client.post(url, json={"sources": [src]}).status_code == 404
+    assert test_client.post(url, json={"sources": []}).status_code == 400
