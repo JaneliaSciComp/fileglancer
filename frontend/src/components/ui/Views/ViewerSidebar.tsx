@@ -7,6 +7,7 @@ import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import CartList from '@/components/ui/Views/CartList';
 import SidebarFileBrowser from '@/components/ui/Views/SidebarFileBrowser';
 import { useAddToView } from '@/hooks/useAddToView';
+import { useCartCount } from '@/hooks/useCartCount';
 import { useCreateViewFlow } from '@/hooks/useCreateViewFlow';
 import { isUnsupportedLayer } from '@/utils/viewCheckout';
 import type { NeuroglancerBridge } from '@/hooks/useNeuroglancerViewer';
@@ -38,6 +39,7 @@ export default function ViewerSidebar({
   });
   const { startAddToView, dialog, pending } = useCreateViewFlow();
   const [tab, setTab] = useState('add');
+  const cartCount = useCartCount();
   const viewSources = useMemo(
     () =>
       [...viewLayers]
@@ -67,10 +69,19 @@ export default function ViewerSidebar({
               Add data
             </Tabs.Trigger>
             <Tabs.Trigger
-              className="!text-foreground h-full whitespace-nowrap"
+              className="!text-foreground h-full gap-1.5 whitespace-nowrap"
               value="cart"
             >
               Layer Cart
+              {/* Always rendered, so the trigger keeps its width (and the
+                  indicator its fit) as the count comes and goes. */}
+              <span
+                aria-hidden={cartCount === 0}
+                aria-label={`${cartCount} ${cartCount === 1 ? 'dataset' : 'datasets'}`}
+                className={`min-w-4 rounded-full bg-secondary px-1 text-center text-[10px] leading-4 text-secondary-foreground ${cartCount > 0 ? '' : 'invisible'}`}
+              >
+                {cartCount}
+              </span>
             </Tabs.Trigger>
             <Tabs.TriggerIndicator className="h-full" />
           </Tabs.List>
