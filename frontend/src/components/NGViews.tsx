@@ -37,7 +37,8 @@ export default function NGViews() {
   const [removeDatasetsItem, setRemoveDatasetsItem] = useState<
     View | undefined
   >(undefined);
-  const [sourcesColWidth, setSourcesColWidth] = useState(420);
+  // null until the user drags: the column then flexes with the screen.
+  const [sourcesColWidth, setSourcesColWidth] = useState<number | null>(null);
   const clampSourcesWidth = useCallback(
     (w: number) => Math.max(120, Math.min(900, w)),
     []
@@ -113,10 +114,13 @@ export default function NGViews() {
     setRemoveDatasetsItem
   );
 
-  // Fixed pixel tracks for every column except Sources (user-resizable).
-  // Fixed (not fr) so the row has a deterministic width — that's what lets
-  // the outer overflow-x-auto scroll when Sources grows past the viewport.
-  const gridColsStyle = `160px 100px ${sourcesColWidth}px 160px 56px`;
+  // minmax tracks start at their max and shrink toward their min on
+  // narrower screens. Content never sizes a track, so the header and every
+  // row (separate grids) stay aligned. Once dragged, Sources is fixed px and
+  // the outer overflow-x-auto scrolls when it outgrows the viewport.
+  const sourcesTrack =
+    sourcesColWidth === null ? 'minmax(160px, 420px)' : `${sourcesColWidth}px`;
+  const gridColsStyle = `minmax(100px, 160px) 100px ${sourcesTrack} minmax(150px, 160px) 56px`;
 
   return (
     <>
