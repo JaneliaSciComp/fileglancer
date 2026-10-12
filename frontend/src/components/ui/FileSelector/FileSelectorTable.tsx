@@ -123,7 +123,16 @@ export default function FileSelectorTable({
         },
         size: 250
       },
-      typeColumn,
+      currentLocation.type === 'filesystem'
+        ? typeColumn
+        : {
+            ...typeColumn,
+            cell: () => (
+              <Typography>
+                {currentLocation.type === 'zones' ? 'Zone' : 'File share'}
+              </Typography>
+            )
+          },
       lastModifiedColumn,
       sizeColumn
     ],

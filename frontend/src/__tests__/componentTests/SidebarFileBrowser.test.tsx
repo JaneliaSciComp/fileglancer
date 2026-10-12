@@ -9,6 +9,7 @@ import type { FileSelectorLocation } from '@/hooks/useFileSelector';
 const addToCart = vi.fn();
 const navigateToLocation = vi.fn();
 const handleItemDoubleClick = vi.fn();
+const navigateToRawPath = vi.fn();
 const fetchNextPage = vi.fn();
 
 type FakeSelector = {
@@ -39,7 +40,7 @@ vi.mock('@/hooks/useFileSelector', () => ({
     fileQuery: fake.fileQuery,
     zonesQuery: fake.zonesQuery,
     navigateToLocation,
-    navigateToRawPath: vi.fn(),
+    navigateToRawPath,
     navigateHome: vi.fn(),
     canGoHome: true,
     currentPathDisplay: '',
@@ -98,6 +99,7 @@ beforeEach(() => {
   addToCart.mockReset().mockResolvedValue(undefined);
   navigateToLocation.mockReset();
   handleItemDoubleClick.mockReset();
+  navigateToRawPath.mockReset();
   fetchNextPage.mockReset();
   vi.mocked(toast.success).mockClear();
   vi.mocked(toast.error).mockClear();
@@ -262,11 +264,16 @@ describe('SidebarFileBrowser', () => {
     expect(handleItemDoubleClick).toHaveBeenCalledWith(fake.items[0]);
   });
 
-  it('has no path field', () => {
+  it('navigates to a typed path on Go', async () => {
+    navigateToRawPath.mockReturnValue(true);
+    const user = userEvent.setup();
     render(<SidebarFileBrowser />);
-    expect(
-      screen.queryByPlaceholderText('Type or paste a path to navigate ...')
-    ).toBeNull();
+    await user.type(
+      screen.getByPlaceholderText('Type or paste a path to navigate ...'),
+      '/groups/lab/data'
+    );
+    await user.click(screen.getByRole('button', { name: 'Go' }));
+    expect(navigateToRawPath).toHaveBeenCalledWith('/groups/lab/data');
   });
 
   it('loads the next page of a large folder', async () => {
