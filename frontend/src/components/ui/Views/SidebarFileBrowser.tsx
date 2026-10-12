@@ -95,8 +95,8 @@ export default function SidebarFileBrowser() {
         }}
         onItemDoubleClick={open}
         onToggleChecked={toggle}
+        pathInputPosition="top"
         selector={selector}
-        showPathInput={false}
         tableClassName="my-2 min-h-[10rem] flex-1"
       />
       <FgButton

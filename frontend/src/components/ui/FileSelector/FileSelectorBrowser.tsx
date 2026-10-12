@@ -2,7 +2,13 @@ import { useState, useEffect } from 'react';
 import type { ChangeEvent, FormEvent, KeyboardEvent } from 'react';
 import { IconButton, Input, Typography } from '@material-tailwind/react';
 import { HiOutlineFunnel, HiXMark } from 'react-icons/hi2';
-import { HiHome, HiFolderAdd, HiEye, HiEyeOff } from 'react-icons/hi';
+import {
+  HiChevronRight,
+  HiHome,
+  HiFolderAdd,
+  HiEye,
+  HiEyeOff
+} from 'react-icons/hi';
 import toast from 'react-hot-toast';
 
 import FgButton from '@/components/designSystem/atoms/FgButton';
@@ -28,7 +34,8 @@ type FileSelectorBrowserProps = {
   readonly onToggleChecked?: (item: FileOrFolder) => void;
   /** Sizes the file list. */
   readonly tableClassName?: string;
-  readonly showPathInput?: boolean;
+  /** Where the editable path field goes; 'top' adds a Go button. */
+  readonly pathInputPosition?: 'top' | 'bottom';
 };
 
 // Icon-button styling matched to the file browser toolbar.
@@ -46,7 +53,7 @@ export default function FileSelectorBrowser({
   checkedPaths,
   onToggleChecked,
   tableClassName = 'my-4 h-[50vh] max-h-96 min-h-[10rem]',
-  showPathInput = true
+  pathInputPosition = 'bottom'
 }: FileSelectorBrowserProps) {
   const {
     state,
@@ -232,6 +239,31 @@ export default function FileSelectorBrowser({
         </form>
       ) : null}
 
+      {pathInputPosition === 'top' ? (
+        <form
+          className="mt-2 flex items-center gap-2"
+          onSubmit={(event: FormEvent<HTMLFormElement>) => {
+            event.preventDefault();
+            handlePathInputSubmit();
+          }}
+        >
+          <div className="min-w-0 flex-1">
+            <FgInput
+              className="font-mono"
+              onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                setPathInput(event.target.value)
+              }
+              placeholder="Type or paste a path to navigate ..."
+              type="text"
+              value={pathInput}
+            />
+          </div>
+          <FgButton icon={HiChevronRight} iconPosition="right" type="submit">
+            Go
+          </FgButton>
+        </form>
+      ) : null}
+
       {/* Table with loading/error states. A failed "Load more" or refetch
           keeps its rows and shows the error under them. */}
       <div className={`flex flex-col ${tableClassName}`}>
@@ -299,7 +331,7 @@ export default function FileSelectorBrowser({
       ) : null}
 
       {/* Editable path: paste a path here to navigate the browser there */}
-      {showPathInput ? (
+      {pathInputPosition === 'bottom' ? (
         <div className="mb-4">
           <Typography className="mb-1 text-sm text-foreground/60">
             Path
