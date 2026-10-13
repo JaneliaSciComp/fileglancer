@@ -148,6 +148,13 @@ function renderViewer(options: { title?: string } = {}) {
   return render(<NeuroglancerView />);
 }
 
+/** Save sits in the toolbar always; it only enables once the View is dirty. */
+const findEnabledSave = () =>
+  screen.findByRole('button', { name: 'Save' }).then(async button => {
+    await waitFor(() => expect(button).toBeEnabled());
+    return button;
+  });
+
 describe('NeuroglancerView', () => {
   beforeEach(() => {
     copyToClipboard.mockReset();
@@ -268,17 +275,15 @@ describe('NeuroglancerView', () => {
     expect(screen.queryByLabelText('Edit view name')).not.toBeInTheDocument();
   });
 
-  it('shows the Save bar to the owner once the View has unsaved changes', async () => {
+  it('enables Save and shows Discard once the View has unsaved changes', async () => {
     useViewsQuery.mockReturnValue({ data: [OWNED] });
     renderViewer();
-    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull();
     act(() => bridgeRef.current!.interact());
     bridgeRef.current!.change({ layers: [{ name: 'L0' }], layout: '4panel' });
-    expect(
-      await screen.findByText(
-        'Unsaved changes — saving updates this View for everyone with its link.'
-      )
-    ).toBeInTheDocument();
+    expect(await findEnabledSave()).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Discard' })).toBeInTheDocument();
   });
 
   it('saves the live viewer state', async () => {
@@ -286,13 +291,13 @@ describe('NeuroglancerView', () => {
     renderViewer();
     act(() => bridgeRef.current!.interact());
     bridgeRef.current!.change({ layers: [{ name: 'L0' }], layout: '4panel' });
-    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    await userEvent.click(await findEnabledSave());
     expect(mutateAsync).toHaveBeenCalledWith({
       short_key: 'sk1',
       ng_state: { layers: [{ name: 'L0' }], layout: '4panel' }
     });
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
     );
     expect(toast.success).toHaveBeenCalledWith('View saved');
   });
@@ -303,9 +308,9 @@ describe('NeuroglancerView', () => {
     renderViewer();
     act(() => bridgeRef.current!.interact());
     bridgeRef.current!.change({ layers: [{ name: 'L0' }], layout: '4panel' });
-    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    await userEvent.click(await findEnabledSave());
     expect(toast.error).toHaveBeenCalledWith('Server error');
-    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
   });
 
   it('discard restores the saved state', async () => {
@@ -320,7 +325,7 @@ describe('NeuroglancerView', () => {
     expect(setState).toHaveBeenCalledWith({ layers: [{ name: 'L0' }] });
   });
 
-  it('never shows the Save bar to a non-owner', async () => {
+  it('never shows Save to a non-owner', async () => {
     useViewsQuery.mockReturnValue({ data: [] });
     renderViewer();
     act(() => bridgeRef.current!.interact());
@@ -398,7 +403,7 @@ describe('NeuroglancerView', () => {
     expect(clean.defaultPrevented).toBe(false);
     act(() => bridgeRef.current!.interact());
     bridgeRef.current!.change({ layers: [], layout: '4panel' });
-    await screen.findByRole('button', { name: 'Save' });
+    await findEnabledSave();
     const dirty = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(dirty);
     expect(dirty.defaultPrevented).toBe(true);
@@ -483,13 +488,13 @@ describe('NeuroglancerView', () => {
     const { rerender } = renderViewer();
     act(() => bridgeRef.current!.interact());
     bridgeRef.current!.change({ layers: [{ name: 'L0' }], layout: '4panel' });
-    await screen.findByRole('button', { name: 'Save' });
+    await findEnabledSave();
     bridgeRef.current!.bridge.status = 'loading';
     rerender(<NeuroglancerView />);
     expect(toast.error).toHaveBeenCalledWith(
       'Neuroglancer reloaded, so unsaved changes may have been lost'
     );
-    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
   });
 
   describe('with unsaved changes', () => {
@@ -658,9 +663,7 @@ describe('NeuroglancerView', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add data' }));
     // No in-viewer interaction first: the add alone must count as an edit.
     await userEvent.click(screen.getByRole('button', { name: 'fake add' }));
-    expect(
-      await screen.findByRole('button', { name: 'Save' })
-    ).toBeInTheDocument();
+    expect(await findEnabledSave()).toBeInTheDocument();
   });
 
   it('saves an unsupported dataset added from the sidebar as a source', async () => {
@@ -670,7 +673,7 @@ describe('NeuroglancerView', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'fake add unsupported' })
     );
-    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    await userEvent.click(await findEnabledSave());
     expect(mutateAsync).toHaveBeenCalledWith(
       expect.objectContaining({
         short_key: 'sk1',
@@ -686,7 +689,7 @@ describe('NeuroglancerView', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'fake remove unsupported' })
     );
-    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    await userEvent.click(await findEnabledSave());
     expect(mutateAsync).toHaveBeenCalledWith(
       expect.objectContaining({
         short_key: 'sk1',

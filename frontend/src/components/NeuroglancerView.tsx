@@ -32,7 +32,7 @@ import RelinkDialog from '@/components/ui/Dialogs/RelinkDialog';
 import UnsavedChangesDialog from '@/components/ui/Dialogs/UnsavedChangesDialog';
 import type { RelinkTarget } from '@/components/ui/Dialogs/RelinkDialog';
 import ViewBrokenBanner from '@/components/ui/Views/ViewBrokenBanner';
-import ViewSaveBar from '@/components/ui/Views/ViewSaveBar';
+import ViewSaveControls from '@/components/ui/Views/ViewSaveControls';
 import ViewerSidebar from '@/components/ui/Views/ViewerSidebar';
 
 type ToolbarIconButtonProps = {
@@ -314,6 +314,15 @@ export default function NeuroglancerView() {
               <Typography className="truncate">{title}</Typography>
             )}
           </div>
+          {canEdit ? (
+            <ViewSaveControls
+              dirty={dirty}
+              onDiscard={editState.discard}
+              onSave={() => void handleSave()}
+              saving={updateViewMutation.isPending}
+              status={bridge.status}
+            />
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-4">
           <div className="flex items-center gap-1">
@@ -366,15 +375,6 @@ export default function NeuroglancerView() {
           </FgTooltip>
         </div>
       </div>
-      {canEdit ? (
-        <ViewSaveBar
-          dirty={dirty}
-          onDiscard={editState.discard}
-          onSave={() => void handleSave()}
-          saving={updateViewMutation.isPending}
-          status={bridge.status}
-        />
-      ) : null}
       {canEdit && ownedView ? (
         <ViewBrokenBanner
           disabled={dirty}
