@@ -1,61 +1,86 @@
 import { useMemo, useState } from 'react';
 import { IconButton, Tabs } from '@material-tailwind/react';
+import toast from 'react-hot-toast';
 import { HiX } from 'react-icons/hi';
 
-import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
-import CartList from '@/components/ui/Views/CartList';
 import SidebarFileBrowser from '@/components/ui/Views/SidebarFileBrowser';
+import SourcesList from '@/components/ui/Views/SourcesList';
 import { useAddToView } from '@/hooks/useAddToView';
-import { useCartCount } from '@/hooks/useCartCount';
-import { useCreateViewFlow } from '@/hooks/useCreateViewFlow';
-import { isUnsupportedLayer } from '@/utils/viewCheckout';
+import { useViewSources } from '@/hooks/useViewSources';
 import type { NeuroglancerBridge } from '@/hooks/useNeuroglancerViewer';
+import type { LiveSource } from '@/hooks/useViewSources';
+import type { ViewEditState } from '@/hooks/useViewEditState';
 import type { ViewLayer } from '@/queries/viewQueries';
+import type { NgState } from '@/utils/viewCheckout';
 
 type ViewerSidebarProps = {
   readonly bridge: NeuroglancerBridge;
   /** The View's saved layer rows. */
   readonly viewLayers: ViewLayer[];
-  /** Called after layers were added to the viewer's state. */
-  readonly onEdited: () => void;
-  /** Called with the Data Links of datasets that can't load as layers. */
-  readonly onAddSources: (sharingKeys: string[]) => void;
+  readonly editState: ViewEditState;
   readonly onClose: () => void;
 };
 
-/** The owner's "Add data" panel beside the embedded viewer. */
+/**
+ * The owner's panel beside the embedded viewer: add data to the View, and
+ * see or remove what's in it. Both tabs edit the viewer's local state, kept
+ * until Save.
+ */
 export default function ViewerSidebar({
   bridge,
   viewLayers,
-  onEdited,
-  onAddSources,
+  editState,
   onClose
 }: ViewerSidebarProps) {
+  const { markEdited, addSources, recordAdded, removeSource } = editState;
   const addToView = useAddToView(bridge, {
     viewLayers,
-    onEdited,
-    onAddSources
+    onEdited: markEdited,
+    onAddSources: addSources,
+    onAdded: recordAdded
   });
-  const { startAddToView, dialog, pending } = useCreateViewFlow();
   const [tab, setTab] = useState('add');
-  const cartCount = useCartCount();
+  const sources = useViewSources(bridge, {
+    viewLayers,
+    added: editState.added,
+    pendingSources: editState.pendingSources,
+    removedSources: editState.removedSources
+  });
   const viewSources = useMemo(
     () =>
-      [...viewLayers]
-        .sort((a, b) => a.layer_index - b.layer_index)
-        .flatMap(l =>
-          l.fsp_name !== null && l.path !== null && !isUnsupportedLayer(l)
-            ? [{ fsp_name: l.fsp_name, path: l.path }]
-            : []
-        ),
-    [viewLayers]
+      sources.flatMap(s =>
+        s.fsp_name !== null && s.path !== null && !s.unsupported
+          ? [{ fsp_name: s.fsp_name, path: s.path }]
+          : []
+      ),
+    [sources]
   );
+
+  const remove = (source: LiveSource) => {
+    if (source.unsupported && source.sharing_key !== null) {
+      removeSource(source.sharing_key);
+    } else {
+      const state = bridge.getState() as NgState;
+      const gone = new Set(source.layerNames);
+      const next: NgState = {
+        ...state,
+        layers: (state.layers ?? []).filter(l => !gone.has(l.name as string))
+      };
+      const selected = state.selectedLayer as { layer?: string } | undefined;
+      if (selected?.layer && gone.has(selected.layer)) {
+        delete next.selectedLayer;
+      }
+      bridge.setState(next);
+      markEdited();
+    }
+    toast.success(`Removed ${source.label}. Save to keep the change.`);
+  };
 
   // Both tabs stay mounted (MT's Tabs.Panel unmounts inactive panels) so
   // switching keeps the browser's folder and checks.
   return (
-    <aside aria-label="Layer Cart sidebar" className="flex h-full flex-col">
+    <aside aria-label="View data sidebar" className="flex h-full flex-col">
       <div className="flex shrink-0 items-center gap-2 bg-surface pr-2 dark:bg-surface-light">
         {/* Content-width triggers, as in the Properties panel: MT measures
             the indicator only on window resize, so triggers that stretch
@@ -69,19 +94,10 @@ export default function ViewerSidebar({
               Add data
             </Tabs.Trigger>
             <Tabs.Trigger
-              className="!text-foreground h-full gap-1.5 whitespace-nowrap"
-              value="cart"
+              className="!text-foreground h-full whitespace-nowrap"
+              value="sources"
             >
-              Layer Cart
-              {/* Always rendered, so the trigger keeps its width (and the
-                  indicator its fit) as the count comes and goes. */}
-              <span
-                aria-hidden={cartCount === 0}
-                aria-label={`${cartCount} ${cartCount === 1 ? 'dataset' : 'datasets'}`}
-                className={`min-w-4 rounded-full bg-secondary px-1 text-center text-[10px] leading-4 text-secondary-foreground ${cartCount > 0 ? '' : 'invisible'}`}
-              >
-                {cartCount}
-              </span>
+              Sources
             </Tabs.Trigger>
             <Tabs.TriggerIndicator className="h-full" />
           </Tabs.List>
@@ -100,29 +116,15 @@ export default function ViewerSidebar({
         className={`min-h-0 flex-1 flex-col overflow-y-auto p-3 ${tab === 'add' ? 'flex' : 'hidden'}`}
         role="tabpanel"
       >
-        <SidebarFileBrowser />
+        <SidebarFileBrowser addToView={addToView} viewSources={viewSources} />
       </div>
       <div
-        aria-label="Layer Cart"
-        className={`min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 ${tab === 'cart' ? 'flex' : 'hidden'}`}
+        aria-label="Sources"
+        className={`min-h-0 flex-1 flex-col overflow-y-auto p-3 ${tab === 'sources' ? 'flex' : 'hidden'}`}
         role="tabpanel"
       >
-        <CartList
-          action={({ cart, hasMismatch, checking }) => (
-            <FgButton
-              // The mismatch check isn't final until every dataset is probed.
-              disabled={pending || checking}
-              loading={pending}
-              loadingText="Adding..."
-              onClick={() => startAddToView(cart, hasMismatch, addToView)}
-            >
-              Add to this View
-            </FgButton>
-          )}
-          viewSources={viewSources}
-        />
+        <SourcesList onRemove={remove} sources={sources} />
       </div>
-      {dialog}
     </aside>
   );
 }

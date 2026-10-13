@@ -1,12 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import toast from 'react-hot-toast';
 
+import type { CartDimensionCheck } from '@/hooks/useCartDimensionCheck';
+import type { CartItem } from '@/contexts/CartContext';
 import type { FileOrFolder } from '@/shared.types';
 import type { FileSelectorLocation } from '@/hooks/useFileSelector';
 
-const addToCart = vi.fn();
+const addToView = vi.fn();
+const startAddToView = vi.fn();
+const dimensionCheck = vi.fn<(items: CartItem[]) => CartDimensionCheck>();
 const navigateToLocation = vi.fn();
 const handleItemDoubleClick = vi.fn();
 const navigateToRawPath = vi.fn();
@@ -57,8 +60,11 @@ vi.mock('@/hooks/useFileSelector', () => ({
 vi.mock('@/queries/fileQueries', () => ({
   useCreateFolderMutation: () => ({ isPending: false, mutateAsync: vi.fn() })
 }));
-vi.mock('@/contexts/CartContext', () => ({
-  useCartContext: () => ({ addToCart })
+vi.mock('@/hooks/useCartDimensionCheck', () => ({
+  useCartDimensionCheck: (items: CartItem[]) => dimensionCheck(items)
+}));
+vi.mock('@/hooks/useCreateViewFlow', () => ({
+  useCreateViewFlow: () => ({ startAddToView, dialog: null, pending: false })
 }));
 // A stable array, as the real context gives: a new one each render would
 // rebuild the table's columns and remount its cells.
@@ -95,14 +101,33 @@ const file = (
   ...extra
 });
 
+// Every checked dataset probed as OME, with matching dimensions.
+const allOk = (items: CartItem[]): CartDimensionCheck => ({
+  mismatchedKeys: new Set(),
+  hasMismatch: false,
+  kindByKey: new Map(items.map(i => [`${i.fsp_name}::${i.path}`, 'ome']))
+});
+
+const VIEW_SOURCES = [{ fsp_name: 'myFsp', path: 'data/first.zarr' }];
+const Browser = () => (
+  <SidebarFileBrowser addToView={addToView} viewSources={VIEW_SOURCES} />
+);
+
 beforeEach(() => {
-  addToCart.mockReset().mockResolvedValue(undefined);
+  addToView.mockReset().mockResolvedValue(undefined);
+  // The real flow asks first only for consent or a mismatch, and toasts a
+  // failed add.
+  startAddToView
+    .mockReset()
+    .mockImplementation(
+      (items: CartItem[], _m: boolean, add: (i: CartItem[]) => Promise<void>) =>
+        add(items).catch(() => {})
+    );
+  dimensionCheck.mockReset().mockImplementation(allOk);
   navigateToLocation.mockReset();
   handleItemDoubleClick.mockReset();
   navigateToRawPath.mockReset();
   fetchNextPage.mockReset();
-  vi.mocked(toast.success).mockClear();
-  vi.mocked(toast.error).mockClear();
   fake = {
     location: { type: 'filesystem', fspName: 'myFsp', path: 'data' },
     items: [
@@ -123,29 +148,110 @@ beforeEach(() => {
 });
 
 describe('SidebarFileBrowser', () => {
-  it('adds checked items to the cart and clears the checks', async () => {
+  it('adds checked items to the View and clears the checks', async () => {
     const user = userEvent.setup();
-    render(<SidebarFileBrowser />);
-    expect(screen.getByRole('button', { name: 'Add to cart' })).toBeDisabled();
+    render(<Browser />);
+    expect(
+      screen.getByRole('button', { name: 'Add to this View' })
+    ).toBeDisabled();
 
     await user.click(screen.getByRole('checkbox', { name: 'Select a.zarr' }));
     await user.click(screen.getByRole('checkbox', { name: 'Select b.n5' }));
-    await user.click(screen.getByRole('button', { name: 'Add 2 to cart' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Add 2 to this View' })
+    );
 
-    expect(addToCart).toHaveBeenCalledWith([
+    const items = [
       { fsp_name: 'myFsp', path: 'data/a.zarr', label: 'a.zarr' },
       { fsp_name: 'myFsp', path: 'data/b.n5', label: 'b.n5' }
-    ]);
-    expect(toast.success).toHaveBeenCalledWith('Added 2 items to the cart');
+    ];
+    expect(startAddToView).toHaveBeenCalledWith(
+      items,
+      false,
+      expect.any(Function)
+    );
+    expect(addToView).toHaveBeenCalledWith(items);
     expect(
       screen.getByRole('checkbox', { name: 'Select a.zarr' })
     ).not.toBeChecked();
-    expect(screen.getByRole('button', { name: 'Add to cart' })).toBeDisabled();
+  });
+
+  it('probes only the checked items', async () => {
+    const user = userEvent.setup();
+    render(<Browser />);
+    expect(dimensionCheck).toHaveBeenLastCalledWith([]);
+    await user.click(screen.getByRole('checkbox', { name: 'Select a.zarr' }));
+    expect(dimensionCheck).toHaveBeenLastCalledWith([
+      { fsp_name: 'myFsp', path: 'data/a.zarr', label: 'a.zarr' }
+    ]);
+  });
+
+  it('waits for the checks before adding', async () => {
+    dimensionCheck.mockImplementation(items => ({
+      mismatchedKeys: new Set(),
+      hasMismatch: false,
+      kindByKey: new Map(items.map(i => [i.path, 'loading' as const]))
+    }));
+    const user = userEvent.setup();
+    render(<Browser />);
+    await user.click(screen.getByRole('checkbox', { name: 'Select a.zarr' }));
+    expect(screen.getByText('Checking the dataset...')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Add 1 to this View' })
+    ).toBeDisabled();
+  });
+
+  it('warns about mismatched and unsupported datasets, and passes the mismatch on', async () => {
+    dimensionCheck.mockImplementation(items => ({
+      mismatchedKeys: new Set(items.length ? ['myFsp::data/a.zarr'] : []),
+      hasMismatch: items.length > 0,
+      kindByKey: new Map(
+        items.map(i => [
+          i.path,
+          i.path.endsWith('.n5') ? ('unsupported' as const) : ('ome' as const)
+        ])
+      )
+    }));
+    const user = userEvent.setup();
+    render(<Browser />);
+    await user.click(screen.getByRole('checkbox', { name: 'Select a.zarr' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select b.n5' }));
+    expect(
+      screen.getByText(
+        "1 dataset can't load as a Neuroglancer layer and will be listed as a source only."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        '1 dataset has dimensions that differ from the first layer.'
+      )
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: 'Add 2 to this View' })
+    );
+    expect(startAddToView).toHaveBeenCalledWith(
+      expect.any(Array),
+      true,
+      expect.any(Function)
+    );
+  });
+
+  it('keeps the checks when adding fails', async () => {
+    addToView.mockRejectedValueOnce(new Error('boom'));
+    const user = userEvent.setup();
+    render(<Browser />);
+    await user.click(screen.getByRole('checkbox', { name: 'Select a.zarr' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Add 1 to this View' })
+    );
+    expect(
+      screen.getByRole('checkbox', { name: 'Select a.zarr' })
+    ).toBeChecked();
   });
 
   it('checks an item by clicking its row', async () => {
     const user = userEvent.setup();
-    render(<SidebarFileBrowser />);
+    render(<Browser />);
     // The name's tooltip repeats it once hovered.
     const name = () => screen.getByText('notes.txt', { selector: 'p' });
     await user.click(name());
@@ -158,41 +264,16 @@ describe('SidebarFileBrowser', () => {
     ).not.toBeChecked();
   });
 
-  it('says "item" when one item is added', async () => {
-    const user = userEvent.setup();
-    render(<SidebarFileBrowser />);
-
-    await user.click(screen.getByRole('checkbox', { name: 'Select a.zarr' }));
-    await user.click(screen.getByRole('button', { name: 'Add 1 to cart' }));
-
-    expect(toast.success).toHaveBeenCalledWith('Added 1 item to the cart');
-  });
-
-  it('keeps the checks when adding to the cart fails', async () => {
-    addToCart.mockRejectedValueOnce(new Error('boom'));
-    const user = userEvent.setup();
-    render(<SidebarFileBrowser />);
-    await user.click(screen.getByRole('checkbox', { name: 'Select a.zarr' }));
-    await user.click(screen.getByRole('button', { name: 'Add 1 to cart' }));
-
-    expect(toast.error).toHaveBeenCalledWith(
-      'Error adding items to the cart: boom'
-    );
-    expect(
-      screen.getByRole('checkbox', { name: 'Select a.zarr' })
-    ).toBeChecked();
-  });
-
   it('opens a folder on double-click', async () => {
     const user = userEvent.setup();
-    render(<SidebarFileBrowser />);
+    render(<Browser />);
     await user.dblClick(screen.getByText('a.zarr'));
     expect(handleItemDoubleClick).toHaveBeenCalledWith(fake.items[0]);
   });
 
   it('does not open a folder when its checkbox is double-clicked', async () => {
     const user = userEvent.setup();
-    render(<SidebarFileBrowser />);
+    render(<Browser />);
     await user.dblClick(
       screen.getByRole('checkbox', { name: 'Select a.zarr' })
     );
@@ -201,25 +282,29 @@ describe('SidebarFileBrowser', () => {
 
   it('does not open a plain file', async () => {
     const user = userEvent.setup();
-    render(<SidebarFileBrowser />);
+    render(<Browser />);
     await user.dblClick(screen.getByText('notes.txt'));
     expect(handleItemDoubleClick).not.toHaveBeenCalled();
   });
 
   it('clears the checks when the folder changes', async () => {
     const user = userEvent.setup();
-    const { rerender } = render(<SidebarFileBrowser />);
+    const { rerender } = render(<Browser />);
     await user.click(screen.getByRole('checkbox', { name: 'Select a.zarr' }));
-    expect(screen.getByRole('button', { name: 'Add 1 to cart' })).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Add 1 to this View' })
+    ).toBeEnabled();
 
     fake.location = { type: 'filesystem', fspName: 'myFsp', path: 'data' };
-    rerender(<SidebarFileBrowser />);
-    expect(screen.getByRole('button', { name: 'Add to cart' })).toBeDisabled();
+    rerender(<Browser />);
+    expect(
+      screen.getByRole('button', { name: 'Add to this View' })
+    ).toBeDisabled();
   });
 
   it('navigates by breadcrumb', async () => {
     const user = userEvent.setup();
-    render(<SidebarFileBrowser />);
+    render(<Browser />);
     await user.click(screen.getByRole('button', { name: 'Zones' }));
     expect(navigateToLocation).toHaveBeenCalledWith({ type: 'zones' });
   });
@@ -233,7 +318,7 @@ describe('SidebarFileBrowser', () => {
       })
     ];
     const user = userEvent.setup();
-    render(<SidebarFileBrowser />);
+    render(<Browser />);
     await user.dblClick(screen.getByText('linked'));
 
     expect(navigateToLocation).toHaveBeenCalledWith({
@@ -247,7 +332,7 @@ describe('SidebarFileBrowser', () => {
   it('does not open a broken symlink', async () => {
     fake.items = [file('dangling', { is_dir: true, is_symlink: true })];
     const user = userEvent.setup();
-    render(<SidebarFileBrowser />);
+    render(<Browser />);
     await user.dblClick(screen.getByText('dangling'));
     expect(navigateToLocation).not.toHaveBeenCalled();
     expect(handleItemDoubleClick).not.toHaveBeenCalled();
@@ -257,7 +342,7 @@ describe('SidebarFileBrowser', () => {
     fake.location = { type: 'zones' };
     fake.items = [file('ZoneA', { path: 'ZoneA', is_dir: true })];
     const user = userEvent.setup();
-    render(<SidebarFileBrowser />);
+    render(<Browser />);
 
     expect(screen.queryByRole('checkbox')).toBeNull();
     await user.dblClick(screen.getByText('ZoneA'));
@@ -267,7 +352,7 @@ describe('SidebarFileBrowser', () => {
   it('navigates to a typed path on Go', async () => {
     navigateToRawPath.mockReturnValue(true);
     const user = userEvent.setup();
-    render(<SidebarFileBrowser />);
+    render(<Browser />);
     await user.type(
       screen.getByPlaceholderText('Type or paste a path to navigate ...'),
       '/groups/lab/data'
@@ -279,7 +364,7 @@ describe('SidebarFileBrowser', () => {
   it('loads the next page of a large folder', async () => {
     fake.fileQuery.hasNextPage = true;
     const user = userEvent.setup();
-    render(<SidebarFileBrowser />);
+    render(<Browser />);
     await user.click(screen.getByRole('button', { name: 'Load more' }));
     expect(fetchNextPage).toHaveBeenCalled();
   });
@@ -290,7 +375,7 @@ describe('SidebarFileBrowser', () => {
     fake.fileQuery.error = new Error(
       'You do not have permission to list this folder.'
     );
-    render(<SidebarFileBrowser />);
+    render(<Browser />);
     expect(
       screen.getByText('You do not have permission to list this folder.')
     ).toBeInTheDocument();
@@ -306,7 +391,7 @@ describe('SidebarFileBrowser', () => {
     };
     fake.items = [];
     fake.fileQuery.isPending = true;
-    render(<SidebarFileBrowser />);
+    render(<Browser />);
     expect(
       screen.getByText('Error loading zones: Zones unavailable')
     ).toBeInTheDocument();
@@ -318,7 +403,7 @@ describe('SidebarFileBrowser', () => {
     fake.fileQuery.error = new Error('Next page failed');
     fake.fileQuery.data = { pages: [] };
     fake.fileQuery.hasNextPage = true;
-    render(<SidebarFileBrowser />);
+    render(<Browser />);
     expect(screen.getByText('Next page failed')).toBeInTheDocument();
     expect(
       screen.getByRole('checkbox', { name: 'Select a.zarr' })

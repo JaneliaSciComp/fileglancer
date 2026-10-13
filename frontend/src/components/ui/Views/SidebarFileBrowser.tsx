@@ -1,30 +1,57 @@
-import { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import { useEffect, useMemo, useState } from 'react';
+import { Typography } from '@material-tailwind/react';
 
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FileSelectorBrowser from '@/components/ui/FileSelector/FileSelectorBrowser';
-import { useCartContext } from '@/contexts/CartContext';
+import { useCartDimensionCheck } from '@/hooks/useCartDimensionCheck';
+import { useCreateViewFlow } from '@/hooks/useCreateViewFlow';
 import useFileSelector from '@/hooks/useFileSelector';
+import type { CartItem } from '@/contexts/CartContext';
+import type { DatasetRef } from '@/hooks/useCartDimensionCheck';
 import type { FileOrFolder } from '@/shared.types';
+
+type SidebarFileBrowserProps = {
+  /** The datasets in the viewer now, in layer order: the dimension reference. */
+  readonly viewSources: DatasetRef[];
+  readonly addToView: (items: CartItem[]) => Promise<void>;
+};
 
 /**
  * The file selector dialog's browser in the viewer's "Add data" sidebar:
- * navigate, check datasets, add them to the Layer Cart. Nothing is probed
- * here; the Layer Cart tab shows each dataset's warnings once it's added.
+ * navigate, check datasets, add them to the open View. Only checked datasets
+ * are probed, so their warnings show before adding, not on every row.
  */
-export default function SidebarFileBrowser() {
+export default function SidebarFileBrowser({
+  viewSources,
+  addToView
+}: SidebarFileBrowserProps) {
   const selector = useFileSelector({ defaultToHome: true });
   const { state, displayItems, navigateToLocation, handleItemDoubleClick } =
     selector;
-  const { addToCart } = useCartContext();
+  const { startAddToView, dialog, pending } = useCreateViewFlow();
   const [checked, setChecked] = useState<ReadonlySet<string>>(new Set());
-  const [adding, setAdding] = useState(false);
 
   const location = state.currentLocation;
-  const checkedFiles = displayItems.filter(f => checked.has(f.path));
+  const fspName = location.type === 'filesystem' ? location.fspName : null;
+  const items = useMemo<CartItem[]>(
+    () =>
+      fspName === null
+        ? []
+        : displayItems
+            .filter(f => checked.has(f.path))
+            .map(f => ({ fsp_name: fspName, path: f.path, label: f.name })),
+    [displayItems, checked, fspName]
+  );
+  const { mismatchedKeys, hasMismatch, kindByKey } = useCartDimensionCheck(
+    items,
+    viewSources
+  );
+  const kinds = [...kindByKey.values()];
+  const checking = kinds.includes('loading');
+  const unsupportedCount = kinds.filter(k => k === 'unsupported').length;
 
-  // Checks belong to the folder on screen, as on the Browse page, so a
-  // cart add never mixes folders or file shares.
+  // Checks belong to the folder on screen, as on the Browse page, so an
+  // add never mixes folders or file shares.
   useEffect(() => {
     setChecked(new Set());
   }, [location]);
@@ -55,29 +82,19 @@ export default function SidebarFileBrowser() {
       return next;
     });
 
-  const add = async () => {
-    if (location.type !== 'filesystem') {
-      return;
-    }
-    setAdding(true);
-    try {
-      await addToCart(
-        checkedFiles.map(f => ({
-          fsp_name: location.fspName,
-          path: f.path,
-          label: f.name
-        }))
-      );
-      const count = checkedFiles.length;
-      toast.success(`Added ${count} item${count === 1 ? '' : 's'} to the cart`);
+  const add = () =>
+    startAddToView(items, hasMismatch, async datasets => {
+      await addToView(datasets);
       setChecked(new Set());
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Error adding items to the cart: ${message}`);
-    } finally {
-      setAdding(false);
-    }
-  };
+    });
+
+  const datasets = (n: number) => `${n} ${n === 1 ? 'dataset' : 'datasets'}`;
+  const warnings = [
+    unsupportedCount > 0 &&
+      `${datasets(unsupportedCount)} can't load as a Neuroglancer layer and will be listed as ${unsupportedCount === 1 ? 'a source' : 'sources'} only.`,
+    mismatchedKeys.size > 0 &&
+      `${datasets(mismatchedKeys.size)} ${mismatchedKeys.size === 1 ? 'has' : 'have'} dimensions that differ from the first layer.`
+  ].filter((w): w is string => !!w);
 
   return (
     // The shared browser is sized for the dialog; shrink all of its text
@@ -99,16 +116,29 @@ export default function SidebarFileBrowser() {
         selector={selector}
         tableClassName="my-2 min-h-[10rem] flex-1"
       />
+      {checking ? (
+        <Typography className="mb-2 text-foreground/70">
+          Checking {items.length === 1 ? 'the dataset' : 'the datasets'}...
+        </Typography>
+      ) : (
+        warnings.map(w => (
+          <Typography className="mb-2 text-warning" key={w}>
+            {w}
+          </Typography>
+        ))
+      )}
       <FgButton
-        disabled={adding || checkedFiles.length === 0}
-        loading={adding}
+        // The checks aren't final until every checked dataset is probed.
+        disabled={pending || checking || items.length === 0}
+        loading={pending}
         loadingText="Adding..."
-        onClick={() => void add()}
+        onClick={add}
       >
-        {checkedFiles.length > 0
-          ? `Add ${checkedFiles.length} to cart`
-          : 'Add to cart'}
+        {items.length > 0
+          ? `Add ${items.length} to this View`
+          : 'Add to this View'}
       </FgButton>
+      {dialog}
     </section>
   );
 }

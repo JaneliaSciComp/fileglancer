@@ -6,13 +6,9 @@ import type { CartItem } from '@/contexts/CartContext';
 import type { ViewLayer } from '@/queries/viewQueries';
 
 const resolveCartDatasets = vi.hoisted(() => vi.fn());
-const removeManyFromCart = vi.hoisted(() => vi.fn());
 const buildViewState = vi.hoisted(() => vi.fn());
 vi.mock('@/hooks/useCartCheckout', () => ({
   useCartCheckout: () => ({ resolveCartDatasets })
-}));
-vi.mock('@/contexts/CartContext', () => ({
-  useCartContext: () => ({ removeManyFromCart })
 }));
 vi.mock('@/utils/viewCheckout', async importOriginal => ({
   ...(await importOriginal<typeof import('@/utils/viewCheckout')>()),
@@ -32,7 +28,6 @@ const resolvedOf = (item: CartItem, key: string) => ({
 
 beforeEach(() => {
   resolveCartDatasets.mockReset();
-  removeManyFromCart.mockReset().mockResolvedValue(undefined);
   buildViewState.mockReset();
 });
 
@@ -43,32 +38,31 @@ function setup(
   const fake = makeFakeBridge(state);
   const onEdited = vi.fn();
   const onAddSources = vi.fn();
+  const onAdded = vi.fn();
   const { result } = renderHook(() =>
-    useAddToView(fake.bridge, { viewLayers, onEdited, onAddSources })
+    useAddToView(fake.bridge, { viewLayers, onEdited, onAddSources, onAdded })
   );
-  return { fake, onEdited, onAddSources, addToView: result.current };
+  return { fake, onEdited, onAddSources, onAdded, addToView: result.current };
 }
 
 describe('useAddToView', () => {
-  it('appends the new layers, marks the View edited, and empties the cart of them', async () => {
+  it('appends the new layers, marks the View edited, and reports the datasets', async () => {
     resolveCartDatasets.mockResolvedValue([resolvedOf(ok, 'k1')]);
     buildViewState.mockResolvedValue({
       ng_state: { layers: [{ name: 'old' }], layout: '4panel' },
       layers: [{ sharing_key: 'k1', layer_index: 0, channel: null, opts: null }]
     });
-    const { fake, onEdited, addToView } = setup();
+    const { fake, onEdited, onAdded, addToView } = setup();
     await addToView([ok]);
     expect(fake.bridge.getState()).toEqual({
       layout: 'xy',
       layers: [{ name: 'old' }, { name: 'old (2)', archived: false }]
     });
     expect(onEdited).toHaveBeenCalled();
-    expect(removeManyFromCart).toHaveBeenCalledWith([
-      { path: '/ok.zarr', channel: undefined }
-    ]);
+    expect(onAdded).toHaveBeenCalledWith([resolvedOf(ok, 'k1')]);
   });
 
-  it('records unsupported datasets as sources and empties the cart of them', async () => {
+  it('records unsupported datasets as sources', async () => {
     resolveCartDatasets.mockResolvedValue([
       resolvedOf(ok, 'k1'),
       resolvedOf(nope, 'k2')
@@ -88,34 +82,6 @@ describe('useAddToView', () => {
     const { onAddSources, addToView } = setup();
     await addToView([ok, nope]);
     expect(onAddSources).toHaveBeenCalledWith(['k2']);
-    expect(removeManyFromCart).toHaveBeenCalledWith([
-      { path: '/ok.zarr', channel: undefined },
-      { path: '/nope', channel: undefined }
-    ]);
-  });
-
-  it('removes a shadowed base entry along with its channel entry', async () => {
-    const base: CartItem = { fsp_name: 'f', path: '/ok.zarr', label: 'ok' };
-    const dapi: CartItem = {
-      ...base,
-      label: 'DAPI',
-      channel: 'DAPI',
-      channelIndex: 0
-    };
-    // Checkout drops the base entry, so only the channel entry resolves.
-    resolveCartDatasets.mockResolvedValue([resolvedOf(dapi, 'k1')]);
-    buildViewState.mockResolvedValue({
-      ng_state: { layers: [{ name: 'DAPI' }] },
-      layers: [
-        { sharing_key: 'k1', layer_index: 0, channel: 'DAPI', opts: null }
-      ]
-    });
-    const { addToView } = setup();
-    await addToView([base, dapi]);
-    expect(removeManyFromCart).toHaveBeenCalledWith([
-      { path: '/ok.zarr', channel: undefined },
-      { path: '/ok.zarr', channel: 'DAPI' }
-    ]);
   });
 
   it('leaves the viewer state alone when no dataset loads', async () => {
@@ -137,9 +103,6 @@ describe('useAddToView', () => {
     expect(setState).not.toHaveBeenCalled();
     expect(onEdited).not.toHaveBeenCalled();
     expect(onAddSources).toHaveBeenCalledWith(['k2']);
-    expect(removeManyFromCart).toHaveBeenCalledWith([
-      { path: '/nope', channel: undefined }
-    ]);
   });
 
   it("points the View's broken layer on the added dataset at its new Data Link", async () => {
@@ -182,11 +145,11 @@ describe('useAddToView', () => {
 
   it('changes nothing when a Data Link cannot be created', async () => {
     resolveCartDatasets.mockRejectedValue(new Error('link failed'));
-    const { fake, addToView } = setup();
+    const { fake, onAdded, addToView } = setup();
     const setState = vi.spyOn(fake.bridge, 'setState');
     await expect(addToView([ok])).rejects.toThrow('link failed');
     expect(setState).not.toHaveBeenCalled();
-    expect(removeManyFromCart).not.toHaveBeenCalled();
+    expect(onAdded).not.toHaveBeenCalled();
   });
 
   it('changes nothing when the sidebar unmounts mid-add (NG reloaded)', async () => {
@@ -200,8 +163,14 @@ describe('useAddToView', () => {
     const setState = vi.spyOn(fake.bridge, 'setState');
     const onEdited = vi.fn();
     const onAddSources = vi.fn();
+    const onAdded = vi.fn();
     const { result, unmount } = renderHook(() =>
-      useAddToView(fake.bridge, { viewLayers: [], onEdited, onAddSources })
+      useAddToView(fake.bridge, {
+        viewLayers: [],
+        onEdited,
+        onAddSources,
+        onAdded
+      })
     );
     const pending = result.current([ok]);
     unmount();
@@ -210,6 +179,6 @@ describe('useAddToView', () => {
     expect(setState).not.toHaveBeenCalled();
     expect(onEdited).not.toHaveBeenCalled();
     expect(onAddSources).not.toHaveBeenCalled();
-    expect(removeManyFromCart).not.toHaveBeenCalled();
+    expect(onAdded).not.toHaveBeenCalled();
   });
 });

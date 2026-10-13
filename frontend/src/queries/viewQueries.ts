@@ -79,6 +79,7 @@ export type ViewUpdateRequest = {
   name?: string;
   ng_state?: Record<string, unknown>;
   unsupported_sharing_keys?: string[];
+  removed_unsupported_sharing_keys?: string[];
 };
 
 /**
@@ -325,6 +326,11 @@ export function useUpdateViewMutation(): UseMutationResult<
       return view as View;
     },
     onSuccess: (view, variables) => {
+      // Show the saved rows now: the viewer's Sources tab maps layers to
+      // datasets through them, and Save just cleared the pending edits.
+      queryClient.setQueryData<View[]>(viewQueryKeys.list(), old =>
+        old?.map(v => (v.short_key === view.short_key ? view : v))
+      );
       queryClient.invalidateQueries({
         queryKey: viewQueryKeys.list()
       });
