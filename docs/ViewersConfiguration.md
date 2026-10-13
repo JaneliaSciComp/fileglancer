@@ -17,15 +17,11 @@ Each viewer is defined by a **capability manifest** hosted at a URL. The configu
 
 **Note:** No configuration is required to use the default viewers defined in `frontend/src/config/viewers.config.yaml`.
 
-1. Copy the default config: `cp frontend/src/config/viewers.config.yaml frontend/viewers.config.yaml`
-2. Edit `frontend/viewers.config.yaml` to customize viewers
-3. Rebuild the application: `pixi run node-build`
+To customize viewers, keep your own `viewers.config.yaml` anywhere outside the source tree and point Fileglancer at it at runtime. No rebuild is required.
 
-## Runtime Configuration (System Deployments)
-
-For deployments where Fileglancer is installed from PyPI and the frontend is pre-built, you can override the viewers configuration at runtime without rebuilding.
-
-Set the `FGC_VIEWERS_CONFIG` environment variable (or `viewers_config` in `config.yaml`) to the absolute path of a `viewers.config.yaml` file on disk:
+1. Copy the default config: `cp frontend/src/config/viewers.config.yaml /opt/deploy/viewers.config.yaml`
+2. Edit your copy to customize viewers
+3. Set the `FGC_VIEWERS_CONFIG` environment variable (or `viewers_config` in `config.yaml`) to the absolute path of your copy:
 
 ```env
 FGC_VIEWERS_CONFIG=/opt/deploy/viewers.config.yaml
@@ -37,31 +33,24 @@ Or in `config.yaml`:
 viewers_config: /opt/deploy/viewers.config.yaml
 ```
 
-When set, the application serves this file via the API and the frontend uses it instead of the bundled config. The file follows the same format as the build-time `viewers.config.yaml`.
+4. Restart the server
 
-### Precedence
+When set, the server returns this file from `GET /api/viewers-config` and the frontend uses it instead of the bundled config. This works the same way for development checkouts and for deployments installed from PyPI.
 
-The viewers configuration is resolved in the following order (highest priority first):
-
-1. **Runtime API config** — served from the path in `FGC_VIEWERS_CONFIG` (no rebuild required)
-2. **Build-time override** — `frontend/viewers.config.yaml` (requires rebuild)
-3. **Build-time default** — `frontend/src/config/viewers.config.yaml` (requires rebuild)
+For local development, put the file at the repo root as `viewers.config.yaml`, which `.gitignore` ignores, and set `viewers_config` in your local `config.yaml`. Your customizations then never end up in a build.
 
 ## Configuration File
 
 ### Location
 
-There are three config locations, resolved in order of precedence:
+There are two config locations, resolved in order of precedence:
 
 | Location | Purpose |
 | -------- | ------- |
-| Path in `FGC_VIEWERS_CONFIG` | **Runtime override** — served via API, no rebuild required; ideal for system deployments |
-| `frontend/viewers.config.yaml` | **Build-time override** — gitignored, safe to customize without merge conflicts |
-| `frontend/src/config/viewers.config.yaml` | **Default config** — committed source file, used when no override exists |
+| Path in `FGC_VIEWERS_CONFIG` | **Runtime override**: served through the API, no rebuild required |
+| `frontend/src/config/viewers.config.yaml` | **Default config**: committed source file, bundled at build time, used when no runtime override is set |
 
-Copy `frontend/src/config/viewers.config.yaml` to `frontend/viewers.config.yaml` to create a local override. This file is listed in `.gitignore` so your customizations will not conflict with upstream updates.
-
-**Important:** The build-time configs are bundled at build time and changes require rebuilding the application. Runtime config via `FGC_VIEWERS_CONFIG` does **not** require rebuilding.
+Edit `frontend/src/config/viewers.config.yaml` only to change the default that ships with Fileglancer. Changes to it require rebuilding the application.
 
 ### Structure
 
@@ -178,10 +167,7 @@ a Neuroglancer fork that call endpoints outside `/neuroglancer/` on its own
 host won't work through a proxy.
 
 Keep the deployment's viewers config in a runtime file set with
-`FGC_VIEWERS_CONFIG`, not in `frontend/viewers.config.yaml`. Vite bundles
-`frontend/viewers.config.yaml` into the build whenever the file exists on
-disk, even though git ignores it, so a developer's local override can ship in
-a release build.
+`FGC_VIEWERS_CONFIG`.
 
 ### Add a custom viewer
 
@@ -222,14 +208,14 @@ Viewer logos are managed by the `@bioimagetools/capability-manifest` library. Lo
 
 When developing with custom configurations:
 
-1. Copy the default config: `cp frontend/src/config/viewers.config.yaml frontend/viewers.config.yaml`
-2. Edit `frontend/viewers.config.yaml`
-3. Rebuild frontend: `pixi run node-build` or use watch mode: `pixi run dev-watch`
+1. Copy the default config to the repo root, where `.gitignore` ignores it: `cp frontend/src/config/viewers.config.yaml viewers.config.yaml`
+2. Edit your copy
+3. Set `viewers_config: /absolute/path/to/repo/viewers.config.yaml` in your local `config.yaml` and restart `pixi run dev-launch`
 4. Check the browser console for viewer initialization messages
 
 ### Validation
 
-The configuration is validated at build time using Zod schemas (see `frontend/src/config/viewersConfig.ts`). Validation enforces:
+The configuration is validated in the browser when it loads, using Zod schemas (see `frontend/src/config/viewersConfig.ts`). Validation enforces:
 
 - The `viewers` array must contain at least one entry
 - Each entry must have a valid `manifest_url` (a properly formed URL)

@@ -74,13 +74,13 @@ Fileglancer supports dynamic configuration of OME-Zarr viewers through `viewers.
 
 **To customize viewers:**
 
-1. Copy the default config: `cp frontend/src/config/viewers.config.yaml frontend/viewers.config.yaml`
+1. Copy the default config to the repo root, where `.gitignore` already ignores it: `cp frontend/src/config/viewers.config.yaml viewers.config.yaml`
 
-2. Edit `frontend/viewers.config.yaml` to enable/disable viewers or customize URLs
+2. Edit your copy to enable/disable viewers or customize URLs
 
-3. Rebuild the application: `pixi run node-build` or use watch mode in development: `pixi run dev-watch`
+3. Point your local `config.yaml` at it with `viewers_config: /absolute/path/to/repo/viewers.config.yaml` (or set `FGC_VIEWERS_CONFIG`), then restart `pixi run dev-launch`
 
-**Note:** The configuration file is bundled at build time, so changes require rebuilding the application. `frontend/viewers.config.yaml` is gitignored so your customizations will not conflict with upstream updates. The default configuration includes Neuroglancer, Avivator, OME-Zarr Validator, and Vol-E viewers.
+**Note:** The server returns this file at runtime, so changes need only a server restart, not a frontend rebuild. The default configuration includes Neuroglancer, Avivator, OME-Zarr Validator, and Vol-E viewers.
 
 For detailed configuration options, examples, and documentation on adding custom viewers, see [ViewersConfiguration.md](ViewersConfiguration.md).
 
@@ -97,9 +97,8 @@ To test editing locally against Janelia's Neuroglancer:
 1. Set `FGC_NEUROGLANCER_URL=https://fileglancer.int.janelia.org/neuroglancer`
    in `.env` (or `neuroglancer_url:` in `config.yaml`). `/neuroglancer/*` is
    then passed through to that URL.
-2. Point Neuroglancer at the passthrough in your viewers config
-   (`frontend/viewers.config.yaml` and `pixi run node-build`, or a runtime file
-   via `FGC_VIEWERS_CONFIG`):
+2. Point Neuroglancer at the passthrough in your runtime viewers config (the
+   file set with `viewers_config` / `FGC_VIEWERS_CONFIG`):
 
    ```yaml
      - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/neuroglancer.yaml'
