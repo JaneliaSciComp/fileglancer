@@ -5,12 +5,11 @@ import toast from 'react-hot-toast';
 import { TableCard } from '@/components/ui/Table/TableCard';
 import {
   useNGViewsColumns,
+  type BrokenSourceTarget,
   type RemoveSourceTarget
 } from '@/components/ui/Table/ngViewsColumns';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
-import RelinkDialog, {
-  type RelinkTarget
-} from '@/components/ui/Dialogs/RelinkDialog';
+import RelinkDialog from '@/components/ui/Dialogs/RelinkDialog';
 import RemoveDatasetsDialog from '@/components/ui/Dialogs/RemoveDatasetsDialog';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
@@ -31,7 +30,9 @@ export default function NGViews() {
   // Sources column is user-resizable via a drag handle in its header. Width
   // lives here (not in the column def) so a re-render on drag actually
   // re-flows the CSS grid template.
-  const [relinkTarget, setRelinkTarget] = useState<RelinkTarget | null>(null);
+  const [brokenTarget, setBrokenTarget] = useState<BrokenSourceTarget | null>(
+    null
+  );
   const [removeSourceTarget, setRemoveSourceTarget] =
     useState<RemoveSourceTarget | null>(null);
   const [removeDatasetsItem, setRemoveDatasetsItem] = useState<
@@ -83,21 +84,20 @@ export default function NGViews() {
     }
   };
 
+  const removeSource = async (target: RemoveSourceTarget) => {
+    await removeViewSourcesMutation.mutateAsync({
+      short_key: target.view.short_key,
+      sources: [{ fsp_name: target.fsp_name, path: target.path }]
+    });
+    toast.success('Dataset removed from View');
+  };
+
   const handleConfirmRemoveSource = async () => {
     if (!removeSourceTarget) {
       return;
     }
     try {
-      await removeViewSourcesMutation.mutateAsync({
-        short_key: removeSourceTarget.view.short_key,
-        sources: [
-          {
-            fsp_name: removeSourceTarget.fsp_name,
-            path: removeSourceTarget.path
-          }
-        ]
-      });
-      toast.success('Dataset removed from View');
+      await removeSource(removeSourceTarget);
       setRemoveSourceTarget(null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Remove failed');
@@ -109,7 +109,7 @@ export default function NGViews() {
     setDeleteItem,
     sourcesColWidth,
     handleSourcesResize,
-    setRelinkTarget,
+    setBrokenTarget,
     setRemoveSourceTarget,
     setRemoveDatasetsItem
   );
@@ -246,10 +246,12 @@ export default function NGViews() {
         />
       ) : null}
 
-      {relinkTarget ? (
+      {brokenTarget ? (
         <RelinkDialog
-          onClose={() => setRelinkTarget(null)}
-          target={relinkTarget}
+          canRelink={brokenTarget.relinkable}
+          onClose={() => setBrokenTarget(null)}
+          onRemove={() => removeSource(brokenTarget)}
+          target={brokenTarget}
         />
       ) : null}
     </>

@@ -23,8 +23,10 @@ import {
   ActionsCell
 } from '@/components/ui/Table/ngViewsColumns';
 import type { View } from '@/queries/viewQueries';
-import type { RemoveSourceTarget } from '@/components/ui/Table/ngViewsColumns';
-import type { RelinkTarget } from '@/components/ui/Dialogs/RelinkDialog';
+import type {
+  BrokenSourceTarget,
+  RemoveSourceTarget
+} from '@/components/ui/Table/ngViewsColumns';
 import { formatDateString } from '@/utils';
 
 vi.mock('@/contexts/PreferencesContext', () => ({
@@ -85,17 +87,22 @@ const view: View = {
   ]
 };
 
+// The CardActionsMenu trigger: the only unlabelled button (the broken
+// source's button is labelled).
+const menuTrigger = () =>
+  screen.getAllByRole('button').filter(b => !b.hasAttribute('aria-label'))[0];
+
 function TableProbe({
   onRename,
   onDelete,
-  onRelink = () => {},
+  onBrokenSource = () => {},
   onRemoveSource = () => {},
   onRemoveDatasets = () => {},
   view: viewProp = view
 }: {
   onRename: (v: View) => void;
   onDelete: (v: View) => void;
-  onRelink?: (t: RelinkTarget) => void;
+  onBrokenSource?: (t: BrokenSourceTarget) => void;
   onRemoveSource?: (t: RemoveSourceTarget) => void;
   onRemoveDatasets?: (v: View) => void;
   view?: View;
@@ -107,7 +114,7 @@ function TableProbe({
     onDelete,
     320,
     () => {},
-    onRelink,
+    onBrokenSource,
     onRemoveSource,
     onRemoveDatasets
   );
@@ -185,9 +192,13 @@ describe('useNGViewsColumns', () => {
       'href',
       expect.stringContaining('two.zarr')
     );
-    expect(screen.getByLabelText('Data link missing')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^Fix broken source / })
+    ).toBeInTheDocument();
     // the intact source has no broken icon
-    expect(screen.getAllByLabelText('Data link missing')).toHaveLength(1);
+    expect(
+      screen.getAllByRole('button', { name: /^Fix broken source / })
+    ).toHaveLength(1);
   });
 
   it('merges broken state across layers sharing one source', () => {
@@ -230,7 +241,9 @@ describe('useNGViewsColumns', () => {
     expect(screen.getAllByRole('link', { name: /shared\.zarr/ })).toHaveLength(
       1
     );
-    expect(screen.getByLabelText('Data link missing')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^Fix broken source / })
+    ).toBeInTheDocument();
   });
 
   it('shows an em dash and no links when no layer has a resolvable source', () => {
@@ -260,7 +273,7 @@ describe('useNGViewsColumns', () => {
       screen.queryByRole('link', { name: /zarr/ })
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByLabelText('Data link missing')
+      screen.queryByRole('button', { name: /^Fix broken source / })
     ).not.toBeInTheDocument();
   });
 
@@ -291,7 +304,9 @@ describe('useNGViewsColumns', () => {
     expect(screen.queryByText('—')).not.toBeInTheDocument();
     const link = screen.getByText('/nrs');
     expect(link.closest('a')).toHaveAttribute('href', '/browse/nrs');
-    expect(screen.getByLabelText('Data link missing')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^Fix broken source / })
+    ).toBeInTheDocument();
   });
 
   it('lists an unsupported source with a remove button and excludes it from the dataset count', async () => {
@@ -326,7 +341,7 @@ describe('useNGViewsColumns', () => {
     expect(screen.getByText('1')).toBeInTheDocument(); // dataset count
     expect(screen.getByRole('link', { name: /plain-dir/ })).toBeInTheDocument();
     expect(
-      screen.queryByLabelText('Data link missing')
+      screen.queryByRole('button', { name: /^Fix broken source / })
     ).not.toBeInTheDocument();
 
     await userEvent.setup().click(
@@ -356,7 +371,7 @@ describe('useNGViewsColumns', () => {
         />
       </MemoryRouter>
     );
-    const trigger = screen.getByRole('button'); // the CardActionsMenu trigger
+    const trigger = menuTrigger();
 
     await user.click(trigger);
     await user.click(await screen.findByText('Rename'));
@@ -381,7 +396,7 @@ describe('useNGViewsColumns', () => {
         onRename={vi.fn()}
       />
     );
-    const trigger = screen.getByRole('button');
+    const trigger = menuTrigger();
 
     await user.click(trigger);
     await user.click(await screen.findByText('Open View'));
@@ -396,7 +411,7 @@ describe('useNGViewsColumns', () => {
         <TableProbe onDelete={vi.fn()} onRename={vi.fn()} />
       </MemoryRouter>
     );
-    const trigger = screen.getByRole('button');
+    const trigger = menuTrigger();
 
     await user.click(trigger);
     await user.click(await screen.findByText('Copy View link to share'));
@@ -409,12 +424,12 @@ describe('useNGViewsColumns', () => {
   });
 });
 
-function renderTable(v: View, onRelink = vi.fn()) {
+function renderTable(v: View, onBrokenSource = vi.fn()) {
   render(
     <MemoryRouter>
       <TableProbe
+        onBrokenSource={onBrokenSource}
         onDelete={vi.fn()}
-        onRelink={onRelink}
         onRename={vi.fn()}
         view={v}
       />
@@ -422,29 +437,32 @@ function renderTable(v: View, onRelink = vi.fn()) {
   );
 }
 
-describe('useNGViewsColumns relink', () => {
-  it('renders a Relink button for a relinkable broken source', async () => {
-    const onRelink = vi.fn();
+describe('useNGViewsColumns broken sources', () => {
+  it('opens the broken-source dialog for a relinkable source', async () => {
+    const onBrokenSource = vi.fn();
     const relinkable: View = {
       ...view,
       layers: [
         { ...view.layers[1], sharing_key: 'dead', url_prefix: 'two.zarr' }
       ]
     };
-    renderTable(relinkable, onRelink);
-    await userEvent
-      .setup()
-      .click(
-        screen.getByRole('button', { name: 'Relink /nrs/dudman/two.zarr' })
-      );
-    expect(onRelink).toHaveBeenCalledWith({
+    renderTable(relinkable, onBrokenSource);
+    await userEvent.setup().click(
+      screen.getByRole('button', {
+        name: 'Fix broken source /nrs/dudman/two.zarr'
+      })
+    );
+    expect(onBrokenSource).toHaveBeenCalledWith({
+      view: relinkable,
       fsp_name: 'nrs',
       path: 'dudman/two.zarr',
-      displayPath: '/nrs/dudman/two.zarr'
+      displayPath: '/nrs/dudman/two.zarr',
+      relinkable: true
     });
   });
 
-  it('treats a source as relinkable if any of its broken layers is', () => {
+  it('treats a source as relinkable if any of its broken layers is', async () => {
+    const onBrokenSource = vi.fn();
     const mixed: View = {
       ...view,
       layers: [
@@ -457,19 +475,27 @@ describe('useNGViewsColumns relink', () => {
         }
       ]
     };
-    renderTable(mixed);
-    expect(
-      screen.getByRole('button', { name: 'Relink /nrs/dudman/two.zarr' })
-    ).toBeInTheDocument();
+    renderTable(mixed, onBrokenSource);
+    await userEvent.setup().click(
+      screen.getByRole('button', {
+        name: 'Fix broken source /nrs/dudman/two.zarr'
+      })
+    );
+    expect(onBrokenSource).toHaveBeenCalledWith(
+      expect.objectContaining({ relinkable: true })
+    );
   });
 
-  it('keeps a plain icon for an unrecoverable broken source', () => {
-    renderTable(view); // view.layers[1]: broken, no key
-    expect(
-      screen.queryByRole('button', { name: /^Relink / })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getAllByLabelText("Can't relink — recreate this View").length
-    ).toBeGreaterThan(0);
+  it('still offers removal for an unrecoverable broken source', async () => {
+    const onBrokenSource = vi.fn();
+    renderTable(view, onBrokenSource); // view.layers[1]: broken, no key
+    await userEvent.setup().click(
+      screen.getByRole('button', {
+        name: 'Fix broken source /nrs/dudman/two.zarr'
+      })
+    );
+    expect(onBrokenSource).toHaveBeenCalledWith(
+      expect.objectContaining({ relinkable: false })
+    );
   });
 });
