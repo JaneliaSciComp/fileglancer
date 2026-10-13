@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 
-import { useCartContext } from '@/contexts/CartContext';
 import { useCartCheckout } from '@/hooks/useCartCheckout';
 import { isRelinkableLayer } from '@/queries/viewQueries';
 import {
@@ -15,30 +14,31 @@ import { datasetKey } from '@/utils/pathHandling';
 import type { CartItem } from '@/contexts/CartContext';
 import type { NeuroglancerBridge } from '@/hooks/useNeuroglancerViewer';
 import type { ViewLayer } from '@/queries/viewQueries';
-import type { NgLayer } from '@/utils/viewCheckout';
+import type { NgLayer, ResolvedCheckoutDataset } from '@/utils/viewCheckout';
 
 /**
- * Adds cart datasets as layers to the View open in the embedded viewer. The
+ * Adds datasets as layers to the View open in the embedded viewer. The
  * change stays local until the owner Saves; the server then records the new
  * view_layers. Datasets that won't load as a layer go to `onAddSources`, so
- * Save records them as unsupported sources. Every added dataset leaves the
- * cart.
+ * Save records them as unsupported sources. `onAdded` gets every resolved
+ * dataset, so their layers can be told apart before they are saved.
  */
 export function useAddToView(
   bridge: NeuroglancerBridge,
   {
     viewLayers,
     onEdited,
-    onAddSources
+    onAddSources,
+    onAdded
   }: {
     /** The View's saved layer rows, to find its broken sources. */
     readonly viewLayers: ViewLayer[];
     readonly onEdited: () => void;
     readonly onAddSources: (sharingKeys: string[]) => void;
+    readonly onAdded: (datasets: ResolvedCheckoutDataset[]) => void;
   }
 ): (items: CartItem[]) => Promise<void> {
   const { resolveCartDatasets } = useCartCheckout();
-  const { removeManyFromCart } = useCartContext();
   // The sidebar unmounts when NG reloads (the bridge leaves `ready`). An add
   // still in flight then holds the dead viewer, so it must stop.
   const mounted = useRef(true);
@@ -95,6 +95,7 @@ export function useAddToView(
           relinked = true;
         }
       }
+      onAdded(resolved);
       if (added.length > 0 || relinked) {
         bridge.setState(appendLayers(current, added));
         onEdited();
@@ -103,15 +104,6 @@ export function useAddToView(
         onAddSources(unsupportedKeys);
       }
 
-      // Remove the raw cart items, not `resolved`: checkout drops a base
-      // entry shadowed by channel entries, and it must leave the cart too.
-      try {
-        await removeManyFromCart(
-          items.map(i => ({ path: i.path, channel: i.channel }))
-        );
-      } catch {
-        toast.error('Added to the View, but the cart could not be updated');
-      }
       const count = new Set(
         resolved.map(ds => datasetKey(ds.fsp_name, ds.path))
       ).size;
@@ -122,13 +114,6 @@ export function useAddToView(
         `Added ${count} dataset${count === 1 ? '' : 's'}. Save to keep ${count === 1 ? 'it' : 'them'}.${skipped}`
       );
     },
-    [
-      resolveCartDatasets,
-      removeManyFromCart,
-      bridge,
-      viewLayers,
-      onEdited,
-      onAddSources
-    ]
+    [resolveCartDatasets, bridge, viewLayers, onEdited, onAddSources, onAdded]
   );
 }

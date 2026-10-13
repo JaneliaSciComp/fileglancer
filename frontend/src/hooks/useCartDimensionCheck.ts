@@ -40,8 +40,6 @@ function uniqueDatasets(items: DatasetRef[]) {
  * of `viewSources` (the open View's datasets, in layer order) that has a
  * signature, else the first cart dataset. A View's dimensions come from its
  * first dataset at checkout.
- * ponytail: viewSources are the saved rows, so a first layer removed but not
- * yet saved still sets the reference.
  */
 export function useCartDimensionCheck(
   items: CartItem[],

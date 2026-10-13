@@ -89,21 +89,26 @@ vi.mock('@/components/ui/Views/ViewBrokenBanner', () => ({
 vi.mock('@/components/ui/Views/ViewerSidebar', () => ({
   default: ({
     bridge,
-    onEdited,
-    onAddSources
+    editState
   }: {
     bridge: { setState: (s: Record<string, unknown>) => void };
-    onEdited: () => void;
-    onAddSources: (keys: string[]) => void;
+    editState: {
+      markEdited: () => void;
+      addSources: (keys: string[]) => void;
+      removeSource: (key: string) => void;
+    };
   }) => (
-    <aside aria-label="Layer Cart sidebar">
-      <button onClick={() => onAddSources(['plainKey'])} type="button">
+    <aside aria-label="View data sidebar">
+      <button onClick={() => editState.addSources(['plainKey'])} type="button">
         fake add unsupported
+      </button>
+      <button onClick={() => editState.removeSource('savedKey')} type="button">
+        fake remove unsupported
       </button>
       <button
         onClick={() => {
           bridge.setState({ layers: [{ name: 'L0' }, { name: 'added' }] });
-          onEdited();
+          editState.markEdited();
         }}
         type="button"
       >
@@ -628,7 +633,7 @@ describe('NeuroglancerView', () => {
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
     await userEvent.click(toggle);
     expect(
-      screen.getByRole('complementary', { name: 'Layer Cart sidebar' })
+      screen.getByRole('complementary', { name: 'View data sidebar' })
     ).toBeInTheDocument();
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(toggle);
@@ -670,6 +675,22 @@ describe('NeuroglancerView', () => {
       expect.objectContaining({
         short_key: 'sk1',
         unsupported_sharing_keys: ['plainKey']
+      })
+    );
+  });
+
+  it('drops a removed unsupported source on Save', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    await userEvent.click(screen.getByRole('button', { name: 'Add data' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'fake remove unsupported' })
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    expect(mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        short_key: 'sk1',
+        removed_unsupported_sharing_keys: ['savedKey']
       })
     );
   });

@@ -186,7 +186,9 @@ export function useCreateViewFlow() {
               Some layers have dimensions that differ from the first layer.
             </Typography>
             <Typography className="text-foreground">
-              Expand each dataset in the Layer Cart to see its full dimensions.
+              {creating
+                ? 'Expand each dataset in the Layer Cart to see its full dimensions.'
+                : "After adding, see each dataset's full dimensions in the Sources tab."}
             </Typography>
           </div>
         ) : null}

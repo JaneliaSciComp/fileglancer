@@ -168,4 +168,24 @@ describe('useViewEditState', () => {
     expect(result.current.pendingSources).toEqual([]);
     expect(result.current.dirty).toBe(false);
   });
+
+  it('removing a pending source drops it; removing a saved one waits for Save', () => {
+    const fake = makeFakeBridge({ layers: [] });
+    const { result } = renderHook(() => useViewEditState(fake.bridge));
+    act(() => result.current.addSources(['new']));
+    act(() => result.current.removeSource('new'));
+    expect(result.current.pendingSources).toEqual([]);
+    expect(result.current.removedSources).toEqual([]);
+    expect(result.current.dirty).toBe(false);
+
+    act(() => result.current.removeSource('saved'));
+    expect(result.current.removedSources).toEqual(['saved']);
+    expect(result.current.dirty).toBe(true);
+    act(() => result.current.discard());
+    expect(result.current.removedSources).toEqual([]);
+    act(() => result.current.removeSource('saved'));
+    act(() => result.current.markSaved(fake.bridge.getState()));
+    expect(result.current.removedSources).toEqual([]);
+    expect(result.current.dirty).toBe(false);
+  });
 });

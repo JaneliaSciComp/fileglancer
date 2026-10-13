@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { NeuroglancerBridge } from '@/hooks/useNeuroglancerViewer';
+import type { ResolvedCheckoutDataset } from '@/utils/viewCheckout';
 
 type NgState = Record<string, unknown>;
 
@@ -9,6 +10,13 @@ export type ViewEditState = {
   /** Data Links of added datasets with no NG layer, recorded on Save. */
   pendingSources: string[];
   addSources: (sharingKeys: string[]) => void;
+  /** Data Links of saved unsupported sources to drop, sent on Save. */
+  removedSources: string[];
+  /** Drops an unsupported source: a pending one now, a saved one on Save. */
+  removeSource: (sharingKey: string) => void;
+  /** Datasets added this session, to map their layers before they're saved. */
+  added: ResolvedCheckoutDataset[];
+  recordAdded: (datasets: ResolvedCheckoutDataset[]) => void;
   discard: () => void;
   markSaved: (sent: NgState) => void;
   markEdited: () => void;
@@ -37,6 +45,8 @@ export function useViewEditState(
   const { status, getState, setState, subscribe, onInteraction } = bridge;
   const [dirty, setDirtyState] = useState(false);
   const [pendingSources, setPendingSources] = useState<string[]>([]);
+  const [removedSources, setRemovedSources] = useState<string[]>([]);
+  const [added, setAdded] = useState<ResolvedCheckoutDataset[]>([]);
   const dirtyRef = useRef(false);
   const baseline = useRef('');
   const interacted = useRef(false);
@@ -56,6 +66,7 @@ export function useViewEditState(
     (sent: NgState) => {
       baseline.current = JSON.stringify(sent);
       setPendingSources([]);
+      setRemovedSources([]);
       setDirty(JSON.stringify(getState()) !== baseline.current);
     },
     [getState, setDirty]
@@ -73,8 +84,26 @@ export function useViewEditState(
     setPendingSources(prev => [...new Set([...prev, ...sharingKeys])]);
   }, []);
 
+  const removeSource = useCallback(
+    (sharingKey: string) => {
+      if (pendingSources.includes(sharingKey)) {
+        setPendingSources(prev => prev.filter(k => k !== sharingKey));
+      } else {
+        setRemovedSources(prev => [...new Set([...prev, sharingKey])]);
+      }
+    },
+    [pendingSources]
+  );
+
+  const recordAdded = useCallback(
+    (datasets: ResolvedCheckoutDataset[]) =>
+      setAdded(prev => [...prev, ...datasets]),
+    []
+  );
+
   const discard = useCallback(() => {
     setPendingSources([]);
+    setRemovedSources([]);
     setState(JSON.parse(baseline.current) as NgState);
     rebaseline();
   }, [setState, rebaseline]);
@@ -122,9 +151,13 @@ export function useViewEditState(
   }, [status, getState, subscribe, onInteraction, rebaseline, setDirty]);
 
   return {
-    dirty: dirty || pendingSources.length > 0,
+    dirty: dirty || pendingSources.length > 0 || removedSources.length > 0,
     pendingSources,
     addSources,
+    removedSources,
+    removeSource,
+    added,
+    recordAdded,
     discard,
     markSaved,
     markEdited,

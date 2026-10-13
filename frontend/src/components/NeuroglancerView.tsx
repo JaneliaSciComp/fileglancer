@@ -238,6 +238,9 @@ export default function NeuroglancerView() {
         ng_state: sent,
         ...(editState.pendingSources.length > 0 && {
           unsupported_sharing_keys: editState.pendingSources
+        }),
+        ...(editState.removedSources.length > 0 && {
+          removed_unsupported_sharing_keys: editState.removedSources
         })
       });
       editState.markSaved(sent);
@@ -412,9 +415,8 @@ export default function NeuroglancerView() {
               >
                 <ViewerSidebar
                   bridge={bridge}
-                  onAddSources={editState.addSources}
+                  editState={editState}
                   onClose={() => setSidebarOpen(false)}
-                  onEdited={editState.markEdited}
                   viewLayers={ownedView?.layers ?? []}
                 />
               </Panel>
