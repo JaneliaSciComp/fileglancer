@@ -6,7 +6,6 @@ import type { ColumnDef } from '@tanstack/react-table';
 import toast from 'react-hot-toast';
 
 import { isRelinkableLayer, type View } from '@/queries/viewQueries';
-import type { RelinkTarget } from '@/components/ui/Dialogs/RelinkDialog';
 import {
   downloadTextFile,
   formatDateString,
@@ -91,6 +90,9 @@ export type RemoveSourceTarget = {
   path: string;
   displayPath: string;
 };
+
+/** A source whose Data Link was deleted: relink it (if possible) or remove it. */
+export type BrokenSourceTarget = RemoveSourceTarget & { relinkable: boolean };
 
 type ViewRowActionProps = {
   item: View;
@@ -234,7 +236,7 @@ export function useNGViewsColumns(
   onDelete: (item: View) => void,
   sourcesColWidth: number | null,
   onSourcesResize: (next: number) => void,
-  onRelink: (target: RelinkTarget) => void,
+  onBrokenSource: (target: BrokenSourceTarget) => void,
   onRemoveSource: (target: RemoveSourceTarget) => void,
   onRemoveDatasets: (item: View) => void
 ): ColumnDef<View>[] {
@@ -329,17 +331,25 @@ export function useNGViewsColumns(
                     className="flex items-center gap-1 min-w-0 h-6"
                     key={datasetKey(src.fsp_name, src.path)}
                   >
-                    {src.broken && src.relinkable ? (
-                      <FgTooltip label="Data link deleted — click to relink">
+                    {src.broken ? (
+                      <FgTooltip
+                        label={
+                          src.relinkable
+                            ? 'Data link deleted — click to relink or remove'
+                            : 'Data link deleted — click to remove'
+                        }
+                      >
                         <IconButton
-                          aria-label={`Relink ${fullPath}`}
+                          aria-label={`Fix broken source ${fullPath}`}
                           className="min-w-0 min-h-0 p-0.5"
                           onClick={e => {
                             e.stopPropagation();
-                            onRelink({
+                            onBrokenSource({
+                              view: row.original,
                               fsp_name: src.fsp_name,
                               path: src.path,
-                              displayPath: fullPath
+                              displayPath: fullPath,
+                              relinkable: src.relinkable
                             });
                           }}
                           size="sm"
@@ -347,15 +357,6 @@ export function useNGViewsColumns(
                         >
                           <FgIcon color="error" icon={MdLinkOff} size="sm" />
                         </IconButton>
-                      </FgTooltip>
-                    ) : src.broken ? (
-                      <FgTooltip label="Can't relink — recreate this View">
-                        <FgIcon
-                          color="error"
-                          icon={MdLinkOff}
-                          label="Data link missing"
-                          size="sm"
-                        />
                       </FgTooltip>
                     ) : src.unsupported ? (
                       <FgTooltip label="Will not load as a Neuroglancer layer — click to remove">
@@ -430,7 +431,7 @@ export function useNGViewsColumns(
     [
       onRename,
       onDelete,
-      onRelink,
+      onBrokenSource,
       onRemoveSource,
       onRemoveDatasets,
       sourcesColWidth,

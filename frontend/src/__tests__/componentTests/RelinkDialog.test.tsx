@@ -134,4 +134,43 @@ describe('RelinkDialog', () => {
     await new Promise(r => setTimeout(r, 200));
     expect(btn).toBeDisabled();
   });
+
+  it('removes the source from the View instead, when offered', async () => {
+    const onClose = vi.fn();
+    const onRemove = vi.fn().mockResolvedValue(undefined);
+    render(
+      <RelinkDialog onClose={onClose} onRemove={onRemove} target={target} />,
+      { initialEntries: ['/browse'] }
+    );
+    expect(
+      await screen.findByRole('button', { name: 'Create Data Link' })
+    ).toBeInTheDocument();
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Remove from View' }));
+    expect(onRemove).toHaveBeenCalled();
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it('offers only removal when the source cannot be relinked', async () => {
+    const onRemove = vi.fn().mockRejectedValue(new Error('gone'));
+    const onClose = vi.fn();
+    render(
+      <RelinkDialog
+        canRelink={false}
+        onClose={onClose}
+        onRemove={onRemove}
+        target={target}
+      />,
+      { initialEntries: ['/browse'] }
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Create Data Link' })
+    ).toBeNull();
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Remove from View' }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('gone'));
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });

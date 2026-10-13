@@ -23,17 +23,24 @@ type RelinkDialogProps = {
   readonly target: RelinkTarget | null;
   readonly onClose: () => void;
   readonly onRelinked?: () => void;
+  /** False for a source with no recorded Data Link: it can only be removed. */
+  readonly canRelink?: boolean;
+  /** Offers removing the source from the View instead. Resolves when done. */
+  readonly onRemove?: () => Promise<void>;
 };
 
 /**
  * Repair a broken source by pointing it at a Data Link for the same dataset.
  * Reuses the caller's existing link if they have one; otherwise creates one
- * (this dialog is the consent) — creation relinks server-side.
+ * (this dialog is the consent) — creation relinks server-side. With
+ * `onRemove`, the source can be removed from the View instead.
  */
 export default function RelinkDialog({
   target,
   onClose,
-  onRelinked
+  onRelinked,
+  canRelink = true,
+  onRemove
 }: RelinkDialogProps) {
   const { allProxiedPathsQuery, createProxiedPathMutation } =
     useProxiedPathContext();
@@ -49,6 +56,18 @@ export default function RelinkDialog({
   const existing = allProxiedPathsQuery.data?.find(
     p => p.fsp_name === target.fsp_name && normalizeFspRootPath(p.path) === path
   );
+
+  const remove = async () => {
+    setPending(true);
+    try {
+      await onRemove?.();
+      onClose();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Remove failed');
+    } finally {
+      setPending(false);
+    }
+  };
 
   const run = async () => {
     setPending(true);
@@ -84,27 +103,41 @@ export default function RelinkDialog({
     <FgDialog onClose={onClose} open>
       <div className="flex flex-col gap-3 my-4">
         <Typography className="text-foreground font-semibold">
-          Relink broken source
+          {onRemove ? 'Broken source' : 'Relink broken source'}
         </Typography>
         <Typography className="text-foreground text-sm">
-          This data source's Data Link was deleted. Create a new data link to
-          restore the data to this View and any other Views containing this
-          source.
+          {canRelink
+            ? `This data source's Data Link was deleted. Create a new data link to restore the data to this View and any other Views containing this source${onRemove ? ', or remove the source from this View' : ''}.`
+            : "This data source's Data Link was deleted, and this View didn't record which link it used, so it can't be relinked. Remove the source from this View, or recreate the View."}
         </Typography>
         <Typography className="text-foreground text-sm font-mono break-all bg-surface/30 p-2 rounded">
           {target.displayPath}
         </Typography>
         <div className="flex gap-4">
-          <FgButton
-            disabled={
-              pending ||
-              !allProxiedPathsQuery.isSuccess ||
-              !zonesAndFspQuery.isSuccess
-            }
-            onClick={() => void run()}
-          >
-            {existing ? 'Relink using existing Data Link' : 'Create Data Link'}
-          </FgButton>
+          {canRelink ? (
+            <FgButton
+              disabled={
+                pending ||
+                !allProxiedPathsQuery.isSuccess ||
+                !zonesAndFspQuery.isSuccess
+              }
+              onClick={() => void run()}
+            >
+              {existing
+                ? 'Relink using existing Data Link'
+                : 'Create Data Link'}
+            </FgButton>
+          ) : null}
+          {onRemove ? (
+            <FgButton
+              color="error"
+              disabled={pending}
+              onClick={() => void remove()}
+              variant={canRelink ? 'ghost' : 'solid'}
+            >
+              Remove from View
+            </FgButton>
+          ) : null}
           <FgButton onClick={onClose} variant="ghost">
             Cancel
           </FgButton>
