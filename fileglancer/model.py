@@ -251,6 +251,9 @@ class ViewUpdateRequest(BaseModel):
         default=None,
         description="Data Links of added datasets that can't load as Neuroglancer layers; "
                     "recorded as unsupported sources")
+    removed_unsupported_sharing_keys: Optional[List[str]] = Field(
+        default=None,
+        description="Data Links whose unsupported source rows to drop from the View")
 
 
 class ViewSummary(BaseModel):

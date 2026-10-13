@@ -2442,6 +2442,22 @@ def test_put_view_rejects_unknown_unsupported_key(test_client):
     assert "Unknown data link sharing key: NOPE" in resp.text
 
 
+def test_put_view_removes_unsupported_sources(test_client, temp_dir):
+    keep = _make_proxied_path(test_client, temp_dir, "uns1")
+    drop = _make_proxied_path(test_client, temp_dir, "uns2")
+    view = _view_on_link(test_client, keep, "uns")
+    url = f"/api/neuroglancer/views/{view['short_key']}"
+    resp = test_client.put(url, json={"unsupported_sharing_keys": [keep, drop]})
+    assert [l["sharing_key"] for l in resp.json()["layers"]] == [keep, keep, drop]
+
+    resp = test_client.put(url, json={"ng_state": view["ng_state"],
+                                      "removed_unsupported_sharing_keys": [drop]})
+    assert resp.status_code == 200, resp.text
+    layers = resp.json()["layers"]
+    assert [(l["sharing_key"], l["layer_index"]) for l in layers] == [(keep, 0), (keep, 1)]
+    assert layers[1]["opts"] == {"unsupported": True}
+
+
 def test_remove_view_sources(test_client, temp_dir):
     sk = _make_proxied_path(test_client, temp_dir, "rm1")
     view = _view_on_link(test_client, sk, "rm")

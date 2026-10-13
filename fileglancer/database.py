@@ -1087,12 +1087,14 @@ def update_view(
     ng_state: Optional[Dict] = None,
     proxy_url: Optional[str] = None,
     unsupported: Optional[List[ProxiedPathDB]] = None,
+    removed_unsupported: Optional[List[str]] = None,
 ) -> ViewDB:
     """Update a View's name and/or state. Authorization is the caller's job
     (server._can_edit_view). A new ng_state rebuilds view_layers from its
     sources when the Data Link base URL is known. `unsupported` Data Links
     (datasets with no Neuroglancer layer) are recorded as unsupported rows
-    past the real layers, once each."""
+    past the real layers, once each. Unsupported rows whose Data Link is in
+    `removed_unsupported` are dropped first."""
     if name is not None:
         view.name = name
     if ng_state is not None:
@@ -1100,6 +1102,13 @@ def update_view(
         view.ng_state = {k: v for k, v in ng_state.items() if k != 'title'}
         if proxy_url:
             reconcile_view_layers(session, view, proxy_url)
+    if removed_unsupported:
+        drop = set(removed_unsupported)
+        for l in [l for l in view.layers
+                  if (l.opts or {}).get('unsupported') and l.sharing_key in drop]:
+            view.layers.remove(l)  # delete-orphan cascade removes the row
+        for i, l in enumerate(sorted(view.layers, key=lambda l: l.layer_index)):
+            l.layer_index = i
     listed = {l.sharing_key for l in view.layers if (l.opts or {}).get('unsupported')}
     next_index = max((l.layer_index for l in view.layers), default=-1) + 1
     for pp in unsupported or []:

@@ -1661,7 +1661,8 @@ def create_app(settings):
                 unsupported.append(pp)
             view = db.update_view(session, view, name=payload.name,
                                   ng_state=payload.ng_state, proxy_url=_proxy_url(settings),
-                                  unsupported=unsupported)
+                                  unsupported=unsupported,
+                                  removed_unsupported=payload.removed_unsupported_sharing_keys)
             return View.model_validate(view)
 
     @app.post("/api/neuroglancer/views/{short_key}/remove-sources", response_model=View,
