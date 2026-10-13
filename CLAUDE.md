@@ -182,18 +182,18 @@ Key settings:
 
 Fileglancer uses a manifest-based viewer configuration system. Each viewer is defined by a **capability manifest** (a YAML file describing the viewer's name, URL template, and capabilities). The config file lists manifest URLs and optional overrides.
 
-- **Configuration file**: `frontend/src/config/viewers.config.yaml` -- lists viewers by `manifest_url` with optional `instance_template_url` and `label` overrides
+- **Default config**: `frontend/src/config/viewers.config.yaml` (bundled at build time) -- lists viewers by `manifest_url` with optional `instance_template_url` and `label` overrides
 - **Manifest files**: Loaded from URLs
 - **Compatibility**: Handled by the `@bioimagetools/capability-manifest` library, which checks dataset metadata against manifest capabilities at runtime
 - **Documentation**: See `docs/ViewersConfiguration.md`
 
 To customize viewers:
 
-1. Copy `frontend/src/config/viewers.config.yaml` to `frontend/viewers.config.yaml`
-2. Edit `frontend/viewers.config.yaml` (add/remove `manifest_url` entries, override URLs or labels)
-3. Rebuild application: `pixi run node-build`
+1. Copy `frontend/src/config/viewers.config.yaml` to `viewers.config.yaml` at the repo root (gitignored)
+2. Edit the copy (add/remove `manifest_url` entries, override URLs or labels)
+3. Set `viewers_config: /absolute/path/to/copy` in `config.yaml` (or `FGC_VIEWERS_CONFIG`) and restart the server
 
-`frontend/viewers.config.yaml` is gitignored so customizations do not conflict with upstream updates. When it exists, it takes precedence over the committed default at `frontend/src/config/viewers.config.yaml`. The config file is bundled at build time.
+The server returns the runtime config from `GET /api/viewers-config`, and the frontend falls back to the bundled default only when none is set. Don't add a build-time override: anything Vite bundles ships in the PyPI build.
 
 ## Pixi Environments
 
