@@ -183,6 +183,22 @@ describe('useCreateViewFlow', () => {
     await waitFor(() => expect(add).toHaveBeenCalledWith(datasets));
   });
 
+  it('shows Data Link consent and the mismatch warning together', async () => {
+    automatic = false;
+    const add = vi.fn().mockResolvedValue(undefined);
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+    act(() => {
+      apiRef.current!.startAddToView(datasets, true, add);
+    });
+    expect(
+      await screen.findByText(/this will create 1 data link\./i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/differ from the first layer/i)
+    ).toBeInTheDocument();
+  });
+
   it('keeps the dialog open and shows the error when adding fails', async () => {
     automatic = false;
     const add = vi.fn().mockRejectedValue(new Error('link failed'));
