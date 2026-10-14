@@ -593,7 +593,11 @@ class AppEntryPoint(BaseModel):
             "work behind the proxy at all, e.g. it pins an OAuth callback to a "
             "fixed host and port. Users then reach it at the direct "
             "http://host:port URL, with no transport encryption on any hop, so "
-            "nothing sensitive should be sent to a service that opts out."
+            "nothing sensitive should be sent to a service that opts out. When "
+            "the proxy is used and the server configures its address, the job "
+            "receives it as $FG_SERVICE_PROXY_ADDRESS (an IP, CIDR network, or "
+            "comma-separated list), so the service can accept connections from "
+            "the proxy only; it is unset otherwise."
         ),
         default=True,
     )

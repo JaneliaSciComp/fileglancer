@@ -59,6 +59,12 @@ class AppsSettings(BaseModel):
     # GET /api/apps/resolve. Empty (the default) publishes the service's own
     # http://host:port URL unchanged.
     service_proxy_domain: str = ""
+    # The address the reverse proxy connects from, as seen by the compute
+    # nodes: an IP address, a CIDR network, or a comma-separated list of them.
+    # It is exported to proxied service jobs as FG_SERVICE_PROXY_ADDRESS so a
+    # service can refuse connections from anywhere else. Only used when
+    # service_proxy_domain is set; empty (the default) exports nothing.
+    service_proxy_address: str = ""
     # Restricts which hosts the service proxy will dial. When set, a service's
     # published upstream hostname must sit inside this DNS zone, e.g.
     # "nodes.example.org" to allow only cluster nodes. Matching is on whole DNS

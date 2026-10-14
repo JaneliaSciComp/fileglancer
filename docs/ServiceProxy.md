@@ -32,9 +32,32 @@ apps:
   service_proxy_domain: "services.example.org"
 ```
 
+Optionally set `apps.service_proxy_address` to the address the reverse proxy connects from, as the compute nodes see it (an IP, a CIDR network, or a comma-separated list). Proxied service jobs then receive it as `FG_SERVICE_PROXY_ADDRESS`, so a service can accept connections from the proxy only. It is not exported when the proxy is disabled, when the entry point sets `service_proxy: false`, or when the address is empty.
+
 Leave `service_proxy_domain` empty to disable; the direct `http://<node>:<port>` URL is then published unchanged.
 
 `session_secret_key` is required when the proxy domain is set, and the server refuses to start without it. An unset key is generated at random per process, so under `uvicorn --workers N` each worker would sign hostnames with a different key and most proxied requests would be refused. Rotating it invalidates live service URLs, on top of the session revocation rotation already causes.
+
+## Restricting a service to the proxy
+
+When `apps.service_proxy_address` is set, every proxied service job gets `FG_SERVICE_PROXY_ADDRESS` in its environment: the address the reverse proxy connects from, as the compute node sees it. It is an IP address, a CIDR network, or a comma-separated list of them, exactly as the administrator configured it.
+
+A service can use it to accept connections from the proxy only, so nothing else on the cluster network can reach it directly. The variable is set only when the proxy is in use for that job. It is absent when `service_proxy_domain` or `service_proxy_address` is empty, and when the entry point sets `service_proxy: false`. Test for that case and keep your normal behavior, since the service is then reached directly:
+
+```yaml
+runnables:
+  - id: serve
+    name: Serve
+    type: service
+    command: |
+      if [ -n "$FG_SERVICE_PROXY_ADDRESS" ]; then
+        exec my-server --port "$FG_SERVICE_PORT" --allow-from "$FG_SERVICE_PROXY_ADDRESS"
+      else
+        exec my-server --port "$FG_SERVICE_PORT"
+      fi
+```
+
+This narrows who can connect. It does not replace the service's own token (`FG_SERVICE_TOKEN`), and if proxy and users share a source address it adds nothing.
 
 ## Apps that opt out
 

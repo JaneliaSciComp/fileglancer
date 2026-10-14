@@ -203,6 +203,14 @@ session_cookie_secure: true
 #                               # resolving upstreams via /api/apps/resolve, and
 #                               # session_secret_key (which signs the hostname);
 #                               # see docs/ServiceProxy.md. Empty = direct URL.
+#   service_proxy_address: 10.1.2.3
+#                               # Address the reverse proxy connects from, as
+#                               # the compute nodes see it: an IP, a CIDR
+#                               # network, or a comma-separated list. Exported
+#                               # to proxied service jobs as
+#                               # FG_SERVICE_PROXY_ADDRESS so a service can
+#                               # accept connections from the proxy only.
+#                               # Needs service_proxy_domain. Empty = not set.
 #   service_proxy_upstream_zone: nodes.example.org
 #                               # DNS zone the proxy is allowed to dial, i.e.
 #                               # where your compute nodes live. A service
