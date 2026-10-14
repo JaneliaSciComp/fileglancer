@@ -5,6 +5,7 @@ import { HiOutlineTrash } from 'react-icons/hi';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import DatasetRow from '@/components/ui/Views/DatasetRow';
 import { useCartDimensionCheck } from '@/hooks/useCartDimensionCheck';
+import { useExpandAll } from '@/hooks/useExpandAll';
 import { datasetKey } from '@/utils/pathHandling';
 import type { CartItem } from '@/contexts/CartContext';
 import type { LiveSource } from '@/hooks/useViewSources';
@@ -27,6 +28,10 @@ export default function SourcesList({ sources, onRemove }: SourcesListProps) {
     [sources]
   );
   const { mismatchedKeys, kindByKey } = useCartDimensionCheck(datasets);
+  const { rowProps, toggle } = useExpandAll(
+    datasets.map(ds => datasetKey(ds.fsp_name, ds.path)),
+    'pt-2'
+  );
 
   if (sources.length === 0) {
     return (
@@ -38,11 +43,13 @@ export default function SourcesList({ sources, onRemove }: SourcesListProps) {
 
   return (
     <div className="flex flex-col">
+      {datasets.length > 0 ? toggle : null}
       {sources.map(source =>
         source.fsp_name !== null && source.path !== null ? (
           <DatasetRow
             fsp_name={source.fsp_name}
             key={source.key}
+            {...rowProps(datasetKey(source.fsp_name, source.path))}
             kind={
               kindByKey.get(datasetKey(source.fsp_name, source.path)) ??
               'loading'

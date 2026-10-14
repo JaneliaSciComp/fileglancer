@@ -14,6 +14,8 @@ interface CartDatasetRowProps {
   readonly items: CartItem[];
   readonly mismatch?: boolean;
   readonly kind: DatasetKind | 'loading';
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 }
 
 /** A cart dataset: removable, with its channels pickable as layers. */
@@ -23,7 +25,9 @@ export default function CartDatasetRow({
   label,
   items,
   mismatch,
-  kind
+  kind,
+  open,
+  onOpenChange
 }: CartDatasetRowProps) {
   const { addToCart, removeFromCart, removeManyFromCart } = useCartContext();
 
@@ -69,7 +73,9 @@ export default function CartDatasetRow({
       kind={kind}
       label={label}
       mismatch={mismatch}
+      onOpenChange={onOpenChange}
       onRemove={() => void handleRemoveDataset()}
+      open={open}
       path={path}
       renderChannels={channels => (
         <div className="flex flex-col gap-1">

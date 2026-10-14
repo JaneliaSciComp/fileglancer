@@ -8,6 +8,7 @@ import CreateViewButton from '@/components/ui/Views/CreateViewButton';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import { useCartContext } from '@/contexts/CartContext';
 import { useCartDimensionCheck } from '@/hooks/useCartDimensionCheck';
+import { useExpandAll } from '@/hooks/useExpandAll';
 import type { DatasetRef } from '@/hooks/useCartDimensionCheck';
 import { datasetKey } from '@/utils/pathHandling';
 import type { CartItem } from '@/contexts/CartContext';
@@ -63,6 +64,9 @@ export default function CartList({ action, viewSources }: CartListProps) {
   const navigate = useNavigate();
 
   const cartGroups = useMemo(() => groupCartByDataset(cart), [cart]);
+  const { rowProps, toggle } = useExpandAll(
+    cartGroups.map(g => datasetKey(g.fsp_name, g.path))
+  );
   const { mismatchedKeys, hasMismatch, kindByKey } = useCartDimensionCheck(
     cart,
     viewSources
@@ -90,11 +94,13 @@ export default function CartList({ action, viewSources }: CartListProps) {
 
   return (
     <div className="flex flex-col gap-3">
+      {toggle}
       {cartGroups.map(group => (
         <CartDatasetRow
           fsp_name={group.fsp_name}
           items={group.items}
           key={datasetKey(group.fsp_name, group.path)}
+          {...rowProps(datasetKey(group.fsp_name, group.path))}
           kind={
             kindByKey.get(datasetKey(group.fsp_name, group.path)) ?? 'loading'
           }

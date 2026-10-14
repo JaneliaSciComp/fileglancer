@@ -120,7 +120,7 @@ export default function ViewerSidebar({
       </div>
       <div
         aria-label="Sources"
-        className={`min-h-0 flex-1 flex-col overflow-y-auto p-3 ${tab === 'sources' ? 'flex' : 'hidden'}`}
+        className={`min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3 ${tab === 'sources' ? 'flex' : 'hidden'}`}
         role="tabpanel"
       >
         <SourcesList onRemove={remove} sources={sources} />

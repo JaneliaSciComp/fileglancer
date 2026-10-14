@@ -197,7 +197,7 @@ export default function PropertiesDrawer({
           // when a file is selected behind the open cart" (design §7) is
           // deferred - it needs cross-panel selection wiring for no
           // functional gain.
-          <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-auto p-2">
+          <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-auto px-2 pb-2">
             <CartList />
           </div>
         ) : (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Collapse, IconButton, Typography } from '@material-tailwind/react';
@@ -35,6 +35,9 @@ interface DatasetRowProps {
   /** Whether the layer status reads "will load" (cart) or "loads" (View). */
   readonly tense?: 'future' | 'present';
   readonly onRemove: () => void;
+  /** Controls expansion from the list (expand all); uncontrolled if unset. */
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
   /** Shown under the axes once the dataset's channels have loaded. */
   readonly renderChannels?: (channels: string[]) => ReactNode;
 }
@@ -73,6 +76,8 @@ export default function DatasetRow({
   kind,
   tense = 'future',
   onRemove,
+  open,
+  onOpenChange,
   renderChannels
 }: DatasetRowProps) {
   const { pathPreference } = usePreferencesContext();
@@ -85,43 +90,36 @@ export default function DatasetRow({
   const displayPath = fsp
     ? getPreferredPathForDisplay(pathPreference, fsp, path)
     : path;
-  const [isOpen, setIsOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const isOpen = open ?? openState;
+  const setIsOpen = onOpenChange ?? setOpenState;
   const [channels, setChannels] = useState<string[] | undefined>(undefined);
-  const [loadingChannels, setLoadingChannels] = useState(false);
-  const [metadata, setMetadata] = useState<Metadata | null>(null);
-  const [loadingMeta, setLoadingMeta] = useState(false);
+  const [metadata, setMetadata] = useState<Metadata | null | undefined>(
+    undefined
+  );
 
-  const handleToggleOpen = async () => {
-    const nextOpen = !isOpen;
-    setIsOpen(nextOpen);
-    if (!nextOpen) {
+  // Fetch once, on first open (by this row or by expand all).
+  const requested = useRef(false);
+  useEffect(() => {
+    if (!isOpen || requested.current) {
       return;
     }
+    requested.current = true;
     const dataUrl = getFileURL(fsp_name, path);
-    if (channels === undefined && !loadingChannels) {
-      setLoadingChannels(true);
-      try {
-        setChannels(await getOmeZarrChannels(dataUrl));
-      } catch (error) {
+    getOmeZarrChannels(dataUrl)
+      .then(setChannels)
+      .catch(error => {
         toast.error(
           error instanceof Error ? error.message : 'Failed to load channels'
         );
         setChannels([]);
-      } finally {
-        setLoadingChannels(false);
-      }
-    }
-    if (metadata === null && !loadingMeta) {
-      setLoadingMeta(true);
-      try {
-        setMetadata(await getOmeZarrMetadata(dataUrl));
-      } catch {
-        // Metadata is a nice-to-have here; ignore fetch failures.
-      } finally {
-        setLoadingMeta(false);
-      }
-    }
-  };
+      });
+    getOmeZarrMetadata(dataUrl)
+      .then(setMetadata)
+      // Metadata is a nice-to-have here; ignore fetch failures.
+      .catch(() => setMetadata(null));
+  }, [isOpen, fsp_name, path]);
+  const loading = channels === undefined || metadata === undefined;
 
   // A plain (non-OME) Zarr array has no multiscale axes and no channels, so its
   // expanded body would otherwise be empty. Track whether there is anything to
@@ -134,7 +132,7 @@ export default function DatasetRow({
       <div className="flex items-center justify-between gap-2">
         <button
           className="flex items-center gap-2 flex-1 min-w-0 text-left"
-          onClick={() => void handleToggleOpen()}
+          onClick={() => setIsOpen(!isOpen)}
           type="button"
         >
           <FgIcon
@@ -181,7 +179,7 @@ export default function DatasetRow({
 
       <Collapse open={isOpen}>
         <div className="pl-6 flex flex-col gap-2 pt-2">
-          {loadingMeta || loadingChannels ? (
+          {loading ? (
             <Typography className="text-foreground/70 text-sm">
               Loading...
             </Typography>

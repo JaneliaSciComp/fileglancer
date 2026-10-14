@@ -33,12 +33,14 @@ vi.mock('@/contexts/CartContext', () => ({
 vi.mock('@/components/ui/Views/CartDatasetRow', () => ({
   default: ({
     label,
-    kind
+    kind,
+    open
   }: {
     label: string;
     kind: DatasetKind | 'loading';
+    open?: boolean;
   }) => (
-    <div data-testid="row">
+    <div data-open={String(!!open)} data-testid="row">
       {label}
       {kind === 'ome' || kind === 'array' ? (
         <span aria-label="Will load as a Neuroglancer layer" role="img" />
@@ -109,6 +111,20 @@ describe('CartList', () => {
     expect(
       screen.getByRole('button', { name: /clear cart/i })
     ).toBeInTheDocument();
+  });
+
+  it('expands and collapses every dataset at once', async () => {
+    cart = [cartA, cartB];
+    const user = userEvent.setup();
+    render(<CartList />);
+    const openStates = () =>
+      screen.getAllByTestId('row').map(r => r.dataset.open);
+
+    expect(openStates()).toEqual(['false', 'false']);
+    await user.click(screen.getByRole('button', { name: 'Expand all' }));
+    expect(openStates()).toEqual(['true', 'true']);
+    await user.click(screen.getByRole('button', { name: 'Collapse all' }));
+    expect(openStates()).toEqual(['false', 'false']);
   });
 
   it('navigates to the embedded viewer and clears the cart when a View is created', async () => {
