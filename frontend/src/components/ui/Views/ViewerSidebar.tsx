@@ -77,6 +77,19 @@ export default function ViewerSidebar({
     toast.success(`Removed ${source.label}. Save to keep the change.`);
   };
 
+  // Archived layers stay in the state, so checking one again restores it
+  // with its settings.
+  const toggleLayer = (layerName: string, shown: boolean) => {
+    const state = bridge.getState() as NgState;
+    bridge.setState({
+      ...state,
+      layers: (state.layers ?? []).map(l =>
+        l.name === layerName ? { ...l, archived: !shown } : l
+      )
+    });
+    markEdited();
+  };
+
   // Both tabs stay mounted (MT's Tabs.Panel unmounts inactive panels) so
   // switching keeps the browser's folder and checks.
   return (
@@ -123,7 +136,11 @@ export default function ViewerSidebar({
         className={`min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3 ${tab === 'sources' ? 'flex' : 'hidden'}`}
         role="tabpanel"
       >
-        <SourcesList onRemove={remove} sources={sources} />
+        <SourcesList
+          onRemove={remove}
+          onToggleLayer={toggleLayer}
+          sources={sources}
+        />
       </div>
     </aside>
   );

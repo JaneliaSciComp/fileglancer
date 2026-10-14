@@ -3,6 +3,7 @@ import { IconButton, Typography } from '@material-tailwind/react';
 import { HiOutlineTrash } from 'react-icons/hi';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
+import FgCheckbox from '@/components/designSystem/atoms/formElements/FgCheckbox';
 import DatasetRow from '@/components/ui/Views/DatasetRow';
 import { useCartDimensionCheck } from '@/hooks/useCartDimensionCheck';
 import { useExpandAll } from '@/hooks/useExpandAll';
@@ -13,10 +14,16 @@ import type { LiveSource } from '@/hooks/useViewSources';
 type SourcesListProps = {
   readonly sources: LiveSource[];
   readonly onRemove: (source: LiveSource) => void;
+  /** Archives a layer (shown false) or brings it back. */
+  readonly onToggleLayer: (layerName: string, shown: boolean) => void;
 };
 
 /** The datasets in the viewer, each with its metadata and a remove button. */
-export default function SourcesList({ sources, onRemove }: SourcesListProps) {
+export default function SourcesList({
+  sources,
+  onRemove,
+  onToggleLayer
+}: SourcesListProps) {
   // Probes are cached per dataset, so these share the Add data tab's.
   const datasets = useMemo<CartItem[]>(
     () =>
@@ -60,6 +67,26 @@ export default function SourcesList({ sources, onRemove }: SourcesListProps) {
             )}
             onRemove={() => onRemove(source)}
             path={source.path}
+            renderChannels={
+              // NG splits a multichannel dataset into a layer per channel.
+              source.layerNames.length > 1
+                ? () => (
+                    <div className="flex flex-col gap-1">
+                      <Typography className="text-foreground/70 text-xs font-semibold">
+                        Uncheck a channel to remove it; check it to add it back
+                      </Typography>
+                      {source.layerNames.map(name => (
+                        <FgCheckbox
+                          checked={!source.archivedNames.includes(name)}
+                          key={name}
+                          label={name}
+                          onChange={e => onToggleLayer(name, e.target.checked)}
+                        />
+                      ))}
+                    </div>
+                  )
+                : undefined
+            }
             tense="present"
           />
         ) : (

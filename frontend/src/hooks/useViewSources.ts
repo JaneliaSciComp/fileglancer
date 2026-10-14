@@ -27,6 +27,8 @@ export type LiveSource = {
   label: string;
   /** The Neuroglancer layers showing this dataset; none if unsupported. */
   layerNames: string[];
+  /** Those of layerNames that are archived: kept in the state, not shown. */
+  archivedNames: string[];
   sharing_key: string | null;
   /** Recorded as a source only: it can't load as a Neuroglancer layer. */
   unsupported: boolean;
@@ -60,6 +62,7 @@ export function groupLayersBySource(
         path: null,
         label: name,
         layerNames: [name],
+        archivedNames: layer.archived ? [name] : [],
         sharing_key: null,
         unsupported: false
       });
@@ -69,6 +72,9 @@ export function groupLayersBySource(
     const row = rows.get(key);
     if (row) {
       row.layerNames.push(name);
+      if (layer.archived) {
+        row.archivedNames.push(name);
+      }
     } else {
       rows.set(key, {
         key,
@@ -76,6 +82,7 @@ export function groupLayersBySource(
         path: ds.path,
         label: basename(ds.path),
         layerNames: [name],
+        archivedNames: layer.archived ? [name] : [],
         sharing_key: ds.sharing_key,
         unsupported: false
       });
@@ -90,6 +97,7 @@ export function groupLayersBySource(
         path: ds.path,
         label: basename(ds.path),
         layerNames: [],
+        archivedNames: [],
         sharing_key: ds.sharing_key,
         unsupported: true
       });
@@ -135,8 +143,11 @@ export function useViewSources(
     const read = () => {
       timer = undefined;
       const next = (getState().layers ?? []) as NgLayer[];
-      // Only names and sources decide the rows; skip camera-only changes.
-      const key = JSON.stringify(next.map(l => [l.name, l.source]));
+      // Only names, sources and archiving decide the rows; skip camera-only
+      // changes.
+      const key = JSON.stringify(
+        next.map(l => [l.name, l.source, !!l.archived])
+      );
       if (key !== shown) {
         shown = key;
         setLayers(next);

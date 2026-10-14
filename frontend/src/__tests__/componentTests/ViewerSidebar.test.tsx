@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactNode } from 'react';
 
 import { makeFakeBridge } from '@/__tests__/mocks/fakeNeuroglancer';
 import type { ViewEditState } from '@/hooks/useViewEditState';
@@ -19,10 +20,21 @@ vi.mock('@/hooks/useCartDimensionCheck', () => ({
 }));
 // The real row fetches metadata through app contexts.
 vi.mock('@/components/ui/Views/DatasetRow', () => ({
-  default: ({ label, onRemove }: { label: string; onRemove: () => void }) => (
-    <button onClick={onRemove} type="button">
-      Remove {label}
-    </button>
+  default: ({
+    label,
+    onRemove,
+    renderChannels
+  }: {
+    label: string;
+    onRemove: () => void;
+    renderChannels?: (channels: string[]) => ReactNode;
+  }) => (
+    <>
+      <button onClick={onRemove} type="button">
+        Remove {label}
+      </button>
+      {renderChannels?.([])}
+    </>
   )
 }));
 
@@ -119,6 +131,30 @@ describe('ViewerSidebar Sources tab', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Remove notes' }));
     expect(editState.removeSource).toHaveBeenCalledWith('K9');
     expect(fake.bridge.getState().layers).toHaveLength(3);
+  });
+
+  it("archives a channel's layer when unchecked and restores it when checked", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const fake = setup();
+    const gfp = () => screen.getByRole('checkbox', { name: 'a GFP' });
+    expect(gfp()).toBeChecked();
+    // A single-layer dataset has no channels to toggle.
+    expect(screen.queryByRole('checkbox', { name: 'b' })).toBeNull();
+
+    await userEvent.click(gfp());
+    expect(fake.bridge.getState().layers).toEqual([
+      layer('a DAPI', 'K1', 'a.zarr'),
+      { ...layer('a GFP', 'K1', 'a.zarr'), archived: true },
+      layer('b', 'K2', 'b.zarr')
+    ]);
+    expect(editState.markEdited).toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(gfp()).not.toBeChecked();
+
+    await userEvent.click(gfp());
+    expect(fake.bridge.getState().layers[1]).toMatchObject({ archived: false });
   });
 
   it('drops a dataset removed in Neuroglancer', () => {
