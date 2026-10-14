@@ -93,7 +93,16 @@ export default function CartList() {
           datasets={cart}
           defaultName="New View"
           label="Create View"
-          onCreated={view => navigate(`/view/${view.read_key}`)}
+          onCreated={view => {
+            // Fire-and-forget: the View already exists, so a cart-clear
+            // failure (a separate network mutation) must not block
+            // navigation. Worst case is a stale cart item, which is
+            // low-stakes and independently retryable via "Clear cart".
+            clearCart().catch(() => {
+              toast.error('View created, but the cart could not be cleared');
+            });
+            navigate(`/view/${view.read_key}`);
+          }}
         />
         <FgButton
           color="error"

@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import type { ReactNode } from 'react';
 
@@ -16,9 +17,19 @@ vi.mock('react-router', () => ({
     createElement('a', { href: to }, children)
 }));
 
+const { copyToClipboard } = vi.hoisted(() => ({
+  copyToClipboard: vi.fn()
+}));
+vi.mock('@/utils/copyText', () => ({ copyToClipboard }));
+
 import NeuroglancerView from '@/components/NeuroglancerView';
 
 describe('NeuroglancerView', () => {
+  beforeEach(() => {
+    copyToClipboard.mockReset();
+    copyToClipboard.mockResolvedValue({ success: true });
+  });
+
   it('shows a loading state while pending', () => {
     useViewStateByReadKey.mockReturnValue({
       data: undefined,
@@ -84,5 +95,22 @@ describe('NeuroglancerView', () => {
     });
     render(<NeuroglancerView />);
     expect(screen.getAllByText('Untitled View').length).toBeGreaterThan(0);
+  });
+
+  it('copies the canonical short link (not the external URL) when "Copy link" is clicked', async () => {
+    const user = userEvent.setup();
+    useViewStateByReadKey.mockReturnValue({
+      data: { title: 'My View', layers: [{ name: 'L0' }] },
+      isPending: false,
+      isError: false
+    });
+    render(<NeuroglancerView />);
+    await user.click(screen.getByRole('button', { name: /copy link/i }));
+    expect(copyToClipboard).toHaveBeenCalledWith(
+      `${window.location.origin}/view/rk1`
+    );
+    expect(copyToClipboard).not.toHaveBeenCalledWith(
+      expect.stringContaining('https://ng.example/')
+    );
   });
 });
