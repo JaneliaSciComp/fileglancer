@@ -15,7 +15,10 @@ import {
 
 import { useViewStateByReadKey } from '@/queries/viewQueries';
 import { useViewsContext } from '@/contexts/ViewsContext';
-import { useInternalNeuroglancerBaseUrl } from '@/hooks/useDefaultNeuroglancerBaseUrl';
+import {
+  useDefaultNeuroglancerBaseUrl,
+  useInternalNeuroglancerBaseUrl
+} from '@/hooks/useDefaultNeuroglancerBaseUrl';
 import { useCanEditView } from '@/hooks/useCanEditView';
 import { useNeuroglancerViewer } from '@/hooks/useNeuroglancerViewer';
 import { useViewEditState } from '@/hooks/useViewEditState';
@@ -93,6 +96,8 @@ export default function NeuroglancerView() {
   const { updateViewMutation } = useViewsContext();
   const { canEdit, view: ownedView } = useCanEditView(readKey);
   const baseUrl = useInternalNeuroglancerBaseUrl();
+  // The new tab isn't framed, so it can honor the Internal/External preference.
+  const preferredBaseUrl = useDefaultNeuroglancerBaseUrl();
   const containerRef = useRef<HTMLDivElement>(null);
   const [iframe, setIframe] = useState<HTMLIFrameElement | null>(null);
   const bridge = useNeuroglancerViewer(iframe);
@@ -357,7 +362,7 @@ export default function NeuroglancerView() {
               onClick={() =>
                 confirmUnsaved(state =>
                   window.open(
-                    constructNeuroglancerUrl(state, baseUrl),
+                    constructNeuroglancerUrl(state, preferredBaseUrl),
                     '_blank',
                     'noopener,noreferrer'
                   )

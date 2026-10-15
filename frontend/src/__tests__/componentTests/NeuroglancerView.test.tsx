@@ -35,7 +35,8 @@ const ngBase = vi.hoisted(() => ({
   current: 'https://ng.example/' as string | null
 }));
 vi.mock('@/hooks/useDefaultNeuroglancerBaseUrl', () => ({
-  useInternalNeuroglancerBaseUrl: () => ngBase.current
+  useInternalNeuroglancerBaseUrl: () => ngBase.current,
+  useDefaultNeuroglancerBaseUrl: () => 'https://ng-preferred.example/'
 }));
 const navigate = vi.hoisted(() => vi.fn());
 vi.mock('react-router', () => ({
@@ -608,6 +609,10 @@ describe('NeuroglancerView', () => {
         expect.stringContaining(encodeURIComponent(JSON.stringify(SAVED))),
         '_blank',
         'noopener,noreferrer'
+      );
+      // The new tab follows the Internal/External preference, not the iframe's URL.
+      expect(open.mock.calls[0][0]).toMatch(
+        /^https:\/\/ng-preferred\.example\//
       );
       await userEvent.click(
         screen.getByRole('button', { name: 'Copy link to share' })
