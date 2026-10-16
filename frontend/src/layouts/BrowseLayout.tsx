@@ -85,7 +85,12 @@ export const BrowsePageLayout = () => {
                 </PanelResizeHandle>
               </>
             ) : null}
-            <Panel id="main" order={2} style={{ overflowX: 'auto' }}>
+            {/* containerType lets the Toolbar size itself to this panel's visible width (cqw) */}
+            <Panel
+              id="main"
+              order={2}
+              style={{ overflowX: 'auto', containerType: 'inline-size' }}
+            >
               <Outlet context={outletContextValue} />
             </Panel>
             {showPropertiesDrawer ? (

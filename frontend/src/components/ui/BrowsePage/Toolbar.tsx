@@ -137,8 +137,10 @@ export default function Toolbar({
   };
 
   return (
-    <div className="flex flex-col min-w-full p-2 border-b border-surface">
-      <div className="flex justify-between items-center">
+    // Visible panel width (not the wider file table), but never narrower than its own buttons.
+    // Sticky so the right buttons stay in view when the table scrolls horizontally.
+    <div className="sticky left-0 flex flex-col w-[100cqw] min-w-fit p-2 border-b border-surface">
+      <div className="flex justify-between items-center gap-1">
         <ButtonGroup className="gap-1">
           {/* Show/hide favorites and zone browser sidebar */}
           <FgTooltip
