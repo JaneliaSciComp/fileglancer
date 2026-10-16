@@ -17,15 +17,11 @@ Each viewer is defined by a **capability manifest** hosted at a URL. The configu
 
 **Note:** No configuration is required to use the default viewers defined in `frontend/src/config/viewers.config.yaml`.
 
-1. Copy the default config: `cp frontend/src/config/viewers.config.yaml frontend/viewers.config.yaml`
-2. Edit `frontend/viewers.config.yaml` to customize viewers
-3. Rebuild the application: `pixi run node-build`
+To customize viewers, keep your own `viewers.config.yaml` anywhere outside the source tree and point Fileglancer at it at runtime. No rebuild is required.
 
-## Runtime Configuration (System Deployments)
-
-For deployments where Fileglancer is installed from PyPI and the frontend is pre-built, you can override the viewers configuration at runtime without rebuilding.
-
-Set the `FGC_VIEWERS_CONFIG` environment variable (or `viewers_config` in `config.yaml`) to the absolute path of a `viewers.config.yaml` file on disk:
+1. Copy the default config: `cp frontend/src/config/viewers.config.yaml /opt/deploy/viewers.config.yaml`
+2. Edit your copy to customize viewers
+3. Set the `FGC_VIEWERS_CONFIG` environment variable (or `viewers_config` in `config.yaml`) to the absolute path of your copy:
 
 ```env
 FGC_VIEWERS_CONFIG=/opt/deploy/viewers.config.yaml
@@ -37,31 +33,24 @@ Or in `config.yaml`:
 viewers_config: /opt/deploy/viewers.config.yaml
 ```
 
-When set, the application serves this file via the API and the frontend uses it instead of the bundled config. The file follows the same format as the build-time `viewers.config.yaml`.
+4. Restart the server
 
-### Precedence
+When set, the server returns this file from `GET /api/viewers-config` and the frontend uses it instead of the bundled config. This works the same way for development checkouts and for deployments installed from PyPI.
 
-The viewers configuration is resolved in the following order (highest priority first):
-
-1. **Runtime API config** — served from the path in `FGC_VIEWERS_CONFIG` (no rebuild required)
-2. **Build-time override** — `frontend/viewers.config.yaml` (requires rebuild)
-3. **Build-time default** — `frontend/src/config/viewers.config.yaml` (requires rebuild)
+For local development, put the file at the repo root as `viewers.config.yaml`, which `.gitignore` ignores, and set `viewers_config` in your local `config.yaml`. Your customizations then never end up in a build.
 
 ## Configuration File
 
 ### Location
 
-There are three config locations, resolved in order of precedence:
+There are two config locations, resolved in order of precedence:
 
 | Location | Purpose |
 | -------- | ------- |
-| Path in `FGC_VIEWERS_CONFIG` | **Runtime override** — served via API, no rebuild required; ideal for system deployments |
-| `frontend/viewers.config.yaml` | **Build-time override** — gitignored, safe to customize without merge conflicts |
-| `frontend/src/config/viewers.config.yaml` | **Default config** — committed source file, used when no override exists |
+| Path in `FGC_VIEWERS_CONFIG` | **Runtime override**: served through the API, no rebuild required |
+| `frontend/src/config/viewers.config.yaml` | **Default config**: committed source file, bundled at build time, used when no runtime override is set |
 
-Copy `frontend/src/config/viewers.config.yaml` to `frontend/viewers.config.yaml` to create a local override. This file is listed in `.gitignore` so your customizations will not conflict with upstream updates.
-
-**Important:** The build-time configs are bundled at build time and changes require rebuilding the application. Runtime config via `FGC_VIEWERS_CONFIG` does **not** require rebuilding.
+Edit `frontend/src/config/viewers.config.yaml` only to change the default that ships with Fileglancer. Changes to it require rebuilding the application.
 
 ### Structure
 
@@ -120,6 +109,66 @@ When a deployment overrides Neuroglancer's URL with `instance_template_url` (for
 
 This choice is a per-user preference (`viewerUrlSources`); it does not change the deployment configuration and only affects the user who sets it. The option only appears when the deployment actually overrides the Neuroglancer URL — if the configured URL already equals the manifest default, there is nothing to switch between and no control is shown.
 
+The embedded View viewer (`/view/<read_key>`) uses the deployment-configured
+Neuroglancer URL (it ignores this per-user preference). Owners can edit and
+save a View there only when that Neuroglancer is served from the same origin as
+Fileglancer; otherwise the viewer is read-only with a note. See
+[Serving Neuroglancer for View editing](#serving-neuroglancer-for-view-editing)
+below, and [Development.md](Development.md#testing-view-editing-locally) for
+testing locally.
+
+### Serving Neuroglancer for View editing
+
+The View page reads the Neuroglancer iframe's `window.viewer` to save and
+restore state. Browsers allow that only when the iframe is same-origin with
+the page: same scheme, host, and port. `localhost` and `127.0.0.1` are
+different origins. When Neuroglancer is cross-origin, the viewer still renders
+but the save bar shows "Editing isn't available with this Neuroglancer
+deployment". That is the expected state for a CLI or PyPI install, which
+embeds `neuroglancer-demo.appspot.com`.
+
+To enable editing, serve Neuroglancer under the Fileglancer host's own
+`/neuroglancer/` path and point `instance_template_url` at that host:
+
+```yaml
+viewers:
+  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/neuroglancer.yaml'
+    instance_template_url: 'https://fileglancer.example.org/neuroglancer/#!{"layers":[{"name":"image","source":"{DATA_URL}","type":"image"}]}'
+```
+
+The host in that URL must match the address in the browser exactly, including
+`https`. How `/neuroglancer/` gets served depends on the environment:
+
+| Environment | How `/neuroglancer/` is served |
+|---|---|
+| Production | nginx serves a Neuroglancer build from disk (`location /neuroglancer/ { alias ...; }`). |
+| Dev or staging host without a build | nginx proxies the production host's `/neuroglancer/` under the dev origin. |
+| Local development | The app's `FGC_NEUROGLANCER_URL` passthrough proxies an external Neuroglancer. |
+
+The nginx block for a dev host:
+
+```nginx
+location /neuroglancer/ {
+  proxy_pass https://fileglancer.example.org/neuroglancer/;
+  proxy_set_header Host fileglancer.example.org;
+  proxy_ssl_server_name on;
+  proxy_hide_header Set-Cookie;
+  expires max;
+}
+```
+
+Reload nginx, then check that `curl -sk https://<dev-host>/neuroglancer/`
+returns a page titled `neuroglancer` rather than Fileglancer's own HTML.
+
+Behind a reverse proxy, `FGC_NEUROGLANCER_URL` has no effect: nginx answers
+`/neuroglancer/` before the request reaches the app. It is a local-development
+feature only, and it buffers each response in memory. Either way, features of
+a Neuroglancer fork that call endpoints outside `/neuroglancer/` on its own
+host won't work through a proxy.
+
+Keep the deployment's viewers config in a runtime file set with
+`FGC_VIEWERS_CONFIG`.
+
 ### Add a custom viewer
 
 To add a new viewer, create a capability manifest YAML file, host it at a URL, and reference it in the config:
@@ -159,14 +208,14 @@ Viewer logos are managed by the `@bioimagetools/capability-manifest` library. Lo
 
 When developing with custom configurations:
 
-1. Copy the default config: `cp frontend/src/config/viewers.config.yaml frontend/viewers.config.yaml`
-2. Edit `frontend/viewers.config.yaml`
-3. Rebuild frontend: `pixi run node-build` or use watch mode: `pixi run dev-watch`
+1. Copy the default config to the repo root, where `.gitignore` ignores it: `cp frontend/src/config/viewers.config.yaml viewers.config.yaml`
+2. Edit your copy
+3. Set `viewers_config: /absolute/path/to/repo/viewers.config.yaml` in your local `config.yaml` and restart `pixi run dev-launch`
 4. Check the browser console for viewer initialization messages
 
 ### Validation
 
-The configuration is validated at build time using Zod schemas (see `frontend/src/config/viewersConfig.ts`). Validation enforces:
+The configuration is validated in the browser when it loads, using Zod schemas (see `frontend/src/config/viewersConfig.ts`). Validation enforces:
 
 - The `viewers` array must contain at least one entry
 - Each entry must have a valid `manifest_url` (a properly formed URL)

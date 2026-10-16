@@ -159,3 +159,43 @@ describe('Data Link dialog at FSP root', () => {
     expect(capturedUrlPrefix).toBe('test/fsp');
   });
 });
+
+describe('Data Link dialog relink notice', () => {
+  it('lists broken Views that the new link will repair', async () => {
+    const { server } = await import('@/__tests__/mocks/node');
+    const { http, HttpResponse } = await import('msw');
+    server.use(
+      http.get('/api/neuroglancer/views/relinkable', ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.searchParams.get('fsp_name')).toBe('test_fsp');
+        expect(url.searchParams.get('path')).toBe('my_folder/my_zarr');
+        return HttpResponse.json({
+          views: [
+            { short_key: 'a', name: 'Seed 6 overlay' },
+            { short_key: 'b', name: 'Cells' }
+          ]
+        });
+      })
+    );
+    render(<TestDataLinkComponent />, {
+      initialEntries: ['/browse/test_fsp/my_folder/my_zarr']
+    });
+    expect(
+      await screen.findByText(
+        'Creating this link will also repair these broken Views:'
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByText('Seed 6 overlay')).toBeInTheDocument();
+    expect(screen.getByText('Cells')).toBeInTheDocument();
+  });
+
+  it('shows no notice when nothing is relinkable', async () => {
+    render(<TestDataLinkComponent />, {
+      initialEntries: ['/browse/test_fsp/my_folder/my_zarr']
+    });
+    await screen.findByText('Are you sure you want to create a data link?');
+    expect(
+      screen.queryByText(/will also repair these broken Views/)
+    ).not.toBeInTheDocument();
+  });
+});

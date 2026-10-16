@@ -23,6 +23,9 @@ const DEBOUNCE_MS = 500;
 export default function useLayoutPrefs() {
   const [showPropertiesDrawer, setShowPropertiesDrawer] =
     useState<boolean>(false);
+  const [propertiesDrawerMode, setPropertiesDrawerMode] = useState<
+    'properties' | 'cart'
+  >('properties');
   const [showSidebar, setShowSidebar] = useState(true);
   const { layout, handleUpdateLayout, preferenceQuery } =
     usePreferencesContext();
@@ -60,6 +63,23 @@ export default function useLayoutPrefs() {
 
   const toggleSidebar = () => {
     setShowSidebar(prev => !prev);
+  };
+
+  const selectDrawerMode = (mode: 'properties' | 'cart') => {
+    if (showPropertiesDrawer && propertiesDrawerMode === mode) {
+      setShowPropertiesDrawer(false);
+    } else {
+      setPropertiesDrawerMode(mode);
+      setShowPropertiesDrawer(true);
+    }
+  };
+  // ponytail: mode is ephemeral (resets to 'properties' on reload). Persisting it would touch the layout-preference schema for a cosmetic default — skip until asked.
+
+  // Non-toggling: used by "add to cart" so the cart becomes visible even if
+  // it was already the selected mode.
+  const openDrawer = (mode: 'properties' | 'cart') => {
+    setPropertiesDrawerMode(mode);
+    setShowPropertiesDrawer(true);
   };
 
   // Initialize layouts from saved preferences (only once on mount)
@@ -249,6 +269,9 @@ export default function useLayoutPrefs() {
     showPropertiesDrawer,
     togglePropertiesDrawer,
     showSidebar,
-    toggleSidebar
+    toggleSidebar,
+    propertiesDrawerMode,
+    selectDrawerMode,
+    openDrawer
   };
 }

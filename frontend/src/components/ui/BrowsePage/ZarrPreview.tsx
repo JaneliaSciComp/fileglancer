@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Typography } from '@material-tailwind/react';
+import toast from 'react-hot-toast';
+import { useOutletContext } from 'react-router';
 import type { UseQueryResult } from '@tanstack/react-query';
 
 import zarrLogo from '@/assets/zarr.jpg';
@@ -13,7 +15,9 @@ import type {
   PendingToolKey
 } from '@/hooks/useZarrMetadata';
 import useDataToolLinks from '@/hooks/useDataToolLinks';
+import { useCartContext } from '@/contexts/CartContext';
 import { Metadata, getDatasetWarnings } from '@/omezarr-helper';
+import type { OutletContextType } from '@/layouts/BrowseLayout';
 
 type ZarrPreviewProps = {
   readonly fspName: string;
@@ -59,6 +63,26 @@ export default function ZarrPreview({
     pendingToolKey,
     setPendingToolKey
   );
+
+  const { addToCart } = useCartContext();
+  // ponytail: optional — component tests render without a router outlet.
+  const outlet = useOutletContext<OutletContextType | null | undefined>();
+
+  // Views are made only from the cart, so the preview offers the cart.
+  const datasetLabel = path.split('/').filter(Boolean).pop() || path;
+  const handleAddToCart = async () => {
+    try {
+      await addToCart([{ fsp_name: fspName, path, label: datasetLabel }]);
+      toast.success(`Added "${datasetLabel}" to the cart`);
+      outlet?.openDrawer('cart');
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      toast.error(
+        `Error adding "${datasetLabel}" to the cart: ${errorMessage}`
+      );
+    }
+  };
 
   return (
     <div className="min-w-full p-4 shadow-sm rounded-md bg-primary-light/30">
@@ -113,6 +137,7 @@ export default function ZarrPreview({
               compact={mainPanelWidth <= 1000}
               dataLinkUrl={openWithToolUrls.copy || undefined}
               fspName={fspName}
+              onAddToCart={() => void handleAddToCart()}
               onToolClick={handleToolClick}
               path={path}
               showCopiedTooltip={showCopiedTooltip}

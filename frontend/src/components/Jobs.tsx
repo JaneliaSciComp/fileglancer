@@ -7,7 +7,7 @@ import { jobsColumns } from './ui/Table/jobsColumns';
 export default function Jobs() {
   const { allTicketsQuery } = useTicketContext();
   return (
-    <div data-tour="tasks-page">
+    <div>
       <Typography className="mb-6 text-foreground font-bold" type="h5">
         Tasks
       </Typography>

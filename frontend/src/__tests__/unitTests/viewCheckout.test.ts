@@ -1,0 +1,404 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const encoded = (state: unknown) => encodeURIComponent(JSON.stringify(state));
+
+vi.mock('@/omezarr-helper', () => ({
+  getOmeZarrMetadata: vi.fn(),
+  generateNeuroglancerStateForOmeZarr: vi.fn(),
+  generateNeuroglancerStateForDataURL: vi.fn(),
+  generateStateForPlainZarr: vi.fn()
+}));
+
+import {
+  getOmeZarrMetadata,
+  generateNeuroglancerStateForOmeZarr,
+  generateStateForPlainZarr
+} from '@/omezarr-helper';
+import {
+  appendLayers,
+  buildViewState,
+  dataLinkSegment,
+  rewriteDataLinkSegment,
+  probeDataset
+} from '@/utils/viewCheckout';
+
+const md = { multiscales: [{}], arr: {}, zarrVersion: 2 };
+
+beforeEach(() => {
+  (getOmeZarrMetadata as any).mockReset().mockResolvedValue(md);
+  (generateStateForPlainZarr as any)
+    .mockReset()
+    .mockRejectedValue(new Error('not a plain array'));
+  (generateNeuroglancerStateForOmeZarr as any)
+    .mockReset()
+    .mockImplementation((url: string) =>
+      encoded({
+        dimensions: { x: [1, 'm'] },
+        layout: '4panel-alt',
+        layers: [{ name: `${url}-L0`, type: 'image' }]
+      })
+    );
+});
+
+describe('buildViewState', () => {
+  it('concatenates layers across datasets and maps ViewLayerInput', async () => {
+    const { ng_state, layers } = await buildViewState([
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        url_prefix: 'a',
+        fsp_name: 'f',
+        path: '/a',
+        label: 'A'
+      },
+      {
+        url: 'b',
+        sharing_key: 'kb',
+        url_prefix: 'b',
+        fsp_name: 'f',
+        path: '/b',
+        channel: 'GFP',
+        label: 'B'
+      }
+    ]);
+    const stateLayers = (ng_state as any).layers;
+    expect(stateLayers).toHaveLength(2);
+    expect((ng_state as any).dimensions).toEqual({ x: [1, 'm'] }); // first dataset's dims kept
+    expect(layers).toEqual([
+      { sharing_key: 'ka', layer_index: 0, channel: null, opts: null },
+      { sharing_key: 'kb', layer_index: 1, channel: 'GFP', opts: null }
+    ]);
+  });
+
+  it('falls back to the data-URL generator when there are no multiscales', async () => {
+    (getOmeZarrMetadata as any).mockResolvedValue({
+      multiscales: undefined,
+      arr: {},
+      zarrVersion: 2
+    });
+    (
+      (await import('@/omezarr-helper'))
+        .generateNeuroglancerStateForDataURL as any
+    ).mockReturnValue(encoded({ layers: [{ name: 'fallback' }] }));
+    const { ng_state } = await buildViewState([
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        url_prefix: 'a',
+        fsp_name: 'f',
+        path: '/a',
+        label: 'A'
+      }
+    ]);
+    expect((ng_state as any).layers).toHaveLength(1);
+  });
+
+  it('falls back to a plain-array layer when the dataset is not OME-Zarr', async () => {
+    // Both cart entries are bare Zarr arrays: OME metadata throws, plain-array
+    // generation succeeds, so each still contributes one layer.
+    (getOmeZarrMetadata as any).mockRejectedValue(new Error('not a group'));
+    (generateStateForPlainZarr as any).mockImplementation((url: string) =>
+      encoded({ layers: [{ name: `${url}-plain` }] })
+    );
+    const { ng_state, layers } = await buildViewState([
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        url_prefix: 'a',
+        fsp_name: 'f',
+        path: '/a',
+        label: 'A'
+      },
+      {
+        url: 'b',
+        sharing_key: 'kb',
+        url_prefix: 'b',
+        fsp_name: 'f',
+        path: '/b',
+        label: 'B'
+      }
+    ]);
+    expect((ng_state as any).layers).toHaveLength(2);
+    expect(layers).toEqual([
+      { sharing_key: 'ka', layer_index: 0, channel: null, opts: null },
+      { sharing_key: 'kb', layer_index: 1, channel: null, opts: null }
+    ]);
+  });
+
+  it('records an unsupported dataset as a layer-less source, keeping the rest', async () => {
+    // OME metadata throws AND plain-array generation throws (plain directory /
+    // moved / not a Zarr array) → no NG layer, but still a ViewLayer flagged
+    // unsupported so the Views table can list it as a source.
+    (getOmeZarrMetadata as any).mockRejectedValueOnce(new Error('gone'));
+    (generateStateForPlainZarr as any).mockRejectedValueOnce(
+      new Error('also gone')
+    );
+    const { ng_state, layers } = await buildViewState([
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        url_prefix: 'a',
+        fsp_name: 'f',
+        path: '/a',
+        label: 'A'
+      },
+      {
+        url: 'b',
+        sharing_key: 'kb',
+        url_prefix: 'b',
+        fsp_name: 'f',
+        path: '/b',
+        label: 'B'
+      }
+    ]);
+    expect((ng_state as any).layers).toHaveLength(1);
+    expect(layers).toEqual([
+      { sharing_key: 'kb', layer_index: 0, channel: null, opts: null },
+      {
+        sharing_key: 'ka',
+        layer_index: 1,
+        channel: null,
+        opts: { unsupported: true }
+      }
+    ]);
+  });
+
+  it('skips a dataset whose OME generation throws after a successful probe', async () => {
+    // The probe succeeds (OME metadata loads), but state generation itself
+    // throws (e.g. a malformed multiscale) — that dataset should be skipped,
+    // not abort the whole checkout.
+    (generateNeuroglancerStateForOmeZarr as any).mockImplementationOnce(() => {
+      throw new Error('bad multiscale');
+    });
+    const { ng_state, layers } = await buildViewState([
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        url_prefix: 'a',
+        fsp_name: 'f',
+        path: '/a',
+        label: 'A'
+      },
+      {
+        url: 'b',
+        sharing_key: 'kb',
+        url_prefix: 'b',
+        fsp_name: 'f',
+        path: '/b',
+        label: 'B'
+      }
+    ]);
+    expect((ng_state as any).layers).toHaveLength(1);
+    expect(layers[0]).toEqual({
+      sharing_key: 'kb',
+      layer_index: 0,
+      channel: null,
+      opts: null
+    });
+    expect(layers[1]).toMatchObject({
+      sharing_key: 'ka',
+      opts: { unsupported: true }
+    });
+  });
+
+  it('selects the layer at the requested channel index', async () => {
+    (generateNeuroglancerStateForOmeZarr as any).mockReturnValue(
+      encoded({
+        layers: [
+          { name: 'DAPI', type: 'image' },
+          { name: 'GFP', type: 'image' }
+        ]
+      })
+    );
+    const { ng_state } = await buildViewState([
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        url_prefix: 'a',
+        fsp_name: 'f',
+        path: '/a',
+        channel: 'GFP',
+        channelIndex: 1,
+        label: 'A'
+      }
+    ]);
+    expect((ng_state as any).layers).toEqual([
+      { name: 'GFP', type: 'image', archived: false }
+    ]);
+  });
+
+  it('selects one per-channel layer per channel entry by index', async () => {
+    // Checkout forces the per-channel layer path when a channel is selected
+    // (8th generator arg = true), yielding layers in c-axis index order.
+    (generateNeuroglancerStateForOmeZarr as any).mockImplementation(
+      (...args: unknown[]) => {
+        const perChannel = args[7] === true;
+        return encoded({
+          layers: perChannel
+            ? [
+                { name: 'Ch0', localPosition: [0] },
+                { name: 'Ch1', localPosition: [1] },
+                { name: 'Ch2', localPosition: [2] },
+                { name: 'Ch3', localPosition: [3] }
+              ]
+            : [{ name: 'combined', localPosition: [] }]
+        });
+      }
+    );
+
+    const noChannel = await buildViewState([
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        url_prefix: 'a',
+        fsp_name: 'f',
+        path: '/a',
+        label: 'A'
+      }
+    ]);
+    expect((noChannel.ng_state as any).layers).toHaveLength(1);
+
+    const twoChannels = await buildViewState([
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        url_prefix: 'a',
+        fsp_name: 'f',
+        path: '/a',
+        channel: 'Ch0',
+        channelIndex: 0,
+        label: 'A'
+      },
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        url_prefix: 'a',
+        fsp_name: 'f',
+        path: '/a',
+        channel: 'Ch2',
+        channelIndex: 2,
+        label: 'A'
+      }
+    ]);
+    const layers = (twoChannels.ng_state as any).layers;
+    expect(layers).toHaveLength(2);
+    expect(layers[0].localPosition).toEqual([0]);
+    expect(layers[1].localPosition).toEqual([2]);
+  });
+});
+
+describe('probeDataset', () => {
+  it('reports ome when OME metadata loads', async () => {
+    const metadata = { multiscales: [{}], zarrVersion: 3 };
+    (getOmeZarrMetadata as any).mockResolvedValueOnce(metadata);
+    expect(await probeDataset('u')).toEqual({ kind: 'ome', metadata });
+  });
+
+  it('falls back to array when only a plain Zarr array loads', async () => {
+    (getOmeZarrMetadata as any).mockRejectedValueOnce(new Error('no ome'));
+    (generateStateForPlainZarr as any).mockResolvedValueOnce('%7B%7D');
+    expect(await probeDataset('u')).toEqual({ kind: 'array', state: '%7B%7D' });
+  });
+
+  it('reports unsupported when neither loads, carrying both failure causes', async () => {
+    (getOmeZarrMetadata as any).mockRejectedValueOnce(new Error('no ome'));
+    (generateStateForPlainZarr as any).mockRejectedValueOnce(
+      new Error('no array')
+    );
+    const probe = await probeDataset('u');
+    expect(probe).toMatchObject({ kind: 'unsupported' });
+    expect((probe as { errors: unknown[] }).errors).toHaveLength(2);
+  });
+});
+
+describe('appendLayers', () => {
+  it("appends after the existing layers and keeps the View's own settings", () => {
+    const current = {
+      dimensions: { x: [1, 'm'] },
+      layout: 'xy',
+      selectedLayer: { visible: true, layer: 'a' },
+      layers: [{ name: 'a', source: 'zarr://a' }]
+    };
+    const merged = appendLayers(current, [{ name: 'b', source: 'zarr://b' }]);
+    expect(merged.dimensions).toEqual({ x: [1, 'm'] });
+    expect(merged.layout).toBe('xy');
+    expect(merged.selectedLayer).toEqual({ visible: true, layer: 'a' });
+    expect(merged.layers?.map(l => l.name)).toEqual(['a', 'b']);
+    expect(current.layers).toHaveLength(1); // input not mutated
+  });
+
+  it('de-duplicates names against existing and added layers', () => {
+    const merged = appendLayers(
+      { layers: [{ name: 'a' }, { name: 'a (2)' }] },
+      [{ name: 'a' }, { name: 'a' }, { name: 'b' }]
+    );
+    expect(merged.layers?.map(l => l.name)).toEqual([
+      'a',
+      'a (2)',
+      'a (3)',
+      'a (4)',
+      'b'
+    ]);
+  });
+
+  it("treats NG's per-channel split layers as taking the name", () => {
+    // NG split an earlier `img.zarr` layer into `img.zarr <channel>` layers.
+    const merged = appendLayers(
+      { layers: [{ name: 'img.zarr DAPI' }, { name: 'img.zarr (2) DAPI' }] },
+      [{ name: 'img.zarr' }]
+    );
+    expect(merged.layers?.[2].name).toBe('img.zarr (3)');
+  });
+
+  it('archives added layers from index 4 on and leaves existing layers alone', () => {
+    const merged = appendLayers(
+      {
+        layers: [{ name: 'a', archived: true }, { name: 'b' }, { name: 'c' }]
+      },
+      [{ name: 'd', archived: true }, { name: 'e' }]
+    );
+    expect(merged.layers?.map(l => l.archived)).toEqual([
+      true,
+      undefined,
+      undefined,
+      false,
+      true
+    ]);
+  });
+
+  it('handles a state without layers', () => {
+    expect(appendLayers({ layout: 'xy' }, [{ name: 'a' }]).layers).toEqual([
+      { name: 'a', archived: false }
+    ]);
+  });
+});
+
+describe('dataLinkSegment', () => {
+  it("quotes the prefix like the server's quote(prefix, safe='/')", () => {
+    expect(dataLinkSegment('K', "a b/c(1)!'*.zarr")).toBe(
+      '/K/a%20b/c%281%29%21%27%2A.zarr'
+    );
+  });
+});
+
+describe('rewriteDataLinkSegment', () => {
+  it('rewrites string, {url} and list sources, whole segments only', () => {
+    const state = {
+      layout: 'xy',
+      layers: [
+        { name: 'a', source: 'zarr://http://h/files/OLD/img.zarr/|zarr2:' },
+        { name: 'b', source: { url: 'http://h/files/OLD/img.zarr' } },
+        { name: 'c', source: ['http://h/files/OLD/img.zarr2'] },
+        { name: 'd' }
+      ]
+    };
+    const out = rewriteDataLinkSegment(state, '/OLD/img.zarr', '/NEW/img.zarr');
+    expect(out.layout).toBe('xy');
+    expect(out.layers?.map(l => l.source)).toEqual([
+      'zarr://http://h/files/NEW/img.zarr/|zarr2:',
+      { url: 'http://h/files/NEW/img.zarr' },
+      ['http://h/files/OLD/img.zarr2'],
+      undefined
+    ]);
+  });
+});

@@ -67,6 +67,20 @@ use_access_flags: False
 external_proxy_url: http://localhost:7878/files
 
 #
+# Dev-only: pass /neuroglancer/* through to this Neuroglancer so the embedded
+# viewer is same-origin and View editing can be tested locally (see
+# docs/Development.md).
+#
+# neuroglancer_url: https://fileglancer.int.janelia.org/neuroglancer
+
+#
+# Absolute path to a viewers config YAML that overrides the bundled default
+# (frontend/src/config/viewers.config.yaml) at runtime, without a rebuild.
+# Restart the server after editing it. See docs/ViewersConfiguration.md.
+#
+# viewers_config: /opt/deploy/viewers.config.yaml
+
+#
 # Maximum size of the sharing key LRU cache
 # This controls how many sharing key lookups are cached in memory
 # Higher values use more memory but reduce database queries

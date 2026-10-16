@@ -17,6 +17,7 @@ try:
 except ImportError:
     import tomli as tomllib
 
+import httpx
 import yaml
 from loguru import logger
 from pydantic import HttpUrl, ValidationError
@@ -203,6 +204,7 @@ def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optiona
         logger.warning(f"No external proxy URL was provided, proxy links will not be available.")
         url = None
     return ProxiedPath(
+        id=db_path.id,
         username=db_path.username,
         sharing_key=db_path.sharing_key,
         sharing_name=db_path.sharing_name,
@@ -244,6 +246,14 @@ def _validate_url_prefix(url_prefix: str) -> None:
         raise HTTPException(status_code=400, detail="Data link name must not contain '.' or '..' segments")
 
 
+_NG_FORWARDED_HEADERS = ("content-type", "cache-control", "etag", "last-modified")
+
+
+def _ng_http_client() -> httpx.AsyncClient:
+    """Client for the dev /neuroglancer passthrough (patched in tests)."""
+    return httpx.AsyncClient(follow_redirects=True, timeout=httpx.Timeout(30, connect=5))
+
+
 def _normalize_proxied_path(path: str) -> str:
     """Normalize an FSP-relative path for a proxied path record.
 
@@ -256,6 +266,18 @@ def _normalize_proxied_path(path: str) -> str:
     if path.startswith("./"):
         return path[2:]
     return path
+
+
+def _can_edit_view(view: db.ViewDB, username: str) -> bool:
+    """The one edit-authorization rule for Views. Owner-only today; shareable
+    edit links (the reserved edit_key) extend this function rather than
+    adding checks per route."""
+    return view.owner == username
+
+
+def _proxy_url(settings) -> Optional[str]:
+    """Data Link base URL as a plain string, or None when unconfigured."""
+    return str(settings.external_proxy_url).rstrip('/') if settings.external_proxy_url else None
 
 
 def _convert_ticket(db_ticket: db.TicketDB) -> Ticket:
@@ -1264,7 +1286,7 @@ def create_app(settings):
             return {"message": f"Neuroglancer link {short_key} deleted"}
 
 
-    @app.post("/api/proxied-path", response_model=ProxiedPath,
+    @app.post("/api/proxied-path", response_model=ProxiedPathCreateResponse,
               description="Create a new proxied path")
     async def create_proxied_path(fsp_name: str = Query(..., description="The name of the file share path that this proxied path is associated with"),
                                   path: str = Query(..., description="The path relative to the file share path mount point"),
@@ -1297,10 +1319,16 @@ def create_app(settings):
                 raise HTTPException(status_code=409, detail="A data link already exists for this path")
             try:
                 new_path = db.create_proxied_path(session, username, sharing_name, fsp_name, path, url_prefix=url_prefix)
-                return _convert_proxied_path(new_path, settings.external_proxy_url)
             except ValueError as e:
                 logger.error(f"Error creating proxied path: {e}")
                 raise HTTPException(status_code=400, detail=str(e))
+            # A new link to a dataset repairs the caller's own broken Views on it.
+            views = db.get_relinkable_views(session, username, new_path.fsp_name, new_path.path)
+            relinked = db.relink_broken_layers(session, views, new_path)
+            return ProxiedPathCreateResponse(
+                **_convert_proxied_path(new_path, settings.external_proxy_url).model_dump(),
+                relinked_views=[ViewSummary(short_key=v.short_key, name=v.name) for v in relinked],
+            )
 
 
     @app.get("/api/proxied-path", response_model=ProxiedPathResponse,
@@ -1334,6 +1362,18 @@ def create_app(settings):
             if path.username != username:
                 raise HTTPException(status_code=404, detail="Proxied path not found for username {username} and sharing key {sharing_key}")
             return _convert_proxied_path(path, settings.external_proxy_url)
+
+
+    @app.get("/api/proxied-path/{sharing_key}/views", response_model=ViewResponse,
+             description="List Neuroglancer Views that depend on this Data Link")
+    async def get_views_for_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path"),
+                                         username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            pp = db.get_proxied_path_by_sharing_key(session, sharing_key)
+            if not pp or pp.username != username:
+                raise HTTPException(status_code=404, detail="Proxied path not found")
+            views = db.get_views_for_data_link(session, pp.id, owner=username)
+            return ViewResponse(views=[View.model_validate(v) for v in views])
 
 
     @app.put("/api/proxied-path/{sharing_key}", description="Update a proxied path by sharing key")
@@ -1371,11 +1411,25 @@ def create_app(settings):
 
     @app.delete("/api/proxied-path/{sharing_key}", description="Delete a proxied path by sharing key")
     async def delete_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path"),
+                                  confirm: bool = Query(False, description="Confirm deletion even though it breaks the caller's own Views"),
                                   username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
-            deleted = db.delete_proxied_path(session, username, sharing_key)
-            if deleted == 0:
+            pp = db.get_proxied_path_by_sharing_key(session, sharing_key)
+            if not pp or pp.username != username:
                 raise HTTPException(status_code=404, detail="Proxied path not found")
+            # Disclose only the caller's OWN dependent Views (never leak others').
+            own_dependents = db.get_views_for_data_link(session, pp.id, owner=username)
+            if own_dependents and not confirm:
+                # ponytail: JSONResponse (not HTTPException) so the structured detail
+                # survives the app-wide handler at server.py:~614 that stringifies dict details.
+                return JSONResponse(status_code=409, content={"detail": {
+                    "message": "This data link backs Neuroglancer Views you own; they will be marked broken.",
+                    "dependent_views": [{"short_key": v.short_key, "name": v.name} for v in own_dependents],
+                }})
+            # Mark ALL layers on this link broken (any owner) for referential integrity,
+            # so other users' Views degrade gracefully without disclosing them here.
+            db.mark_view_layers_broken(session, pp.id)
+            db.delete_proxied_path(session, username, sharing_key)
             return {"message": f"Proxied path {sharing_key} deleted for user {username}"}
 
 
@@ -1401,6 +1455,21 @@ def create_app(settings):
             if entry.short_name != short_name:
                 raise HTTPException(status_code=404, detail="Neuroglancer state not found")
             return JSONResponse(content=entry.state, headers={"Cache-Control": "no-store"})
+
+
+    # ponytail: sharing_mode is not enforced here — every View is readable by its
+    # read_key (bearer token). A future PR adds "public" (unauthenticated/listed)
+    # vs owner-only semantics; until then sharing_mode is a stored label only.
+    @app.get("/ngview/{key}", name="get_view_state", include_in_schema=False)
+    async def get_view_state(key: str = Path(..., description="A View's read key")):
+        with db.get_db_session(settings.db_url) as session:
+            view = db.get_view_by_read_key(session, key)
+            if not view:
+                raise HTTPException(status_code=404, detail="View not found")
+            # Title is the View's name (single source of truth); inject it so the
+            # embedded viewer titles from the current name and survives renames.
+            state = {**view.ng_state, "title": view.name}
+            return JSONResponse(content=state, headers={"Cache-Control": "no-store"})
 
 
     @app.get("/api/neuroglancer/nglinks", response_model=NeuroglancerShortLinkResponse,
@@ -1496,6 +1565,128 @@ def create_app(settings):
                                    _link_virtual_prefix(link, prefix, f"{sharing_key}/"),
                                    continuation_token, delimiter, encoding_type,
                                    fetch_owner, max_keys, prefix, start_after)
+
+    @app.post("/api/neuroglancer/views", response_model=View,
+              description="Create a Neuroglancer View from a client-built state and layer list")
+    async def create_view_endpoint(payload: ViewCreateRequest,
+                                   username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            layers = []
+            for layer in payload.layers:
+                data_link_id = None
+                fsp_name = None
+                path = None
+                sharing_key = None
+                url_prefix = None
+                if layer.sharing_key:
+                    pp = db.get_proxied_path_by_sharing_key(session, layer.sharing_key)
+                    if not pp:
+                        raise HTTPException(status_code=400,
+                                            detail=f"Unknown data link sharing key: {layer.sharing_key}")
+                    data_link_id = pp.id
+                    fsp_name = pp.fsp_name
+                    path = pp.path
+                    sharing_key = pp.sharing_key
+                    url_prefix = pp.url_prefix
+                layers.append({
+                    "data_link_id": data_link_id,
+                    "layer_index": layer.layer_index,
+                    "channel": layer.channel,
+                    "opts": layer.opts,
+                    "fsp_name": fsp_name,
+                    "path": path,
+                    "sharing_key": sharing_key,
+                    "url_prefix": url_prefix,
+                })
+            view = db.create_view(session, username, payload.name, payload.ng_state,
+                                  layers, payload.sharing_mode)
+            return View.model_validate(view)
+
+    @app.get("/api/neuroglancer/views", response_model=ViewResponse,
+             description="List the current user's Neuroglancer Views")
+    async def list_views_endpoint(username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            views = db.get_views(session, username)
+            return ViewResponse(views=[View.model_validate(v) for v in views])
+
+    @app.get("/api/neuroglancer/views/relinkable", response_model=ViewSummaryResponse,
+             description="The caller's broken Views that a Data Link to this dataset would repair")
+    async def relinkable_views_endpoint(fsp_name: str = Query(..., description="File share path name"),
+                                        path: str = Query(..., description="Path relative to the file share path"),
+                                        username: str = Depends(get_current_user)):
+        path = _normalize_proxied_path(path)
+        with db.get_db_session(settings.db_url) as session:
+            views = db.get_relinkable_views(session, username, fsp_name, path)
+            return ViewSummaryResponse(views=[ViewSummary(short_key=v.short_key, name=v.name) for v in views])
+
+    @app.post("/api/neuroglancer/views/relink", response_model=ViewSummaryResponse,
+              description="Relink the caller's broken Views onto one of the caller's Data Links")
+    async def relink_views_endpoint(payload: RelinkRequest,
+                                    username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            pp = db.get_proxied_path_by_sharing_key(session, payload.sharing_key)
+            if not pp or pp.username != username:
+                raise HTTPException(status_code=404, detail="Data link not found")
+            views = [v for v in db.get_relinkable_views(session, username, pp.fsp_name, pp.path)
+                     if _can_edit_view(v, username)]
+            changed = db.relink_broken_layers(session, views, pp)
+            return ViewSummaryResponse(views=[ViewSummary(short_key=v.short_key, name=v.name) for v in changed])
+
+    @app.get("/api/neuroglancer/views/{short_key}", response_model=View,
+             description="Get one of the current user's Neuroglancer Views")
+    async def get_view_endpoint(short_key: str = Path(..., description="The View's short key"),
+                                username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            view = db.get_view_by_short_key(session, short_key)
+            if not view or view.owner != username:
+                raise HTTPException(status_code=404, detail="View not found")
+            return View.model_validate(view)
+
+    @app.put("/api/neuroglancer/views/{short_key}", response_model=View,
+             description="Update (rename / restate) one of the current user's Views")
+    async def update_view_endpoint(payload: ViewUpdateRequest,
+                                   short_key: str = Path(..., description="The View's short key"),
+                                   username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            view = db.get_view_by_short_key(session, short_key)
+            if not view or not _can_edit_view(view, username):
+                raise HTTPException(status_code=404, detail="View not found")
+            if payload.ng_state is not None and not isinstance(payload.ng_state.get('layers', []), list):
+                raise HTTPException(status_code=400, detail="ng_state.layers must be a list")
+            unsupported = []
+            for key in payload.unsupported_sharing_keys or []:
+                pp = db.get_proxied_path_by_sharing_key(session, key)
+                if not pp:
+                    raise HTTPException(status_code=400, detail=f"Unknown data link sharing key: {key}")
+                unsupported.append(pp)
+            view = db.update_view(session, view, name=payload.name,
+                                  ng_state=payload.ng_state, proxy_url=_proxy_url(settings),
+                                  unsupported=unsupported,
+                                  removed_unsupported=payload.removed_unsupported_sharing_keys)
+            return View.model_validate(view)
+
+    @app.post("/api/neuroglancer/views/{short_key}/remove-sources", response_model=View,
+              description="Remove datasets (all their layers) from one of the current user's Views")
+    async def remove_view_sources_endpoint(payload: RemoveViewSourcesRequest,
+                                           short_key: str = Path(..., description="The View's short key"),
+                                           username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            view = db.get_view_by_short_key(session, short_key)
+            if not view or not _can_edit_view(view, username):
+                raise HTTPException(status_code=404, detail="View not found")
+            if not db.remove_view_sources(session, view, [(s.fsp_name, s.path) for s in payload.sources]):
+                raise HTTPException(status_code=404, detail="Source not found in View")
+            return View.model_validate(view)
+
+    @app.delete("/api/neuroglancer/views/{short_key}",
+                description="Delete one of the current user's Views")
+    async def delete_view_endpoint(short_key: str = Path(..., description="The View's short key"),
+                                   username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            deleted = db.delete_view(session, username, short_key)
+            if deleted == 0:
+                raise HTTPException(status_code=404, detail="View not found")
+            return {"message": f"View {short_key} deleted"}
 
 
     @app.get("/files/{sharing_key}/{path:path}")
@@ -3053,6 +3244,32 @@ def create_app(settings):
     @app.get("/attributes.json", include_in_schema=False)
     async def serve_attributes_json():
         raise HTTPException(status_code=404, detail="Not found")
+
+    if settings.neuroglancer_url:
+        ng_upstream = settings.neuroglancer_url.rstrip('/')
+
+        @app.get("/neuroglancer", include_in_schema=False)
+        async def neuroglancer_root():
+            # NG's asset URLs are relative; they need the trailing slash.
+            return RedirectResponse(url="/neuroglancer/")
+
+        @app.get("/neuroglancer/{path:path}", include_in_schema=False)
+        async def neuroglancer_passthrough(path: str = ""):
+            # ponytail: dev-only GET passthrough of NG's static assets, no
+            # streaming or caching; production serves NG from its reverse proxy.
+            # `path` is decoded, so reject anything httpx would resolve outside
+            # the configured prefix (dot segments) or into a query/fragment. No
+            # '%' either: a still-encoded %2e%2e would be resolved upstream.
+            if any(seg in ("..", ".") for seg in path.split("/")) or any(c in path for c in "?#%"):
+                raise HTTPException(status_code=400, detail="Invalid file path")
+            try:
+                async with _ng_http_client() as client:
+                    r = await client.get(f"{ng_upstream}/{path}")
+            except httpx.HTTPError as e:
+                raise HTTPException(status_code=502,
+                                    detail=f"Could not reach Neuroglancer at {settings.neuroglancer_url}: {e}")
+            headers = {k: r.headers[k] for k in _NG_FORWARDED_HEADERS if k in r.headers}
+            return Response(content=r.content, status_code=r.status_code, headers=headers)
 
     # Serve SPA at /* for client-side routing
     # This must be the LAST route registered

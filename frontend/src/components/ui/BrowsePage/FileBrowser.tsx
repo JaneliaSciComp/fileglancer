@@ -2,6 +2,7 @@ import type { MouseEvent } from 'react';
 import { Typography } from '@material-tailwind/react';
 import { useHotkey } from '@tanstack/react-hotkeys';
 import toast from 'react-hot-toast';
+import { useOutletContext } from 'react-router';
 
 import Crumbs from './Crumbs';
 import MetadataHint from './MetadataHint';
@@ -9,6 +10,7 @@ import ZarrPreview from './ZarrPreview';
 import N5Preview from './N5Preview';
 import Table from './FileTable';
 import FileViewer from './FileViewer';
+import SelectionBar from './SelectionBar';
 import ContextMenu, {
   type ContextMenuItem
 } from '@/components/ui/Menus/ContextMenu';
@@ -18,6 +20,8 @@ import useZarrMetadata from '@/hooks/useZarrMetadata';
 import useN5Metadata from '@/hooks/useN5Metadata';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
+import { useCartContext } from '@/contexts/CartContext';
+import type { OutletContextType } from '@/layouts/BrowseLayout';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
 import { useHandleDownload } from '@/hooks/useHandleDownload';
 import { useHandleView } from '@/hooks/useHandleView';
@@ -61,6 +65,8 @@ export default function FileBrowser({
   } = useFileBrowserContext();
   const { folderPreferenceMap, handleContextMenuFavorite } =
     usePreferencesContext();
+  const { addToCart } = useCartContext();
+  const outlet = useOutletContext<OutletContextType | null | undefined>();
   const { displayFiles } = useHideDotFiles();
   const { handleDownload } = useHandleDownload();
   const { handleView } = useHandleView();
@@ -185,6 +191,35 @@ export default function FileBrowser({
         },
         shouldShow:
           tasksEnabled &&
+          fileBrowserState.selectedFiles[0]?.is_dir &&
+          !fileBrowserState.selectedFiles[0]?.is_symlink
+      },
+      {
+        name: 'Add to cart',
+        action: async () => {
+          const file = fileBrowserState.selectedFiles[0];
+          if (!file) {
+            return;
+          }
+          try {
+            await addToCart([
+              {
+                fsp_name: fileQuery.data?.currentFileSharePath?.name ?? '',
+                path: file.path,
+                label: file.name
+              }
+            ]);
+            toast.success(`Added "${file.name}" to the cart`);
+            outlet?.openDrawer('cart');
+          } catch (error) {
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            toast.error(
+              `Error adding "${file.name}" to the cart: ${errorMessage}`
+            );
+          }
+        },
+        shouldShow:
           fileBrowserState.selectedFiles[0]?.is_dir &&
           !fileBrowserState.selectedFiles[0]?.is_symlink
       },
@@ -336,6 +371,7 @@ export default function FileBrowser({
           y={contextMenuCoords.y}
         />
       ) : null}
+      <SelectionBar />
     </>
   );
 }

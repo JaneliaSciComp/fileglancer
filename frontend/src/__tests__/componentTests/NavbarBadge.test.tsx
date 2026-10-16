@@ -10,14 +10,6 @@ vi.mock('@/hooks/useActiveJobCount', () => ({
   useActiveJobCount: vi.fn(() => 0)
 }));
 
-vi.mock('@/hooks/useTheme', () => ({
-  default: vi.fn(() => ({
-    toggleTheme: vi.fn(),
-    isLightTheme: true,
-    setIsLightTheme: vi.fn()
-  }))
-}));
-
 vi.mock('@/utils/fathom', () => ({
   trackEvent: vi.fn()
 }));

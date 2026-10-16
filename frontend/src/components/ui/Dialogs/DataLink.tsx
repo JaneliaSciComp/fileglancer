@@ -21,6 +21,11 @@ import {
 } from '@/utils/pathHandling';
 import type { FileSharePath } from '@/shared.types';
 import type { PendingToolKey } from '@/hooks/useZarrMetadata';
+import { DependentViewsError } from '@/queries/proxiedPathQueries';
+import {
+  useRelinkableViewsQuery,
+  useViewsForDataLinkQuery
+} from '@/queries/viewQueries';
 import FgDialog from './FgDialog';
 import TextWithFilePath from './TextWithFilePath';
 import DataLinkOptions, {
@@ -54,7 +59,10 @@ interface DeleteLinkDialogProps extends CommonDataLinkDialogProps {
   action: 'delete';
   pending: boolean;
   proxiedPath: ProxiedPath;
-  handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
+  handleDeleteDataLink: (
+    proxiedPath: ProxiedPath,
+    confirm?: boolean
+  ) => Promise<void>;
 }
 
 type DataLinkDialogProps =
@@ -190,6 +198,32 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
   const [openAdvancedSections, setOpenAdvancedSections] = useState<string[]>(
     []
   );
+  const [dependentViews, setDependentViews] = useState<
+    { short_key: string; name: string }[] | null
+  >(null);
+
+  // Pre-fetch dependent Views so the warning is visible on open and the
+  // delete is a single confirming click. `dependentViews` (set from a 409)
+  // remains as the fallback for a View created between fetch and click.
+  const dependentViewsQuery = useViewsForDataLinkQuery(
+    props.action === 'delete' ? props.proxiedPath.sharing_key : undefined
+  );
+  const knownDependents =
+    dependentViews ??
+    (dependentViewsQuery.data ?? []).map(v => ({
+      short_key: v.short_key,
+      name: v.name
+    }));
+
+  // Creating a link relinks the caller's broken Views on this dataset (server
+  // side, always). In consent mode, say so before they click.
+  const relinkableQuery = useRelinkableViewsQuery(
+    props.action === 'create' && !localAreDataLinksAutomatic && fspName
+      ? fspName
+      : undefined,
+    normalizedFilePath
+  );
+  const relinkable = relinkableQuery.data ?? [];
 
   const customSubpathError = useMemo(
     () =>
@@ -283,6 +317,20 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               If you share the data link with internal collaborators, they will
               be able to view these data.
             </Typography>
+            {relinkable.length > 0 ? (
+              <div className="flex flex-col gap-2 border-l-4 border-info bg-surface/30 p-3 rounded">
+                <Typography className="text-info font-semibold">
+                  Creating this link will also repair these broken Views:
+                </Typography>
+                <ul className="list-disc pl-5">
+                  {relinkable.map(v => (
+                    <li className="text-foreground text-sm" key={v.short_key}>
+                      {v.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <div className="flex flex-col gap-2">
               <Typography className="font-semibold text-foreground">
                 Don't ask me this again:
@@ -356,15 +404,40 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               be able to use it to view these data. You can create a new data
               link at any time.
             </Typography>
+            {knownDependents.length > 0 ? (
+              <div className="flex flex-col gap-2 border-l-4 border-warning bg-surface/30 p-3 rounded">
+                <Typography className="text-warning font-semibold">
+                  These Views you own use this data link and will be marked
+                  broken:
+                </Typography>
+                <ul className="list-disc pl-5">
+                  {knownDependents.map(v => (
+                    <li className="text-foreground text-sm" key={v.short_key}>
+                      {v.name || v.short_key}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <BtnContainer>
               <FgButton
                 color="error"
-                disabled={false}
+                disabled={props.pending || dependentViewsQuery.isPending}
                 loading={props.pending}
                 loadingText="Deleting..."
                 onClick={async () => {
-                  await props.handleDeleteDataLink(props.proxiedPath);
-                  props.setShowDataLinkDialog(false);
+                  try {
+                    await props.handleDeleteDataLink(
+                      props.proxiedPath,
+                      knownDependents.length > 0
+                    );
+                    props.setShowDataLinkDialog(false);
+                  } catch (error) {
+                    if (error instanceof DependentViewsError) {
+                      setDependentViews(error.views);
+                    }
+                    // other errors are already toasted in handleDeleteDataLink
+                  }
                 }}
               >
                 Delete

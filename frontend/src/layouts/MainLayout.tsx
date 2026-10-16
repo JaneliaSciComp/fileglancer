@@ -1,7 +1,8 @@
 /* eslint-disable react/jsx-max-depth */
 // Disable max depth because of many context providers
 
-import { Outlet, useParams } from 'react-router';
+import { useEffect } from 'react';
+import { Outlet, useParams, useMatch } from 'react-router';
 import { Toaster } from 'react-hot-toast';
 import { ErrorBoundary } from 'react-error-boundary';
 import 'shepherd.js/dist/css/shepherd.css';
@@ -10,6 +11,8 @@ import '@/components/tours/shepherd-overrides.css';
 import { ZonesAndFspMapContextProvider } from '@/contexts/ZonesAndFspMapContext';
 import { FileBrowserContextProvider } from '@/contexts/FileBrowserContext';
 import { PreferencesProvider } from '@/contexts/PreferencesContext';
+import { CartProvider } from '@/contexts/CartContext';
+import { ViewsProvider } from '@/contexts/ViewsContext';
 import { OpenFavoritesProvider } from '@/contexts/OpenFavoritesContext';
 import { TicketProvider } from '@/contexts/TicketsContext';
 import { ProxiedPathProvider } from '@/contexts/ProxiedPathContext';
@@ -29,6 +32,17 @@ const MainLayoutContent = () => {
   const { showWarningOverlay, checkHealth, nextRetrySeconds } =
     useServerHealthContext();
   const bare = isConnectLoginPopup();
+  // The embedded neuroglancer viewer renders its own collapsed top bar, so
+  // suppress the global navbar there.
+  const isViewer = useMatch('/view/:readKey');
+
+  // Restore persisted theme on load. Lives here (always mounted) rather than in
+  // the navbar so dark mode applies on routes that hide the navbar (the viewer).
+  useEffect(() => {
+    if (localStorage.getItem('theme') === 'dark') {
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
 
   return (
     <>
@@ -40,7 +54,7 @@ const MainLayoutContent = () => {
         }}
       />
       <div className="flex flex-col h-full w-full overflow-y-hidden bg-background text-foreground box-border">
-        {!bare ? (
+        {!bare && !isViewer ? (
           <div className="flex-shrink-0 w-full">
             <FileglancerNavbar />
             <Notifications />
@@ -73,17 +87,21 @@ export const MainLayout = () => {
           <OpenFavoritesProvider>
             <FileBrowserContextProvider filePath={filePath} fspName={fspName}>
               <PreferencesProvider>
-                <ExternalBucketProvider>
-                  <ProxiedPathProvider>
-                    <ProfileContextProvider>
-                      <NotificationProvider>
-                        <TicketProvider>
-                          <MainLayoutContent />
-                        </TicketProvider>
-                      </NotificationProvider>
-                    </ProfileContextProvider>
-                  </ProxiedPathProvider>
-                </ExternalBucketProvider>
+                <CartProvider>
+                  <ViewsProvider>
+                    <ExternalBucketProvider>
+                      <ProxiedPathProvider>
+                        <ProfileContextProvider>
+                          <NotificationProvider>
+                            <TicketProvider>
+                              <MainLayoutContent />
+                            </TicketProvider>
+                          </NotificationProvider>
+                        </ProfileContextProvider>
+                      </ProxiedPathProvider>
+                    </ExternalBucketProvider>
+                  </ViewsProvider>
+                </CartProvider>
               </PreferencesProvider>
             </FileBrowserContextProvider>
           </OpenFavoritesProvider>

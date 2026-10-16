@@ -1,0 +1,408 @@
+import toast from 'react-hot-toast';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  UseQueryResult,
+  UseMutationResult
+} from '@tanstack/react-query';
+
+import { sendFetchRequest, buildUrl } from '@/utils';
+import {
+  getResponseJsonOrError,
+  sendRequestAndThrowForNotOk,
+  throwResponseNotOkError
+} from './queryUtils';
+
+export type ViewLayer = {
+  layer_index: number;
+  data_link_id: number | null;
+  channel: string | null;
+  opts: Record<string, unknown> | null;
+  broken: boolean;
+  fsp_name: string | null;
+  path: string | null;
+  sharing_key: string | null;
+  url_prefix: string | null;
+};
+
+export type ViewSummary = { short_key: string; name: string };
+
+type ViewSummaryResponse = { views?: ViewSummary[] };
+
+/** A broken layer can be relinked once its dead Data Link key and prefix are known. */
+export function isRelinkableLayer<
+  L extends Pick<ViewLayer, 'broken' | 'sharing_key' | 'url_prefix'>
+>(layer: L): layer is L & { sharing_key: string; url_prefix: string } {
+  return (
+    layer.broken && layer.sharing_key !== null && layer.url_prefix !== null
+  );
+}
+
+/** Shared by Data Link creation and explicit relink. */
+export function toastRelinked(views: ViewSummary[]): void {
+  if (views.length === 0) {
+    return;
+  }
+  toast.success(
+    `Relinked ${views.length} broken View${views.length === 1 ? '' : 's'}`
+  );
+}
+
+export type View = {
+  short_key: string;
+  read_key: string;
+  name: string;
+  ng_state: Record<string, unknown>;
+  sharing_mode: 'private' | 'read';
+  owner: string;
+  created_at: string;
+  updated_at: string;
+  layers: ViewLayer[];
+};
+
+export type ViewLayerInput = {
+  sharing_key: string | null;
+  layer_index: number;
+  channel: string | null;
+  opts: Record<string, unknown> | null;
+};
+
+export type ViewCreateRequest = {
+  name: string;
+  ng_state: Record<string, unknown>;
+  sharing_mode?: 'private' | 'read';
+  layers: ViewLayerInput[];
+};
+
+export type ViewUpdateRequest = {
+  name?: string;
+  ng_state?: Record<string, unknown>;
+  unsupported_sharing_keys?: string[];
+  removed_unsupported_sharing_keys?: string[];
+};
+
+/**
+ * Raw API envelope from GET /api/neuroglancer/views
+ */
+type ViewsResponse = {
+  views?: View[];
+};
+
+// Query key factory for Views
+export const viewQueryKeys = {
+  all: ['views'] as const,
+  list: () => ['views', 'list'] as const,
+  forDataLink: (sharingKey: string) =>
+    ['views', 'forDataLink', sharingKey] as const,
+  forDataLinkAll: () => ['views', 'forDataLink'] as const,
+  relinkable: (fspName: string, path: string) =>
+    ['views', 'relinkable', fspName, path] as const,
+  state: (readKey: string) => ['views', 'state', readKey] as const
+};
+
+/**
+ * Sort Views by date (newest updated first)
+ */
+function sortViewsByDate(views: View[]): View[] {
+  return views.sort(
+    (a, b) =>
+      new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+  );
+}
+
+/**
+ * Fetches all Views for the current user from the backend
+ * Returns empty array if no views exist (404)
+ */
+const fetchViews = async (signal?: AbortSignal): Promise<View[]> => {
+  const response = await sendFetchRequest(
+    '/api/neuroglancer/views',
+    'GET',
+    undefined,
+    { signal }
+  );
+  const data = (await getResponseJsonOrError(response)) as ViewsResponse;
+
+  if (response.ok) {
+    if (data?.views) {
+      return sortViewsByDate(data.views);
+    } else {
+      return [];
+    }
+  }
+
+  // Handle error responses
+  if (response.status === 404) {
+    // Not an error, just no views available
+    return [];
+  } else {
+    throwResponseNotOkError(response, data);
+  }
+};
+
+/**
+ * Fetches the Views (owned by the current user) that depend on a Data Link.
+ * Returns [] on 404. Mirrors fetchViews: manual status branch so a 404 is not
+ * an error and the {error} envelope is not required.
+ */
+const fetchViewsForDataLink = async (
+  sharingKey: string,
+  signal?: AbortSignal
+): Promise<View[]> => {
+  const url = buildUrl('/api/proxied-path', `${sharingKey}/views`);
+  const response = await sendFetchRequest(url, 'GET', undefined, { signal });
+  const data = (await getResponseJsonOrError(response)) as ViewsResponse;
+
+  if (response.ok) {
+    return data?.views ?? [];
+  }
+  if (response.status === 404) {
+    return [];
+  }
+  throwResponseNotOkError(response, data);
+};
+
+/**
+ * Fetches a View's raw Neuroglancer state by its public read key.
+ * Mirrors fetchViews' manual status branch: 404 (unknown/removed key) → null,
+ * not an error, so the embedded viewer can render a "View not found" state.
+ * The endpoint (GET /ngview/{key}) returns the bare ng_state object, unwrapped.
+ */
+const fetchViewState = async (
+  readKey: string,
+  signal?: AbortSignal
+): Promise<Record<string, unknown> | null> => {
+  const url = buildUrl('/ngview/', readKey, null);
+  const response = await sendFetchRequest(url, 'GET', undefined, { signal });
+  if (response.status === 404) {
+    return null;
+  }
+  const data = await getResponseJsonOrError(response);
+  if (!response.ok) {
+    throwResponseNotOkError(response, data);
+  }
+  return data as Record<string, unknown>;
+};
+
+/**
+ * Query hook for fetching all Views belonging to the current user
+ *
+ * @returns Query result with all Views
+ */
+export function useViewsQuery(): UseQueryResult<View[], Error> {
+  return useQuery<View[], Error>({
+    queryKey: viewQueryKeys.list(),
+    queryFn: ({ signal }) => fetchViews(signal)
+  });
+}
+
+/**
+ * Query hook for the Views that depend on a given Data Link (by sharing key).
+ * Disabled until a sharing key is provided.
+ */
+export function useViewsForDataLinkQuery(
+  sharingKey?: string
+): UseQueryResult<View[], Error> {
+  return useQuery<View[], Error>({
+    queryKey: viewQueryKeys.forDataLink(sharingKey ?? ''),
+    queryFn: ({ signal }) => fetchViewsForDataLink(sharingKey!, signal),
+    enabled: !!sharingKey
+  });
+}
+
+export function useRelinkableViewsQuery(
+  fspName?: string,
+  path?: string
+): UseQueryResult<ViewSummary[], Error> {
+  return useQuery<ViewSummary[], Error>({
+    queryKey: viewQueryKeys.relinkable(fspName ?? '', path ?? ''),
+    queryFn: async () => {
+      const url = buildUrl('/api/neuroglancer/views/relinkable', null, {
+        fsp_name: fspName!,
+        path: path!
+      });
+      const data = (await sendRequestAndThrowForNotOk(
+        url,
+        'GET'
+      )) as ViewSummaryResponse;
+      return data.views ?? [];
+    },
+    // path '' is the FSP root, so test for undefined, not falsiness
+    enabled: fspName !== undefined && path !== undefined
+  });
+}
+
+export function useRelinkViewsMutation(): UseMutationResult<
+  ViewSummary[],
+  Error,
+  string
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (sharingKey: string) => {
+      const data = (await sendRequestAndThrowForNotOk(
+        '/api/neuroglancer/views/relink',
+        'POST',
+        { sharing_key: sharingKey }
+      )) as ViewSummaryResponse;
+      return data.views ?? [];
+    },
+    onSuccess: views => {
+      toastRelinked(views);
+      queryClient.invalidateQueries({ queryKey: viewQueryKeys.all });
+    }
+  });
+}
+
+/**
+ * Query hook for a View's Neuroglancer state by read key. Disabled until a
+ * read key is provided. Data is `null` when the key resolves to no View.
+ */
+export function useViewStateByReadKey(
+  readKey?: string
+): UseQueryResult<Record<string, unknown> | null, Error> {
+  return useQuery<Record<string, unknown> | null, Error>({
+    queryKey: viewQueryKeys.state(readKey ?? ''),
+    queryFn: ({ signal }) => fetchViewState(readKey!, signal),
+    enabled: !!readKey
+  });
+}
+
+/**
+ * Mutation hook for creating a View
+ *
+ * @returns Mutation result
+ * @example
+ * const mutation = useCreateViewMutation();
+ * mutation.mutate({ name: 'my-view', ng_state: {...}, layers: [] });
+ */
+export function useCreateViewMutation(): UseMutationResult<
+  View,
+  Error,
+  ViewCreateRequest
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: ViewCreateRequest) => {
+      const view = await sendRequestAndThrowForNotOk(
+        '/api/neuroglancer/views',
+        'POST',
+        payload
+      );
+      return view as View;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: viewQueryKeys.all
+      });
+    }
+  });
+}
+
+/**
+ * Mutation hook for updating a View
+ *
+ * @returns Mutation result
+ * @example
+ * const mutation = useUpdateViewMutation();
+ * mutation.mutate({ short_key: 'abc123', name: 'New Name' });
+ */
+export function useUpdateViewMutation(): UseMutationResult<
+  View,
+  Error,
+  { short_key: string } & ViewUpdateRequest
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      short_key,
+      ...body
+    }: { short_key: string } & ViewUpdateRequest) => {
+      const url = buildUrl('/api/neuroglancer/views/', short_key, null);
+      const view = await sendRequestAndThrowForNotOk(url, 'PUT', body);
+      return view as View;
+    },
+    onSuccess: (view, variables) => {
+      // Show the saved rows now: the viewer's Sources tab maps layers to
+      // datasets through them, and Save just cleared the pending edits.
+      queryClient.setQueryData<View[]>(viewQueryKeys.list(), old =>
+        old?.map(v => (v.short_key === view.short_key ? view : v))
+      );
+      queryClient.invalidateQueries({
+        queryKey: viewQueryKeys.list()
+      });
+      // Prefix-matches every sharing key's forDataLink query, so AppearsInViews
+      // and the Data Link delete dialog's dependentViewsQuery pick up the new
+      // name too (name/ng_state changes both land here, unlike the state key).
+      queryClient.invalidateQueries({
+        queryKey: viewQueryKeys.forDataLinkAll()
+      });
+      // A name-only rename must not touch the state query: the embedded
+      // viewer's active viewQueryKeys.state(readKey) query would refetch,
+      // changing the iframe src and reloading Neuroglancer (losing the
+      // user's camera/layers). Only ng_state changes warrant that refetch.
+      if (variables.ng_state !== undefined) {
+        queryClient.invalidateQueries({
+          queryKey: viewQueryKeys.state(view.read_key)
+        });
+      }
+    }
+  });
+}
+
+/**
+ * Mutation hook for deleting a View
+ *
+ * @returns Mutation result
+ * @example
+ * const mutation = useDeleteViewMutation();
+ * mutation.mutate('abc123');
+ */
+export function useDeleteViewMutation(): UseMutationResult<
+  void,
+  Error,
+  string
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (shortKey: string) => {
+      const url = buildUrl('/api/neuroglancer/views/', shortKey, null);
+      await sendRequestAndThrowForNotOk(url, 'DELETE');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: viewQueryKeys.all
+      });
+    }
+  });
+}
+
+/** Mutation hook for removing datasets (all their layers) from a View */
+export function useRemoveViewSourcesMutation(): UseMutationResult<
+  View,
+  Error,
+  { short_key: string; sources: { fsp_name: string; path: string }[] }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ short_key, sources }) => {
+      const viewUrl = buildUrl('/api/neuroglancer/views/', short_key, null);
+      const view = await sendRequestAndThrowForNotOk(
+        viewUrl + '/remove-sources',
+        'POST',
+        { sources }
+      );
+      return view as View;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: viewQueryKeys.all
+      });
+    }
+  });
+}

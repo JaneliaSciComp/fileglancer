@@ -3,7 +3,7 @@ import shlex
 from datetime import datetime
 from typing import Annotated, Any, List, Literal, Optional, Dict, Union
 
-from pydantic import BaseModel, Discriminator, Field, HttpUrl, Tag, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Discriminator, Field, HttpUrl, Tag, field_validator, model_validator
 
 from fileglancer.giturls import _parse_github_url
 
@@ -131,6 +131,9 @@ class UserPreference(BaseModel):
 
 class ProxiedPath(BaseModel):
     """A proxied path which is used to share a file system path via a URL"""
+    id: int = Field(
+        description="Database id of the Data Link; matches ViewLayer.data_link_id"
+    )
     username: str = Field(
         description="The username of the user who owns this proxied path"
     )
@@ -160,10 +163,121 @@ class ProxiedPath(BaseModel):
         default=None
     )
 
+class ProxiedPathCreateResponse(ProxiedPath):
+    relinked_views: List["ViewSummary"] = Field(
+        default_factory=list,
+        description="The caller's broken Views that creating this Data Link repaired",
+    )
+
+
 class ProxiedPathResponse(BaseModel):
     paths: List[ProxiedPath] = Field(
         description="A list of proxied paths"
     )
+
+
+class ViewLayer(BaseModel):
+    """One dataset/channel layer of a Neuroglancer View."""
+    model_config = ConfigDict(from_attributes=True)
+
+    layer_index: int = Field(description="Position of this layer within the View")
+    data_link_id: Optional[int] = Field(
+        default=None,
+        description="ID of the Data Link (proxied path) backing this layer; null if broken",
+    )
+    channel: Optional[str] = Field(default=None, description="Channel identifier, if this layer is one channel")
+    opts: Optional[Dict] = Field(default=None, description="Per-layer options")
+    fsp_name: Optional[str] = Field(
+        default=None,
+        description="File share path name of this layer's source; kept when the Data Link is deleted",
+    )
+    path: Optional[str] = Field(
+        default=None,
+        description="Path (relative to the FSP mount) of this layer's source; kept when the Data Link is deleted",
+    )
+    sharing_key: Optional[str] = Field(
+        default=None,
+        description="Sharing key of the Data Link this layer was built against; kept when the link is deleted",
+    )
+    url_prefix: Optional[str] = Field(
+        default=None,
+        description="URL prefix of that Data Link; kept when the link is deleted",
+    )
+    broken: bool = Field(default=False, description="True if the backing Data Link was deleted")
+
+
+class View(BaseModel):
+    """A Neuroglancer View: saved NG state + its layers + sharing settings."""
+    model_config = ConfigDict(from_attributes=True)
+
+    short_key: str = Field(description="Owner-facing key identifying this View")
+    read_key: str = Field(description="Key that opens this View read-only")
+    name: str = Field(description="Display name of the View")
+    ng_state: Dict = Field(description="The Neuroglancer state JSON")
+    sharing_mode: Literal['private', 'read'] = Field(description="'private' or 'read'")
+    owner: str = Field(description="Username of the View owner")
+    created_at: datetime = Field(description="When this View was created")
+    updated_at: datetime = Field(description="When this View was last updated")
+    layers: List[ViewLayer] = Field(default_factory=list, description="The layers of this View")
+
+
+class ViewResponse(BaseModel):
+    views: List[View] = Field(description="A list of Neuroglancer Views")
+
+
+class ViewLayerInput(BaseModel):
+    """One layer in a create-View request. `sharing_key` names the Data Link
+    that backs this layer (resolved to an internal id server-side); null for a
+    layer with no Fileglancer Data Link (e.g. an external URL layer)."""
+    sharing_key: Optional[str] = Field(default=None, description="Data Link sharing key backing this layer")
+    layer_index: int = Field(description="Position of this layer within the View")
+    channel: Optional[str] = Field(default=None, description="Channel identifier, if this layer is one channel")
+    opts: Optional[Dict] = Field(default=None, description="Per-layer options")
+
+
+class ViewCreateRequest(BaseModel):
+    """Request body for creating a View. The client builds `ng_state`."""
+    name: str = Field(description="Display name of the View")
+    ng_state: Dict = Field(description="The Neuroglancer state JSON")
+    sharing_mode: Literal['private', 'read'] = Field(default='read', description="'private' or 'read'")
+    layers: List[ViewLayerInput] = Field(default_factory=list, description="Layers backing this View")
+
+
+class ViewUpdateRequest(BaseModel):
+    """Request body for an owner update (rename / restate)."""
+    name: Optional[str] = Field(default=None, description="New display name")
+    ng_state: Optional[Dict] = Field(default=None, description="Replacement Neuroglancer state JSON")
+    unsupported_sharing_keys: Optional[List[str]] = Field(
+        default=None,
+        description="Data Links of added datasets that can't load as Neuroglancer layers; "
+                    "recorded as unsupported sources")
+    removed_unsupported_sharing_keys: Optional[List[str]] = Field(
+        default=None,
+        description="Data Links whose unsupported source rows to drop from the View")
+
+
+class ViewSummary(BaseModel):
+    short_key: str = Field(description="The View's short key")
+    name: str = Field(description="Display name of the View")
+
+
+class ViewSummaryResponse(BaseModel):
+    views: List[ViewSummary] = Field(description="A list of View summaries")
+
+
+class ViewSource(BaseModel):
+    fsp_name: str = Field(description="File share path name")
+    path: str = Field(description="Dataset path within the file share")
+
+
+class RemoveViewSourcesRequest(BaseModel):
+    """Datasets to remove (with all their layers) from a View."""
+    sources: List[ViewSource] = Field(min_length=1, description="Datasets to remove")
+
+
+class RelinkRequest(BaseModel):
+    """Relink the caller's broken Views onto one of the caller's Data Links."""
+    sharing_key: str = Field(description="Sharing key of the Data Link to relink onto")
 
 
 class ExternalBucket(BaseModel):

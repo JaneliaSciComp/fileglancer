@@ -1,0 +1,717 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { createElement } from 'react';
+import type { ReactNode } from 'react';
+import toast from 'react-hot-toast';
+import type { View } from '@/queries/viewQueries';
+import { makeFakeBridge } from '@/__tests__/mocks/fakeNeuroglancer';
+
+const { useViewStateByReadKey } = vi.hoisted(() => ({
+  useViewStateByReadKey: vi.fn()
+}));
+const useViewsQuery = vi.hoisted(() => vi.fn(() => ({ data: [] as View[] })));
+const mutateAsync = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const { bridgeRef } = vi.hoisted(() => ({
+  bridgeRef: {
+    current: null as null | ReturnType<
+      typeof import('@/__tests__/mocks/fakeNeuroglancer').makeFakeBridge
+    >
+  }
+}));
+vi.mock('@/hooks/useNeuroglancerViewer', () => ({
+  useNeuroglancerViewer: () => bridgeRef.current!.bridge
+}));
+vi.mock('@/queries/viewQueries', () => ({
+  useViewStateByReadKey
+}));
+vi.mock('@/contexts/ViewsContext', () => ({
+  useViewsContext: () => ({
+    allViewsQuery: useViewsQuery(),
+    updateViewMutation: { mutateAsync }
+  })
+}));
+const ngBase = vi.hoisted(() => ({
+  current: 'https://ng.example/' as string | null
+}));
+vi.mock('@/hooks/useDefaultNeuroglancerBaseUrl', () => ({
+  useInternalNeuroglancerBaseUrl: () => ngBase.current,
+  useDefaultNeuroglancerBaseUrl: () => 'https://ng-preferred.example/'
+}));
+const navigate = vi.hoisted(() => vi.fn());
+vi.mock('react-router', () => ({
+  useParams: () => ({ readKey: 'rk1' }),
+  useNavigate: () => navigate,
+  Link: ({ to, children }: { to: string; children: ReactNode }) =>
+    createElement('a', { href: to }, children)
+}));
+
+const { copyToClipboard } = vi.hoisted(() => ({
+  copyToClipboard: vi.fn()
+}));
+vi.mock('@/utils/copyText', () => ({ copyToClipboard }));
+const downloadTextFile = vi.hoisted(() => vi.fn());
+vi.mock('@/utils', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/utils')>()),
+  downloadTextFile
+}));
+
+vi.mock('@/components/ui/Navbar/ProfileMenu', () => ({
+  default: () => <div data-testid="profile-menu" />
+}));
+
+// ponytail: FgTooltip.Trigger duplicates its aria-label onto a wrapping div
+// (see FgTooltip.tsx), which breaks getByLabelText with two matches. Mirror
+// InlineNameEditor.test.tsx and strip the wrapper in tests.
+vi.mock('@/components/ui/widgets/FgTooltip', () => ({
+  default: ({ children }: { children: ReactNode }) => <>{children}</>
+}));
+
+vi.mock('@/components/ui/Views/ViewBrokenBanner', () => ({
+  default: ({
+    onRelink
+  }: {
+    onRelink: (t: {
+      fsp_name: string;
+      path: string;
+      displayPath: string;
+    }) => void;
+  }) => (
+    <button
+      onClick={() =>
+        onRelink({ fsp_name: 'fsp', path: 'a.zarr', displayPath: 'a.zarr' })
+      }
+      type="button"
+    >
+      banner relink
+    </button>
+  )
+}));
+vi.mock('@/components/ui/Views/ViewerSidebar', () => ({
+  default: ({
+    bridge,
+    editState
+  }: {
+    bridge: { setState: (s: Record<string, unknown>) => void };
+    editState: {
+      markEdited: () => void;
+      addSources: (keys: string[]) => void;
+      removeSource: (key: string) => void;
+    };
+  }) => (
+    <aside aria-label="View data sidebar">
+      <button onClick={() => editState.addSources(['plainKey'])} type="button">
+        fake add unsupported
+      </button>
+      <button onClick={() => editState.removeSource('savedKey')} type="button">
+        fake remove unsupported
+      </button>
+      <button
+        onClick={() => {
+          bridge.setState({ layers: [{ name: 'L0' }, { name: 'added' }] });
+          editState.markEdited();
+        }}
+        type="button"
+      >
+        fake add
+      </button>
+    </aside>
+  )
+}));
+vi.mock('@/components/ui/Dialogs/RelinkDialog', () => ({
+  default: ({ onRelinked }: { onRelinked?: () => void }) => (
+    <button onClick={() => onRelinked?.()} type="button">
+      dialog relinked
+    </button>
+  )
+}));
+
+import NeuroglancerView from '@/components/NeuroglancerView';
+
+const OWNED = {
+  short_key: 'sk1',
+  read_key: 'rk1',
+  name: 'Mine',
+  ng_state: {},
+  sharing_mode: 'read',
+  owner: 'me',
+  created_at: '',
+  updated_at: '',
+  layers: []
+} as unknown as View;
+
+function renderViewer(options: { title?: string } = {}) {
+  useViewStateByReadKey.mockReturnValue({
+    data: { title: options.title, layers: [{ name: 'L0' }] },
+    isPending: false,
+    isError: false
+  });
+  return render(<NeuroglancerView />);
+}
+
+/** Save sits in the toolbar always; it only enables once the View is dirty. */
+const findEnabledSave = () =>
+  screen.findByRole('button', { name: 'Save' }).then(async button => {
+    await waitFor(() => expect(button).toBeEnabled());
+    return button;
+  });
+
+describe('NeuroglancerView', () => {
+  beforeEach(() => {
+    copyToClipboard.mockReset();
+    copyToClipboard.mockResolvedValue({ success: true });
+    useViewsQuery.mockReturnValue({ data: [] });
+    ngBase.current = 'https://ng.example/';
+    mutateAsync.mockReset();
+    navigate.mockReset();
+    downloadTextFile.mockReset();
+    mutateAsync.mockResolvedValue(undefined);
+    bridgeRef.current = makeFakeBridge({ layers: [{ name: 'L0' }] });
+  });
+
+  it('shows a loading state while pending', () => {
+    useViewStateByReadKey.mockReturnValue({
+      data: undefined,
+      isPending: true,
+      isError: false
+    });
+    render(<NeuroglancerView />);
+    expect(screen.getByText(/loading/i)).toBeInTheDocument();
+  });
+
+  it('shows "not found" when the key resolves to null', () => {
+    useViewStateByReadKey.mockReturnValue({
+      data: null,
+      isPending: false,
+      isError: false
+    });
+    render(<NeuroglancerView />);
+    expect(screen.getByText(/view not found/i)).toBeInTheDocument();
+  });
+
+  it('iframes Neuroglancer with the inline state and shows the export actions', () => {
+    useViewStateByReadKey.mockReturnValue({
+      data: { title: 'My View', layers: [{ name: 'L0' }] },
+      isPending: false,
+      isError: false
+    });
+    render(<NeuroglancerView />);
+    const iframe = screen.getByTitle(/neuroglancer/i) as HTMLIFrameElement;
+    expect(iframe.src).toContain('https://ng.example/#!');
+    expect(iframe.src).toContain(
+      encodeURIComponent(
+        JSON.stringify({ title: 'My View', layers: [{ name: 'L0' }] })
+      )
+    );
+    expect(screen.getAllByText('My View').length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole('button', { name: /copy link/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /download json/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /open in neuroglancer/i })
+    ).toBeInTheDocument();
+  });
+
+  it('shows a breadcrumb linking back to the Views list', () => {
+    useViewStateByReadKey.mockReturnValue({
+      data: { title: 'My View', layers: [{ name: 'L0' }] },
+      isPending: false,
+      isError: false
+    });
+    render(<NeuroglancerView />);
+    const crumbLink = screen.getByRole('link', { name: /^views$/i });
+    expect(crumbLink).toHaveAttribute('href', '/ngviews');
+  });
+
+  it('falls back to "Untitled View" when the view has no title', () => {
+    useViewStateByReadKey.mockReturnValue({
+      data: { layers: [{ name: 'L0' }] },
+      isPending: false,
+      isError: false
+    });
+    render(<NeuroglancerView />);
+    expect(screen.getAllByText('Untitled View').length).toBeGreaterThan(0);
+  });
+
+  it('copies the canonical short link (not the external URL) when "Copy link to share" is clicked', async () => {
+    const user = userEvent.setup();
+    useViewStateByReadKey.mockReturnValue({
+      data: { title: 'My View', layers: [{ name: 'L0' }] },
+      isPending: false,
+      isError: false
+    });
+    render(<NeuroglancerView />);
+    await user.click(
+      screen.getByRole('button', { name: 'Copy link to share' })
+    );
+    expect(copyToClipboard).toHaveBeenCalledWith(
+      `${window.location.origin}/view/rk1`
+    );
+    expect(copyToClipboard).not.toHaveBeenCalledWith(
+      expect.stringContaining('https://ng.example/')
+    );
+    expect(toast.success).toHaveBeenCalledWith('View link copied');
+  });
+
+  it('shows the owned View name with a rename control', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    expect(await screen.findByText('Mine')).toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText('Edit view name'));
+    await userEvent.clear(screen.getByRole('textbox'));
+    await userEvent.type(screen.getByRole('textbox'), 'Renamed{Enter}');
+    expect(mutateAsync).toHaveBeenCalledWith({
+      short_key: 'sk1',
+      name: 'Renamed'
+    });
+  });
+
+  it('shows a read-only title without a rename control when the View is not owned', () => {
+    useViewsQuery.mockReturnValue({ data: [] });
+    renderViewer({ title: 'Theirs' });
+    expect(screen.getByText('Theirs')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Edit view name')).not.toBeInTheDocument();
+  });
+
+  it('enables Save and shows Discard once the View has unsaved changes', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull();
+    act(() => bridgeRef.current!.interact());
+    bridgeRef.current!.change({ layers: [{ name: 'L0' }], layout: '4panel' });
+    expect(await findEnabledSave()).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Discard' })).toBeInTheDocument();
+  });
+
+  it('saves the live viewer state', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    act(() => bridgeRef.current!.interact());
+    bridgeRef.current!.change({ layers: [{ name: 'L0' }], layout: '4panel' });
+    await userEvent.click(await findEnabledSave());
+    expect(mutateAsync).toHaveBeenCalledWith({
+      short_key: 'sk1',
+      ng_state: { layers: [{ name: 'L0' }], layout: '4panel' }
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    );
+    expect(toast.success).toHaveBeenCalledWith('View saved');
+  });
+
+  it('keeps unsaved changes when Save fails', async () => {
+    mutateAsync.mockRejectedValueOnce(new Error('Server error'));
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    act(() => bridgeRef.current!.interact());
+    bridgeRef.current!.change({ layers: [{ name: 'L0' }], layout: '4panel' });
+    await userEvent.click(await findEnabledSave());
+    expect(toast.error).toHaveBeenCalledWith('Server error');
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+
+  it('discard restores the saved state', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    const setState = vi.spyOn(bridgeRef.current!.bridge, 'setState');
+    renderViewer();
+    act(() => bridgeRef.current!.interact());
+    bridgeRef.current!.change({ layers: [{ name: 'L0' }], layout: '4panel' });
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Discard' })
+    );
+    expect(setState).toHaveBeenCalledWith({ layers: [{ name: 'L0' }] });
+  });
+
+  it('never shows Save to a non-owner', async () => {
+    useViewsQuery.mockReturnValue({ data: [] });
+    renderViewer();
+    act(() => bridgeRef.current!.interact());
+    bridgeRef.current!.change({ layers: [], layout: '4panel' });
+    await new Promise(r => setTimeout(r, 400));
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+  });
+
+  it('tells the owner when editing is unavailable', () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    bridgeRef.current!.bridge.status = 'unavailable';
+    renderViewer();
+    expect(
+      screen.getByText(
+        "Editing isn't available with this Neuroglancer deployment"
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('does not tell a non-owner that editing is unavailable', () => {
+    bridgeRef.current!.bridge.status = 'unavailable';
+    renderViewer();
+    expect(
+      screen.queryByText(
+        "Editing isn't available with this Neuroglancer deployment"
+      )
+    ).toBeNull();
+  });
+
+  it('loads the iframe from the refetched state, not a stale cached one', () => {
+    // Reopening a View after "Save and continue" left the page: the cache
+    // still holds the old state while the mount refetch is in flight.
+    useViewStateByReadKey.mockReturnValue({
+      data: { layers: [{ name: 'old' }] },
+      isPending: false,
+      isFetching: true,
+      isError: false
+    });
+    const { rerender } = render(<NeuroglancerView />);
+    expect(screen.queryByTitle(/neuroglancer/i)).toBeNull();
+    useViewStateByReadKey.mockReturnValue({
+      data: { layers: [{ name: 'saved' }] },
+      isPending: false,
+      isFetching: false,
+      isError: false
+    });
+    rerender(<NeuroglancerView />);
+    const src = decodeURIComponent(
+      (screen.getByTitle(/neuroglancer/i) as HTMLIFrameElement).src
+    );
+    expect(src).toContain('"saved"');
+    expect(src).not.toContain('"old"');
+  });
+
+  it('does not reload the iframe when the saved state refetches', () => {
+    const { rerender } = renderViewer({ title: 'My View' });
+    const iframe = screen.getByTitle(/neuroglancer/i) as HTMLIFrameElement;
+    const src = iframe.src;
+    useViewStateByReadKey.mockReturnValue({
+      data: { title: 'My View', layers: [{ name: 'L0' }, { name: 'L1' }] },
+      isPending: false,
+      isError: false
+    });
+    rerender(<NeuroglancerView />);
+    expect((screen.getByTitle(/neuroglancer/i) as HTMLIFrameElement).src).toBe(
+      src
+    );
+  });
+
+  it('warns before leaving with unsaved changes', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    const clean = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(clean);
+    expect(clean.defaultPrevented).toBe(false);
+    act(() => bridgeRef.current!.interact());
+    bridgeRef.current!.change({ layers: [], layout: '4panel' });
+    await findEnabledSave();
+    const dirty = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(dirty);
+    expect(dirty.defaultPrevented).toBe(true);
+  });
+
+  it('pushes the relinked state into the viewer', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    const relinked = { layers: [{ name: 'L0', source: 'new' }] };
+    const refetch = vi.fn().mockResolvedValue({ data: relinked });
+    useViewStateByReadKey.mockReturnValue({
+      data: { layers: [{ name: 'L0' }] },
+      isPending: false,
+      isError: false,
+      refetch
+    });
+    const setState = vi.spyOn(bridgeRef.current!.bridge, 'setState');
+    render(<NeuroglancerView />);
+    await userEvent.click(screen.getByText('banner relink'));
+    await userEvent.click(screen.getByText('dialog relinked'));
+    await waitFor(() => expect(setState).toHaveBeenCalledWith(relinked));
+  });
+
+  it('reloads the iframe with the relinked state when editing is unavailable', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    bridgeRef.current!.bridge.status = 'unavailable';
+    const relinked = { layers: [{ name: 'L0', source: 'new' }] };
+    useViewStateByReadKey.mockReturnValue({
+      data: { layers: [{ name: 'L0' }] },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn().mockResolvedValue({ data: relinked })
+    });
+    render(<NeuroglancerView />);
+    await userEvent.click(screen.getByText('banner relink'));
+    await userEvent.click(screen.getByText('dialog relinked'));
+    await waitFor(() =>
+      expect(
+        (screen.getByTitle(/neuroglancer/i) as HTMLIFrameElement).src
+      ).toContain(encodeURIComponent(JSON.stringify(relinked)))
+    );
+  });
+
+  it('shows no broken banner to a non-owner', () => {
+    renderViewer();
+    expect(screen.queryByText('banner relink')).toBeNull();
+  });
+
+  it('waits for the configured Neuroglancer before loading the iframe', () => {
+    ngBase.current = null; // viewers config still loading
+    const { rerender } = renderViewer();
+    expect(screen.queryByTitle(/neuroglancer/i)).toBeNull();
+    ngBase.current = 'https://ng.example/';
+    rerender(<NeuroglancerView />);
+    expect(
+      (screen.getByTitle(/neuroglancer/i) as HTMLIFrameElement).src
+    ).toContain('https://ng.example/#!');
+  });
+
+  it('does not warn a non-owner before leaving', async () => {
+    renderViewer();
+    act(() => bridgeRef.current!.interact());
+    bridgeRef.current!.change({ layers: [], layout: '4panel' });
+    await new Promise(r => setTimeout(r, 400));
+    const leave = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(leave);
+    expect(leave.defaultPrevented).toBe(false);
+  });
+
+  it('keeps the viewer when a background refetch fails', () => {
+    const { rerender } = renderViewer({ title: 'My View' });
+    useViewStateByReadKey.mockReturnValue({
+      data: { title: 'My View', layers: [{ name: 'L0' }] },
+      isPending: false,
+      isError: true
+    });
+    rerender(<NeuroglancerView />);
+    expect(screen.getByTitle(/neuroglancer/i)).toBeInTheDocument();
+  });
+
+  it('tells the owner when Neuroglancer reloads with unsaved changes', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    const { rerender } = renderViewer();
+    act(() => bridgeRef.current!.interact());
+    bridgeRef.current!.change({ layers: [{ name: 'L0' }], layout: '4panel' });
+    await findEnabledSave();
+    bridgeRef.current!.bridge.status = 'loading';
+    rerender(<NeuroglancerView />);
+    expect(toast.error).toHaveBeenCalledWith(
+      'Neuroglancer reloaded, so unsaved changes may have been lost'
+    );
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  });
+
+  describe('with unsaved changes', () => {
+    const SAVED = { layers: [{ name: 'L0' }] };
+    const LIVE = { layers: [{ name: 'L0' }], layout: '4panel' };
+
+    async function renderDirty(views: View[] = [OWNED]) {
+      useViewsQuery.mockReturnValue({ data: views });
+      useViewStateByReadKey.mockReturnValue({
+        data: SAVED,
+        isPending: false,
+        isError: false
+      });
+      render(<NeuroglancerView />);
+      act(() => bridgeRef.current!.interact());
+      bridgeRef.current!.change(LIVE);
+      await new Promise(r => setTimeout(r, 400));
+    }
+
+    it('asks before following an in-app link, and can leave without saving', async () => {
+      await renderDirty();
+      await userEvent.click(screen.getByRole('link', { name: /^views$/i }));
+      expect(navigate).not.toHaveBeenCalled();
+      expect(
+        await screen.findByText(/leaving this page discards them/i)
+      ).toBeInTheDocument();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Continue without saving' })
+      );
+      expect(navigate).toHaveBeenCalledWith('/ngviews');
+      expect(mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('saves before following the link', async () => {
+      await renderDirty();
+      await userEvent.click(screen.getByRole('link', { name: /^views$/i }));
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Save and continue' })
+      );
+      expect(mutateAsync).toHaveBeenCalledWith({
+        short_key: 'sk1',
+        ng_state: LIVE
+      });
+      expect(navigate).toHaveBeenCalledWith('/ngviews');
+    });
+
+    it('stays on the page when that save fails', async () => {
+      mutateAsync.mockRejectedValueOnce(new Error('Server error'));
+      await renderDirty();
+      await userEvent.click(screen.getByRole('link', { name: /^views$/i }));
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Save and continue' })
+      );
+      expect(toast.error).toHaveBeenCalledWith('Server error');
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('cancel stays on the page', async () => {
+      await renderDirty();
+      await userEvent.click(screen.getByRole('link', { name: /^views$/i }));
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Cancel' })
+      );
+      expect(navigate).not.toHaveBeenCalled();
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('button', { name: 'Continue without saving' })
+        ).toBeNull()
+      );
+    });
+
+    it('asks before Download JSON; continuing downloads the saved View', async () => {
+      await renderDirty();
+      await userEvent.click(
+        screen.getByRole('button', { name: /download json/i })
+      );
+      expect(downloadTextFile).not.toHaveBeenCalled();
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Continue without saving' })
+      );
+      expect(downloadTextFile).toHaveBeenCalledWith(
+        JSON.stringify(SAVED, null, 2),
+        'Mine.json'
+      );
+    });
+
+    it('saving first downloads what was saved', async () => {
+      await renderDirty();
+      await userEvent.click(
+        screen.getByRole('button', { name: /download json/i })
+      );
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Save and continue' })
+      );
+      expect(downloadTextFile).toHaveBeenCalledWith(
+        JSON.stringify(LIVE, null, 2),
+        'Mine.json'
+      );
+    });
+
+    it('asks before Open in Neuroglancer and Copy link', async () => {
+      const open = vi.spyOn(window, 'open').mockReturnValue(null);
+      await renderDirty();
+      await userEvent.click(
+        screen.getByRole('button', { name: /open in neuroglancer/i })
+      );
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Continue without saving' })
+      );
+      expect(open).toHaveBeenCalledWith(
+        expect.stringContaining(encodeURIComponent(JSON.stringify(SAVED))),
+        '_blank',
+        'noopener,noreferrer'
+      );
+      // The new tab follows the Internal/External preference, not the iframe's URL.
+      expect(open.mock.calls[0][0]).toMatch(
+        /^https:\/\/ng-preferred\.example\//
+      );
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Copy link to share' })
+      );
+      expect(copyToClipboard).not.toHaveBeenCalled();
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Continue without saving' })
+      );
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        `${window.location.origin}/view/rk1`
+      );
+      open.mockRestore();
+    });
+
+    it('lets a non-owner export without asking', async () => {
+      await renderDirty([]);
+      await userEvent.click(
+        screen.getByRole('button', { name: /download json/i })
+      );
+      expect(downloadTextFile).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('lets the owner open and close the Add data sidebar', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    const toggle = screen.getByRole('button', { name: 'Add data' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(toggle);
+    expect(
+      screen.getByRole('complementary', { name: 'View data sidebar' })
+    ).toBeInTheDocument();
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(toggle);
+    expect(screen.queryByRole('complementary')).toBeNull();
+  });
+
+  it('toggling the sidebar keeps the same iframe', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    const iframe = screen.getByTitle(/neuroglancer/i) as HTMLIFrameElement;
+    const src = iframe.src;
+    await userEvent.click(screen.getByRole('button', { name: 'Add data' }));
+    expect(screen.getByTitle(/neuroglancer/i)).toBe(iframe);
+    await userEvent.click(screen.getByRole('button', { name: 'Add data' }));
+    expect(screen.getByTitle(/neuroglancer/i)).toBe(iframe);
+    expect(iframe.src).toBe(src);
+  });
+
+  it('shows the Save bar after adding from the sidebar', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    await userEvent.click(screen.getByRole('button', { name: 'Add data' }));
+    // No in-viewer interaction first: the add alone must count as an edit.
+    await userEvent.click(screen.getByRole('button', { name: 'fake add' }));
+    expect(await findEnabledSave()).toBeInTheDocument();
+  });
+
+  it('saves an unsupported dataset added from the sidebar as a source', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    await userEvent.click(screen.getByRole('button', { name: 'Add data' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'fake add unsupported' })
+    );
+    await userEvent.click(await findEnabledSave());
+    expect(mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        short_key: 'sk1',
+        unsupported_sharing_keys: ['plainKey']
+      })
+    );
+  });
+
+  it('drops a removed unsupported source on Save', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    await userEvent.click(screen.getByRole('button', { name: 'Add data' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'fake remove unsupported' })
+    );
+    await userEvent.click(await findEnabledSave());
+    expect(mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        short_key: 'sk1',
+        removed_unsupported_sharing_keys: ['savedKey']
+      })
+    );
+  });
+
+  it('hides Add data from a non-owner', () => {
+    renderViewer();
+    expect(screen.queryByRole('button', { name: 'Add data' })).toBeNull();
+  });
+
+  it('hides Add data when editing is unavailable', () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    bridgeRef.current!.bridge.status = 'unavailable';
+    renderViewer();
+    expect(screen.queryByRole('button', { name: 'Add data' })).toBeNull();
+  });
+});
