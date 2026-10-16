@@ -132,25 +132,26 @@ export const tourSteps: StepOptions[] = [
     buttons: [backButton, takeAnotherTourButton, exitButton]
   },
 
-  // File Conversion workflow
+  // Views workflow
   {
-    id: 'conversion-start',
-    title: 'File Conversion',
-    text: "Navigate to a file you want to convert. Let's go to an example file.",
+    id: 'views-add-to-cart',
+    title: 'Views',
+    text: 'A View opens several datasets together in Neuroglancer, one layer per dataset. When you browse a Zarr or N5 dataset, click "Add to cart" to collect it in your Layer Cart.',
+    attachTo: { element: '[data-tour="data-tool-links"]', on: 'bottom' },
+    buttons: [backButton, nextButton, exitButton]
+  },
+  {
+    id: 'views-cart',
+    title: 'Layer Cart',
+    text: 'Open the Layer Cart to review the datasets you collected. Click "Create View" to open them together in Neuroglancer.',
+    attachTo: { element: '[data-tour="layer-cart-button"]', on: 'bottom' },
     buttons: [] // Will be dynamically replaced with navigation logic
   },
   {
-    id: 'conversion-properties',
-    title: 'Request Conversion',
-    text: 'Select a file and open the properties panel to the "Convert" tab. Click "Open conversion request" to submit a conversion task.',
-    attachTo: { element: '[data-tour="properties-drawer"]', on: 'left' },
-    buttons: [] // Will be dynamically replaced with navigation logic
-  },
-  {
-    id: 'conversion-jobs',
-    title: 'Monitor Tasks',
-    text: 'View the status of your conversion requests on the Tasks page.',
-    attachTo: { element: '[data-tour="tasks-page"]', on: 'bottom' },
+    id: 'views-page',
+    title: 'Your Views',
+    text: 'Your saved Views are listed on the Views page. Open, rename, or delete them, or remove datasets from a View.',
+    attachTo: { element: '[data-tour="views-page"]', on: 'bottom' },
     buttons: [backButton, takeAnotherTourButton, exitButton]
   }
 ];

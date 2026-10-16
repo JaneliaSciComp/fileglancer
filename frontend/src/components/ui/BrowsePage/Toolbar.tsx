@@ -238,7 +238,12 @@ export default function Toolbar({
             }`}
           />
           {/* Cart badge mirrors the count badge style used in the navbar. */}
-          <Badge color="secondary" overlap="circular" placement="top-end">
+          <Badge
+            color="secondary"
+            data-tour="layer-cart-button"
+            overlap="circular"
+            placement="top-end"
+          >
             <Badge.Content>
               <FgTooltip
                 as={IconButton}

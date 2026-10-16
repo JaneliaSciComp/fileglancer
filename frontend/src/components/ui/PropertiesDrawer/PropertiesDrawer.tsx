@@ -463,7 +463,6 @@ export default function PropertiesDrawer({
                           viewers like Neuroglancer.
                         </Typography>
                         <FgButton
-                          data-tour="open-conversion-request"
                           disabled={
                             fileBrowserState.propertiesTarget.hasRead === false
                           }

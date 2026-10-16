@@ -124,7 +124,7 @@ export default function NGViews() {
 
   return (
     <>
-      <div className="w-full">
+      <div className="w-full" data-tour="views-page">
         <Typography className="mb-2 text-foreground font-bold" type="h5">
           Views
         </Typography>

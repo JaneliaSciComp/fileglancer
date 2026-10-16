@@ -46,8 +46,6 @@ export default function StartTour({
           item.mount_path.toLowerCase().includes('nearline'))
     );
 
-  const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
-
   // Helper to set up navigation input step with dynamic text including sample path
   const setupNavigationInputStep = (tour: Tour) => {
     const navInputStep = tour.getById('nav-navigation-input');
@@ -139,44 +137,18 @@ export default function StartTour({
     }
   };
 
-  // Helper to set up conversion properties step with convert tab opened
-  const setupConversionStartStep = (tour: Tour) => {
-    const conversionStartStep = tour.getById('conversion-start');
-    if (conversionStartStep) {
-      conversionStartStep.updateStepOptions({
+  // Helper to set up Layer Cart step that navigates to the Views page
+  const setupViewsCartStep = (tour: Tour) => {
+    const viewsCartStep = tour.getById('views-cart');
+    if (viewsCartStep) {
+      viewsCartStep.updateStepOptions({
         buttons: [
           backButton,
           {
             text: 'Next',
             action: async function (this: any) {
-              // Navigate with openConvertTab state to open properties with Convert tab selected
-              const currentPath = window.location.pathname;
-              navigate(currentPath, {
-                state: { openConvertTab: true },
-                replace: true
-              });
-              await waitForElement('[data-tour="open-conversion-request"]');
-              return this.next();
-            }
-          },
-          exitButton
-        ]
-      });
-    }
-  };
-
-  // Helper to set up conversion properties step with convert tab opened
-  const setupConversionPropertiesStep = (tour: Tour) => {
-    const conversionPropertiesStep = tour.getById('conversion-properties');
-    if (conversionPropertiesStep) {
-      conversionPropertiesStep.updateStepOptions({
-        buttons: [
-          backButton,
-          {
-            text: 'Next',
-            action: async function (this: any) {
-              navigate('/jobs');
-              await waitForElement('[data-tour="tasks-page"]');
+              navigate('/ngviews');
+              await waitForElement('[data-tour="views-page"]');
               return this.next();
             }
           },
@@ -192,7 +164,7 @@ export default function StartTour({
       'nav-properties',
       'datalinks-janelia-preferences',
       'datalinks-general-preferences',
-      'conversion-jobs'
+      'views-page'
     ];
 
     completionStepIds.forEach(stepId => {
@@ -266,33 +238,29 @@ export default function StartTour({
       }
     ];
 
-    // Only add File Conversion option if tasks are enabled
-    if (tasksEnabled) {
-      workflowButtons.push({
-        text: 'File Conversion',
-        action: async function (this: any) {
-          const currentTour = Shepherd.activeTour as Tour;
-          if (isJaneliaFilesystem) {
-            navigate(
-              '/browse/nrs_opendata/ome-zarr-examples/fused-timeseries.zarr'
-            );
-          } else {
-            const firstZone = Object.values(zonesAndFspQuery.data || {}).find(
-              item => 'fileSharePaths' in item
-            ) as Zone | undefined;
-            if (firstZone && firstZone.fileSharePaths.length > 0) {
-              const firstFsp = firstZone.fileSharePaths[0];
-              navigate(`/browse/${firstFsp.name}`);
-            }
+    workflowButtons.push({
+      text: 'Views',
+      action: async function (this: any) {
+        const currentTour = Shepherd.activeTour as Tour;
+        if (isJaneliaFilesystem) {
+          navigate(
+            '/browse/nrs_opendata/ome-zarr-examples/fused-timeseries.zarr'
+          );
+        } else {
+          const firstZone = Object.values(zonesAndFspQuery.data || {}).find(
+            item => 'fileSharePaths' in item
+          ) as Zone | undefined;
+          if (firstZone && firstZone.fileSharePaths.length > 0) {
+            const firstFsp = firstZone.fileSharePaths[0];
+            navigate(`/browse/${firstFsp.name}`);
           }
-          await waitForElement('[data-tour="file-browser"]');
-          setupConversionStartStep(currentTour);
-          setupConversionPropertiesStep(currentTour);
-          setupCompletionButtons(currentTour);
-          currentTour.show('conversion-start');
         }
-      });
-    }
+        await waitForElement('[data-tour="file-browser"]');
+        setupViewsCartStep(currentTour);
+        setupCompletionButtons(currentTour);
+        currentTour.show('views-add-to-cart');
+      }
+    });
 
     workflowButtons.push({
       text: 'Exit',
