@@ -41,7 +41,7 @@ dependencies = [
     "packaging ==26.3",
     "uvicorn ==0.38.0",
     "x2s3 ==1.6.0",
-    "py-cluster-api ==0.8.0"
+    "py-cluster-api ==0.8.1"
 ]
 
 [project.scripts]
@@ -210,7 +210,7 @@ fileglancer = { path = ".", editable = true }
 # pixi or pip -- sync_pyproject_versions.py is the only consumer.
 [tool.sync-pypi-versions.ranges]
 x2s3 = ">=1.5.2,<2"
-py-cluster-api = ">=0.8.0,<0.9"
+py-cluster-api = ">=0.8.1,<0.9"
 build = ">=1.3.0,<2"
 
 [dependency-groups]
