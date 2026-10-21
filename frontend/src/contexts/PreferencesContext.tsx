@@ -51,6 +51,9 @@ export type FolderPreference = {
 export type ViewerUrlSource = 'configured' | 'manifest' | { custom: string };
 export type ViewerUrlSources = Record<string, ViewerUrlSource>;
 
+/** Where the metadata panel's Neuroglancer button opens a dataset. */
+export type NeuroglancerButtonTarget = 'views' | 'standalone';
+
 type PreferencesContextType = {
   //Full query for accessing loading/error states
   preferenceQuery: ReturnType<typeof usePreferencesQuery>;
@@ -65,6 +68,8 @@ type PreferencesContextType = {
   disableHeuristicalLayerTypeDetection: boolean;
   useLegacyMultichannelApproach: boolean;
   viewerUrlSources: ViewerUrlSources;
+  neuroglancerButtonTarget: NeuroglancerButtonTarget;
+  viewsNeuroglancerUrlSource: ViewerUrlSource;
   isFilteredByGroups: boolean;
   showTutorial: boolean;
   defaultExtraArgs: string;
@@ -99,6 +104,12 @@ type PreferencesContextType = {
   toggleUseLegacyMultichannelApproach: () => Promise<Result<void>>;
   setViewerUrlSource: (
     viewerKey: string,
+    source: ViewerUrlSource
+  ) => Promise<Result<void>>;
+  setNeuroglancerButtonTarget: (
+    target: NeuroglancerButtonTarget
+  ) => Promise<Result<void>>;
+  setViewsNeuroglancerUrlSource: (
     source: ViewerUrlSource
   ) => Promise<Result<void>>;
   toggleFilterByGroups: () => Promise<Result<void>>;
@@ -286,6 +297,34 @@ export const PreferencesProvider = ({
       await updatePreferenceMutation.mutateAsync({
         key: 'viewerUrlSources',
         value: updated
+      });
+      return createSuccess(undefined);
+    } catch (error) {
+      return handleError(error);
+    }
+  };
+
+  const setNeuroglancerButtonTarget = async (
+    target: NeuroglancerButtonTarget
+  ): Promise<Result<void>> => {
+    try {
+      await updatePreferenceMutation.mutateAsync({
+        key: 'neuroglancerButtonTarget',
+        value: target
+      });
+      return createSuccess(undefined);
+    } catch (error) {
+      return handleError(error);
+    }
+  };
+
+  const setViewsNeuroglancerUrlSource = async (
+    source: ViewerUrlSource
+  ): Promise<Result<void>> => {
+    try {
+      await updatePreferenceMutation.mutateAsync({
+        key: 'viewsNeuroglancerUrlSource',
+        value: source
       });
       return createSuccess(undefined);
     } catch (error) {
@@ -587,6 +626,10 @@ export const PreferencesProvider = ({
     useLegacyMultichannelApproach:
       preferencesQuery.data?.useLegacyMultichannelApproach || false,
     viewerUrlSources: preferencesQuery.data?.viewerUrlSources || {},
+    neuroglancerButtonTarget:
+      preferencesQuery.data?.neuroglancerButtonTarget ?? 'views',
+    viewsNeuroglancerUrlSource:
+      preferencesQuery.data?.viewsNeuroglancerUrlSource ?? 'configured',
     isFilteredByGroups: preferencesQuery.data?.isFilteredByGroups ?? true,
     showTutorial: preferencesQuery.data?.showTutorial ?? true,
     defaultExtraArgs: preferencesQuery.data?.defaultExtraArgs || '',
@@ -617,6 +660,8 @@ export const PreferencesProvider = ({
     toggleDisableHeuristicalLayerTypeDetection,
     toggleUseLegacyMultichannelApproach,
     setViewerUrlSource,
+    setNeuroglancerButtonTarget,
+    setViewsNeuroglancerUrlSource,
     toggleFilterByGroups,
     toggleShowTutorial,
     updateDefaultExtraArgs,
