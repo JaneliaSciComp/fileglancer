@@ -31,14 +31,15 @@ export default function CartDatasetRow({
 }: CartDatasetRowProps) {
   const { addToCart, removeFromCart, removeManyFromCart } = useCartContext();
 
-  const checkedChannels = new Set(
-    items.map(item => item.channel).filter((c): c is string => Boolean(c))
-  );
+  const checkedIndices = new Set(items.map(item => item.channelIndex));
 
   const handleRemoveDataset = async () => {
     try {
       await removeManyFromCart(
-        items.map(item => ({ path: item.path, channel: item.channel }))
+        items.map(item => ({
+          path: item.path,
+          channelIndex: item.channelIndex
+        }))
       );
     } catch (error) {
       toast.error(
@@ -58,7 +59,7 @@ export default function CartDatasetRow({
           { fsp_name, path, channel, label: channel, channelIndex: index }
         ]);
       } else {
-        await removeFromCart(path, channel);
+        await removeFromCart(path, index);
       }
     } catch (error) {
       toast.error(
@@ -84,8 +85,8 @@ export default function CartDatasetRow({
           </Typography>
           {channels.map((channel, index) => (
             <FgCheckbox
-              checked={checkedChannels.has(channel)}
-              key={channel}
+              checked={checkedIndices.has(index)}
+              key={index}
               label={channel}
               onChange={e =>
                 void handleToggleChannel(channel, index, e.target.checked)
