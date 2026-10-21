@@ -47,6 +47,14 @@ test.describe('Data Link Operations', () => {
   test.beforeEach(
     'Wait for Zarr directories to load',
     async ({ fileglancerPage: page }) => {
+      // These tests cover the data link the standalone viewer needs; by
+      // default, the Neuroglancer button creates a View instead.
+      const response = await page.request.put(
+        '/api/preference/neuroglancerButtonTarget',
+        { data: { value: 'standalone' } }
+      );
+      expect(response.ok()).toBe(true);
+      await page.reload();
       await expect(
         page.getByRole('link', { name: ZARR_TEST_FILE_INFO.v3_ome.dirname })
       ).toBeVisible();
