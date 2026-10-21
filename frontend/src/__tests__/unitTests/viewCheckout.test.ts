@@ -368,6 +368,15 @@ describe('appendLayers', () => {
     expect(merged.layers?.[2].name).toBe('img.zarr (3)');
   });
 
+  it('keeps added layers shown past index 4 when asked', () => {
+    const merged = appendLayers(
+      { layers: [{ name: 'a' }, { name: 'b' }, { name: 'c' }, { name: 'd' }] },
+      [{ name: 'e' }],
+      true
+    );
+    expect(merged.layers?.[4].archived).toBe(false);
+  });
+
   it('archives added layers from index 4 on and leaves existing layers alone', () => {
     const merged = appendLayers(
       {
