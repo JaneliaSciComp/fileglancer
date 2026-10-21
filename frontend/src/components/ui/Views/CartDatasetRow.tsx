@@ -83,16 +83,19 @@ export default function CartDatasetRow({
           <Typography className="text-foreground/70 text-xs font-semibold">
             Optional: select channels to create per-channel layers
           </Typography>
-          {channels.map((channel, index) => (
-            <FgCheckbox
-              checked={checkedIndices.has(index)}
-              key={index}
-              label={channel}
-              onChange={e =>
-                void handleToggleChannel(channel, index, e.target.checked)
-              }
-            />
-          ))}
+          {/* Column-major, so channels still read in c-axis order. */}
+          <div className="columns-[8rem] gap-x-4 [&>*]:mb-1 [&>*]:break-inside-avoid">
+            {channels.map((channel, index) => (
+              <FgCheckbox
+                checked={checkedIndices.has(index)}
+                key={index}
+                label={channel}
+                onChange={e =>
+                  void handleToggleChannel(channel, index, e.target.checked)
+                }
+              />
+            ))}
+          </div>
         </div>
       )}
     />
