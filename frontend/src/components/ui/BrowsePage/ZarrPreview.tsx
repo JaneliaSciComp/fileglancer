@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
-import { useOutletContext } from 'react-router';
+import { useNavigate, useOutletContext } from 'react-router';
 import type { UseQueryResult } from '@tanstack/react-query';
 
 import zarrLogo from '@/assets/zarr.jpg';
@@ -15,7 +15,9 @@ import type {
   PendingToolKey
 } from '@/hooks/useZarrMetadata';
 import useDataToolLinks from '@/hooks/useDataToolLinks';
+import { useCreateViewFlow } from '@/hooks/useCreateViewFlow';
 import { useCartContext } from '@/contexts/CartContext';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { Metadata, getDatasetWarnings } from '@/omezarr-helper';
 import type { OutletContextType } from '@/layouts/BrowseLayout';
 
@@ -65,6 +67,9 @@ export default function ZarrPreview({
   );
 
   const { addToCart } = useCartContext();
+  const { neuroglancerButtonTarget } = usePreferencesContext();
+  const { startCreateView, dialog: createViewDialog } = useCreateViewFlow();
+  const navigate = useNavigate();
   // ponytail: optional — component tests render without a router outlet.
   const outlet = useOutletContext<OutletContextType | null | undefined>();
 
@@ -138,6 +143,16 @@ export default function ZarrPreview({
               dataLinkUrl={openWithToolUrls.copy || undefined}
               fspName={fspName}
               onAddToCart={() => void handleAddToCart()}
+              onOpenNeuroglancer={
+                neuroglancerButtonTarget === 'views'
+                  ? () =>
+                      startCreateView(
+                        [{ fsp_name: fspName, path, label: datasetLabel }],
+                        datasetLabel,
+                        view => navigate(`/view/${view.read_key}`)
+                      )
+                  : undefined
+              }
               onToolClick={handleToolClick}
               path={path}
               showCopiedTooltip={showCopiedTooltip}
@@ -157,6 +172,7 @@ export default function ZarrPreview({
               tools={true}
             />
           ) : null}
+          {createViewDialog}
         </div>
         {zarrMetadataQuery.data?.metadata &&
         'arr' in zarrMetadataQuery.data.metadata ? (
