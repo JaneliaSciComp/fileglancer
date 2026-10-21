@@ -77,6 +77,47 @@ export default function ViewerSidebar({
     toast.success(`Removed ${source.label}. Save to keep the change.`);
   };
 
+  // Shown at once, even past the 4th layer: the owner asked to see it.
+  // Channels being added, as `${source.key}::${index}`: a second click
+  // before the first add lands must not add the channel twice.
+  const [addingChannels, setAddingChannels] = useState<Set<string>>(
+    () => new Set()
+  );
+  const addChannel = (source: LiveSource, channel: string, index: number) => {
+    const key = `${source.key}::${index}`;
+    if (source.fsp_name === null || source.path === null) {
+      return;
+    }
+    if (addingChannels.has(key)) {
+      return;
+    }
+    setAddingChannels(prev => new Set(prev).add(key));
+    addToView(
+      [
+        {
+          fsp_name: source.fsp_name,
+          path: source.path,
+          channel,
+          label: channel,
+          channelIndex: index
+        }
+      ],
+      { shown: true }
+    )
+      .catch(error => {
+        toast.error(
+          error instanceof Error ? error.message : 'Failed to add channel'
+        );
+      })
+      .finally(() => {
+        setAddingChannels(prev => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+      });
+  };
+
   // Archived layers stay in the state, so checking one again restores it
   // with its settings.
   const toggleLayer = (layerName: string, shown: boolean) => {
@@ -137,6 +178,8 @@ export default function ViewerSidebar({
         role="tabpanel"
       >
         <SourcesList
+          addingChannels={addingChannels}
+          onAddChannel={addChannel}
           onRemove={remove}
           onToggleLayer={toggleLayer}
           sources={sources}

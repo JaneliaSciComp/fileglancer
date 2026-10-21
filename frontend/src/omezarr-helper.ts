@@ -608,8 +608,13 @@ function generateFullNeuroglancerStateForOmeZarr(
       channels[0].color = 'white';
     }
 
-    // Add layers for each channel
+    // Add layers for each channel. NG layer names must be unique, and some
+    // datasets repeat a channel label, so repeats become `name (2)`, ...
+    const nameCounts = new Map<string, number>();
     channels.forEach((channel, i) => {
+      const count = (nameCounts.get(channel.name) ?? 0) + 1;
+      nameCounts.set(channel.name, count);
+
       // Format color
       let color = channel.color;
       if (/^[\dA-F]{6}$/.test(color)) {
@@ -622,7 +627,7 @@ function generateFullNeuroglancerStateForOmeZarr(
       const transform = { outputDimensions: localDimensions };
 
       const layer: Record<string, any> = {
-        name: channel.name,
+        name: count > 1 ? `${channel.name} (${count})` : channel.name,
         type: layerType,
         source: {
           url: sourceUrl,

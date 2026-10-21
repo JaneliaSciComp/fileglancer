@@ -31,14 +31,15 @@ export default function CartDatasetRow({
 }: CartDatasetRowProps) {
   const { addToCart, removeFromCart, removeManyFromCart } = useCartContext();
 
-  const checkedChannels = new Set(
-    items.map(item => item.channel).filter((c): c is string => Boolean(c))
-  );
+  const checkedIndices = new Set(items.map(item => item.channelIndex));
 
   const handleRemoveDataset = async () => {
     try {
       await removeManyFromCart(
-        items.map(item => ({ path: item.path, channel: item.channel }))
+        items.map(item => ({
+          path: item.path,
+          channelIndex: item.channelIndex
+        }))
       );
     } catch (error) {
       toast.error(
@@ -58,7 +59,7 @@ export default function CartDatasetRow({
           { fsp_name, path, channel, label: channel, channelIndex: index }
         ]);
       } else {
-        await removeFromCart(path, channel);
+        await removeFromCart(path, index);
       }
     } catch (error) {
       toast.error(
@@ -82,16 +83,19 @@ export default function CartDatasetRow({
           <Typography className="text-foreground/70 text-xs font-semibold">
             Optional: select channels to create per-channel layers
           </Typography>
-          {channels.map((channel, index) => (
-            <FgCheckbox
-              checked={checkedChannels.has(channel)}
-              key={channel}
-              label={channel}
-              onChange={e =>
-                void handleToggleChannel(channel, index, e.target.checked)
-              }
-            />
-          ))}
+          {/* Column-major, so channels still read in c-axis order. */}
+          <div className="columns-[8rem] gap-x-4 [&>*]:mb-1 [&>*]:break-inside-avoid">
+            {channels.map((channel, index) => (
+              <FgCheckbox
+                checked={checkedIndices.has(index)}
+                key={index}
+                label={channel}
+                onChange={e =>
+                  void handleToggleChannel(channel, index, e.target.checked)
+                }
+              />
+            ))}
+          </div>
         </div>
       )}
     />

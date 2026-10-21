@@ -9,6 +9,7 @@ import { useCartDimensionCheck } from '@/hooks/useCartDimensionCheck';
 import { useExpandAll } from '@/hooks/useExpandAll';
 import { datasetKey } from '@/utils/pathHandling';
 import type { CartItem } from '@/contexts/CartContext';
+import { channelRows } from '@/hooks/useViewSources';
 import type { LiveSource } from '@/hooks/useViewSources';
 
 type SourcesListProps = {
@@ -16,13 +17,23 @@ type SourcesListProps = {
   readonly onRemove: (source: LiveSource) => void;
   /** Archives a layer (shown false) or brings it back. */
   readonly onToggleLayer: (layerName: string, shown: boolean) => void;
+  /** Channels being added, as `${source.key}::${index}`. */
+  readonly addingChannels: Set<string>;
+  /** Adds a channel of the dataset that isn't in the View yet. */
+  readonly onAddChannel: (
+    source: LiveSource,
+    channel: string,
+    index: number
+  ) => void;
 };
 
 /** The datasets in the viewer, each with its metadata and a remove button. */
 export default function SourcesList({
   sources,
   onRemove,
-  onToggleLayer
+  onToggleLayer,
+  addingChannels,
+  onAddChannel
 }: SourcesListProps) {
   // Probes are cached per dataset, so these share the Add data tab's.
   const datasets = useMemo<CartItem[]>(
@@ -67,26 +78,43 @@ export default function SourcesList({
             )}
             onRemove={() => onRemove(source)}
             path={source.path}
-            renderChannels={
-              // NG splits a multichannel dataset into a layer per channel.
-              source.layerNames.length > 1
-                ? () => (
-                    <div className="flex flex-col gap-1">
-                      <Typography className="text-foreground/70 text-xs font-semibold">
-                        Uncheck a channel to remove it; check it to add it back
-                      </Typography>
-                      {source.layerNames.map(name => (
+            renderChannels={channels => {
+              const rows = channelRows(source, channels);
+              return rows ? (
+                <div className="flex flex-col gap-1">
+                  <Typography className="text-foreground/70 text-xs font-semibold">
+                    Check a channel to show it; uncheck it to hide it
+                  </Typography>
+                  {/* Column-major, so channels still read in c-axis order. */}
+                  <div className="columns-[8rem] gap-x-4 [&>*]:mb-1 [&>*]:break-inside-avoid">
+                    {rows.map((row, index) => {
+                      const adding = addingChannels.has(
+                        `${source.key}::${index}`
+                      );
+                      return (
                         <FgCheckbox
-                          checked={!source.archivedNames.includes(name)}
-                          key={name}
-                          label={name}
-                          onChange={e => onToggleLayer(name, e.target.checked)}
+                          checked={
+                            row.layerName === undefined
+                              ? adding
+                              : !source.archivedNames.includes(row.layerName)
+                          }
+                          disabled={adding}
+                          key={row.key}
+                          label={row.label}
+                          onChange={e => {
+                            if (row.layerName !== undefined) {
+                              onToggleLayer(row.layerName, e.target.checked);
+                            } else if (e.target.checked) {
+                              onAddChannel(source, row.label, index);
+                            }
+                          }}
                         />
-                      ))}
-                    </div>
-                  )
-                : undefined
-            }
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null;
+            }}
             tense="present"
           />
         ) : (
