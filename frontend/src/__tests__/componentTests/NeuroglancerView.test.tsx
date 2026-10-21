@@ -90,8 +90,10 @@ vi.mock('@/components/ui/Views/ViewBrokenBanner', () => ({
 vi.mock('@/components/ui/Views/ViewerSidebar', () => ({
   default: ({
     bridge,
-    editState
+    editState,
+    tab
   }: {
+    tab: string;
     bridge: { setState: (s: Record<string, unknown>) => void };
     editState: {
       markEdited: () => void;
@@ -99,7 +101,7 @@ vi.mock('@/components/ui/Views/ViewerSidebar', () => ({
       removeSource: (key: string) => void;
     };
   }) => (
-    <aside aria-label="View data sidebar">
+    <aside aria-label="View data sidebar" data-tab={tab}>
       <button onClick={() => editState.addSources(['plainKey'])} type="button">
         fake add unsupported
       </button>
@@ -647,6 +649,25 @@ describe('NeuroglancerView', () => {
     ).toBeInTheDocument();
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(toggle);
+    expect(screen.queryByRole('complementary')).toBeNull();
+  });
+
+  it('opens the sidebar to the Sources tab from the info button', async () => {
+    useViewsQuery.mockReturnValue({ data: [OWNED] });
+    renderViewer();
+    const sources = screen.getByRole('button', {
+      name: 'View and edit data sources'
+    });
+    await userEvent.click(sources);
+    expect(
+      screen.getByRole('complementary', { name: 'View data sidebar' })
+    ).toHaveAttribute('data-tab', 'sources');
+    expect(sources).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Add data' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    await userEvent.click(sources);
     expect(screen.queryByRole('complementary')).toBeNull();
   });
 
