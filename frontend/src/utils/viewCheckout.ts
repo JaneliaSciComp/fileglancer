@@ -124,6 +124,7 @@ export async function buildViewState(
   const viewLayers: ViewLayerInput[] = [];
   const unsupported: ResolvedCheckoutDataset[] = [];
   let base: NgState | null = null;
+  const taken = new Set<string>();
 
   for (const ds of datasets) {
     const state = await generateStateForDataset(ds);
@@ -136,7 +137,10 @@ export async function buildViewState(
     }
     for (const layer of selectLayers(state, ds.channelIndex)) {
       const layer_index = combinedLayers.length;
-      combinedLayers.push({ ...layer, archived: layer_index >= 4 });
+      // Datasets can share layer names (e.g. two with a "DAPI" channel).
+      const name = uniqueName(layer.name ?? 'layer', taken);
+      taken.add(name);
+      combinedLayers.push({ ...layer, name, archived: layer_index >= 4 });
       viewLayers.push({
         sharing_key: ds.sharing_key,
         layer_index,
