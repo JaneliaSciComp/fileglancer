@@ -285,6 +285,24 @@ describe('buildViewState', () => {
     expect(layers[0].localPosition).toEqual([0]);
     expect(layers[1].localPosition).toEqual([2]);
   });
+  it('renames layers that would share a name across datasets', async () => {
+    (generateNeuroglancerStateForOmeZarr as any).mockReturnValue(
+      encoded({ layers: [{ name: 'DAPI' }] })
+    );
+    const ds = (path: string) => ({
+      url: path,
+      sharing_key: path,
+      url_prefix: path,
+      fsp_name: 'f',
+      path,
+      label: path
+    });
+    const { ng_state } = await buildViewState([ds('/a'), ds('/b')]);
+    expect((ng_state as any).layers.map((l: any) => l.name)).toEqual([
+      'DAPI',
+      'DAPI (2)'
+    ]);
+  });
 });
 
 describe('probeDataset', () => {
