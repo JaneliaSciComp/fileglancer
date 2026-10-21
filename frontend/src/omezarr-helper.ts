@@ -181,17 +181,61 @@ type OmeZarrChannel = {
 
 const COLORS = ['magenta', 'green', 'cyan', 'white', 'red', 'yellow', 'blue'];
 
-const UNIT_CONVERSIONS: Record<string, string> = {
-  micron: 'um', // Micron is not a valid UDUNITS-2, but some data still uses it
-  micrometer: 'um',
-  millimeter: 'mm',
-  nanometer: 'nm',
-  centimeter: 'cm',
-  meter: 'm',
-  second: 's',
-  millisecond: 'ms',
-  microsecond: 'us',
-  nanosecond: 'ns'
+// OME-NGFF axis units mapped to [scale factor, Neuroglancer unit].
+// Neuroglancer only accepts SI base units with SI prefixes, so non-SI units
+// (and the hecto/deci prefixes, to avoid relying on them) are rescaled to a
+// base unit.
+const NEUROGLANCER_UNITS: Record<string, [number, string]> = {
+  micron: [1, 'um'], // Micron is not a valid UDUNITS-2, but some data still uses it
+  yoctometer: [1, 'ym'],
+  zeptometer: [1, 'zm'],
+  attometer: [1, 'am'],
+  femtometer: [1, 'fm'],
+  picometer: [1, 'pm'],
+  angstrom: [1e-10, 'm'],
+  nanometer: [1, 'nm'],
+  micrometer: [1, 'um'],
+  millimeter: [1, 'mm'],
+  centimeter: [1, 'cm'],
+  decimeter: [0.1, 'm'],
+  meter: [1, 'm'],
+  hectometer: [100, 'm'],
+  kilometer: [1, 'km'],
+  megameter: [1, 'Mm'],
+  gigameter: [1, 'Gm'],
+  terameter: [1, 'Tm'],
+  petameter: [1, 'Pm'],
+  exameter: [1, 'Em'],
+  zettameter: [1, 'Zm'],
+  yottameter: [1, 'Ym'],
+  inch: [0.0254, 'm'],
+  foot: [0.3048, 'm'],
+  yard: [0.9144, 'm'],
+  mile: [1609.344, 'm'],
+  parsec: [3.085677581491367e16, 'm'],
+  yoctosecond: [1, 'ys'],
+  zeptosecond: [1, 'zs'],
+  attosecond: [1, 'as'],
+  femtosecond: [1, 'fs'],
+  picosecond: [1, 'ps'],
+  nanosecond: [1, 'ns'],
+  microsecond: [1, 'us'],
+  millisecond: [1, 'ms'],
+  centisecond: [1, 'cs'],
+  decisecond: [0.1, 's'],
+  second: [1, 's'],
+  hectosecond: [100, 's'],
+  kilosecond: [1, 'ks'],
+  megasecond: [1, 'Ms'],
+  gigasecond: [1, 'Gs'],
+  terasecond: [1, 'Ts'],
+  petasecond: [1, 'Ps'],
+  exasecond: [1, 'Es'],
+  zettasecond: [1, 'Zs'],
+  yottasecond: [1, 'Ys'],
+  minute: [60, 's'],
+  hour: [3600, 's'],
+  day: [86400, 's']
 };
 
 const SHADER = `#uicontrol invlerp contrast
@@ -207,16 +251,35 @@ void main() {
 }`;
 
 /**
- * Convert UDUNITS-2 units to Neuroglancer SI units.
+ * Convert a UDUNITS-2 unit to its Neuroglancer name. Units that need a
+ * rescale to convert (such as minute or angstrom) keep their original name,
+ * since this returns a unit without a value; use toNeuroglancerDimension to
+ * convert a scale and unit together.
  */
 function translateUnitToNeuroglancer(unit: string): string {
   if (unit === null || unit === undefined) {
     return '';
   }
-  if (UNIT_CONVERSIONS[unit]) {
-    return UNIT_CONVERSIONS[unit];
+  const conversion = NEUROGLANCER_UNITS[unit];
+  if (conversion && conversion[0] === 1) {
+    return conversion[1];
   }
   return unit;
+}
+
+/**
+ * Convert an OME-Zarr axis scale and UDUNITS-2 unit to a Neuroglancer
+ * dimension, e.g. [5, 'minute'] becomes [300, 's'].
+ */
+function toNeuroglancerDimension(
+  scale: number,
+  unit: string
+): [number, string] {
+  const conversion = NEUROGLANCER_UNITS[unit];
+  if (conversion) {
+    return [scale * conversion[0], conversion[1]];
+  }
+  return [scale, translateUnitToNeuroglancer(unit)];
 }
 
 /**
@@ -524,8 +587,10 @@ function generateFullNeuroglancerStateForOmeZarr(
   for (const name of dimensionNames) {
     if (axesMap[name]) {
       const axis = axesMap[name];
-      const unit = translateUnitToNeuroglancer(axis.unit);
-      state.dimensions[name] = [scales[axis.index], unit];
+      state.dimensions[name] = toNeuroglancerDimension(
+        scales[axis.index],
+        axis.unit
+      );
       imageDimensions.delete(name);
     } else {
       log.trace('Dimension not found in axes map: ', name);
@@ -1002,6 +1067,7 @@ export {
   generateNeuroglancerStateForZarrArray,
   generateNeuroglancerStateForOmeZarr,
   translateUnitToNeuroglancer,
+  toNeuroglancerDimension,
   determineLayerType,
   analyzeThumbnailEdgeContent
 };
