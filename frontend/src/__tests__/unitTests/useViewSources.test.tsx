@@ -2,7 +2,11 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 
 import { makeFakeBridge } from '@/__tests__/mocks/fakeNeuroglancer';
-import { groupLayersBySource, useViewSources } from '@/hooks/useViewSources';
+import {
+  channelRows,
+  groupLayersBySource,
+  useViewSources
+} from '@/hooks/useViewSources';
 import type { ViewLayer } from '@/queries/viewQueries';
 import type { ResolvedCheckoutDataset } from '@/utils/viewCheckout';
 
@@ -32,6 +36,38 @@ const row = (
   sharing_key: key,
   url_prefix: path.split('/').pop()!,
   ...extra
+});
+
+describe('channelRows', () => {
+  const channelLayer = (name: string, index: number) => ({
+    ...layer(name, 'K1', 'a.zarr'),
+    localPosition: [index]
+  });
+
+  it('lists every channel of a per-channel dataset, linked to its layer', () => {
+    const [source] = groupLayersBySource(
+      [channelLayer('Gpb5 (2)', 2), channelLayer('DAPI', 0)],
+      [ds('K1', 'data/a.zarr')],
+      []
+    );
+    expect(channelRows(source, ['DAPI', 'Gpb5', 'Gpb5'])).toEqual([
+      { key: 'channel:0', label: 'DAPI', layerName: 'DAPI' },
+      { key: 'channel:1', label: 'Gpb5', layerName: undefined },
+      { key: 'channel:2', label: 'Gpb5', layerName: 'Gpb5 (2)' }
+    ]);
+  });
+
+  it('falls back to the layer names when a layer is not one channel', () => {
+    const [source] = groupLayersBySource(
+      [layer('a DAPI', 'K1', 'a.zarr'), layer('a GFP', 'K1', 'a.zarr')],
+      [ds('K1', 'data/a.zarr')],
+      []
+    );
+    expect(channelRows(source, ['DAPI', 'GFP'])?.map(r => r.label)).toEqual([
+      'a DAPI',
+      'a GFP'
+    ]);
+  });
 });
 
 describe('groupLayersBySource', () => {

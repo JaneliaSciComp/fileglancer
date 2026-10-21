@@ -191,8 +191,12 @@ function uniqueName(name: string, taken: Set<string>): string {
 
 // Adds layers to an existing View's state. The View keeps its dimensions,
 // layout and selected layer. Added layers from index 4 on start archived,
-// the same rule as checkout.
-export function appendLayers(current: NgState, added: NgLayer[]): NgState {
+// the same rule as checkout, unless `shown` asks for them to stay visible.
+export function appendLayers(
+  current: NgState,
+  added: NgLayer[],
+  shown = false
+): NgState {
   const layers = [...(current.layers ?? [])];
   const taken = new Set(
     layers.map(l => l.name).filter((n): n is string => typeof n === 'string')
@@ -200,7 +204,7 @@ export function appendLayers(current: NgState, added: NgLayer[]): NgState {
   for (const layer of added) {
     const name = uniqueName(layer.name ?? 'layer', taken);
     taken.add(name);
-    layers.push({ ...layer, name, archived: layers.length >= 4 });
+    layers.push({ ...layer, name, archived: !shown && layers.length >= 4 });
   }
   return { ...current, layers };
 }
