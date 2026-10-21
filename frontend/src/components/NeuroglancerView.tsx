@@ -10,6 +10,7 @@ import {
   HiOutlineDownload,
   HiOutlineExternalLink,
   HiOutlineArrowsExpand,
+  HiOutlineInformationCircle,
   HiOutlinePlusCircle
 } from 'react-icons/hi';
 
@@ -37,6 +38,7 @@ import type { RelinkTarget } from '@/components/ui/Dialogs/RelinkDialog';
 import ViewBrokenBanner from '@/components/ui/Views/ViewBrokenBanner';
 import ViewSaveControls from '@/components/ui/Views/ViewSaveControls';
 import ViewerSidebar from '@/components/ui/Views/ViewerSidebar';
+import type { SidebarTab } from '@/components/ui/Views/ViewerSidebar';
 
 type ToolbarIconButtonProps = {
   readonly label: string;
@@ -109,7 +111,10 @@ export default function NeuroglancerView() {
   // Wait out the mount refetch: a cached state can predate a Save made just
   // before leaving this page.
   const [iframeSrc, setIframeSrc] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // null when the sidebar is closed.
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab | null>(null);
+  const toggleSidebar = (tab: SidebarTab) =>
+    setSidebarTab(current => (current === tab ? null : tab));
   // While resizing, the overlay covers the iframe: over the iframe, the
   // pointer's moves go to Neuroglancer and the drag stalls.
   const [resizing, setResizing] = useState(false);
@@ -335,8 +340,16 @@ export default function NeuroglancerView() {
               <ToolbarIconButton
                 icon={HiOutlinePlusCircle}
                 label="Add data"
-                onClick={() => setSidebarOpen(open => !open)}
-                pressed={sidebarOpen}
+                onClick={() => toggleSidebar('add')}
+                pressed={sidebarTab === 'add'}
+              />
+            ) : null}
+            {canAddData ? (
+              <ToolbarIconButton
+                icon={HiOutlineInformationCircle}
+                label="View and edit data sources"
+                onClick={() => toggleSidebar('sources')}
+                pressed={sidebarTab === 'sources'}
               />
             ) : null}
             <ToolbarIconButton
@@ -396,7 +409,7 @@ export default function NeuroglancerView() {
           src={iframeSrc ?? externalUrl}
           title="Neuroglancer viewer"
         />
-        {canAddData && sidebarOpen ? (
+        {canAddData && sidebarTab ? (
           <div
             className={`absolute inset-0 ${resizing ? 'cursor-col-resize' : 'pointer-events-none'}`}
           >
@@ -421,7 +434,9 @@ export default function NeuroglancerView() {
                 <ViewerSidebar
                   bridge={bridge}
                   editState={editState}
-                  onClose={() => setSidebarOpen(false)}
+                  onClose={() => setSidebarTab(null)}
+                  onTabChange={setSidebarTab}
+                  tab={sidebarTab}
                   viewLayers={ownedView?.layers ?? []}
                 />
               </Panel>

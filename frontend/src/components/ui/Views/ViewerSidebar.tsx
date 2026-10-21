@@ -14,12 +14,16 @@ import type { ViewEditState } from '@/hooks/useViewEditState';
 import type { ViewLayer } from '@/queries/viewQueries';
 import type { NgState } from '@/utils/viewCheckout';
 
+export type SidebarTab = 'add' | 'sources';
+
 type ViewerSidebarProps = {
   readonly bridge: NeuroglancerBridge;
   /** The View's saved layer rows. */
   readonly viewLayers: ViewLayer[];
   readonly editState: ViewEditState;
   readonly onClose: () => void;
+  readonly tab: SidebarTab;
+  readonly onTabChange: (tab: SidebarTab) => void;
 };
 
 /**
@@ -31,7 +35,9 @@ export default function ViewerSidebar({
   bridge,
   viewLayers,
   editState,
-  onClose
+  onClose,
+  tab,
+  onTabChange
 }: ViewerSidebarProps) {
   const { markEdited, addSources, recordAdded, removeSource } = editState;
   const addToView = useAddToView(bridge, {
@@ -40,7 +46,6 @@ export default function ViewerSidebar({
     onAddSources: addSources,
     onAdded: recordAdded
   });
-  const [tab, setTab] = useState('add');
   const sources = useViewSources(bridge, {
     viewLayers,
     added: editState.added,
@@ -139,7 +144,11 @@ export default function ViewerSidebar({
         {/* Content-width triggers, as in the Properties panel: MT measures
             the indicator only on window resize, so triggers that stretch
             with the panel, or wrap when it narrows, would leave it behind. */}
-        <Tabs className="min-w-0 flex-1" onValueChange={setTab} value={tab}>
+        <Tabs
+          className="min-w-0 flex-1"
+          onValueChange={value => onTabChange(value as SidebarTab)}
+          value={tab}
+        >
           <Tabs.List className="justify-start items-stretch shrink-0 min-w-fit w-full py-2 bg-surface dark:bg-surface-light">
             <Tabs.Trigger
               className="!text-foreground h-full whitespace-nowrap"
