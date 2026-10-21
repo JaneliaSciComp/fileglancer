@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { getNeuroglancerSource } from '@/omezarr-helper';
+import {
+  generateNeuroglancerStateForOmeZarr,
+  getNeuroglancerSource
+} from '@/omezarr-helper';
 
 describe('getNeuroglancerSource with version selection', () => {
   it('should generate v3 source URL when v3 is selected', () => {
@@ -33,5 +36,42 @@ describe('getNeuroglancerSource with version selection', () => {
     expect(source).toBe(
       'https://different.host/some/deep/path/data.zarr/|zarr2:'
     );
+  });
+});
+
+describe('generateNeuroglancerStateForOmeZarr per-channel layers', () => {
+  it('gives repeated channel labels unique layer names', () => {
+    const multiscale = {
+      axes: [
+        { name: 'c', type: 'channel' },
+        { name: 'y', type: 'space' },
+        { name: 'x', type: 'space' }
+      ],
+      datasets: [
+        {
+          path: '0',
+          coordinateTransformations: [{ type: 'scale', scale: [1, 1, 1] }]
+        }
+      ]
+    };
+    const omero = {
+      channels: [{ label: 'Gpb5' }, { label: 'Pale' }, { label: 'Gpb5' }]
+    };
+    const encoded = generateNeuroglancerStateForOmeZarr(
+      'https://example.com/data.zarr',
+      3,
+      'image',
+      multiscale as any,
+      { shape: [3, 10, 10], dtype: 'uint16' } as any,
+      undefined,
+      omero as any,
+      true
+    );
+    const state = JSON.parse(decodeURIComponent(encoded!));
+    expect(state.layers.map((l: any) => l.name)).toEqual([
+      'Gpb5',
+      'Pale',
+      'Gpb5 (2)'
+    ]);
   });
 });
