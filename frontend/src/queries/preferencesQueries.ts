@@ -18,6 +18,8 @@ import type {
   FileSharePathPreference,
   FolderPreference,
   FolderFavorite,
+  NeuroglancerButtonTarget,
+  ViewerUrlSource,
   ViewerUrlSources
 } from '@/contexts/PreferencesContext';
 import {
@@ -50,6 +52,8 @@ type PreferencesApiResponse = {
   disableHeuristicalLayerTypeDetection?: { value: boolean };
   useLegacyMultichannelApproach?: { value: boolean };
   viewerUrlSources?: { value: ViewerUrlSources };
+  neuroglancerButtonTarget?: { value: NeuroglancerButtonTarget };
+  viewsNeuroglancerUrlSource?: { value: ViewerUrlSource };
   isFilteredByGroups?: { value: boolean };
   showTutorial?: { value: boolean };
   defaultExtraArgs?: { value: string };
@@ -85,6 +89,8 @@ export type PreferencesQueryData = {
   disableHeuristicalLayerTypeDetection: boolean;
   useLegacyMultichannelApproach: boolean;
   viewerUrlSources: ViewerUrlSources;
+  neuroglancerButtonTarget: NeuroglancerButtonTarget;
+  viewsNeuroglancerUrlSource: ViewerUrlSource;
   isFilteredByGroups: boolean;
   showTutorial: boolean;
   defaultExtraArgs: string;
@@ -259,6 +265,10 @@ const createTransformPreferences = (
       useLegacyMultichannelApproach:
         rawData.useLegacyMultichannelApproach?.value || false,
       viewerUrlSources: rawData.viewerUrlSources?.value || {},
+      neuroglancerButtonTarget:
+        rawData.neuroglancerButtonTarget?.value ?? 'views',
+      viewsNeuroglancerUrlSource:
+        rawData.viewsNeuroglancerUrlSource?.value ?? 'configured',
       isFilteredByGroups: rawData.isFilteredByGroups?.value ?? true,
       showTutorial: rawData.showTutorial?.value ?? true,
       defaultExtraArgs: rawData.defaultExtraArgs?.value || '',
