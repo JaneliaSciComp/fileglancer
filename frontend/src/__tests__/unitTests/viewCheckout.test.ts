@@ -227,6 +227,35 @@ describe('buildViewState', () => {
     ]);
   });
 
+  it('generates state once for several channel entries of one dataset', async () => {
+    (generateNeuroglancerStateForOmeZarr as any).mockReturnValue(
+      encoded({
+        layers: [
+          { name: 'DAPI', type: 'image' },
+          { name: 'GFP', type: 'image' }
+        ]
+      })
+    );
+    const entry = {
+      url: 'a',
+      sharing_key: 'ka',
+      url_prefix: 'a',
+      fsp_name: 'f',
+      path: '/a',
+      label: 'A'
+    };
+    const { ng_state } = await buildViewState([
+      { ...entry, channel: 'DAPI', channelIndex: 0 },
+      { ...entry, channel: 'GFP', channelIndex: 1 }
+    ]);
+    expect(getOmeZarrMetadata).toHaveBeenCalledTimes(1);
+    expect(generateNeuroglancerStateForOmeZarr).toHaveBeenCalledTimes(1);
+    expect((ng_state as any).layers.map((l: any) => l.name)).toEqual([
+      'DAPI',
+      'GFP'
+    ]);
+  });
+
   it('selects one per-channel layer per channel entry by index', async () => {
     // Checkout forces the per-channel layer path when a channel is selected
     // (8th generator arg = true), yielding layers in c-axis index order.

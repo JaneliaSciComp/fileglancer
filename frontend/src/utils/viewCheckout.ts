@@ -126,8 +126,18 @@ export async function buildViewState(
   let base: NgState | null = null;
   const taken = new Set<string>();
 
+  // Every channel entry of a dataset generates the same state; generate it
+  // once per dataset and layer path, then slice it per entry.
+  const stateCache = new Map<string, Promise<NgState | null>>();
+
   for (const ds of datasets) {
-    const state = await generateStateForDataset(ds);
+    const cacheKey = `${ds.url}::${ds.channel !== undefined}`;
+    let pending = stateCache.get(cacheKey);
+    if (!pending) {
+      pending = generateStateForDataset(ds);
+      stateCache.set(cacheKey, pending);
+    }
+    const state = await pending;
     if (!state) {
       unsupported.push(ds);
       continue;
