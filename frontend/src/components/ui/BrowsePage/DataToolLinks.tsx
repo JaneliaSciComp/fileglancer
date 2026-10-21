@@ -65,6 +65,7 @@ export default function DataToolLinks({
   dataLinkUrl,
   fspName,
   onAddToCart,
+  onOpenNeuroglancer,
   onToolClick,
   path,
   showCopiedTooltip,
@@ -75,6 +76,8 @@ export default function DataToolLinks({
   readonly dataLinkUrl?: string;
   readonly fspName?: string;
   readonly onAddToCart?: () => void;
+  // Replaces the Neuroglancer link (e.g. to create a View instead).
+  readonly onOpenNeuroglancer?: () => void;
   readonly onToolClick: (toolKey: PendingToolKey) => Promise<void>;
   readonly path?: string;
   readonly showCopiedTooltip: boolean;
@@ -103,15 +106,20 @@ export default function DataToolLinks({
             return null;
           }
 
+          const opensView = viewer.key === 'neuroglancer' && onOpenNeuroglancer;
           return (
             <ToolLink
               key={viewer.key}
-              label={viewer.displayName}
+              label={opensView ? 'Neuroglancer View' : viewer.displayName}
               logoAlt={viewer.label}
               logoSrc={viewer.logoPath}
-              onToolClick={onToolClick}
+              onToolClick={
+                opensView ? async () => onOpenNeuroglancer() : onToolClick
+              }
               toolKey={viewer.key as PendingToolKey}
-              tooltipLabel={viewer.label}
+              tooltipLabel={
+                opensView ? 'Create a View from this dataset' : viewer.label
+              }
               url={url}
             />
           );
