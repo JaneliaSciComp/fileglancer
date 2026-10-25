@@ -39,6 +39,7 @@ from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
 from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header, make_etag, parse_http_date_to_epoch
 from fileglancer.filestore import Filestore, RootCheckError
+from fileglancer.s3store import S3Store, S3Error
 from fileglancer.log import AccessLogMiddleware
 from fileglancer.logconf import configure_logging, disable_uvicorn_access_log
 from fileglancer.worker_pool import (
@@ -495,6 +496,39 @@ def create_app(settings):
             result.pop("_fd", None)
             result.pop("_fd_mode", None)
             return result
+
+    CLOUD_WRITE_ERROR = "Not supported on cloud storage"
+
+    def _cloud_store(username: str, fsp_name: str) -> Optional[S3Store]:
+        """The S3Store for the user's bucket named fsp_name, or None to use the worker.
+
+        Site shares win name clashes, so a bucket shadowed by one is never served.
+        """
+        if not settings.cloud_storage.enabled:
+            return None
+        with db.get_db_session(settings.db_url) as session:
+            if db.get_file_share_path(session, fsp_name):
+                return None
+            row = db.get_cloud_bucket(session, username, fsp_name)
+            return S3Store.for_bucket(row) if row else None
+
+    def _reject_cloud_write(username: str, fsp_name: str) -> None:
+        if _cloud_store(username, fsp_name):
+            raise HTTPException(status_code=405, detail=CLOUD_WRITE_ERROR)
+
+    async def _s3_content_response(store: S3Store, subpath: str, range_header: Optional[str]) -> Response:
+        """Stream an object (or the requested range of it) from a bucket."""
+        try:
+            status, headers, body = await store.open_range(subpath, range_header)
+        except S3Error as e:
+            if e.status_code == 416:
+                return Response(status_code=416, headers=e.headers or {})
+            raise HTTPException(status_code=e.status_code, detail=e.message)
+        file_name = subpath.split('/')[-1] if subpath else ''
+        content_type = guess_content_type(file_name)
+        if content_type == 'application/octet-stream' and file_name:
+            headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+        return StreamingResponse(body, status_code=status, headers=headers, media_type=content_type)
 
     def _resolve_sharing_key(sharing_key: str, key: str) -> dict | Response:
         """Resolve a sharing key to the shared link's mount path, owner and name.
@@ -1905,7 +1939,11 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
-        result = await _worker_exec(username, "head_file", fsp_name=filestore_name, subpath=subpath)
+        store = _cloud_store(username, filestore_name)
+        if store:
+            result = await store.head_file(subpath)
+        else:
+            result = await _worker_exec(username, "head_file", fsp_name=filestore_name, subpath=subpath)
         if result.get("redirect"):
             redirect_url = f"/api/content/{result['fsp_name']}"
             if result.get("subpath"):
@@ -1943,6 +1981,10 @@ def create_app(settings):
             filestore_name = path_name
         else:
             filestore_name, _, subpath = path_name.partition('/')
+
+        store = _cloud_store(username, filestore_name)
+        if store:
+            return await _s3_content_response(store, subpath, request.headers.get('Range'))
 
         # Worker opens the file as the user and passes the fd back
         result = await _worker_exec(username, "open_file", fsp_name=filestore_name, subpath=subpath)
@@ -2033,6 +2075,8 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
+        _reject_cloud_write(username, filestore_name)
+
         if not subpath:
             raise HTTPException(status_code=400, detail="File path is required")
 
@@ -2112,7 +2156,12 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
-        if limit is not None:
+        store = _cloud_store(username, filestore_name)
+        if store and limit is not None:
+            result = await store.list_dir_paged(subpath, limit, cursor, settings.max_directory_count)
+        elif store:
+            result = await store.list_dir(subpath)
+        elif limit is not None:
             result = await _worker_exec(username, "list_dir_paged",
                                         fsp_name=filestore_name, subpath=subpath,
                                         limit=limit, cursor=cursor,
@@ -2142,6 +2191,7 @@ def create_app(settings):
                                  body: Dict = Body(...),
                                  username: str = Depends(get_current_user)):
         """Handle POST requests to create a new file or directory"""
+        _reject_cloud_write(username, path_name)
         # Validate and sanitize the user-provided subpath to prevent path traversal attacks
         if not subpath:
             raise HTTPException(status_code=400, detail="File or directory path is required")
@@ -2183,6 +2233,7 @@ def create_app(settings):
                                  body: Dict = Body(...),
                                  username: str = Depends(get_current_user)):
         """Handle PATCH requests to rename or update file permissions"""
+        _reject_cloud_write(username, path_name)
         new_path = body.get("path")
         new_permissions = body.get("permissions")
 
@@ -2210,6 +2261,7 @@ def create_app(settings):
                                  subpath: Optional[str] = Query(''),
                                  username: str = Depends(get_current_user)):
         """Handle DELETE requests to remove a file or (empty) directory"""
+        _reject_cloud_write(username, fsp_name)
         logger.info(f"User {username} deleting {fsp_name}/{subpath}")
         result = await _worker_exec(username, "delete", fsp_name=fsp_name, subpath=subpath)
         if "error" in result:
