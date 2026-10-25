@@ -5,12 +5,21 @@ import {
   useCreateProxiedPathMutation
 } from '@/queries/proxiedPathQueries';
 import { useViewsContext } from '@/contexts/ViewsContext';
+import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { buildViewState } from '@/utils/viewCheckout';
 import type { ResolvedCheckoutDataset } from '@/utils/viewCheckout';
 import { datasetKey, normalizeFspRootPath } from '@/utils/pathHandling';
+import { isReadOnlyFsp } from '@/utils/cloudStorage';
+import { buildUrl, makeMapKey } from '@/utils';
 import type { CartItem } from '@/queries/preferencesQueries';
 import type { View } from '@/queries/viewQueries';
 import type { ProxiedPath } from '@/contexts/ProxiedPathContext';
+import type { FileSharePath } from '@/shared.types';
+
+/** What a dataset's layers are built from: a Data Link, or a bucket's own URL. */
+type ResolvedLink = Pick<ProxiedPath, 'url' | 'url_prefix'> & {
+  sharing_key: string | null;
+};
 
 // A dataset can hold both a base (channel-less) CartItem and channel-specific
 // CartItems at once. Drop the base entry when channel entries exist for the
@@ -38,6 +47,23 @@ export function useCartCheckout() {
   const allProxiedPathsQuery = useAllProxiedPathsQuery();
   const createProxiedPath = useCreateProxiedPathMutation();
   const { createViewMutation } = useViewsContext();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
+
+  const bucketFor = useCallback(
+    (ds: Pick<CartItem, 'fsp_name'>): FileSharePath | null => {
+      const fsp = zonesAndFspQuery.data?.[makeMapKey('fsp', ds.fsp_name)] as
+        | FileSharePath
+        | undefined;
+      return isReadOnlyFsp(fsp) ? fsp! : null;
+    },
+    [zonesAndFspQuery.data]
+  );
+
+  /** A public bucket's data needs no Data Link; it is served at its own URL. */
+  const isBucketDataset = useCallback(
+    (ds: Pick<CartItem, 'fsp_name'>): boolean => bucketFor(ds) !== null,
+    [bucketFor]
+  );
 
   // Finds or creates one Data Link per dataset. Shared by checkout and
   // "Add to this View".
@@ -52,18 +78,24 @@ export function useCartCheckout() {
       );
 
       // Resolve one Data Link per unique (fsp_name, path); create if missing.
-      const linkByKey = new Map<string, ProxiedPath>();
+      const linkByKey = new Map<string, ResolvedLink>();
       for (const ds of datasets) {
         const key = datasetKey(ds.fsp_name, ds.path);
         if (linkByKey.has(key)) {
           continue;
         }
-        const link =
-          existing.get(key) ??
-          (await createProxiedPath.mutateAsync({
-            fsp_name: ds.fsp_name,
-            path: normalizeFspRootPath(ds.path)
-          }));
+        const bucket = bucketFor(ds);
+        const link: ResolvedLink = bucket
+          ? {
+              url: buildUrl(bucket.mount_path, normalizeFspRootPath(ds.path)),
+              sharing_key: null,
+              url_prefix: ''
+            }
+          : (existing.get(key) ??
+            (await createProxiedPath.mutateAsync({
+              fsp_name: ds.fsp_name,
+              path: normalizeFspRootPath(ds.path)
+            })));
         linkByKey.set(key, link);
       }
 
@@ -86,7 +118,7 @@ export function useCartCheckout() {
         };
       });
     },
-    [allProxiedPathsQuery.data, createProxiedPath]
+    [allProxiedPathsQuery.data, createProxiedPath, bucketFor]
   );
 
   const checkout = useCallback(
@@ -98,5 +130,5 @@ export function useCartCheckout() {
     [resolveCartDatasets, createViewMutation]
   );
 
-  return { checkout, resolveCartDatasets };
+  return { checkout, resolveCartDatasets, isBucketDataset };
 }

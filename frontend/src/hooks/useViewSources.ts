@@ -236,10 +236,17 @@ export function useViewSources(
       }
     }
     // ponytail: added datasets are never forgotten this session; once their
-    // layers are gone (Discard) they simply match nothing.
-    const pending = added.filter(ds => pendingSources.includes(ds.sharing_key));
+    // layers are gone (Discard) they simply match nothing. Bucket datasets
+    // have no Data Link segment to match, so they stay plain viewer layers.
+    const linked = added.filter(
+      (ds): ds is ResolvedCheckoutDataset & { sharing_key: string } =>
+        ds.sharing_key !== null
+    );
+    const pending = linked.filter(ds =>
+      pendingSources.includes(ds.sharing_key)
+    );
     return {
-      known: [...saved, ...added],
+      known: [...saved, ...linked],
       unsupported: [...unsupported, ...pending]
     };
   }, [viewLayers, added, pendingSources, removedSources]);

@@ -38,7 +38,8 @@ export async function probeDataset(url: string): Promise<DatasetProbe> {
 
 export type ResolvedCheckoutDataset = {
   url: string;
-  sharing_key: string;
+  /** Null for a dataset in a public bucket, which has no Data Link. */
+  sharing_key: string | null;
   url_prefix: string;
   fsp_name: string;
   path: string;

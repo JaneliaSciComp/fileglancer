@@ -6,7 +6,10 @@ import toast from 'react-hot-toast';
 const checkout = vi.fn();
 let automatic = true;
 vi.mock('@/hooks/useCartCheckout', () => ({
-  useCartCheckout: () => ({ checkout })
+  useCartCheckout: () => ({
+    checkout,
+    isBucketDataset: (ds: { fsp_name: string }) => ds.fsp_name === 'bucket'
+  })
 }));
 vi.mock('@/contexts/PreferencesContext', () => ({
   usePreferencesContext: () => ({
@@ -115,6 +118,26 @@ describe('useCreateViewFlow', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /continue/i }));
     expect(checkout).toHaveBeenCalledWith(datasets, 'A');
+  });
+
+  it('asks no data-link consent for a bucket dataset, which needs no link', async () => {
+    automatic = false;
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+
+    act(() => {
+      apiRef.current!.startCreateView(
+        [{ fsp_name: 'bucket', path: 'sample.zarr', label: 'S' }],
+        'A'
+      );
+    });
+
+    expect(
+      await screen.findByRole('button', { name: /^create$/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/are you sure you want to create a data link/i)
+    ).toBeNull();
   });
 
   it('keeps the dialog open and shows an error toast when checkout fails', async () => {

@@ -31,7 +31,7 @@ type PendingRequest = {
 );
 
 export function useCreateViewFlow() {
-  const { checkout } = useCartCheckout();
+  const { checkout, isBucketDataset } = useCartCheckout();
   const {
     areDataLinksAutomatic,
     dataLinkSubpathMode,
@@ -78,8 +78,10 @@ export function useCreateViewFlow() {
     const existingKeys = new Set(
       (allProxiedPathsQuery.data ?? []).map(p => datasetKey(p.fsp_name, p.path))
     );
+    // Public buckets need no Data Link, so they never count
     const newLinkCount = new Set(
       datasets
+        .filter(ds => !isBucketDataset(ds))
         .map(ds => datasetKey(ds.fsp_name, ds.path))
         .filter(key => !existingKeys.has(key))
     ).size;
