@@ -249,3 +249,10 @@ def test_format_timestamp_is_an_http_date():
     value = format_timestamp(1700000000.7)
     assert value == "Tue, 14 Nov 2023 22:13:20 GMT"
     assert parsedate_to_datetime(value).timestamp() == 1700000000
+
+
+def test_parse_range_header_is_x2s3s():
+    """One implementation: fileglancer re-exports x2s3's rather than copying it."""
+    import x2s3.utils
+    from fileglancer.utils import parse_range_header
+    assert parse_range_header is x2s3.utils.parse_range_header

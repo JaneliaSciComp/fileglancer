@@ -4,10 +4,10 @@ import pwd
 import re
 from datetime import datetime, timezone
 from email.utils import formatdate
-from typing import Optional, Tuple
+from typing import Optional
 from urllib.parse import quote
 
-from x2s3.utils import guess_content_type  # noqa: F401  re-exported; one implementation
+from x2s3.utils import guess_content_type, parse_range_header  # noqa: F401  re-exported; one implementation
 
 def slugify_path(s):
     """Slugify a path to make it into a name"""
@@ -102,39 +102,6 @@ def is_likely_binary(data: bytes) -> bool:
 
     # If more than 1% of bytes are control characters, consider it binary
     return control_count / len(data) >= 0.01
-
-
-def parse_range_header(range_header: Optional[str], file_size: int) -> Optional[Tuple[int, int]]:
-    """Parse a single-range HTTP Range header into inclusive (start, end) byte positions.
-
-    Returns None when the header should be ignored and the full body served:
-    absent, not a byte range, malformed (including start after end), or multi-range
-    (unsupported, as on S3). Raises ValueError when the range is well-formed but
-    unsatisfiable (416).
-    """
-    if not range_header or not range_header.startswith('bytes='):
-        return None
-    range_spec = range_header[6:]
-    if ',' in range_spec or '-' not in range_spec:
-        return None
-    start_str, end_str = range_spec.split('-', 1)
-    # RFC 9110: both positions are plain digit strings and first-pos <= last-pos,
-    # or the byte-range-spec is invalid and the recipient ignores it
-    if (start_str and not start_str.isdigit()) or (end_str and not end_str.isdigit()):
-        return None
-    if start_str and end_str:
-        start, end = int(start_str), int(end_str)
-        if start > end:
-            return None
-    elif start_str:
-        start, end = int(start_str), file_size - 1
-    elif end_str:
-        start, end = max(0, file_size - int(end_str)), file_size - 1
-    else:
-        return None
-    if start >= file_size:
-        raise ValueError(f"Range not satisfiable: {range_header} for {file_size} bytes")
-    return start, min(end, file_size - 1)
 
 
 def s3_public_url(bucket: str, endpoint_url: Optional[str], key: str = '') -> str:
