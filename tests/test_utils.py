@@ -208,3 +208,10 @@ def test_is_likely_binary_log_file():
     """Test that log file content is detected as text"""
     log_data = b"[2024-01-01 12:00:00] INFO: Server started\n[2024-01-01 12:00:01] DEBUG: Connection established\n"
     assert not is_likely_binary(log_data)
+
+
+def test_guess_content_type_is_x2s3s():
+    """One implementation: fileglancer re-exports x2s3's rather than copying it."""
+    import x2s3.utils
+    from fileglancer.utils import guess_content_type
+    assert guess_content_type is x2s3.utils.guess_content_type

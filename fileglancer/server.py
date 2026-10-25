@@ -48,8 +48,6 @@ from fileglancer.user_worker import serialize_job_for_worker
 from fileglancer import sshkeys
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response, generate_request_id, get_list_xml
-from x2s3.client_file import FileProxyClient
-from x2s3.client import ObjectHandle
 
 
 class RequestIdMiddleware:
@@ -328,6 +326,18 @@ def _convert_api_token(row: db.ApiTokenDB) -> ApiTokenInfo:
         expires_at=_ensure_utc(row.expires_at),
         last_used_at=_ensure_utc(row.last_used_at),
     )
+
+
+def _safe_subpath(subpath: str) -> str:
+    """
+    Normalize a user-supplied path for a write route and reject one that escapes
+    the share lexically ("../x", "/abs", "a/../../x"). A boundary check only: the
+    worker's Filestore._check_path_in_root is the real containment check.
+    """
+    normalized = os.path.normpath(subpath)
+    if normalized.startswith('..') or os.path.isabs(normalized):
+        raise HTTPException(status_code=400, detail="Path cannot escape the current directory")
+    return normalized
 
 
 def _validate_filename(name: str) -> None:
@@ -2172,11 +2182,7 @@ def create_app(settings):
         if not subpath:
             raise HTTPException(status_code=400, detail="File path is required")
 
-        # Sanitize the target path the same way file creation does, to prevent
-        # path traversal outside the file share.
-        normalized_path = os.path.normpath(subpath)
-        if normalized_path.startswith('..') or os.path.isabs(normalized_path):
-            raise HTTPException(status_code=400, detail="Path cannot escape the current directory")
+        normalized_path = _safe_subpath(subpath)
         _validate_filename(os.path.basename(normalized_path))
 
         # Optimistic concurrency: honor If-Match (ETag) and If-Unmodified-Since.
@@ -2288,21 +2294,8 @@ def create_app(settings):
         if not subpath:
             raise HTTPException(status_code=400, detail="File or directory path is required")
 
-        # Normalize the path to prevent path traversal (e.g., "../../../etc/passwd")
-        # This converts relative paths to a clean form and removes redundant separators
-        normalized_path = os.path.normpath(subpath)
-
-        # Security check: Ensure normalized path doesn't start with ".." or "/"
-        # which would indicate an attempt to escape the intended directory
-        if normalized_path.startswith('..') or os.path.isabs(normalized_path):
-            raise HTTPException(status_code=400, detail="Path cannot escape the current directory")
-
-        # Validate the filename portion (basename) for invalid characters
-        filename = os.path.basename(normalized_path)
-        _validate_filename(filename)
-
-        # Use the validated and sanitized path for all operations
-        validated_subpath = normalized_path
+        validated_subpath = _safe_subpath(subpath)
+        _validate_filename(os.path.basename(validated_subpath))
 
         file_type = body.get("type")
         if file_type == "directory":
@@ -2332,12 +2325,8 @@ def create_app(settings):
         # Validate and sanitize new_path if renaming
         validated_new_path = new_path
         if new_path is not None:
-            normalized_new_path = os.path.normpath(new_path)
-            if normalized_new_path.startswith('..') or os.path.isabs(normalized_new_path):
-                raise HTTPException(status_code=400, detail="New path cannot escape the current directory")
-            new_filename = os.path.basename(normalized_new_path)
-            _validate_filename(new_filename)
-            validated_new_path = normalized_new_path
+            validated_new_path = _safe_subpath(new_path)
+            _validate_filename(os.path.basename(validated_new_path))
 
         result = await _worker_exec(username, "update_file",
                                     fsp_name=path_name, subpath=subpath,
