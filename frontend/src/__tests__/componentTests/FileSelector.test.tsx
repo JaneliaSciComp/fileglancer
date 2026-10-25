@@ -6,12 +6,12 @@ import FileSelectorButton from '@/components/ui/FileSelector/FileSelectorButton'
 import { render, screen, waitFor } from '@/__tests__/test-utils';
 import { server } from '@/__tests__/mocks/node';
 
-const COSEM = {
-  name: 'cosem',
+const EXAMPLE = {
+  name: 'example',
   zone: 'S3',
   group: 'cloud',
-  storage: 'COSEM',
-  mount_path: 's3://cosem-datasets',
+  storage: 'Example',
+  mount_path: 's3://example-datasets',
   linux_path: null,
   mac_path: null,
   windows_path: null,
@@ -34,7 +34,7 @@ function serveBucket() {
             linux_path: '/test/fsp',
             protocol: 'file'
           },
-          COSEM
+          EXAMPLE
         ]
       })
     )
@@ -341,7 +341,7 @@ describe('FileSelector', () => {
       await user.dblClick(screen.getByText('S3'));
 
       expect(
-        await screen.findByText('s3://cosem-datasets')
+        await screen.findByText('s3://example-datasets')
       ).toBeInTheDocument();
     });
   });

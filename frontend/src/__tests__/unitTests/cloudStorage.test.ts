@@ -33,19 +33,19 @@ describe('isReadOnlyFsp', () => {
 describe('parseS3Url', () => {
   it.each([
     [
-      's3://janelia-cosem-datasets/jrc_hela-2',
+      's3://example-datasets/sample-dataset',
       {
-        bucket: 'janelia-cosem-datasets',
-        prefix: 'jrc_hela-2',
+        bucket: 'example-datasets',
+        prefix: 'sample-dataset',
         endpointUrl: ''
       }
     ],
     ['s3://bucket', { bucket: 'bucket', prefix: '', endpointUrl: '' }],
     [
-      'https://janelia-cosem-datasets.s3.amazonaws.com/jrc_hela-2/',
+      'https://example-datasets.s3.amazonaws.com/sample-dataset/',
       {
-        bucket: 'janelia-cosem-datasets',
-        prefix: 'jrc_hela-2',
+        bucket: 'example-datasets',
+        prefix: 'sample-dataset',
         endpointUrl: ''
       }
     ],

@@ -45,12 +45,12 @@ const TEST_FSP = {
   protocol: 'file' as const
 };
 
-const COSEM = {
-  name: 'cosem',
+const EXAMPLE = {
+  name: 'example',
   zone: 'S3',
   group: 'cloud',
-  storage: 'COSEM',
-  mount_path: 's3://cosem-datasets',
+  storage: 'Example',
+  mount_path: 's3://example-datasets',
   linux_path: null,
   mac_path: null,
   windows_path: null,
@@ -69,9 +69,9 @@ describe('Read-only gating', () => {
   beforeEach(() => {
     server.use(
       http.get('/api/file-share-paths', () =>
-        HttpResponse.json({ paths: [TEST_FSP, COSEM] })
+        HttpResponse.json({ paths: [TEST_FSP, EXAMPLE] })
       ),
-      http.get('/api/files/cosem', () =>
+      http.get('/api/files/example', () =>
         HttpResponse.json({
           info: {
             ...READ_ONLY,
@@ -84,8 +84,8 @@ describe('Read-only gating', () => {
           files: [
             {
               ...READ_ONLY,
-              name: 'jrc_hela-2',
-              path: 'jrc_hela-2',
+              name: 'sample.zarr',
+              path: 'sample.zarr',
               size: 0,
               is_dir: true,
               last_modified: 0
@@ -97,7 +97,7 @@ describe('Read-only gating', () => {
   });
 
   it('offers no New folder button on a bucket', async () => {
-    render(<Browse />, { initialEntries: ['/browse/cosem'] });
+    render(<Browse />, { initialEntries: ['/browse/example'] });
 
     // Rendered under the same is-a-folder condition as New folder
     expect(
@@ -146,7 +146,7 @@ describe('Read-only gating', () => {
         />
         <AutomaticLinksLoaded />
       </>,
-      { initialEntries: ['/browse/cosem'] }
+      { initialEntries: ['/browse/example'] }
     );
 
     await screen.findByText('automatic links loaded');
