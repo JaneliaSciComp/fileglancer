@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
+import userEvent from '@testing-library/user-event';
 
 import { render, screen } from '@/__tests__/test-utils';
 import { server } from '@/__tests__/mocks/node';
 import Browse from '@/components/Browse';
+import PropertiesDrawer from '@/components/ui/PropertiesDrawer/PropertiesDrawer';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
 
 vi.mock('@/components/tours/StartTour', () => ({
   default: ({ children }: { children: React.ReactNode }) => (
@@ -108,6 +111,49 @@ describe('Read-only gating', () => {
 
     expect(
       await screen.findByRole('button', { name: /new folder/i })
+    ).toBeInTheDocument();
+  });
+
+  it('asks before creating a data link on a bucket even with automatic custom-named links', async () => {
+    server.use(
+      http.get('/api/preference', () =>
+        HttpResponse.json({
+          path: { value: ['linux_path'] },
+          areDataLinksAutomatic: { value: true },
+          dataLinkSubpathMode: { value: 'custom' },
+          isFilteredByGroups: { value: true },
+          showTutorial: { value: true },
+          layout: { value: '' },
+          zone: { value: [] },
+          fileSharePath: { value: [] },
+          folder: { value: [] },
+          recentlyViewedFolders: { value: [] }
+        })
+      )
+    );
+    // The switch reads the preference at click time, so wait for it to load
+    function AutomaticLinksLoaded() {
+      const { areDataLinksAutomatic } = usePreferencesContext();
+      return areDataLinksAutomatic ? <span>automatic links loaded</span> : null;
+    }
+    const user = userEvent.setup();
+    render(
+      <>
+        <PropertiesDrawer
+          setShowConvertFileDialog={vi.fn()}
+          setShowPermissionsDialog={vi.fn()}
+          togglePropertiesDrawer={vi.fn()}
+        />
+        <AutomaticLinksLoaded />
+      </>,
+      { initialEntries: ['/browse/cosem'] }
+    );
+
+    await screen.findByText('automatic links loaded');
+    await user.click(await screen.findByText('Create data link'));
+
+    expect(
+      await screen.findByRole('button', { name: 'Create Data Link' })
     ).toBeInTheDocument();
   });
 });

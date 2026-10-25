@@ -22,6 +22,10 @@ describe('isReadOnlyFsp', () => {
     expect(isReadOnlyFsp(null)).toBe(false);
     expect(isReadOnlyFsp(undefined)).toBe(false);
   });
+  it('is false for a share without a protocol', () => {
+    const { protocol: _protocol, ...withoutProtocol } = fsp;
+    expect(isReadOnlyFsp(withoutProtocol as FileSharePath)).toBe(false);
+  });
   it('is true for s3', () =>
     expect(isReadOnlyFsp({ ...fsp, protocol: 's3' })).toBe(true));
 });

@@ -169,8 +169,10 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
       : null;
 
   // A read-only share's data link is its direct URL, which the link name and
-  // subpath mode cannot shape, so those controls are not offered.
+  // subpath mode cannot shape, so those controls are not offered and the
+  // dialog always asks for confirmation instead of creating automatically.
   const readOnly = isReadOnlyFsp(pathFsp);
+  const automaticLinks = localAreDataLinksAutomatic && !readOnly;
   const dataLinkSubpathMode = readOnly ? 'full_path' : preferredSubpathMode;
 
   function getDisplayPath(): string {
@@ -227,7 +229,7 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
   // Creating a link relinks the caller's broken Views on this dataset (server
   // side, always). In consent mode, say so before they click.
   const relinkableQuery = useRelinkableViewsQuery(
-    props.action === 'create' && !localAreDataLinksAutomatic && fspName
+    props.action === 'create' && !automaticLinks && fspName
       ? fspName
       : undefined,
     normalizedFilePath
@@ -259,7 +261,7 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
   // Whether this dialog was triggered by automatic+custom mode
   const isAutoCustom =
     props.action === 'create' &&
-    localAreDataLinksAutomatic &&
+    automaticLinks &&
     dataLinkSubpathMode === 'custom';
 
   const handleConfirmWithPrefix = async () => {
@@ -314,10 +316,10 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
             </Typography>
           </>
         ) : props.action === 'create' &&
-          localAreDataLinksAutomatic &&
+          automaticLinks &&
           dataLinkSubpathMode !== 'custom' ? (
           <> </>
-        ) : props.action === 'create' && !localAreDataLinksAutomatic ? (
+        ) : props.action === 'create' && !automaticLinks ? (
           <>
             <Typography className="text-foreground font-semibold">
               Are you sure you want to create a data link?

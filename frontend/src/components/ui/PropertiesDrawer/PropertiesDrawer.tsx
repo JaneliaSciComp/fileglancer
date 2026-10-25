@@ -346,6 +346,7 @@ export default function PropertiesDrawer({
                             if (
                               areDataLinksAutomatic &&
                               dataLinkSubpathMode !== 'custom' &&
+                              !readOnly &&
                               !proxiedPathByFspAndPathQuery.data
                             ) {
                               await handleCreateDataLink();
