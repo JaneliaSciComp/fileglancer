@@ -3,7 +3,8 @@ import os
 import pwd
 import re
 from datetime import datetime, timezone
-from typing import Optional
+from email.utils import formatdate
+from typing import Optional, Tuple
 from urllib.parse import quote
 
 from x2s3.utils import guess_content_type  # noqa: F401  re-exported; one implementation
@@ -22,9 +23,8 @@ def slugify_path(s):
 
 
 def format_timestamp(timestamp):
-    """Format the given timestamp to ISO date format compatible with HTTP."""
-    dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-    return dt.isoformat()
+    """Format a POSIX timestamp as an RFC 7231 HTTP-date, for Last-Modified."""
+    return formatdate(timestamp, usegmt=True)
 
 
 def get_user_groups(username: str) -> list[str]:
@@ -104,43 +104,33 @@ def is_likely_binary(data: bytes) -> bool:
     return control_count / len(data) >= 0.01
 
 
-def parse_range_header(range_header: str, file_size: int):
-    """Parse HTTP Range header and return start and end byte positions."""
+def parse_range_header(range_header: Optional[str], file_size: int) -> Optional[Tuple[int, int]]:
+    """Parse a single-range HTTP Range header into inclusive (start, end) byte positions.
+
+    Returns None when the header should be ignored and the full body served:
+    absent, not a byte range, malformed, or multi-range (unsupported, as on S3).
+    Raises ValueError when the range is well-formed but unsatisfiable (416).
+    """
     if not range_header or not range_header.startswith('bytes='):
         return None
-
+    range_spec = range_header[6:]
+    if ',' in range_spec or '-' not in range_spec:
+        return None
+    start_str, end_str = range_spec.split('-', 1)
     try:
-        range_spec = range_header[6:]  # Remove 'bytes=' prefix
-
-        if ',' in range_spec:
-            range_spec = range_spec.split(',')[0].strip()
-
-        if '-' not in range_spec:
-            return None
-
-        start_str, end_str = range_spec.split('-', 1)
-
         if start_str and end_str:
-            start = int(start_str)
-            end = int(end_str)
-        elif start_str and not end_str:
-            start = int(start_str)
-            end = file_size - 1
-        elif not start_str and end_str:
-            suffix_length = int(end_str)
-            start = max(0, file_size - suffix_length)
-            end = file_size - 1
+            start, end = int(start_str), int(end_str)
+        elif start_str:
+            start, end = int(start_str), file_size - 1
+        elif end_str:
+            start, end = max(0, file_size - int(end_str)), file_size - 1
         else:
             return None
-
-        if start < 0 or end < 0 or start >= file_size or start > end:
-            return None
-
-        end = min(end, file_size - 1)
-        return (start, end)
-
-    except (ValueError, IndexError):
+    except ValueError:
         return None
+    if start < 0 or end < 0 or start >= file_size or start > end:
+        raise ValueError(f"Range not satisfiable: {range_header} for {file_size} bytes")
+    return start, min(end, file_size - 1)
 
 
 def s3_public_url(bucket: str, endpoint_url: Optional[str], key: str = '') -> str:

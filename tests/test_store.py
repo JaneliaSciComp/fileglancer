@@ -117,3 +117,12 @@ async def test_open_range_missing_is_404(store):
     with pytest.raises(StoreError) as e:
         await store.open_range("nope.txt", None)
     assert e.value.status_code == 404
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("header", ["bytes=0-1,3-4", "bytes=abc"])
+async def test_multi_range_and_malformed_range_are_ignored(store, header):
+    """Policy shared by both backends: unsupported or malformed Range → the full body, 200."""
+    status, headers, body = await store.open_range("readme.txt", header)
+    assert status == 200 and "Content-Range" not in headers
+    assert await _read(body) == CONTENT
