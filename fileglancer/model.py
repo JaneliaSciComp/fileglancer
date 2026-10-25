@@ -48,6 +48,27 @@ class FileSharePathResponse(BaseModel):
     paths: List[FileSharePath] = Field(
         description="A list of file share paths"
     )
+
+
+class CloudBucketCreateRequest(BaseModel):
+    """A public bucket for the current user to add as a share"""
+    protocol: Literal['s3'] = Field(description="Storage protocol", default='s3')
+    bucket: str = Field(description="The bucket name")
+    prefix: Optional[str] = Field(description="Key prefix within the bucket to use as the root", default=None)
+    endpoint_url: Optional[str] = Field(description="S3-compatible endpoint; AWS when omitted", default=None)
+    label: Optional[str] = Field(description="Display name; defaults to bucket/prefix", default=None)
+
+class CloudBucketListResponse(BaseModel):
+    buckets: List[FileSharePath] = Field(description="The current user's buckets")
+
+class CloudBucketDeleteResponse(BaseModel):
+    name: str = Field(description="The name of the removed bucket")
+    removed_links: int = Field(description="How many of the user's data links into the bucket were removed")
+
+class CloudStorageConfigResponse(BaseModel):
+    enabled: bool = Field(description="Whether users may add cloud buckets")
+    endpoint_url_allowed: bool = Field(description="Whether a custom endpoint may be given at all")
+    allowed_endpoints: Optional[List[str]] = Field(description="Permitted endpoint origins; null means any public host")
     
 class TicketComment(BaseModel):
     """A comment on a ticket"""

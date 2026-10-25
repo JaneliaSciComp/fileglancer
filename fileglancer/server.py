@@ -37,9 +37,9 @@ from fileglancer.giturls import canonical_github_url
 from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
-from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header, make_etag, parse_http_date_to_epoch
+from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header, make_etag, parse_http_date_to_epoch, slugify_path
 from fileglancer.filestore import Filestore, RootCheckError
-from fileglancer.s3store import S3Store, S3Error
+from fileglancer.s3store import S3Store, S3Error, BUCKET_NAME_RE, normalize_prefix, validate_endpoint_url
 from fileglancer.log import AccessLogMiddleware
 from fileglancer.logconf import configure_logging, disable_uvicorn_access_log
 from fileglancer.worker_pool import (
@@ -185,6 +185,14 @@ def get_current_user(request: Request):
     if auth.parse_bearer_token(request) is None:
         auth.enforce_request_origin(request, settings)
     return auth.get_current_user(request, settings)
+
+
+def get_optional_user(request: Request) -> Optional[str]:
+    """Like get_current_user, but None instead of an error for an anonymous or under-scoped caller"""
+    try:
+        return get_current_user(request)
+    except HTTPException:
+        return None
 
 
 def _convert_external_bucket(db_bucket: db.ExternalBucketDB) -> ExternalBucket:
@@ -1022,9 +1030,9 @@ def create_app(settings):
 
     @app.get("/api/file-share-paths", response_model=FileSharePathResponse,
              description="Get all file share paths from the database")
-    async def get_file_share_paths() -> List[FileSharePath]:
+    async def get_file_share_paths(username: Optional[str] = Depends(get_optional_user)) -> List[FileSharePath]:
         with db.get_db_session(settings.db_url) as session:
-            paths = db.get_file_share_paths(session)
+            paths = db.get_file_share_paths(session, username=username)
             return FileSharePathResponse(paths=paths)
 
 
@@ -1042,6 +1050,74 @@ def create_app(settings):
         with db.get_db_session(settings.db_url) as session:
             buckets = [_convert_external_bucket(bucket) for bucket in db.get_external_buckets(session, fsp_name)]
             return ExternalBucketResponse(buckets=buckets)
+
+
+    # --- Cloud storage ---
+
+    def _require_cloud_storage() -> None:
+        if not settings.cloud_storage.enabled:
+            raise HTTPException(status_code=404, detail="Cloud storage is disabled")
+
+    @app.get("/api/cloud-storage/config", response_model=CloudStorageConfigResponse,
+             description="Whether users may add cloud buckets, and which endpoints they may use")
+    async def get_cloud_storage_config() -> CloudStorageConfigResponse:
+        allowed = settings.cloud_storage.allowed_endpoints
+        return CloudStorageConfigResponse(enabled=settings.cloud_storage.enabled,
+                                          endpoint_url_allowed=allowed != [],
+                                          allowed_endpoints=allowed)
+
+    @app.get("/api/cloud-storage/buckets", response_model=CloudBucketListResponse,
+             description="List the current user's cloud buckets")
+    async def list_cloud_buckets(username: str = Depends(get_current_user)) -> CloudBucketListResponse:
+        _require_cloud_storage()
+        with db.get_db_session(settings.db_url) as session:
+            return CloudBucketListResponse(
+                buckets=[db.cloud_bucket_to_fsp(row) for row in db.get_cloud_buckets(session, username)])
+
+    @app.post("/api/cloud-storage/buckets", response_model=FileSharePath, status_code=201,
+              description="Add a public bucket as a share for the current user")
+    async def create_cloud_bucket(body: CloudBucketCreateRequest,
+                                  username: str = Depends(get_current_user)) -> FileSharePath:
+        _require_cloud_storage()
+        if not BUCKET_NAME_RE.match(body.bucket):
+            raise HTTPException(status_code=400, detail="Invalid bucket name")
+        try:
+            prefix = normalize_prefix(body.prefix)
+            endpoint_url = None
+            if body.endpoint_url:
+                # Resolves DNS synchronously, so keep it off the event loop
+                endpoint_url = await asyncio.to_thread(
+                    validate_endpoint_url, body.endpoint_url, settings.cloud_storage.allowed_endpoints)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        label = (body.label or '').strip() or (body.bucket + ('/' + prefix if prefix else ''))
+        name = slugify_path(label)
+        if not name:
+            raise HTTPException(status_code=400, detail="Display name must contain a letter or digit")
+        with db.get_db_session(settings.db_url) as session:
+            if db.get_file_share_path(session, name, username=username):
+                raise HTTPException(status_code=409, detail=f"A share or bucket named '{name}' already exists")
+        try:
+            await S3Store(body.bucket, prefix, endpoint_url).probe()
+        except S3Error as e:
+            raise HTTPException(status_code=400, detail=e.message)
+        with db.get_db_session(settings.db_url) as session:
+            try:
+                row = db.create_cloud_bucket(session, username, name, body.protocol, label,
+                                             body.bucket, prefix, endpoint_url)
+            except ValueError:  # added concurrently while the probe ran
+                raise HTTPException(status_code=409, detail=f"A share or bucket named '{name}' already exists")
+            return db.cloud_bucket_to_fsp(row)
+
+    @app.delete("/api/cloud-storage/buckets/{name}", response_model=CloudBucketDeleteResponse,
+                description="Remove one of the current user's buckets and their data links into it")
+    async def delete_cloud_bucket(name: str, username: str = Depends(get_current_user)) -> CloudBucketDeleteResponse:
+        _require_cloud_storage()
+        with db.get_db_session(settings.db_url) as session:
+            removed = db.delete_cloud_bucket(session, username, name)
+        if removed is None:
+            raise HTTPException(status_code=404, detail="Bucket not found")
+        return CloudBucketDeleteResponse(name=name, removed_links=removed)
 
 
     @app.get("/api/notifications", response_model=NotificationResponse,
