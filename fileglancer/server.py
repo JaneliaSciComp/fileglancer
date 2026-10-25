@@ -40,6 +40,7 @@ from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, dele
 from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header, make_etag, parse_http_date_to_epoch, slugify_path
 from fileglancer.filestore import Filestore, RootCheckError
 from fileglancer.s3store import S3Store, S3Error, BUCKET_NAME_RE, normalize_prefix, validate_endpoint_url
+from fileglancer.store import ReadStore, StoreError, StoreRedirect, WorkerStore, WriteStore
 from fileglancer.log import AccessLogMiddleware
 from fileglancer.logconf import configure_logging, disable_uvicorn_access_log
 from fileglancer.worker_pool import (
@@ -541,19 +542,17 @@ def create_app(settings):
         if _cloud_store(username, fsp_name):
             raise HTTPException(status_code=405, detail=CLOUD_WRITE_ERROR)
 
-    async def _s3_content_response(store: S3Store, subpath: str, range_header: Optional[str]) -> Response:
-        """Stream an object (or the requested range of it) from a bucket."""
-        try:
-            status, headers, body = await store.open_range(subpath, range_header)
-        except S3Error as e:
-            if e.status_code == 416:
-                return Response(status_code=416, headers=e.headers or {})
-            raise HTTPException(status_code=e.status_code, detail=e.message)
-        file_name = subpath.split('/')[-1] if subpath else ''
-        content_type = guess_content_type(file_name)
-        if content_type == 'application/octet-stream' and file_name:
-            headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
-        return StreamingResponse(body, status_code=status, headers=headers, media_type=content_type)
+    def _store_for(username: str, fsp_name: str, enforce_endpoint: bool = True) -> ReadStore:
+        """The backend serving fsp_name for this user: their bucket, else the worker."""
+        return _cloud_store(username, fsp_name, enforce_endpoint) or WorkerStore(_worker_exec, username, fsp_name)
+
+    def _writable_store(username: str, fsp_name: str) -> WriteStore:
+        """Like _store_for, but 405 before anything touches a read-only backend."""
+        store = _store_for(username, fsp_name)
+        if not isinstance(store, WriteStore):
+            raise HTTPException(status_code=405, detail=CLOUD_WRITE_ERROR)
+        return store
+
 
     def _resolve_sharing_key(sharing_key: str, key: str) -> dict | Response:
         """Resolve a sharing key to the shared link's mount path, owner and name.
@@ -769,6 +768,14 @@ def create_app(settings):
                 logger.warning(f"Error shutting down worker pool: {e}")
 
     app = FastAPI(lifespan=lifespan)
+
+    @app.exception_handler(StoreRedirect)
+    async def _store_redirect(request: Request, exc: StoreRedirect):
+        """A path that belongs to another share: 307 to the same route on that share."""
+        url = request.scope["route"].path.split("{", 1)[0] + exc.fsp_name
+        if exc.subpath:
+            url += f"?subpath={exc.subpath}"
+        return RedirectResponse(url=url, status_code=307)
 
     # Add custom access log middleware
     # This logs HTTP access information with authenticated username, and
@@ -2041,16 +2048,7 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
-        store = _cloud_store(username, filestore_name)
-        if store:
-            result = await store.head_file(subpath)
-        else:
-            result = await _worker_exec(username, "head_file", fsp_name=filestore_name, subpath=subpath)
-        if result.get("redirect"):
-            redirect_url = f"/api/content/{result['fsp_name']}"
-            if result.get("subpath"):
-                redirect_url += f"?subpath={result['subpath']}"
-            return RedirectResponse(url=redirect_url, status_code=307)
+        result = await _store_for(username, filestore_name).head_file(subpath)
         if "error" in result:
             raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
 
@@ -2084,82 +2082,18 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
-        store = _cloud_store(username, filestore_name)
-        if store:
-            return await _s3_content_response(store, subpath, request.headers.get('Range'))
-
-        # Worker opens the file as the user and passes the fd back
-        result = await _worker_exec(username, "open_file", fsp_name=filestore_name, subpath=subpath)
-
-        if result.get("redirect"):
-            redirect_url = f"/api/content/{result['fsp_name']}"
-            if result.get("subpath"):
-                redirect_url += f"?subpath={result['subpath']}"
-            return RedirectResponse(url=redirect_url, status_code=307)
-        if "error" in result:
-            raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
-
-        file_handle = result.get("_file_handle")
-
-        file_size = result["file_size"]
-        content_type = result["content_type"]
-        last_modified = result.get("last_modified")
+        store = _store_for(username, filestore_name)
+        try:
+            status, headers, body = await store.open_range(subpath, request.headers.get('Range'))
+        except StoreError as e:
+            if e.status_code == 416:
+                return Response(status_code=416, headers=e.headers or {})
+            raise HTTPException(status_code=e.status_code, detail=e.message)
         file_name = subpath.split('/')[-1] if subpath else ''
-
-        # Validators for optimistic-concurrency writes (see PUT below).
-        validator_headers = {}
-        if last_modified is not None:
-            validator_headers['Last-Modified'] = format_timestamp(last_modified)
-            validator_headers['ETag'] = make_etag(last_modified, file_size)
-
-        range_header = request.headers.get('Range')
-
-        if range_header:
-            range_result = parse_range_header(range_header, file_size)
-            if range_result is None:
-                file_handle.close()
-                return Response(
-                    status_code=416,
-                    headers={'Content-Range': f'bytes */{file_size}'}
-                )
-
-            start, end = range_result
-            content_length = end - start + 1
-
-            headers = {
-                'Accept-Ranges': 'bytes',
-                'Content-Length': str(content_length),
-                'Content-Range': f'bytes {start}-{end}/{file_size}',
-                **validator_headers,
-            }
-
-            if content_type == 'application/octet-stream' and file_name:
-                headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
-
-            # Construct a temporary filestore just for streaming
-            # (stream_file_range only needs the file_handle)
-            return StreamingResponse(
-                Filestore._stream_range(start=start, end=end, content_length=content_length, file_handle=file_handle),
-                status_code=206,
-                headers=headers,
-                media_type=content_type
-            )
-        else:
-            headers = {
-                'Accept-Ranges': 'bytes',
-                'Content-Length': str(file_size),
-                **validator_headers,
-            }
-
-            if content_type == 'application/octet-stream' and file_name:
-                headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
-
-            return StreamingResponse(
-                Filestore._stream_contents(file_handle=file_handle),
-                status_code=200,
-                headers=headers,
-                media_type=content_type
-            )
+        content_type = guess_content_type(file_name)
+        if content_type == 'application/octet-stream' and file_name:
+            headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+        return StreamingResponse(body, status_code=status, headers=headers, media_type=content_type)
 
 
     @app.put("/api/content/{path_name:path}")
@@ -2254,25 +2188,11 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
-        store = _cloud_store(username, filestore_name)
-        if store and limit is not None:
+        store = _store_for(username, filestore_name)
+        if limit is not None:
             result = await store.list_dir_paged(subpath, limit, cursor, settings.max_directory_count)
-        elif store:
-            result = await store.list_dir(subpath)
-        elif limit is not None:
-            result = await _worker_exec(username, "list_dir_paged",
-                                        fsp_name=filestore_name, subpath=subpath,
-                                        limit=limit, cursor=cursor,
-                                        max_count=settings.max_directory_count)
         else:
-            result = await _worker_exec(username, "list_dir",
-                                        fsp_name=filestore_name, subpath=subpath)
-
-        if result.get("redirect"):
-            redirect_url = f"/api/files/{result['fsp_name']}"
-            if result.get("subpath"):
-                redirect_url += f"?subpath={result['subpath']}"
-            return RedirectResponse(url=redirect_url, status_code=307)
+            result = await store.list_dir(subpath)
         if "error" in result and "status_code" in result:
             status_code = result["status_code"]
             if status_code == 403 or status_code == 404:
