@@ -22,6 +22,7 @@ classifiers = [
 ]
 dynamic = ["version", "description", "urls", "keywords"]
 dependencies = [
+    "aiobotocore ==3.9.1",
     "alembic ==1.19.2",
     "atlassian-python-api ==4.0.7",
     "authlib ==1.8.0",

@@ -13998,6 +13998,7 @@ packages:
 - pypi: ./
   name: fileglancer
   requires_dist:
+  - aiobotocore==3.9.1
   - alembic==1.19.2
   - atlassian-python-api==4.0.7
   - authlib==1.8.0
