@@ -6,7 +6,6 @@ import FgButton from '@/components/designSystem/atoms/FgButton';
 import type { FileSharePath } from '@/shared.types';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useDeleteCloudBucketMutation } from '@/queries/cloudStorageQueries';
-import { makeMapKey } from '@/utils';
 
 type RemoveBucketDialogProps = {
   readonly open: boolean;
@@ -20,8 +19,7 @@ export default function RemoveBucketDialog({
   fsp
 }: RemoveBucketDialogProps) {
   const deleteBucketMutation = useDeleteCloudBucketMutation();
-  const { fileSharePathPreferenceMap, folderFavorites, handleFavoriteChange } =
-    usePreferencesContext();
+  const { removeFavoritesForFsp } = usePreferencesContext();
 
   const handleRemove = async () => {
     try {
@@ -34,16 +32,9 @@ export default function RemoveBucketDialog({
             ? ` and ${removed_links} data link${removed_links === 1 ? '' : 's'}`
             : '')
       );
-      // ponytail: each toggle rewrites the whole folder list from this render's
-      // preferences, so with several folder favorites on one bucket only the
-      // last removal sticks; batch them into one preference write if that matters.
-      if (fileSharePathPreferenceMap[makeMapKey('fsp', fsp.name)]) {
-        await handleFavoriteChange(fsp, 'fileSharePath');
-      }
-      for (const folder of folderFavorites) {
-        if (folder.fsp.name === fsp.name) {
-          await handleFavoriteChange(folder, 'folder');
-        }
+      const cleanup = await removeFavoritesForFsp(fsp.name);
+      if (!cleanup.success) {
+        toast.error(cleanup.error);
       }
       onClose();
     } catch (error) {

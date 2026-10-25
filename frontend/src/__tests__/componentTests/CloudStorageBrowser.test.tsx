@@ -138,4 +138,50 @@ describe('CloudStorageBrowser', () => {
     });
     expect(deleted).toBe(true);
   });
+
+  it("removes all of the bucket's favorites in one write per list", async () => {
+    serveBucket();
+    const puts: Record<string, unknown> = {};
+    server.use(
+      http.get('/api/preference', () =>
+        HttpResponse.json({
+          path: { value: ['linux_path'] },
+          fileSharePath: { value: [{ type: 'fsp', name: 'cosem' }] },
+          folder: {
+            value: [
+              { type: 'folder', fspName: 'cosem', folderPath: 'a' },
+              { type: 'folder', fspName: 'cosem', folderPath: 'b' },
+              { type: 'folder', fspName: 'test_fsp', folderPath: 'c' }
+            ]
+          }
+        })
+      ),
+      http.put('/api/preference/:key', async ({ params, request }) => {
+        puts[params.key as string] = await request.json();
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.delete('/api/cloud-storage/buckets/cosem', () =>
+        HttpResponse.json({ name: 'cosem', removed_links: 0 })
+      )
+    );
+    const user = userEvent.setup();
+    render(<Sidebar />, { initialEntries: ['/browse'] });
+
+    // Wait for the favorites to load so the dialog sees them
+    await waitFor(() => {
+      expect(screen.getAllByText('COSEM').length).toBeGreaterThan(1);
+    });
+    await user.click(
+      await screen.findByRole('button', { name: 'Remove bucket COSEM' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
+
+    await waitFor(() => {
+      expect(puts.folder).toEqual({
+        value: [{ type: 'folder', fspName: 'test_fsp', folderPath: 'c' }]
+      });
+    });
+    expect(puts.fileSharePath).toEqual({ value: [] });
+    expect(toast.success).toHaveBeenCalledWith('Removed bucket "COSEM"');
+  });
 });
