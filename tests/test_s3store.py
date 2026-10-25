@@ -2,6 +2,9 @@
 
 import botocore
 import pytest
+from aiobotocore.session import get_session
+from aiohttp import web
+from aiohttp.test_utils import TestServer
 
 from fileglancer import s3store
 from fileglancer.s3store import (
@@ -112,6 +115,43 @@ async def test_head_file_sniffs_binary(client):
 
 
 @pytest.mark.asyncio
+async def test_redirect_to_internal_host_is_not_followed(monkeypatch):
+    """A real client against a local endpoint that redirects every object GET to an internal URL."""
+    secret_hits = []
+
+    async def redirect(request):
+        raise web.HTTPFound("/internal/secret")
+
+    async def secret(request):
+        secret_hits.append(request.path)
+        return web.Response(body=b"INTERNAL-SECRET")
+
+    app = web.Application()
+    app.router.add_get("/internal/secret", secret)
+    app.router.add_get("/idr/{key:.*}", redirect)
+    async with TestServer(app, host="127.0.0.1") as server:
+        endpoint = str(server.make_url("")).rstrip("/")
+        async with get_session().create_client("s3", **client_kwargs(endpoint)) as real_client:
+            async def get_client(endpoint_url):
+                return real_client
+            monkeypatch.setattr(s3store, "get_client", get_client)
+            with pytest.raises(S3Error) as e:
+                await S3Store("idr", "", endpoint).open_range("key", None)
+    assert e.value.status_code == 502 and "redirect" in e.value.message
+    assert secret_hits == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["../other", "a.ome.zarr/../../x", "./readme.txt", "a/./b"])
+async def test_dot_segments_in_paths_are_rejected(path, client):
+    assert await store.list_dir(path) == {"error": "Path cannot contain '.' or '..' segments", "status_code": 400}
+    with pytest.raises(S3Error) as e:
+        await store.open_range(path, None)
+    assert e.value.status_code == 400
+    assert client.calls == []
+
+
+@pytest.mark.asyncio
 async def test_validate_proxied_path(client):
     assert await store.validate_proxied_path("a.ome.zarr") == {"ok": True}
     assert (await store.validate_proxied_path("nope"))["status_code"] == 400
@@ -129,7 +169,9 @@ def test_client_kwargs():
     aws = client_kwargs(None)
     assert "endpoint_url" not in aws and aws["region_name"] == "us-east-1"
     assert aws["config"].signature_version is botocore.UNSIGNED and aws["config"].connect_timeout == 5 and aws["config"].read_timeout == 30
+    assert aws["config"].http_session_cls is s3store.NoRedirectAIOHTTPSession
     custom = client_kwargs("https://s3.example.org")
+    assert custom["config"].http_session_cls is s3store.NoRedirectAIOHTTPSession
     assert custom["endpoint_url"] == "https://s3.example.org" and custom["config"].s3 == {"addressing_style": "path"}
 
 

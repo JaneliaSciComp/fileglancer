@@ -19,6 +19,7 @@ import botocore
 import botocore.exceptions
 import botocore.parsers
 from aiobotocore.config import AioConfig
+from aiobotocore.httpsession import AIOHTTPSession
 from aiobotocore.session import get_session
 from loguru import logger
 
@@ -50,6 +51,27 @@ _S3_EXCEPTIONS = (
 ) + _UNREACHABLE
 
 
+class _NoRedirectClientSession:
+    """Wraps an aiohttp.ClientSession so every request is sent with allow_redirects=False."""
+
+    def __init__(self, session):
+        self._session = session
+
+    def request(self, *args, **kwargs):
+        return self._session.request(*args, allow_redirects=False, **kwargs)
+
+
+class NoRedirectAIOHTTPSession(AIOHTTPSession):
+    """
+    aiobotocore HTTP session that never follows redirects. aiohttp follows them by
+    default, which would let a validated public endpoint bounce the server to an
+    internal host; a 3xx instead surfaces as an error.
+    """
+
+    async def _get_session(self, proxy_url):
+        return _NoRedirectClientSession(await super()._get_session(proxy_url))
+
+
 class S3Error(Exception):
     """An S3 failure mapped to an HTTP status and a user-facing message."""
 
@@ -68,6 +90,7 @@ def client_kwargs(endpoint_url: Optional[str]) -> dict:
             signature_version=botocore.UNSIGNED,
             connect_timeout=5,
             read_timeout=30,
+            http_session_cls=NoRedirectAIOHTTPSession,
             s3={'addressing_style': 'path'} if endpoint_url else {},
         ),
     }
@@ -128,12 +151,16 @@ def validate_endpoint_url(endpoint_url: str, allowed: Optional[List[str]]) -> st
     return origin
 
 
+def _has_dot_segment(path: str) -> bool:
+    return any(s in ('.', '..') for s in path.split('/'))
+
+
 def normalize_prefix(prefix: Optional[str]) -> str:
     """Strip surrounding whitespace and slashes and collapse repeated '/'."""
-    segments = [s for s in (prefix or '').strip().split('/') if s]
-    if any(s in ('.', '..') for s in segments):
+    normalized = '/'.join(s for s in (prefix or '').strip().split('/') if s)
+    if _has_dot_segment(normalized):
         raise ValueError("Prefix cannot contain '.' or '..' segments")
-    return '/'.join(segments)
+    return normalized
 
 
 def _map_client_error(exc: Exception) -> S3Error:
@@ -149,6 +176,8 @@ def _map_client_error(exc: Exception) -> S3Error:
             return S3Error(403, "Permission denied")
         if code == 'InvalidRange':
             return S3Error(416, "Requested range not satisfiable")
+        if status is not None and 300 <= status < 400:
+            return S3Error(502, "Endpoint returned a redirect, which is not followed")
         return S3Error(502, f"S3 error: {code}")
     if isinstance(exc, botocore.parsers.ResponseParserError):
         return S3Error(502, "Endpoint does not speak the S3 API")
@@ -183,10 +212,15 @@ class S3Store:
         return cls(row.bucket, row.prefix, row.endpoint_url)
 
     def key_for(self, path: str) -> str:
-        """The object key for a path relative to the prefix ('' or '.' is the prefix itself)."""
+        """
+        The object key for a path relative to the prefix ('' or '.' is the prefix itself).
+        Raises S3Error(400) for '.' or '..' segments, which could escape the prefix.
+        """
         path = (path or '').strip('/')
         if path in ('', '.'):
             return self.prefix
+        if _has_dot_segment(path):
+            raise S3Error(400, "Path cannot contain '.' or '..' segments")
         return f"{self.prefix}/{path}" if self.prefix else path
 
     def public_url(self, path: str) -> str:
