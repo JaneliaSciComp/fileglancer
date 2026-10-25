@@ -454,27 +454,25 @@ def _action_open_file(request: dict, ctx: WorkerContext, filestore, fsps) -> dic
     from fileglancer.utils import guess_content_type
 
     try:
-        file_info = filestore.get_file_info(subpath)
-        if file_info.is_dir:
-            return {"error": "Cannot download directory content", "status_code": 400}
-
-        file_name = subpath.split('/')[-1] if subpath else ''
-        content_type = guess_content_type(file_name)
         full_path = filestore._check_path_in_root(subpath)
 
         # Open the file — the fd retains user's access rights
         file_handle = open(full_path, 'rb')
-        fd = file_handle.fileno()
+        # Describe the file we actually opened, not whatever was at the path a moment ago
+        st = os.fstat(file_handle.fileno())
 
+        file_name = subpath.split('/')[-1] if subpath else ''
         return {
-            "file_size": file_info.size,
-            "last_modified": file_info.last_modified,
-            "content_type": content_type,
-            "_fd": fd,
+            "file_size": st.st_size,
+            "last_modified": st.st_mtime,
+            "content_type": guess_content_type(file_name),
+            "_fd": file_handle.fileno(),
             "_file_handle": file_handle,  # kept alive until fd is sent
         }
     except RootCheckError as e:
         return _redirect_or_error(e, fsps)
+    except IsADirectoryError:
+        return {"error": "Cannot download directory content", "status_code": 400}
     except FileNotFoundError:
         return {"error": f"File or directory not found: {fsp_name}/{subpath}", "status_code": 404}
     except PermissionError:
