@@ -1,4 +1,5 @@
 import { type MouseEvent } from 'react';
+import type { IconType } from 'react-icons';
 import { Link } from 'react-router';
 import { List, Typography, IconButton } from '@material-tailwind/react';
 import { HiOutlineStar, HiStar } from 'react-icons/hi';
@@ -18,11 +19,13 @@ import {
 type FileSharePathComponentProps = {
   readonly fsp: FileSharePath;
   readonly isFavoritable?: boolean;
+  readonly icon?: IconType;
 };
 
 export default function FileSharePathComponent({
   fsp,
-  isFavoritable = true
+  isFavoritable = true,
+  icon = HiOutlineRectangleStack
 }: FileSharePathComponentProps) {
   const { pathPreference, fileSharePathPreferenceMap, handleFavoriteChange } =
     usePreferencesContext();
@@ -42,7 +45,7 @@ export default function FileSharePathComponent({
         <div className="flex gap-1 items-center max-w-full">
           <FgIcon
             className="short:icon-xsmall stroke-2"
-            icon={HiOutlineRectangleStack}
+            icon={icon}
             size="sm"
           />
           <Typography className="truncate text-sm leading-4 short:text-xs font-semibold">

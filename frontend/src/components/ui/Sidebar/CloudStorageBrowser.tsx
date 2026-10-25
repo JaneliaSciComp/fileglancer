@@ -2,7 +2,7 @@ import { Fragment } from 'react';
 import type { KeyboardEvent } from 'react';
 import { Collapse, Typography, List } from '@material-tailwind/react';
 import { HiChevronRight } from 'react-icons/hi';
-import { HiOutlineCloud, HiOutlineSquares2X2, HiPlus } from 'react-icons/hi2';
+import { HiCloud, HiOutlineSquares2X2, HiPlus } from 'react-icons/hi2';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import type { FileSharePath } from '@/shared.types';
@@ -63,7 +63,7 @@ export default function CloudStorageBrowser({
           <List.ItemStart>
             <FgIcon
               className="short:icon-small text-surface-foreground"
-              icon={HiOutlineCloud}
+              icon={HiCloud}
             />
           </List.ItemStart>
           <Typography className="font-bold text-surface-foreground short:text-sm text-base">
