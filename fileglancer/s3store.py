@@ -25,6 +25,7 @@ from loguru import logger
 
 from .database import CloudBucketDB
 from .filestore import FileInfo
+from .store import StoreError
 from .utils import format_timestamp, guess_content_type, is_likely_binary, make_etag, s3_public_url
 
 BUCKET_NAME_RE = re.compile(r'^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$')
@@ -72,14 +73,8 @@ class NoRedirectAIOHTTPSession(AIOHTTPSession):
         return _NoRedirectClientSession(await super()._get_session(proxy_url))
 
 
-class S3Error(Exception):
+class S3Error(StoreError):
     """An S3 failure mapped to an HTTP status and a user-facing message."""
-
-    def __init__(self, status_code: int, message: str, headers: Optional[dict] = None):
-        super().__init__(message)
-        self.status_code = status_code
-        self.message = message
-        self.headers = headers
 
 
 def client_kwargs(endpoint_url: Optional[str]) -> dict:
