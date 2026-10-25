@@ -194,21 +194,12 @@ class FileInfo(BaseModel):
 
     @staticmethod
     def _get_user_groups(username: str) -> set[str]:
-        """Compute all groups a user belongs to. Call once per listing, not per file."""
-        groups: set[str] = set()
+        """All groups a user belongs to, as a UI permission hint. Call once per listing, not per file."""
+        from .utils import get_user_groups
         try:
-            for g in grp.getgrall():
-                if username in g.gr_mem:
-                    groups.add(g.gr_name)
-        except (KeyError, OSError, AttributeError):
-            pass
-        try:
-            primary_gid = pwd.getpwnam(username).pw_gid
-            primary_group = grp.getgrgid(primary_gid).gr_name
-            groups.add(primary_group)
-        except (KeyError, OSError, AttributeError):
-            pass
-        return groups
+            return set(get_user_groups(username))
+        except (KeyError, OSError):
+            return set()
 
     @staticmethod
     def _check_permissions(stat_result: os.stat_result, current_user: str,
@@ -613,89 +604,6 @@ class Filestore:
                 # Skip files we don't have permission to access
                 logger.error(f"Permission denied accessing entry: {entry.path}: {e}")
                 continue
-
-
-    def stream_file_contents(self, path: str = None, buffer_size: int = DEFAULT_BUFFER_SIZE, file_handle = None) -> Generator[bytes, None, None]:
-        """
-        Stream the contents of a file at the given path or from an open file handle.
-
-        Args:
-            path (str): The path to the file to stream (optional if file_handle is provided).
-            buffer_size (int): The size of the buffer to use when reading the file.
-                Defaults to DEFAULT_BUFFER_SIZE, which is 8192 bytes.
-            file_handle: An open file handle to stream from (optional, takes precedence over path).
-                The handle will be closed when streaming completes.
-
-        Raises:
-            ValueError: If path attempts to escape root directory or neither path nor file_handle is provided
-        """
-        if file_handle is not None:
-            # Stream from the provided file handle and ensure it gets closed
-            try:
-                while True:
-                    chunk = file_handle.read(buffer_size)
-                    if not chunk:
-                        break
-                    yield chunk
-            finally:
-                file_handle.close()
-        else:
-            # Legacy behavior: open file from path
-            if path is None or path == "":
-                raise ValueError("Path cannot be None or empty")
-            full_path = self._check_path_in_root(path)
-            with open(full_path, 'rb') as file:
-                while True:
-                    chunk = file.read(buffer_size)
-                    if not chunk:
-                        break
-                    yield chunk
-
-    def stream_file_range(self, path: str = None, start: int = 0, end: int = 0, buffer_size: int = DEFAULT_BUFFER_SIZE, file_handle = None) -> Generator[bytes, None, None]:
-        """
-        Stream a specific byte range of a file at the given path or from an open file handle.
-
-        Args:
-            path (str): The path to the file to stream (optional if file_handle is provided).
-            start (int): The starting byte position (inclusive).
-            end (int): The ending byte position (inclusive).
-            buffer_size (int): The size of the buffer to use when reading the file.
-            file_handle: An open file handle to stream from (optional, takes precedence over path).
-                The handle will be closed when streaming completes.
-
-        Raises:
-            ValueError: If path attempts to escape root directory or if range is invalid
-        """
-        if start < 0:
-            raise ValueError("Start position cannot be negative")
-        if end < start:
-            raise ValueError("End position cannot be less than start position")
-
-        # Determine which file handle to use
-        should_close_handle = file_handle is not None
-        if file_handle is None:
-            # Legacy behavior: open file from path
-            if path is None or path == "":
-                raise ValueError("Path cannot be None or empty")
-            full_path = self._check_path_in_root(path)
-            file_handle = open(full_path, 'rb')
-            should_close_handle = True
-
-        # Stream from the file handle
-        try:
-            file_handle.seek(start)
-            remaining = end - start + 1
-
-            while remaining > 0:
-                chunk_size = min(buffer_size, remaining)
-                chunk = file_handle.read(chunk_size)
-                if not chunk:
-                    break
-                yield chunk
-                remaining -= len(chunk)
-        finally:
-            if should_close_handle:
-                file_handle.close()
 
 
     @staticmethod
