@@ -64,6 +64,8 @@ def db_session(temp_dir):
         session.query(FileSharePathDB).delete()
         session.query(LastRefreshDB).delete()
         session.query(UserPreferenceDB).delete()
+        session.query(CloudBucketDB).delete()
+        session.query(ProxiedPathDB).delete()
         session.commit()
     finally:
         session.close()
@@ -1091,3 +1093,52 @@ def test_file_share_path_protocol_defaults_to_file(db_session, fsp):
     path = get_file_share_path(db_session, "tempdir")
     assert path.protocol == "file"
     assert path.model_dump()["protocol"] == "file"
+
+
+def _add_bucket(session, username="alice", name="cosem", bucket="janelia-cosem-datasets", prefix="", endpoint_url=None, label=None):
+    return create_cloud_bucket(session, username, name, "s3", label or name, bucket, prefix, endpoint_url)
+
+def test_cloud_bucket_to_fsp_shape(db_session):
+    row = _add_bucket(db_session, prefix="zarr/v0.4", label="IDR zarr")
+    fsp = cloud_bucket_to_fsp(row)
+    assert fsp.model_dump() == {
+        "name": "cosem", "zone": "S3", "group": "cloud", "storage": "IDR zarr",
+        "mount_path": "s3://janelia-cosem-datasets/zarr/v0.4",
+        "mac_path": None, "windows_path": None, "linux_path": None, "protocol": "s3",
+    }
+
+def test_cloud_bucket_mount_path_without_prefix(db_session):
+    assert cloud_bucket_to_fsp(_add_bucket(db_session)).mount_path == "s3://janelia-cosem-datasets"
+
+def test_file_share_paths_include_callers_buckets_only_with_username(db_session, fsp):
+    _add_bucket(db_session, username="alice")
+    _add_bucket(db_session, username="bob", name="bobs")
+    assert [p.name for p in get_file_share_paths(db_session)] == ["tempdir"]
+    assert [p.name for p in get_file_share_paths(db_session, username="alice")] == ["tempdir", "cosem"]
+    assert get_file_share_path(db_session, "cosem", username="alice").protocol == "s3"
+    assert get_file_share_path(db_session, "cosem", username="bob") is None
+
+def test_site_share_wins_over_same_named_bucket(db_session, fsp):
+    _add_bucket(db_session, name="tempdir")
+    assert get_file_share_path(db_session, "tempdir", username="alice").protocol == "file"
+
+def test_duplicate_bucket_name_per_user_is_rejected(db_session):
+    _add_bucket(db_session)
+    with pytest.raises(ValueError, match="already exists"):
+        _add_bucket(db_session)
+
+def test_delete_cloud_bucket_cascades_to_owner_links(db_session):
+    _add_bucket(db_session)
+    create_proxied_path(db_session, "alice", "a", "cosem", "x", url_prefix="x")
+    create_proxied_path(db_session, "alice", "b", "cosem", "y", url_prefix="y")
+    assert delete_cloud_bucket(db_session, "alice", "cosem") == 2
+    assert get_proxied_paths(db_session, "alice") == []
+    assert get_cloud_bucket(db_session, "alice", "cosem") is None
+    assert delete_cloud_bucket(db_session, "alice", "cosem") is None
+
+def test_create_proxied_path_on_bucket_requires_owner_username(db_session):
+    _add_bucket(db_session)
+    pp = create_proxied_path(db_session, "alice", "a", "cosem", "x", url_prefix="x")
+    assert pp.fsp_name == "cosem"
+    with pytest.raises(ValueError, match="does not exist"):
+        create_proxied_path(db_session, "bob", "a", "cosem", "x", url_prefix="x")

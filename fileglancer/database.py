@@ -77,6 +77,24 @@ class ExternalBucketDB(Base):
     relative_path = Column(String)
 
 
+class CloudBucketDB(Base):
+    """Database model for a user's own public cloud bucket"""
+    __tablename__ = 'cloud_buckets'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String, nullable=False, index=True)
+    name = Column(String, nullable=False)
+    protocol = Column(String, nullable=False, default='s3')
+    label = Column(String, nullable=False)
+    bucket = Column(String, nullable=False)
+    prefix = Column(String, nullable=False, server_default='')
+    endpoint_url = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+
+    __table_args__ = (
+        UniqueConstraint('username', 'name', name='uq_cloud_bucket_name'),
+    )
+
+
 class LastRefreshDB(Base):
     """Database model for storing the last refresh time of tables"""
     __tablename__ = 'last_refresh'
@@ -556,7 +574,56 @@ def _load_file_share_paths(session: Session) -> List[FileSharePath]:
     ) for path in db_paths]
 
 
-def get_file_share_paths(session: Session, fsp_name: Optional[str] = None):
+def cloud_bucket_to_fsp(row: CloudBucketDB) -> FileSharePath:
+    """Present a user's cloud bucket as a file share path"""
+    mount_path = f"{row.protocol}://{row.bucket}"
+    if row.prefix:
+        mount_path += f"/{row.prefix}"
+    return FileSharePath(
+        name=row.name,
+        zone=row.protocol.upper(),
+        group='cloud',
+        storage=row.label,
+        mount_path=mount_path,
+        protocol=row.protocol,
+    )
+
+
+def get_cloud_buckets(session: Session, username: str) -> List[CloudBucketDB]:
+    return session.query(CloudBucketDB).filter_by(username=username).order_by(CloudBucketDB.name).all()
+
+
+def get_cloud_bucket(session: Session, username: str, name: str) -> Optional[CloudBucketDB]:
+    return session.query(CloudBucketDB).filter_by(username=username, name=name).first()
+
+
+def create_cloud_bucket(session: Session, username: str, name: str, protocol: str,
+                        label: str, bucket: str, prefix: str,
+                        endpoint_url: Optional[str]) -> CloudBucketDB:
+    if get_cloud_bucket(session, username, name):
+        raise ValueError(f"A bucket named '{name}' already exists")
+    row = CloudBucketDB(username=username, name=name, protocol=protocol, label=label,
+                        bucket=bucket, prefix=prefix, endpoint_url=endpoint_url)
+    session.add(row)
+    session.commit()
+    return row
+
+
+def delete_cloud_bucket(session: Session, username: str, name: str) -> Optional[int]:
+    """Delete a bucket and the owner's links into it; returns links removed, None if no bucket"""
+    row = get_cloud_bucket(session, username, name)
+    if not row:
+        return None
+    links = session.query(ProxiedPathDB).filter_by(username=username, fsp_name=name).all()
+    for link in links:
+        _invalidate_sharing_key_cache(link.sharing_key)
+        session.delete(link)
+    session.delete(row)
+    session.commit()
+    return len(links)
+
+
+def get_file_share_paths(session: Session, fsp_name: Optional[str] = None, username: Optional[str] = None):
     """
     Get all file share paths from either the local configuration or the database.
 
@@ -573,6 +640,8 @@ def get_file_share_paths(session: Session, fsp_name: Optional[str] = None):
     Args:
         session: Database session
         fsp_name: Optional name to filter by
+        username: If given, that user's cloud buckets are appended after the
+            site shares (never cached, so site shares win name clashes)
 
     Returns:
         List of FileSharePath objects ready to be used in responses
@@ -581,15 +650,18 @@ def get_file_share_paths(session: Session, fsp_name: Optional[str] = None):
     paths = _fsp_cache.get(key)
     if paths is None:
         paths = _fsp_cache[key] = _load_file_share_paths(session)
+    # Copy so a caller mutating the list can't corrupt the cached one.
+    paths = list(paths)
+    if username:
+        paths += [cloud_bucket_to_fsp(b) for b in get_cloud_buckets(session, username)]
     if fsp_name:
         return [path for path in paths if path.name == fsp_name]
-    # Copy so a caller mutating the list can't corrupt the cached one.
-    return list(paths)
+    return paths
 
 
-def get_file_share_path(session: Session, name: str) -> Optional[FileSharePath]:
-    """Get a file share path by name"""
-    paths = get_file_share_paths(session, name)
+def get_file_share_path(session: Session, name: str, username: Optional[str] = None) -> Optional[FileSharePath]:
+    """Get a file share path by name; a site share wins over the user's same-named bucket"""
+    paths = get_file_share_paths(session, name, username)
     return paths[0] if paths else None
 
 
@@ -838,7 +910,7 @@ def find_fsp_from_absolute_path(session: Session, absolute_path: str) -> Optiona
     return find_fsp_in_paths(get_file_share_paths(session), absolute_path)
 
 
-def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
+def _validate_proxied_path(session: Session, fsp_name: str, path: str, username: Optional[str] = None) -> None:
     """Validate that the file share path for a proxied path exists.
 
     Note: the filesystem existence and accessibility of *path* are deliberately
@@ -851,14 +923,14 @@ def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
     user worker (see ``_action_validate_proxied_path``), which executes as the
     real user before this function is called.
     """
-    fsp = get_file_share_path(session, fsp_name)
+    fsp = get_file_share_path(session, fsp_name, username)
     if not fsp:
         raise ValueError(f"File share path {fsp_name} does not exist")
 
 
 def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_name: str, path: str, url_prefix: str = "") -> ProxiedPathDB:
     """Create a new proxied path"""
-    _validate_proxied_path(session, fsp_name, path)
+    _validate_proxied_path(session, fsp_name, path, username)
 
     sharing_key = secrets.token_urlsafe(SHARING_KEY_LENGTH)
     now = datetime.now(UTC)
@@ -907,7 +979,7 @@ def update_proxied_path(session: Session,
     if new_path:
         proxied_path.path = new_path
 
-    _validate_proxied_path(session, proxied_path.fsp_name, proxied_path.path)
+    _validate_proxied_path(session, proxied_path.fsp_name, proxied_path.path, proxied_path.username)
     proxied_path.updated_at = datetime.now(UTC)
 
     session.commit()
