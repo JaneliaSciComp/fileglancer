@@ -38,7 +38,7 @@ from fileglancer.ngstate import bucket_source
 from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
-from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header, make_etag, parse_http_date_to_epoch, slugify_path
+from fileglancer.utils import format_timestamp, guess_content_type, make_etag, parse_http_date_to_epoch, slugify_path
 from fileglancer.filestore import Filestore, RootCheckError
 from fileglancer.s3store import S3Store, S3Error, BUCKET_NAME_RE, normalize_prefix, validate_endpoint_url
 from fileglancer.store import ReadStore, StoreError, StoreRedirect, WorkerStore, WriteStore
@@ -519,33 +519,28 @@ def create_app(settings):
 
     CLOUD_WRITE_ERROR = "Not supported on cloud storage"
 
-    def _cloud_store(username: str, fsp_name: str, enforce_endpoint: bool = True) -> Optional[S3Store]:
-        """The S3Store for the user's bucket named fsp_name, or None to use the worker.
+    def _store_for(username: str, fsp_name: str, enforce_endpoint: bool = True) -> ReadStore:
+        """The backend serving fsp_name for this user: their bucket, else the worker.
 
         Site shares win name clashes, so a bucket shadowed by one is never served.
         A bucket whose endpoint the admin has since removed from the allowlist is 403
         for data access; pass enforce_endpoint=False where no request reaches the
         endpoint.
         """
+        local = WorkerStore(_worker_exec, username, fsp_name)
         if not settings.cloud_storage.enabled:
-            return None
+            return local
         with db.get_db_session(settings.db_url) as session:
             if db.get_file_share_path(session, fsp_name):
-                return None
+                return local
             row = db.get_cloud_bucket(session, username, fsp_name)
-            store = S3Store.for_bucket(row) if row else None
+        if row is None:
+            return local
+        store = S3Store.for_bucket(row)
         allowed = settings.cloud_storage.allowed_endpoints
-        if enforce_endpoint and store and store.endpoint_url and allowed is not None and store.endpoint_url not in allowed:
+        if enforce_endpoint and store.endpoint_url and allowed is not None and store.endpoint_url not in allowed:
             raise HTTPException(status_code=403, detail="Endpoint no longer allowed on this server")
         return store
-
-    def _reject_cloud_write(username: str, fsp_name: str) -> None:
-        if _cloud_store(username, fsp_name):
-            raise HTTPException(status_code=405, detail=CLOUD_WRITE_ERROR)
-
-    def _store_for(username: str, fsp_name: str, enforce_endpoint: bool = True) -> ReadStore:
-        """The backend serving fsp_name for this user: their bucket, else the worker."""
-        return _cloud_store(username, fsp_name, enforce_endpoint) or WorkerStore(_worker_exec, username, fsp_name)
 
     def _writable_store(username: str, fsp_name: str) -> WriteStore:
         """Like _store_for, but 405 before anything touches a read-only backend."""
@@ -1055,8 +1050,8 @@ def create_app(settings):
     async def get_external_buckets(fsp_name: str, username: Optional[str] = Depends(get_optional_user)) -> ExternalBucket:
         with db.get_db_session(settings.db_url) as session:
             buckets = [_convert_external_bucket(bucket) for bucket in db.get_external_buckets(session, fsp_name)]
-        store = _cloud_store(username, fsp_name, enforce_endpoint=False) if username and not buckets else None
-        if store:
+        store = _store_for(username, fsp_name, enforce_endpoint=False) if username and not buckets else None
+        if isinstance(store, S3Store):
             # A public bucket's data is already served at a direct URL, so there is
             # nothing to create: present the whole bucket as an external bucket.
             buckets = [ExternalBucket(full_path=store.public_url(''),
@@ -1451,7 +1446,7 @@ def create_app(settings):
         sharing_name = url_prefix
         logger.info(f"Creating proxied path for {username} with sharing name {sharing_name} and fsp_name {fsp_name} and path {path} (url_prefix={url_prefix})")
         # A public bucket is its own data link (see /api/external-buckets/{fsp_name})
-        _reject_cloud_write(username, fsp_name)
+        _writable_store(username, fsp_name)
         # Validate the user can access the path via worker
         validation = await _worker_exec(username, "validate_proxied_path", fsp_name=fsp_name, path=path)
         if "error" in validation:
@@ -1528,7 +1523,7 @@ def create_app(settings):
         if path is not None:
             path = _normalize_proxied_path(path)
         if fsp_name is not None:
-            _reject_cloud_write(username, fsp_name)
+            _writable_store(username, fsp_name)
         # If path or fsp_name is changing, validate access via worker
         if path is not None or fsp_name is not None:
             with db.get_db_session(settings.db_url) as session:
@@ -2120,7 +2115,7 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
-        _reject_cloud_write(username, filestore_name)
+        store = _writable_store(username, filestore_name)
 
         if not subpath:
             raise HTTPException(status_code=400, detail="File path is required")
@@ -2146,16 +2141,8 @@ def create_app(settings):
                 raise HTTPException(status_code=413,
                                     detail=f"Upload exceeds the maximum size of {max_size} bytes")
 
-        result = await _worker_exec(username, "write_file",
-                                    fsp_name=filestore_name, subpath=normalized_path,
-                                    if_match=if_match, if_unmodified_since=if_unmodified_since)
-
-        if result.get("redirect"):
-            redirect_url = f"/api/content/{result['fsp_name']}"
-            if result.get("subpath"):
-                redirect_url += f"?subpath={result['subpath']}"
-            # 307 preserves the PUT method and body when the client re-requests.
-            return RedirectResponse(url=redirect_url, status_code=307)
+        # A cross-share path raises StoreRedirect; the 307 preserves the PUT method and body.
+        result = await store.write_file(normalized_path, if_match, if_unmodified_since)
         if "error" in result:
             raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
 
@@ -2218,7 +2205,7 @@ def create_app(settings):
                                  body: Dict = Body(...),
                                  username: str = Depends(get_current_user)):
         """Handle POST requests to create a new file or directory"""
-        _reject_cloud_write(username, path_name)
+        store = _writable_store(username, path_name)
         # Validate and sanitize the user-provided subpath to prevent path traversal attacks
         if not subpath:
             raise HTTPException(status_code=400, detail="File or directory path is required")
@@ -2229,10 +2216,10 @@ def create_app(settings):
         file_type = body.get("type")
         if file_type == "directory":
             logger.info(f"User {username} creating directory {path_name}/{validated_subpath}")
-            result = await _worker_exec(username, "create_dir", fsp_name=path_name, subpath=validated_subpath)
+            result = await store.create_dir(validated_subpath)
         elif file_type == "file":
             logger.info(f"User {username} creating file {path_name}/{validated_subpath}")
-            result = await _worker_exec(username, "create_file", fsp_name=path_name, subpath=validated_subpath)
+            result = await store.create_file(validated_subpath)
         else:
             raise HTTPException(status_code=400, detail="Invalid file type")
 
@@ -2247,7 +2234,7 @@ def create_app(settings):
                                  body: Dict = Body(...),
                                  username: str = Depends(get_current_user)):
         """Handle PATCH requests to rename or update file permissions"""
-        _reject_cloud_write(username, path_name)
+        store = _writable_store(username, path_name)
         new_path = body.get("path")
         new_permissions = body.get("permissions")
 
@@ -2257,10 +2244,7 @@ def create_app(settings):
             validated_new_path = _safe_subpath(new_path)
             _validate_filename(os.path.basename(validated_new_path))
 
-        result = await _worker_exec(username, "update_file",
-                                    fsp_name=path_name, subpath=subpath,
-                                    new_path=validated_new_path,
-                                    new_permissions=new_permissions)
+        result = await store.update_file(subpath, validated_new_path, new_permissions)
         if "error" in result:
             raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
         return JSONResponse(status_code=200, content={"message": "Permissions changed"})
@@ -2271,9 +2255,9 @@ def create_app(settings):
                                  subpath: Optional[str] = Query(''),
                                  username: str = Depends(get_current_user)):
         """Handle DELETE requests to remove a file or (empty) directory"""
-        _reject_cloud_write(username, fsp_name)
+        store = _writable_store(username, fsp_name)
         logger.info(f"User {username} deleting {fsp_name}/{subpath}")
-        result = await _worker_exec(username, "delete", fsp_name=fsp_name, subpath=subpath)
+        result = await store.delete(subpath)
         if "error" in result:
             raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
         return JSONResponse(status_code=200, content={"message": "Item deleted"})
