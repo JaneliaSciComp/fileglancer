@@ -39,6 +39,10 @@ class FileSharePath(BaseModel):
         description="The path used to mount the file share on Linux (e.g. /unix/style/path)",
         default=None
     )
+    protocol: str = Field(
+        description="Storage protocol: 'file' for a mounted file share, 's3' for a user-added S3 bucket",
+        default='file'
+    )
 
 class FileSharePathResponse(BaseModel):
     paths: List[FileSharePath] = Field(

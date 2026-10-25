@@ -1085,3 +1085,9 @@ def test_relinkable_is_owner_scoped_and_skips_unrecoverable(db_session, fsp):
     _break(db_session, old)
     assert get_relinkable_views(db_session, "u", fsp.name, "s.zarr") == []
     assert len(get_relinkable_views(db_session, "other", fsp.name, "s.zarr")) == 1
+
+
+def test_file_share_path_protocol_defaults_to_file(db_session, fsp):
+    path = get_file_share_path(db_session, "tempdir")
+    assert path.protocol == "file"
+    assert path.model_dump()["protocol"] == "file"
