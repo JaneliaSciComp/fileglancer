@@ -239,27 +239,12 @@ _user_groups_cache: dict[str, list[str]] = {}
 
 
 def _get_user_groups(username: str) -> list[str]:
-    """Return the supplementary group names for a user.
-
-    Uses os.getgrouplist (NSS initgroups) instead of grp.getgrall, which
-    enumerates every group on the system and is very slow on LDAP/NIS hosts.
-    Result is cached for the lifetime of the process.
-    """
+    """Supplementary group names for a user, cached for the lifetime of the process."""
     cached = _user_groups_cache.get(username)
-    if cached is not None:
-        return cached
-
-    import grp as _grp
-    pw = pwd.getpwnam(username)
-    gids = os.getgrouplist(username, pw.pw_gid)
-    names = []
-    for gid in gids:
-        try:
-            names.append(_grp.getgrgid(gid).gr_name)
-        except KeyError:
-            continue
-    _user_groups_cache[username] = names
-    return names
+    if cached is None:
+        from fileglancer.utils import get_user_groups
+        cached = _user_groups_cache[username] = get_user_groups(username)
+    return cached
 
 
 def _get_filestore(fsp_name: str, fsps: list):

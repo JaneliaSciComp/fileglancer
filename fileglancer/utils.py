@@ -1,3 +1,6 @@
+import grp
+import os
+import pwd
 import re
 from datetime import datetime, timezone
 from typing import Optional
@@ -22,6 +25,22 @@ def format_timestamp(timestamp):
     """Format the given timestamp to ISO date format compatible with HTTP."""
     dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
     return dt.isoformat()
+
+
+def get_user_groups(username: str) -> list[str]:
+    """Group names for a user via os.getgrouplist (NSS initgroups).
+
+    grp.getgrall enumerates every group on the system and is very slow on
+    LDAP/NIS hosts. Raises KeyError for an unknown user.
+    """
+    pw = pwd.getpwnam(username)
+    names = []
+    for gid in os.getgrouplist(username, pw.pw_gid):
+        try:
+            names.append(grp.getgrgid(gid).gr_name)
+        except KeyError:
+            continue
+    return names
 
 
 def make_etag(last_modified: float, size: int) -> str:
