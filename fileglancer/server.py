@@ -1472,6 +1472,7 @@ def create_app(settings):
                 raise HTTPException(status_code=404, detail="Proxied path not found")
             # A bucket link's URL outlives the link, so its Views keep working.
             if _cloud_store(pp.username, pp.fsp_name):
+                db.detach_view_layers(session, pp.id)
                 db.delete_proxied_path(session, username, sharing_key)
                 return {"message": f"Proxied path {sharing_key} deleted for user {username}"}
             # Disclose only the caller's OWN dependent Views (never leak others').

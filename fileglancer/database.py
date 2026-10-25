@@ -617,6 +617,7 @@ def delete_cloud_bucket(session: Session, username: str, name: str) -> Optional[
     links = session.query(ProxiedPathDB).filter_by(username=username, fsp_name=name).all()
     for link in links:
         _invalidate_sharing_key_cache(link.sharing_key)
+        detach_view_layers(session, link.id)
         session.delete(link)
     session.delete(row)
     session.commit()
@@ -1378,6 +1379,13 @@ def mark_view_layers_broken(session: Session, data_link_id: int) -> int:
         layer.broken = True
     session.commit()
     return len(layers)
+
+
+def detach_view_layers(session: Session, data_link_id: int) -> int:
+    """Null data_link_id on the View layers using a Data Link about to be
+    deleted, leaving broken as is (a bucket link's direct URL keeps working).
+    Returns the number of layers detached. Does not commit."""
+    return session.query(ViewLayerDB).filter_by(data_link_id=data_link_id).update({"data_link_id": None})
 
 
 def get_tickets(session: Session, username: str, fsp_name: str = None, path: str = None) -> List[TicketDB]:

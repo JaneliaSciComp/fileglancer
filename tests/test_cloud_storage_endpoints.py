@@ -151,4 +151,5 @@ def test_delete_cloud_link_skips_dependent_views_409(test_client, bucket):
         "name": "v", "ng_state": {}, "layers": [{"layer_index": 0, "sharing_key": key}]}).json()
     assert test_client.delete(f"/api/proxied-path/{key}").status_code == 200
     assert test_client.get(f"/api/proxied-path/{key}").status_code == 404
-    assert test_client.get(f"/api/neuroglancer/views/{view['short_key']}").json()["layers"][0]["broken"] is False
+    layer = test_client.get(f"/api/neuroglancer/views/{view['short_key']}").json()["layers"][0]
+    assert layer["data_link_id"] is None and layer["broken"] is False
