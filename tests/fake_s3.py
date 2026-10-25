@@ -97,8 +97,10 @@ class FakeS3Client:
             raise _client_error("NoSuchKey", 404, "GetObject")
         data = self.objects[Key]
         headers = {}
+        # Like S3: a Range it cannot parse (multi-range, malformed) is ignored
+        m = re.fullmatch(r"bytes=(\d+)-(\d*)", Range) if Range else None
+        Range = Range if m else None
         if Range:
-            m = re.fullmatch(r"bytes=(\d+)-(\d*)", Range)
             start = int(m.group(1))
             if start >= len(data):
                 raise _client_error("InvalidRange", 416, "GetObject")

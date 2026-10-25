@@ -2486,3 +2486,22 @@ def test_write_routes_reject_escaping_subpath(test_client, temp_dir, method, url
     assert response.status_code == 400
     assert response.json() == {"error": "Path cannot escape the current directory"}
     assert not os.path.exists(os.path.join(os.path.dirname(temp_dir), "x"))
+
+
+def test_content_last_modified_is_an_http_date(test_client, temp_dir):
+    """Last-Modified is an RFC 7231 HTTP-date on GET and HEAD, matching the file's mtime."""
+    from email.utils import parsedate_to_datetime
+    path = os.path.join(temp_dir, "dated.txt")
+    with open(path, "w") as f:
+        f.write("v1")
+    for method in ("GET", "HEAD"):
+        value = test_client.request(method, "/api/content/tempdir?subpath=dated.txt").headers["Last-Modified"]
+        assert value.endswith(" GMT")
+        assert parsedate_to_datetime(value).timestamp() == int(os.stat(path).st_mtime)
+
+
+def test_get_file_content_multi_range_returns_full_body(test_client, temp_dir):
+    with open(os.path.join(temp_dir, "multi.txt"), "w") as f:
+        f.write("0123456789")
+    response = test_client.get("/api/content/tempdir?subpath=multi.txt", headers={"Range": "bytes=0-1,3-4"})
+    assert response.status_code == 200 and response.content == b"0123456789"

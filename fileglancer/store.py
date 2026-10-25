@@ -89,13 +89,14 @@ class WorkerStore:
             'Last-Modified': format_timestamp(last_modified),
             'ETag': make_etag(last_modified, size),
         }
-        if not range_header:
-            headers['Content-Length'] = str(size)
-            return 200, headers, Filestore._stream_contents(file_handle)
-        byte_range = parse_range_header(range_header, size)
-        if byte_range is None:
+        try:
+            byte_range = parse_range_header(range_header, size)
+        except ValueError:
             file_handle.close()
             raise StoreError(416, "Requested range not satisfiable", headers={'Content-Range': f'bytes */{size}'})
+        if byte_range is None:
+            headers['Content-Length'] = str(size)
+            return 200, headers, Filestore._stream_contents(file_handle)
         start, end = byte_range
         length = end - start + 1
         headers['Content-Length'] = str(length)
