@@ -16,7 +16,8 @@ export default function CloudBucketRow({
 
   return (
     <div className="flex items-center w-full">
-      <div className="flex-1 min-w-0">
+      {/* Same class as the list so index.css indents the row like an FSP under a zone */}
+      <div className="file-share-path-list flex-1 min-w-0">
         <FileSharePathComponent fsp={fsp} />
       </div>
       <IconButton

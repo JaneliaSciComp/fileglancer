@@ -131,7 +131,7 @@ export default function CloudStorageBrowser({
                       ))}
                     <List.Item
                       aria-label="Add bucket"
-                      className="pl-6 w-full rounded-md cursor-pointer text-foreground hover:!bg-primary-light/30 focus:!bg-primary-light/30"
+                      className="file-share-path pl-6 w-full rounded-md cursor-pointer text-foreground hover:!bg-primary-light/30 focus:!bg-primary-light/30"
                       onClick={onAddBucket}
                       onKeyDown={onActivateKey(onAddBucket)}
                       role="button"
