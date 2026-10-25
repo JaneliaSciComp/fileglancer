@@ -94,4 +94,93 @@ describe('AddBucketDialog', () => {
     await new Promise(r => setTimeout(r, 50));
     expect(screen.queryByLabelText('Endpoint URL')).toBeNull();
   });
+
+  const serveConfig = (config: object) => {
+    const state = { consumed: false };
+    server.use(
+      http.get('/api/cloud-storage/config', () => {
+        state.consumed = true;
+        return HttpResponse.json(config);
+      })
+    );
+    return state;
+  };
+
+  const capturePost = () => {
+    const state: { body?: Record<string, unknown> } = {};
+    server.use(
+      http.post('/api/cloud-storage/buckets', async ({ request }) => {
+        state.body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(CREATED);
+      })
+    );
+    return state;
+  };
+
+  it('does not submit a pasted endpoint when endpoints are not allowed', async () => {
+    const user = userEvent.setup();
+    const cfg = serveConfig({
+      enabled: true,
+      endpoint_url_allowed: false,
+      allowed_endpoints: []
+    });
+    const posted = capturePost();
+    render(<AddBucketDialog onClose={vi.fn()} open />, {
+      initialEntries: ['/browse']
+    });
+    await waitFor(() => expect(cfg.consumed).toBe(true));
+    await user.type(
+      screen.getByLabelText('URL'),
+      'https://store.example.org/idr/zarr'
+    );
+    expect(screen.getByLabelText('Bucket name')).toHaveValue('idr');
+    expect(screen.getByLabelText('Prefix')).toHaveValue('zarr');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(posted.body).toBeDefined());
+    expect(posted.body).not.toHaveProperty('endpoint_url');
+  });
+
+  it('only applies a pasted endpoint that is in the allowed list', async () => {
+    const user = userEvent.setup();
+    serveConfig({
+      enabled: true,
+      endpoint_url_allowed: true,
+      allowed_endpoints: ['https://s3.example.org']
+    });
+    const posted = capturePost();
+    render(<AddBucketDialog onClose={vi.fn()} open />, {
+      initialEntries: ['/browse']
+    });
+    const select = await screen.findByLabelText('Endpoint URL');
+    await user.type(
+      screen.getByLabelText('URL'),
+      'https://store.example.org/idr/zarr'
+    );
+    expect(select).toHaveValue('');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(posted.body).toBeDefined());
+    expect(posted.body).not.toHaveProperty('endpoint_url');
+  });
+
+  it('selects a pasted endpoint that is in the allowed list', async () => {
+    const user = userEvent.setup();
+    serveConfig({
+      enabled: true,
+      endpoint_url_allowed: true,
+      allowed_endpoints: ['https://s3.example.org']
+    });
+    const posted = capturePost();
+    render(<AddBucketDialog onClose={vi.fn()} open />, {
+      initialEntries: ['/browse']
+    });
+    const select = await screen.findByLabelText('Endpoint URL');
+    await user.type(
+      screen.getByLabelText('URL'),
+      'https://s3.example.org/idr/zarr'
+    );
+    expect(select).toHaveValue('https://s3.example.org');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(posted.body).toBeDefined());
+    expect(posted.body?.endpoint_url).toBe('https://s3.example.org');
+  });
 });

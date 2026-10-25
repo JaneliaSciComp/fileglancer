@@ -46,7 +46,12 @@ export default function AddBucketDialog({
     if (parsed) {
       setBucket(parsed.bucket);
       setPrefix(parsed.prefix);
-      setEndpointUrl(parsed.endpointUrl ?? '');
+      // Only apply an endpoint the rendered form can show and the user can change.
+      const endpoint = parsed.endpointUrl ?? '';
+      const usable =
+        endpointAllowed &&
+        (!allowedEndpoints || allowedEndpoints.includes(endpoint));
+      setEndpointUrl(usable ? endpoint : '');
     }
   };
 
