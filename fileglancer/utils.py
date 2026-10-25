@@ -1,8 +1,9 @@
 import re
 from datetime import datetime, timezone
-from mimetypes import guess_type
 from typing import Optional
 from urllib.parse import quote
+
+from x2s3.utils import guess_content_type  # noqa: F401  re-exported; one implementation
 
 def slugify_path(s):
     """Slugify a path to make it into a name"""
@@ -54,18 +55,6 @@ def parse_http_date_to_epoch(value: str):
             dt = dt.replace(tzinfo=timezone.utc)
         return dt.timestamp()
     return None
-
-
-def guess_content_type(filename):
-    """A wrapper for guess_type which deals with unknown MIME types"""
-    content_type, _ = guess_type(filename)
-    if content_type:
-        return content_type
-    else:
-        if filename.endswith('.yaml'):
-            return 'text/plain+yaml'
-        else:
-            return 'application/octet-stream'
 
 
 def is_likely_binary(data: bytes) -> bool:

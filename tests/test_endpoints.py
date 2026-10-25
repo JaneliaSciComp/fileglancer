@@ -2469,3 +2469,20 @@ def test_remove_view_sources(test_client, temp_dir):
     assert resp.json()["layers"] == [] and resp.json()["ng_state"]["layers"] == []
     assert test_client.post(url, json={"sources": [src]}).status_code == 404
     assert test_client.post(url, json={"sources": []}).status_code == 400
+
+
+@pytest.mark.parametrize("bad", ["../x", "/abs", "a/../../x"])
+@pytest.mark.parametrize("method, url, kwargs", [
+    ("PUT", "/api/content/tempdir?subpath={bad}", {"content": b"data"}),
+    ("POST", "/api/files/tempdir?subpath={bad}", {"json": {"type": "file"}}),
+    ("PATCH", "/api/files/tempdir?subpath=x.txt", {"json": {"path": "{bad}"}}),
+])
+def test_write_routes_reject_escaping_subpath(test_client, temp_dir, method, url, kwargs, bad):
+    """Every write route applies the same lexical traversal check with the same 400."""
+    with open(os.path.join(temp_dir, "x.txt"), "w") as f:
+        f.write("x")
+    kwargs = json.loads(json.dumps(kwargs).replace("{bad}", bad)) if "json" in kwargs else kwargs
+    response = test_client.request(method, url.replace("{bad}", quote(bad, safe="")), **kwargs)
+    assert response.status_code == 400
+    assert response.json() == {"error": "Path cannot escape the current directory"}
+    assert not os.path.exists(os.path.join(os.path.dirname(temp_dir), "x"))
