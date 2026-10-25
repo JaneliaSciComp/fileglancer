@@ -41,7 +41,7 @@ dependencies = [
     "sqlalchemy ==2.0.52",
     "packaging ==26.3",
     "uvicorn ==0.38.0",
-    "x2s3 ==1.6.0",
+    "x2s3 ==1.6.1",
     "py-cluster-api ==0.8.0"
 ]
 
