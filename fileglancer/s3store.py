@@ -25,7 +25,7 @@ from loguru import logger
 
 from .database import CloudBucketDB
 from .filestore import FileInfo
-from .utils import format_timestamp, guess_content_type, is_likely_binary, make_etag
+from .utils import format_timestamp, guess_content_type, is_likely_binary, make_etag, s3_public_url
 
 BUCKET_NAME_RE = re.compile(r'^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$')
 
@@ -227,15 +227,7 @@ class S3Store:
 
     def public_url(self, path: str) -> str:
         """Direct anonymous HTTPS URL for a path."""
-        if self.endpoint_url:
-            base = f"{self.endpoint_url}/{self.bucket}"
-        elif '.' in self.bucket:
-            # A dotted name breaks the *.s3.amazonaws.com wildcard certificate
-            base = f"https://s3.amazonaws.com/{self.bucket}"
-        else:
-            base = f"https://{self.bucket}.s3.amazonaws.com"
-        key = quote(self.key_for(path), safe='/')
-        return f"{base}/{key}" if key else base
+        return s3_public_url(self.bucket, self.endpoint_url, self.key_for(path))
 
     async def _call(self, operation: str, **kwargs) -> dict:
         client = await get_client(self.endpoint_url)
@@ -251,7 +243,7 @@ class S3Store:
         return FileInfo(
             name=key.rsplit('/', 1)[-1] or self.bucket,
             path=rel or '.',
-            absolute_path=f"s3://{self.bucket}/{key}" if key else f"s3://{self.bucket}",
+            absolute_path=s3_public_url(self.bucket, self.endpoint_url, key),
             size=0 if is_dir else size,
             is_dir=is_dir,
             permissions='dr-xr-xr-x' if is_dir else '-r--r--r--',

@@ -38,7 +38,7 @@ const EXAMPLE = {
   zone: 'S3',
   group: 'cloud',
   storage: 'Example',
-  mount_path: 's3://example-datasets',
+  mount_path: 'https://example-datasets.s3.amazonaws.com',
   linux_path: null,
   mac_path: null,
   windows_path: null,
@@ -67,7 +67,7 @@ describe('CloudStorageBrowser', () => {
     expect(await within(cloud).findByText('Example')).toBeInTheDocument();
     expect(within(cloud).getByText('S3')).toBeInTheDocument();
     expect(
-      within(cloud).getByText('s3://example-datasets')
+      within(cloud).getByText('https://example-datasets.s3.amazonaws.com')
     ).toBeInTheDocument();
     expect(
       within(cloud).getByRole('button', { name: 'Add bucket' })

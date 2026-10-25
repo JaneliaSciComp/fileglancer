@@ -1041,7 +1041,7 @@ def create_app(settings):
         if store:
             # A public bucket's data is already served at a direct URL, so there is
             # nothing to create: present the whole bucket as an external bucket.
-            buckets = [ExternalBucket(full_path=f"s3://{store.bucket}/{store.prefix}".rstrip('/'),
+            buckets = [ExternalBucket(full_path=store.public_url(''),
                                       external_url=store.public_url(''), fsp_name=fsp_name, relative_path='')]
         return ExternalBucketResponse(buckets=buckets)
 

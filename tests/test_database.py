@@ -1103,12 +1103,12 @@ def test_cloud_bucket_to_fsp_shape(db_session):
     fsp = cloud_bucket_to_fsp(row)
     assert fsp.model_dump() == {
         "name": "cosem", "zone": "S3", "group": "cloud", "storage": "IDR zarr",
-        "mount_path": "s3://janelia-cosem-datasets/zarr/v0.4",
+        "mount_path": "https://janelia-cosem-datasets.s3.amazonaws.com/zarr/v0.4",
         "mac_path": None, "windows_path": None, "linux_path": None, "protocol": "s3",
     }
 
 def test_cloud_bucket_mount_path_without_prefix(db_session):
-    assert cloud_bucket_to_fsp(_add_bucket(db_session)).mount_path == "s3://janelia-cosem-datasets"
+    assert cloud_bucket_to_fsp(_add_bucket(db_session)).mount_path == "https://janelia-cosem-datasets.s3.amazonaws.com"
 
 def test_file_share_paths_include_callers_buckets_only_with_username(db_session, fsp):
     _add_bucket(db_session, username="alice")

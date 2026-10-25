@@ -15,7 +15,7 @@ const CREATED = {
   zone: 'S3',
   group: 'cloud',
   storage: 'idr',
-  mount_path: 's3://idr',
+  mount_path: 'https://idr.s3.amazonaws.com',
   linux_path: null,
   mac_path: null,
   windows_path: null,

@@ -200,7 +200,7 @@ function getPreferredPathForDisplay(
     isReadOnlyFsp(fsp) ||
     (fromMountPath && /^[a-z][a-z0-9+.-]*:\/\//i.test(basePath))
   ) {
-    // A URI (s3://bucket/prefix): POSIX normalization would collapse the '//'
+    // A URL (https://bucket.s3.amazonaws.com/prefix): POSIX normalization would collapse the '//'
     return `${basePath.replace(/\/+$/, '')}/${subPath.replace(/^\/+/, '')}`;
   } else {
     let fullPath = joinPaths(basePath, subPath); // Linux = POSIX style

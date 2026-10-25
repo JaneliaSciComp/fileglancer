@@ -138,14 +138,14 @@ def test_moving_data_link_onto_bucket_is_405(test_client, bucket, temp_dir):
 
 def test_bucket_is_its_own_external_bucket(test_client, bucket):
     [b] = test_client.get("/api/external-buckets/idr").json()["buckets"]
-    assert b == {"id": None, "full_path": "s3://idr/zarr/v0.4", "external_url": "https://idr.s3.amazonaws.com/zarr/v0.4",
+    assert b == {"id": None, "full_path": "https://idr.s3.amazonaws.com/zarr/v0.4", "external_url": "https://idr.s3.amazonaws.com/zarr/v0.4",
                  "fsp_name": "idr", "relative_path": ""}
 
 
 def test_custom_endpoint_bucket_external_url_is_path_style(test_client, bucket):
     _add_bucket("minio", prefix="", endpoint_url="https://s3.example.org")
     [b] = test_client.get("/api/external-buckets/minio").json()["buckets"]
-    assert b["external_url"] == "https://s3.example.org/idr" and b["full_path"] == "s3://idr"
+    assert b["external_url"] == "https://s3.example.org/idr" and b["full_path"] == "https://s3.example.org/idr"
 
 
 def test_site_share_has_no_synthesized_external_bucket(test_client, bucket):
@@ -175,7 +175,7 @@ def test_create_bucket_returns_fsp_and_lists_it(test_client, fake_s3):
     r = test_client.post("/api/cloud-storage/buckets", json=CREATE)
     assert r.status_code == 201
     assert r.json() == {"name": "IDR_zarr", "zone": "S3", "group": "cloud", "storage": "IDR zarr",
-                        "mount_path": "s3://idr/zarr/v0.4", "mac_path": None, "windows_path": None, "linux_path": None, "protocol": "s3"}
+                        "mount_path": "https://idr.s3.amazonaws.com/zarr/v0.4", "mac_path": None, "windows_path": None, "linux_path": None, "protocol": "s3"}
     assert [b["name"] for b in test_client.get("/api/cloud-storage/buckets").json()["buckets"]] == ["IDR_zarr"]
     names = [p["name"] for p in test_client.get("/api/file-share-paths").json()["paths"]]
     assert names == ["tempdir", "IDR_zarr"]

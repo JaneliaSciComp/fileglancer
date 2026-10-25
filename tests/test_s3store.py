@@ -55,7 +55,7 @@ async def test_list_dir_root_folds_markers_and_sorts_dirs_first(client):
     assert r["info"]["path"] == "." and r["info"]["is_dir"] is True
     assert [f["name"] for f in r["files"]] == ["a.ome.zarr", "both", "emptydir", "readme.txt", "with space#1.txt"]
     assert [f["is_dir"] for f in r["files"]][:3] == [True, True, True]
-    assert r["files"][3]["path"] == "readme.txt" and r["files"][3]["absolute_path"] == "s3://idr/zarr/v0.4/readme.txt"
+    assert r["files"][3]["path"] == "readme.txt" and r["files"][3]["absolute_path"] == "https://idr.s3.amazonaws.com/zarr/v0.4/readme.txt"
     assert r["files"][3]["permissions"] == "-r--r--r--" and r["files"][3]["hasWrite"] is False and r["files"][3]["size"] == 11
 
 

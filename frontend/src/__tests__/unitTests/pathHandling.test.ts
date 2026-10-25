@@ -444,10 +444,10 @@ describe('getPreferredPathForDisplay', () => {
       linux_path: '',
       windows_path: '',
       mac_path: '',
-      mount_path: 's3://bucket'
+      mount_path: 'https://bucket.s3.amazonaws.com'
     };
     expect(getPreferredPathForDisplay(['mac_path'], bucket)).toBe(
-      's3://bucket'
+      'https://bucket.s3.amazonaws.com'
     );
   });
 
@@ -456,21 +456,21 @@ describe('getPreferredPathForDisplay', () => {
   });
 
   test.each(['linux_path', 'mac_path', 'windows_path'] as const)(
-    'keeps the s3:// URI intact under the %s preference',
+    'keeps the bucket URL intact under the %s preference',
     pref => {
       const bucket = {
         ...mockFsp,
         linux_path: null,
         windows_path: null,
         mac_path: null,
-        mount_path: 's3://bucket/zarr',
+        mount_path: 'https://bucket.s3.amazonaws.com/zarr',
         protocol: 's3'
       } as FileSharePath;
       expect(getPreferredPathForDisplay([pref], bucket, 'a.ome.zarr/0')).toBe(
-        's3://bucket/zarr/a.ome.zarr/0'
+        'https://bucket.s3.amazonaws.com/zarr/a.ome.zarr/0'
       );
       expect(getPreferredPathForDisplay([pref], bucket, '/a.ome.zarr/0')).toBe(
-        's3://bucket/zarr/a.ome.zarr/0'
+        'https://bucket.s3.amazonaws.com/zarr/a.ome.zarr/0'
       );
     }
   );

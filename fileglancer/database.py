@@ -19,7 +19,7 @@ from fileglancer.giturls import canonical_github_url
 from fileglancer.model import FileSharePath
 from fileglancer.ngstate import data_link_segment, default_url_prefix, layer_sharing_key, layer_uses_segment, rewrite_layer_segment
 from fileglancer.settings import get_settings
-from fileglancer.utils import slugify_path
+from fileglancer.utils import s3_public_url, slugify_path
 
 # Constants
 SHARING_KEY_LENGTH = 12
@@ -575,16 +575,13 @@ def _load_file_share_paths(session: Session) -> List[FileSharePath]:
 
 
 def cloud_bucket_to_fsp(row: CloudBucketDB) -> FileSharePath:
-    """Present a user's cloud bucket as a file share path"""
-    mount_path = f"{row.protocol}://{row.bucket}"
-    if row.prefix:
-        mount_path += f"/{row.prefix}"
+    """Present a user's cloud bucket as a file share path; its path is the public HTTPS URL"""
     return FileSharePath(
         name=row.name,
         zone=row.protocol.upper(),
         group='cloud',
         storage=row.label,
-        mount_path=mount_path,
+        mount_path=s3_public_url(row.bucket, row.endpoint_url, row.prefix),
         protocol=row.protocol,
     )
 

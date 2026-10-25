@@ -1,6 +1,8 @@
 import re
 from datetime import datetime, timezone
 from mimetypes import guess_type
+from typing import Optional
+from urllib.parse import quote
 
 def slugify_path(s):
     """Slugify a path to make it into a name"""
@@ -131,3 +133,18 @@ def parse_range_header(range_header: str, file_size: int):
 
     except (ValueError, IndexError):
         return None
+
+
+def s3_public_url(bucket: str, endpoint_url: Optional[str], key: str = '') -> str:
+    """Direct anonymous HTTPS URL for an object key ('' for the bucket or prefix itself).
+
+    AWS buckets get virtual-hosted URLs unless the name has a dot, which the
+    *.s3.amazonaws.com wildcard certificate cannot cover; custom endpoints are path style.
+    """
+    if endpoint_url:
+        base = f"{endpoint_url}/{bucket}"
+    elif '.' in bucket:
+        base = f"https://s3.amazonaws.com/{bucket}"
+    else:
+        base = f"https://{bucket}.s3.amazonaws.com"
+    return f"{base}/{quote(key, safe='/')}" if key else base

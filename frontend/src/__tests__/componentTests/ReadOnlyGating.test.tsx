@@ -48,7 +48,7 @@ const EXAMPLE = {
   zone: 'S3',
   group: 'cloud',
   storage: 'Example',
-  mount_path: 's3://example-datasets',
+  mount_path: 'https://example-datasets.s3.amazonaws.com',
   linux_path: null,
   mac_path: null,
   windows_path: null,
@@ -119,7 +119,7 @@ describe('Read-only gating', () => {
           buckets: [
             {
               id: null,
-              full_path: 's3://example-datasets',
+              full_path: 'https://example-datasets.s3.amazonaws.com',
               external_url: 'https://example-datasets.s3.amazonaws.com',
               fsp_name: 'example',
               relative_path: ''

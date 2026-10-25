@@ -6,7 +6,7 @@ const BUCKET = {
   zone: 'S3',
   group: 'cloud',
   storage: 'Example',
-  mount_path: 's3://example-datasets',
+  mount_path: 'https://example-datasets.s3.amazonaws.com',
   linux_path: null,
   mac_path: null,
   windows_path: null,
@@ -57,12 +57,17 @@ test('add a public bucket, browse it read-only, return to a local share', async 
   await page.route('**/api/files/example*', async route => {
     await route.fulfill({
       json: {
-        info: entry('example', '.', 's3://example-datasets', true),
+        info: entry(
+          'example',
+          '.',
+          'https://example-datasets.s3.amazonaws.com',
+          true
+        ),
         files: [
           entry(
             'sample.zarr',
             'sample.zarr',
-            's3://example-datasets/sample.zarr',
+            'https://example-datasets.s3.amazonaws.com/sample.zarr',
             true
           )
         ]

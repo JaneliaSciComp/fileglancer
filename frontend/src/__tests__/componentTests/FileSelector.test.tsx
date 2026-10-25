@@ -11,7 +11,7 @@ const EXAMPLE = {
   zone: 'S3',
   group: 'cloud',
   storage: 'Example',
-  mount_path: 's3://example-datasets',
+  mount_path: 'https://example-datasets.s3.amazonaws.com',
   linux_path: null,
   mac_path: null,
   windows_path: null,
@@ -341,7 +341,7 @@ describe('FileSelector', () => {
       await user.dblClick(screen.getByText('S3'));
 
       expect(
-        await screen.findByText('s3://example-datasets')
+        await screen.findByText('https://example-datasets.s3.amazonaws.com')
       ).toBeInTheDocument();
     });
   });
