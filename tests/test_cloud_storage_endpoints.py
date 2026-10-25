@@ -111,6 +111,19 @@ def test_disabled_feature_hides_buckets(test_client, bucket):
     assert test_client.get("/api/files/idr").status_code == 404
 
 
+def test_disabled_feature_omits_buckets_from_share_list(test_client, bucket):
+    fileglancer.settings.get_settings().cloud_storage.enabled = False
+    assert [p["name"] for p in test_client.get("/api/file-share-paths").json()["paths"]] == ["tempdir"]
+
+
+def test_bucket_on_endpoint_no_longer_allowed_is_403(test_client, fake_s3):
+    assert test_client.post("/api/cloud-storage/buckets", json={"bucket": "idr", "label": "far", "endpoint_url": "https://s3.example.org"}).status_code == 201
+    fileglancer.settings.get_settings().cloud_storage.allowed_endpoints = []
+    r = test_client.get("/api/files/far")
+    assert r.status_code == 403 and r.json() == {"error": "Endpoint no longer allowed on this server"}
+    assert test_client.get("/api/files/tempdir").status_code == 200
+
+
 def test_data_link_on_bucket_has_direct_url(test_client, bucket):
     r = test_client.post("/api/proxied-path?fsp_name=idr&path=a.ome.zarr")
     assert r.status_code == 200
@@ -205,6 +218,7 @@ def test_create_bucket_custom_endpoint_stores_origin(test_client, fake_s3):
 
 @pytest.mark.parametrize("body,message", [
     ({"bucket": "Bad_Name"}, "Invalid bucket name"),
+    ({"bucket": "idr\n"}, "Invalid bucket name"),
     ({"bucket": "idr", "prefix": "a/../b"}, "Prefix cannot contain"),
     ({"bucket": "idr", "label": "***"}, "Display name must contain"),
     ({"bucket": "idr", "endpoint_url": "http://s3.example.org"}, "must be an https"),

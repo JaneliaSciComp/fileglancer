@@ -517,6 +517,7 @@ def create_app(settings):
         """The S3Store for the user's bucket named fsp_name, or None to use the worker.
 
         Site shares win name clashes, so a bucket shadowed by one is never served.
+        A bucket whose endpoint the admin has since removed from the allowlist is 403.
         """
         if not settings.cloud_storage.enabled:
             return None
@@ -524,7 +525,11 @@ def create_app(settings):
             if db.get_file_share_path(session, fsp_name):
                 return None
             row = db.get_cloud_bucket(session, username, fsp_name)
-            return S3Store.for_bucket(row) if row else None
+            store = S3Store.for_bucket(row) if row else None
+        allowed = settings.cloud_storage.allowed_endpoints
+        if store and store.endpoint_url and allowed is not None and store.endpoint_url not in allowed:
+            raise HTTPException(status_code=403, detail="Endpoint no longer allowed on this server")
+        return store
 
     def _to_proxied_path(db_path: db.ProxiedPathDB) -> ProxiedPath:
         """A data link on a bucket path points straight at the bucket, others at the /files proxy."""
@@ -1032,7 +1037,8 @@ def create_app(settings):
              description="Get all file share paths from the database")
     async def get_file_share_paths(username: Optional[str] = Depends(get_optional_user)) -> List[FileSharePath]:
         with db.get_db_session(settings.db_url) as session:
-            paths = db.get_file_share_paths(session, username=username)
+            paths = db.get_file_share_paths(
+                session, username=username if settings.cloud_storage.enabled else None)
             return FileSharePathResponse(paths=paths)
 
 
@@ -1079,7 +1085,7 @@ def create_app(settings):
     async def create_cloud_bucket(body: CloudBucketCreateRequest,
                                   username: str = Depends(get_current_user)) -> FileSharePath:
         _require_cloud_storage()
-        if not BUCKET_NAME_RE.match(body.bucket):
+        if not BUCKET_NAME_RE.fullmatch(body.bucket):
             raise HTTPException(status_code=400, detail="Invalid bucket name")
         try:
             prefix = normalize_prefix(body.prefix)

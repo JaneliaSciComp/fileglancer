@@ -90,6 +90,8 @@ def client_kwargs(endpoint_url: Optional[str]) -> dict:
             signature_version=botocore.UNSIGNED,
             connect_timeout=5,
             read_timeout=30,
+            # botocore's legacy default of 5 attempts multiplies every timeout
+            retries={'max_attempts': 2},
             http_session_cls=NoRedirectAIOHTTPSession,
             s3={'addressing_style': 'path'} if endpoint_url else {},
         ),
@@ -227,6 +229,9 @@ class S3Store:
         """Direct anonymous HTTPS URL for a path."""
         if self.endpoint_url:
             base = f"{self.endpoint_url}/{self.bucket}"
+        elif '.' in self.bucket:
+            # A dotted name breaks the *.s3.amazonaws.com wildcard certificate
+            base = f"https://s3.amazonaws.com/{self.bucket}"
         else:
             base = f"https://{self.bucket}.s3.amazonaws.com"
         return f"{base}/{quote(self.key_for(path), safe='/')}"

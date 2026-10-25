@@ -161,6 +161,9 @@ def test_public_url_aws_and_custom_encode_segments():
     assert store.public_url("with space#1.txt") == "https://idr.s3.amazonaws.com/zarr/v0.4/with%20space%231.txt"
     assert store.public_url(".") == "https://idr.s3.amazonaws.com/zarr/v0.4"
     assert S3Store("idr", "", None).public_url("") == "https://idr.s3.amazonaws.com/"
+    # Dotted names break virtual-hosted TLS, so they go path style
+    assert S3Store("open.data", "", None).public_url("x y") == "https://s3.amazonaws.com/open.data/x%20y"
+    assert S3Store("open.data", "", None).public_url("") == "https://s3.amazonaws.com/open.data/"
     custom = S3Store("idr", "zarr/v0.4", "https://s3.example.org")
     assert custom.public_url("a.ome.zarr") == "https://s3.example.org/idr/zarr/v0.4/a.ome.zarr"
 
@@ -170,8 +173,10 @@ def test_client_kwargs():
     assert "endpoint_url" not in aws and aws["region_name"] == "us-east-1"
     assert aws["config"].signature_version is botocore.UNSIGNED and aws["config"].connect_timeout == 5 and aws["config"].read_timeout == 30
     assert aws["config"].http_session_cls is s3store.NoRedirectAIOHTTPSession
+    assert aws["config"].retries == {"max_attempts": 2}
     custom = client_kwargs("https://s3.example.org")
     assert custom["config"].http_session_cls is s3store.NoRedirectAIOHTTPSession
+    assert custom["config"].retries == {"max_attempts": 2}
     assert custom["endpoint_url"] == "https://s3.example.org" and custom["config"].s3 == {"addressing_style": "path"}
 
 
