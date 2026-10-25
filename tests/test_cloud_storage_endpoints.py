@@ -124,6 +124,20 @@ def test_bucket_on_endpoint_no_longer_allowed_is_403(test_client, fake_s3):
     assert test_client.get("/api/files/tempdir").status_code == 200
 
 
+def test_links_on_stranded_bucket_stay_manageable(test_client, fake_s3):
+    assert test_client.post("/api/cloud-storage/buckets", json={"bucket": "idr", "prefix": "zarr/v0.4", "label": "far", "endpoint_url": "https://s3.example.org"}).status_code == 201
+    key = test_client.post("/api/proxied-path?fsp_name=far&path=a.ome.zarr").json()["sharing_key"]
+    fileglancer.settings.get_settings().cloud_storage.allowed_endpoints = []
+    r = test_client.get("/api/proxied-path")
+    assert r.status_code == 200
+    [link] = r.json()["paths"]
+    assert link["sharing_key"] == key and link["url"] == "https://s3.example.org/idr/zarr/v0.4/a.ome.zarr"
+    assert test_client.get(f"/api/proxied-path/{key}").status_code == 200
+    assert test_client.put(f"/api/proxied-path/{key}?sharing_name=renamed").status_code == 200
+    assert test_client.delete(f"/api/proxied-path/{key}").status_code == 200
+    assert test_client.get("/api/files/far").status_code == 403
+
+
 def test_data_link_on_bucket_has_direct_url(test_client, bucket):
     r = test_client.post("/api/proxied-path?fsp_name=idr&path=a.ome.zarr")
     assert r.status_code == 200

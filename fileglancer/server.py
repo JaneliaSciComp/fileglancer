@@ -513,11 +513,13 @@ def create_app(settings):
 
     CLOUD_WRITE_ERROR = "Not supported on cloud storage"
 
-    def _cloud_store(username: str, fsp_name: str) -> Optional[S3Store]:
+    def _cloud_store(username: str, fsp_name: str, enforce_endpoint: bool = True) -> Optional[S3Store]:
         """The S3Store for the user's bucket named fsp_name, or None to use the worker.
 
         Site shares win name clashes, so a bucket shadowed by one is never served.
-        A bucket whose endpoint the admin has since removed from the allowlist is 403.
+        A bucket whose endpoint the admin has since removed from the allowlist is 403
+        for data access; pass enforce_endpoint=False where no request reaches the
+        endpoint, so users can still see and remove their links on it.
         """
         if not settings.cloud_storage.enabled:
             return None
@@ -527,13 +529,13 @@ def create_app(settings):
             row = db.get_cloud_bucket(session, username, fsp_name)
             store = S3Store.for_bucket(row) if row else None
         allowed = settings.cloud_storage.allowed_endpoints
-        if store and store.endpoint_url and allowed is not None and store.endpoint_url not in allowed:
+        if enforce_endpoint and store and store.endpoint_url and allowed is not None and store.endpoint_url not in allowed:
             raise HTTPException(status_code=403, detail="Endpoint no longer allowed on this server")
         return store
 
     def _to_proxied_path(db_path: db.ProxiedPathDB) -> ProxiedPath:
         """A data link on a bucket path points straight at the bucket, others at the /files proxy."""
-        store = _cloud_store(db_path.username, db_path.fsp_name)
+        store = _cloud_store(db_path.username, db_path.fsp_name, enforce_endpoint=False)
         return _convert_proxied_path(db_path, settings.external_proxy_url,
                                      public_url=store.public_url(db_path.path) if store else None)
 
@@ -1553,7 +1555,7 @@ def create_app(settings):
             if not pp or pp.username != username:
                 raise HTTPException(status_code=404, detail="Proxied path not found")
             # A bucket link's URL outlives the link, so its Views keep working.
-            if _cloud_store(pp.username, pp.fsp_name):
+            if _cloud_store(pp.username, pp.fsp_name, enforce_endpoint=False):
                 db.detach_view_layers(session, pp.id)
                 db.delete_proxied_path(session, username, sharing_key)
                 return {"message": f"Proxied path {sharing_key} deleted for user {username}"}
