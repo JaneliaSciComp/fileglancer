@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { IconButton } from '@material-tailwind/react';
-import { BsBucket } from 'react-icons/bs';
 import { HiOutlineTrash } from 'react-icons/hi2';
+import { TbBucket } from 'react-icons/tb';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FileSharePathComponent from './FileSharePath';
@@ -19,7 +19,7 @@ export default function CloudBucketRow({
     <div className="flex items-center w-full">
       {/* Same class as the list so index.css indents the row like an FSP under a zone */}
       <div className="file-share-path-list flex-1 min-w-0">
-        <FileSharePathComponent fsp={fsp} icon={BsBucket} />
+        <FileSharePathComponent fsp={fsp} icon={TbBucket} />
       </div>
       <IconButton
         aria-label={`Remove bucket ${fsp.storage}`}
