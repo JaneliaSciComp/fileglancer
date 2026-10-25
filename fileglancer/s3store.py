@@ -234,7 +234,8 @@ class S3Store:
             base = f"https://s3.amazonaws.com/{self.bucket}"
         else:
             base = f"https://{self.bucket}.s3.amazonaws.com"
-        return f"{base}/{quote(self.key_for(path), safe='/')}"
+        key = quote(self.key_for(path), safe='/')
+        return f"{base}/{key}" if key else base
 
     async def _call(self, operation: str, **kwargs) -> dict:
         client = await get_client(self.endpoint_url)
@@ -367,14 +368,6 @@ class S3Store:
         if content_range:
             headers['Content-Range'] = content_range
         return (206 if content_range else 200), headers, _stream(r['Body'])
-
-    async def validate_proxied_path(self, path: str) -> dict:
-        """{'ok': True} if path exists and is readable, else a 400 error dict."""
-        try:
-            await self.get_file_info(path)
-        except S3Error as e:
-            return {"error": e.message, "status_code": 400}
-        return {"ok": True}
 
     async def probe(self) -> None:
         """Check the bucket and prefix are anonymously listable. Raises S3Error(400, message)."""

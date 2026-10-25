@@ -8,7 +8,6 @@ import {
   sendRequestAndThrowForNotOk,
   throwResponseNotOkError
 } from './queryUtils';
-import { proxiedPathQueryKeys } from './proxiedPathQueries';
 
 export type CloudStorageConfig = {
   enabled: boolean;
@@ -26,7 +25,6 @@ export type CreateCloudBucketPayload = {
 
 export type DeleteCloudBucketResponse = {
   name: string;
-  removed_links: number;
 };
 
 export const cloudStorageQueryKeys = {
@@ -94,7 +92,6 @@ export function useDeleteCloudBucketMutation(): UseMutationResult<
       )) as DeleteCloudBucketResponse,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fileSharePaths'] });
-      queryClient.invalidateQueries({ queryKey: proxiedPathQueryKeys.all });
     }
   });
 }

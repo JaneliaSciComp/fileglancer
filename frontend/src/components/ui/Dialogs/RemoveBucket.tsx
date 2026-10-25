@@ -23,15 +23,8 @@ export default function RemoveBucketDialog({
 
   const handleRemove = async () => {
     try {
-      const { removed_links } = await deleteBucketMutation.mutateAsync({
-        name: fsp.name
-      });
-      toast.success(
-        `Removed bucket "${fsp.storage}"` +
-          (removed_links > 0
-            ? ` and ${removed_links} data link${removed_links === 1 ? '' : 's'}`
-            : '')
-      );
+      await deleteBucketMutation.mutateAsync({ name: fsp.name });
+      toast.success(`Removed bucket "${fsp.storage}"`);
       const cleanup = await removeFavoritesForFsp(fsp.name);
       if (!cleanup.success) {
         toast.error(cleanup.error);
@@ -48,8 +41,8 @@ export default function RemoveBucketDialog({
         Remove bucket
       </Typography>
       <Typography className="text-foreground" variant="small">
-        Remove "{fsp.storage}" from your Cloud Storage? Data links you created
-        on it will be removed too. The bucket itself is not changed.
+        Remove "{fsp.storage}" from your Cloud Storage? The bucket itself is not
+        changed.
       </Typography>
       <div className="flex gap-3">
         <FgButton

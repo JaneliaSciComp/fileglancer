@@ -346,7 +346,6 @@ export default function PropertiesDrawer({
                             if (
                               areDataLinksAutomatic &&
                               dataLinkSubpathMode !== 'custom' &&
-                              !readOnly &&
                               !proxiedPathByFspAndPathQuery.data
                             ) {
                               await handleCreateDataLink();
@@ -360,7 +359,9 @@ export default function PropertiesDrawer({
                           type="small"
                         >
                           {externalDataUrlQuery.data
-                            ? 'Public data link already exists since this data is on s3.janelia.org.'
+                            ? readOnly
+                              ? 'This bucket is public, so its data link already exists.'
+                              : 'Public data link already exists since this data is on s3.janelia.org.'
                             : proxiedPathByFspAndPathQuery.data
                               ? 'Deleting the data link will remove data access for collaborators with the link.'
                               : 'Creating a data link allows you to share the data at this path with internal collaborators or use tools to view the data.'}

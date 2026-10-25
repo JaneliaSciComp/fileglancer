@@ -151,19 +151,13 @@ async def test_dot_segments_in_paths_are_rejected(path, client):
     assert client.calls == []
 
 
-@pytest.mark.asyncio
-async def test_validate_proxied_path(client):
-    assert await store.validate_proxied_path("a.ome.zarr") == {"ok": True}
-    assert (await store.validate_proxied_path("nope"))["status_code"] == 400
-
-
 def test_public_url_aws_and_custom_encode_segments():
     assert store.public_url("with space#1.txt") == "https://idr.s3.amazonaws.com/zarr/v0.4/with%20space%231.txt"
     assert store.public_url(".") == "https://idr.s3.amazonaws.com/zarr/v0.4"
-    assert S3Store("idr", "", None).public_url("") == "https://idr.s3.amazonaws.com/"
+    assert S3Store("idr", "", None).public_url("") == "https://idr.s3.amazonaws.com"
     # Dotted names break virtual-hosted TLS, so they go path style
     assert S3Store("open.data", "", None).public_url("x y") == "https://s3.amazonaws.com/open.data/x%20y"
-    assert S3Store("open.data", "", None).public_url("") == "https://s3.amazonaws.com/open.data/"
+    assert S3Store("open.data", "", None).public_url("") == "https://s3.amazonaws.com/open.data"
     custom = S3Store("idr", "zarr/v0.4", "https://s3.example.org")
     assert custom.public_url("a.ome.zarr") == "https://s3.example.org/idr/zarr/v0.4/a.ome.zarr"
 

@@ -1127,27 +1127,14 @@ def test_duplicate_bucket_name_per_user_is_rejected(db_session):
     with pytest.raises(ValueError, match="already exists"):
         _add_bucket(db_session)
 
-def test_delete_cloud_bucket_cascades_to_owner_links(db_session):
+def test_delete_cloud_bucket(db_session):
     _add_bucket(db_session)
-    create_proxied_path(db_session, "alice", "a", "cosem", "x", url_prefix="x")
-    create_proxied_path(db_session, "alice", "b", "cosem", "y", url_prefix="y")
-    assert delete_cloud_bucket(db_session, "alice", "cosem") == 2
-    assert get_proxied_paths(db_session, "alice") == []
+    assert delete_cloud_bucket(db_session, "alice", "cosem") is True
     assert get_cloud_bucket(db_session, "alice", "cosem") is None
-    assert delete_cloud_bucket(db_session, "alice", "cosem") is None
+    assert delete_cloud_bucket(db_session, "alice", "cosem") is False
 
-def test_delete_cloud_bucket_detaches_view_layers(db_session):
+def test_create_proxied_path_on_bucket_is_rejected(db_session):
     _add_bucket(db_session)
-    pp = create_proxied_path(db_session, "alice", "a", "cosem", "x", url_prefix="x")
-    v = create_view(db_session, "alice", "v", {"layers": []},
-                    [{"data_link_id": pp.id, "layer_index": 0, "channel": None, "opts": None}], "read")
-    assert delete_cloud_bucket(db_session, "alice", "cosem") == 1
-    db_session.refresh(v)
-    assert v.layers[0].data_link_id is None and v.layers[0].broken is False
-
-def test_create_proxied_path_on_bucket_requires_owner_username(db_session):
-    _add_bucket(db_session)
-    pp = create_proxied_path(db_session, "alice", "a", "cosem", "x", url_prefix="x")
-    assert pp.fsp_name == "cosem"
     with pytest.raises(ValueError, match="does not exist"):
-        create_proxied_path(db_session, "bob", "a", "cosem", "x", url_prefix="x")
+        create_proxied_path(db_session, "alice", "a", "cosem", "x", url_prefix="x")
+

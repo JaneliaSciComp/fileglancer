@@ -609,19 +609,14 @@ def create_cloud_bucket(session: Session, username: str, name: str, protocol: st
     return row
 
 
-def delete_cloud_bucket(session: Session, username: str, name: str) -> Optional[int]:
-    """Delete a bucket and the owner's links into it; returns links removed, None if no bucket"""
+def delete_cloud_bucket(session: Session, username: str, name: str) -> bool:
+    """Delete a user's bucket; False if there is no such bucket"""
     row = get_cloud_bucket(session, username, name)
     if not row:
-        return None
-    links = session.query(ProxiedPathDB).filter_by(username=username, fsp_name=name).all()
-    for link in links:
-        _invalidate_sharing_key_cache(link.sharing_key)
-        detach_view_layers(session, link.id)
-        session.delete(link)
+        return False
     session.delete(row)
     session.commit()
-    return len(links)
+    return True
 
 
 def get_file_share_paths(session: Session, fsp_name: Optional[str] = None, username: Optional[str] = None):
@@ -911,7 +906,7 @@ def find_fsp_from_absolute_path(session: Session, absolute_path: str) -> Optiona
     return find_fsp_in_paths(get_file_share_paths(session), absolute_path)
 
 
-def _validate_proxied_path(session: Session, fsp_name: str, path: str, username: Optional[str] = None) -> None:
+def _validate_proxied_path(session: Session, fsp_name: str, path: str) -> None:
     """Validate that the file share path for a proxied path exists.
 
     Note: the filesystem existence and accessibility of *path* are deliberately
@@ -924,14 +919,14 @@ def _validate_proxied_path(session: Session, fsp_name: str, path: str, username:
     user worker (see ``_action_validate_proxied_path``), which executes as the
     real user before this function is called.
     """
-    fsp = get_file_share_path(session, fsp_name, username)
+    fsp = get_file_share_path(session, fsp_name)
     if not fsp:
         raise ValueError(f"File share path {fsp_name} does not exist")
 
 
 def create_proxied_path(session: Session, username: str, sharing_name: str, fsp_name: str, path: str, url_prefix: str = "") -> ProxiedPathDB:
     """Create a new proxied path"""
-    _validate_proxied_path(session, fsp_name, path, username)
+    _validate_proxied_path(session, fsp_name, path)
 
     sharing_key = secrets.token_urlsafe(SHARING_KEY_LENGTH)
     now = datetime.now(UTC)
@@ -980,7 +975,7 @@ def update_proxied_path(session: Session,
     if new_path:
         proxied_path.path = new_path
 
-    _validate_proxied_path(session, proxied_path.fsp_name, proxied_path.path, proxied_path.username)
+    _validate_proxied_path(session, proxied_path.fsp_name, proxied_path.path)
     proxied_path.updated_at = datetime.now(UTC)
 
     session.commit()
@@ -1379,13 +1374,6 @@ def mark_view_layers_broken(session: Session, data_link_id: int) -> int:
         layer.broken = True
     session.commit()
     return len(layers)
-
-
-def detach_view_layers(session: Session, data_link_id: int) -> int:
-    """Null data_link_id on the View layers using a Data Link about to be
-    deleted, leaving broken as is (a bucket link's direct URL keeps working).
-    Returns the number of layers detached. Does not commit."""
-    return session.query(ViewLayerDB).filter_by(data_link_id=data_link_id).update({"data_link_id": None})
 
 
 def get_tickets(session: Session, username: str, fsp_name: str = None, path: str = None) -> List[TicketDB]:

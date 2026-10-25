@@ -17,7 +17,6 @@ import {
   normalizePosixStylePath
 } from '@/utils/pathHandling';
 import useCopyTooltip from './useCopyTooltip';
-import { isReadOnlyFsp } from '@/utils/cloudStorage';
 import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
 
 const VALID_URL_PREFIX_RE = /^[A-Za-z0-9\-._~/!@$&'()*+,;:=%]+$/;
@@ -262,12 +261,7 @@ export default function useDataToolLinks(
 
   const handleToolClick = async (toolKey: PendingToolKey) => {
     if (!currentDirProxiedPathQuery.data && !externalDataUrlQuery.data) {
-      // A bucket link always gets the confirm dialog
-      if (
-        areDataLinksAutomatic &&
-        dataLinkSubpathMode !== 'custom' &&
-        !isReadOnlyFsp(fileQuery.data?.currentFileSharePath)
-      ) {
+      if (areDataLinksAutomatic && dataLinkSubpathMode !== 'custom') {
         await createLinkAndExecuteAction(toolKey);
       } else {
         setPendingToolKey?.(toolKey);

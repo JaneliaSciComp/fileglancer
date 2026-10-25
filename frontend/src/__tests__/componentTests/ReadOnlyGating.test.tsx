@@ -1,12 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import userEvent from '@testing-library/user-event';
 
 import { render, screen } from '@/__tests__/test-utils';
 import { server } from '@/__tests__/mocks/node';
 import Browse from '@/components/Browse';
 import PropertiesDrawer from '@/components/ui/PropertiesDrawer/PropertiesDrawer';
-import { usePreferencesContext } from '@/contexts/PreferencesContext';
 
 vi.mock('@/components/tours/StartTour', () => ({
   default: ({ children }: { children: React.ReactNode }) => (
@@ -114,46 +112,39 @@ describe('Read-only gating', () => {
     ).toBeInTheDocument();
   });
 
-  it('asks before creating a data link on a bucket even with automatic custom-named links', async () => {
+  it('shows the bucket path as an existing public data link instead of a Create switch', async () => {
     server.use(
-      http.get('/api/preference', () =>
+      http.get('/api/external-buckets/example', () =>
         HttpResponse.json({
-          path: { value: ['linux_path'] },
-          areDataLinksAutomatic: { value: true },
-          dataLinkSubpathMode: { value: 'custom' },
-          isFilteredByGroups: { value: true },
-          showTutorial: { value: true },
-          layout: { value: '' },
-          zone: { value: [] },
-          fileSharePath: { value: [] },
-          folder: { value: [] },
-          recentlyViewedFolders: { value: [] }
+          buckets: [
+            {
+              id: null,
+              full_path: 's3://example-datasets',
+              external_url: 'https://example-datasets.s3.amazonaws.com',
+              fsp_name: 'example',
+              relative_path: ''
+            }
+          ]
         })
       )
     );
-    // The switch reads the preference at click time, so wait for it to load
-    function AutomaticLinksLoaded() {
-      const { areDataLinksAutomatic } = usePreferencesContext();
-      return areDataLinksAutomatic ? <span>automatic links loaded</span> : null;
-    }
-    const user = userEvent.setup();
     render(
-      <>
-        <PropertiesDrawer
-          setShowConvertFileDialog={vi.fn()}
-          setShowPermissionsDialog={vi.fn()}
-          togglePropertiesDrawer={vi.fn()}
-        />
-        <AutomaticLinksLoaded />
-      </>,
+      <PropertiesDrawer
+        setShowConvertFileDialog={vi.fn()}
+        setShowPermissionsDialog={vi.fn()}
+        togglePropertiesDrawer={vi.fn()}
+      />,
       { initialEntries: ['/browse/example'] }
     );
 
-    await screen.findByText('automatic links loaded');
-    await user.click(await screen.findByText('Create data link'));
-
     expect(
-      await screen.findByRole('button', { name: 'Create Data Link' })
+      await screen.findByText(
+        'This bucket is public, so its data link already exists.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Create data link')).toBeDisabled();
+    expect(
+      screen.getByText('https://example-datasets.s3.amazonaws.com')
     ).toBeInTheDocument();
   });
 });

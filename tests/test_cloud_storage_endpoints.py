@@ -124,74 +124,39 @@ def test_bucket_on_endpoint_no_longer_allowed_is_403(test_client, fake_s3):
     assert test_client.get("/api/files/tempdir").status_code == 200
 
 
-def test_links_on_stranded_bucket_stay_manageable(test_client, fake_s3):
-    assert test_client.post("/api/cloud-storage/buckets", json={"bucket": "idr", "prefix": "zarr/v0.4", "label": "far", "endpoint_url": "https://s3.example.org"}).status_code == 201
-    key = test_client.post("/api/proxied-path?fsp_name=far&path=a.ome.zarr").json()["sharing_key"]
-    fileglancer.settings.get_settings().cloud_storage.allowed_endpoints = []
-    r = test_client.get("/api/proxied-path")
-    assert r.status_code == 200
-    [link] = r.json()["paths"]
-    assert link["sharing_key"] == key and link["url"] == "https://s3.example.org/idr/zarr/v0.4/a.ome.zarr"
-    assert test_client.get(f"/api/proxied-path/{key}").status_code == 200
-    assert test_client.put(f"/api/proxied-path/{key}?sharing_name=renamed").status_code == 200
-    assert test_client.delete(f"/api/proxied-path/{key}").status_code == 200
-    assert test_client.get("/api/files/far").status_code == 403
-
-
-def test_data_link_on_bucket_has_direct_url(test_client, bucket):
+def test_data_link_on_bucket_is_405(test_client, bucket):
     r = test_client.post("/api/proxied-path?fsp_name=idr&path=a.ome.zarr")
-    assert r.status_code == 200
-    assert r.json()["url"] == "https://idr.s3.amazonaws.com/zarr/v0.4/a.ome.zarr"
-    listed = test_client.get("/api/proxied-path").json()["paths"]
-    assert listed[0]["url"] == "https://idr.s3.amazonaws.com/zarr/v0.4/a.ome.zarr"
-    key = r.json()["sharing_key"]
-    assert test_client.get(f"/api/proxied-path/{key}").json()["url"] == "https://idr.s3.amazonaws.com/zarr/v0.4/a.ome.zarr"
+    assert r.status_code == 405 and r.json() == {"error": "Not supported on cloud storage"}
+    assert test_client.get("/api/proxied-path").json().get("paths", []) == []
 
 
-def test_data_link_on_custom_endpoint_bucket_is_path_style(test_client, bucket):
-    _add_bucket("minio", endpoint_url="https://s3.example.org")
-    r = test_client.post("/api/proxied-path?fsp_name=minio&path=a.ome.zarr")
-    assert r.status_code == 200
-    assert r.json()["url"] == "https://s3.example.org/idr/zarr/v0.4/a.ome.zarr"
+def test_moving_data_link_onto_bucket_is_405(test_client, bucket, temp_dir):
+    os.makedirs(os.path.join(temp_dir, "test_proxied_path"), exist_ok=True)
+    key = test_client.post("/api/proxied-path?fsp_name=tempdir&path=test_proxied_path").json()["sharing_key"]
+    assert test_client.put(f"/api/proxied-path/{key}?fsp_name=idr&path=a.ome.zarr").status_code == 405
 
 
-def test_data_link_on_bucket_root(test_client, bucket):
-    assert test_client.post("/api/proxied-path?fsp_name=idr&path=.").json()["url"] == "https://idr.s3.amazonaws.com/zarr/v0.4"
+def test_bucket_is_its_own_external_bucket(test_client, bucket):
+    [b] = test_client.get("/api/external-buckets/idr").json()["buckets"]
+    assert b == {"id": None, "full_path": "s3://idr/zarr/v0.4", "external_url": "https://idr.s3.amazonaws.com/zarr/v0.4",
+                 "fsp_name": "idr", "relative_path": ""}
 
 
-def test_data_link_on_missing_bucket_path_is_400(test_client, bucket):
-    r = test_client.post("/api/proxied-path?fsp_name=idr&path=nope")
-    assert r.status_code == 400 and r.json()["error"]
+def test_custom_endpoint_bucket_external_url_is_path_style(test_client, bucket):
+    _add_bucket("minio", prefix="", endpoint_url="https://s3.example.org")
+    [b] = test_client.get("/api/external-buckets/minio").json()["buckets"]
+    assert b["external_url"] == "https://s3.example.org/idr" and b["full_path"] == "s3://idr"
 
 
-def test_update_data_link_on_bucket_validates_and_keeps_direct_url(test_client, bucket):
-    key = test_client.post("/api/proxied-path?fsp_name=idr&path=a.ome.zarr").json()["sharing_key"]
-    assert test_client.put(f"/api/proxied-path/{key}?path=nope").status_code == 400
-    r = test_client.put(f"/api/proxied-path/{key}?path=readme.txt")
-    assert r.status_code == 200 and r.json()["url"] == "https://idr.s3.amazonaws.com/zarr/v0.4/readme.txt"
+def test_site_share_has_no_synthesized_external_bucket(test_client, bucket):
+    assert test_client.get("/api/external-buckets/tempdir").json()["buckets"] == []
+    assert test_client.get("/api/external-buckets/nope").json()["buckets"] == []
 
 
 def test_local_data_link_url_unchanged(test_client, bucket, temp_dir):
     os.makedirs(os.path.join(temp_dir, "test_proxied_path"), exist_ok=True)
     r = test_client.post("/api/proxied-path?fsp_name=tempdir&path=test_proxied_path")
     assert r.json()["url"].startswith("http://localhost/files/")
-
-
-def test_files_proxy_refuses_cloud_link(test_client, bucket):
-    key = test_client.post("/api/proxied-path?fsp_name=idr&path=a.ome.zarr").json()["sharing_key"]
-    r = test_client.get(f"/files/{key}/a.ome.zarr/.zattrs")
-    assert r.status_code == 400 and b"InvalidArgument" in r.content
-
-
-def test_delete_cloud_link_skips_dependent_views_409(test_client, bucket):
-    # The local-link side (409 without confirm) is test_endpoints.py::test_delete_data_link_blocks_then_confirms_marks_broken
-    key = test_client.post("/api/proxied-path?fsp_name=idr&path=a.ome.zarr").json()["sharing_key"]
-    view = test_client.post("/api/neuroglancer/views", json={
-        "name": "v", "ng_state": {}, "layers": [{"layer_index": 0, "sharing_key": key}]}).json()
-    assert test_client.delete(f"/api/proxied-path/{key}").status_code == 200
-    assert test_client.get(f"/api/proxied-path/{key}").status_code == 404
-    layer = test_client.get(f"/api/neuroglancer/views/{view['short_key']}").json()["layers"][0]
-    assert layer["data_link_id"] is None and layer["broken"] is False
 
 
 CREATE = {"protocol": "s3", "bucket": "idr", "prefix": "/zarr/v0.4/", "label": "IDR zarr"}
@@ -269,11 +234,9 @@ def test_create_bucket_name_collisions_409(test_client, fake_s3):
     assert test_client.post("/api/cloud-storage/buckets", json=CREATE).status_code == 409
 
 
-def test_delete_bucket_cascades_links(test_client, bucket):
-    test_client.post("/api/proxied-path?fsp_name=idr&path=a.ome.zarr")
+def test_delete_bucket(test_client, bucket):
     r = test_client.delete("/api/cloud-storage/buckets/idr")
-    assert r.status_code == 200 and r.json() == {"name": "idr", "removed_links": 1}
-    assert test_client.get("/api/proxied-path").json().get("paths", []) == []
+    assert r.status_code == 200 and r.json() == {"name": "idr"}
     assert test_client.get("/api/files/idr").status_code == 404
     assert test_client.delete("/api/cloud-storage/buckets/idr").status_code == 404
 

@@ -149,7 +149,7 @@ describe('CloudStorageBrowser', () => {
     server.use(
       http.delete('/api/cloud-storage/buckets/example', () => {
         deleted = true;
-        return HttpResponse.json({ name: 'example', removed_links: 2 });
+        return HttpResponse.json({ name: 'example' });
       })
     );
     const user = userEvent.setup();
@@ -160,15 +160,13 @@ describe('CloudStorageBrowser', () => {
     );
     expect(
       await screen.findByText(
-        'Remove "Example" from your Cloud Storage? Data links you created on it will be removed too. The bucket itself is not changed.'
+        'Remove "Example" from your Cloud Storage? The bucket itself is not changed.'
       )
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove' }));
 
     await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith(
-        'Removed bucket "Example" and 2 data links'
-      );
+      expect(toast.success).toHaveBeenCalledWith('Removed bucket "Example"');
     });
     expect(deleted).toBe(true);
   });
@@ -195,7 +193,7 @@ describe('CloudStorageBrowser', () => {
         return new HttpResponse(null, { status: 204 });
       }),
       http.delete('/api/cloud-storage/buckets/example', () =>
-        HttpResponse.json({ name: 'example', removed_links: 0 })
+        HttpResponse.json({ name: 'example' })
       )
     );
     const user = userEvent.setup();

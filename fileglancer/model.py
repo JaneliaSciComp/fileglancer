@@ -63,7 +63,6 @@ class CloudBucketListResponse(BaseModel):
 
 class CloudBucketDeleteResponse(BaseModel):
     name: str = Field(description="The name of the removed bucket")
-    removed_links: int = Field(description="How many of the user's data links into the bucket were removed")
 
 class CloudStorageConfigResponse(BaseModel):
     enabled: bool = Field(description="Whether users may add cloud buckets")
@@ -307,8 +306,9 @@ class RelinkRequest(BaseModel):
 
 class ExternalBucket(BaseModel):
     """An external bucket for S3-compatible storage"""
-    id: int = Field(
-        description="The unique identifier for this external bucket"
+    id: Optional[int] = Field(
+        description="The unique identifier for this external bucket; None for a user's cloud bucket",
+        default=None
     )
     full_path: str = Field(
         description="The full path to the external bucket"

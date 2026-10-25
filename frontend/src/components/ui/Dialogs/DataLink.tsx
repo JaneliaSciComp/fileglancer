@@ -13,7 +13,6 @@ import { validateUrlPrefix } from '@/hooks/useDataToolLinks';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { makeMapKey } from '@/utils';
-import { isReadOnlyFsp } from '@/utils/cloudStorage';
 import {
   getPreferredPathForDisplay,
   joinPaths,
@@ -148,11 +147,8 @@ function CustomSubpathInput({
 
 export default function DataLinkDialog(props: DataLinkDialogProps) {
   const { fspName, filePath } = useFileBrowserContext();
-  const {
-    pathPreference,
-    areDataLinksAutomatic,
-    dataLinkSubpathMode: preferredSubpathMode
-  } = usePreferencesContext();
+  const { pathPreference, areDataLinksAutomatic, dataLinkSubpathMode } =
+    usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const [localAreDataLinksAutomatic] = useState(areDataLinksAutomatic);
 
@@ -167,13 +163,6 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
     fspKey && zonesAndFspQuery.isSuccess
       ? (zonesAndFspQuery.data[fspKey] as FileSharePath)
       : null;
-
-  // A read-only share's data link is its direct URL, which the link name and
-  // subpath mode cannot shape, so those controls are not offered and the
-  // dialog always asks for confirmation instead of creating automatically.
-  const readOnly = isReadOnlyFsp(pathFsp);
-  const automaticLinks = localAreDataLinksAutomatic && !readOnly;
-  const dataLinkSubpathMode = readOnly ? 'full_path' : preferredSubpathMode;
 
   function getDisplayPath(): string {
     const targetPath =
@@ -229,7 +218,7 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
   // Creating a link relinks the caller's broken Views on this dataset (server
   // side, always). In consent mode, say so before they click.
   const relinkableQuery = useRelinkableViewsQuery(
-    props.action === 'create' && !automaticLinks && fspName
+    props.action === 'create' && !localAreDataLinksAutomatic && fspName
       ? fspName
       : undefined,
     normalizedFilePath
@@ -261,7 +250,7 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
   // Whether this dialog was triggered by automatic+custom mode
   const isAutoCustom =
     props.action === 'create' &&
-    automaticLinks &&
+    localAreDataLinksAutomatic &&
     dataLinkSubpathMode === 'custom';
 
   const handleConfirmWithPrefix = async () => {
@@ -316,10 +305,10 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
             </Typography>
           </>
         ) : props.action === 'create' &&
-          automaticLinks &&
+          localAreDataLinksAutomatic &&
           dataLinkSubpathMode !== 'custom' ? (
           <> </>
-        ) : props.action === 'create' && !automaticLinks ? (
+        ) : props.action === 'create' && !localAreDataLinksAutomatic ? (
           <>
             <Typography className="text-foreground font-semibold">
               Are you sure you want to create a data link?
@@ -356,38 +345,36 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               <CancelBtn onCancel={props.onCancel} />
             </BtnContainer>
             <div className="flex flex-col gap-2 mt-4">
-              {!readOnly ? (
-                <Accordion
-                  onValueChange={
-                    setOpenAdvancedSections as Dispatch<
-                      SetStateAction<string | string[]>
-                    >
-                  }
-                  type="multiple"
-                  value={openAdvancedSections}
-                >
-                  <Accordion.Item value="advanced">
-                    <Accordion.Trigger className="flex w-full items-center justify-between py-2">
-                      <div className="text-foreground font-semibold text-sm">
-                        Advanced settings
-                      </div>
-                      <HiChevronDown
-                        className={`h-4 w-4 text-foreground transition-transform ${
-                          openAdvancedSections.includes('advanced')
-                            ? 'rotate-180'
-                            : ''
-                        }`}
-                      />
-                    </Accordion.Trigger>
-                    <Accordion.Content className="pt-2 pb-2 flex flex-col gap-2">
-                      <SubpathModeOptions />
-                      <Typography className="text-foreground text-sm font-mono break-all bg-surface/30 p-2 rounded">
-                        {dataLinkPreview}
-                      </Typography>
-                    </Accordion.Content>
-                  </Accordion.Item>
-                </Accordion>
-              ) : null}
+              <Accordion
+                onValueChange={
+                  setOpenAdvancedSections as Dispatch<
+                    SetStateAction<string | string[]>
+                  >
+                }
+                type="multiple"
+                value={openAdvancedSections}
+              >
+                <Accordion.Item value="advanced">
+                  <Accordion.Trigger className="flex w-full items-center justify-between py-2">
+                    <div className="text-foreground font-semibold text-sm">
+                      Advanced settings
+                    </div>
+                    <HiChevronDown
+                      className={`h-4 w-4 text-foreground transition-transform ${
+                        openAdvancedSections.includes('advanced')
+                          ? 'rotate-180'
+                          : ''
+                      }`}
+                    />
+                  </Accordion.Trigger>
+                  <Accordion.Content className="pt-2 pb-2 flex flex-col gap-2">
+                    <SubpathModeOptions />
+                    <Typography className="text-foreground text-sm font-mono break-all bg-surface/30 p-2 rounded">
+                      {dataLinkPreview}
+                    </Typography>
+                  </Accordion.Content>
+                </Accordion.Item>
+              </Accordion>
               {dataLinkSubpathMode === 'custom' ? (
                 <CustomSubpathInput
                   error={customSubpathError}
