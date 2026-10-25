@@ -197,9 +197,15 @@ def _convert_external_bucket(db_bucket: db.ExternalBucketDB) -> ExternalBucket:
     )
 
 
-def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optional[HttpUrl]) -> ProxiedPath:
-    """Convert a database ProxiedPathDB model to a Pydantic ProxiedPath model"""
-    if external_proxy_url:
+def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optional[HttpUrl],
+                          public_url: Optional[str] = None) -> ProxiedPath:
+    """Convert a database ProxiedPathDB model to a Pydantic ProxiedPath model.
+
+    public_url, when given, is the link's URL (a bucket path served directly).
+    """
+    if public_url:
+        url = public_url
+    elif external_proxy_url:
         url = f"{external_proxy_url}/{db_path.sharing_key}/{quote(db_path.url_prefix, safe='/')}"
     else:
         logger.warning(f"No external proxy URL was provided, proxy links will not be available.")
@@ -512,6 +518,18 @@ def create_app(settings):
             row = db.get_cloud_bucket(session, username, fsp_name)
             return S3Store.for_bucket(row) if row else None
 
+    def _to_proxied_path(db_path: db.ProxiedPathDB) -> ProxiedPath:
+        """A data link on a bucket path points straight at the bucket, others at the /files proxy."""
+        store = _cloud_store(db_path.username, db_path.fsp_name)
+        return _convert_proxied_path(db_path, settings.external_proxy_url,
+                                     public_url=store.public_url(db_path.path) if store else None)
+
+    async def _validate_link_path(username: str, fsp_name: str, path: str) -> dict:
+        store = _cloud_store(username, fsp_name)
+        if store:
+            return await store.validate_proxied_path(path)
+        return await _worker_exec(username, "validate_proxied_path", fsp_name=fsp_name, path=path)
+
     def _reject_cloud_write(username: str, fsp_name: str) -> None:
         if _cloud_store(username, fsp_name):
             raise HTTPException(status_code=405, detail=CLOUD_WRITE_ERROR)
@@ -546,9 +564,11 @@ def create_app(settings):
             stored_path = "" if proxied_path.path == "." else proxied_path.path
             stored_prefix = "" if proxied_path.url_prefix == "." else proxied_path.url_prefix
 
-            fsp = db.get_file_share_path(session, proxied_path.fsp_name)
+            fsp = db.get_file_share_path(session, proxied_path.fsp_name, username=proxied_path.username)
             if not fsp:
                 return get_error_response(400, "InvalidArgument", f"File share path {proxied_path.fsp_name} not found", key)
+            if fsp.protocol != 'file':
+                return get_error_response(400, "InvalidArgument", "This data link is served directly by its bucket", key)
             expanded_mount_path = os.path.expanduser(fsp.mount_path)
             # For FSP-root links (empty path) use the mount path directly to
             # avoid a stray trailing slash in mount_path.
@@ -1344,7 +1364,7 @@ def create_app(settings):
         sharing_name = url_prefix
         logger.info(f"Creating proxied path for {username} with sharing name {sharing_name} and fsp_name {fsp_name} and path {path} (url_prefix={url_prefix})")
         # Validate the user can access the path via worker
-        validation = await _worker_exec(username, "validate_proxied_path", fsp_name=fsp_name, path=path)
+        validation = await _validate_link_path(username, fsp_name, path)
         if "error" in validation:
             raise HTTPException(status_code=400, detail=validation["error"])
 
@@ -1360,7 +1380,7 @@ def create_app(settings):
             views = db.get_relinkable_views(session, username, new_path.fsp_name, new_path.path)
             relinked = db.relink_broken_layers(session, views, new_path)
             return ProxiedPathCreateResponse(
-                **_convert_proxied_path(new_path, settings.external_proxy_url).model_dump(),
+                **_to_proxied_path(new_path).model_dump(),
                 relinked_views=[ViewSummary(short_key=v.short_key, name=v.name) for v in relinked],
             )
 
@@ -1380,7 +1400,7 @@ def create_app(settings):
 
         with db.get_db_session(settings.db_url) as session:
             db_proxied_paths = db.get_proxied_paths(session, username, fsp_name, path)
-            proxied_paths = [_convert_proxied_path(db_path, settings.external_proxy_url) for db_path in db_proxied_paths]
+            proxied_paths = [_to_proxied_path(db_path) for db_path in db_proxied_paths]
             return ProxiedPathResponse(paths=proxied_paths)
 
 
@@ -1395,7 +1415,7 @@ def create_app(settings):
                 raise HTTPException(status_code=404, detail="Proxied path not found for sharing key {sharing_key}")
             if path.username != username:
                 raise HTTPException(status_code=404, detail="Proxied path not found for username {username} and sharing key {sharing_key}")
-            return _convert_proxied_path(path, settings.external_proxy_url)
+            return _to_proxied_path(path)
 
 
     @app.get("/api/proxied-path/{sharing_key}/views", response_model=ViewResponse,
@@ -1429,15 +1449,14 @@ def create_app(settings):
                     if any(p.sharing_key != sharing_key for p in conflicts):
                         raise HTTPException(status_code=409, detail="A data link already exists for this path")
             if existing:
-                validation = await _worker_exec(username, "validate_proxied_path",
-                                                fsp_name=validate_fsp, path=validate_path)
+                validation = await _validate_link_path(username, validate_fsp, validate_path)
                 if "error" in validation:
                     raise HTTPException(status_code=400, detail=validation["error"])
 
         with db.get_db_session(settings.db_url) as session:
             try:
                 updated = db.update_proxied_path(session, username, sharing_key, new_path=path, new_sharing_name=sharing_name, new_fsp_name=fsp_name)
-                return _convert_proxied_path(updated, settings.external_proxy_url)
+                return _to_proxied_path(updated)
             except ValueError as e:
                 logger.error(f"Error updating proxied path: {e}")
                 raise HTTPException(status_code=400, detail=str(e))
@@ -1451,6 +1470,10 @@ def create_app(settings):
             pp = db.get_proxied_path_by_sharing_key(session, sharing_key)
             if not pp or pp.username != username:
                 raise HTTPException(status_code=404, detail="Proxied path not found")
+            # A bucket link's URL outlives the link, so its Views keep working.
+            if _cloud_store(pp.username, pp.fsp_name):
+                db.delete_proxied_path(session, username, sharing_key)
+                return {"message": f"Proxied path {sharing_key} deleted for user {username}"}
             # Disclose only the caller's OWN dependent Views (never leak others').
             own_dependents = db.get_views_for_data_link(session, pp.id, owner=username)
             if own_dependents and not confirm:
