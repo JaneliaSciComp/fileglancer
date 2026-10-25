@@ -59,8 +59,8 @@ def make_etag(last_modified: float, size: int) -> str:
 def parse_http_date_to_epoch(value: str):
     """Parse an HTTP-date or ISO-8601 datetime to a POSIX timestamp (float).
 
-    Accepts both because we emit Last-Modified in ISO form; returns None if the
-    value can't be parsed.
+    Accepts both because earlier releases emitted Last-Modified in ISO form, so a
+    client may send that back; returns None if the value can't be parsed.
     """
     from email.utils import parsedate_to_datetime
     for parse in (parsedate_to_datetime, datetime.fromisoformat):
@@ -108,8 +108,9 @@ def parse_range_header(range_header: Optional[str], file_size: int) -> Optional[
     """Parse a single-range HTTP Range header into inclusive (start, end) byte positions.
 
     Returns None when the header should be ignored and the full body served:
-    absent, not a byte range, malformed, or multi-range (unsupported, as on S3).
-    Raises ValueError when the range is well-formed but unsatisfiable (416).
+    absent, not a byte range, malformed (including start after end), or multi-range
+    (unsupported, as on S3). Raises ValueError when the range is well-formed but
+    unsatisfiable (416).
     """
     if not range_header or not range_header.startswith('bytes='):
         return None
@@ -117,18 +118,21 @@ def parse_range_header(range_header: Optional[str], file_size: int) -> Optional[
     if ',' in range_spec or '-' not in range_spec:
         return None
     start_str, end_str = range_spec.split('-', 1)
-    try:
-        if start_str and end_str:
-            start, end = int(start_str), int(end_str)
-        elif start_str:
-            start, end = int(start_str), file_size - 1
-        elif end_str:
-            start, end = max(0, file_size - int(end_str)), file_size - 1
-        else:
-            return None
-    except ValueError:
+    # RFC 9110: both positions are plain digit strings and first-pos <= last-pos,
+    # or the byte-range-spec is invalid and the recipient ignores it
+    if (start_str and not start_str.isdigit()) or (end_str and not end_str.isdigit()):
         return None
-    if start < 0 or end < 0 or start >= file_size or start > end:
+    if start_str and end_str:
+        start, end = int(start_str), int(end_str)
+        if start > end:
+            return None
+    elif start_str:
+        start, end = int(start_str), file_size - 1
+    elif end_str:
+        start, end = max(0, file_size - int(end_str)), file_size - 1
+    else:
+        return None
+    if start >= file_size:
         raise ValueError(f"Range not satisfiable: {range_header} for {file_size} bytes")
     return start, min(end, file_size - 1)
 

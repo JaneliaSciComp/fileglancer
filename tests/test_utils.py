@@ -230,13 +230,13 @@ def test_parse_range_header_satisfiable(header, expected):
     assert parse_range_header(header, 10) == expected
 
 
-@pytest.mark.parametrize("header", ["", None, "items=0-3", "bytes=abc", "bytes=3", "bytes=0-1,3-4", "bytes=-"])
+@pytest.mark.parametrize("header", ["", None, "items=0-3", "bytes=abc", "bytes=3", "bytes=0-1,3-4", "bytes=-", "bytes=5-2", "bytes=--3", "bytes=+1-3"])
 def test_parse_range_header_ignores_absent_malformed_and_multi_range(header):
     from fileglancer.utils import parse_range_header
     assert parse_range_header(header, 10) is None
 
 
-@pytest.mark.parametrize("header", ["bytes=10-", "bytes=99-200", "bytes=5-2"])
+@pytest.mark.parametrize("header", ["bytes=10-", "bytes=99-200"])
 def test_parse_range_header_raises_for_unsatisfiable(header):
     from fileglancer.utils import parse_range_header
     with pytest.raises(ValueError):

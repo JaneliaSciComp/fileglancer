@@ -144,7 +144,7 @@ class FileInfo(BaseModel):
             current_user: Username for permission checking (optional).
             fsps: List of FileSharePath objects for symlink target resolution (optional).
             root_path: Filestore root for defense-in-depth validation in symlink reading (optional).
-            user_groups: Pre-computed user group set to avoid per-file getgrall() (optional).
+            user_groups: Pre-computed user group set to avoid a per-file lookup (optional).
         """
         if path is None or path == "":
             raise ValueError("Path cannot be None or empty")
@@ -209,7 +209,7 @@ class FileInfo(BaseModel):
 
         Args:
             user_groups: Pre-computed set of group names the user belongs to.
-                When provided, avoids the expensive grp.getgrall() call.
+                When provided, avoids a group lookup per file.
         """
         mode = stat_result.st_mode
 
