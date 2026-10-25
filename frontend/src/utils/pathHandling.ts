@@ -187,7 +187,8 @@ function getPreferredPathForDisplay(
     return '';
   }
 
-  const basePath = fsp[pathKey] ?? fsp.linux_path ?? fsp.mount_path;
+  // || not ??: the zones map normalizes null OS paths to ''
+  const basePath = fsp[pathKey] || fsp.linux_path || fsp.mount_path;
 
   if (!basePath) {
     return '';

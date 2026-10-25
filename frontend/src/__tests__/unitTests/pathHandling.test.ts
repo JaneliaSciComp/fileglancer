@@ -438,6 +438,19 @@ describe('getPreferredPathForDisplay', () => {
     );
   });
 
+  test('falls back to mount_path when OS paths are empty', () => {
+    const bucket = {
+      ...mockFsp,
+      linux_path: '',
+      windows_path: '',
+      mac_path: '',
+      mount_path: 's3://bucket'
+    };
+    expect(getPreferredPathForDisplay(['mac_path'], bucket)).toBe(
+      's3://bucket'
+    );
+  });
+
   test('returns empty string if fsp is null', () => {
     expect(getPreferredPathForDisplay(['linux_path'], null)).toBe('');
   });
