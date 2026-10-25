@@ -32,6 +32,7 @@ export default function AddBucketDialog({
   const [prefix, setPrefix] = useState('');
   const [endpointUrl, setEndpointUrl] = useState('');
   const [label, setLabel] = useState('');
+  const [blockedEndpoint, setBlockedEndpoint] = useState('');
 
   const config = configQuery.data;
   const endpointAllowed = config?.endpoint_url_allowed ?? false;
@@ -43,15 +44,17 @@ export default function AddBucketDialog({
   const handleUrlChange = (event: ChangeEvent<HTMLInputElement>) => {
     setUrl(event.target.value);
     const parsed = parseS3Url(event.target.value);
-    if (parsed) {
+    const endpoint = parsed?.endpointUrl ?? '';
+    // An endpoint this server refuses fills nothing, rather than retargeting to AWS
+    const usable =
+      !endpoint ||
+      (endpointAllowed &&
+        (!allowedEndpoints || allowedEndpoints.includes(endpoint)));
+    setBlockedEndpoint(usable ? '' : endpoint);
+    if (parsed && usable) {
       setBucket(parsed.bucket);
       setPrefix(parsed.prefix);
-      // Only apply an endpoint the rendered form can show and the user can change.
-      const endpoint = parsed.endpointUrl ?? '';
-      const usable =
-        endpointAllowed &&
-        (!allowedEndpoints || allowedEndpoints.includes(endpoint));
-      setEndpointUrl(usable ? endpoint : '');
+      setEndpointUrl(endpoint);
     }
   };
 
@@ -60,7 +63,7 @@ export default function AddBucketDialog({
     mutation.mutate(
       {
         protocol: 's3',
-        bucket,
+        bucket: bucket.trim(),
         prefix: prefix || undefined,
         endpoint_url: endpointUrl || undefined,
         label: label || undefined
@@ -73,6 +76,7 @@ export default function AddBucketDialog({
           setPrefix('');
           setEndpointUrl('');
           setLabel('');
+          setBlockedEndpoint('');
           navigate(makeBrowseLink(created.name));
         }
       }
@@ -95,6 +99,12 @@ export default function AddBucketDialog({
               value={url}
             />
           </FgFormField>
+          {blockedEndpoint ? (
+            <Typography className="text-error" role="status" type="small">
+              This server does not allow the endpoint {blockedEndpoint}; ask the
+              administrator.
+            </Typography>
+          ) : null}
           <FgFormField htmlFor="bucket_name" label="Bucket name">
             <FgInput
               id="bucket_name"
@@ -162,7 +172,7 @@ export default function AddBucketDialog({
         ) : null}
         <div className="mt-4 flex gap-2">
           <FgButton
-            disabled={!bucket || mutation.isPending}
+            disabled={!bucket.trim() || mutation.isPending}
             loading={mutation.isPending}
             loadingText="Adding..."
             type="submit"

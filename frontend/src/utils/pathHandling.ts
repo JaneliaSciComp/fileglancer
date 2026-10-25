@@ -1,5 +1,6 @@
 import path from 'path';
 import type { FileSharePath } from '@/shared.types';
+import { isReadOnlyFsp } from '@/utils/cloudStorage';
 
 const PATH_DELIMITER = '/';
 
@@ -189,11 +190,18 @@ function getPreferredPathForDisplay(
 
   // || not ??: the zones map normalizes null OS paths to ''
   const basePath = fsp[pathKey] || fsp.linux_path || fsp.mount_path;
+  const fromMountPath = !fsp[pathKey] && !fsp.linux_path;
 
   if (!basePath) {
     return '';
   } else if (!subPath) {
     return basePath;
+  } else if (
+    isReadOnlyFsp(fsp) ||
+    (fromMountPath && /^[a-z][a-z0-9+.-]*:\/\//i.test(basePath))
+  ) {
+    // A URI (s3://bucket/prefix): POSIX normalization would collapse the '//'
+    return `${basePath.replace(/\/+$/, '')}/${subPath.replace(/^\/+/, '')}`;
   } else {
     let fullPath = joinPaths(basePath, subPath); // Linux = POSIX style
 

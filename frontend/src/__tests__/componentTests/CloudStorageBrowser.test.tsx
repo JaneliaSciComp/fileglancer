@@ -4,6 +4,7 @@ import { http, HttpResponse } from 'msw';
 import toast from 'react-hot-toast';
 
 import Sidebar from '@/components/ui/Sidebar/Sidebar';
+import CloudStorageBrowser from '@/components/ui/Sidebar/CloudStorageBrowser';
 import { render, screen, waitFor, within } from '@/__tests__/test-utils';
 import { server } from '@/__tests__/mocks/node';
 
@@ -32,12 +33,12 @@ const LOCAL_SHARES = [
   }
 ];
 
-const COSEM = {
-  name: 'cosem',
+const EXAMPLE = {
+  name: 'example',
   zone: 'S3',
   group: 'cloud',
-  storage: 'COSEM',
-  mount_path: 's3://janelia-cosem-datasets',
+  storage: 'Example',
+  mount_path: 's3://example-datasets',
   linux_path: null,
   mac_path: null,
   windows_path: null,
@@ -47,7 +48,7 @@ const COSEM = {
 function serveBucket() {
   server.use(
     http.get('/api/file-share-paths', () =>
-      HttpResponse.json({ paths: [...LOCAL_SHARES, COSEM] })
+      HttpResponse.json({ paths: [...LOCAL_SHARES, EXAMPLE] })
     )
   );
 }
@@ -63,14 +64,47 @@ describe('CloudStorageBrowser', () => {
 
     expect(await screen.findByText('Cloud Storage')).toBeInTheDocument();
     const cloud = screen.getByLabelText('List of cloud storage buckets');
-    expect(await within(cloud).findByText('COSEM')).toBeInTheDocument();
+    expect(await within(cloud).findByText('Example')).toBeInTheDocument();
     expect(within(cloud).getByText('S3')).toBeInTheDocument();
     expect(
-      within(cloud).getByText('s3://janelia-cosem-datasets')
+      within(cloud).getByText('s3://example-datasets')
     ).toBeInTheDocument();
     expect(
       within(cloud).getByRole('button', { name: 'Add bucket' })
     ).toBeInTheDocument();
+  });
+
+  it('activates its rows from the keyboard', async () => {
+    const onAddBucket = vi.fn();
+    const user = userEvent.setup();
+    render(<CloudStorageBrowser onAddBucket={onAddBucket} searchQuery="" />, {
+      initialEntries: ['/browse']
+    });
+
+    const addRow = await screen.findByRole('button', { name: 'Add bucket' });
+    addRow.focus();
+    await user.keyboard('{Enter}');
+    expect(onAddBucket).toHaveBeenCalledTimes(1);
+    await user.keyboard(' ');
+    expect(onAddBucket).toHaveBeenCalledTimes(2);
+
+    const header = screen.getByRole('button', { name: 'Cloud Storage' });
+    expect(header).toHaveAttribute('tabindex', '0');
+    expect(header).toHaveAttribute('aria-expanded', 'true');
+    header.focus();
+    await user.keyboard(' ');
+    expect(header).toHaveAttribute('aria-expanded', 'false');
+    await user.keyboard('{Enter}');
+    expect(header).toHaveAttribute('aria-expanded', 'true');
+
+    const group = screen.getByRole('button', { name: 'S3' });
+    expect(group).toHaveAttribute('tabindex', '0');
+    expect(group).toHaveAttribute('aria-expanded', 'true');
+    group.focus();
+    await user.keyboard('{Enter}');
+    expect(group).toHaveAttribute('aria-expanded', 'false');
+    await user.keyboard(' ');
+    expect(group).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('keeps cloud zones out of the Zones section', async () => {
@@ -113,27 +147,27 @@ describe('CloudStorageBrowser', () => {
     serveBucket();
     let deleted = false;
     server.use(
-      http.delete('/api/cloud-storage/buckets/cosem', () => {
+      http.delete('/api/cloud-storage/buckets/example', () => {
         deleted = true;
-        return HttpResponse.json({ name: 'cosem', removed_links: 2 });
+        return HttpResponse.json({ name: 'example', removed_links: 2 });
       })
     );
     const user = userEvent.setup();
     render(<Sidebar />, { initialEntries: ['/browse'] });
 
     await user.click(
-      await screen.findByRole('button', { name: 'Remove bucket COSEM' })
+      await screen.findByRole('button', { name: 'Remove bucket Example' })
     );
     expect(
       await screen.findByText(
-        'Remove "COSEM" from your Cloud Storage? Data links you created on it will be removed too. The bucket itself is not changed.'
+        'Remove "Example" from your Cloud Storage? Data links you created on it will be removed too. The bucket itself is not changed.'
       )
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove' }));
 
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
-        'Removed bucket "COSEM" and 2 data links'
+        'Removed bucket "Example" and 2 data links'
       );
     });
     expect(deleted).toBe(true);
@@ -146,11 +180,11 @@ describe('CloudStorageBrowser', () => {
       http.get('/api/preference', () =>
         HttpResponse.json({
           path: { value: ['linux_path'] },
-          fileSharePath: { value: [{ type: 'fsp', name: 'cosem' }] },
+          fileSharePath: { value: [{ type: 'fsp', name: 'example' }] },
           folder: {
             value: [
-              { type: 'folder', fspName: 'cosem', folderPath: 'a' },
-              { type: 'folder', fspName: 'cosem', folderPath: 'b' },
+              { type: 'folder', fspName: 'example', folderPath: 'a' },
+              { type: 'folder', fspName: 'example', folderPath: 'b' },
               { type: 'folder', fspName: 'test_fsp', folderPath: 'c' }
             ]
           }
@@ -160,8 +194,8 @@ describe('CloudStorageBrowser', () => {
         puts[params.key as string] = await request.json();
         return new HttpResponse(null, { status: 204 });
       }),
-      http.delete('/api/cloud-storage/buckets/cosem', () =>
-        HttpResponse.json({ name: 'cosem', removed_links: 0 })
+      http.delete('/api/cloud-storage/buckets/example', () =>
+        HttpResponse.json({ name: 'example', removed_links: 0 })
       )
     );
     const user = userEvent.setup();
@@ -169,10 +203,10 @@ describe('CloudStorageBrowser', () => {
 
     // Wait for the favorites to load so the dialog sees them
     await waitFor(() => {
-      expect(screen.getAllByText('COSEM').length).toBeGreaterThan(1);
+      expect(screen.getAllByText('Example').length).toBeGreaterThan(1);
     });
     await user.click(
-      await screen.findByRole('button', { name: 'Remove bucket COSEM' })
+      await screen.findByRole('button', { name: 'Remove bucket Example' })
     );
     await user.click(screen.getByRole('button', { name: 'Remove' }));
 
@@ -182,6 +216,6 @@ describe('CloudStorageBrowser', () => {
       });
     });
     expect(puts.fileSharePath).toEqual({ value: [] });
-    expect(toast.success).toHaveBeenCalledWith('Removed bucket "COSEM"');
+    expect(toast.success).toHaveBeenCalledWith('Removed bucket "Example"');
   });
 });

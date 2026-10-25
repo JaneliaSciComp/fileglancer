@@ -74,9 +74,9 @@ export function useCreateCloudBucketMutation(): UseMutationResult<
         'POST',
         payload
       )) as FileSharePath,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['fileSharePaths'] });
-    }
+    // Returned so callers navigate only once the new share is in the map
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['fileSharePaths'] })
   });
 }
 

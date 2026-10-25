@@ -2,8 +2,12 @@ import { describe, it, expect, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
+import type { ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
 import AddBucketDialog from '@/components/ui/Dialogs/AddBucket';
-import { render, screen, waitFor } from '@/__tests__/test-utils';
+import { useCreateCloudBucketMutation } from '@/queries/cloudStorageQueries';
+import { render, renderHook, screen, waitFor } from '@/__tests__/test-utils';
 import { server } from '@/__tests__/mocks/node';
 
 const CREATED = {
@@ -50,7 +54,7 @@ describe('AddBucketDialog', () => {
       initialEntries: ['/browse']
     });
     await screen.findByLabelText('Endpoint URL');
-    await user.type(screen.getByLabelText('Bucket name'), 'idr');
+    await user.type(screen.getByLabelText('Bucket name'), ' idr ');
     await user.type(screen.getByLabelText('Prefix'), '/zarr/');
     await user.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
@@ -117,7 +121,7 @@ describe('AddBucketDialog', () => {
     return state;
   };
 
-  it('does not submit a pasted endpoint when endpoints are not allowed', async () => {
+  it('refuses a pasted endpoint when endpoints are not allowed', async () => {
     const user = userEvent.setup();
     const cfg = serveConfig({
       enabled: true,
@@ -133,14 +137,33 @@ describe('AddBucketDialog', () => {
       screen.getByLabelText('URL'),
       'https://store.example.org/idr/zarr'
     );
-    expect(screen.getByLabelText('Bucket name')).toHaveValue('idr');
-    expect(screen.getByLabelText('Prefix')).toHaveValue('zarr');
-    await user.click(screen.getByRole('button', { name: 'Add' }));
-    await waitFor(() => expect(posted.body).toBeDefined());
-    expect(posted.body).not.toHaveProperty('endpoint_url');
+    expect(screen.getByLabelText('Bucket name')).toHaveValue('');
+    expect(screen.getByLabelText('Prefix')).toHaveValue('');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'This server does not allow the endpoint https://store.example.org; ask the administrator.'
+    );
+    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
+    expect(posted.body).toBeUndefined();
   });
 
-  it('only applies a pasted endpoint that is in the allowed list', async () => {
+  it('still fills an AWS URL when endpoints are not allowed', async () => {
+    const user = userEvent.setup();
+    const cfg = serveConfig({
+      enabled: true,
+      endpoint_url_allowed: false,
+      allowed_endpoints: []
+    });
+    render(<AddBucketDialog onClose={vi.fn()} open />, {
+      initialEntries: ['/browse']
+    });
+    await waitFor(() => expect(cfg.consumed).toBe(true));
+    await user.type(screen.getByLabelText('URL'), 's3://idr/zarr');
+    expect(screen.getByLabelText('Bucket name')).toHaveValue('idr');
+    expect(screen.getByLabelText('Prefix')).toHaveValue('zarr');
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('refuses a pasted endpoint that is not in the allowed list', async () => {
     const user = userEvent.setup();
     serveConfig({
       enabled: true,
@@ -157,9 +180,12 @@ describe('AddBucketDialog', () => {
       'https://store.example.org/idr/zarr'
     );
     expect(select).toHaveValue('');
-    await user.click(screen.getByRole('button', { name: 'Add' }));
-    await waitFor(() => expect(posted.body).toBeDefined());
-    expect(posted.body).not.toHaveProperty('endpoint_url');
+    expect(screen.getByLabelText('Bucket name')).toHaveValue('');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'This server does not allow the endpoint https://store.example.org; ask the administrator.'
+    );
+    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
+    expect(posted.body).toBeUndefined();
   });
 
   it('selects a pasted endpoint that is in the allowed list', async () => {
@@ -182,5 +208,33 @@ describe('AddBucketDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(posted.body).toBeDefined());
     expect(posted.body?.endpoint_url).toBe('https://s3.example.org');
+  });
+
+  it('settles only after the share list has been invalidated', async () => {
+    server.use(
+      http.post('/api/cloud-storage/buckets', () => HttpResponse.json(CREATED))
+    );
+    const client = new QueryClient();
+    let release!: () => void;
+    const invalidate = vi
+      .spyOn(client, 'invalidateQueries')
+      .mockReturnValue(new Promise<void>(r => (release = r)));
+    const { result } = renderHook(() => useCreateCloudBucketMutation(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      )
+    });
+    let settled = false;
+    const done = result.current
+      .mutateAsync({ protocol: 's3', bucket: 'idr' })
+      .then(() => (settled = true));
+    await waitFor(() =>
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['fileSharePaths'] })
+    );
+    await new Promise(r => setTimeout(r, 20));
+    expect(settled).toBe(false);
+    release();
+    await done;
+    expect(settled).toBe(true);
   });
 });

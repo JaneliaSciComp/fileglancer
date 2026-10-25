@@ -1,4 +1,5 @@
 import { Fragment } from 'react';
+import type { KeyboardEvent } from 'react';
 import { Collapse, Typography, List } from '@material-tailwind/react';
 import { HiChevronRight } from 'react-icons/hi';
 import { HiOutlineCloud, HiOutlineSquares2X2, HiPlus } from 'react-icons/hi2';
@@ -10,6 +11,14 @@ import { useCloudStorageConfigQuery } from '@/queries/cloudStorageQueries';
 import useOpenZones from '@/hooks/useOpenZones';
 import { isReadOnlyFsp } from '@/utils/cloudStorage';
 import CloudBucketRow from './CloudBucketRow';
+
+// Enter and Space activate an li with role="button", as they would a <button>
+const onActivateKey = (action: () => void) => (event: KeyboardEvent) => {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    action();
+  }
+};
 
 export default function CloudStorageBrowser({
   searchQuery,
@@ -44,8 +53,10 @@ export default function CloudStorageBrowser({
     <div className="flex flex-col my-1 mx-1">
       <List className="!min-w-20">
         <List.Item
+          aria-expanded={Boolean(openZones['all'])}
           className="cursor-pointer rounded-md py-2 short:py-1 hover:!bg-surface-light focus:!bg-surface-light"
           onClick={() => toggleOpenZones('all')}
+          onKeyDown={onActivateKey(() => toggleOpenZones('all'))}
           role="button"
           tabIndex={0}
         >
@@ -76,17 +87,20 @@ export default function CloudStorageBrowser({
         >
           {groups.map(group => {
             const isOpen = openZones[group] ?? true;
+            const toggleGroup = () =>
+              setOpenZones(prev => ({
+                ...prev,
+                [group]: !(prev[group] ?? true)
+              }));
             return (
               <Fragment key={group}>
                 <List.Item
+                  aria-expanded={isOpen}
                   className="pl-6 w-full flex items-center justify-between rounded-md cursor-pointer text-foreground hover:!bg-primary-light/30 focus:!bg-primary-light/30"
-                  onClick={() =>
-                    setOpenZones(prev => ({
-                      ...prev,
-                      [group]: !(prev[group] ?? true)
-                    }))
-                  }
+                  onClick={toggleGroup}
+                  onKeyDown={onActivateKey(toggleGroup)}
                   role="button"
+                  tabIndex={0}
                 >
                   <List.ItemStart>
                     <FgIcon
@@ -119,6 +133,7 @@ export default function CloudStorageBrowser({
                       aria-label="Add bucket"
                       className="pl-6 w-full rounded-md cursor-pointer text-foreground hover:!bg-primary-light/30 focus:!bg-primary-light/30"
                       onClick={onAddBucket}
+                      onKeyDown={onActivateKey(onAddBucket)}
                       role="button"
                       tabIndex={0}
                     >
