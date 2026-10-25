@@ -6,6 +6,41 @@ import FileSelectorButton from '@/components/ui/FileSelector/FileSelectorButton'
 import { render, screen, waitFor } from '@/__tests__/test-utils';
 import { server } from '@/__tests__/mocks/node';
 
+const COSEM = {
+  name: 'cosem',
+  zone: 'S3',
+  group: 'cloud',
+  storage: 'COSEM',
+  mount_path: 's3://cosem-datasets',
+  linux_path: null,
+  mac_path: null,
+  windows_path: null,
+  protocol: 's3' as const
+};
+
+function serveBucket() {
+  server.use(
+    http.get('/api/file-share-paths', () =>
+      HttpResponse.json({
+        paths: [
+          {
+            name: 'test_fsp',
+            zone: 'Zone1',
+            group: 'group1',
+            storage: 'primary',
+            mount_path: '/test/fsp',
+            mac_path: 'smb://test/fsp',
+            windows_path: '\\\\test\\fsp',
+            linux_path: '/test/fsp',
+            protocol: 'file'
+          },
+          COSEM
+        ]
+      })
+    )
+  );
+}
+
 describe('FileSelector', () => {
   const onSelect = vi.fn();
 
@@ -139,7 +174,8 @@ describe('FileSelector', () => {
                 mount_path: '/test/fsp',
                 mac_path: 'smb://test/fsp',
                 windows_path: '\\\\test\\fsp',
-                linux_path: '/test/fsp'
+                linux_path: '/test/fsp',
+                protocol: 'file'
               },
               {
                 name: 'alpha_fsp',
@@ -149,7 +185,8 @@ describe('FileSelector', () => {
                 mount_path: '/alpha/fsp',
                 mac_path: 'smb://alpha/fsp',
                 windows_path: '\\\\alpha\\fsp',
-                linux_path: '/alpha/fsp'
+                linux_path: '/alpha/fsp',
+                protocol: 'file'
               }
             ]
           });
@@ -266,6 +303,46 @@ describe('FileSelector', () => {
         ).not.toBeInTheDocument();
         expect(screen.queryByText('Viewing all zones')).not.toBeInTheDocument();
       });
+    });
+  });
+
+  describe('Cloud storage', () => {
+    it('hides cloud zones by default', async () => {
+      serveBucket();
+      const user = userEvent.setup();
+      render(<FileSelectorButton onSelect={onSelect} />, {
+        initialEntries: ['/browse']
+      });
+
+      await user.click(screen.getByRole('button', { name: /browse/i }));
+
+      expect(await screen.findByText('Zone1')).toBeInTheDocument();
+      expect(screen.queryByText('S3')).not.toBeInTheDocument();
+    });
+
+    it('shows cloud zones and buckets with includeCloud', async () => {
+      serveBucket();
+      // Group filtering is on by default; the bucket's 'cloud' group is not one of these
+      server.use(
+        http.get('/api/profile', () =>
+          HttpResponse.json({ username: 'testuser', groups: ['group1'] })
+        )
+      );
+      const user = userEvent.setup();
+      render(<FileSelectorButton includeCloud onSelect={onSelect} />, {
+        initialEntries: ['/browse']
+      });
+
+      await user.click(screen.getByRole('button', { name: /browse/i }));
+
+      expect(await screen.findByText('S3')).toBeInTheDocument();
+      expect(screen.getByText('Zone1')).toBeInTheDocument();
+
+      await user.dblClick(screen.getByText('S3'));
+
+      expect(
+        await screen.findByText('s3://cosem-datasets')
+      ).toBeInTheDocument();
     });
   });
 });

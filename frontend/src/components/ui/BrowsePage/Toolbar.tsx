@@ -29,6 +29,7 @@ import {
   makeMapKey
 } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
+import { isReadOnlyFsp } from '@/utils/cloudStorage';
 import useFavoriteToggle from '@/hooks/useFavoriteToggle';
 import { useRefreshFileBrowser } from '@/hooks/useRefreshFileBrowser';
 
@@ -52,6 +53,7 @@ export default function Toolbar({
   const cartCount = useCartCount();
 
   const { currentFileSharePath, currentFileOrFolder } = fileQuery.data || {};
+  const readOnly = isReadOnlyFsp(currentFileSharePath);
   const { profile } = useProfileContext();
   const {
     folderPreferenceMap,
@@ -182,7 +184,7 @@ export default function Toolbar({
           ) : null}
 
           {/* Make new folder */}
-          {isFolder ? (
+          {isFolder && !readOnly ? (
             <NewFolderButton triggerClasses={triggerClasses} />
           ) : null}
 

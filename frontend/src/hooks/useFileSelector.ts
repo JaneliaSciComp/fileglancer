@@ -11,6 +11,7 @@ import {
 } from '@/utils/pathHandling';
 import { makeMapKey } from '@/utils';
 import { filterFspsByGroupMembership } from '@/utils/groupFiltering';
+import { isReadOnlyFsp } from '@/utils/cloudStorage';
 import type { FileOrFolder, FileSharePath, Zone } from '@/shared.types';
 
 export type FileSelectorLocation =
@@ -45,6 +46,8 @@ type FileSelectorOptions = {
   // When neither initialLocation nor initialPath resolves to a folder, open in
   // the user's home directory instead of the top-level zones list.
   defaultToHome?: boolean;
+  // List cloud storage buckets alongside file shares.
+  includeCloud?: boolean;
 };
 
 export default function useFileSelector(options?: FileSelectorOptions) {
@@ -54,6 +57,7 @@ export default function useFileSelector(options?: FileSelectorOptions) {
 
   const initialLocation = options?.initialLocation;
   const defaultToHome = options?.defaultToHome ?? false;
+  const includeCloud = options?.includeCloud ?? false;
   const overrideKey = options?.pathPreferenceOverride?.[0];
   const effectivePathPreference = useMemo(
     () => (overrideKey ? ([overrideKey] as ['linux_path']) : pathPreference),
@@ -233,26 +237,30 @@ export default function useFileSelector(options?: FileSelectorOptions) {
       return [];
     }
 
+    // File shares pass group filtering; cloud buckets belong to no group and
+    // are listed only when includeCloud is set.
+    const userGroups = profile?.groups || [];
+    const visibleFsps = (fsps: FileSharePath[]) => {
+      const accessible = new Set(
+        filterFspsByGroupMembership(fsps, userGroups, isFilteredByGroups)
+      );
+      return fsps.filter(fsp =>
+        isReadOnlyFsp(fsp) ? includeCloud : accessible.has(fsp)
+      );
+    };
+
     if (state.currentLocation.type === 'zones') {
       // Show zones at zones level
       const items: FileOrFolder[] = [];
 
       // Add zones as folders
-      const userGroups = profile?.groups || [];
       Object.entries(zonesAndFspQuery.data).forEach(([key, value]) => {
         if (key.startsWith('zone_')) {
           const zone = value as Zone;
 
-          // If group filtering is enabled, only show zones that have at least one accessible FSP
-          if (isFilteredByGroups && userGroups.length > 0) {
-            const accessibleFsps = filterFspsByGroupMembership(
-              zone.fileSharePaths,
-              userGroups,
-              isFilteredByGroups
-            );
-            if (accessibleFsps.length === 0) {
-              return; // Skip this zone
-            }
+          // Only show zones that have at least one visible FSP
+          if (visibleFsps(zone.fileSharePaths).length === 0) {
+            return; // Skip this zone
           }
 
           items.push({
@@ -278,7 +286,6 @@ export default function useFileSelector(options?: FileSelectorOptions) {
       return items;
     } else if (state.currentLocation.type === 'zone') {
       // Show FSPs in the selected zone
-      const userGroups = profile?.groups || [];
       const zoneId = state.currentLocation.zoneId;
 
       // Collect all FSPs for this zone
@@ -292,12 +299,7 @@ export default function useFileSelector(options?: FileSelectorOptions) {
         }
       });
 
-      // Filter FSPs by group membership
-      const accessibleFsps = filterFspsByGroupMembership(
-        zoneFsps,
-        userGroups,
-        isFilteredByGroups
-      );
+      const accessibleFsps = visibleFsps(zoneFsps);
 
       // Filter FSPs by search query
       const searchFilteredFsps = normalizedQuery
@@ -339,6 +341,7 @@ export default function useFileSelector(options?: FileSelectorOptions) {
     fileQuery.data,
     isFilteredByGroups,
     profile,
+    includeCloud,
     normalizedQuery,
     hideDotFilesLocal
   ]);

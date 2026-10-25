@@ -25,7 +25,7 @@ export default function SidebarFileBrowser({
   viewSources,
   addToView
 }: SidebarFileBrowserProps) {
-  const selector = useFileSelector({ defaultToHome: true });
+  const selector = useFileSelector({ defaultToHome: true, includeCloud: true });
   const { state, displayItems, navigateToLocation, handleItemDoubleClick } =
     selector;
   const { startAddToView, dialog, pending } = useCreateViewFlow();

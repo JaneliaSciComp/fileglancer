@@ -13,6 +13,7 @@ import { validateUrlPrefix } from '@/hooks/useDataToolLinks';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { makeMapKey } from '@/utils';
+import { isReadOnlyFsp } from '@/utils/cloudStorage';
 import {
   getPreferredPathForDisplay,
   joinPaths,
@@ -147,8 +148,11 @@ function CustomSubpathInput({
 
 export default function DataLinkDialog(props: DataLinkDialogProps) {
   const { fspName, filePath } = useFileBrowserContext();
-  const { pathPreference, areDataLinksAutomatic, dataLinkSubpathMode } =
-    usePreferencesContext();
+  const {
+    pathPreference,
+    areDataLinksAutomatic,
+    dataLinkSubpathMode: preferredSubpathMode
+  } = usePreferencesContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const [localAreDataLinksAutomatic] = useState(areDataLinksAutomatic);
 
@@ -163,6 +167,11 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
     fspKey && zonesAndFspQuery.isSuccess
       ? (zonesAndFspQuery.data[fspKey] as FileSharePath)
       : null;
+
+  // A read-only share's data link is its direct URL, which the link name and
+  // subpath mode cannot shape, so those controls are not offered.
+  const readOnly = isReadOnlyFsp(pathFsp);
+  const dataLinkSubpathMode = readOnly ? 'full_path' : preferredSubpathMode;
 
   function getDisplayPath(): string {
     const targetPath =
@@ -345,36 +354,38 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
               <CancelBtn onCancel={props.onCancel} />
             </BtnContainer>
             <div className="flex flex-col gap-2 mt-4">
-              <Accordion
-                onValueChange={
-                  setOpenAdvancedSections as Dispatch<
-                    SetStateAction<string | string[]>
-                  >
-                }
-                type="multiple"
-                value={openAdvancedSections}
-              >
-                <Accordion.Item value="advanced">
-                  <Accordion.Trigger className="flex w-full items-center justify-between py-2">
-                    <div className="text-foreground font-semibold text-sm">
-                      Advanced settings
-                    </div>
-                    <HiChevronDown
-                      className={`h-4 w-4 text-foreground transition-transform ${
-                        openAdvancedSections.includes('advanced')
-                          ? 'rotate-180'
-                          : ''
-                      }`}
-                    />
-                  </Accordion.Trigger>
-                  <Accordion.Content className="pt-2 pb-2 flex flex-col gap-2">
-                    <SubpathModeOptions />
-                    <Typography className="text-foreground text-sm font-mono break-all bg-surface/30 p-2 rounded">
-                      {dataLinkPreview}
-                    </Typography>
-                  </Accordion.Content>
-                </Accordion.Item>
-              </Accordion>
+              {!readOnly ? (
+                <Accordion
+                  onValueChange={
+                    setOpenAdvancedSections as Dispatch<
+                      SetStateAction<string | string[]>
+                    >
+                  }
+                  type="multiple"
+                  value={openAdvancedSections}
+                >
+                  <Accordion.Item value="advanced">
+                    <Accordion.Trigger className="flex w-full items-center justify-between py-2">
+                      <div className="text-foreground font-semibold text-sm">
+                        Advanced settings
+                      </div>
+                      <HiChevronDown
+                        className={`h-4 w-4 text-foreground transition-transform ${
+                          openAdvancedSections.includes('advanced')
+                            ? 'rotate-180'
+                            : ''
+                        }`}
+                      />
+                    </Accordion.Trigger>
+                    <Accordion.Content className="pt-2 pb-2 flex flex-col gap-2">
+                      <SubpathModeOptions />
+                      <Typography className="text-foreground text-sm font-mono break-all bg-surface/30 p-2 rounded">
+                        {dataLinkPreview}
+                      </Typography>
+                    </Accordion.Content>
+                  </Accordion.Item>
+                </Accordion>
+              ) : null}
               {dataLinkSubpathMode === 'custom' ? (
                 <CustomSubpathInput
                   error={customSubpathError}
