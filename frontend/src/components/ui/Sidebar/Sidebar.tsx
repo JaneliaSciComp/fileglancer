@@ -7,6 +7,7 @@ import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FavoritesBrowser from './FavoritesBrowser';
 import ZonesBrowser from './ZonesBrowser';
 import CloudStorageBrowser from './CloudStorageBrowser';
+import AddBucketDialog from '@/components/ui/Dialogs/AddBucket';
 import useFilteredZonesAndFavorites from '@/hooks/useFilteredZonesAndFavorites';
 
 export default function Sidebar() {
@@ -67,6 +68,10 @@ export default function Sidebar() {
           searchQuery={searchQuery}
         />
       </div>
+      <AddBucketDialog
+        onClose={() => setShowAddBucket(false)}
+        open={showAddBucket}
+      />
     </Card>
   );
 }
