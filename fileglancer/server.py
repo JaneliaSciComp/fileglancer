@@ -2283,7 +2283,7 @@ def create_app(settings):
                 {
                     "url": row.url,
                     "manifest_path": row.manifest_path,
-                    "name": row.name,
+                    "name": row.effective_name,
                     "description": row.description,
                     "branch": row.branch,
                     "commit_sha": row.commit_sha,
@@ -2495,7 +2495,7 @@ def create_app(settings):
                     branch=row.branch,
                     commit_sha=row.commit_sha,
                     code_commit_sha=row.code_commit_sha,
-                    name=row.name,
+                    name=row.effective_name,
                     description=row.description,
                     added_at=row.added_at,
                     updated_at=row.updated_at,
@@ -2559,6 +2559,29 @@ def create_app(settings):
             db.delete_user_app(session, username, url, manifest_path)
         _spawn_snapshot_gc(username, gc_urls)
         return {"message": "App removed"}
+
+    @app.patch("/api/apps", response_model=UserApp,
+               description="Set an app's display name; an empty name restores the manifest name")
+    async def rename_user_app(body: AppRenameRequest,
+                              username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            row = db.set_user_app_display_name(
+                session, username, body.url, body.manifest_path,
+                display_name=body.name.strip() or None)
+            if row is None:
+                raise HTTPException(status_code=404, detail="App not found")
+            return UserApp(
+                url=row.url,
+                manifest_path=row.manifest_path,
+                branch=row.branch,
+                commit_sha=row.commit_sha,
+                code_commit_sha=row.code_commit_sha,
+                name=row.effective_name,
+                description=row.description,
+                added_at=row.added_at,
+                updated_at=row.updated_at,
+                manifest=AppManifest(**row.manifest) if row.manifest else None,
+            )
 
     @app.post("/api/apps/update", response_model=UserApp,
               description="Pull latest code and re-pin this app to the new tip commit")
@@ -2624,7 +2647,7 @@ def create_app(settings):
                 branch=row.branch,
                 commit_sha=row.commit_sha,
                 code_commit_sha=row.code_commit_sha,
-                name=row.name,
+                name=row.effective_name,
                 description=row.description,
                 added_at=row.added_at,
                 updated_at=row.updated_at,
@@ -2888,7 +2911,7 @@ def create_app(settings):
                 branch=row.branch,
                 commit_sha=row.commit_sha,
                 code_commit_sha=row.code_commit_sha,
-                name=row.name,
+                name=row.effective_name,
                 description=row.description,
                 added_at=row.added_at,
                 updated_at=row.updated_at,

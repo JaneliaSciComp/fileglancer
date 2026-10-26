@@ -302,6 +302,9 @@ class UserAppDB(Base):
     url = Column(String, nullable=False)
     manifest_path = Column(String, nullable=False, server_default="")
     name = Column(String, nullable=False)
+    # User-chosen label that overrides `name` for display. Unlike `name`, it is
+    # never touched by an update, so a rename survives manifest changes.
+    display_name = Column(String, nullable=True)
     description = Column(String, nullable=True)
     branch = Column(String, nullable=True)
     # Commit the app is pinned to: jobs run from an immutable snapshot of this
@@ -317,6 +320,10 @@ class UserAppDB(Base):
     __table_args__ = (
         UniqueConstraint('username', 'url', 'manifest_path', name='uq_user_app'),
     )
+
+    @property
+    def effective_name(self) -> str:
+        return self.display_name or self.name
 
 
 class AppListingDB(Base):
@@ -1862,6 +1869,21 @@ def update_user_app_manifest_cache(session: Session, username: str, url: str,
     row.manifest = manifest
     if bump_updated_at:
         row.updated_at = datetime.now(UTC)
+    session.commit()
+    return row
+
+
+def set_user_app_display_name(session: Session, username: str, url: str,
+                              manifest_path: str = "", *,
+                              display_name: Optional[str]) -> Optional[UserAppDB]:
+    """Set (or with None, clear) the user's custom label for an app.
+
+    Returns None when the app doesn't exist.
+    """
+    row = get_user_app(session, username, url, manifest_path)
+    if row is None:
+        return None
+    row.display_name = display_name
     session.commit()
     return row
 

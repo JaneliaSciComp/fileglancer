@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/AppsPage/appMenuItems';
 import type { AppActions } from '@/hooks/useAppActions';
 import { useAppUpdateAvailable } from '@/queries/appsQueries';
-import { getAppIconType } from '@/utils';
+import { appRevision, getAppIconType } from '@/utils';
 import type { UserApp } from '@/shared.types';
 
 interface AppCardProps {
@@ -27,6 +27,7 @@ interface AppCardProps {
 export default function AppCard({ app, actions }: AppCardProps) {
   const isShared = isAppShared(app);
   const updateAvailable = useAppUpdateAvailable(app);
+  const revision = appRevision(app.url, app.branch);
 
   const menuItems = buildAppMenuItems(app, actions);
 
@@ -87,6 +88,12 @@ export default function AppCard({ app, actions }: AppCardProps) {
         >
           {app.name}
         </Typography>
+
+        {revision ? (
+          <Typography className="text-foreground/70 text-xs -mt-2 truncate">
+            {revision}
+          </Typography>
+        ) : null}
 
         {app.description ? (
           <Typography className="text-sm md:text-base text-foreground">

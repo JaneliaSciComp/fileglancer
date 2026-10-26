@@ -218,6 +218,28 @@ export function useUpdateAppMutation(): UseMutationResult<
   });
 }
 
+export function useRenameAppMutation(): UseMutationResult<
+  UserApp,
+  Error,
+  { url: string; manifest_path: string; name: string }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async payload => {
+      // An empty name clears the custom label back to the manifest name.
+      const response = await sendFetchRequest('/api/apps', 'PATCH', payload);
+      const data = await getResponseJsonOrError(response);
+      if (!response.ok) {
+        throwResponseNotOkError(response, data);
+      }
+      return data as UserApp;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: appsQueryKeys.all });
+    }
+  });
+}
+
 export function useRemoveAppMutation(): UseMutationResult<
   unknown,
   Error,
