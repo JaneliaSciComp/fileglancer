@@ -981,7 +981,7 @@ class UserApp(BaseModel):
         description="Pin for the manifest's separate code repo (repo_url), when declared.",
         default=None,
     )
-    name: str = Field(description="App name from manifest")
+    name: str = Field(description="Display name: the user's custom label if set, else the manifest name")
     description: Optional[str] = Field(description="App description from manifest", default=None)
     added_at: datetime = Field(description="When the app was added")
     updated_at: Optional[datetime] = Field(description="When the app was last updated", default=None)
@@ -1069,6 +1069,11 @@ class ManifestFetchRequest(BaseModel):
     """Request to fetch an app manifest"""
     url: str = Field(description="URL to the app manifest or GitHub repo")
     manifest_path: str = Field(description="Relative directory path to the manifest within the repo", default="")
+
+
+class AppRenameRequest(ManifestFetchRequest):
+    """Request to set an app's display name"""
+    name: str = Field(description="New display name; empty resets to the manifest name")
 
 
 class AppAddRequest(BaseModel):

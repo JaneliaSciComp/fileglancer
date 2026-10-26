@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 
 import {
   useRemoveAppMutation,
+  useRenameAppMutation,
   useShareAppMutation,
   useUnshareListingMutation,
   useUpdateAppMutation
@@ -16,6 +17,11 @@ export interface AppActions {
   launch: (app: UserApp, entryPointId?: string) => void;
   view: (app: UserApp) => void;
   update: (app: UserApp) => Promise<void>;
+  rename: (app: UserApp, name: string) => Promise<void>;
+  requestRename: (app: UserApp) => void;
+  renameTarget: UserApp | null;
+  closeRename: () => void;
+  renaming: boolean;
   requestUnshare: (app: UserApp) => void;
   confirmUnshare: () => Promise<void>;
   unshareTarget: UserApp | null;
@@ -41,8 +47,8 @@ export interface AppActions {
 
 /**
  * Navigation and mutation handlers for the actions offered on a user app
- * (launch, view details, share/unshare, update, remove), shared by the My Apps
- * cards and the app detail page. Share and remove are two-step flows: the
+ * (launch, view details, share/unshare, update, rename, remove), shared by the
+ * My Apps cards and the app detail page. Share, rename and remove are two-step flows: the
  * `request*` functions set a target app whose dialog is rendered by
  * `AppActionDialogs`.
  */
@@ -51,9 +57,11 @@ export function useAppActions(opts?: { onRemoved?: () => void }): AppActions {
   const [shareTarget, setShareTarget] = useState<UserApp | null>(null);
   const [removeTarget, setRemoveTarget] = useState<UserApp | null>(null);
   const [unshareTarget, setUnshareTarget] = useState<UserApp | null>(null);
+  const [renameTarget, setRenameTarget] = useState<UserApp | null>(null);
 
   const updateAppMutation = useUpdateAppMutation();
   const removeAppMutation = useRemoveAppMutation();
+  const renameAppMutation = useRenameAppMutation();
   const shareAppMutation = useShareAppMutation();
   const unshareListingMutation = useUnshareListingMutation();
 
@@ -96,6 +104,16 @@ export function useAppActions(opts?: { onRemoved?: () => void }): AppActions {
     } catch (error) {
       showErrorToast(error, 'Failed to update app');
     }
+  };
+
+  // Errors propagate so the rename dialog / inline editor can show them.
+  const rename = async (app: UserApp, name: string) => {
+    await renameAppMutation.mutateAsync({
+      url: app.url,
+      manifest_path: app.manifest_path,
+      name
+    });
+    toast.success('App renamed');
   };
 
   const confirmUnshare = async () => {
@@ -145,6 +163,11 @@ export function useAppActions(opts?: { onRemoved?: () => void }): AppActions {
     launch,
     view,
     update,
+    rename,
+    requestRename: setRenameTarget,
+    renameTarget,
+    closeRename: () => setRenameTarget(null),
+    renaming: renameAppMutation.isPending,
     requestUnshare: setUnshareTarget,
     confirmUnshare,
     unshareTarget,
