@@ -99,6 +99,8 @@ function setup() {
       bridge={fake.bridge}
       editState={editState}
       onClose={vi.fn()}
+      onTabChange={vi.fn()}
+      tab="sources"
       viewLayers={VIEW_LAYERS}
     />
   );
