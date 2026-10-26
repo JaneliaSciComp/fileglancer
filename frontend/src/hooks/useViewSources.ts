@@ -29,10 +29,20 @@ export type LiveSource = {
   layerNames: string[];
   /** Those of layerNames that are archived: kept in the state, not shown. */
   archivedNames: string[];
+  /** Per layerNames entry: its channel index, or null if not one channel. */
+  layerChannels: (number | null)[];
   sharing_key: string | null;
   /** Recorded as a source only: it can't load as a Neuroglancer layer. */
   unsupported: boolean;
 };
+
+// A per-channel layer pins its one local dimension, the channel axis.
+function channelOf(layer: NgLayer): number | null {
+  const pos = layer.localPosition;
+  return Array.isArray(pos) && pos.length === 1 && typeof pos[0] === 'number'
+    ? pos[0]
+    : null;
+}
 
 const basename = (path: string) =>
   path.replace(/\/+$/, '').split('/').pop() || path;
@@ -63,6 +73,7 @@ export function groupLayersBySource(
         label: name,
         layerNames: [name],
         archivedNames: layer.archived ? [name] : [],
+        layerChannels: [channelOf(layer)],
         sharing_key: null,
         unsupported: false
       });
@@ -72,6 +83,7 @@ export function groupLayersBySource(
     const row = rows.get(key);
     if (row) {
       row.layerNames.push(name);
+      row.layerChannels.push(channelOf(layer));
       if (layer.archived) {
         row.archivedNames.push(name);
       }
@@ -83,6 +95,7 @@ export function groupLayersBySource(
         label: basename(ds.path),
         layerNames: [name],
         archivedNames: layer.archived ? [name] : [],
+        layerChannels: [channelOf(layer)],
         sharing_key: ds.sharing_key,
         unsupported: false
       });
@@ -98,12 +111,47 @@ export function groupLayersBySource(
         label: basename(ds.path),
         layerNames: [],
         archivedNames: [],
+        layerChannels: [],
         sharing_key: ds.sharing_key,
         unsupported: true
       });
     }
   }
   return [...rows.values()];
+}
+
+/** A checkbox in a Sources row; no layerName if not in the View yet. */
+export type ChannelRow = { key: string; label: string; layerName?: string };
+
+// When every layer of the dataset is one channel, list all of its channels,
+// so channels never added to the View can be added here. Otherwise list the
+// layers NG split the dataset into.
+export function channelRows(
+  source: LiveSource,
+  channels: string[]
+): ChannelRow[] | null {
+  const perChannel =
+    channels.length > 0 &&
+    source.layerChannels.length > 0 &&
+    source.layerChannels.every(c => c !== null);
+  if (perChannel) {
+    return channels.map((label, index) => {
+      const i = source.layerChannels.indexOf(index);
+      return {
+        key: `channel:${index}`,
+        label,
+        layerName: i >= 0 ? source.layerNames[i] : undefined
+      };
+    });
+  }
+  if (source.layerNames.length > 1) {
+    return source.layerNames.map(name => ({
+      key: name,
+      label: name,
+      layerName: name
+    }));
+  }
+  return null;
 }
 
 // NG fires `changed` on every camera frame.

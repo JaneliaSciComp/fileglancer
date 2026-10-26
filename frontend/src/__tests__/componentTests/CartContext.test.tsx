@@ -43,11 +43,34 @@ function Probe() {
       <button onClick={() => removeFromCart('/a')}>remove</button>
       <button
         onClick={() =>
-          removeManyFromCart([{ path: '/a' }, { path: '/b', channel: 'DAPI' }])
+          removeManyFromCart([{ path: '/a' }, { path: '/b', channelIndex: 0 }])
         }
       >
         removeMany
       </button>
+      <button
+        onClick={() =>
+          addToCart([
+            {
+              fsp_name: 'fsp',
+              path: '/r',
+              channel: 'Gpb5',
+              channelIndex: 1,
+              label: 'Gpb5'
+            },
+            {
+              fsp_name: 'fsp',
+              path: '/r',
+              channel: 'Gpb5',
+              channelIndex: 4,
+              label: 'Gpb5'
+            }
+          ])
+        }
+      >
+        addRepeated
+      </button>
+      <button onClick={() => removeFromCart('/r', 4)}>removeRepeated</button>
       <button onClick={() => clearCart()}>clear</button>
     </div>
   );
@@ -87,7 +110,13 @@ describe('CartContext', () => {
   it('removeManyFromCart filters all removals in a single persist call', async () => {
     cartData = [
       { fsp_name: 'fsp', path: '/a', label: 'a' },
-      { fsp_name: 'fsp', path: '/b', channel: 'DAPI', label: 'DAPI' },
+      {
+        fsp_name: 'fsp',
+        path: '/b',
+        channel: 'DAPI',
+        channelIndex: 0,
+        label: 'DAPI'
+      },
       { fsp_name: 'fsp', path: '/c', label: 'c' }
     ];
     const user = userEvent.setup();
@@ -102,6 +131,28 @@ describe('CartContext', () => {
       key: 'neuroglancerCart',
       value: [{ fsp_name: 'fsp', path: '/c', label: 'c' }]
     });
+  });
+
+  it('keys channels by index, so repeated channel names stay distinct', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <CartProvider>
+        <Probe />
+      </CartProvider>
+    );
+    await user.click(screen.getByText('addRepeated'));
+    expect(mutateAsync.mock.calls[0][0].value).toHaveLength(2);
+
+    cartData = mutateAsync.mock.calls[0][0].value;
+    rerender(
+      <CartProvider>
+        <Probe />
+      </CartProvider>
+    );
+    await user.click(screen.getByText('removeRepeated'));
+    expect(mutateAsync.mock.calls[1][0].value).toEqual([
+      expect.objectContaining({ channelIndex: 1 })
+    ]);
   });
 
   it('clearCart persists an empty array', async () => {

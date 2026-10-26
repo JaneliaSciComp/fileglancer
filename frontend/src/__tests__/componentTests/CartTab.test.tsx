@@ -32,6 +32,7 @@ const cartAGfp: CartItem = {
   fsp_name: 'fsp1',
   path: '/a',
   channel: 'GFP',
+  channelIndex: 1,
   label: 'GFP'
 };
 const cartB: CartItem = { fsp_name: 'fsp2', path: '/b', label: 'Dataset B' };
@@ -267,8 +268,8 @@ describe('Layer Cart tab', () => {
       expect(removeManyFromCart).toHaveBeenCalledTimes(1);
     });
     expect(removeManyFromCart).toHaveBeenCalledWith([
-      { path: '/a', channel: undefined },
-      { path: '/a', channel: 'GFP' }
+      { path: '/a', channelIndex: undefined },
+      { path: '/a', channelIndex: 1 }
     ]);
     // The bug being regression-tested: no per-item loop calling single-remove.
     expect(removeFromCart).not.toHaveBeenCalled();

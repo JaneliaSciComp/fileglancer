@@ -37,7 +37,7 @@ export function useAddToView(
     readonly onAddSources: (sharingKeys: string[]) => void;
     readonly onAdded: (datasets: ResolvedCheckoutDataset[]) => void;
   }
-): (items: CartItem[]) => Promise<void> {
+): (items: CartItem[], options?: { shown?: boolean }) => Promise<void> {
   const { resolveCartDatasets } = useCartCheckout();
   // The sidebar unmounts when NG reloads (the bridge leaves `ready`). An add
   // still in flight then holds the dead viewer, so it must stop.
@@ -50,7 +50,7 @@ export function useAddToView(
   }, []);
 
   return useCallback(
-    async (items: CartItem[]) => {
+    async (items: CartItem[], options?: { shown?: boolean }) => {
       // Snapshot before resolving: creating a Data Link relinks this View's
       // broken layers on that dataset server-side and refetches the rows.
       const broken = viewLayers.filter(isRelinkableLayer);
@@ -97,21 +97,24 @@ export function useAddToView(
       }
       onAdded(resolved);
       if (added.length > 0 || relinked) {
-        bridge.setState(appendLayers(current, added));
+        bridge.setState(appendLayers(current, added, options?.shown));
         onEdited();
       }
       if (unsupportedKeys.length > 0) {
         onAddSources(unsupportedKeys);
       }
 
-      const count = new Set(
-        resolved.map(ds => datasetKey(ds.fsp_name, ds.path))
-      ).size;
+      // Picking channels of a dataset in the View adds channels, not datasets.
+      const channelsOnly = resolved.every(ds => ds.channel !== undefined);
+      const noun = channelsOnly ? 'channel' : 'dataset';
+      const count = channelsOnly
+        ? resolved.length
+        : new Set(resolved.map(ds => datasetKey(ds.fsp_name, ds.path))).size;
       const skipped = unsupportedKeys.length
         ? ` ${unsupportedKeys.length} can't display in Neuroglancer and will be listed as ${unsupportedKeys.length === 1 ? 'a source' : 'sources'} only.`
         : '';
       toast.success(
-        `Added ${count} dataset${count === 1 ? '' : 's'}. Save to keep ${count === 1 ? 'it' : 'them'}.${skipped}`
+        `Added ${count} ${noun}${count === 1 ? '' : 's'}. Save to keep ${count === 1 ? 'it' : 'them'}.${skipped}`
       );
     },
     [resolveCartDatasets, bridge, viewLayers, onEdited, onAddSources, onAdded]

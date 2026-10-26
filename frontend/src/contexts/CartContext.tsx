@@ -7,13 +7,13 @@ import type { CartItem } from '@/queries/preferencesQueries';
 
 export type { CartItem };
 
-type CartRemoval = { path: string; channel?: string };
+type CartRemoval = { path: string; channelIndex?: number };
 
 type CartContextType = {
   cart: CartItem[];
   cartCount: number;
   addToCart: (items: CartItem[]) => Promise<void>;
-  removeFromCart: (path: string, channel?: string) => Promise<void>;
+  removeFromCart: (path: string, channelIndex?: number) => Promise<void>;
   removeManyFromCart: (removals: CartRemoval[]) => Promise<void>;
   clearCart: () => Promise<void>;
 };
@@ -28,8 +28,10 @@ export const useCartContext = () => {
   return context;
 };
 
-// Identity of a cart entry: fsp + path + channel (channel-per-layer).
-const itemKey = (i: CartItem) => `${i.fsp_name}::${i.path}::${i.channel ?? ''}`;
+// Identity of a cart entry: fsp + path + channel index (channel-per-layer).
+// The index, not the name: a dataset can repeat a channel name.
+const itemKey = (i: CartItem) =>
+  `${i.fsp_name}::${i.path}::${i.channelIndex ?? ''}`;
 
 export const CartProvider = ({
   children
@@ -74,9 +76,9 @@ export const CartProvider = ({
   );
 
   const removeFromCart = useCallback(
-    async (path: string, channel?: string) => {
+    async (path: string, channelIndex?: number) => {
       await persist(
-        cart.filter(i => !(i.path === path && i.channel === channel))
+        cart.filter(i => !(i.path === path && i.channelIndex === channelIndex))
       );
     },
     [cart, persist]
@@ -87,9 +89,11 @@ export const CartProvider = ({
   // same pre-loop `cart`/`persist` and overwrite the previous removal).
   const removeManyFromCart = useCallback(
     async (removals: CartRemoval[]) => {
-      const keys = new Set(removals.map(r => `${r.path}::${r.channel ?? ''}`));
+      const keys = new Set(
+        removals.map(r => `${r.path}::${r.channelIndex ?? ''}`)
+      );
       await persist(
-        cart.filter(i => !keys.has(`${i.path}::${i.channel ?? ''}`))
+        cart.filter(i => !keys.has(`${i.path}::${i.channelIndex ?? ''}`))
       );
     },
     [cart, persist]

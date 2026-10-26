@@ -124,9 +124,20 @@ export async function buildViewState(
   const viewLayers: ViewLayerInput[] = [];
   const unsupported: ResolvedCheckoutDataset[] = [];
   let base: NgState | null = null;
+  const taken = new Set<string>();
+
+  // Every channel entry of a dataset generates the same state; generate it
+  // once per dataset and layer path, then slice it per entry.
+  const stateCache = new Map<string, Promise<NgState | null>>();
 
   for (const ds of datasets) {
-    const state = await generateStateForDataset(ds);
+    const cacheKey = `${ds.url}::${ds.channel !== undefined}`;
+    let pending = stateCache.get(cacheKey);
+    if (!pending) {
+      pending = generateStateForDataset(ds);
+      stateCache.set(cacheKey, pending);
+    }
+    const state = await pending;
     if (!state) {
       unsupported.push(ds);
       continue;
@@ -136,7 +147,10 @@ export async function buildViewState(
     }
     for (const layer of selectLayers(state, ds.channelIndex)) {
       const layer_index = combinedLayers.length;
-      combinedLayers.push({ ...layer, archived: layer_index >= 4 });
+      // Datasets can share layer names (e.g. two with a "DAPI" channel).
+      const name = uniqueName(layer.name ?? 'layer', taken);
+      taken.add(name);
+      combinedLayers.push({ ...layer, name, archived: layer_index >= 4 });
       viewLayers.push({
         sharing_key: ds.sharing_key,
         layer_index,
@@ -187,8 +201,12 @@ function uniqueName(name: string, taken: Set<string>): string {
 
 // Adds layers to an existing View's state. The View keeps its dimensions,
 // layout and selected layer. Added layers from index 4 on start archived,
-// the same rule as checkout.
-export function appendLayers(current: NgState, added: NgLayer[]): NgState {
+// the same rule as checkout, unless `shown` asks for them to stay visible.
+export function appendLayers(
+  current: NgState,
+  added: NgLayer[],
+  shown = false
+): NgState {
   const layers = [...(current.layers ?? [])];
   const taken = new Set(
     layers.map(l => l.name).filter((n): n is string => typeof n === 'string')
@@ -196,7 +214,7 @@ export function appendLayers(current: NgState, added: NgLayer[]): NgState {
   for (const layer of added) {
     const name = uniqueName(layer.name ?? 'layer', taken);
     taken.add(name);
-    layers.push({ ...layer, name, archived: layers.length >= 4 });
+    layers.push({ ...layer, name, archived: !shown && layers.length >= 4 });
   }
   return { ...current, layers };
 }
