@@ -118,6 +118,13 @@ function selectLayers(state: NgState, channelIndex?: number): NgLayer[] {
 // reconciled (first dataset's dimensions win) and layer_index>4 is archived
 // per NG default — fine for curated read-only carts; revisit if
 // mixed-resolution overlays misalign.
+
+// Image layers from index 4 on start archived, like the standalone generator
+// does for channels. A dataset's label (segmentation) layers always stay
+// shown, so a one-dataset View matches the standalone Neuroglancer button.
+function startsArchived(layer: NgLayer, index: number): boolean {
+  return layer.type !== 'segmentation' && index >= 4;
+}
 export async function buildViewState(
   datasets: ResolvedCheckoutDataset[]
 ): Promise<{ ng_state: Record<string, unknown>; layers: ViewLayerInput[] }> {
@@ -151,7 +158,11 @@ export async function buildViewState(
       // Datasets can share layer names (e.g. two with a "DAPI" channel).
       const name = uniqueName(layer.name ?? 'layer', taken);
       taken.add(name);
-      combinedLayers.push({ ...layer, name, archived: layer_index >= 4 });
+      combinedLayers.push({
+        ...layer,
+        name,
+        archived: startsArchived(layer, layer_index)
+      });
       viewLayers.push({
         sharing_key: ds.sharing_key,
         layer_index,
@@ -201,8 +212,8 @@ function uniqueName(name: string, taken: Set<string>): string {
 }
 
 // Adds layers to an existing View's state. The View keeps its dimensions,
-// layout and selected layer. Added layers from index 4 on start archived,
-// the same rule as checkout, unless `shown` asks for them to stay visible.
+// layout and selected layer. Added layers start archived by the same rule
+// as checkout, unless `shown` asks for them to stay visible.
 export function appendLayers(
   current: NgState,
   added: NgLayer[],
@@ -215,7 +226,11 @@ export function appendLayers(
   for (const layer of added) {
     const name = uniqueName(layer.name ?? 'layer', taken);
     taken.add(name);
-    layers.push({ ...layer, name, archived: !shown && layers.length >= 4 });
+    layers.push({
+      ...layer,
+      name,
+      archived: !shown && startsArchived(layer, layers.length)
+    });
   }
   return { ...current, layers };
 }
