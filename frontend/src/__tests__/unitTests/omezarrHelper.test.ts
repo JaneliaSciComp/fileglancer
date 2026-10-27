@@ -74,4 +74,44 @@ describe('generateNeuroglancerStateForOmeZarr per-channel layers', () => {
       'Gpb5 (2)'
     ]);
   });
+
+  it('handles labels on a dataset with no channel axis', () => {
+    const multiscale = {
+      axes: [
+        { name: 'z', type: 'space', unit: 'nanometer' },
+        { name: 'y', type: 'space', unit: 'nanometer' },
+        { name: 'x', type: 'space', unit: 'nanometer' }
+      ],
+      datasets: [
+        {
+          path: 'raw/s0',
+          coordinateTransformations: [{ type: 'scale', scale: [8, 8, 8] }]
+        }
+      ]
+    };
+    // ome-zarr.js >= 0.0.22 synthesizes a one-channel omero when none is stored
+    const omero = { channels: [{ label: 'Channel 0', color: '808080' }] };
+    const encoded = generateNeuroglancerStateForOmeZarr(
+      'https://example.com/crop.zarr',
+      3,
+      'image',
+      multiscale as any,
+      { shape: [100, 100, 100], dtype: 'uint8' } as any,
+      ['nuclei', 'mito'],
+      omero as any,
+      false
+    );
+    const state = JSON.parse(decodeURIComponent(encoded!));
+    expect(state.layers.map((l: any) => l.name)).toEqual([
+      'Channel 0',
+      'nuclei',
+      'mito'
+    ]);
+    expect(state.layers[0].source).toBe(
+      'https://example.com/crop.zarr/|zarr3:'
+    );
+    expect(state.layers[0].localDimensions).toBeUndefined();
+    expect(state.layers[1].type).toBe('segmentation');
+    expect(Object.keys(state.dimensions)).toEqual(['x', 'y', 'z']);
+  });
 });

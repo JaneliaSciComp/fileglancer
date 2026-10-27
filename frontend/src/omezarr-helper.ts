@@ -622,17 +622,10 @@ function generateFullNeuroglancerStateForOmeZarr(
         color = '#' + color;
       }
 
-      const channelUnit = translateUnitToNeuroglancer(axesMap['c'].unit);
-      const localDimensions = { "c'": [1, channelUnit] };
-      const transform = { outputDimensions: localDimensions };
-
       const layer: Record<string, any> = {
         name: count > 1 ? `${channel.name} (${count})` : channel.name,
         type: layerType,
-        source: {
-          url: sourceUrl,
-          transform
-        },
+        source: sourceUrl,
         tab: 'rendering',
         archived: i >= 4, // Archive layers after the first 4
         opacity: 1,
@@ -640,10 +633,22 @@ function generateFullNeuroglancerStateForOmeZarr(
         shader: SHADER,
         shaderControls: {
           color: color
-        },
-        localDimensions: localDimensions,
-        localPosition: [i]
+        }
       };
+
+      // Without a `c` axis there is no channel dimension to slice (ome-zarr.js
+      // synthesizes a one-channel omero for such datasets), so the layer
+      // points at the plain source like the single-layer branch does.
+      if (axesMap['c']) {
+        const channelUnit = translateUnitToNeuroglancer(axesMap['c'].unit);
+        const localDimensions = { "c'": [1, channelUnit] };
+        layer.source = {
+          url: sourceUrl,
+          transform: { outputDimensions: localDimensions }
+        };
+        layer.localDimensions = localDimensions;
+        layer.localPosition = [i];
+      }
 
       if (channel.contrast_range) {
         if (!layer.shaderControls.contrast) {
