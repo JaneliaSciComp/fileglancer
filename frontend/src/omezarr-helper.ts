@@ -756,6 +756,7 @@ async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
   });
   const { arr, shapes, multiscale, omero, scales, zarr_version } =
     await omezarr.getMultiscaleWithArray(store, 0);
+  const labels = await getOmeZarrLabels(store, zarr_version);
 
   // ome-zarr.js returns a single `multiscale` with its own, looser types.
   // Normalize it once here, at the ingestion boundary, into the canonical
@@ -788,10 +789,34 @@ async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
     multiscales: normalizedMultiscale ? [normalizedMultiscale] : undefined,
     axes: normalizedMultiscale?.axes,
     omero: omero2,
-    labels: undefined
+    labels
   };
 
   return metadata;
+}
+
+/**
+ * The label image names listed by the OME-NGFF `labels` group (v3
+ * `attributes.ome.labels`, v2 `.zattrs` `labels`), or undefined when the
+ * dataset has no labels group or an empty list.
+ */
+async function getOmeZarrLabels(
+  store: zarr.FetchStore,
+  zarrVersion: 2 | 3
+): Promise<string[] | undefined> {
+  try {
+    const group = await omezarr.openGroup(store, 'labels', zarrVersion);
+    const attrs = group.attrs as {
+      ome?: { labels?: string[] };
+      labels?: string[];
+    };
+    const labels = attrs?.ome?.labels ?? attrs?.labels;
+    return Array.isArray(labels) && labels.length > 0 ? labels : undefined;
+  } catch (error) {
+    // No labels group: fine, most datasets have none.
+    log.trace('Could not load labels group: ', error);
+    return undefined;
+  }
 }
 
 /**
