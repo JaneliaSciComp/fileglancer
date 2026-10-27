@@ -81,7 +81,7 @@ export default function Apps() {
             data={appsQuery.data || []}
             dataType="apps"
             errorState={appsQuery.error}
-            gridColsClass="grid-cols-[3fr_max-content_4fr_1fr_1fr]"
+            gridColsClass="grid-cols-[3fr_8rem_4fr_1fr_1fr]"
             initialPageSize={50}
             loadingState={appsQuery.isPending}
           />
