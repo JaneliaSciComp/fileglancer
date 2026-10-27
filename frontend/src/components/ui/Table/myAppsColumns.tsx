@@ -14,7 +14,7 @@ import {
   appRevision,
   buildAppDetailPath,
   getAppIconType,
-  repoLabel
+  shortRevision
 } from '@/utils';
 import type { AppActions } from '@/hooks/useAppActions';
 import type { UserApp } from '@/shared.types';
@@ -63,26 +63,14 @@ function NameCell({
 export function createMyAppsColumns(actions: AppActions): ColumnDef<UserApp>[] {
   return [
     {
-      id: 'repository',
-      accessorFn: row => repoLabel(row.url),
-      header: 'Repository',
-      cell: ({ getValue, table }) => {
-        const value = getValue() as string;
-        const onContextMenu = table.options.meta?.onCellContextMenu;
-        return (
-          <div
-            className="flex items-center truncate w-full h-full"
-            onContextMenu={e => {
-              e.preventDefault();
-              onContextMenu?.(e, { value });
-            }}
-          >
-            <FgTooltip label={value} triggerClasses="max-w-full truncate">
-              <span className="truncate text-sm">{value}</span>
-            </FgTooltip>
-          </div>
-        );
-      },
+      accessorKey: 'name',
+      header: 'App Name',
+      cell: ({ row, table }) => (
+        <NameCell
+          app={row.original}
+          onContextMenu={table.options.meta?.onCellContextMenu}
+        />
+      ),
       enableSorting: true
     },
     {
@@ -100,21 +88,12 @@ export function createMyAppsColumns(actions: AppActions): ColumnDef<UserApp>[] {
               onContextMenu?.(e, { value });
             }}
           >
-            <span className="truncate text-sm">{value}</span>
+            <FgTooltip label={value} triggerClasses="max-w-full truncate">
+              <span className="truncate text-sm">{shortRevision(value)}</span>
+            </FgTooltip>
           </div>
         );
       },
-      enableSorting: true
-    },
-    {
-      accessorKey: 'name',
-      header: 'App Name',
-      cell: ({ row, table }) => (
-        <NameCell
-          app={row.original}
-          onContextMenu={table.options.meta?.onCellContextMenu}
-        />
-      ),
       enableSorting: true
     },
     {
