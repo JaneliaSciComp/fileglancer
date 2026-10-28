@@ -71,3 +71,16 @@ def test_layer_uses_segment():
 def test_default_url_prefix():
     assert default_url_prefix("nrs", "lab/img.zarr") == "img.zarr"
     assert default_url_prefix("nrs", "") == "nrs"
+
+
+def test_bucket_source_matches_public_url_and_unquotes_path():
+    from fileglancer.ngstate import bucket_source
+    roots = [("idr", "https://idr.s3.amazonaws.com"), ("deep", "https://s3.example.org/b/pre%20fix")]
+    assert bucket_source({"source": "zarr://https://idr.s3.amazonaws.com/zarr/v0.4/my%20img.zarr|zarr2:"}, roots) == (
+        "idr", "zarr/v0.4/my img.zarr")
+    # the longest root wins; the bucket root itself is the empty path
+    assert bucket_source({"source": {"url": "https://s3.example.org/b/pre%20fix/a.zarr/"}}, roots) == ("deep", "a.zarr")
+    assert bucket_source({"source": "https://idr.s3.amazonaws.com"}, roots) == ("idr", "")
+    assert bucket_source({"source": "https://idr.s3.amazonaws.com.evil/x"}, roots) is None
+    assert bucket_source({"source": "s3://idr/x.zarr"}, roots) is None
+    assert bucket_source({"type": "annotation"}, roots) is None

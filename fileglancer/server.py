@@ -34,6 +34,7 @@ from fileglancer import database as db
 from fileglancer import auth
 from fileglancer import apps as apps_module
 from fileglancer.giturls import canonical_github_url
+from fileglancer.ngstate import bucket_source
 from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
@@ -1698,12 +1699,20 @@ def create_app(settings):
                                    username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
             layers = []
+            roots = db.bucket_url_roots(session, username)
+            ng_layers = payload.ng_state.get('layers')
+            ng_layers = ng_layers if isinstance(ng_layers, list) else []
             for layer in payload.layers:
                 data_link_id = None
                 fsp_name = None
                 path = None
                 sharing_key = None
                 url_prefix = None
+                # A bucket dataset has no Data Link: its layer's source URL names it.
+                ng_layer = ng_layers[layer.layer_index] if layer.layer_index < len(ng_layers) else None
+                bucket = bucket_source(ng_layer, roots) if isinstance(ng_layer, dict) else None
+                if not layer.sharing_key and bucket:
+                    fsp_name, path = bucket
                 if layer.sharing_key:
                     pp = db.get_proxied_path_by_sharing_key(session, layer.sharing_key)
                     if not pp:

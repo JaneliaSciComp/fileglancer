@@ -87,6 +87,16 @@ function normalizeFspRootPath(filePath: string | null | undefined): string {
 }
 
 /**
+ * The public URL a bucket dataset is served at: what its View layers point
+ * to. `bucket.mount_path` is the bucket's public base URL.
+ */
+function bucketDatasetUrl(bucket: FileSharePath, filePath: string): string {
+  const base = bucket.mount_path.replace(/\/+$/, '');
+  const sub = normalizeFspRootPath(filePath);
+  return sub ? `${base}/${escapePathForUrl(sub)}` : base;
+}
+
+/**
  * Builds the key used to identify a unique dataset (fsp_name + normalized
  * path) across the cart/checkout/views pipeline. Uses normalizeFspRootPath
  * so lookups against Data Links match what was actually created/stored.
@@ -294,6 +304,7 @@ function resolvePathToFsp(
 }
 
 export {
+  bucketDatasetUrl,
   convertBackToForwardSlash,
   datasetKey,
   escapePathForUrl,

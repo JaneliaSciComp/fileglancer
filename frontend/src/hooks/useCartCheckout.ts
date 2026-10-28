@@ -8,9 +8,13 @@ import { useViewsContext } from '@/contexts/ViewsContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { buildViewState } from '@/utils/viewCheckout';
 import type { ResolvedCheckoutDataset } from '@/utils/viewCheckout';
-import { datasetKey, normalizeFspRootPath } from '@/utils/pathHandling';
+import {
+  bucketDatasetUrl,
+  datasetKey,
+  normalizeFspRootPath
+} from '@/utils/pathHandling';
 import { isReadOnlyFsp } from '@/utils/cloudStorage';
-import { buildUrl, makeMapKey } from '@/utils';
+import { makeMapKey } from '@/utils';
 import type { CartItem } from '@/queries/preferencesQueries';
 import type { View } from '@/queries/viewQueries';
 import type { ProxiedPath } from '@/contexts/ProxiedPathContext';
@@ -87,7 +91,7 @@ export function useCartCheckout() {
         const bucket = bucketFor(ds);
         const link: ResolvedLink = bucket
           ? {
-              url: buildUrl(bucket.mount_path, normalizeFspRootPath(ds.path)),
+              url: bucketDatasetUrl(bucket, ds.path),
               sharing_key: null,
               url_prefix: ''
             }

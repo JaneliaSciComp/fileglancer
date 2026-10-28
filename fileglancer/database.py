@@ -17,7 +17,7 @@ from cachetools import LRUCache, TTLCache
 
 from fileglancer.giturls import canonical_github_url
 from fileglancer.model import FileSharePath
-from fileglancer.ngstate import data_link_segment, default_url_prefix, layer_sharing_key, layer_uses_segment, rewrite_layer_segment
+from fileglancer.ngstate import bucket_source, data_link_segment, default_url_prefix, layer_sharing_key, layer_uses_segment, rewrite_layer_segment
 from fileglancer.settings import get_settings
 from fileglancer.utils import s3_public_url, slugify_path
 
@@ -588,6 +588,11 @@ def cloud_bucket_to_fsp(row: CloudBucketDB) -> FileSharePath:
 
 def get_cloud_buckets(session: Session, username: str) -> List[CloudBucketDB]:
     return session.query(CloudBucketDB).filter_by(username=username).order_by(CloudBucketDB.name).all()
+
+
+def bucket_url_roots(session: Session, username: str) -> List[Tuple[str, str]]:
+    """(fsp_name, public base URL) of each of the user's buckets, for ngstate.bucket_source."""
+    return [(b.name, s3_public_url(b.bucket, b.endpoint_url, b.prefix)) for b in get_cloud_buckets(session, username)]
 
 
 def get_cloud_bucket(session: Session, username: str, name: str) -> Optional[CloudBucketDB]:
@@ -1200,20 +1205,26 @@ def reconcile_view_layers(session: Session, view: ViewDB, proxy_url: str) -> Non
     the real layers. Does not commit."""
     old = list(view.layers)
     unsupported = [l for l in old if (l.opts or {}).get('unsupported')]
-    keyed: Dict[str, List[ViewLayerDB]] = {}
+    # Data Link rows by key, bucket rows by dataset: a bucket layer has no key.
+    keyed: Dict[object, List[ViewLayerDB]] = {}
     legacy: List[ViewLayerDB] = []  # broken before keys were recorded
     for l in old:
         if l in unsupported:
             continue
         if l.sharing_key:
             keyed.setdefault(l.sharing_key, []).append(l)
-        elif l.broken and l.fsp_name is not None and l.path is not None:
-            legacy.append(l)
+        elif l.fsp_name is not None and l.path is not None:
+            if l.broken:
+                legacy.append(l)
+            else:
+                keyed.setdefault((l.fsp_name, l.path), []).append(l)
+    roots = bucket_url_roots(session, view.owner)
 
     rows: List[Dict] = []
     for i, ng_layer in enumerate(view.ng_state.get('layers') or []):
         key = layer_sharing_key(ng_layer, proxy_url) if isinstance(ng_layer, dict) else None
-        prev = keyed[key].pop(0) if key and keyed.get(key) else None
+        bucket = bucket_source(ng_layer, roots) if not key and isinstance(ng_layer, dict) else None
+        prev = keyed[key or bucket].pop(0) if (key or bucket) and keyed.get(key or bucket) else None
         pp = get_proxied_path_by_sharing_key(session, key) if key else None
         if pp:
             row = dict(sharing_key=key, url_prefix=pp.url_prefix, data_link_id=pp.id,
@@ -1228,8 +1239,9 @@ def reconcile_view_layers(session: Session, view: ViewDB, proxy_url: str) -> Non
                        fsp_name=prev.fsp_name if prev else None,
                        path=prev.path if prev else None, broken=True)
         else:
+            fsp_name, path = bucket or (None, None)
             row = dict(sharing_key=None, url_prefix=None, data_link_id=None,
-                       fsp_name=None, path=None, broken=False)
+                       fsp_name=fsp_name, path=path, broken=False)
         row.update(layer_index=i,
                    channel=prev.channel if prev else None,
                    opts=prev.opts if prev else None)

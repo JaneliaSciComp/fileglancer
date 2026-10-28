@@ -5,17 +5,24 @@ import {
   isUnsupportedLayer,
   layerUsesSegment
 } from '@/utils/viewCheckout';
-import { datasetKey } from '@/utils/pathHandling';
+import { bucketDatasetUrl, datasetKey } from '@/utils/pathHandling';
+import { isReadOnlyFsp } from '@/utils/cloudStorage';
+import { makeMapKey } from '@/utils';
+import useZoneAndFileSharePathMapQuery from '@/queries/zoneAndFileSharePathMapQuery';
 import type { NeuroglancerBridge } from '@/hooks/useNeuroglancerViewer';
 import type { ViewLayer } from '@/queries/viewQueries';
+import type { FileSharePath } from '@/shared.types';
 import type { NgLayer, ResolvedCheckoutDataset } from '@/utils/viewCheckout';
 
-/** A dataset whose Data Link may appear in the viewer's layer sources. */
+/** A dataset that may appear in the viewer's layer sources. */
 export type KnownDataset = {
   fsp_name: string;
   path: string;
-  sharing_key: string;
-  url_prefix: string;
+  /** Null for a dataset in a public bucket, which has no Data Link. */
+  sharing_key: string | null;
+  /** What its layers' source URLs contain: a Data Link segment, or the
+   *  bucket dataset's public URL. */
+  segment: string;
 };
 
 /** One row of the Sources tab: a dataset in the viewer, or a stray layer. */
@@ -48,23 +55,19 @@ const basename = (path: string) =>
   path.replace(/\/+$/, '').split('/').pop() || path;
 
 /**
- * Groups the viewer's layers into datasets by the Data Link segment in their
- * sources (as the server's reconcile_view_layers does), in first-layer order,
- * then appends the unsupported datasets, which have no layer.
+ * Groups the viewer's layers into datasets by the segment in their sources
+ * (as the server's reconcile_view_layers does), in first-layer order, then
+ * appends the unsupported datasets, which have no layer.
  */
 export function groupLayersBySource(
   layers: NgLayer[],
   known: KnownDataset[],
   unsupported: KnownDataset[]
 ): LiveSource[] {
-  const segments = known.map(ds => ({
-    ds,
-    segment: dataLinkSegment(ds.sharing_key, ds.url_prefix)
-  }));
   const rows = new Map<string, LiveSource>();
   layers.forEach((layer, i) => {
     const name = typeof layer.name === 'string' ? layer.name : `layer ${i}`;
-    const ds = segments.find(s => layerUsesSegment(layer, s.segment))?.ds;
+    const ds = known.find(k => layerUsesSegment(layer, k.segment));
     if (!ds) {
       rows.set(`layer:${name}`, {
         key: `layer:${name}`,
@@ -211,45 +214,57 @@ export function useViewSources(
     };
   }, [status, getState, subscribe]);
 
+  // A saved bucket layer has no Data Link; its segment is the dataset's
+  // public URL, built the same way checkout built the layer's source.
+  const fspMap = useZoneAndFileSharePathMapQuery().data;
   const { known, unsupported } = useMemo(() => {
     const saved: KnownDataset[] = [];
     const unsupported: KnownDataset[] = [];
     for (const l of viewLayers) {
-      if (
-        l.fsp_name === null ||
-        l.path === null ||
-        l.sharing_key === null ||
-        l.url_prefix === null
-      ) {
+      if (l.fsp_name === null || l.path === null) {
+        continue;
+      }
+      let segment: string | null = null;
+      if (l.sharing_key !== null && l.url_prefix !== null) {
+        segment = dataLinkSegment(l.sharing_key, l.url_prefix);
+      } else if (l.sharing_key === null && !l.broken) {
+        const fsp = fspMap?.[makeMapKey('fsp', l.fsp_name)] as
+          | FileSharePath
+          | undefined;
+        segment = isReadOnlyFsp(fsp) ? bucketDatasetUrl(fsp!, l.path) : null;
+      }
+      if (segment === null) {
         continue;
       }
       const ds = {
         fsp_name: l.fsp_name,
         path: l.path,
         sharing_key: l.sharing_key,
-        url_prefix: l.url_prefix
+        segment
       };
       if (!isUnsupportedLayer(l)) {
         saved.push(ds);
-      } else if (!removedSources.includes(l.sharing_key)) {
+      } else if (!removedSources.includes(l.sharing_key ?? '')) {
         unsupported.push(ds);
       }
     }
     // ponytail: added datasets are never forgotten this session; once their
-    // layers are gone (Discard) they simply match nothing. Bucket datasets
-    // have no Data Link segment to match, so they stay plain viewer layers.
-    const linked = added.filter(
-      (ds): ds is ResolvedCheckoutDataset & { sharing_key: string } =>
+    // layers are gone (Discard) they simply match nothing.
+    const linked = added.map(ds => ({
+      ...ds,
+      segment:
         ds.sharing_key !== null
-    );
-    const pending = linked.filter(ds =>
-      pendingSources.includes(ds.sharing_key)
+          ? dataLinkSegment(ds.sharing_key, ds.url_prefix)
+          : ds.url
+    }));
+    const pending = linked.filter(
+      ds => ds.sharing_key !== null && pendingSources.includes(ds.sharing_key)
     );
     return {
       known: [...saved, ...linked],
       unsupported: [...unsupported, ...pending]
     };
-  }, [viewLayers, added, pendingSources, removedSources]);
+  }, [viewLayers, added, pendingSources, removedSources, fspMap]);
 
   return useMemo(
     () => groupLayersBySource(layers, known, unsupported),

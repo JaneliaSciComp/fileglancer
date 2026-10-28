@@ -1138,3 +1138,18 @@ def test_create_proxied_path_on_bucket_is_rejected(db_session):
     with pytest.raises(ValueError, match="does not exist"):
         create_proxied_path(db_session, "alice", "a", "cosem", "x", url_prefix="x")
 
+
+
+def test_reconcile_keeps_bucket_layers_as_dataset_rows(db_session):
+    create_cloud_bucket(db_session, "u", "idr", "s3", "IDR", "idr", "", None)
+    src = "zarr://https://idr.s3.amazonaws.com/zarr/img.zarr|zarr2:"
+    state = {"layers": [{"name": "img", "source": src}]}
+    v = create_view(db_session, "u", "b", state,
+                    [{"layer_index": 0, "channel": "DAPI", "opts": None, "fsp_name": "idr", "path": "zarr/img.zarr"}], "read")
+
+    # reorder behind a foreign layer: the row follows its layer and keeps its channel
+    new_state = {"layers": [{"name": "ext", "source": "https://elsewhere/x.zarr"}, state["layers"][0]]}
+    update_view(db_session, v, ng_state=new_state, proxy_url=PROXY)
+    rows = sorted(v.layers, key=lambda l: l.layer_index)
+    assert [(r.fsp_name, r.path, r.channel, r.broken) for r in rows] == [
+        (None, None, None, False), ("idr", "zarr/img.zarr", "DAPI", False)]
