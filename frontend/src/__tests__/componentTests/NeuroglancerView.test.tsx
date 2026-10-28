@@ -12,6 +12,11 @@ const { useViewStateByReadKey } = vi.hoisted(() => ({
 }));
 const useViewsQuery = vi.hoisted(() => vi.fn(() => ({ data: [] as View[] })));
 const mutateAsync = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const createMutateAsync = vi.hoisted(() => vi.fn());
+const route = vi.hoisted(() => ({
+  readKey: 'rk1',
+  state: null as unknown
+}));
 const { bridgeRef } = vi.hoisted(() => ({
   bridgeRef: {
     current: null as null | ReturnType<
@@ -28,7 +33,8 @@ vi.mock('@/queries/viewQueries', () => ({
 vi.mock('@/contexts/ViewsContext', () => ({
   useViewsContext: () => ({
     allViewsQuery: useViewsQuery(),
-    updateViewMutation: { mutateAsync }
+    updateViewMutation: { mutateAsync },
+    createViewMutation: { mutateAsync: createMutateAsync }
   })
 }));
 const ngBase = vi.hoisted(() => ({
@@ -40,8 +46,11 @@ vi.mock('@/hooks/useDefaultNeuroglancerBaseUrl', () => ({
 }));
 const navigate = vi.hoisted(() => vi.fn());
 vi.mock('react-router', () => ({
-  useParams: () => ({ readKey: 'rk1' }),
+  useParams: () => ({ readKey: route.readKey }),
+  useLocation: () => ({ state: route.state }),
   useNavigate: () => navigate,
+  Navigate: ({ to }: { to: string }) =>
+    createElement('div', { 'data-testid': 'redirect' }, to),
   Link: ({ to, children }: { to: string; children: ReactNode }) =>
     createElement('a', { href: to }, children)
 }));
@@ -91,17 +100,24 @@ vi.mock('@/components/ui/Views/ViewerSidebar', () => ({
   default: ({
     bridge,
     editState,
-    tab
+    tab,
+    viewLayers
   }: {
     tab: string;
+    viewLayers: { path: string | null }[];
     bridge: { setState: (s: Record<string, unknown>) => void };
     editState: {
       markEdited: () => void;
       addSources: (keys: string[]) => void;
       removeSource: (key: string) => void;
+      recordAdded: (datasets: unknown[]) => void;
     };
   }) => (
-    <aside aria-label="View data sidebar" data-tab={tab}>
+    <aside
+      aria-label="View data sidebar"
+      data-sources={viewLayers.map(l => l.path).join(',')}
+      data-tab={tab}
+    >
       <button onClick={() => editState.addSources(['plainKey'])} type="button">
         fake add unsupported
       </button>
@@ -111,6 +127,7 @@ vi.mock('@/components/ui/Views/ViewerSidebar', () => ({
       <button
         onClick={() => {
           bridge.setState({ layers: [{ name: 'L0' }, { name: 'added' }] });
+          editState.recordAdded([{ url: 'u' }]);
           editState.markEdited();
         }}
         type="button"
@@ -168,7 +185,120 @@ describe('NeuroglancerView', () => {
     navigate.mockReset();
     downloadTextFile.mockReset();
     mutateAsync.mockResolvedValue(undefined);
+    createMutateAsync
+      .mockReset()
+      .mockResolvedValue({ short_key: 'sk-new', read_key: 'rk-new' });
+    route.readKey = 'rk1';
+    route.state = null;
     bridgeRef.current = makeFakeBridge({ layers: [{ name: 'L0' }] });
+  });
+
+  describe('draft at /view/new', () => {
+    const DRAFT = {
+      name: 'my.zarr',
+      ng_state: { layers: [{ name: 'L0' }] },
+      layers: [
+        { sharing_key: 'k1', layer_index: 0, channel: null, opts: null }
+      ],
+      datasets: [
+        {
+          url: 'u',
+          sharing_key: 'k1',
+          url_prefix: 'p',
+          fsp_name: 'f',
+          path: '/my.zarr',
+          label: 'my.zarr'
+        }
+      ]
+    };
+
+    function renderDraft() {
+      route.readKey = 'new';
+      route.state = { draft: DRAFT };
+      useViewStateByReadKey.mockReturnValue({
+        data: undefined,
+        isPending: true
+      });
+      return render(<NeuroglancerView />);
+    }
+
+    it('shows the draft unsaved, with its default name and no fetch', async () => {
+      renderDraft();
+      expect(screen.getByText('my.zarr')).toBeInTheDocument();
+      expect(useViewStateByReadKey).toHaveBeenCalledWith(undefined);
+      await findEnabledSave();
+    });
+
+    it("names the draft's layers in the sidebar from its datasets", async () => {
+      renderDraft();
+      await userEvent.click(screen.getByRole('button', { name: 'Add data' }));
+      expect(
+        screen.getByRole('complementary', { name: 'View data sidebar' })
+      ).toHaveAttribute('data-sources', '/my.zarr');
+    });
+
+    it('Save creates the View from the live state and moves to its URL', async () => {
+      renderDraft();
+      await userEvent.click(await findEnabledSave());
+      expect(createMutateAsync).toHaveBeenCalledWith({
+        ...DRAFT,
+        ng_state: { layers: [{ name: 'L0' }] }
+      });
+      expect(mutateAsync).not.toHaveBeenCalled();
+      expect(navigate).toHaveBeenCalledWith('/view/rk-new', { replace: true });
+    });
+
+    it('records data added before the first Save with a follow-up update', async () => {
+      renderDraft();
+      await userEvent.click(screen.getByRole('button', { name: 'Add data' }));
+      await userEvent.click(screen.getByRole('button', { name: 'fake add' }));
+      await userEvent.click(
+        screen.getByRole('button', { name: 'fake add unsupported' })
+      );
+      await userEvent.click(await findEnabledSave());
+      const live = { layers: [{ name: 'L0' }, { name: 'added' }] };
+      expect(createMutateAsync).toHaveBeenCalledWith({
+        ...DRAFT,
+        ng_state: live
+      });
+      expect(mutateAsync).toHaveBeenCalledWith({
+        short_key: 'sk-new',
+        ng_state: live,
+        unsupported_sharing_keys: ['plainKey']
+      });
+      expect(toast.success).toHaveBeenCalledWith('Created View "my.zarr"');
+    });
+
+    it('keeps the created View dirty when the follow-up update fails', async () => {
+      mutateAsync.mockRejectedValueOnce(new Error('Server error'));
+      renderDraft();
+      await userEvent.click(screen.getByRole('button', { name: 'Add data' }));
+      await userEvent.click(screen.getByRole('button', { name: 'fake add' }));
+      await userEvent.click(await findEnabledSave());
+      expect(navigate).toHaveBeenCalledWith('/view/rk-new', { replace: true });
+      expect(toast.error).toHaveBeenCalledWith('Server error');
+      expect(toast.success).not.toHaveBeenCalledWith('Created View "my.zarr"');
+    });
+
+    it('asks before leaving; Save and continue creates then leaves', async () => {
+      renderDraft();
+      await userEvent.click(screen.getByRole('link', { name: /^views$/i }));
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Save and continue' })
+      );
+      expect(createMutateAsync).toHaveBeenCalled();
+      expect(navigate).toHaveBeenLastCalledWith('/ngviews');
+    });
+
+    it('redirects to the Views list when there is no draft (e.g. a reload)', () => {
+      route.readKey = 'new';
+      useViewStateByReadKey.mockReturnValue({
+        data: undefined,
+        isPending: true
+      });
+      render(<NeuroglancerView />);
+      expect(screen.getByTestId('redirect')).toHaveTextContent('/ngviews');
+    });
   });
 
   it('shows a loading state while pending', () => {

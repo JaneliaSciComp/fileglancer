@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
-import { useNavigate, useOutletContext } from 'react-router';
+import { useOutletContext } from 'react-router';
 import type { UseQueryResult } from '@tanstack/react-query';
 
 import zarrLogo from '@/assets/zarr.jpg';
@@ -68,8 +68,7 @@ export default function ZarrPreview({
 
   const { addToCart } = useCartContext();
   const { neuroglancerButtonTarget } = usePreferencesContext();
-  const { startCreateView, dialog: createViewDialog } = useCreateViewFlow();
-  const navigate = useNavigate();
+  const { startDraftView, dialog: createViewDialog } = useCreateViewFlow();
   // ponytail: optional — component tests render without a router outlet.
   const outlet = useOutletContext<OutletContextType | null | undefined>();
 
@@ -146,10 +145,9 @@ export default function ZarrPreview({
               onOpenNeuroglancer={
                 neuroglancerButtonTarget === 'views'
                   ? () =>
-                      startCreateView(
+                      startDraftView(
                         [{ fsp_name: fspName, path, label: datasetLabel }],
-                        datasetLabel,
-                        view => navigate(`/view/${view.read_key}`)
+                        datasetLabel
                       )
                   : undefined
               }
