@@ -636,8 +636,8 @@ function generateFullNeuroglancerStateForOmeZarr(
         }
       };
 
-      // Without a `c` axis there is no channel dimension to slice (ome-zarr.js
-      // synthesizes a one-channel omero for such datasets), so the layer
+      // A dataset may store omero channels without a `c` axis (one channel,
+      // z,y,x). Then there is no channel dimension to slice, so the layer
       // points at the plain source like the single-layer branch does.
       if (axesMap['c']) {
         const channelUnit = translateUnitToNeuroglancer(axesMap['c'].unit);
@@ -754,8 +754,17 @@ async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
       credentials: 'include'
     }
   });
-  const { arr, shapes, multiscale, omero, scales, zarr_version } =
-    await omezarr.getMultiscaleWithArray(store, 0);
+  // Not `getMultiscaleWithArray`: since ome-zarr.js 0.0.22 its `omero` is a
+  // synthesized one-channel block when the dataset stores none, which would
+  // send a plain z,y,x image down the per-channel layer branch. The dataset's
+  // own attrs are on `imgAttrs`.
+  const img = await omezarr.NgffImage.load(store);
+  const arr = await img.openArray(0);
+  const multiscale = img.multiscales[0];
+  const omero = img.imgAttrs.omero;
+  const { scales, zarr_version } = img;
+  const allShapes = await img.calcShapes();
+  const shapes = allShapes.length > 0 ? allShapes : undefined;
   const labels = await getOmeZarrLabels(store, zarr_version);
 
   // ome-zarr.js returns a single `multiscale` with its own, looser types.

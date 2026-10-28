@@ -75,7 +75,7 @@ describe('generateNeuroglancerStateForOmeZarr per-channel layers', () => {
     ]);
   });
 
-  it('handles labels on a dataset with no channel axis', () => {
+  it('handles a stored omero on a dataset with no channel axis', () => {
     const multiscale = {
       axes: [
         { name: 'z', type: 'space', unit: 'nanometer' },
@@ -89,7 +89,7 @@ describe('generateNeuroglancerStateForOmeZarr per-channel layers', () => {
         }
       ]
     };
-    // ome-zarr.js >= 0.0.22 synthesizes a one-channel omero when none is stored
+    // A stored one-channel omero on a z,y,x dataset: legal, and no `c` axis
     const omero = { channels: [{ label: 'Channel 0', color: '808080' }] };
     const encoded = generateNeuroglancerStateForOmeZarr(
       'https://example.com/crop.zarr',
