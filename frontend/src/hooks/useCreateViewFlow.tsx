@@ -9,6 +9,7 @@ import { useCartDimensionCheck } from '@/hooks/useCartDimensionCheck';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useAllProxiedPathsQuery } from '@/queries/proxiedPathQueries';
 import { datasetKey } from '@/utils/pathHandling';
+import { buildUrl } from '@/utils';
 import { buildViewState } from '@/utils/viewCheckout';
 import type { ResolvedCheckoutDataset } from '@/utils/viewCheckout';
 import FgButton from '@/components/designSystem/atoms/FgButton';
@@ -18,7 +19,7 @@ import FgDialog from '@/components/ui/Dialogs/FgDialog';
 import type { CartItem } from '@/queries/preferencesQueries';
 import type { View, ViewCreateRequest } from '@/queries/viewQueries';
 
-/** Passed via router state to /view/new; saved only when the user clicks Save. */
+/** Handed to /view/new (new tab: localStorage; same tab: router state); saved only on Save. */
 export type ViewDraft = Pick<
   ViewCreateRequest,
   'name' | 'ng_state' | 'layers'
@@ -27,6 +28,40 @@ export type ViewDraft = Pick<
   datasets: ResolvedCheckoutDataset[];
 };
 export const DRAFT_VIEW_PATH = '/view/new';
+const DRAFT_STORAGE_PREFIX = 'fg-view-draft:';
+// Drafts from tabs closed unsaved are never cleaned up by the tab itself;
+// they age out the next time a draft is stored.
+const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+type StoredDraft = { draft: ViewDraft; storedAt: number };
+
+/** Stores the draft for a new tab; returns the URL that tab should open. */
+export function storeDraft(draft: ViewDraft): string {
+  const now = Date.now();
+  Object.keys(localStorage)
+    .filter(k => k.startsWith(DRAFT_STORAGE_PREFIX))
+    .forEach(k => {
+      const storedAt = (JSON.parse(localStorage.getItem(k)!) as StoredDraft)
+        .storedAt;
+      if (now - storedAt > DRAFT_MAX_AGE_MS) {
+        localStorage.removeItem(k);
+      }
+    });
+  const id = crypto.randomUUID();
+  const stored: StoredDraft = { draft, storedAt: now };
+  localStorage.setItem(DRAFT_STORAGE_PREFIX + id, JSON.stringify(stored));
+  return buildUrl(DRAFT_VIEW_PATH, null, { draft: id });
+}
+
+export function loadDraft(id: string | null): ViewDraft | undefined {
+  const raw = id && localStorage.getItem(DRAFT_STORAGE_PREFIX + id);
+  return raw ? (JSON.parse(raw) as StoredDraft).draft : undefined;
+}
+
+export function clearDraft(id: string | null) {
+  if (id) {
+    localStorage.removeItem(DRAFT_STORAGE_PREFIX + id);
+  }
+}
 
 type PendingRequest = {
   datasets: CartItem[];
@@ -67,7 +102,11 @@ export function useCreateViewFlow() {
     const resolved = await resolveCartDatasets(datasets);
     const { ng_state, layers } = await buildViewState(resolved);
     const draft: ViewDraft = { name, ng_state, layers, datasets: resolved };
-    navigate(DRAFT_VIEW_PATH, { state: { draft } });
+    // Opens in a new tab; falls back to this tab if the popup was blocked.
+    // No 'noopener': it makes window.open return null, which reads as blocked.
+    if (!window.open(storeDraft(draft), '_blank')) {
+      navigate(DRAFT_VIEW_PATH, { state: { draft } });
+    }
   };
 
   const runRequest = async () => {

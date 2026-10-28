@@ -15,7 +15,8 @@ const mutateAsync = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const createMutateAsync = vi.hoisted(() => vi.fn());
 const route = vi.hoisted(() => ({
   readKey: 'rk1',
-  state: null as unknown
+  state: null as unknown,
+  search: ''
 }));
 const { bridgeRef } = vi.hoisted(() => ({
   bridgeRef: {
@@ -47,7 +48,7 @@ vi.mock('@/hooks/useDefaultNeuroglancerBaseUrl', () => ({
 const navigate = vi.hoisted(() => vi.fn());
 vi.mock('react-router', () => ({
   useParams: () => ({ readKey: route.readKey }),
-  useLocation: () => ({ state: route.state }),
+  useLocation: () => ({ state: route.state, search: route.search }),
   useNavigate: () => navigate,
   Navigate: ({ to }: { to: string }) =>
     createElement('div', { 'data-testid': 'redirect' }, to),
@@ -190,6 +191,8 @@ describe('NeuroglancerView', () => {
       .mockResolvedValue({ short_key: 'sk-new', read_key: 'rk-new' });
     route.readKey = 'rk1';
     route.state = null;
+    route.search = '';
+    localStorage.clear();
     bridgeRef.current = makeFakeBridge({ layers: [{ name: 'L0' }] });
   });
 
@@ -288,6 +291,24 @@ describe('NeuroglancerView', () => {
       );
       expect(createMutateAsync).toHaveBeenCalled();
       expect(navigate).toHaveBeenLastCalledWith('/ngviews');
+    });
+
+    it('loads a new-tab draft from localStorage via ?draft=id and clears it on Save', async () => {
+      route.readKey = 'new';
+      route.search = '?draft=d1';
+      localStorage.setItem(
+        'fg-view-draft:d1',
+        JSON.stringify({ draft: DRAFT, storedAt: Date.now() })
+      );
+      useViewStateByReadKey.mockReturnValue({
+        data: undefined,
+        isPending: true
+      });
+      render(<NeuroglancerView />);
+      expect(screen.getByText('my.zarr')).toBeInTheDocument();
+      await userEvent.click(await findEnabledSave());
+      await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
+      expect(localStorage.getItem('fg-view-draft:d1')).toBeNull();
     });
 
     it('redirects to the Views list when there is no draft (e.g. a reload)', () => {

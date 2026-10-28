@@ -53,6 +53,8 @@ function Harness({ apiRef }: { apiRef: { current: FlowApi | null } }) {
 }
 
 beforeEach(() => {
+  localStorage.clear();
+  vi.spyOn(window, 'open').mockReturnValue({} as Window);
   checkout
     .mockReset()
     .mockResolvedValue({ short_key: 'v1', read_key: 'rk1', name: 'A' });
@@ -65,7 +67,14 @@ beforeEach(() => {
 });
 
 describe('useCreateViewFlow draft', () => {
-  it('opens the unsaved draft directly, without a dialog, when links are automatic', async () => {
+  const DRAFT = {
+    name: 'A',
+    ng_state: { layers: [] },
+    layers: [],
+    datasets: [{ url: 'u' }]
+  };
+
+  it('opens the unsaved draft in a new tab, without a dialog, when links are automatic', async () => {
     const apiRef: { current: FlowApi | null } = { current: null };
     render(<Harness apiRef={apiRef} />);
 
@@ -74,19 +83,53 @@ describe('useCreateViewFlow draft', () => {
     });
 
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    await waitFor(() => expect(window.open).toHaveBeenCalled());
+    const url = vi.mocked(window.open).mock.calls[0][0] as string;
+    const id = new URL(url, 'http://x').searchParams.get('draft')!;
+    expect(url).toBe(`/view/new?draft=${id}`);
+    expect(
+      JSON.parse(localStorage.getItem(`fg-view-draft:${id}`)!).draft
+    ).toEqual(DRAFT);
+    expect(navigate).not.toHaveBeenCalled();
+    expect(checkout).not.toHaveBeenCalled();
+  });
+
+  it('keeps other recent drafts and drops ones older than a day', async () => {
+    const day = 24 * 60 * 60 * 1000;
+    localStorage.setItem(
+      'fg-view-draft:recent',
+      JSON.stringify({ draft: DRAFT, storedAt: Date.now() - day / 2 })
+    );
+    localStorage.setItem(
+      'fg-view-draft:old',
+      JSON.stringify({ draft: DRAFT, storedAt: Date.now() - 2 * day })
+    );
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+
+    act(() => {
+      apiRef.current!.startDraftView(datasets, 'A');
+    });
+
+    await waitFor(() => expect(window.open).toHaveBeenCalled());
+    expect(localStorage.getItem('fg-view-draft:recent')).not.toBeNull();
+    expect(localStorage.getItem('fg-view-draft:old')).toBeNull();
+  });
+
+  it('falls back to this tab when the popup is blocked', async () => {
+    vi.mocked(window.open).mockReturnValue(null);
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+
+    act(() => {
+      apiRef.current!.startDraftView(datasets, 'A');
+    });
+
     await waitFor(() =>
       expect(navigate).toHaveBeenCalledWith('/view/new', {
-        state: {
-          draft: {
-            name: 'A',
-            ng_state: { layers: [] },
-            layers: [],
-            datasets: [{ url: 'u' }]
-          }
-        }
+        state: { draft: DRAFT }
       })
     );
-    expect(checkout).not.toHaveBeenCalled();
   });
 
   it('asks only for data-link consent (no name) when links are not automatic', async () => {
@@ -107,9 +150,7 @@ describe('useCreateViewFlow draft', () => {
     await userEvent
       .setup()
       .click(screen.getByRole('button', { name: /continue/i }));
-    await waitFor(() =>
-      expect(navigate).toHaveBeenCalledWith('/view/new', expect.anything())
-    );
+    await waitFor(() => expect(window.open).toHaveBeenCalled());
   });
 
   it('toasts and stays put when the draft cannot be built', async () => {
@@ -122,6 +163,7 @@ describe('useCreateViewFlow draft', () => {
     });
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('No layers'));
+    expect(window.open).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
   });
 });

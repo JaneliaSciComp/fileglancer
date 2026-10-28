@@ -30,7 +30,11 @@ import {
 import { useCanEditView } from '@/hooks/useCanEditView';
 import { useNeuroglancerViewer } from '@/hooks/useNeuroglancerViewer';
 import { useViewEditState } from '@/hooks/useViewEditState';
-import { DRAFT_VIEW_PATH } from '@/hooks/useCreateViewFlow';
+import {
+  DRAFT_VIEW_PATH,
+  clearDraft,
+  loadDraft
+} from '@/hooks/useCreateViewFlow';
 import type { ViewDraft } from '@/hooks/useCreateViewFlow';
 import { constructNeuroglancerUrl } from '@/utils/neuroglancerUrl';
 import { downloadTextFile } from '@/utils';
@@ -100,10 +104,18 @@ const warnChangesLost = () =>
 export default function NeuroglancerView() {
   const { readKey } = useParams();
   const navigate = useNavigate();
-  // /view/new shows an unsaved draft handed over in router state; Save
-  // creates it and moves to its real URL. A reload loses the draft.
+  // /view/new shows an unsaved draft: opened in a new tab it comes from
+  // localStorage (?draft=id), otherwise from router state. Save creates it
+  // and moves to its real URL.
   const isDraftRoute = `/view/${readKey}` === DRAFT_VIEW_PATH;
-  const draft = (useLocation().state as { draft?: ViewDraft } | null)?.draft;
+  const location = useLocation();
+  const draftId = new URLSearchParams(location.search).get('draft');
+  const draft = useMemo(
+    () =>
+      (location.state as { draft?: ViewDraft } | null)?.draft ??
+      loadDraft(draftId),
+    [location.state, draftId]
+  );
   const stateQuery = useViewStateByReadKey(isDraftRoute ? undefined : readKey);
   // The rows Save will create, so the sidebar can group the draft's layers
   // into datasets the way it does for saved ones.
@@ -291,6 +303,7 @@ export default function NeuroglancerView() {
           ng_state: sent
         });
         // Leave the draft URL first: a failure below must not re-create.
+        clearDraft(draftId);
         navigate(`/view/${view.read_key}`, { replace: true });
         // Create records only the draft's own layers. Datasets added from
         // the sidebar are recorded the way a Save records them: an update
