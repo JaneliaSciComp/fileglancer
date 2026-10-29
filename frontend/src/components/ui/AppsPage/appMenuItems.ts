@@ -19,6 +19,7 @@ export function buildAppMenuItems(
   return [
     { name: 'Launch', action: a => actions.launch(a) },
     { name: 'View', action: a => actions.view(a) },
+    { name: 'Rename', action: a => actions.requestRename(a) },
     {
       name: 'Share to Catalog',
       action: a => actions.requestShare(a),

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  generateNeuroglancerStateForOmeZarr,
   getNeuroglancerSource,
   toNeuroglancerDimension,
   translateUnitToNeuroglancer
@@ -65,5 +66,42 @@ describe('translateUnitToNeuroglancer', () => {
     expect(translateUnitToNeuroglancer('minute')).toBe('minute');
     expect(translateUnitToNeuroglancer('angstrom')).toBe('angstrom');
     expect(translateUnitToNeuroglancer('picometer')).toBe('pm');
+  });
+});
+
+describe('generateNeuroglancerStateForOmeZarr per-channel layers', () => {
+  it('gives repeated channel labels unique layer names', () => {
+    const multiscale = {
+      axes: [
+        { name: 'c', type: 'channel' },
+        { name: 'y', type: 'space' },
+        { name: 'x', type: 'space' }
+      ],
+      datasets: [
+        {
+          path: '0',
+          coordinateTransformations: [{ type: 'scale', scale: [1, 1, 1] }]
+        }
+      ]
+    };
+    const omero = {
+      channels: [{ label: 'Gpb5' }, { label: 'Pale' }, { label: 'Gpb5' }]
+    };
+    const encoded = generateNeuroglancerStateForOmeZarr(
+      'https://example.com/data.zarr',
+      3,
+      'image',
+      multiscale as any,
+      { shape: [3, 10, 10], dtype: 'uint16' } as any,
+      undefined,
+      omero as any,
+      true
+    );
+    const state = JSON.parse(decodeURIComponent(encoded!));
+    expect(state.layers.map((l: any) => l.name)).toEqual([
+      'Gpb5',
+      'Pale',
+      'Gpb5 (2)'
+    ]);
   });
 });

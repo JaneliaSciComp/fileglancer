@@ -4,9 +4,19 @@ import userEvent from '@testing-library/user-event';
 import toast from 'react-hot-toast';
 
 const checkout = vi.fn();
+const resolveCartDatasets = vi.fn();
+const buildViewState = vi.fn();
+const navigate = vi.fn();
 let automatic = true;
+vi.mock('@/utils/viewCheckout', () => ({
+  buildViewState: (...args: unknown[]) => buildViewState(...args)
+}));
 vi.mock('@/hooks/useCartCheckout', () => ({
-  useCartCheckout: () => ({ checkout })
+  useCartCheckout: () => ({
+    checkout,
+    resolveCartDatasets,
+    isBucketDataset: (ds: { fsp_name: string }) => ds.fsp_name === 'bucket'
+  })
 }));
 vi.mock('@/contexts/PreferencesContext', () => ({
   usePreferencesContext: () => ({
@@ -18,7 +28,7 @@ vi.mock('@/contexts/PreferencesContext', () => ({
 vi.mock('@/queries/proxiedPathQueries', () => ({
   useAllProxiedPathsQuery: () => ({ data: [] })
 }));
-vi.mock('react-router', () => ({ useNavigate: () => vi.fn() }));
+vi.mock('react-router', () => ({ useNavigate: () => navigate }));
 vi.mock('@/hooks/useCartDimensionCheck', () => ({
   useCartDimensionCheck: () => ({
     mismatchedKeys: new Set(),
@@ -43,10 +53,119 @@ function Harness({ apiRef }: { apiRef: { current: FlowApi | null } }) {
 }
 
 beforeEach(() => {
+  localStorage.clear();
+  vi.spyOn(window, 'open').mockReturnValue({} as Window);
   checkout
     .mockReset()
     .mockResolvedValue({ short_key: 'v1', read_key: 'rk1', name: 'A' });
   automatic = true;
+  navigate.mockReset();
+  resolveCartDatasets.mockReset().mockResolvedValue([{ url: 'u' }]);
+  buildViewState
+    .mockReset()
+    .mockResolvedValue({ ng_state: { layers: [] }, layers: [] });
+});
+
+describe('useCreateViewFlow draft', () => {
+  const DRAFT = {
+    name: 'A',
+    ng_state: { layers: [] },
+    layers: [],
+    datasets: [{ url: 'u' }]
+  };
+
+  it('opens the unsaved draft in a new tab, without a dialog, when links are automatic', async () => {
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+
+    act(() => {
+      apiRef.current!.startDraftView(datasets, 'A');
+    });
+
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    await waitFor(() => expect(window.open).toHaveBeenCalled());
+    const url = vi.mocked(window.open).mock.calls[0][0] as string;
+    const id = new URL(url, 'http://x').searchParams.get('draft')!;
+    expect(url).toBe(`/view/new?draft=${id}`);
+    expect(
+      JSON.parse(localStorage.getItem(`fg-view-draft:${id}`)!).draft
+    ).toEqual(DRAFT);
+    expect(navigate).not.toHaveBeenCalled();
+    expect(checkout).not.toHaveBeenCalled();
+  });
+
+  it('keeps other recent drafts and drops ones older than a day', async () => {
+    const day = 24 * 60 * 60 * 1000;
+    localStorage.setItem(
+      'fg-view-draft:recent',
+      JSON.stringify({ draft: DRAFT, storedAt: Date.now() - day / 2 })
+    );
+    localStorage.setItem(
+      'fg-view-draft:old',
+      JSON.stringify({ draft: DRAFT, storedAt: Date.now() - 2 * day })
+    );
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+
+    act(() => {
+      apiRef.current!.startDraftView(datasets, 'A');
+    });
+
+    await waitFor(() => expect(window.open).toHaveBeenCalled());
+    expect(localStorage.getItem('fg-view-draft:recent')).not.toBeNull();
+    expect(localStorage.getItem('fg-view-draft:old')).toBeNull();
+  });
+
+  it('falls back to this tab when the popup is blocked', async () => {
+    vi.mocked(window.open).mockReturnValue(null);
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+
+    act(() => {
+      apiRef.current!.startDraftView(datasets, 'A');
+    });
+
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith('/view/new', {
+        state: { draft: DRAFT }
+      })
+    );
+  });
+
+  it('asks only for data-link consent (no name) when links are not automatic', async () => {
+    automatic = false;
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+
+    act(() => {
+      apiRef.current!.startDraftView(datasets, 'A');
+    });
+
+    expect(
+      await screen.findByText(/are you sure you want to create a data link/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('View name')).toBeNull();
+    expect(navigate).not.toHaveBeenCalled();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: /continue/i }));
+    await waitFor(() => expect(window.open).toHaveBeenCalled());
+  });
+
+  it('toasts and stays put when the draft cannot be built', async () => {
+    buildViewState.mockRejectedValue(new Error('No layers'));
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+
+    act(() => {
+      apiRef.current!.startDraftView(datasets, 'A');
+    });
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('No layers'));
+    expect(window.open).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
+  });
 });
 
 describe('useCreateViewFlow', () => {
@@ -115,6 +234,26 @@ describe('useCreateViewFlow', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /continue/i }));
     expect(checkout).toHaveBeenCalledWith(datasets, 'A');
+  });
+
+  it('asks no data-link consent for a bucket dataset, which needs no link', async () => {
+    automatic = false;
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+
+    act(() => {
+      apiRef.current!.startCreateView(
+        [{ fsp_name: 'bucket', path: 'sample.zarr', label: 'S' }],
+        'A'
+      );
+    });
+
+    expect(
+      await screen.findByRole('button', { name: /^create$/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/are you sure you want to create a data link/i)
+    ).toBeNull();
   });
 
   it('keeps the dialog open and shows an error toast when checkout fails', async () => {

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 
+import toast from 'react-hot-toast';
+
 import { makeFakeBridge } from '@/__tests__/mocks/fakeNeuroglancer';
 import type { CartItem } from '@/contexts/CartContext';
 import type { ViewLayer } from '@/queries/viewQueries';
@@ -60,6 +62,22 @@ describe('useAddToView', () => {
     });
     expect(onEdited).toHaveBeenCalled();
     expect(onAdded).toHaveBeenCalledWith([resolvedOf(ok, 'k1')]);
+  });
+
+  it('counts channels, not datasets, when adding channels', async () => {
+    const gpb5 = { ...ok, channel: 'Gpb5', channelIndex: 4 };
+    resolveCartDatasets.mockResolvedValue([resolvedOf(gpb5, 'k1')]);
+    buildViewState.mockResolvedValue({
+      ng_state: { layers: [{ name: 'Gpb5' }] },
+      layers: [
+        { sharing_key: 'k1', layer_index: 0, channel: 'Gpb5', opts: null }
+      ]
+    });
+    const success = vi.spyOn(toast, 'success');
+    const { addToView } = setup();
+    await addToView([gpb5]);
+    expect(success).toHaveBeenCalledWith('Added 1 channel. Save to keep it.');
+    success.mockRestore();
   });
 
   it('records unsupported datasets as sources', async () => {

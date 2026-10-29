@@ -21,6 +21,20 @@ vi.mock('@/contexts/ViewsContext', () => ({
 vi.mock('@/utils/viewCheckout', () => ({
   buildViewState
 }));
+vi.mock('@/contexts/ZonesAndFspMapContext', () => ({
+  useZoneAndFspMapContext: () => ({
+    zonesAndFspQuery: {
+      data: {
+        fsp_f: { name: 'f', protocol: 'file', mount_path: '/f' },
+        fsp_bucket: {
+          name: 'bucket',
+          protocol: 's3',
+          mount_path: 'https://example-datasets.s3.amazonaws.com/zarr'
+        }
+      }
+    }
+  })
+}));
 
 import { useCartCheckout } from '@/hooks/useCartCheckout';
 
@@ -80,6 +94,28 @@ describe('useCartCheckout', () => {
     expect(resolvedDatasets).toEqual([
       expect.objectContaining({ fsp_name: 'f', path: '/a', channel: 'DAPI' })
     ]);
+  });
+
+  it('resolves a bucket dataset to its public URL without creating a Data Link', async () => {
+    const { result } = renderHook(() => useCartCheckout(), { wrapper });
+    const resolved = await result.current.resolveCartDatasets([
+      { fsp_name: 'bucket', path: 'a b/sample.zarr', label: 'S' },
+      { fsp_name: 'bucket', path: '.', label: 'root' }
+    ]);
+    expect(resolved).toEqual([
+      expect.objectContaining({
+        url: 'https://example-datasets.s3.amazonaws.com/zarr/a%20b/sample.zarr',
+        sharing_key: null,
+        url_prefix: ''
+      }),
+      expect.objectContaining({
+        url: 'https://example-datasets.s3.amazonaws.com/zarr',
+        sharing_key: null
+      })
+    ]);
+    expect(createProxied).not.toHaveBeenCalled();
+    expect(result.current.isBucketDataset({ fsp_name: 'bucket' })).toBe(true);
+    expect(result.current.isBucketDataset({ fsp_name: 'f' })).toBe(false);
   });
 
   it('resolves Data Links without building or creating a View', async () => {

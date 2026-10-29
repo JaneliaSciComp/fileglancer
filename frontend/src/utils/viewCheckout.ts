@@ -38,7 +38,8 @@ export async function probeDataset(url: string): Promise<DatasetProbe> {
 
 export type ResolvedCheckoutDataset = {
   url: string;
-  sharing_key: string;
+  /** Null for a dataset in a public bucket, which has no Data Link. */
+  sharing_key: string | null;
   url_prefix: string;
   fsp_name: string;
   path: string;
@@ -114,9 +115,19 @@ function selectLayers(state: NgState, channelIndex?: number): NgLayer[] {
 
 // ponytail: merge per-dataset generated states instead of refactoring the
 // generator to emit objects. Ceiling: cross-dataset coordinate spaces aren't
-// reconciled (first dataset's dimensions win) and layer_index>4 is archived
-// per NG default — fine for curated read-only carts; revisit if
-// mixed-resolution overlays misalign.
+// reconciled (first dataset's dimensions win) — fine for curated read-only
+// carts; revisit if mixed-resolution overlays misalign.
+
+// Fileglancer's own rule, not a Neuroglancer default (Neuroglancer never
+// archives a layer on its own): image layers from index 4 on start archived,
+// mirroring `archived: i >= 4` in the standalone generator's channel loop
+// (omezarr-helper.ts, generateFullNeuroglancerStateForOmeZarr). That loop
+// never touches label layers, so segmentation layers always stay shown and a
+// one-dataset View matches the standalone Neuroglancer button. Keep the two
+// in sync.
+function startsArchived(layer: NgLayer, index: number): boolean {
+  return layer.type !== 'segmentation' && index >= 4;
+}
 export async function buildViewState(
   datasets: ResolvedCheckoutDataset[]
 ): Promise<{ ng_state: Record<string, unknown>; layers: ViewLayerInput[] }> {
@@ -124,9 +135,20 @@ export async function buildViewState(
   const viewLayers: ViewLayerInput[] = [];
   const unsupported: ResolvedCheckoutDataset[] = [];
   let base: NgState | null = null;
+  const taken = new Set<string>();
+
+  // Every channel entry of a dataset generates the same state; generate it
+  // once per dataset and layer path, then slice it per entry.
+  const stateCache = new Map<string, Promise<NgState | null>>();
 
   for (const ds of datasets) {
-    const state = await generateStateForDataset(ds);
+    const cacheKey = `${ds.url}::${ds.channel !== undefined}`;
+    let pending = stateCache.get(cacheKey);
+    if (!pending) {
+      pending = generateStateForDataset(ds);
+      stateCache.set(cacheKey, pending);
+    }
+    const state = await pending;
     if (!state) {
       unsupported.push(ds);
       continue;
@@ -136,7 +158,14 @@ export async function buildViewState(
     }
     for (const layer of selectLayers(state, ds.channelIndex)) {
       const layer_index = combinedLayers.length;
-      combinedLayers.push({ ...layer, archived: layer_index >= 4 });
+      // Datasets can share layer names (e.g. two with a "DAPI" channel).
+      const name = uniqueName(layer.name ?? 'layer', taken);
+      taken.add(name);
+      combinedLayers.push({
+        ...layer,
+        name,
+        archived: startsArchived(layer, layer_index)
+      });
       viewLayers.push({
         sharing_key: ds.sharing_key,
         layer_index,
@@ -186,9 +215,13 @@ function uniqueName(name: string, taken: Set<string>): string {
 }
 
 // Adds layers to an existing View's state. The View keeps its dimensions,
-// layout and selected layer. Added layers from index 4 on start archived,
-// the same rule as checkout.
-export function appendLayers(current: NgState, added: NgLayer[]): NgState {
+// layout and selected layer. Added layers start archived by the same rule
+// as checkout, unless `shown` asks for them to stay visible.
+export function appendLayers(
+  current: NgState,
+  added: NgLayer[],
+  shown = false
+): NgState {
   const layers = [...(current.layers ?? [])];
   const taken = new Set(
     layers.map(l => l.name).filter((n): n is string => typeof n === 'string')
@@ -196,7 +229,11 @@ export function appendLayers(current: NgState, added: NgLayer[]): NgState {
   for (const layer of added) {
     const name = uniqueName(layer.name ?? 'layer', taken);
     taken.add(name);
-    layers.push({ ...layer, name, archived: layers.length >= 4 });
+    layers.push({
+      ...layer,
+      name,
+      archived: !shown && startsArchived(layer, layers.length)
+    });
   }
   return { ...current, layers };
 }

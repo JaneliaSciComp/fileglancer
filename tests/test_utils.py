@@ -208,3 +208,51 @@ def test_is_likely_binary_log_file():
     """Test that log file content is detected as text"""
     log_data = b"[2024-01-01 12:00:00] INFO: Server started\n[2024-01-01 12:00:01] DEBUG: Connection established\n"
     assert not is_likely_binary(log_data)
+
+
+def test_guess_content_type_is_x2s3s():
+    """One implementation: fileglancer re-exports x2s3's rather than copying it."""
+    import x2s3.utils
+    from fileglancer.utils import guess_content_type
+    assert guess_content_type is x2s3.utils.guess_content_type
+
+
+# --- parse_range_header: None means "ignore the header", ValueError means 416 ---
+
+@pytest.mark.parametrize("header, expected", [
+    ("bytes=0-3", (0, 3)),
+    ("bytes=5-", (5, 9)),
+    ("bytes=-4", (6, 9)),
+    ("bytes=0-99", (0, 9)),
+])
+def test_parse_range_header_satisfiable(header, expected):
+    from fileglancer.utils import parse_range_header
+    assert parse_range_header(header, 10) == expected
+
+
+@pytest.mark.parametrize("header", ["", None, "items=0-3", "bytes=abc", "bytes=3", "bytes=0-1,3-4", "bytes=-", "bytes=5-2", "bytes=--3", "bytes=+1-3"])
+def test_parse_range_header_ignores_absent_malformed_and_multi_range(header):
+    from fileglancer.utils import parse_range_header
+    assert parse_range_header(header, 10) is None
+
+
+@pytest.mark.parametrize("header", ["bytes=10-", "bytes=99-200"])
+def test_parse_range_header_raises_for_unsatisfiable(header):
+    from fileglancer.utils import parse_range_header
+    with pytest.raises(ValueError):
+        parse_range_header(header, 10)
+
+
+def test_format_timestamp_is_an_http_date():
+    from email.utils import parsedate_to_datetime
+    from fileglancer.utils import format_timestamp
+    value = format_timestamp(1700000000.7)
+    assert value == "Tue, 14 Nov 2023 22:13:20 GMT"
+    assert parsedate_to_datetime(value).timestamp() == 1700000000
+
+
+def test_parse_range_header_is_x2s3s():
+    """One implementation: fileglancer re-exports x2s3's rather than copying it."""
+    import x2s3.utils
+    from fileglancer.utils import parse_range_header
+    assert parse_range_header is x2s3.utils.parse_range_header

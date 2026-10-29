@@ -31,18 +31,46 @@ export default function CartDatasetRow({
 }: CartDatasetRowProps) {
   const { addToCart, removeFromCart, removeManyFromCart } = useCartContext();
 
-  const checkedChannels = new Set(
-    items.map(item => item.channel).filter((c): c is string => Boolean(c))
-  );
+  const checkedIndices = new Set(items.map(item => item.channelIndex));
 
   const handleRemoveDataset = async () => {
     try {
       await removeManyFromCart(
-        items.map(item => ({ path: item.path, channel: item.channel }))
+        items.map(item => ({
+          path: item.path,
+          channelIndex: item.channelIndex
+        }))
       );
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to remove dataset'
+      );
+    }
+  };
+
+  const handleToggleAll = async (channels: string[], checked: boolean) => {
+    try {
+      if (checked) {
+        await addToCart(
+          channels.map((channel, index) => ({
+            fsp_name,
+            path,
+            channel,
+            label: channel,
+            channelIndex: index
+          }))
+        );
+      } else {
+        // Keep the channel-less entry, so the dataset stays in the cart.
+        await removeManyFromCart(
+          items
+            .filter(item => item.channelIndex !== undefined)
+            .map(item => ({ path: item.path, channelIndex: item.channelIndex }))
+        );
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to update channels'
       );
     }
   };
@@ -58,7 +86,7 @@ export default function CartDatasetRow({
           { fsp_name, path, channel, label: channel, channelIndex: index }
         ]);
       } else {
-        await removeFromCart(path, channel);
+        await removeFromCart(path, index);
       }
     } catch (error) {
       toast.error(
@@ -77,23 +105,44 @@ export default function CartDatasetRow({
       onRemove={() => void handleRemoveDataset()}
       open={open}
       path={path}
-      renderChannels={channels => (
-        <div className="flex flex-col gap-1">
-          <Typography className="text-foreground/70 text-xs font-semibold">
-            Optional: select channels to create per-channel layers
-          </Typography>
-          {channels.map((channel, index) => (
-            <FgCheckbox
-              checked={checkedChannels.has(channel)}
-              key={channel}
-              label={channel}
-              onChange={e =>
-                void handleToggleChannel(channel, index, e.target.checked)
-              }
-            />
-          ))}
-        </div>
-      )}
+      renderChannels={channels => {
+        const checkedCount = channels.filter((_, index) =>
+          checkedIndices.has(index)
+        ).length;
+        const allChecked = checkedCount === channels.length;
+        return (
+          <div className="flex flex-col gap-1">
+            <Typography className="text-foreground/70 text-xs font-semibold">
+              Optional: select channels to create per-channel layers
+            </Typography>
+            {channels.length > 1 ? (
+              <FgCheckbox
+                checked={allChecked}
+                label="All channels"
+                onChange={e => void handleToggleAll(channels, e.target.checked)}
+                ref={el => {
+                  if (el) {
+                    el.indeterminate = checkedCount > 0 && !allChecked;
+                  }
+                }}
+              />
+            ) : null}
+            {/* Column-major, so channels still read in c-axis order. */}
+            <div className="columns-[8rem] gap-x-4 [&>*]:mb-1 [&>*]:break-inside-avoid">
+              {channels.map((channel, index) => (
+                <FgCheckbox
+                  checked={checkedIndices.has(index)}
+                  key={index}
+                  label={channel}
+                  onChange={e =>
+                    void handleToggleChannel(channel, index, e.target.checked)
+                  }
+                />
+              ))}
+            </div>
+          </div>
+        );
+      }}
     />
   );
 }

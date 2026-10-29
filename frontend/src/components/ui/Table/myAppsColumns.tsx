@@ -10,7 +10,12 @@ import {
   buildAppMenuItems,
   isAppShared
 } from '@/components/ui/AppsPage/appMenuItems';
-import { buildAppDetailPath, getAppIconType, repoLabel } from '@/utils';
+import {
+  appRevision,
+  buildAppDetailPath,
+  getAppIconType,
+  shortRevision
+} from '@/utils';
 import type { AppActions } from '@/hooks/useAppActions';
 import type { UserApp } from '@/shared.types';
 
@@ -58,9 +63,20 @@ function NameCell({
 export function createMyAppsColumns(actions: AppActions): ColumnDef<UserApp>[] {
   return [
     {
-      id: 'repository',
-      accessorFn: row => repoLabel(row.url),
-      header: 'Repository',
+      accessorKey: 'name',
+      header: 'App Name',
+      cell: ({ row, table }) => (
+        <NameCell
+          app={row.original}
+          onContextMenu={table.options.meta?.onCellContextMenu}
+        />
+      ),
+      enableSorting: true
+    },
+    {
+      id: 'revision',
+      accessorFn: row => appRevision(row.url, row.branch) ?? '',
+      header: 'Revision',
       cell: ({ getValue, table }) => {
         const value = getValue() as string;
         const onContextMenu = table.options.meta?.onCellContextMenu;
@@ -73,22 +89,11 @@ export function createMyAppsColumns(actions: AppActions): ColumnDef<UserApp>[] {
             }}
           >
             <FgTooltip label={value} triggerClasses="max-w-full truncate">
-              <span className="truncate text-sm">{value}</span>
+              <span className="truncate text-sm">{shortRevision(value)}</span>
             </FgTooltip>
           </div>
         );
       },
-      enableSorting: true
-    },
-    {
-      accessorKey: 'name',
-      header: 'App Name',
-      cell: ({ row, table }) => (
-        <NameCell
-          app={row.original}
-          onContextMenu={table.options.meta?.onCellContextMenu}
-        />
-      ),
       enableSorting: true
     },
     {

@@ -5,17 +5,24 @@ import {
   isUnsupportedLayer,
   layerUsesSegment
 } from '@/utils/viewCheckout';
-import { datasetKey } from '@/utils/pathHandling';
+import { bucketDatasetUrl, datasetKey } from '@/utils/pathHandling';
+import { isReadOnlyFsp } from '@/utils/cloudStorage';
+import { makeMapKey } from '@/utils';
+import useZoneAndFileSharePathMapQuery from '@/queries/zoneAndFileSharePathMapQuery';
 import type { NeuroglancerBridge } from '@/hooks/useNeuroglancerViewer';
 import type { ViewLayer } from '@/queries/viewQueries';
+import type { FileSharePath } from '@/shared.types';
 import type { NgLayer, ResolvedCheckoutDataset } from '@/utils/viewCheckout';
 
-/** A dataset whose Data Link may appear in the viewer's layer sources. */
+/** A dataset that may appear in the viewer's layer sources. */
 export type KnownDataset = {
   fsp_name: string;
   path: string;
-  sharing_key: string;
-  url_prefix: string;
+  /** Null for a dataset in a public bucket, which has no Data Link. */
+  sharing_key: string | null;
+  /** What its layers' source URLs contain: a Data Link segment, or the
+   *  bucket dataset's public URL. */
+  segment: string;
 };
 
 /** One row of the Sources tab: a dataset in the viewer, or a stray layer. */
@@ -29,32 +36,38 @@ export type LiveSource = {
   layerNames: string[];
   /** Those of layerNames that are archived: kept in the state, not shown. */
   archivedNames: string[];
+  /** Per layerNames entry: its channel index, or null if not one channel. */
+  layerChannels: (number | null)[];
   sharing_key: string | null;
   /** Recorded as a source only: it can't load as a Neuroglancer layer. */
   unsupported: boolean;
 };
 
+// A per-channel layer pins its one local dimension, the channel axis.
+function channelOf(layer: NgLayer): number | null {
+  const pos = layer.localPosition;
+  return Array.isArray(pos) && pos.length === 1 && typeof pos[0] === 'number'
+    ? pos[0]
+    : null;
+}
+
 const basename = (path: string) =>
   path.replace(/\/+$/, '').split('/').pop() || path;
 
 /**
- * Groups the viewer's layers into datasets by the Data Link segment in their
- * sources (as the server's reconcile_view_layers does), in first-layer order,
- * then appends the unsupported datasets, which have no layer.
+ * Groups the viewer's layers into datasets by the segment in their sources
+ * (as the server's reconcile_view_layers does), in first-layer order, then
+ * appends the unsupported datasets, which have no layer.
  */
 export function groupLayersBySource(
   layers: NgLayer[],
   known: KnownDataset[],
   unsupported: KnownDataset[]
 ): LiveSource[] {
-  const segments = known.map(ds => ({
-    ds,
-    segment: dataLinkSegment(ds.sharing_key, ds.url_prefix)
-  }));
   const rows = new Map<string, LiveSource>();
   layers.forEach((layer, i) => {
     const name = typeof layer.name === 'string' ? layer.name : `layer ${i}`;
-    const ds = segments.find(s => layerUsesSegment(layer, s.segment))?.ds;
+    const ds = known.find(k => layerUsesSegment(layer, k.segment));
     if (!ds) {
       rows.set(`layer:${name}`, {
         key: `layer:${name}`,
@@ -63,6 +76,7 @@ export function groupLayersBySource(
         label: name,
         layerNames: [name],
         archivedNames: layer.archived ? [name] : [],
+        layerChannels: [channelOf(layer)],
         sharing_key: null,
         unsupported: false
       });
@@ -72,6 +86,7 @@ export function groupLayersBySource(
     const row = rows.get(key);
     if (row) {
       row.layerNames.push(name);
+      row.layerChannels.push(channelOf(layer));
       if (layer.archived) {
         row.archivedNames.push(name);
       }
@@ -83,6 +98,7 @@ export function groupLayersBySource(
         label: basename(ds.path),
         layerNames: [name],
         archivedNames: layer.archived ? [name] : [],
+        layerChannels: [channelOf(layer)],
         sharing_key: ds.sharing_key,
         unsupported: false
       });
@@ -98,12 +114,47 @@ export function groupLayersBySource(
         label: basename(ds.path),
         layerNames: [],
         archivedNames: [],
+        layerChannels: [],
         sharing_key: ds.sharing_key,
         unsupported: true
       });
     }
   }
   return [...rows.values()];
+}
+
+/** A checkbox in a Sources row; no layerName if not in the View yet. */
+export type ChannelRow = { key: string; label: string; layerName?: string };
+
+// When every layer of the dataset is one channel, list all of its channels,
+// so channels never added to the View can be added here. Otherwise list the
+// layers NG split the dataset into.
+export function channelRows(
+  source: LiveSource,
+  channels: string[]
+): ChannelRow[] | null {
+  const perChannel =
+    channels.length > 0 &&
+    source.layerChannels.length > 0 &&
+    source.layerChannels.every(c => c !== null);
+  if (perChannel) {
+    return channels.map((label, index) => {
+      const i = source.layerChannels.indexOf(index);
+      return {
+        key: `channel:${index}`,
+        label,
+        layerName: i >= 0 ? source.layerNames[i] : undefined
+      };
+    });
+  }
+  if (source.layerNames.length > 1) {
+    return source.layerNames.map(name => ({
+      key: name,
+      label: name,
+      layerName: name
+    }));
+  }
+  return null;
 }
 
 // NG fires `changed` on every camera frame.
@@ -163,38 +214,57 @@ export function useViewSources(
     };
   }, [status, getState, subscribe]);
 
+  // A saved bucket layer has no Data Link; its segment is the dataset's
+  // public URL, built the same way checkout built the layer's source.
+  const fspMap = useZoneAndFileSharePathMapQuery().data;
   const { known, unsupported } = useMemo(() => {
     const saved: KnownDataset[] = [];
     const unsupported: KnownDataset[] = [];
     for (const l of viewLayers) {
-      if (
-        l.fsp_name === null ||
-        l.path === null ||
-        l.sharing_key === null ||
-        l.url_prefix === null
-      ) {
+      if (l.fsp_name === null || l.path === null) {
+        continue;
+      }
+      let segment: string | null = null;
+      if (l.sharing_key !== null && l.url_prefix !== null) {
+        segment = dataLinkSegment(l.sharing_key, l.url_prefix);
+      } else if (l.sharing_key === null && !l.broken) {
+        const fsp = fspMap?.[makeMapKey('fsp', l.fsp_name)] as
+          | FileSharePath
+          | undefined;
+        segment = isReadOnlyFsp(fsp) ? bucketDatasetUrl(fsp!, l.path) : null;
+      }
+      if (segment === null) {
         continue;
       }
       const ds = {
         fsp_name: l.fsp_name,
         path: l.path,
         sharing_key: l.sharing_key,
-        url_prefix: l.url_prefix
+        segment
       };
       if (!isUnsupportedLayer(l)) {
         saved.push(ds);
-      } else if (!removedSources.includes(l.sharing_key)) {
+      } else if (!removedSources.includes(l.sharing_key ?? '')) {
         unsupported.push(ds);
       }
     }
     // ponytail: added datasets are never forgotten this session; once their
     // layers are gone (Discard) they simply match nothing.
-    const pending = added.filter(ds => pendingSources.includes(ds.sharing_key));
+    const linked = added.map(ds => ({
+      ...ds,
+      segment:
+        ds.sharing_key !== null
+          ? dataLinkSegment(ds.sharing_key, ds.url_prefix)
+          : ds.url
+    }));
+    const pending = linked.filter(
+      ds => ds.sharing_key !== null && pendingSources.includes(ds.sharing_key)
+    );
     return {
-      known: [...saved, ...added],
+      known: [...saved, ...linked],
       unsupported: [...unsupported, ...pending]
     };
-  }, [viewLayers, added, pendingSources, removedSources]);
+  }, [viewLayers, added, pendingSources, removedSources, fspMap]);
 
   return useMemo(
     () => groupLayersBySource(layers, known, unsupported),

@@ -64,6 +64,8 @@ def db_session(temp_dir):
         session.query(FileSharePathDB).delete()
         session.query(LastRefreshDB).delete()
         session.query(UserPreferenceDB).delete()
+        session.query(CloudBucketDB).delete()
+        session.query(ProxiedPathDB).delete()
         session.commit()
     finally:
         session.close()
@@ -1085,3 +1087,69 @@ def test_relinkable_is_owner_scoped_and_skips_unrecoverable(db_session, fsp):
     _break(db_session, old)
     assert get_relinkable_views(db_session, "u", fsp.name, "s.zarr") == []
     assert len(get_relinkable_views(db_session, "other", fsp.name, "s.zarr")) == 1
+
+
+def test_file_share_path_protocol_defaults_to_file(db_session, fsp):
+    path = get_file_share_path(db_session, "tempdir")
+    assert path.protocol == "file"
+    assert path.model_dump()["protocol"] == "file"
+
+
+def _add_bucket(session, username="alice", name="cosem", bucket="janelia-cosem-datasets", prefix="", endpoint_url=None, label=None):
+    return create_cloud_bucket(session, username, name, "s3", label or name, bucket, prefix, endpoint_url)
+
+def test_cloud_bucket_to_fsp_shape(db_session):
+    row = _add_bucket(db_session, prefix="zarr/v0.4", label="IDR zarr")
+    fsp = cloud_bucket_to_fsp(row)
+    assert fsp.model_dump() == {
+        "name": "cosem", "zone": "S3", "group": "cloud", "storage": "IDR zarr",
+        "mount_path": "https://janelia-cosem-datasets.s3.amazonaws.com/zarr/v0.4",
+        "mac_path": None, "windows_path": None, "linux_path": None, "protocol": "s3",
+    }
+
+def test_cloud_bucket_mount_path_without_prefix(db_session):
+    assert cloud_bucket_to_fsp(_add_bucket(db_session)).mount_path == "https://janelia-cosem-datasets.s3.amazonaws.com"
+
+def test_file_share_paths_include_callers_buckets_only_with_username(db_session, fsp):
+    _add_bucket(db_session, username="alice")
+    _add_bucket(db_session, username="bob", name="bobs")
+    assert [p.name for p in get_file_share_paths(db_session)] == ["tempdir"]
+    assert [p.name for p in get_file_share_paths(db_session, username="alice")] == ["tempdir", "cosem"]
+    assert get_file_share_path(db_session, "cosem", username="alice").protocol == "s3"
+    assert get_file_share_path(db_session, "cosem", username="bob") is None
+
+def test_site_share_wins_over_same_named_bucket(db_session, fsp):
+    _add_bucket(db_session, name="tempdir")
+    assert get_file_share_path(db_session, "tempdir", username="alice").protocol == "file"
+
+def test_duplicate_bucket_name_per_user_is_rejected(db_session):
+    _add_bucket(db_session)
+    with pytest.raises(ValueError, match="already exists"):
+        _add_bucket(db_session)
+
+def test_delete_cloud_bucket(db_session):
+    _add_bucket(db_session)
+    assert delete_cloud_bucket(db_session, "alice", "cosem") is True
+    assert get_cloud_bucket(db_session, "alice", "cosem") is None
+    assert delete_cloud_bucket(db_session, "alice", "cosem") is False
+
+def test_create_proxied_path_on_bucket_is_rejected(db_session):
+    _add_bucket(db_session)
+    with pytest.raises(ValueError, match="does not exist"):
+        create_proxied_path(db_session, "alice", "a", "cosem", "x", url_prefix="x")
+
+
+
+def test_reconcile_keeps_bucket_layers_as_dataset_rows(db_session):
+    create_cloud_bucket(db_session, "u", "idr", "s3", "IDR", "idr", "", None)
+    src = "zarr://https://idr.s3.amazonaws.com/zarr/img.zarr|zarr2:"
+    state = {"layers": [{"name": "img", "source": src}]}
+    v = create_view(db_session, "u", "b", state,
+                    [{"layer_index": 0, "channel": "DAPI", "opts": None, "fsp_name": "idr", "path": "zarr/img.zarr"}], "read")
+
+    # reorder behind a foreign layer: the row follows its layer and keeps its channel
+    new_state = {"layers": [{"name": "ext", "source": "https://elsewhere/x.zarr"}, state["layers"][0]]}
+    update_view(db_session, v, ng_state=new_state, proxy_url=PROXY)
+    rows = sorted(v.layers, key=lambda l: l.layer_index)
+    assert [(r.fsp_name, r.path, r.channel, r.broken) for r in rows] == [
+        (None, None, None, False), ("idr", "zarr/img.zarr", "DAPI", False)]

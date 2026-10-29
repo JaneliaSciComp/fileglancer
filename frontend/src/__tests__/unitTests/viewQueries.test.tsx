@@ -15,6 +15,7 @@ vi.mock('@/utils', () => ({
 
 import {
   useViewsQuery,
+  useCreateViewMutation,
   useUpdateViewMutation,
   viewQueryKeys
 } from '@/queries/viewQueries';
@@ -64,6 +65,25 @@ describe('viewQueries', () => {
     const { result } = renderHook(() => useViewsQuery(), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual([]);
+  });
+
+  it("seeds the new View's state query on create, so the draft viewer never shows Loading", async () => {
+    const ng_state = { layers: [{ name: 'L0' }] };
+    sendFetchRequest.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ short_key: 'k1', read_key: 'r1', ng_state })
+    });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } }
+    });
+    const { result } = renderHook(() => useCreateViewMutation(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      )
+    });
+    await result.current.mutateAsync({ name: 'A', ng_state, layers: [] });
+    expect(client.getQueryData(viewQueryKeys.state('r1'))).toEqual(ng_state);
   });
 
   describe('useUpdateViewMutation invalidation', () => {

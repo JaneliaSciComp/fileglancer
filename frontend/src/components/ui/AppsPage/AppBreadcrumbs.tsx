@@ -9,6 +9,7 @@ import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgLink from '@/components/designSystem/atoms/FgLink';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
+import InlineNameEditor from '@/components/ui/widgets/InlineNameEditor';
 
 interface AppBreadcrumbsProps {
   /** Link target for the leading apps-home icon (My Apps or the Catalog). */
@@ -19,6 +20,8 @@ interface AppBreadcrumbsProps {
   readonly appName?: string;
   /** When set, the app name links to the app/listing detail page. */
   readonly appTo?: string;
+  /** When set (and appTo isn't), the app name is editable in place. */
+  readonly onRenameApp?: (name: string) => Promise<void>;
   /** Entry-point segment (the current, non-clickable leaf). */
   readonly entryPointName?: string;
   readonly entryPointIcon?: IconType;
@@ -51,6 +54,7 @@ export default function AppBreadcrumbs({
   homeLabel,
   appName,
   appTo,
+  onRenameApp,
   entryPointName,
   entryPointIcon,
   actions,
@@ -82,6 +86,14 @@ export default function AppBreadcrumbs({
                 <FgLink className="truncate min-w-0" size="sm" to={appTo}>
                   {appName}
                 </FgLink>
+              ) : onRenameApp ? (
+                <InlineNameEditor
+                  className="font-medium text-foreground truncate"
+                  label="app name"
+                  onSave={onRenameApp}
+                  typographyType="p"
+                  value={appName}
+                />
               ) : (
                 <Typography
                   className="font-medium text-foreground truncate"

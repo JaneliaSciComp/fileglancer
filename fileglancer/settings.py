@@ -36,6 +36,14 @@ class ClusterSettings(BaseModel):
     poll_all_users: bool = False
 
 
+class CloudStorageSettings(BaseModel):
+    """User-added cloud buckets (Cloud Storage sidebar section)."""
+    enabled: bool = True
+    # None: any https endpoint that resolves to public address space.
+    # []: AWS only. A list of https origins: only those.
+    allowed_endpoints: Optional[List[str]] = None
+
+
 class AppsSettings(BaseModel):
     """Apps-specific configuration (not passed to py-cluster-api)."""
     extra_paths: List[str] = []
@@ -218,6 +226,8 @@ class Settings(BaseSettings):
 
     # Apps-specific settings (not passed to py-cluster-api)
     apps: AppsSettings = AppsSettings()
+
+    cloud_storage: CloudStorageSettings = CloudStorageSettings()
 
     # Test API key for automated integration testing.
     # NEVER set on production. The bypass activates when this value is set.

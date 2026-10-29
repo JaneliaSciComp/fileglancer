@@ -6,7 +6,10 @@ const checkout = vi.fn().mockResolvedValue({ short_key: 'v1', name: 'N' });
 let automatic = true;
 
 vi.mock('@/hooks/useCartCheckout', () => ({
-  useCartCheckout: () => ({ checkout })
+  useCartCheckout: () => ({
+    checkout,
+    isBucketDataset: (ds: { fsp_name: string }) => ds.fsp_name === 'bucket'
+  })
 }));
 vi.mock('@/contexts/PreferencesContext', () => ({
   usePreferencesContext: () => ({

@@ -15,7 +15,9 @@ import type {
   PendingToolKey
 } from '@/hooks/useZarrMetadata';
 import useDataToolLinks from '@/hooks/useDataToolLinks';
+import { useCreateViewFlow } from '@/hooks/useCreateViewFlow';
 import { useCartContext } from '@/contexts/CartContext';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { Metadata, getDatasetWarnings } from '@/omezarr-helper';
 import type { OutletContextType } from '@/layouts/BrowseLayout';
 
@@ -65,6 +67,8 @@ export default function ZarrPreview({
   );
 
   const { addToCart } = useCartContext();
+  const { neuroglancerButtonTarget } = usePreferencesContext();
+  const { startDraftView, dialog: createViewDialog } = useCreateViewFlow();
   // ponytail: optional — component tests render without a router outlet.
   const outlet = useOutletContext<OutletContextType | null | undefined>();
 
@@ -138,6 +142,15 @@ export default function ZarrPreview({
               dataLinkUrl={openWithToolUrls.copy || undefined}
               fspName={fspName}
               onAddToCart={() => void handleAddToCart()}
+              onOpenNeuroglancer={
+                neuroglancerButtonTarget === 'views'
+                  ? () =>
+                      startDraftView(
+                        [{ fsp_name: fspName, path, label: datasetLabel }],
+                        datasetLabel
+                      )
+                  : undefined
+              }
               onToolClick={handleToolClick}
               path={path}
               showCopiedTooltip={showCopiedTooltip}
@@ -157,6 +170,7 @@ export default function ZarrPreview({
               tools={true}
             />
           ) : null}
+          {createViewDialog}
         </div>
         {zarrMetadataQuery.data?.metadata &&
         'arr' in zarrMetadataQuery.data.metadata ? (

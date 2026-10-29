@@ -29,6 +29,7 @@ import { areZarrMetadataFilesPresent } from '@/queries/zarrQueries';
 import { getBrowserRenderableType } from '@/utils/fileTypes';
 import { detectN5, getN5DetectionSignals } from '@/queries/n5Queries';
 import { makeMapKey } from '@/utils';
+import { isReadOnlyFsp } from '@/utils/cloudStorage';
 import type { FileOrFolder } from '@/shared.types';
 
 const tasksEnabled = import.meta.env.VITE_ENABLE_TASKS === 'true';
@@ -92,6 +93,7 @@ export default function FileBrowser({
 
   const files = (fileQuery.data?.files ?? []) as FileOrFolder[];
   const currentName = fileQuery.data?.currentFileOrFolder?.name ?? '';
+  const readOnly = isReadOnlyFsp(fileQuery.data?.currentFileSharePath);
 
   const isZarrDir = areZarrMetadataFilesPresent(files);
   const isN5Dir = detectN5(files);
@@ -192,7 +194,8 @@ export default function FileBrowser({
         shouldShow:
           tasksEnabled &&
           fileBrowserState.selectedFiles[0]?.is_dir &&
-          !fileBrowserState.selectedFiles[0]?.is_symlink
+          !fileBrowserState.selectedFiles[0]?.is_symlink &&
+          !readOnly
       },
       {
         name: 'Add to cart',
@@ -228,14 +231,14 @@ export default function FileBrowser({
         action: () => {
           setShowRenameDialog(true);
         },
-        shouldShow: true
+        shouldShow: !readOnly
       },
       {
         name: 'Change permissions',
         action: () => {
           setShowPermissionsDialog(true);
         },
-        shouldShow: true
+        shouldShow: !readOnly
       },
       {
         name: 'Delete',
@@ -243,7 +246,7 @@ export default function FileBrowser({
           setShowDeleteDialog(true);
         },
         color: 'text-error',
-        shouldShow: true
+        shouldShow: !readOnly
       }
     ];
   };

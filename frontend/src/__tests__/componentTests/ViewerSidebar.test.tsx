@@ -11,6 +11,9 @@ vi.mock('@/components/ui/Views/SidebarFileBrowser', () => ({
   default: () => null
 }));
 vi.mock('@/hooks/useAddToView', () => ({ useAddToView: () => vi.fn() }));
+vi.mock('@/queries/zoneAndFileSharePathMapQuery', () => ({
+  default: () => ({ data: {} })
+}));
 vi.mock('@/hooks/useCartDimensionCheck', () => ({
   useCartDimensionCheck: () => ({
     mismatchedKeys: new Set(),
@@ -99,6 +102,8 @@ function setup() {
       bridge={fake.bridge}
       editState={editState}
       onClose={vi.fn()}
+      onTabChange={vi.fn()}
+      tab="sources"
       viewLayers={VIEW_LAYERS}
     />
   );

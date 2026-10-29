@@ -344,6 +344,34 @@ describe('DataToolLinks - Expected Behavior', () => {
       expect(onAddToCart).toHaveBeenCalled();
     });
 
+    it('routes the Neuroglancer button to onOpenNeuroglancer when given', async () => {
+      const onOpenNeuroglancer = vi.fn();
+      const onToolClick = vi.fn(async () => {});
+      render(
+        <ViewersProvider>
+          <DataToolLinks
+            onOpenNeuroglancer={onOpenNeuroglancer}
+            onToolClick={onToolClick}
+            showCopiedTooltip={false}
+            title="Test Tools"
+            urls={mockOpenWithToolUrls}
+          />
+        </ViewersProvider>,
+        { initialEntries: ['/browse/test_fsp/test_file'] }
+      );
+
+      const logo = await screen.findByAltText(
+        'View in Neuroglancer',
+        {},
+        { timeout: 3000 }
+      );
+      expect(screen.getByText('Neuroglancer View')).toBeInTheDocument();
+      logo.click();
+
+      await waitFor(() => expect(onOpenNeuroglancer).toHaveBeenCalled());
+      expect(onToolClick).not.toHaveBeenCalled();
+    });
+
     it('should call onToolClick when copy icon is clicked', async () => {
       const onToolClick = vi.fn(async () => {});
       renderDataToolLinks(undefined, onToolClick);

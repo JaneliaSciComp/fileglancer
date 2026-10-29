@@ -25,6 +25,7 @@ type FileSharePath = {
   linux_path: string | null;
   mac_path: string | null;
   windows_path: string | null;
+  protocol: 'file' | 's3';
 };
 // Note: linux_path, mac_path, and windows_path are null when running in local env with no fileglancer_central url set in the jupyter server config
 

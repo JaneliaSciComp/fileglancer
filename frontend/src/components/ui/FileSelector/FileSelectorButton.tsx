@@ -36,6 +36,7 @@ type FileSelectorButtonProps = {
   readonly useServerPath?: boolean;
   readonly initialPath?: string;
   readonly defaultToHome?: boolean;
+  readonly includeCloud?: boolean;
 };
 
 export default function FileSelectorButton({
@@ -46,7 +47,8 @@ export default function FileSelectorButton({
   mode = 'any',
   useServerPath,
   initialPath,
-  defaultToHome = false
+  defaultToHome = false,
+  includeCloud = false
 }: FileSelectorButtonProps) {
   const [showDialog, setShowDialog] = useState(false);
 
@@ -64,7 +66,8 @@ export default function FileSelectorButton({
     initialPath: showDialog ? effectiveInitialPath : undefined,
     initialPathIsFile,
     pathPreferenceOverride: useServerPath ? ['linux_path'] : undefined,
-    defaultToHome
+    defaultToHome,
+    includeCloud
   });
   const { state, selectItem, reset } = selector;
 

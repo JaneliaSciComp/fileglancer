@@ -1026,3 +1026,28 @@ class TestValidatePathsAction:
             ctx,
         )
         assert result == {"errors": {}}
+
+
+class TestOpenFileAction:
+
+    def test_reports_the_size_of_the_file_it_opened(self, tmp_path, monkeypatch):
+        """Metadata must come from the opened descriptor, not an earlier stat by path."""
+        target = tmp_path / "f.txt"
+        target.write_text("short")
+        fsp = FileSharePath(zone="test", name="of_fstat", mount_path=str(tmp_path))
+
+        real_check = Filestore._check_path_in_root
+
+        def replace_file_then_check(self, path):
+            full_path = real_check(self, path)
+            target.write_text("much longer content")  # file changes between stat and open
+            return full_path
+
+        monkeypatch.setattr(Filestore, "_check_path_in_root", replace_file_then_check)
+        result = _ACTIONS["open_file"](
+            _with_fsps({"fsp_name": "of_fstat", "subpath": "f.txt"}, fsp), WorkerContext(username="test"))
+        try:
+            assert result["file_size"] == len("much longer content")
+            assert result["last_modified"] == pytest.approx(target.stat().st_mtime)
+        finally:
+            result["_file_handle"].close()

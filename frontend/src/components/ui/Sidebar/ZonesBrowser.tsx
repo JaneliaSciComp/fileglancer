@@ -13,6 +13,7 @@ import { SidebarItemSkeleton } from '@/components/ui/widgets/Loaders';
 import FgLink from '@/components/designSystem/atoms/FgLink';
 import FgSwitch from '@/components/designSystem/atoms/formElements/FgSwitch';
 import FgFormField from '@/components/designSystem/molecules/FgFormField';
+import { isReadOnlyFsp } from '@/utils/cloudStorage';
 
 export default function ZonesBrowser({
   searchQuery,
@@ -108,12 +109,18 @@ export default function ZonesBrowser({
             ) : (
               Object.entries(displayZones).map(([key, value]) => {
                 if (key.startsWith('zone') && 'fileSharePaths' in value) {
+                  const fileSharePaths = value.fileSharePaths.filter(
+                    fsp => !isReadOnlyFsp(fsp)
+                  );
+                  if (fileSharePaths.length === 0) {
+                    return null;
+                  }
                   return (
                     <Zone
                       key={key}
                       openZones={openZones}
                       toggleOpenZones={toggleOpenZones}
-                      zone={value}
+                      zone={{ ...value, fileSharePaths }}
                     />
                   );
                 }

@@ -51,6 +51,9 @@ export type FolderPreference = {
 export type ViewerUrlSource = 'configured' | 'manifest' | { custom: string };
 export type ViewerUrlSources = Record<string, ViewerUrlSource>;
 
+/** Where the metadata panel's Neuroglancer button opens a dataset. */
+export type NeuroglancerButtonTarget = 'views' | 'standalone';
+
 type PreferencesContextType = {
   //Full query for accessing loading/error states
   preferenceQuery: ReturnType<typeof usePreferencesQuery>;
@@ -65,6 +68,8 @@ type PreferencesContextType = {
   disableHeuristicalLayerTypeDetection: boolean;
   useLegacyMultichannelApproach: boolean;
   viewerUrlSources: ViewerUrlSources;
+  neuroglancerButtonTarget: NeuroglancerButtonTarget;
+  viewsNeuroglancerUrlSource: ViewerUrlSource;
   isFilteredByGroups: boolean;
   showTutorial: boolean;
   defaultExtraArgs: string;
@@ -101,6 +106,12 @@ type PreferencesContextType = {
     viewerKey: string,
     source: ViewerUrlSource
   ) => Promise<Result<void>>;
+  setNeuroglancerButtonTarget: (
+    target: NeuroglancerButtonTarget
+  ) => Promise<Result<void>>;
+  setViewsNeuroglancerUrlSource: (
+    source: ViewerUrlSource
+  ) => Promise<Result<void>>;
   toggleFilterByGroups: () => Promise<Result<void>>;
   toggleShowTutorial: () => Promise<Result<void>>;
   updateDefaultExtraArgs: (args: string) => Promise<Result<void>>;
@@ -110,6 +121,7 @@ type PreferencesContextType = {
     type: 'zone' | 'fileSharePath' | 'folder'
   ) => Promise<Result<boolean>>;
   handleContextMenuFavorite: () => Promise<Result<boolean>>;
+  removeFavoritesForFsp: (fspName: string) => Promise<Result<void>>;
 };
 
 const PreferencesContext = createContext<PreferencesContextType | null>(null);
@@ -293,6 +305,34 @@ export const PreferencesProvider = ({
     }
   };
 
+  const setNeuroglancerButtonTarget = async (
+    target: NeuroglancerButtonTarget
+  ): Promise<Result<void>> => {
+    try {
+      await updatePreferenceMutation.mutateAsync({
+        key: 'neuroglancerButtonTarget',
+        value: target
+      });
+      return createSuccess(undefined);
+    } catch (error) {
+      return handleError(error);
+    }
+  };
+
+  const setViewsNeuroglancerUrlSource = async (
+    source: ViewerUrlSource
+  ): Promise<Result<void>> => {
+    try {
+      await updatePreferenceMutation.mutateAsync({
+        key: 'viewsNeuroglancerUrlSource',
+        value: source
+      });
+      return createSuccess(undefined);
+    } catch (error) {
+      return handleError(error);
+    }
+  };
+
   const toggleShowTutorial = async (): Promise<Result<void>> => {
     return togglePreference(
       'showTutorial',
@@ -435,6 +475,39 @@ export const PreferencesProvider = ({
       return handleError(error);
     }
     return createSuccess(favoriteAdded);
+  };
+
+  // One write per list: sequential toggles would each start from the same stale map
+  const removeFavoritesForFsp = async (
+    fspName: string
+  ): Promise<Result<void>> => {
+    try {
+      const fspMap = preferencesQuery.data?.fileSharePathPreferenceMap || {};
+      const fspKey = makeMapKey('fsp', fspName);
+      if (fspKey in fspMap) {
+        await updatePreferenceListMutation.mutateAsync({
+          preferenceKey: 'fileSharePath',
+          updatedMap: Object.fromEntries(
+            Object.entries(fspMap).filter(([key]) => key !== fspKey)
+          )
+        });
+      }
+      const folderMap = preferencesQuery.data?.folderPreferenceMap || {};
+      const updatedFolders = Object.fromEntries(
+        Object.entries(folderMap).filter(([, pref]) => pref.fspName !== fspName)
+      );
+      if (
+        Object.keys(updatedFolders).length !== Object.keys(folderMap).length
+      ) {
+        await updatePreferenceListMutation.mutateAsync({
+          preferenceKey: 'folder',
+          updatedMap: updatedFolders
+        });
+      }
+    } catch (error) {
+      return handleError(error);
+    }
+    return createSuccess(undefined);
   };
 
   const handleContextMenuFavorite = async (): Promise<Result<boolean>> => {
@@ -587,6 +660,10 @@ export const PreferencesProvider = ({
     useLegacyMultichannelApproach:
       preferencesQuery.data?.useLegacyMultichannelApproach || false,
     viewerUrlSources: preferencesQuery.data?.viewerUrlSources || {},
+    neuroglancerButtonTarget:
+      preferencesQuery.data?.neuroglancerButtonTarget ?? 'views',
+    viewsNeuroglancerUrlSource:
+      preferencesQuery.data?.viewsNeuroglancerUrlSource ?? 'configured',
     isFilteredByGroups: preferencesQuery.data?.isFilteredByGroups ?? true,
     showTutorial: preferencesQuery.data?.showTutorial ?? true,
     defaultExtraArgs: preferencesQuery.data?.defaultExtraArgs || '',
@@ -617,12 +694,15 @@ export const PreferencesProvider = ({
     toggleDisableHeuristicalLayerTypeDetection,
     toggleUseLegacyMultichannelApproach,
     setViewerUrlSource,
+    setNeuroglancerButtonTarget,
+    setViewsNeuroglancerUrlSource,
     toggleFilterByGroups,
     toggleShowTutorial,
     updateDefaultExtraArgs,
     updateApptainerCacheDir,
     handleFavoriteChange,
-    handleContextMenuFavorite
+    handleContextMenuFavorite,
+    removeFavoritesForFsp
   };
 
   return (
