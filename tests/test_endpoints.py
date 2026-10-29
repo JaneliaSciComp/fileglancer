@@ -2469,3 +2469,39 @@ def test_remove_view_sources(test_client, temp_dir):
     assert resp.json()["layers"] == [] and resp.json()["ng_state"]["layers"] == []
     assert test_client.post(url, json={"sources": [src]}).status_code == 404
     assert test_client.post(url, json={"sources": []}).status_code == 400
+
+
+@pytest.mark.parametrize("bad", ["../x", "/abs", "a/../../x"])
+@pytest.mark.parametrize("method, url, kwargs", [
+    ("PUT", "/api/content/tempdir?subpath={bad}", {"content": b"data"}),
+    ("POST", "/api/files/tempdir?subpath={bad}", {"json": {"type": "file"}}),
+    ("PATCH", "/api/files/tempdir?subpath=x.txt", {"json": {"path": "{bad}"}}),
+])
+def test_write_routes_reject_escaping_subpath(test_client, temp_dir, method, url, kwargs, bad):
+    """Every write route applies the same lexical traversal check with the same 400."""
+    with open(os.path.join(temp_dir, "x.txt"), "w") as f:
+        f.write("x")
+    kwargs = json.loads(json.dumps(kwargs).replace("{bad}", bad)) if "json" in kwargs else kwargs
+    response = test_client.request(method, url.replace("{bad}", quote(bad, safe="")), **kwargs)
+    assert response.status_code == 400
+    assert response.json() == {"error": "Path cannot escape the current directory"}
+    assert not os.path.exists(os.path.join(os.path.dirname(temp_dir), "x"))
+
+
+def test_content_last_modified_is_an_http_date(test_client, temp_dir):
+    """Last-Modified is an RFC 7231 HTTP-date on GET and HEAD, matching the file's mtime."""
+    from email.utils import parsedate_to_datetime
+    path = os.path.join(temp_dir, "dated.txt")
+    with open(path, "w") as f:
+        f.write("v1")
+    for method in ("GET", "HEAD"):
+        value = test_client.request(method, "/api/content/tempdir?subpath=dated.txt").headers["Last-Modified"]
+        assert value.endswith(" GMT")
+        assert parsedate_to_datetime(value).timestamp() == int(os.stat(path).st_mtime)
+
+
+def test_get_file_content_multi_range_returns_full_body(test_client, temp_dir):
+    with open(os.path.join(temp_dir, "multi.txt"), "w") as f:
+        f.write("0123456789")
+    response = test_client.get("/api/content/tempdir?subpath=multi.txt", headers={"Range": "bytes=0-1,3-4"})
+    assert response.status_code == 200 and response.content == b"0123456789"

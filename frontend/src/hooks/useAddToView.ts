@@ -86,7 +86,7 @@ export function useAddToView(
             datasetKey(d.fsp_name, d.path) ===
               datasetKey(row.fsp_name, row.path)
         );
-        if (ds && ds.sharing_key !== row.sharing_key) {
+        if (ds && ds.sharing_key && ds.sharing_key !== row.sharing_key) {
           current = rewriteDataLinkSegment(
             current,
             dataLinkSegment(row.sharing_key, row.url_prefix),

@@ -13,7 +13,7 @@ import {
   HiOutlineSquares2X2,
   HiOutlineRectangleStack
 } from 'react-icons/hi2';
-import { TbFile } from 'react-icons/tb';
+import { TbBucket, TbFile } from 'react-icons/tb';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgCheckbox from '@/components/designSystem/atoms/formElements/FgCheckbox';
@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/BrowsePage/fileTableColumns';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { getPreferredPathForDisplay, makeMapKey } from '@/utils';
+import { isReadOnlyFsp } from '@/utils/cloudStorage';
 
 type FileSelectorTableProps = {
   readonly data: FileOrFolder[];
@@ -84,16 +85,15 @@ export default function FileSelectorTable({
               />
             );
           } else if (currentLocation.type === 'zone') {
-            // At zone level: show FSP icon and use preferred path format
+            // At zone level: show FSP (or bucket) icon and use preferred path format
+            const fspKey = makeMapKey('fsp', name);
+            const fsp = zonesData?.[fspKey] as FileSharePath;
             icon = (
               <FgIcon
                 className="text-foreground flex-shrink-0"
-                icon={HiOutlineRectangleStack}
+                icon={isReadOnlyFsp(fsp) ? TbBucket : HiOutlineRectangleStack}
               />
             );
-            // Get FSP from zonesData and display in preferred format
-            const fspKey = makeMapKey('fsp', name);
-            const fsp = zonesData?.[fspKey] as FileSharePath;
             if (fsp) {
               displayName = getPreferredPathForDisplay(pathPreference, fsp);
             }

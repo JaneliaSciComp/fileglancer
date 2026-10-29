@@ -121,6 +121,7 @@ type PreferencesContextType = {
     type: 'zone' | 'fileSharePath' | 'folder'
   ) => Promise<Result<boolean>>;
   handleContextMenuFavorite: () => Promise<Result<boolean>>;
+  removeFavoritesForFsp: (fspName: string) => Promise<Result<void>>;
 };
 
 const PreferencesContext = createContext<PreferencesContextType | null>(null);
@@ -476,6 +477,39 @@ export const PreferencesProvider = ({
     return createSuccess(favoriteAdded);
   };
 
+  // One write per list: sequential toggles would each start from the same stale map
+  const removeFavoritesForFsp = async (
+    fspName: string
+  ): Promise<Result<void>> => {
+    try {
+      const fspMap = preferencesQuery.data?.fileSharePathPreferenceMap || {};
+      const fspKey = makeMapKey('fsp', fspName);
+      if (fspKey in fspMap) {
+        await updatePreferenceListMutation.mutateAsync({
+          preferenceKey: 'fileSharePath',
+          updatedMap: Object.fromEntries(
+            Object.entries(fspMap).filter(([key]) => key !== fspKey)
+          )
+        });
+      }
+      const folderMap = preferencesQuery.data?.folderPreferenceMap || {};
+      const updatedFolders = Object.fromEntries(
+        Object.entries(folderMap).filter(([, pref]) => pref.fspName !== fspName)
+      );
+      if (
+        Object.keys(updatedFolders).length !== Object.keys(folderMap).length
+      ) {
+        await updatePreferenceListMutation.mutateAsync({
+          preferenceKey: 'folder',
+          updatedMap: updatedFolders
+        });
+      }
+    } catch (error) {
+      return handleError(error);
+    }
+    return createSuccess(undefined);
+  };
+
   const handleContextMenuFavorite = async (): Promise<Result<boolean>> => {
     if (fileQuery.data?.currentFileSharePath) {
       return await handleFavoriteChange(
@@ -667,7 +701,8 @@ export const PreferencesProvider = ({
     updateDefaultExtraArgs,
     updateApptainerCacheDir,
     handleFavoriteChange,
-    handleContextMenuFavorite
+    handleContextMenuFavorite,
+    removeFavoritesForFsp
   };
 
   return (

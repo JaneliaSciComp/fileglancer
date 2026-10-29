@@ -7,21 +7,24 @@ import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgFormField from '@/components/designSystem/molecules/FgFormField';
 import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
 
-interface RenameJobDialogProps {
+interface RenameNameDialogProps {
   readonly open: boolean;
+  /** Dialog heading, e.g. "Rename Job". */
+  readonly title: string;
   readonly initialName: string;
   readonly onClose: () => void;
   readonly onSave: (name: string) => Promise<void>;
   readonly saving: boolean;
 }
 
-export default function RenameJobDialog({
+export default function RenameNameDialog({
   open,
+  title,
   initialName,
   onClose,
   onSave,
   saving
-}: RenameJobDialogProps) {
+}: RenameNameDialogProps) {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
 
@@ -42,18 +45,18 @@ export default function RenameJobDialog({
       await onSave(name.trim());
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to rename job');
+      setError(e instanceof Error ? e.message : 'Failed to rename');
     }
   };
 
   return (
     <FgDialog className="max-w-lg" onClose={onClose} open={open}>
       <Typography className="text-foreground font-bold mb-4 pr-8" type="h6">
-        Rename Job
+        {title}
       </Typography>
-      <FgFormField htmlFor="rename-job-name" label="Name">
+      <FgFormField htmlFor="rename-name" label="Name">
         <FgInput
-          id="rename-job-name"
+          id="rename-name"
           onChange={e => {
             setName(e.target.value);
             setError('');

@@ -314,6 +314,38 @@ describe('buildViewState', () => {
     expect(layers[0].localPosition).toEqual([0]);
     expect(layers[1].localPosition).toEqual([2]);
   });
+  it("keeps a dataset's label layers shown past index 4", async () => {
+    (generateNeuroglancerStateForOmeZarr as any).mockImplementation(() =>
+      encoded({
+        layers: [
+          { name: 'raw', type: 'image' },
+          ...['l1', 'l2', 'l3', 'l4', 'l5'].map(name => ({
+            name,
+            type: 'segmentation'
+          }))
+        ]
+      })
+    );
+    const { ng_state } = await buildViewState([
+      {
+        url: 'a',
+        sharing_key: 'ka',
+        url_prefix: 'a',
+        fsp_name: 'f',
+        path: '/a',
+        label: 'A'
+      }
+    ]);
+    expect((ng_state as any).layers.map((l: any) => l.archived)).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]);
+  });
+
   it('renames layers that would share a name across datasets', async () => {
     (generateNeuroglancerStateForOmeZarr as any).mockReturnValue(
       encoded({ layers: [{ name: 'DAPI' }] })
@@ -420,6 +452,17 @@ describe('appendLayers', () => {
       false,
       true
     ]);
+  });
+
+  it('keeps appended label layers shown past index 4', () => {
+    const merged = appendLayers(
+      { layers: [{ name: 'a' }, { name: 'b' }, { name: 'c' }, { name: 'd' }] },
+      [
+        { name: 'e', type: 'image' },
+        { name: 'f', type: 'segmentation' }
+      ]
+    );
+    expect(merged.layers?.slice(4).map(l => l.archived)).toEqual([true, false]);
   });
 
   it('handles a state without layers', () => {

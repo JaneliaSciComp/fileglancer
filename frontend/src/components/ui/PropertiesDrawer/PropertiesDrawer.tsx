@@ -21,6 +21,7 @@ import TextDialogBtn from '@/components/ui/buttons/DialogTextBtn';
 import FgSwitch from '@/components/ui/widgets/FgSwitch';
 import { getPreferredPathForDisplay } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
+import { isReadOnlyFsp } from '@/utils/cloudStorage';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { useCartContext } from '@/contexts/CartContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
@@ -113,6 +114,7 @@ export default function PropertiesDrawer({
   // (the row-menu action only covers subdirectories). Any directory can be
   // added; the cart row's status icon says whether it will load as a layer.
   const currentFsp = fileQuery.data?.currentFileSharePath;
+  const readOnly = isReadOnlyFsp(currentFsp);
   const currentItem = fileQuery.data?.currentFileOrFolder;
 
   const handleAddCurrentDirToCart = async () => {
@@ -251,7 +253,8 @@ export default function PropertiesDrawer({
                 className="flex flex-col flex-1 min-h-0 "
                 key="file-properties-tabs"
                 onValueChange={setActiveTab}
-                value={activeTab}
+                // Overview is the only tab a read-only share has
+                value={readOnly ? 'overview' : activeTab}
               >
                 <Tabs.List className="justify-start items-stretch shrink-0 min-w-fit w-full py-2 bg-surface dark:bg-surface-light">
                   <Tabs.Trigger
@@ -261,15 +264,18 @@ export default function PropertiesDrawer({
                     Overview
                   </Tabs.Trigger>
 
-                  <Tabs.Trigger
-                    className="!text-foreground h-full"
-                    value="permissions"
-                  >
-                    Permissions
-                  </Tabs.Trigger>
+                  {!readOnly ? (
+                    <Tabs.Trigger
+                      className="!text-foreground h-full"
+                      value="permissions"
+                    >
+                      Permissions
+                    </Tabs.Trigger>
+                  ) : null}
 
                   {tasksEnabled &&
-                  !fileBrowserState.propertiesTarget.is_symlink ? (
+                  !fileBrowserState.propertiesTarget.is_symlink &&
+                  !readOnly ? (
                     <Tabs.Trigger
                       className="!text-foreground h-full"
                       value="convert"
@@ -353,7 +359,9 @@ export default function PropertiesDrawer({
                           type="small"
                         >
                           {externalDataUrlQuery.data
-                            ? 'Public data link already exists since this data is on s3.janelia.org.'
+                            ? readOnly
+                              ? 'This bucket is public, so its data link already exists.'
+                              : 'Public data link already exists since this data is on s3.janelia.org.'
                             : proxiedPathByFspAndPathQuery.data
                               ? 'Deleting the data link will remove data access for collaborators with the link.'
                               : 'Creating a data link allows you to share the data at this path with internal collaborators or use tools to view the data.'}
@@ -413,24 +421,28 @@ export default function PropertiesDrawer({
                 </Tabs.Panel>
 
                 {/*Permissions panel*/}
-                <Tabs.Panel
-                  className="flex flex-col max-w-full gap-4 flex-1 p-2"
-                  value="permissions"
-                >
-                  <PermissionsTable file={fileBrowserState.propertiesTarget} />
-                  <FgButton
-                    className="!text-primary !text-nowrap !self-start"
-                    disabled={
-                      fileBrowserState.propertiesTarget.hasWrite === false
-                    }
-                    onClick={() => {
-                      setShowPermissionsDialog(true);
-                    }}
-                    variant="outline"
+                {!readOnly ? (
+                  <Tabs.Panel
+                    className="flex flex-col max-w-full gap-4 flex-1 p-2"
+                    value="permissions"
                   >
-                    Change Permissions
-                  </FgButton>
-                </Tabs.Panel>
+                    <PermissionsTable
+                      file={fileBrowserState.propertiesTarget}
+                    />
+                    <FgButton
+                      className="!text-primary !text-nowrap !self-start"
+                      disabled={
+                        fileBrowserState.propertiesTarget.hasWrite === false
+                      }
+                      onClick={() => {
+                        setShowPermissionsDialog(true);
+                      }}
+                      variant="outline"
+                    >
+                      Change Permissions
+                    </FgButton>
+                  </Tabs.Panel>
+                ) : null}
 
                 {/*Task panel*/}
                 {tasksEnabled &&

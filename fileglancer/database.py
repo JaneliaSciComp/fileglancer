@@ -17,9 +17,9 @@ from cachetools import LRUCache, TTLCache
 
 from fileglancer.giturls import canonical_github_url
 from fileglancer.model import FileSharePath
-from fileglancer.ngstate import data_link_segment, default_url_prefix, layer_sharing_key, layer_uses_segment, rewrite_layer_segment
+from fileglancer.ngstate import bucket_source, data_link_segment, default_url_prefix, layer_sharing_key, layer_uses_segment, rewrite_layer_segment
 from fileglancer.settings import get_settings
-from fileglancer.utils import slugify_path
+from fileglancer.utils import s3_public_url, slugify_path
 
 # Constants
 SHARING_KEY_LENGTH = 12
@@ -75,6 +75,24 @@ class ExternalBucketDB(Base):
     external_url = Column(String)
     fsp_name = Column(String, nullable=False)
     relative_path = Column(String)
+
+
+class CloudBucketDB(Base):
+    """Database model for a user's own public cloud bucket"""
+    __tablename__ = 'cloud_buckets'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String, nullable=False, index=True)
+    name = Column(String, nullable=False)
+    protocol = Column(String, nullable=False, default='s3')
+    label = Column(String, nullable=False)
+    bucket = Column(String, nullable=False)
+    prefix = Column(String, nullable=False, server_default='')
+    endpoint_url = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+
+    __table_args__ = (
+        UniqueConstraint('username', 'name', name='uq_cloud_bucket_name'),
+    )
 
 
 class LastRefreshDB(Base):
@@ -284,6 +302,9 @@ class UserAppDB(Base):
     url = Column(String, nullable=False)
     manifest_path = Column(String, nullable=False, server_default="")
     name = Column(String, nullable=False)
+    # User-chosen label that overrides `name` for display. Unlike `name`, it is
+    # never touched by an update, so a rename survives manifest changes.
+    display_name = Column(String, nullable=True)
     description = Column(String, nullable=True)
     branch = Column(String, nullable=True)
     # Commit the app is pinned to: jobs run from an immutable snapshot of this
@@ -299,6 +320,10 @@ class UserAppDB(Base):
     __table_args__ = (
         UniqueConstraint('username', 'url', 'manifest_path', name='uq_user_app'),
     )
+
+    @property
+    def effective_name(self) -> str:
+        return self.display_name or self.name
 
 
 class AppListingDB(Base):
@@ -556,7 +581,54 @@ def _load_file_share_paths(session: Session) -> List[FileSharePath]:
     ) for path in db_paths]
 
 
-def get_file_share_paths(session: Session, fsp_name: Optional[str] = None):
+def cloud_bucket_to_fsp(row: CloudBucketDB) -> FileSharePath:
+    """Present a user's cloud bucket as a file share path; its path is the public HTTPS URL"""
+    return FileSharePath(
+        name=row.name,
+        zone=row.protocol.upper(),
+        group='cloud',
+        storage=row.label,
+        mount_path=s3_public_url(row.bucket, row.endpoint_url, row.prefix),
+        protocol=row.protocol,
+    )
+
+
+def get_cloud_buckets(session: Session, username: str) -> List[CloudBucketDB]:
+    return session.query(CloudBucketDB).filter_by(username=username).order_by(CloudBucketDB.name).all()
+
+
+def bucket_url_roots(session: Session, username: str) -> List[Tuple[str, str]]:
+    """(fsp_name, public base URL) of each of the user's buckets, for ngstate.bucket_source."""
+    return [(b.name, s3_public_url(b.bucket, b.endpoint_url, b.prefix)) for b in get_cloud_buckets(session, username)]
+
+
+def get_cloud_bucket(session: Session, username: str, name: str) -> Optional[CloudBucketDB]:
+    return session.query(CloudBucketDB).filter_by(username=username, name=name).first()
+
+
+def create_cloud_bucket(session: Session, username: str, name: str, protocol: str,
+                        label: str, bucket: str, prefix: str,
+                        endpoint_url: Optional[str]) -> CloudBucketDB:
+    if get_cloud_bucket(session, username, name):
+        raise ValueError(f"A bucket named '{name}' already exists")
+    row = CloudBucketDB(username=username, name=name, protocol=protocol, label=label,
+                        bucket=bucket, prefix=prefix, endpoint_url=endpoint_url)
+    session.add(row)
+    session.commit()
+    return row
+
+
+def delete_cloud_bucket(session: Session, username: str, name: str) -> bool:
+    """Delete a user's bucket; False if there is no such bucket"""
+    row = get_cloud_bucket(session, username, name)
+    if not row:
+        return False
+    session.delete(row)
+    session.commit()
+    return True
+
+
+def get_file_share_paths(session: Session, fsp_name: Optional[str] = None, username: Optional[str] = None):
     """
     Get all file share paths from either the local configuration or the database.
 
@@ -573,6 +645,8 @@ def get_file_share_paths(session: Session, fsp_name: Optional[str] = None):
     Args:
         session: Database session
         fsp_name: Optional name to filter by
+        username: If given, that user's cloud buckets are appended after the
+            site shares (never cached, so site shares win name clashes)
 
     Returns:
         List of FileSharePath objects ready to be used in responses
@@ -581,15 +655,18 @@ def get_file_share_paths(session: Session, fsp_name: Optional[str] = None):
     paths = _fsp_cache.get(key)
     if paths is None:
         paths = _fsp_cache[key] = _load_file_share_paths(session)
+    # Copy so a caller mutating the list can't corrupt the cached one.
+    paths = list(paths)
+    if username:
+        paths += [cloud_bucket_to_fsp(b) for b in get_cloud_buckets(session, username)]
     if fsp_name:
         return [path for path in paths if path.name == fsp_name]
-    # Copy so a caller mutating the list can't corrupt the cached one.
-    return list(paths)
+    return paths
 
 
-def get_file_share_path(session: Session, name: str) -> Optional[FileSharePath]:
-    """Get a file share path by name"""
-    paths = get_file_share_paths(session, name)
+def get_file_share_path(session: Session, name: str, username: Optional[str] = None) -> Optional[FileSharePath]:
+    """Get a file share path by name; a site share wins over the user's same-named bucket"""
+    paths = get_file_share_paths(session, name, username)
     return paths[0] if paths else None
 
 
@@ -1135,20 +1212,26 @@ def reconcile_view_layers(session: Session, view: ViewDB, proxy_url: str) -> Non
     the real layers. Does not commit."""
     old = list(view.layers)
     unsupported = [l for l in old if (l.opts or {}).get('unsupported')]
-    keyed: Dict[str, List[ViewLayerDB]] = {}
+    # Data Link rows by key, bucket rows by dataset: a bucket layer has no key.
+    keyed: Dict[object, List[ViewLayerDB]] = {}
     legacy: List[ViewLayerDB] = []  # broken before keys were recorded
     for l in old:
         if l in unsupported:
             continue
         if l.sharing_key:
             keyed.setdefault(l.sharing_key, []).append(l)
-        elif l.broken and l.fsp_name is not None and l.path is not None:
-            legacy.append(l)
+        elif l.fsp_name is not None and l.path is not None:
+            if l.broken:
+                legacy.append(l)
+            else:
+                keyed.setdefault((l.fsp_name, l.path), []).append(l)
+    roots = bucket_url_roots(session, view.owner)
 
     rows: List[Dict] = []
     for i, ng_layer in enumerate(view.ng_state.get('layers') or []):
         key = layer_sharing_key(ng_layer, proxy_url) if isinstance(ng_layer, dict) else None
-        prev = keyed[key].pop(0) if key and keyed.get(key) else None
+        bucket = bucket_source(ng_layer, roots) if not key and isinstance(ng_layer, dict) else None
+        prev = keyed[key or bucket].pop(0) if (key or bucket) and keyed.get(key or bucket) else None
         pp = get_proxied_path_by_sharing_key(session, key) if key else None
         if pp:
             row = dict(sharing_key=key, url_prefix=pp.url_prefix, data_link_id=pp.id,
@@ -1163,8 +1246,9 @@ def reconcile_view_layers(session: Session, view: ViewDB, proxy_url: str) -> Non
                        fsp_name=prev.fsp_name if prev else None,
                        path=prev.path if prev else None, broken=True)
         else:
+            fsp_name, path = bucket or (None, None)
             row = dict(sharing_key=None, url_prefix=None, data_link_id=None,
-                       fsp_name=None, path=None, broken=False)
+                       fsp_name=fsp_name, path=path, broken=False)
         row.update(layer_index=i,
                    channel=prev.channel if prev else None,
                    opts=prev.opts if prev else None)
@@ -1797,6 +1881,21 @@ def update_user_app_manifest_cache(session: Session, username: str, url: str,
     row.manifest = manifest
     if bump_updated_at:
         row.updated_at = datetime.now(UTC)
+    session.commit()
+    return row
+
+
+def set_user_app_display_name(session: Session, username: str, url: str,
+                              manifest_path: str = "", *,
+                              display_name: Optional[str]) -> Optional[UserAppDB]:
+    """Set (or with None, clear) the user's custom label for an app.
+
+    Returns None when the app doesn't exist.
+    """
+    row = get_user_app(session, username, url, manifest_path)
+    if row is None:
+        return None
+    row.display_name = display_name
     session.commit()
     return row
 

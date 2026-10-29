@@ -1,6 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { IconType } from 'react-icons';
-import { Link, useNavigate, useParams } from 'react-router';
+import {
+  Link,
+  Navigate,
+  useLocation,
+  useNavigate,
+  useParams
+} from 'react-router';
 import { IconButton, Typography } from '@material-tailwind/react';
 import toast from 'react-hot-toast';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
@@ -15,6 +21,7 @@ import {
 } from 'react-icons/hi';
 
 import { useViewStateByReadKey } from '@/queries/viewQueries';
+import type { ViewLayer } from '@/queries/viewQueries';
 import { useViewsContext } from '@/contexts/ViewsContext';
 import {
   useInternalNeuroglancerBaseUrl,
@@ -23,6 +30,12 @@ import {
 import { useCanEditView } from '@/hooks/useCanEditView';
 import { useNeuroglancerViewer } from '@/hooks/useNeuroglancerViewer';
 import { useViewEditState } from '@/hooks/useViewEditState';
+import {
+  DRAFT_VIEW_PATH,
+  clearDraft,
+  loadDraft
+} from '@/hooks/useCreateViewFlow';
+import type { ViewDraft } from '@/hooks/useCreateViewFlow';
 import { constructNeuroglancerUrl } from '@/utils/neuroglancerUrl';
 import { downloadTextFile } from '@/utils';
 import { copyToClipboard } from '@/utils/copyText';
@@ -91,12 +104,43 @@ const warnChangesLost = () =>
 export default function NeuroglancerView() {
   const { readKey } = useParams();
   const navigate = useNavigate();
-  const stateQuery = useViewStateByReadKey(readKey);
+  // /view/new shows an unsaved draft: opened in a new tab it comes from
+  // localStorage (?draft=id), otherwise from router state. Save creates it
+  // and moves to its real URL.
+  const isDraftRoute = `/view/${readKey}` === DRAFT_VIEW_PATH;
+  const location = useLocation();
+  const draftId = new URLSearchParams(location.search).get('draft');
+  const draft = useMemo(
+    () =>
+      (location.state as { draft?: ViewDraft } | null)?.draft ??
+      loadDraft(draftId),
+    [location.state, draftId]
+  );
+  const stateQuery = useViewStateByReadKey(isDraftRoute ? undefined : readKey);
+  // The rows Save will create, so the sidebar can group the draft's layers
+  // into datasets the way it does for saved ones.
+  const draftLayers = useMemo<ViewLayer[]>(
+    () =>
+      (draft?.layers ?? []).map(l => {
+        const ds = draft?.datasets.find(d => d.sharing_key === l.sharing_key);
+        return {
+          ...l,
+          data_link_id: null,
+          broken: false,
+          fsp_name: ds?.fsp_name ?? null,
+          path: ds?.path ?? null,
+          url_prefix: ds?.url_prefix ?? null
+        };
+      }),
+    [draft]
+  );
   // The public read_key endpoint returns only ng_state. Ownership, name and
   // short_key come from the owner's own Views list (cached app-wide); a miss
   // means "not mine" and the title renders read-only.
-  const { updateViewMutation } = useViewsContext();
-  const { canEdit, view: ownedView } = useCanEditView(readKey);
+  const { createViewMutation, updateViewMutation } = useViewsContext();
+  const owned = useCanEditView(readKey);
+  const ownedView = owned.view;
+  const canEdit = owned.canEdit || !!draft;
   const baseUrl = useInternalNeuroglancerBaseUrl();
   // The new tab isn't framed, so it can honor the Views Internal/Public preference.
   const preferredBaseUrl = useViewsNeuroglancerBaseUrl();
@@ -104,7 +148,7 @@ export default function NeuroglancerView() {
   const [iframe, setIframe] = useState<HTMLIFrameElement | null>(null);
   const bridge = useNeuroglancerViewer(iframe);
   const editState = useViewEditState(bridge, warnChangesLost);
-  const ngState = stateQuery.data;
+  const ngState = draft?.ng_state ?? stateQuery.data;
 
   // Set once from the first loaded state: later refetches (rename, Save)
   // must not reload Neuroglancer. Changes after load go through the bridge.
@@ -144,8 +188,10 @@ export default function NeuroglancerView() {
     null
   );
 
-  const { dirty } = editState;
+  // A draft is unsaved by definition.
+  const dirty = editState.dirty || !!draft;
   const canAddData = canEdit && bridge.status === 'ready';
+  const saving = updateViewMutation.isPending || createViewMutation.isPending;
   useEffect(() => {
     if (!dirty || !canEdit) {
       return;
@@ -189,7 +235,11 @@ export default function NeuroglancerView() {
     };
   }, [dirty, canEdit, navigate]);
 
-  if (stateQuery.isPending || !baseUrl || awaitingFreshState) {
+  if (isDraftRoute && !draft) {
+    return <Navigate replace to="/ngviews" />;
+  }
+
+  if (!baseUrl || (!draft && (stateQuery.isPending || awaitingFreshState))) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <Typography className="text-foreground">Loading View…</Typography>
@@ -206,7 +256,11 @@ export default function NeuroglancerView() {
     );
   }
 
-  const title = ownedView?.name || (ngState.title as string) || 'Untitled View';
+  const title =
+    ownedView?.name ||
+    draft?.name ||
+    (ngState.title as string) ||
+    'Untitled View';
   const externalUrl = constructNeuroglancerUrl(ngState, baseUrl);
 
   // Owner with unsaved edits: ask first. Otherwise run on the saved state.
@@ -237,14 +291,38 @@ export default function NeuroglancerView() {
 
   /** Resolves to the state that was saved, or null if the save failed. */
   const handleSave = async (): Promise<NgState | null> => {
-    if (!ownedView) {
+    if (!ownedView && !draft) {
       return null;
     }
     try {
       // Inside the try: throws if Neuroglancer is mid-reload.
       const sent = bridge.getState();
+      if (draft) {
+        const view = await createViewMutation.mutateAsync({
+          ...draft,
+          ng_state: sent
+        });
+        // Leave the draft URL first: a failure below must not re-create.
+        clearDraft(draftId);
+        navigate(`/view/${view.read_key}`, { replace: true });
+        // Create records only the draft's own layers. Datasets added from
+        // the sidebar are recorded the way a Save records them: an update
+        // rebuilds the layer rows from ng_state and adds unsupported sources.
+        if (editState.added.length > 0 || editState.pendingSources.length > 0) {
+          await updateViewMutation.mutateAsync({
+            short_key: view.short_key,
+            ng_state: sent,
+            ...(editState.pendingSources.length > 0 && {
+              unsupported_sharing_keys: editState.pendingSources
+            })
+          });
+        }
+        editState.markSaved(sent);
+        toast.success(`Created View "${draft.name}"`);
+        return sent;
+      }
       await updateViewMutation.mutateAsync({
-        short_key: ownedView.short_key,
+        short_key: ownedView!.short_key,
         ng_state: sent,
         ...(editState.pendingSources.length > 0 && {
           unsupported_sharing_keys: editState.pendingSources
@@ -329,7 +407,7 @@ export default function NeuroglancerView() {
               dirty={dirty}
               onDiscard={editState.discard}
               onSave={() => void handleSave()}
-              saving={updateViewMutation.isPending}
+              saving={saving}
               status={bridge.status}
             />
           ) : null}
@@ -437,7 +515,7 @@ export default function NeuroglancerView() {
                   onClose={() => setSidebarTab(null)}
                   onTabChange={setSidebarTab}
                   tab={sidebarTab}
-                  viewLayers={ownedView?.layers ?? []}
+                  viewLayers={ownedView?.layers ?? draftLayers}
                 />
               </Panel>
             </PanelGroup>
@@ -453,7 +531,7 @@ export default function NeuroglancerView() {
             pendingAction.run(ngState);
           }}
           onSave={() => void saveThenRun(pendingAction)}
-          saving={updateViewMutation.isPending}
+          saving={saving}
         />
       ) : null}
       {relinkTarget ? (

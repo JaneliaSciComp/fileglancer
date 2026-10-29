@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import FgLink from '@/components/designSystem/atoms/FgLink';
 import CancelJobDialog from '@/components/ui/Dialogs/CancelJob';
 import DeleteJobDialog from '@/components/ui/Dialogs/DeleteJob';
-import RenameJobDialog from '@/components/ui/Dialogs/RenameJob';
+import RenameNameDialog from '@/components/ui/Dialogs/RenameName';
 import { TableCard } from '@/components/ui/Table/TableCard';
 import { createAppsJobsColumns } from '@/components/ui/Table/appsJobsColumns';
 import { buildRelaunchPath, parseGithubUrl } from '@/utils';
@@ -140,7 +140,7 @@ export default function AppJobs() {
         open={jobToDelete !== null}
       />
 
-      <RenameJobDialog
+      <RenameNameDialog
         initialName={
           jobToRename
             ? jobToRename.name ||
@@ -151,6 +151,7 @@ export default function AppJobs() {
         onSave={handleConfirmRename}
         open={jobToRename !== null}
         saving={updateJobMutation.isPending}
+        title="Rename Job"
       />
     </div>
   );

@@ -438,7 +438,53 @@ describe('getPreferredPathForDisplay', () => {
     );
   });
 
+  test('falls back to mount_path when OS paths are empty', () => {
+    const bucket = {
+      ...mockFsp,
+      linux_path: '',
+      windows_path: '',
+      mac_path: '',
+      mount_path: 'https://bucket.s3.amazonaws.com'
+    };
+    expect(getPreferredPathForDisplay(['mac_path'], bucket)).toBe(
+      'https://bucket.s3.amazonaws.com'
+    );
+  });
+
   test('returns empty string if fsp is null', () => {
     expect(getPreferredPathForDisplay(['linux_path'], null)).toBe('');
+  });
+
+  test.each(['linux_path', 'mac_path', 'windows_path'] as const)(
+    'keeps the bucket URL intact under the %s preference',
+    pref => {
+      const bucket = {
+        ...mockFsp,
+        linux_path: null,
+        windows_path: null,
+        mac_path: null,
+        mount_path: 'https://bucket.s3.amazonaws.com/zarr',
+        protocol: 's3'
+      } as FileSharePath;
+      expect(getPreferredPathForDisplay([pref], bucket, 'a.ome.zarr/0')).toBe(
+        'https://bucket.s3.amazonaws.com/zarr/a.ome.zarr/0'
+      );
+      expect(getPreferredPathForDisplay([pref], bucket, '/a.ome.zarr/0')).toBe(
+        'https://bucket.s3.amazonaws.com/zarr/a.ome.zarr/0'
+      );
+    }
+  );
+
+  test('keeps a URI mount_path fallback intact without a protocol', () => {
+    const share = {
+      ...mockFsp,
+      linux_path: '',
+      windows_path: '',
+      mac_path: '',
+      mount_path: 'gs://bucket/'
+    };
+    expect(getPreferredPathForDisplay(['windows_path'], share, 'a/b')).toBe(
+      'gs://bucket/a/b'
+    );
   });
 });

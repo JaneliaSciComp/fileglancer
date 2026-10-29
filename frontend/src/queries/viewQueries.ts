@@ -293,7 +293,14 @@ export function useCreateViewMutation(): UseMutationResult<
       );
       return view as View;
     },
-    onSuccess: () => {
+    onSuccess: view => {
+      // Seed the new View's state so the viewer, already showing it as a
+      // draft, doesn't fall back to "Loading" (and reload Neuroglancer)
+      // when its URL changes to the real read_key.
+      queryClient.setQueryData(
+        viewQueryKeys.state(view.read_key),
+        view.ng_state
+      );
       queryClient.invalidateQueries({
         queryKey: viewQueryKeys.all
       });

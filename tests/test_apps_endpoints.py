@@ -1413,3 +1413,54 @@ def test_alembic_migration_moves_legacy_apps(temp_dir, monkeypatch):
     assert prefs == []
     s.close()
     engine.dispose()
+
+
+def test_rename_app_sets_display_name_and_survives_update(test_client, db_session):
+    _seed_app(db_session, manifest=_make_manifest().model_dump(mode="json"))
+
+    response = test_client.patch(
+        "/api/apps",
+        json={"url": "https://github.com/owner/repo", "manifest_path": "",
+              "name": "  My Fork  "},
+    )
+    assert response.status_code == 200
+    assert response.json()["name"] == "My Fork"
+
+    # The manifest name stays in `name`; the user's label lives beside it.
+    row = get_user_app(db_session, TEST_USERNAME, "https://github.com/owner/repo")
+    db_session.refresh(row)
+    assert row.name == "Demo App"
+    assert row.display_name == "My Fork"
+
+    # Listing and updating report the custom name, not the manifest's.
+    assert test_client.get("/api/apps").json()[0]["name"] == "My Fork"
+    with patch("fileglancer.apps.fetch_app_manifest",
+               new=AsyncMock(return_value=_make_manifest(name="Renamed Upstream"))), \
+         _patch_snapshot(TEST_SHA_2):
+        response = test_client.post(
+            "/api/apps/update",
+            json={"url": "https://github.com/owner/repo", "manifest_path": ""},
+        )
+    assert response.status_code == 200
+    assert response.json()["name"] == "My Fork"
+    db_session.refresh(row)
+    assert row.name == "Renamed Upstream"
+    assert row.display_name == "My Fork"
+
+    # An empty name clears the custom label and falls back to the manifest.
+    response = test_client.patch(
+        "/api/apps",
+        json={"url": "https://github.com/owner/repo", "name": ""},
+    )
+    assert response.status_code == 200
+    assert response.json()["name"] == "Renamed Upstream"
+    db_session.refresh(row)
+    assert row.display_name is None
+
+
+def test_rename_app_unknown_returns_404(test_client):
+    response = test_client.patch(
+        "/api/apps",
+        json={"url": "https://github.com/owner/nope", "name": "x"},
+    )
+    assert response.status_code == 404

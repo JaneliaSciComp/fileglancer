@@ -37,6 +37,10 @@ def test_api_scopes_are_exactly_the_six_documented_names():
     ("/api/jobs", "GET", "jobs:read"),
     ("/api/jobs", "POST", "jobs:write"),
     ("/api/jobs/12/cancel", "POST", "jobs:write"),
+    ("/api/cloud-storage/buckets", "GET", "files:read"),
+    ("/api/cloud-storage/buckets", "POST", "files:write"),
+    ("/api/cloud-storage/buckets/idr", "DELETE", "files:write"),
+    ("/api/file-share-paths", "GET", "files:read"),
 ])
 def test_required_scope_maps_path_and_method(path, method, expected):
     assert required_scope(path, method) == expected

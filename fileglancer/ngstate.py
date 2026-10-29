@@ -8,8 +8,8 @@ string, a ``{"url": ...}`` dict, or a list of either; URLs may carry a
 """
 import os
 import re
-from typing import Any, Iterator, Optional
-from urllib.parse import quote
+from typing import Any, Iterable, Iterator, Optional, Tuple
+from urllib.parse import quote, unquote
 
 _SCHEME_PREFIX = re.compile(r'^[a-z0-9+.-]+://(?=https?://)', re.IGNORECASE)
 # A segment ends at a path separator, the NG pipeline separator, a query,
@@ -43,6 +43,19 @@ def layer_sharing_key(layer: dict, proxy_url: str) -> Optional[str]:
         key = _sharing_key_from_url(url, proxy_url)
         if key:
             return key
+    return None
+
+
+def bucket_source(layer: dict, buckets: Iterable[Tuple[str, str]]) -> Optional[Tuple[str, str]]:
+    """(fsp_name, path) of the first source in `layer` served straight from one
+    of `buckets`, given as (fsp_name, public base URL) pairs; None if none is.
+    A bucket layer has no Data Link, so its source URL is the only identity."""
+    roots = sorted(((name, root.rstrip('/')) for name, root in buckets), key=lambda r: -len(r[1]))
+    for url in _iter_source_urls(layer.get('source')):
+        base = re.split(r'[|?#]', _SCHEME_PREFIX.sub('', url), maxsplit=1)[0]
+        for name, root in roots:
+            if base == root or base.startswith(root + '/'):
+                return name, unquote(base[len(root):]).strip('/')
     return None
 
 

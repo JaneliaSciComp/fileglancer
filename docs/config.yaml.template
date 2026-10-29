@@ -235,6 +235,17 @@ session_cookie_secure: true
 #                               # restriction. Loopback, link-local and the other
 #                               # host-local ranges are refused either way.
 
+#
+# Settings for Cloud Storage (user-added public S3 buckets)
+#
+# cloud_storage:
+#   enabled: true               # Show the Cloud Storage section and allow users
+#                               # to add buckets.
+#   allowed_endpoints:          # Which S3 endpoints users may add. Unset: any
+#     - https://s3.example.org  # https endpoint that resolves to public address
+#                               # space. Empty list ([]): AWS only. A list of
+#                               # https origins: only those.
+
 # Cluster configuration
 # Mirrors py-cluster-api ClusterConfig - all fields are optional
 # See: https://github.com/JaneliaSciComp/py-cluster-api

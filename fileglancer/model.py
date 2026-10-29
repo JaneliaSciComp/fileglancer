@@ -39,11 +39,35 @@ class FileSharePath(BaseModel):
         description="The path used to mount the file share on Linux (e.g. /unix/style/path)",
         default=None
     )
+    protocol: str = Field(
+        description="Storage protocol: 'file' for a mounted file share, 's3' for a user-added S3 bucket",
+        default='file'
+    )
 
 class FileSharePathResponse(BaseModel):
     paths: List[FileSharePath] = Field(
         description="A list of file share paths"
     )
+
+
+class CloudBucketCreateRequest(BaseModel):
+    """A public bucket for the current user to add as a share"""
+    protocol: Literal['s3'] = Field(description="Storage protocol", default='s3')
+    bucket: str = Field(description="The bucket name")
+    prefix: Optional[str] = Field(description="Key prefix within the bucket to use as the root", default=None)
+    endpoint_url: Optional[str] = Field(description="S3-compatible endpoint; AWS when omitted", default=None)
+    label: Optional[str] = Field(description="Display name; defaults to bucket/prefix", default=None)
+
+class CloudBucketListResponse(BaseModel):
+    buckets: List[FileSharePath] = Field(description="The current user's buckets")
+
+class CloudBucketDeleteResponse(BaseModel):
+    name: str = Field(description="The name of the removed bucket")
+
+class CloudStorageConfigResponse(BaseModel):
+    enabled: bool = Field(description="Whether users may add cloud buckets")
+    endpoint_url_allowed: bool = Field(description="Whether a custom endpoint may be given at all")
+    allowed_endpoints: Optional[List[str]] = Field(description="Permitted endpoint origins; null means any public host")
     
 class TicketComment(BaseModel):
     """A comment on a ticket"""
@@ -282,8 +306,9 @@ class RelinkRequest(BaseModel):
 
 class ExternalBucket(BaseModel):
     """An external bucket for S3-compatible storage"""
-    id: int = Field(
-        description="The unique identifier for this external bucket"
+    id: Optional[int] = Field(
+        description="The unique identifier for this external bucket; None for a user's cloud bucket",
+        default=None
     )
     full_path: str = Field(
         description="The full path to the external bucket"
@@ -956,7 +981,7 @@ class UserApp(BaseModel):
         description="Pin for the manifest's separate code repo (repo_url), when declared.",
         default=None,
     )
-    name: str = Field(description="App name from manifest")
+    name: str = Field(description="Display name: the user's custom label if set, else the manifest name")
     description: Optional[str] = Field(description="App description from manifest", default=None)
     added_at: datetime = Field(description="When the app was added")
     updated_at: Optional[datetime] = Field(description="When the app was last updated", default=None)
@@ -1044,6 +1069,11 @@ class ManifestFetchRequest(BaseModel):
     """Request to fetch an app manifest"""
     url: str = Field(description="URL to the app manifest or GitHub repo")
     manifest_path: str = Field(description="Relative directory path to the manifest within the repo", default="")
+
+
+class AppRenameRequest(ManifestFetchRequest):
+    """Request to set an app's display name"""
+    name: str = Field(description="New display name; empty resets to the manifest name")
 
 
 class AppAddRequest(BaseModel):

@@ -34,11 +34,14 @@ from fileglancer import database as db
 from fileglancer import auth
 from fileglancer import apps as apps_module
 from fileglancer.giturls import canonical_github_url
+from fileglancer.ngstate import bucket_source
 from fileglancer.model import *
 from fileglancer.settings import get_settings
 from fileglancer.issues import create_jira_ticket, get_jira_ticket_details, delete_jira_ticket
-from fileglancer.utils import format_timestamp, guess_content_type, parse_range_header, make_etag, parse_http_date_to_epoch
+from fileglancer.utils import format_timestamp, guess_content_type, make_etag, parse_http_date_to_epoch, slugify_path
 from fileglancer.filestore import Filestore, RootCheckError
+from fileglancer.s3store import S3Store, S3Error, BUCKET_NAME_RE, normalize_prefix, validate_endpoint_url
+from fileglancer.store import ReadStore, StoreError, StoreRedirect, WorkerStore, WriteStore
 from fileglancer.log import AccessLogMiddleware
 from fileglancer.logconf import configure_logging, disable_uvicorn_access_log
 from fileglancer.worker_pool import (
@@ -47,8 +50,6 @@ from fileglancer.user_worker import serialize_job_for_worker
 from fileglancer import sshkeys
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response, generate_request_id, get_list_xml
-from x2s3.client_file import FileProxyClient
-from x2s3.client import ObjectHandle
 
 
 class RequestIdMiddleware:
@@ -186,6 +187,14 @@ def get_current_user(request: Request):
     return auth.get_current_user(request, settings)
 
 
+def get_optional_user(request: Request) -> Optional[str]:
+    """Like get_current_user, but None instead of an error for an anonymous or under-scoped caller"""
+    try:
+        return get_current_user(request)
+    except HTTPException:
+        return None
+
+
 def _convert_external_bucket(db_bucket: db.ExternalBucketDB) -> ExternalBucket:
     return ExternalBucket(
         id=db_bucket.id,
@@ -197,7 +206,7 @@ def _convert_external_bucket(db_bucket: db.ExternalBucketDB) -> ExternalBucket:
 
 
 def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optional[HttpUrl]) -> ProxiedPath:
-    """Convert a database ProxiedPathDB model to a Pydantic ProxiedPath model"""
+    """Convert a database ProxiedPathDB model to a Pydantic ProxiedPath model."""
     if external_proxy_url:
         url = f"{external_proxy_url}/{db_path.sharing_key}/{quote(db_path.url_prefix, safe='/')}"
     else:
@@ -319,6 +328,18 @@ def _convert_api_token(row: db.ApiTokenDB) -> ApiTokenInfo:
         expires_at=_ensure_utc(row.expires_at),
         last_used_at=_ensure_utc(row.last_used_at),
     )
+
+
+def _safe_subpath(subpath: str) -> str:
+    """
+    Normalize a user-supplied path for a write route and reject one that escapes
+    the share lexically ("../x", "/abs", "a/../../x"). A boundary check only: the
+    worker's Filestore._check_path_in_root is the real containment check.
+    """
+    normalized = os.path.normpath(subpath)
+    if normalized.startswith('..') or os.path.isabs(normalized):
+        raise HTTPException(status_code=400, detail="Path cannot escape the current directory")
+    return normalized
 
 
 def _validate_filename(name: str) -> None:
@@ -495,6 +516,39 @@ def create_app(settings):
             result.pop("_fd", None)
             result.pop("_fd_mode", None)
             return result
+
+    CLOUD_WRITE_ERROR = "Not supported on cloud storage"
+
+    def _store_for(username: str, fsp_name: str, enforce_endpoint: bool = True) -> ReadStore:
+        """The backend serving fsp_name for this user: their bucket, else the worker.
+
+        Site shares win name clashes, so a bucket shadowed by one is never served.
+        A bucket whose endpoint the admin has since removed from the allowlist is 403
+        for data access; pass enforce_endpoint=False where no request reaches the
+        endpoint.
+        """
+        local = WorkerStore(_worker_exec, username, fsp_name)
+        if not settings.cloud_storage.enabled:
+            return local
+        with db.get_db_session(settings.db_url) as session:
+            if db.get_file_share_path(session, fsp_name):
+                return local
+            row = db.get_cloud_bucket(session, username, fsp_name)
+        if row is None:
+            return local
+        store = S3Store.for_bucket(row)
+        allowed = settings.cloud_storage.allowed_endpoints
+        if enforce_endpoint and store.endpoint_url and allowed is not None and store.endpoint_url not in allowed:
+            raise HTTPException(status_code=403, detail="Endpoint no longer allowed on this server")
+        return store
+
+    def _writable_store(username: str, fsp_name: str) -> WriteStore:
+        """Like _store_for, but 405 before anything touches a read-only backend."""
+        store = _store_for(username, fsp_name)
+        if not isinstance(store, WriteStore):
+            raise HTTPException(status_code=405, detail=CLOUD_WRITE_ERROR)
+        return store
+
 
     def _resolve_sharing_key(sharing_key: str, key: str) -> dict | Response:
         """Resolve a sharing key to the shared link's mount path, owner and name.
@@ -710,6 +764,14 @@ def create_app(settings):
                 logger.warning(f"Error shutting down worker pool: {e}")
 
     app = FastAPI(lifespan=lifespan)
+
+    @app.exception_handler(StoreRedirect)
+    async def _store_redirect(request: Request, exc: StoreRedirect):
+        """A path that belongs to another share: 307 to the same route on that share."""
+        url = request.scope["route"].path.split("{", 1)[0] + exc.fsp_name
+        if exc.subpath:
+            url += f"?subpath={exc.subpath}"
+        return RedirectResponse(url=url, status_code=307)
 
     # Add custom access log middleware
     # This logs HTTP access information with authenticated username, and
@@ -968,9 +1030,10 @@ def create_app(settings):
 
     @app.get("/api/file-share-paths", response_model=FileSharePathResponse,
              description="Get all file share paths from the database")
-    async def get_file_share_paths() -> List[FileSharePath]:
+    async def get_file_share_paths(username: Optional[str] = Depends(get_optional_user)) -> List[FileSharePath]:
         with db.get_db_session(settings.db_url) as session:
-            paths = db.get_file_share_paths(session)
+            paths = db.get_file_share_paths(
+                session, username=username if settings.cloud_storage.enabled else None)
             return FileSharePathResponse(paths=paths)
 
 
@@ -983,11 +1046,84 @@ def create_app(settings):
 
 
     @app.get("/api/external-buckets/{fsp_name}", response_model=ExternalBucketResponse,
-             description="Get the external buckets for a given FSP name")
-    async def get_external_buckets(fsp_name: str) -> ExternalBucket:
+             description="Get the external buckets for a given FSP name; a user's cloud bucket is its own external bucket")
+    async def get_external_buckets(fsp_name: str, username: Optional[str] = Depends(get_optional_user)) -> ExternalBucket:
         with db.get_db_session(settings.db_url) as session:
             buckets = [_convert_external_bucket(bucket) for bucket in db.get_external_buckets(session, fsp_name)]
-            return ExternalBucketResponse(buckets=buckets)
+        store = _store_for(username, fsp_name, enforce_endpoint=False) if username and not buckets else None
+        if isinstance(store, S3Store):
+            # A public bucket's data is already served at a direct URL, so there is
+            # nothing to create: present the whole bucket as an external bucket.
+            buckets = [ExternalBucket(full_path=store.public_url(''),
+                                      external_url=store.public_url(''), fsp_name=fsp_name, relative_path='')]
+        return ExternalBucketResponse(buckets=buckets)
+
+
+    # --- Cloud storage ---
+
+    def _require_cloud_storage() -> None:
+        if not settings.cloud_storage.enabled:
+            raise HTTPException(status_code=404, detail="Cloud storage is disabled")
+
+    @app.get("/api/cloud-storage/config", response_model=CloudStorageConfigResponse,
+             description="Whether users may add cloud buckets, and which endpoints they may use")
+    async def get_cloud_storage_config() -> CloudStorageConfigResponse:
+        allowed = settings.cloud_storage.allowed_endpoints
+        return CloudStorageConfigResponse(enabled=settings.cloud_storage.enabled,
+                                          endpoint_url_allowed=allowed != [],
+                                          allowed_endpoints=allowed)
+
+    @app.get("/api/cloud-storage/buckets", response_model=CloudBucketListResponse,
+             description="List the current user's cloud buckets")
+    async def list_cloud_buckets(username: str = Depends(get_current_user)) -> CloudBucketListResponse:
+        _require_cloud_storage()
+        with db.get_db_session(settings.db_url) as session:
+            return CloudBucketListResponse(
+                buckets=[db.cloud_bucket_to_fsp(row) for row in db.get_cloud_buckets(session, username)])
+
+    @app.post("/api/cloud-storage/buckets", response_model=FileSharePath, status_code=201,
+              description="Add a public bucket as a share for the current user")
+    async def create_cloud_bucket(body: CloudBucketCreateRequest,
+                                  username: str = Depends(get_current_user)) -> FileSharePath:
+        _require_cloud_storage()
+        if not BUCKET_NAME_RE.fullmatch(body.bucket):
+            raise HTTPException(status_code=400, detail="Invalid bucket name")
+        try:
+            prefix = normalize_prefix(body.prefix)
+            endpoint_url = None
+            if body.endpoint_url:
+                # Resolves DNS synchronously, so keep it off the event loop
+                endpoint_url = await asyncio.to_thread(
+                    validate_endpoint_url, body.endpoint_url, settings.cloud_storage.allowed_endpoints)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        label = (body.label or '').strip() or (body.bucket + ('/' + prefix if prefix else ''))
+        name = slugify_path(label)
+        if not name:
+            raise HTTPException(status_code=400, detail="Display name must contain a letter or digit")
+        with db.get_db_session(settings.db_url) as session:
+            if db.get_file_share_path(session, name, username=username):
+                raise HTTPException(status_code=409, detail=f"A share or bucket named '{name}' already exists")
+        try:
+            await S3Store(body.bucket, prefix, endpoint_url).probe()
+        except S3Error as e:
+            raise HTTPException(status_code=400, detail=e.message)
+        with db.get_db_session(settings.db_url) as session:
+            try:
+                row = db.create_cloud_bucket(session, username, name, body.protocol, label,
+                                             body.bucket, prefix, endpoint_url)
+            except ValueError:  # added concurrently while the probe ran
+                raise HTTPException(status_code=409, detail=f"A share or bucket named '{name}' already exists")
+            return db.cloud_bucket_to_fsp(row)
+
+    @app.delete("/api/cloud-storage/buckets/{name}", response_model=CloudBucketDeleteResponse,
+                description="Remove one of the current user's buckets")
+    async def delete_cloud_bucket(name: str, username: str = Depends(get_current_user)) -> CloudBucketDeleteResponse:
+        _require_cloud_storage()
+        with db.get_db_session(settings.db_url) as session:
+            if not db.delete_cloud_bucket(session, username, name):
+                raise HTTPException(status_code=404, detail="Bucket not found")
+        return CloudBucketDeleteResponse(name=name)
 
 
     @app.get("/api/notifications", response_model=NotificationResponse,
@@ -1309,6 +1445,8 @@ def create_app(settings):
         _validate_url_prefix(url_prefix)
         sharing_name = url_prefix
         logger.info(f"Creating proxied path for {username} with sharing name {sharing_name} and fsp_name {fsp_name} and path {path} (url_prefix={url_prefix})")
+        # A public bucket is its own data link (see /api/external-buckets/{fsp_name})
+        _writable_store(username, fsp_name)
         # Validate the user can access the path via worker
         validation = await _worker_exec(username, "validate_proxied_path", fsp_name=fsp_name, path=path)
         if "error" in validation:
@@ -1384,6 +1522,8 @@ def create_app(settings):
                                   username: str = Depends(get_current_user)):
         if path is not None:
             path = _normalize_proxied_path(path)
+        if fsp_name is not None:
+            _writable_store(username, fsp_name)
         # If path or fsp_name is changing, validate access via worker
         if path is not None or fsp_name is not None:
             with db.get_db_session(settings.db_url) as session:
@@ -1395,8 +1535,7 @@ def create_app(settings):
                     if any(p.sharing_key != sharing_key for p in conflicts):
                         raise HTTPException(status_code=409, detail="A data link already exists for this path")
             if existing:
-                validation = await _worker_exec(username, "validate_proxied_path",
-                                                fsp_name=validate_fsp, path=validate_path)
+                validation = await _worker_exec(username, "validate_proxied_path", fsp_name=validate_fsp, path=validate_path)
                 if "error" in validation:
                     raise HTTPException(status_code=400, detail=validation["error"])
 
@@ -1572,12 +1711,20 @@ def create_app(settings):
                                    username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
             layers = []
+            roots = db.bucket_url_roots(session, username)
+            ng_layers = payload.ng_state.get('layers')
+            ng_layers = ng_layers if isinstance(ng_layers, list) else []
             for layer in payload.layers:
                 data_link_id = None
                 fsp_name = None
                 path = None
                 sharing_key = None
                 url_prefix = None
+                # A bucket dataset has no Data Link: its layer's source URL names it.
+                ng_layer = ng_layers[layer.layer_index] if layer.layer_index < len(ng_layers) else None
+                bucket = bucket_source(ng_layer, roots) if isinstance(ng_layer, dict) else None
+                if not layer.sharing_key and bucket:
+                    fsp_name, path = bucket
                 if layer.sharing_key:
                     pp = db.get_proxied_path_by_sharing_key(session, layer.sharing_key)
                     if not pp:
@@ -1905,12 +2052,7 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
-        result = await _worker_exec(username, "head_file", fsp_name=filestore_name, subpath=subpath)
-        if result.get("redirect"):
-            redirect_url = f"/api/content/{result['fsp_name']}"
-            if result.get("subpath"):
-                redirect_url += f"?subpath={result['subpath']}"
-            return RedirectResponse(url=redirect_url, status_code=307)
+        result = await _store_for(username, filestore_name).head_file(subpath)
         if "error" in result:
             raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
 
@@ -1944,78 +2086,18 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
-        # Worker opens the file as the user and passes the fd back
-        result = await _worker_exec(username, "open_file", fsp_name=filestore_name, subpath=subpath)
-
-        if result.get("redirect"):
-            redirect_url = f"/api/content/{result['fsp_name']}"
-            if result.get("subpath"):
-                redirect_url += f"?subpath={result['subpath']}"
-            return RedirectResponse(url=redirect_url, status_code=307)
-        if "error" in result:
-            raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
-
-        file_handle = result.get("_file_handle")
-
-        file_size = result["file_size"]
-        content_type = result["content_type"]
-        last_modified = result.get("last_modified")
+        store = _store_for(username, filestore_name)
+        try:
+            status, headers, body = await store.open_range(subpath, request.headers.get('Range'))
+        except StoreError as e:
+            if e.status_code == 416:
+                return Response(status_code=416, headers=e.headers or {})
+            raise HTTPException(status_code=e.status_code, detail=e.message)
         file_name = subpath.split('/')[-1] if subpath else ''
-
-        # Validators for optimistic-concurrency writes (see PUT below).
-        validator_headers = {}
-        if last_modified is not None:
-            validator_headers['Last-Modified'] = format_timestamp(last_modified)
-            validator_headers['ETag'] = make_etag(last_modified, file_size)
-
-        range_header = request.headers.get('Range')
-
-        if range_header:
-            range_result = parse_range_header(range_header, file_size)
-            if range_result is None:
-                file_handle.close()
-                return Response(
-                    status_code=416,
-                    headers={'Content-Range': f'bytes */{file_size}'}
-                )
-
-            start, end = range_result
-            content_length = end - start + 1
-
-            headers = {
-                'Accept-Ranges': 'bytes',
-                'Content-Length': str(content_length),
-                'Content-Range': f'bytes {start}-{end}/{file_size}',
-                **validator_headers,
-            }
-
-            if content_type == 'application/octet-stream' and file_name:
-                headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
-
-            # Construct a temporary filestore just for streaming
-            # (stream_file_range only needs the file_handle)
-            return StreamingResponse(
-                Filestore._stream_range(start=start, end=end, content_length=content_length, file_handle=file_handle),
-                status_code=206,
-                headers=headers,
-                media_type=content_type
-            )
-        else:
-            headers = {
-                'Accept-Ranges': 'bytes',
-                'Content-Length': str(file_size),
-                **validator_headers,
-            }
-
-            if content_type == 'application/octet-stream' and file_name:
-                headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
-
-            return StreamingResponse(
-                Filestore._stream_contents(file_handle=file_handle),
-                status_code=200,
-                headers=headers,
-                media_type=content_type
-            )
+        content_type = guess_content_type(file_name)
+        if content_type == 'application/octet-stream' and file_name:
+            headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+        return StreamingResponse(body, status_code=status, headers=headers, media_type=content_type)
 
 
     @app.put("/api/content/{path_name:path}")
@@ -2033,14 +2115,12 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
+        store = _writable_store(username, filestore_name)
+
         if not subpath:
             raise HTTPException(status_code=400, detail="File path is required")
 
-        # Sanitize the target path the same way file creation does, to prevent
-        # path traversal outside the file share.
-        normalized_path = os.path.normpath(subpath)
-        if normalized_path.startswith('..') or os.path.isabs(normalized_path):
-            raise HTTPException(status_code=400, detail="Path cannot escape the current directory")
+        normalized_path = _safe_subpath(subpath)
         _validate_filename(os.path.basename(normalized_path))
 
         # Optimistic concurrency: honor If-Match (ETag) and If-Unmodified-Since.
@@ -2061,16 +2141,8 @@ def create_app(settings):
                 raise HTTPException(status_code=413,
                                     detail=f"Upload exceeds the maximum size of {max_size} bytes")
 
-        result = await _worker_exec(username, "write_file",
-                                    fsp_name=filestore_name, subpath=normalized_path,
-                                    if_match=if_match, if_unmodified_since=if_unmodified_since)
-
-        if result.get("redirect"):
-            redirect_url = f"/api/content/{result['fsp_name']}"
-            if result.get("subpath"):
-                redirect_url += f"?subpath={result['subpath']}"
-            # 307 preserves the PUT method and body when the client re-requests.
-            return RedirectResponse(url=redirect_url, status_code=307)
+        # A cross-share path raises StoreRedirect; the 307 preserves the PUT method and body.
+        result = await store.write_file(normalized_path, if_match, if_unmodified_since)
         if "error" in result:
             raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
 
@@ -2112,20 +2184,11 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
+        store = _store_for(username, filestore_name)
         if limit is not None:
-            result = await _worker_exec(username, "list_dir_paged",
-                                        fsp_name=filestore_name, subpath=subpath,
-                                        limit=limit, cursor=cursor,
-                                        max_count=settings.max_directory_count)
+            result = await store.list_dir_paged(subpath, limit, cursor, settings.max_directory_count)
         else:
-            result = await _worker_exec(username, "list_dir",
-                                        fsp_name=filestore_name, subpath=subpath)
-
-        if result.get("redirect"):
-            redirect_url = f"/api/files/{result['fsp_name']}"
-            if result.get("subpath"):
-                redirect_url += f"?subpath={result['subpath']}"
-            return RedirectResponse(url=redirect_url, status_code=307)
+            result = await store.list_dir(subpath)
         if "error" in result and "status_code" in result:
             status_code = result["status_code"]
             if status_code == 403 or status_code == 404:
@@ -2142,33 +2205,21 @@ def create_app(settings):
                                  body: Dict = Body(...),
                                  username: str = Depends(get_current_user)):
         """Handle POST requests to create a new file or directory"""
+        store = _writable_store(username, path_name)
         # Validate and sanitize the user-provided subpath to prevent path traversal attacks
         if not subpath:
             raise HTTPException(status_code=400, detail="File or directory path is required")
 
-        # Normalize the path to prevent path traversal (e.g., "../../../etc/passwd")
-        # This converts relative paths to a clean form and removes redundant separators
-        normalized_path = os.path.normpath(subpath)
-
-        # Security check: Ensure normalized path doesn't start with ".." or "/"
-        # which would indicate an attempt to escape the intended directory
-        if normalized_path.startswith('..') or os.path.isabs(normalized_path):
-            raise HTTPException(status_code=400, detail="Path cannot escape the current directory")
-
-        # Validate the filename portion (basename) for invalid characters
-        filename = os.path.basename(normalized_path)
-        _validate_filename(filename)
-
-        # Use the validated and sanitized path for all operations
-        validated_subpath = normalized_path
+        validated_subpath = _safe_subpath(subpath)
+        _validate_filename(os.path.basename(validated_subpath))
 
         file_type = body.get("type")
         if file_type == "directory":
             logger.info(f"User {username} creating directory {path_name}/{validated_subpath}")
-            result = await _worker_exec(username, "create_dir", fsp_name=path_name, subpath=validated_subpath)
+            result = await store.create_dir(validated_subpath)
         elif file_type == "file":
             logger.info(f"User {username} creating file {path_name}/{validated_subpath}")
-            result = await _worker_exec(username, "create_file", fsp_name=path_name, subpath=validated_subpath)
+            result = await store.create_file(validated_subpath)
         else:
             raise HTTPException(status_code=400, detail="Invalid file type")
 
@@ -2183,23 +2234,17 @@ def create_app(settings):
                                  body: Dict = Body(...),
                                  username: str = Depends(get_current_user)):
         """Handle PATCH requests to rename or update file permissions"""
+        store = _writable_store(username, path_name)
         new_path = body.get("path")
         new_permissions = body.get("permissions")
 
         # Validate and sanitize new_path if renaming
         validated_new_path = new_path
         if new_path is not None:
-            normalized_new_path = os.path.normpath(new_path)
-            if normalized_new_path.startswith('..') or os.path.isabs(normalized_new_path):
-                raise HTTPException(status_code=400, detail="New path cannot escape the current directory")
-            new_filename = os.path.basename(normalized_new_path)
-            _validate_filename(new_filename)
-            validated_new_path = normalized_new_path
+            validated_new_path = _safe_subpath(new_path)
+            _validate_filename(os.path.basename(validated_new_path))
 
-        result = await _worker_exec(username, "update_file",
-                                    fsp_name=path_name, subpath=subpath,
-                                    new_path=validated_new_path,
-                                    new_permissions=new_permissions)
+        result = await store.update_file(subpath, validated_new_path, new_permissions)
         if "error" in result:
             raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
         return JSONResponse(status_code=200, content={"message": "Permissions changed"})
@@ -2210,8 +2255,9 @@ def create_app(settings):
                                  subpath: Optional[str] = Query(''),
                                  username: str = Depends(get_current_user)):
         """Handle DELETE requests to remove a file or (empty) directory"""
+        store = _writable_store(username, fsp_name)
         logger.info(f"User {username} deleting {fsp_name}/{subpath}")
-        result = await _worker_exec(username, "delete", fsp_name=fsp_name, subpath=subpath)
+        result = await store.delete(subpath)
         if "error" in result:
             raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
         return JSONResponse(status_code=200, content={"message": "Item deleted"})
@@ -2246,7 +2292,7 @@ def create_app(settings):
                 {
                     "url": row.url,
                     "manifest_path": row.manifest_path,
-                    "name": row.name,
+                    "name": row.effective_name,
                     "description": row.description,
                     "branch": row.branch,
                     "commit_sha": row.commit_sha,
@@ -2458,7 +2504,7 @@ def create_app(settings):
                     branch=row.branch,
                     commit_sha=row.commit_sha,
                     code_commit_sha=row.code_commit_sha,
-                    name=row.name,
+                    name=row.effective_name,
                     description=row.description,
                     added_at=row.added_at,
                     updated_at=row.updated_at,
@@ -2522,6 +2568,29 @@ def create_app(settings):
             db.delete_user_app(session, username, url, manifest_path)
         _spawn_snapshot_gc(username, gc_urls)
         return {"message": "App removed"}
+
+    @app.patch("/api/apps", response_model=UserApp,
+               description="Set an app's display name; an empty name restores the manifest name")
+    async def rename_user_app(body: AppRenameRequest,
+                              username: str = Depends(get_current_user)):
+        with db.get_db_session(settings.db_url) as session:
+            row = db.set_user_app_display_name(
+                session, username, body.url, body.manifest_path,
+                display_name=body.name.strip() or None)
+            if row is None:
+                raise HTTPException(status_code=404, detail="App not found")
+            return UserApp(
+                url=row.url,
+                manifest_path=row.manifest_path,
+                branch=row.branch,
+                commit_sha=row.commit_sha,
+                code_commit_sha=row.code_commit_sha,
+                name=row.effective_name,
+                description=row.description,
+                added_at=row.added_at,
+                updated_at=row.updated_at,
+                manifest=AppManifest(**row.manifest) if row.manifest else None,
+            )
 
     @app.post("/api/apps/update", response_model=UserApp,
               description="Pull latest code and re-pin this app to the new tip commit")
@@ -2587,7 +2656,7 @@ def create_app(settings):
                 branch=row.branch,
                 commit_sha=row.commit_sha,
                 code_commit_sha=row.code_commit_sha,
-                name=row.name,
+                name=row.effective_name,
                 description=row.description,
                 added_at=row.added_at,
                 updated_at=row.updated_at,
@@ -2851,7 +2920,7 @@ def create_app(settings):
                 branch=row.branch,
                 commit_sha=row.commit_sha,
                 code_commit_sha=row.code_commit_sha,
-                name=row.name,
+                name=row.effective_name,
                 description=row.description,
                 added_at=row.added_at,
                 updated_at=row.updated_at,
