@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   generateNeuroglancerStateForOmeZarr,
-  getNeuroglancerSource
+  getNeuroglancerSource,
+  toNeuroglancerDimension,
+  translateUnitToNeuroglancer
 } from '@/omezarr-helper';
 
 describe('getNeuroglancerSource with version selection', () => {
@@ -36,6 +38,34 @@ describe('getNeuroglancerSource with version selection', () => {
     expect(source).toBe(
       'https://different.host/some/deep/path/data.zarr/|zarr2:'
     );
+  });
+});
+
+describe('toNeuroglancerDimension', () => {
+  it('rescales non-SI units to an SI base unit', () => {
+    expect(toNeuroglancerDimension(5, 'minute')).toEqual([300, 's']);
+    expect(toNeuroglancerDimension(2, 'hour')).toEqual([7200, 's']);
+    expect(toNeuroglancerDimension(1, 'day')).toEqual([86400, 's']);
+    expect(toNeuroglancerDimension(4, 'angstrom')).toEqual([4e-10, 'm']);
+    expect(toNeuroglancerDimension(2, 'foot')).toEqual([0.6096, 'm']);
+  });
+
+  it('renames SI-prefixed units without changing the scale', () => {
+    expect(toNeuroglancerDimension(0.292, 'micrometer')).toEqual([0.292, 'um']);
+    expect(toNeuroglancerDimension(3, 'picometer')).toEqual([3, 'pm']);
+    expect(toNeuroglancerDimension(5, 'second')).toEqual([5, 's']);
+  });
+
+  it('passes unknown units through', () => {
+    expect(toNeuroglancerDimension(1, 'pixel')).toEqual([1, 'pixel']);
+  });
+});
+
+describe('translateUnitToNeuroglancer', () => {
+  it('keeps units that need a rescale unchanged', () => {
+    expect(translateUnitToNeuroglancer('minute')).toBe('minute');
+    expect(translateUnitToNeuroglancer('angstrom')).toBe('angstrom');
+    expect(translateUnitToNeuroglancer('picometer')).toBe('pm');
   });
 });
 
