@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 
 import { makeFakeBridge } from '@/__tests__/mocks/fakeNeuroglancer';
 import {
@@ -12,6 +14,11 @@ import type { ViewLayer } from '@/queries/viewQueries';
 import type { ResolvedCheckoutDataset } from '@/utils/viewCheckout';
 
 const BUCKET_URL = 'https://idr.s3.amazonaws.com';
+const fetchExternalBucket = vi.hoisted(() => vi.fn());
+vi.mock('@/queries/externalBucketQueries', async importOriginal => ({
+  ...(await importOriginal<object>()),
+  fetchExternalBucket
+}));
 vi.mock('@/queries/zoneAndFileSharePathMapQuery', () => ({
   default: () => ({
     data: {
@@ -146,6 +153,7 @@ describe('groupLayersBySource', () => {
 describe('useViewSources', () => {
   afterEach(() => {
     vi.useRealTimers();
+    fetchExternalBucket.mockReset();
   });
 
   const setup = (opts: {
@@ -156,13 +164,22 @@ describe('useViewSources', () => {
     removedSources?: string[];
   }) => {
     const fake = makeFakeBridge({ layers: opts.layers });
-    const hook = renderHook(() =>
-      useViewSources(fake.bridge, {
-        viewLayers: opts.viewLayers ?? [],
-        added: opts.added ?? [],
-        pendingSources: opts.pendingSources ?? [],
-        removedSources: opts.removedSources ?? []
-      })
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } }
+    });
+    const hook = renderHook(
+      () =>
+        useViewSources(fake.bridge, {
+          viewLayers: opts.viewLayers ?? [],
+          added: opts.added ?? [],
+          pendingSources: opts.pendingSources ?? [],
+          removedSources: opts.removedSources ?? []
+        }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        )
+      }
     );
     return { fake, ...hook };
   };
@@ -206,6 +223,27 @@ describe('useViewSources', () => {
       ['idr', 'zarr/new.zarr', 'new.zarr'],
       [null, null, 'other']
     ]);
+  });
+
+  it('maps saved layers of an externally mapped path by their external URL', async () => {
+    fetchExternalBucket.mockResolvedValue({
+      full_path: '/mnt/f/pub',
+      external_url: 'https://s3.example.org/pub/',
+      fsp_name: 'f',
+      relative_path: 'pub'
+    });
+    const { result } = setup({
+      layers: [
+        { name: 'img', source: 'https://s3.example.org/pub/a.zarr/|zarr3:' }
+      ],
+      viewLayers: [row(null, 'pub/a.zarr', { data_link_id: null })]
+    });
+    await waitFor(() =>
+      expect(result.current.map(s => [s.fsp_name, s.path])).toEqual([
+        ['f', 'pub/a.zarr']
+      ])
+    );
+    expect(fetchExternalBucket).toHaveBeenCalledWith('f', expect.anything());
   });
 
   it('follows layers removed in Neuroglancer', () => {

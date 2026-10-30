@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQueries } from '@tanstack/react-query';
 
 import {
   dataLinkSegment,
@@ -9,8 +10,14 @@ import { bucketDatasetUrl, datasetKey } from '@/utils/pathHandling';
 import { isReadOnlyFsp } from '@/utils/cloudStorage';
 import { makeMapKey } from '@/utils';
 import useZoneAndFileSharePathMapQuery from '@/queries/zoneAndFileSharePathMapQuery';
+import {
+  externalBucketQueryKeys,
+  fetchExternalBucket,
+  transformBucketToDataUrl
+} from '@/queries/externalBucketQueries';
 import type { NeuroglancerBridge } from '@/hooks/useNeuroglancerViewer';
 import type { ViewLayer } from '@/queries/viewQueries';
+import type { ExternalBucket } from '@/queries/externalBucketQueries';
 import type { FileSharePath } from '@/shared.types';
 import type { NgLayer, ResolvedCheckoutDataset } from '@/utils/viewCheckout';
 
@@ -214,9 +221,49 @@ export function useViewSources(
     };
   }, [status, getState, subscribe]);
 
-  // A saved bucket layer has no Data Link; its segment is the dataset's
-  // public URL, built the same way checkout built the layer's source.
+  // A saved layer without a Data Link is in a public bucket or an externally
+  // mapped path; its segment is the dataset's public URL, built the same way
+  // checkout built the layer's source.
   const fspMap = useZoneAndFileSharePathMapQuery().data;
+  const fspOf = useCallback(
+    (fspName: string) =>
+      fspMap?.[makeMapKey('fsp', fspName)] as FileSharePath | undefined,
+    [fspMap]
+  );
+  const externalFspNames = [
+    ...new Set(
+      viewLayers
+        .filter(
+          l =>
+            l.sharing_key === null &&
+            l.fsp_name !== null &&
+            !isReadOnlyFsp(fspOf(l.fsp_name))
+        )
+        .map(l => l.fsp_name!)
+    )
+  ].sort();
+  // A stable combine keeps the Map, and so the rows below, from changing on
+  // every render.
+  const externalKey = externalFspNames.join('\n');
+  const combineBuckets = useCallback(
+    (results: { data?: ExternalBucket | null }[]) =>
+      new Map(
+        (externalKey ? externalKey.split('\n') : []).map((name, i) => [
+          name,
+          results[i]?.data ?? null
+        ])
+      ),
+    [externalKey]
+  );
+  const externalBuckets = useQueries({
+    queries: externalFspNames.map(fspName => ({
+      queryKey: externalBucketQueryKeys.byFsp(fspName),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchExternalBucket(fspName, signal),
+      staleTime: 5 * 60 * 1000
+    })),
+    combine: combineBuckets
+  });
   const { known, unsupported } = useMemo(() => {
     const saved: KnownDataset[] = [];
     const unsupported: KnownDataset[] = [];
@@ -228,10 +275,14 @@ export function useViewSources(
       if (l.sharing_key !== null && l.url_prefix !== null) {
         segment = dataLinkSegment(l.sharing_key, l.url_prefix);
       } else if (l.sharing_key === null && !l.broken) {
-        const fsp = fspMap?.[makeMapKey('fsp', l.fsp_name)] as
-          | FileSharePath
-          | undefined;
-        segment = isReadOnlyFsp(fsp) ? bucketDatasetUrl(fsp!, l.path) : null;
+        const fsp = fspOf(l.fsp_name);
+        segment = isReadOnlyFsp(fsp)
+          ? bucketDatasetUrl(fsp!, l.path)
+          : transformBucketToDataUrl(
+              externalBuckets.get(l.fsp_name) ?? null,
+              l.path,
+              l.fsp_name
+            );
       }
       if (segment === null) {
         continue;
@@ -264,7 +315,14 @@ export function useViewSources(
       known: [...saved, ...linked],
       unsupported: [...unsupported, ...pending]
     };
-  }, [viewLayers, added, pendingSources, removedSources, fspMap]);
+  }, [
+    viewLayers,
+    added,
+    pendingSources,
+    removedSources,
+    fspOf,
+    externalBuckets
+  ]);
 
   return useMemo(
     () => groupLayersBySource(layers, known, unsupported),

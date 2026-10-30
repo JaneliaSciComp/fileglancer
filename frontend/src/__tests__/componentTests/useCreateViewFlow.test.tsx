@@ -15,7 +15,8 @@ vi.mock('@/hooks/useCartCheckout', () => ({
   useCartCheckout: () => ({
     checkout,
     resolveCartDatasets,
-    isBucketDataset: (ds: { fsp_name: string }) => ds.fsp_name === 'bucket'
+    isServedWithoutLink: async (ds: { fsp_name: string }) =>
+      ds.fsp_name === 'bucket'
   })
 }));
 vi.mock('@/contexts/PreferencesContext', () => ({
@@ -86,7 +87,7 @@ describe('useCreateViewFlow draft', () => {
     });
 
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-    expect(window.open).toHaveBeenCalledWith('', '_blank');
+    await waitFor(() => expect(window.open).toHaveBeenCalledWith('', '_blank'));
     await waitFor(() => expect(tab.location.href).not.toBe(''));
     const url = tab.location.href;
     const id = new URL(url, 'http://x').searchParams.get('draft')!;
@@ -155,6 +156,22 @@ describe('useCreateViewFlow draft', () => {
       .setup()
       .click(screen.getByRole('button', { name: /continue/i }));
     await waitFor(() => expect(tab.location.href).not.toBe(''));
+  });
+
+  it('opens the tab on the click and closes it again when consent is needed', async () => {
+    automatic = false;
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+
+    act(() => {
+      apiRef.current!.startDraftView(datasets, 'A');
+    });
+
+    // Synchronously, inside the click's user activation.
+    expect(window.open).toHaveBeenCalledWith('', '_blank');
+    await screen.findByText(/are you sure you want to create a data link/i);
+    expect(tab.close).toHaveBeenCalled();
+    expect(tab.location.href).toBe('');
   });
 
   it('toasts and stays put when the draft cannot be built', async () => {
@@ -271,7 +288,7 @@ describe('useCreateViewFlow', () => {
     });
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /^create$/i }));
+    await user.click(await screen.findByRole('button', { name: /^create$/i }));
 
     expect(checkout).toHaveBeenCalledWith(datasets, 'A');
     expect(toast.error).toHaveBeenCalledWith('checkout failed');

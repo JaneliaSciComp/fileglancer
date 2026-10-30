@@ -65,7 +65,8 @@ export function clearDraft(id: string | null) {
 
 type PendingRequest = {
   datasets: CartItem[];
-  newLinkCount: number;
+  /** One dataset per Data Link checkout will create. */
+  newLinks: CartItem[];
   needsLinkConsent: boolean;
 } & (
   | { mode: 'create'; onCreated?: (view: View) => void }
@@ -80,7 +81,8 @@ type PendingRequest = {
 );
 
 export function useCreateViewFlow() {
-  const { checkout, resolveCartDatasets, isBucketDataset } = useCartCheckout();
+  const { checkout, resolveCartDatasets, isServedWithoutLink } =
+    useCartCheckout();
   const {
     areDataLinksAutomatic,
     dataLinkSubpathMode,
@@ -99,12 +101,18 @@ export function useCreateViewFlow() {
   const hasMismatch =
     request?.mode === 'add' ? request.hasMismatch : cartCheck.hasMismatch;
 
-  const openDraft = async (datasets: CartItem[], name: string) => {
-    // Open the tab now, while the click's user activation is still fresh:
-    // building the state renders a thumbnail per dataset, which can outlast
-    // it and get the popup blocked. Falls back to this tab if blocked anyway.
-    // No 'noopener': it makes window.open return null, which reads as blocked.
-    const tab = window.open('', '_blank');
+  // Open the tab while the click's user activation is still fresh: the
+  // consent check can fetch, and building the state renders a thumbnail per
+  // dataset, either of which can outlast it and get the popup blocked. Falls
+  // back to this tab if blocked anyway. No 'noopener': it makes window.open
+  // return null, which reads as blocked.
+  const openTab = () => window.open('', '_blank');
+
+  const openDraft = async (
+    datasets: CartItem[],
+    name: string,
+    tab: Window | null = openTab()
+  ) => {
     try {
       const resolved = await resolveCartDatasets(datasets);
       const { ng_state, layers } = await buildViewState(
@@ -150,84 +158,104 @@ export function useCreateViewFlow() {
     }
   };
 
-  const linkConsent = (datasets: CartItem[]) => {
+  const linkConsent = async (datasets: CartItem[]) => {
     const existingKeys = new Set(
       (allProxiedPathsQuery.data ?? []).map(p => datasetKey(p.fsp_name, p.path))
     );
-    // Public buckets need no Data Link, so they never count
-    const newLinkCount = new Set(
-      datasets
-        .filter(ds => !isBucketDataset(ds))
-        .map(ds => datasetKey(ds.fsp_name, ds.path))
-        .filter(key => !existingKeys.has(key))
-    ).size;
+    const newLinksByKey = new Map<string, CartItem>();
+    for (const ds of datasets) {
+      const key = datasetKey(ds.fsp_name, ds.path);
+      // Buckets and externally mapped paths need no Data Link, so they never count
+      if (
+        !existingKeys.has(key) &&
+        !newLinksByKey.has(key) &&
+        !(await isServedWithoutLink(ds))
+      ) {
+        newLinksByKey.set(key, ds);
+      }
+    }
+    const newLinks = [...newLinksByKey.values()];
     const autoLinksCoverThis =
       areDataLinksAutomatic && dataLinkSubpathMode !== 'custom';
     return {
-      newLinkCount,
-      needsLinkConsent: !autoLinksCoverThis && newLinkCount > 0
+      newLinks,
+      needsLinkConsent: !autoLinksCoverThis && newLinks.length > 0
     };
+  };
+
+  // Checking for external URLs can fetch, so the start* entry points are
+  // async; `pending` covers the check and whatever `then` awaits.
+  const withConsent = (
+    datasets: CartItem[],
+    then: (
+      consent: Awaited<ReturnType<typeof linkConsent>>
+    ) => void | Promise<void>,
+    failMessage: string,
+    onAbort?: () => void
+  ) => {
+    if (datasets.length === 0) {
+      toast.error('Nothing to add');
+      onAbort?.();
+      return;
+    }
+    setPending(true);
+    linkConsent(datasets)
+      .then(then)
+      .catch(error => {
+        onAbort?.();
+        toast.error(error instanceof Error ? error.message : failMessage);
+      })
+      .finally(() => setPending(false));
   };
 
   const startCreateView = (
     datasets: CartItem[],
     defaultName: string,
     onCreated?: (view: View) => void
-  ) => {
-    if (datasets.length === 0) {
-      toast.error('Nothing to add');
-      return;
-    }
-    setName(defaultName);
-    setRequest({
+  ) =>
+    withConsent(
       datasets,
-      ...linkConsent(datasets),
-      mode: 'create',
-      onCreated
-    });
-  };
+      consent => {
+        setName(defaultName);
+        setRequest({ datasets, ...consent, mode: 'create', onCreated });
+      },
+      'Checkout failed'
+    );
 
   /** Opens a View in the viewer without saving it; consent dialog only if needed. */
   const startDraftView = (datasets: CartItem[], name: string) => {
-    if (datasets.length === 0) {
-      toast.error('Nothing to add');
-      return;
-    }
-    const consent = linkConsent(datasets);
-    if (!consent.needsLinkConsent) {
-      setPending(true);
-      openDraft(datasets, name)
-        .catch(error =>
-          toast.error(error instanceof Error ? error.message : 'Open failed')
-        )
-        .finally(() => setPending(false));
-      return;
-    }
-    setRequest({ datasets, ...consent, mode: 'draft', name });
+    const tab = openTab();
+    withConsent(
+      datasets,
+      consent => {
+        if (!consent.needsLinkConsent) {
+          return openDraft(datasets, name, tab);
+        }
+        // The dialog's Continue click opens a fresh tab.
+        tab?.close();
+        setRequest({ datasets, ...consent, mode: 'draft', name });
+      },
+      'Open failed',
+      () => tab?.close()
+    );
   };
 
   const startAddToView = (
     datasets: CartItem[],
     hasMismatch: boolean,
     add: (datasets: CartItem[]) => Promise<void>
-  ) => {
-    if (datasets.length === 0) {
-      toast.error('Nothing to add');
-      return;
-    }
-    const consent = linkConsent(datasets);
-    if (!consent.needsLinkConsent && !hasMismatch) {
-      // Nothing to ask, and unlike Create View there's no name to pick.
-      setPending(true);
-      add(datasets)
-        .catch(error =>
-          toast.error(error instanceof Error ? error.message : 'Add failed')
-        )
-        .finally(() => setPending(false));
-      return;
-    }
-    setRequest({ datasets, ...consent, mode: 'add', add, hasMismatch });
-  };
+  ) =>
+    withConsent(
+      datasets,
+      consent => {
+        if (!consent.needsLinkConsent && !hasMismatch) {
+          // Nothing to ask, and unlike Create View there's no name to pick.
+          return add(datasets);
+        }
+        setRequest({ datasets, ...consent, mode: 'add', add, hasMismatch });
+      },
+      'Add failed'
+    );
 
   const open = request !== null;
   const creating = request?.mode === 'create';
@@ -258,8 +286,8 @@ export function useCreateViewFlow() {
               Are you sure you want to create a data link?
             </Typography>
             <Typography className="text-foreground">
-              This will create {request.newLinkCount} data link
-              {request.newLinkCount === 1 ? '' : 's'}
+              This will create {request.newLinks.length} data link
+              {request.newLinks.length === 1 ? '' : 's'}
               {creating || drafting ? ' and 1 View' : ''}. If you share the data
               link(s) with internal collaborators, they will be able to view
               these data.
