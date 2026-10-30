@@ -894,11 +894,10 @@ async function generateStateForPlainZarr(dataUrl: string): Promise<string> {
   // first (most fileglancer data), then v3. If neither opens, this throws and
   // the caller skips the dataset.
   let zarrVersion: 2 | 3 = 2;
-  let arr;
   try {
-    arr = await getZarrArray(dataUrl, 2);
+    await getZarrArray(dataUrl, 2);
   } catch {
-    arr = await getZarrArray(dataUrl, 3);
+    await getZarrArray(dataUrl, 3);
     zarrVersion = 3;
   }
   // Plain arrays have no thumbnail for the edge heuristic, so the standalone
