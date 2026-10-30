@@ -8,6 +8,7 @@ const resolveCartDatasets = vi.fn();
 const buildViewState = vi.fn();
 const navigate = vi.fn();
 let automatic = true;
+let subpathMode = 'full_path';
 vi.mock('@/utils/viewCheckout', () => ({
   buildViewState: (...args: unknown[]) => buildViewState(...args)
 }));
@@ -22,7 +23,7 @@ vi.mock('@/hooks/useCartCheckout', () => ({
 vi.mock('@/contexts/PreferencesContext', () => ({
   usePreferencesContext: () => ({
     areDataLinksAutomatic: automatic,
-    dataLinkSubpathMode: 'full_path',
+    dataLinkSubpathMode: subpathMode,
     toggleAutomaticDataLinks: vi.fn()
   })
 }));
@@ -63,6 +64,7 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue({ short_key: 'v1', read_key: 'rk1', name: 'A' });
   automatic = true;
+  subpathMode = 'full_path';
   navigate.mockReset();
   resolveCartDatasets.mockReset().mockResolvedValue([{ url: 'u' }]);
   buildViewState
@@ -211,7 +213,7 @@ describe('useCreateViewFlow', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /^create$/i }));
 
-    expect(checkout).toHaveBeenCalledWith(datasets, 'A');
+    expect(checkout).toHaveBeenCalledWith(datasets, 'A', undefined);
     expect(onCreated).toHaveBeenCalledWith(
       expect.objectContaining({ read_key: 'rk1' })
     );
@@ -255,7 +257,57 @@ describe('useCreateViewFlow', () => {
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /continue/i }));
-    expect(checkout).toHaveBeenCalledWith(datasets, 'A');
+    expect(checkout).toHaveBeenCalledWith(datasets, 'A', undefined);
+  });
+
+  it('asks for a name per new data link in custom naming mode and checks out with them', async () => {
+    subpathMode = 'custom';
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+
+    act(() => {
+      apiRef.current!.startCreateView(
+        [{ fsp_name: 'f', path: 'x/a.zarr', label: 'a.zarr' }],
+        'A'
+      );
+    });
+
+    const input = await screen.findByLabelText('Data link name for a.zarr');
+    expect(input).toHaveValue('a.zarr');
+    const user = userEvent.setup();
+    await user.clear(input);
+    expect(screen.getByRole('button', { name: /continue/i })).toBeDisabled();
+    await user.type(input, 'my-link');
+    await user.click(screen.getByRole('button', { name: /continue/i }));
+    expect(checkout).toHaveBeenCalledWith(
+      [{ fsp_name: 'f', path: 'x/a.zarr', label: 'a.zarr' }],
+      'A',
+      { 'f::x/a.zarr': 'my-link' }
+    );
+  });
+
+  it('only asks for names, not consent, when links are automatic in custom mode', async () => {
+    subpathMode = 'custom';
+    const apiRef: { current: FlowApi | null } = { current: null };
+    render(<Harness apiRef={apiRef} />);
+
+    act(() => {
+      apiRef.current!.startCreateView(
+        [{ fsp_name: 'f', path: '.', label: 'root' }],
+        'A'
+      );
+    });
+
+    expect(await screen.findByText('Set data link name')).toBeInTheDocument();
+    expect(
+      screen.queryByText(/are you sure you want to create a data link/i)
+    ).toBeNull();
+    expect(screen.queryByLabelText(/automatically create/i)).toBeNull();
+    // FSP root: the default name is the FSP, not "."
+    expect(screen.getByLabelText('Data link name for root')).toHaveValue('f');
+    expect(
+      screen.getByRole('button', { name: /continue/i })
+    ).not.toBeDisabled();
   });
 
   it('asks no data-link consent for a bucket dataset, which needs no link', async () => {
@@ -290,7 +342,7 @@ describe('useCreateViewFlow', () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: /^create$/i }));
 
-    expect(checkout).toHaveBeenCalledWith(datasets, 'A');
+    expect(checkout).toHaveBeenCalledWith(datasets, 'A', undefined);
     expect(toast.error).toHaveBeenCalledWith('checkout failed');
     expect(
       screen.getByRole('textbox', { name: /view name/i })
@@ -323,7 +375,7 @@ describe('useCreateViewFlow', () => {
     ).toBeInTheDocument();
     expect(add).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    await waitFor(() => expect(add).toHaveBeenCalledWith(datasets));
+    await waitFor(() => expect(add).toHaveBeenCalledWith(datasets, undefined));
     await waitFor(() =>
       expect(screen.queryByText('Add to this View')).toBeNull()
     );
@@ -341,7 +393,7 @@ describe('useCreateViewFlow', () => {
       await screen.findByText(/differ from the first layer/i)
     ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Add' }));
-    await waitFor(() => expect(add).toHaveBeenCalledWith(datasets));
+    await waitFor(() => expect(add).toHaveBeenCalledWith(datasets, undefined));
   });
 
   it('shows Data Link consent and the mismatch warning together', async () => {

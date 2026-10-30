@@ -141,7 +141,7 @@ describe('useCartCheckout', () => {
     ).toBe(false);
   });
 
-  it('names new Data Links by the subpath-mode preference', async () => {
+  it('names new Data Links by the subpath-mode preference, or the given custom prefix', async () => {
     subpathMode = 'full_path';
     const { result } = renderHook(() => useCartCheckout(), { wrapper });
     await result.current.resolveCartDatasets([
@@ -152,6 +152,14 @@ describe('useCartCheckout', () => {
       path: 'x/b.zarr',
       url_prefix: 'groups/f/x/b.zarr'
     });
+
+    await result.current.resolveCartDatasets(
+      [{ fsp_name: 'f', path: 'x/c.zarr', label: 'C' }],
+      { 'f::x/c.zarr': 'my-name' }
+    );
+    expect(createProxied).toHaveBeenLastCalledWith(
+      expect.objectContaining({ path: 'x/c.zarr', url_prefix: 'my-name' })
+    );
   });
 
   it('uses an external bucket URL instead of a Data Link', async () => {
@@ -191,6 +199,17 @@ describe('useCartCheckout', () => {
     expect(
       await result.current.isServedWithoutLink({ fsp_name: 'f', path: '/b' })
     ).toBe(false);
+  });
+
+  it('rejects an invalid custom prefix before creating the link', async () => {
+    const { result } = renderHook(() => useCartCheckout(), { wrapper });
+    await expect(
+      result.current.resolveCartDatasets(
+        [{ fsp_name: 'f', path: 'x/c.zarr', label: 'C' }],
+        { 'f::x/c.zarr': 'a//b' }
+      )
+    ).rejects.toThrow(/consecutive slashes/);
+    expect(createProxied).not.toHaveBeenCalled();
   });
 
   it('resolves Data Links without building or creating a View', async () => {

@@ -57,7 +57,7 @@ describe('CreateViewButton', () => {
     ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /^create$/i }));
-    expect(checkout).toHaveBeenCalledWith(datasets, 'V');
+    expect(checkout).toHaveBeenCalledWith(datasets, 'V', undefined);
   });
 
   it('checks out with the edited name, not defaultName', async () => {
@@ -70,7 +70,11 @@ describe('CreateViewButton', () => {
     await user.type(input, 'My Renamed View');
 
     await user.click(screen.getByRole('button', { name: /^create$/i }));
-    expect(checkout).toHaveBeenCalledWith(datasets, 'My Renamed View');
+    expect(checkout).toHaveBeenCalledWith(
+      datasets,
+      'My Renamed View',
+      undefined
+    );
   });
 
   it('disables the create button when the name is empty', async () => {
@@ -100,6 +104,6 @@ describe('CreateViewButton', () => {
     await user.type(input, 'Linked View');
 
     await user.click(screen.getByRole('button', { name: /continue/i }));
-    expect(checkout).toHaveBeenCalledWith(datasets, 'Linked View');
+    expect(checkout).toHaveBeenCalledWith(datasets, 'Linked View', undefined);
   });
 });

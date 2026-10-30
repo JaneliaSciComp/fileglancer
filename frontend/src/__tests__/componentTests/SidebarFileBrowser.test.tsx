@@ -170,7 +170,7 @@ describe('SidebarFileBrowser', () => {
       false,
       expect.any(Function)
     );
-    expect(addToView).toHaveBeenCalledWith(items);
+    expect(addToView).toHaveBeenCalledWith(items, { urlPrefixes: undefined });
     expect(
       screen.getByRole('checkbox', { name: 'Select a.zarr' })
     ).not.toBeChecked();

@@ -21,7 +21,7 @@ import {
   normalizeFspRootPath
 } from '@/utils/pathHandling';
 import { isReadOnlyFsp } from '@/utils/cloudStorage';
-import { defaultUrlPrefix } from '@/hooks/useDataToolLinks';
+import { defaultUrlPrefix, validateUrlPrefix } from '@/hooks/useDataToolLinks';
 import { default as log } from '@/logger';
 import { makeMapKey } from '@/utils';
 import type { CartItem } from '@/queries/preferencesQueries';
@@ -33,6 +33,9 @@ import type { FileSharePath } from '@/shared.types';
 type ResolvedLink = Pick<ProxiedPath, 'url' | 'url_prefix'> & {
   sharing_key: string | null;
 };
+
+/** Custom url_prefix per new Data Link, keyed by datasetKey. */
+export type UrlPrefixes = Record<string, string>;
 
 // A dataset can hold both a base (channel-less) CartItem and channel-specific
 // CartItems at once. Drop the base entry when channel entries exist for the
@@ -114,7 +117,10 @@ export function useCartCheckout() {
   // Finds or creates one Data Link per dataset. Shared by checkout and
   // "Add to this View".
   const resolveCartDatasets = useCallback(
-    async (rawDatasets: CartItem[]): Promise<ResolvedCheckoutDataset[]> => {
+    async (
+      rawDatasets: CartItem[],
+      urlPrefixes?: UrlPrefixes
+    ): Promise<ResolvedCheckoutDataset[]> => {
       const datasets = dropShadowedBaseEntries(rawDatasets);
       const existing = new Map<string, ProxiedPath>(
         (allProxiedPathsQuery.data ?? []).map(p => [
@@ -145,18 +151,26 @@ export function useCartCheckout() {
           continue;
         }
         const path = normalizeFspRootPath(ds.path);
-        const link =
-          existing.get(key) ??
-          (await createProxiedPath.mutateAsync({
-            fsp_name: ds.fsp_name,
-            path,
-            url_prefix: defaultUrlPrefix(
+        let link = existing.get(key);
+        if (!link) {
+          const url_prefix =
+            urlPrefixes?.[key] ??
+            defaultUrlPrefix(
               dataLinkSubpathMode,
               path,
               ds.fsp_name,
               fspFor(ds)?.linux_path
-            )
-          }));
+            );
+          const prefixError = validateUrlPrefix(url_prefix);
+          if (prefixError) {
+            throw new Error(prefixError);
+          }
+          link = await createProxiedPath.mutateAsync({
+            fsp_name: ds.fsp_name,
+            path,
+            url_prefix
+          });
+        }
         linkByKey.set(key, link);
       }
 
@@ -190,8 +204,12 @@ export function useCartCheckout() {
   );
 
   const checkout = useCallback(
-    async (rawDatasets: CartItem[], name: string): Promise<View> => {
-      const resolved = await resolveCartDatasets(rawDatasets);
+    async (
+      rawDatasets: CartItem[],
+      name: string,
+      urlPrefixes?: UrlPrefixes
+    ): Promise<View> => {
+      const resolved = await resolveCartDatasets(rawDatasets, urlPrefixes);
       const { ng_state, layers } = await buildViewState(
         resolved,
         !disableHeuristicalLayerTypeDetection
