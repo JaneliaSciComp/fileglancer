@@ -155,17 +155,23 @@ export async function buildViewState(
   const taken = new Set<string>();
 
   // Every channel entry of a dataset generates the same state; generate it
-  // once per dataset and layer path, then slice it per entry.
+  // once per dataset and layer path, then slice it per entry. All datasets
+  // start up front: each one probes metadata and renders a thumbnail, so
+  // awaiting them one at a time would make checkout time grow with cart size.
   const stateCache = new Map<string, Promise<NgState | null>>();
+  const cacheKeyFor = (ds: ResolvedCheckoutDataset) =>
+    `${ds.url}::${ds.channel !== undefined}`;
+  for (const ds of datasets) {
+    if (!stateCache.has(cacheKeyFor(ds))) {
+      stateCache.set(
+        cacheKeyFor(ds),
+        generateStateForDataset(ds, detectLayerType)
+      );
+    }
+  }
 
   for (const ds of datasets) {
-    const cacheKey = `${ds.url}::${ds.channel !== undefined}`;
-    let pending = stateCache.get(cacheKey);
-    if (!pending) {
-      pending = generateStateForDataset(ds, detectLayerType);
-      stateCache.set(cacheKey, pending);
-    }
-    const state = await pending;
+    const state = await stateCache.get(cacheKeyFor(ds))!;
     if (!state) {
       unsupported.push(ds);
       continue;
