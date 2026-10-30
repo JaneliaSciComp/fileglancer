@@ -8,7 +8,8 @@ let automatic = true;
 vi.mock('@/hooks/useCartCheckout', () => ({
   useCartCheckout: () => ({
     checkout,
-    isBucketDataset: (ds: { fsp_name: string }) => ds.fsp_name === 'bucket'
+    isServedWithoutLink: async (ds: { fsp_name: string }) =>
+      ds.fsp_name === 'bucket'
   })
 }));
 vi.mock('@/contexts/PreferencesContext', () => ({

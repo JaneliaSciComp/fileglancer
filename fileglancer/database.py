@@ -597,9 +597,13 @@ def get_cloud_buckets(session: Session, username: str) -> List[CloudBucketDB]:
     return session.query(CloudBucketDB).filter_by(username=username).order_by(CloudBucketDB.name).all()
 
 
-def bucket_url_roots(session: Session, username: str) -> List[Tuple[str, str]]:
-    """(fsp_name, public base URL) of each of the user's buckets, for ngstate.bucket_source."""
-    return [(b.name, s3_public_url(b.bucket, b.endpoint_url, b.prefix)) for b in get_cloud_buckets(session, username)]
+def bucket_url_roots(session: Session, username: str) -> List[Tuple[str, str, str]]:
+    """(fsp_name, public base URL, path it serves) of each of the user's buckets
+    and each externally mapped path, for ngstate.bucket_source."""
+    return ([(b.name, s3_public_url(b.bucket, b.endpoint_url, b.prefix), '')
+             for b in get_cloud_buckets(session, username)]
+            + [(e.fsp_name, e.external_url, e.relative_path or '')
+               for e in get_external_buckets(session) if e.external_url])
 
 
 def get_cloud_bucket(session: Session, username: str, name: str) -> Optional[CloudBucketDB]:

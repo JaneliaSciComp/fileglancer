@@ -46,16 +46,19 @@ def layer_sharing_key(layer: dict, proxy_url: str) -> Optional[str]:
     return None
 
 
-def bucket_source(layer: dict, buckets: Iterable[Tuple[str, str]]) -> Optional[Tuple[str, str]]:
+def bucket_source(layer: dict, buckets: Iterable[Tuple[str, str, str]]) -> Optional[Tuple[str, str]]:
     """(fsp_name, path) of the first source in `layer` served straight from one
-    of `buckets`, given as (fsp_name, public base URL) pairs; None if none is.
-    A bucket layer has no Data Link, so its source URL is the only identity."""
-    roots = sorted(((name, root.rstrip('/')) for name, root in buckets), key=lambda r: -len(r[1]))
+    of `buckets`, given as (fsp_name, public base URL, path the URL serves)
+    triples; None if none is. A bucket layer has no Data Link, so its source
+    URL is the only identity."""
+    roots = sorted(((name, root.rstrip('/'), prefix.strip('/')) for name, root, prefix in buckets),
+                   key=lambda r: -len(r[1]))
     for url in _iter_source_urls(layer.get('source')):
         base = re.split(r'[|?#]', _SCHEME_PREFIX.sub('', url), maxsplit=1)[0]
-        for name, root in roots:
+        for name, root, prefix in roots:
             if base == root or base.startswith(root + '/'):
-                return name, unquote(base[len(root):]).strip('/')
+                rest = unquote(base[len(root):]).strip('/')
+                return name, '/'.join(p for p in (prefix, rest) if p)
     return None
 
 

@@ -1153,3 +1153,17 @@ def test_reconcile_keeps_bucket_layers_as_dataset_rows(db_session):
     rows = sorted(v.layers, key=lambda l: l.layer_index)
     assert [(r.fsp_name, r.path, r.channel, r.broken) for r in rows] == [
         (None, None, None, False), ("idr", "zarr/img.zarr", "DAPI", False)]
+
+
+def test_reconcile_keeps_externally_mapped_layers_as_dataset_rows(db_session):
+    db_session.add(ExternalBucketDB(full_path="/nrs/lab/data_external", external_url="https://s3.example.org/lab/",
+                                    fsp_name="nrs_lab", relative_path="data_external"))
+    db_session.commit()
+    src = "https://s3.example.org/lab/a/img.zarr/|zarr3:"
+    state = {"layers": [{"name": "img", "source": src}]}
+    v = create_view(db_session, "u", "e", state,
+                    [{"layer_index": 0, "channel": None, "opts": None,
+                      "fsp_name": "nrs_lab", "path": "data_external/a/img.zarr"}], "read")
+
+    update_view(db_session, v, ng_state=state, proxy_url=PROXY)
+    assert [(r.fsp_name, r.path, r.broken) for r in v.layers] == [("nrs_lab", "data_external/a/img.zarr", False)]

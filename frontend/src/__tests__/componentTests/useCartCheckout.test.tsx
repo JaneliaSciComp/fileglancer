@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 const createProxied = vi.fn();
 const createViewAsync = vi.fn();
 const buildViewState = vi.hoisted(() => vi.fn());
+const fetchExternalBucket = vi.hoisted(() => vi.fn());
 
 vi.mock('@/queries/proxiedPathQueries', () => ({
   useAllProxiedPathsQuery: () => ({
@@ -20,6 +21,10 @@ vi.mock('@/contexts/ViewsContext', () => ({
 }));
 vi.mock('@/contexts/PreferencesContext', () => ({
   usePreferencesContext: () => ({ disableHeuristicalLayerTypeDetection: false })
+}));
+vi.mock('@/queries/externalBucketQueries', async importOriginal => ({
+  ...(await importOriginal<object>()),
+  fetchExternalBucket
 }));
 vi.mock('@/utils/viewCheckout', () => ({
   buildViewState
@@ -49,6 +54,7 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 beforeEach(() => {
+  fetchExternalBucket.mockReset().mockResolvedValue(null);
   createProxied.mockReset().mockResolvedValue({
     fsp_name: 'f',
     path: '/b',
@@ -117,8 +123,51 @@ describe('useCartCheckout', () => {
       })
     ]);
     expect(createProxied).not.toHaveBeenCalled();
-    expect(result.current.isBucketDataset({ fsp_name: 'bucket' })).toBe(true);
-    expect(result.current.isBucketDataset({ fsp_name: 'f' })).toBe(false);
+    expect(
+      await result.current.isServedWithoutLink({ fsp_name: 'bucket', path: '' })
+    ).toBe(true);
+    expect(
+      await result.current.isServedWithoutLink({ fsp_name: 'f', path: '/b' })
+    ).toBe(false);
+  });
+
+  it('uses an external bucket URL instead of a Data Link', async () => {
+    fetchExternalBucket.mockResolvedValue({
+      full_path: '/groups/f/pub',
+      external_url: 'https://s3.example.org/pub',
+      fsp_name: 'f',
+      relative_path: 'pub'
+    });
+    const { result } = renderHook(() => useCartCheckout(), { wrapper });
+    const resolved = await result.current.resolveCartDatasets([
+      { fsp_name: 'f', path: 'pub/s.zarr', label: 'S' }
+    ]);
+    expect(resolved).toEqual([
+      expect.objectContaining({
+        url: 'https://s3.example.org/pub/s.zarr',
+        sharing_key: null
+      })
+    ]);
+    expect(createProxied).not.toHaveBeenCalled();
+    expect(
+      await result.current.isServedWithoutLink({
+        fsp_name: 'f',
+        path: 'pub/s.zarr'
+      })
+    ).toBe(true);
+  });
+
+  it('falls back to a Data Link when the external bucket lookup fails', async () => {
+    fetchExternalBucket.mockRejectedValue(new Error('boom'));
+    const { result } = renderHook(() => useCartCheckout(), { wrapper });
+    const resolved = await result.current.resolveCartDatasets([
+      { fsp_name: 'f', path: '/b', label: 'B' }
+    ]);
+    expect(resolved).toEqual([expect.objectContaining({ sharing_key: 'kb' })]);
+    expect(createProxied).toHaveBeenCalled();
+    expect(
+      await result.current.isServedWithoutLink({ fsp_name: 'f', path: '/b' })
+    ).toBe(false);
   });
 
   it('resolves Data Links without building or creating a View', async () => {

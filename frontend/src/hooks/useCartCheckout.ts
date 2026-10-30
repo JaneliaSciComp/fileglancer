@@ -1,9 +1,15 @@
 import { useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import {
   useAllProxiedPathsQuery,
   useCreateProxiedPathMutation
 } from '@/queries/proxiedPathQueries';
+import {
+  externalBucketQueryKeys,
+  fetchExternalBucket,
+  transformBucketToDataUrl
+} from '@/queries/externalBucketQueries';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useViewsContext } from '@/contexts/ViewsContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
@@ -15,6 +21,7 @@ import {
   normalizeFspRootPath
 } from '@/utils/pathHandling';
 import { isReadOnlyFsp } from '@/utils/cloudStorage';
+import { default as log } from '@/logger';
 import { makeMapKey } from '@/utils';
 import type { CartItem } from '@/queries/preferencesQueries';
 import type { View } from '@/queries/viewQueries';
@@ -54,6 +61,7 @@ export function useCartCheckout() {
   const { createViewMutation } = useViewsContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
   const { disableHeuristicalLayerTypeDetection } = usePreferencesContext();
+  const queryClient = useQueryClient();
 
   const bucketFor = useCallback(
     (ds: Pick<CartItem, 'fsp_name'>): FileSharePath | null => {
@@ -65,10 +73,34 @@ export function useCartCheckout() {
     [zonesAndFspQuery.data]
   );
 
-  /** A public bucket's data needs no Data Link; it is served at its own URL. */
-  const isBucketDataset = useCallback(
-    (ds: Pick<CartItem, 'fsp_name'>): boolean => bucketFor(ds) !== null,
-    [bucketFor]
+  /** The URL an external bucket mapping serves this dataset at, if any. */
+  const externalUrlFor = useCallback(
+    async (ds: Pick<CartItem, 'fsp_name' | 'path'>): Promise<string | null> => {
+      try {
+        const bucket = await queryClient.fetchQuery({
+          queryKey: externalBucketQueryKeys.byFsp(ds.fsp_name),
+          queryFn: ({ signal }) => fetchExternalBucket(ds.fsp_name, signal),
+          staleTime: 5 * 60 * 1000
+        });
+        return transformBucketToDataUrl(bucket, ds.path, ds.fsp_name);
+      } catch (error) {
+        // Like the file browser, a failed lookup means "no mapping": fall
+        // back to a Data Link rather than failing the whole checkout.
+        log.warn(`External bucket lookup failed for ${ds.fsp_name}`, error);
+        return null;
+      }
+    },
+    [queryClient]
+  );
+
+  /**
+   * Public buckets and externally mapped paths need no Data Link; they are
+   * served at their own URL.
+   */
+  const isServedWithoutLink = useCallback(
+    async (ds: Pick<CartItem, 'fsp_name' | 'path'>): Promise<boolean> =>
+      bucketFor(ds) !== null || (await externalUrlFor(ds)) !== null,
+    [bucketFor, externalUrlFor]
   );
 
   // Finds or creates one Data Link per dataset. Shared by checkout and
@@ -91,17 +123,25 @@ export function useCartCheckout() {
           continue;
         }
         const bucket = bucketFor(ds);
-        const link: ResolvedLink = bucket
-          ? {
-              url: bucketDatasetUrl(bucket, ds.path),
-              sharing_key: null,
-              url_prefix: ''
-            }
-          : (existing.get(key) ??
-            (await createProxiedPath.mutateAsync({
-              fsp_name: ds.fsp_name,
-              path: normalizeFspRootPath(ds.path)
-            })));
+        // Like the file browser's data tools, an external URL wins over a
+        // Data Link.
+        const ownUrl = bucket
+          ? bucketDatasetUrl(bucket, ds.path)
+          : await externalUrlFor(ds);
+        if (ownUrl) {
+          linkByKey.set(key, {
+            url: ownUrl,
+            sharing_key: null,
+            url_prefix: ''
+          });
+          continue;
+        }
+        const link =
+          existing.get(key) ??
+          (await createProxiedPath.mutateAsync({
+            fsp_name: ds.fsp_name,
+            path: normalizeFspRootPath(ds.path)
+          }));
         linkByKey.set(key, link);
       }
 
@@ -124,7 +164,7 @@ export function useCartCheckout() {
         };
       });
     },
-    [allProxiedPathsQuery.data, createProxiedPath, bucketFor]
+    [allProxiedPathsQuery.data, createProxiedPath, bucketFor, externalUrlFor]
   );
 
   const checkout = useCallback(
@@ -143,5 +183,5 @@ export function useCartCheckout() {
     ]
   );
 
-  return { checkout, resolveCartDatasets, isBucketDataset };
+  return { checkout, resolveCartDatasets, isServedWithoutLink };
 }

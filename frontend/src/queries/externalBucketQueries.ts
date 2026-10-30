@@ -21,7 +21,7 @@ export const externalBucketQueryKeys = {
  * Fetches an external bucket by FSP name
  * Returns null if no external bucket exists (404)
  */
-const fetchExternalBucket = async (
+export const fetchExternalBucket = async (
   fspName: string,
   signal?: AbortSignal
 ): Promise<ExternalBucket | null> => {
