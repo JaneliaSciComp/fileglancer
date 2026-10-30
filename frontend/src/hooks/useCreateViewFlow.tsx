@@ -84,7 +84,8 @@ export function useCreateViewFlow() {
   const {
     areDataLinksAutomatic,
     dataLinkSubpathMode,
-    toggleAutomaticDataLinks
+    toggleAutomaticDataLinks,
+    disableHeuristicalLayerTypeDetection
   } = usePreferencesContext();
   const allProxiedPathsQuery = useAllProxiedPathsQuery();
   const navigate = useNavigate();
@@ -100,7 +101,10 @@ export function useCreateViewFlow() {
 
   const openDraft = async (datasets: CartItem[], name: string) => {
     const resolved = await resolveCartDatasets(datasets);
-    const { ng_state, layers } = await buildViewState(resolved);
+    const { ng_state, layers } = await buildViewState(
+      resolved,
+      !disableHeuristicalLayerTypeDetection
+    );
     const draft: ViewDraft = { name, ng_state, layers, datasets: resolved };
     // Opens in a new tab; falls back to this tab if the popup was blocked.
     // No 'noopener': it makes window.open return null, which reads as blocked.

@@ -12,6 +12,9 @@ const buildViewState = vi.hoisted(() => vi.fn());
 vi.mock('@/hooks/useCartCheckout', () => ({
   useCartCheckout: () => ({ resolveCartDatasets })
 }));
+vi.mock('@/contexts/PreferencesContext', () => ({
+  usePreferencesContext: () => ({ disableHeuristicalLayerTypeDetection: false })
+}));
 vi.mock('@/utils/viewCheckout', async importOriginal => ({
   ...(await importOriginal<typeof import('@/utils/viewCheckout')>()),
   buildViewState
