@@ -1332,6 +1332,24 @@ def _path_aliases(path: str) -> List[str]:
     return ["", "."] if path == "" else [path]
 
 
+def get_views_for_dataset(session: Session, owner: str, fsp_name: str, path: str) -> List[ViewDB]:
+    """The owner's Views with a working layer on this dataset, matched by
+    (fsp_name, path) so layers without a Data Link (cloud buckets, externally
+    mapped paths) count too. IN-subquery for the reason in get_views_for_data_link."""
+    layer_view_ids = (
+        session.query(ViewLayerDB.view_id)
+        .filter(ViewLayerDB.broken.is_(False),
+                ViewLayerDB.fsp_name == fsp_name,
+                ViewLayerDB.path.in_(_path_aliases(path)))
+    )
+    return (
+        session.query(ViewDB)
+        .filter(ViewDB.id.in_(layer_view_ids), ViewDB.owner == owner)
+        .order_by(ViewDB.created_at.desc())
+        .all()
+    )
+
+
 def get_relinkable_views(session: Session, owner: str, fsp_name: str, path: str) -> List[ViewDB]:
     """The owner's Views with a broken layer on this dataset that can be
     relinked (its dead Data Link key and prefix are known)."""
