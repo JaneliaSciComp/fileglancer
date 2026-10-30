@@ -5,10 +5,12 @@ import { useNavigate } from 'react-router';
 import type { ReactNode } from 'react';
 
 import { useCartCheckout } from '@/hooks/useCartCheckout';
+import type { UrlPrefixes } from '@/hooks/useCartCheckout';
+import { defaultUrlPrefix, validateUrlPrefix } from '@/hooks/useDataToolLinks';
 import { useCartDimensionCheck } from '@/hooks/useCartDimensionCheck';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useAllProxiedPathsQuery } from '@/queries/proxiedPathQueries';
-import { datasetKey } from '@/utils/pathHandling';
+import { datasetKey, normalizeFspRootPath } from '@/utils/pathHandling';
 import { buildUrl } from '@/utils';
 import { buildViewState } from '@/utils/viewCheckout';
 import type { ResolvedCheckoutDataset } from '@/utils/viewCheckout';
@@ -16,6 +18,7 @@ import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgInput from '@/components/designSystem/atoms/formElements/FgInput';
 import FgSwitch from '@/components/designSystem/atoms/formElements/FgSwitch';
 import FgDialog from '@/components/ui/Dialogs/FgDialog';
+import { CustomSubpathInput } from '@/components/ui/Dialogs/DataLink';
 import type { CartItem } from '@/queries/preferencesQueries';
 import type { View, ViewCreateRequest } from '@/queries/viewQueries';
 
@@ -74,7 +77,7 @@ type PendingRequest = {
   | { mode: 'draft'; name: string }
   | {
       mode: 'add';
-      add: (datasets: CartItem[]) => Promise<void>;
+      add: (datasets: CartItem[], urlPrefixes?: UrlPrefixes) => Promise<void>;
       // Checked against the View's own datasets by the caller.
       hasMismatch: boolean;
     }
@@ -94,12 +97,36 @@ export function useCreateViewFlow() {
 
   const [pending, setPending] = useState(false);
   const [name, setName] = useState('');
-  const [request, setRequest] = useState<PendingRequest | null>(null);
+  const [request, setRequestState] = useState<PendingRequest | null>(null);
+  // Data link names typed in the dialog, used when naming mode is 'custom'.
+  const [urlPrefixes, setUrlPrefixes] = useState<UrlPrefixes>({});
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const cartCheck = useCartDimensionCheck(request?.datasets ?? []);
   const hasMismatch =
     request?.mode === 'add' ? request.hasMismatch : cartCheck.hasMismatch;
+
+  const askNames = dataLinkSubpathMode === 'custom';
+  const setRequest = (next: PendingRequest | null) => {
+    setRequestState(next);
+    setUrlPrefixes(
+      Object.fromEntries(
+        (next?.newLinks ?? []).map(ds => [
+          datasetKey(ds.fsp_name, ds.path),
+          defaultUrlPrefix(
+            'custom',
+            normalizeFspRootPath(ds.path),
+            ds.fsp_name,
+            null
+          )
+        ])
+      )
+    );
+  };
+  const prefixErrors = askNames
+    ? Object.values(urlPrefixes).map(validateUrlPrefix).filter(Boolean)
+    : [];
+  const chosenPrefixes = askNames ? urlPrefixes : undefined;
 
   // Open the tab while the click's user activation is still fresh: the
   // consent check can fetch, and building the state renders a thumbnail per
@@ -111,10 +138,11 @@ export function useCreateViewFlow() {
   const openDraft = async (
     datasets: CartItem[],
     name: string,
+    prefixes?: UrlPrefixes,
     tab: Window | null = openTab()
   ) => {
     try {
-      const resolved = await resolveCartDatasets(datasets);
+      const resolved = await resolveCartDatasets(datasets, prefixes);
       const { ng_state, layers } = await buildViewState(
         resolved,
         !disableHeuristicalLayerTypeDetection
@@ -138,11 +166,11 @@ export function useCreateViewFlow() {
     setPending(true);
     try {
       if (request.mode === 'add') {
-        await request.add(request.datasets);
+        await request.add(request.datasets, chosenPrefixes);
       } else if (request.mode === 'draft') {
-        await openDraft(request.datasets, request.name);
+        await openDraft(request.datasets, request.name, chosenPrefixes);
       } else {
-        const view = await checkout(request.datasets, name);
+        const view = await checkout(request.datasets, name, chosenPrefixes);
         toast.success(`Created View "${name}"`);
         if (request.onCreated) {
           request.onCreated(view);
@@ -229,7 +257,7 @@ export function useCreateViewFlow() {
       datasets,
       consent => {
         if (!consent.needsLinkConsent) {
-          return openDraft(datasets, name, tab);
+          return openDraft(datasets, name, undefined, tab);
         }
         // The dialog's Continue click opens a fresh tab.
         tab?.close();
@@ -243,7 +271,7 @@ export function useCreateViewFlow() {
   const startAddToView = (
     datasets: CartItem[],
     hasMismatch: boolean,
-    add: (datasets: CartItem[]) => Promise<void>
+    add: (datasets: CartItem[], urlPrefixes?: UrlPrefixes) => Promise<void>
   ) =>
     withConsent(
       datasets,
@@ -257,6 +285,9 @@ export function useCreateViewFlow() {
       'Add failed'
     );
 
+  // Automatic links in custom naming mode: consent was already given, only
+  // the names are missing (mirrors DataLinkDialog's isAutoCustom branch).
+  const autoCustom = areDataLinksAutomatic && askNames;
   const open = request !== null;
   const creating = request?.mode === 'create';
   const drafting = request?.mode === 'draft';
@@ -283,7 +314,9 @@ export function useCreateViewFlow() {
         {request.needsLinkConsent ? (
           <>
             <Typography className="text-foreground font-semibold">
-              Are you sure you want to create a data link?
+              {autoCustom
+                ? `Set data link name${request.newLinks.length === 1 ? '' : 's'}`
+                : 'Are you sure you want to create a data link?'}
             </Typography>
             <Typography className="text-foreground">
               This will create {request.newLinks.length} data link
@@ -292,18 +325,36 @@ export function useCreateViewFlow() {
               link(s) with internal collaborators, they will be able to view
               these data.
             </Typography>
-            <div className="flex flex-col gap-2">
-              <Typography className="font-semibold text-foreground">
-                Don't ask me this again:
-              </Typography>
-              <FgSwitch
-                checked={areDataLinksAutomatic}
-                label="Automatically create data links"
-                onChange={() => {
-                  void toggleAutomaticDataLinks();
-                }}
-              />
-            </div>
+            {autoCustom ? null : (
+              <div className="flex flex-col gap-2">
+                <Typography className="font-semibold text-foreground">
+                  Don't ask me this again:
+                </Typography>
+                <FgSwitch
+                  checked={areDataLinksAutomatic}
+                  label="Automatically create data links"
+                  onChange={() => {
+                    void toggleAutomaticDataLinks();
+                  }}
+                />
+              </div>
+            )}
+            {askNames
+              ? request.newLinks.map(ds => {
+                  const key = datasetKey(ds.fsp_name, ds.path);
+                  return (
+                    <CustomSubpathInput
+                      error={validateUrlPrefix(urlPrefixes[key] ?? '')}
+                      key={key}
+                      label={`Data link name for ${ds.label}`}
+                      onChange={value =>
+                        setUrlPrefixes(prev => ({ ...prev, [key]: value }))
+                      }
+                      value={urlPrefixes[key] ?? ''}
+                    />
+                  );
+                })
+              : null}
           </>
         ) : null}
 
@@ -322,7 +373,11 @@ export function useCreateViewFlow() {
 
         <div className="flex gap-4">
           <FgButton
-            disabled={pending || (creating && name.trim() === '')}
+            disabled={
+              pending ||
+              (creating && name.trim() === '') ||
+              prefixErrors.length > 0
+            }
             loading={pending}
             loadingText={creating ? 'Creating...' : 'Adding...'}
             onClick={() => void runRequest()}
