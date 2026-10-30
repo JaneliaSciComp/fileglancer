@@ -84,7 +84,8 @@ export function useCreateViewFlow() {
   const {
     areDataLinksAutomatic,
     dataLinkSubpathMode,
-    toggleAutomaticDataLinks
+    toggleAutomaticDataLinks,
+    disableHeuristicalLayerTypeDetection
   } = usePreferencesContext();
   const allProxiedPathsQuery = useAllProxiedPathsQuery();
   const navigate = useNavigate();
@@ -99,13 +100,26 @@ export function useCreateViewFlow() {
     request?.mode === 'add' ? request.hasMismatch : cartCheck.hasMismatch;
 
   const openDraft = async (datasets: CartItem[], name: string) => {
-    const resolved = await resolveCartDatasets(datasets);
-    const { ng_state, layers } = await buildViewState(resolved);
-    const draft: ViewDraft = { name, ng_state, layers, datasets: resolved };
-    // Opens in a new tab; falls back to this tab if the popup was blocked.
+    // Open the tab now, while the click's user activation is still fresh:
+    // building the state renders a thumbnail per dataset, which can outlast
+    // it and get the popup blocked. Falls back to this tab if blocked anyway.
     // No 'noopener': it makes window.open return null, which reads as blocked.
-    if (!window.open(storeDraft(draft), '_blank')) {
-      navigate(DRAFT_VIEW_PATH, { state: { draft } });
+    const tab = window.open('', '_blank');
+    try {
+      const resolved = await resolveCartDatasets(datasets);
+      const { ng_state, layers } = await buildViewState(
+        resolved,
+        !disableHeuristicalLayerTypeDetection
+      );
+      const draft: ViewDraft = { name, ng_state, layers, datasets: resolved };
+      if (tab) {
+        tab.location.href = storeDraft(draft);
+      } else {
+        navigate(DRAFT_VIEW_PATH, { state: { draft } });
+      }
+    } catch (error) {
+      tab?.close();
+      throw error;
     }
   };
 

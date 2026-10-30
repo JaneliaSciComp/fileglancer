@@ -52,9 +52,12 @@ function Harness({ apiRef }: { apiRef: { current: FlowApi | null } }) {
   return <>{api.dialog}</>;
 }
 
+// The pre-opened tab the draft is handed to.
+let tab: { location: { href: string }; close: ReturnType<typeof vi.fn> };
 beforeEach(() => {
   localStorage.clear();
-  vi.spyOn(window, 'open').mockReturnValue({} as Window);
+  tab = { location: { href: '' }, close: vi.fn() };
+  vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
   checkout
     .mockReset()
     .mockResolvedValue({ short_key: 'v1', read_key: 'rk1', name: 'A' });
@@ -83,8 +86,9 @@ describe('useCreateViewFlow draft', () => {
     });
 
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-    await waitFor(() => expect(window.open).toHaveBeenCalled());
-    const url = vi.mocked(window.open).mock.calls[0][0] as string;
+    expect(window.open).toHaveBeenCalledWith('', '_blank');
+    await waitFor(() => expect(tab.location.href).not.toBe(''));
+    const url = tab.location.href;
     const id = new URL(url, 'http://x').searchParams.get('draft')!;
     expect(url).toBe(`/view/new?draft=${id}`);
     expect(
@@ -111,7 +115,7 @@ describe('useCreateViewFlow draft', () => {
       apiRef.current!.startDraftView(datasets, 'A');
     });
 
-    await waitFor(() => expect(window.open).toHaveBeenCalled());
+    await waitFor(() => expect(tab.location.href).not.toBe(''));
     expect(localStorage.getItem('fg-view-draft:recent')).not.toBeNull();
     expect(localStorage.getItem('fg-view-draft:old')).toBeNull();
   });
@@ -150,7 +154,7 @@ describe('useCreateViewFlow draft', () => {
     await userEvent
       .setup()
       .click(screen.getByRole('button', { name: /continue/i }));
-    await waitFor(() => expect(window.open).toHaveBeenCalled());
+    await waitFor(() => expect(tab.location.href).not.toBe(''));
   });
 
   it('toasts and stays put when the draft cannot be built', async () => {
@@ -163,7 +167,8 @@ describe('useCreateViewFlow draft', () => {
     });
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('No layers'));
-    expect(window.open).not.toHaveBeenCalled();
+    expect(tab.close).toHaveBeenCalled();
+    expect(tab.location.href).toBe('');
     expect(navigate).not.toHaveBeenCalled();
   });
 });

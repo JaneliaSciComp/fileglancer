@@ -4,6 +4,8 @@ const encoded = (state: unknown) => encodeURIComponent(JSON.stringify(state));
 
 vi.mock('@/omezarr-helper', () => ({
   getOmeZarrMetadata: vi.fn(),
+  getOmeZarrThumbnail: vi.fn(),
+  determineLayerType: vi.fn(),
   generateNeuroglancerStateForOmeZarr: vi.fn(),
   generateNeuroglancerStateForDataURL: vi.fn(),
   generateStateForPlainZarr: vi.fn()
@@ -11,21 +13,29 @@ vi.mock('@/omezarr-helper', () => ({
 
 import {
   getOmeZarrMetadata,
+  getOmeZarrThumbnail,
+  determineLayerType,
   generateNeuroglancerStateForOmeZarr,
   generateStateForPlainZarr
 } from '@/omezarr-helper';
 import {
   appendLayers,
-  buildViewState,
+  buildViewState as buildViewStateImpl,
   dataLinkSegment,
   rewriteDataLinkSegment,
   probeDataset
 } from '@/utils/viewCheckout';
 
 const md = { multiscales: [{}], arr: {}, zarrVersion: 2 };
+const buildViewState = (
+  datasets: Parameters<typeof buildViewStateImpl>[0],
+  detectLayerType = true
+) => buildViewStateImpl(datasets, detectLayerType);
 
 beforeEach(() => {
   (getOmeZarrMetadata as any).mockReset().mockResolvedValue(md);
+  (getOmeZarrThumbnail as any).mockReset().mockResolvedValue(['thumb', null]);
+  (determineLayerType as any).mockReset().mockResolvedValue('image');
   (generateStateForPlainZarr as any)
     .mockReset()
     .mockRejectedValue(new Error('not a plain array'));
@@ -41,6 +51,32 @@ beforeEach(() => {
 });
 
 describe('buildViewState', () => {
+  const one = {
+    url: 'a',
+    sharing_key: 'ka',
+    url_prefix: 'a',
+    fsp_name: 'f',
+    path: '/a',
+    label: 'A'
+  };
+
+  it('uses the inferred layer type for OME-Zarr layers', async () => {
+    (determineLayerType as any).mockResolvedValue('segmentation');
+    await buildViewState([one], true);
+    expect(determineLayerType).toHaveBeenCalledWith(true, 'thumb');
+    expect((generateNeuroglancerStateForOmeZarr as any).mock.calls[0][2]).toBe(
+      'segmentation'
+    );
+  });
+
+  it('skips inference when detection is disabled', async () => {
+    await buildViewState([one], false);
+    expect(getOmeZarrThumbnail).not.toHaveBeenCalled();
+    expect((generateNeuroglancerStateForOmeZarr as any).mock.calls[0][2]).toBe(
+      'image'
+    );
+  });
+
   it('concatenates layers across datasets and maps ViewLayerInput', async () => {
     const { ng_state, layers } = await buildViewState([
       {
