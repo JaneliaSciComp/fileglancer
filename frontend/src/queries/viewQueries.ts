@@ -96,6 +96,9 @@ export const viewQueryKeys = {
   forDataLink: (sharingKey: string) =>
     ['views', 'forDataLink', sharingKey] as const,
   forDataLinkAll: () => ['views', 'forDataLink'] as const,
+  forDataset: (fspName: string, path: string) =>
+    ['views', 'forDataset', fspName, path] as const,
+  forDatasetAll: () => ['views', 'forDataset'] as const,
   relinkable: (fspName: string, path: string) =>
     ['views', 'relinkable', fspName, path] as const,
   state: (readKey: string) => ['views', 'state', readKey] as const
@@ -208,6 +211,32 @@ export function useViewsForDataLinkQuery(
     queryKey: viewQueryKeys.forDataLink(sharingKey ?? ''),
     queryFn: ({ signal }) => fetchViewsForDataLink(sharingKey!, signal),
     enabled: !!sharingKey
+  });
+}
+
+/**
+ * Query hook for the Views with a working layer on a dataset, matched by
+ * (fspName, path), so datasets without a Data Link are covered. Disabled
+ * until both are provided.
+ */
+export function useViewsForDatasetQuery(
+  fspName?: string,
+  path?: string
+): UseQueryResult<View[], Error> {
+  return useQuery<View[], Error>({
+    queryKey: viewQueryKeys.forDataset(fspName ?? '', path ?? ''),
+    queryFn: async ({ signal }) => {
+      const url = buildUrl('/api/neuroglancer/views/for-dataset', null, {
+        fsp_name: fspName!,
+        path: path!
+      });
+      const data = (await sendRequestAndThrowForNotOk(url, 'GET', undefined, {
+        signal
+      })) as ViewsResponse;
+      return data.views ?? [];
+    },
+    // path '' is the FSP root, so test for undefined, not falsiness
+    enabled: fspName !== undefined && path !== undefined
   });
 }
 
@@ -346,6 +375,9 @@ export function useUpdateViewMutation(): UseMutationResult<
       // name too (name/ng_state changes both land here, unlike the state key).
       queryClient.invalidateQueries({
         queryKey: viewQueryKeys.forDataLinkAll()
+      });
+      queryClient.invalidateQueries({
+        queryKey: viewQueryKeys.forDatasetAll()
       });
       // A name-only rename must not touch the state query: the embedded
       // viewer's active viewQueryKeys.state(readKey) query would refetch,

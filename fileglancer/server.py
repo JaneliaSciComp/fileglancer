@@ -1756,6 +1756,16 @@ def create_app(settings):
             views = db.get_views(session, username)
             return ViewResponse(views=[View.model_validate(v) for v in views])
 
+    @app.get("/api/neuroglancer/views/for-dataset", response_model=ViewResponse,
+             description="The caller's Views with a working layer on this dataset")
+    async def views_for_dataset_endpoint(fsp_name: str = Query(..., description="File share path name"),
+                                         path: str = Query(..., description="Path relative to the file share path"),
+                                         username: str = Depends(get_current_user)):
+        path = _normalize_proxied_path(path)
+        with db.get_db_session(settings.db_url) as session:
+            views = db.get_views_for_dataset(session, username, fsp_name, path)
+            return ViewResponse(views=[View.model_validate(v) for v in views])
+
     @app.get("/api/neuroglancer/views/relinkable", response_model=ViewSummaryResponse,
              description="The caller's broken Views that a Data Link to this dataset would repair")
     async def relinkable_views_endpoint(fsp_name: str = Query(..., description="File share path name"),

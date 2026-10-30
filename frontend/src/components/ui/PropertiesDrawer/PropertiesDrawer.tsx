@@ -20,6 +20,7 @@ import DataLinkUsageDialog from '@/components/ui/Dialogs/dataLinkUsage/DataLinkU
 import TextDialogBtn from '@/components/ui/buttons/DialogTextBtn';
 import FgSwitch from '@/components/ui/widgets/FgSwitch';
 import { getPreferredPathForDisplay } from '@/utils';
+import { normalizeFspRootPath } from '@/utils/pathHandling';
 import { copyToClipboard } from '@/utils/copyText';
 import { isReadOnlyFsp } from '@/utils/cloudStorage';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
@@ -416,6 +417,13 @@ export default function PropertiesDrawer({
                   {proxiedPathByFspAndPathQuery.data?.sharing_key ? (
                     <AppearsInViews
                       sharingKey={proxiedPathByFspAndPathQuery.data.sharing_key}
+                    />
+                  ) : currentFsp &&
+                    fileBrowserState.dataLinkPath !== null &&
+                    (readOnly || externalDataUrlQuery.data) ? (
+                    <AppearsInViews
+                      fspName={currentFsp.name}
+                      path={normalizeFspRootPath(fileBrowserState.dataLinkPath)}
                     />
                   ) : null}
                 </Tabs.Panel>
