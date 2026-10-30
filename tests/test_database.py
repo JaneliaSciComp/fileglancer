@@ -1153,3 +1153,42 @@ def test_reconcile_keeps_bucket_layers_as_dataset_rows(db_session):
     rows = sorted(v.layers, key=lambda l: l.layer_index)
     assert [(r.fsp_name, r.path, r.channel, r.broken) for r in rows] == [
         (None, None, None, False), ("idr", "zarr/img.zarr", "DAPI", False)]
+
+
+def test_reconcile_keeps_externally_mapped_layers_as_dataset_rows(db_session):
+    db_session.add(ExternalBucketDB(full_path="/nrs/lab/data_external", external_url="https://s3.example.org/lab/",
+                                    fsp_name="nrs_lab", relative_path="data_external"))
+    db_session.commit()
+    src = "https://s3.example.org/lab/a/img.zarr/|zarr3:"
+    state = {"layers": [{"name": "img", "source": src}]}
+    v = create_view(db_session, "u", "e", state,
+                    [{"layer_index": 0, "channel": None, "opts": None,
+                      "fsp_name": "nrs_lab", "path": "data_external/a/img.zarr"}], "read")
+
+    update_view(db_session, v, ng_state=state, proxy_url=PROXY)
+    assert [(r.fsp_name, r.path, r.broken) for r in v.layers] == [("nrs_lab", "data_external/a/img.zarr", False)]
+
+
+def test_get_views_for_dataset_matches_layers_without_data_links(db_session):
+    def layer(i, fsp_name, path, channel=None):
+        return {"layer_index": i, "channel": channel, "opts": None, "fsp_name": fsp_name, "path": path}
+
+    bucket = create_view(db_session, "u", "bucket", {"layers": []}, [layer(0, "idr", "zarr/img.zarr")], "read")
+    external = create_view(db_session, "u", "ext", {"layers": []},
+                           [layer(0, "nrs_lab", "data_external/a/img.zarr")], "read")
+    channels = create_view(db_session, "u", "channels", {"layers": []},
+                           [layer(0, "idr", "zarr/img.zarr", "DAPI"), layer(1, "idr", "zarr/img.zarr", "GFP")], "read")
+    create_view(db_session, "other", "theirs", {"layers": []}, [layer(0, "idr", "zarr/img.zarr")], "read")
+
+    found = get_views_for_dataset(db_session, "u", "idr", "zarr/img.zarr")
+    assert sorted(v.short_key for v in found) == sorted([bucket.short_key, channels.short_key])
+    assert [v.short_key for v in get_views_for_dataset(db_session, "u", "nrs_lab", "data_external/a/img.zarr")] == [external.short_key]
+
+
+def test_get_views_for_dataset_skips_broken_layers_and_matches_legacy_root(db_session):
+    v = create_view(db_session, "u", "root", {"layers": []},
+                    [{"layer_index": 0, "channel": None, "opts": None, "fsp_name": "nrs", "path": "."}], "read")
+    assert [x.short_key for x in get_views_for_dataset(db_session, "u", "nrs", "")] == [v.short_key]
+    v.layers[0].broken = True
+    db_session.commit()
+    assert get_views_for_dataset(db_session, "u", "nrs", "") == []

@@ -1,9 +1,15 @@
 import { useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import {
   useAllProxiedPathsQuery,
   useCreateProxiedPathMutation
 } from '@/queries/proxiedPathQueries';
+import {
+  externalBucketQueryKeys,
+  fetchExternalBucket,
+  transformBucketToDataUrl
+} from '@/queries/externalBucketQueries';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useViewsContext } from '@/contexts/ViewsContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
@@ -15,6 +21,8 @@ import {
   normalizeFspRootPath
 } from '@/utils/pathHandling';
 import { isReadOnlyFsp } from '@/utils/cloudStorage';
+import { defaultUrlPrefix, validateUrlPrefix } from '@/hooks/useDataToolLinks';
+import { default as log } from '@/logger';
 import { makeMapKey } from '@/utils';
 import type { CartItem } from '@/queries/preferencesQueries';
 import type { View } from '@/queries/viewQueries';
@@ -25,6 +33,9 @@ import type { FileSharePath } from '@/shared.types';
 type ResolvedLink = Pick<ProxiedPath, 'url' | 'url_prefix'> & {
   sharing_key: string | null;
 };
+
+/** Custom url_prefix per new Data Link, keyed by datasetKey. */
+export type UrlPrefixes = Record<string, string>;
 
 // A dataset can hold both a base (channel-less) CartItem and channel-specific
 // CartItems at once. Drop the base entry when channel entries exist for the
@@ -53,28 +64,63 @@ export function useCartCheckout() {
   const createProxiedPath = useCreateProxiedPathMutation();
   const { createViewMutation } = useViewsContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
-  const { disableHeuristicalLayerTypeDetection } = usePreferencesContext();
+  const { disableHeuristicalLayerTypeDetection, dataLinkSubpathMode } =
+    usePreferencesContext();
+  const queryClient = useQueryClient();
 
-  const bucketFor = useCallback(
-    (ds: Pick<CartItem, 'fsp_name'>): FileSharePath | null => {
-      const fsp = zonesAndFspQuery.data?.[makeMapKey('fsp', ds.fsp_name)] as
+  const fspFor = useCallback(
+    (ds: Pick<CartItem, 'fsp_name'>): FileSharePath | undefined =>
+      zonesAndFspQuery.data?.[makeMapKey('fsp', ds.fsp_name)] as
         | FileSharePath
-        | undefined;
-      return isReadOnlyFsp(fsp) ? fsp! : null;
-    },
+        | undefined,
     [zonesAndFspQuery.data]
   );
 
-  /** A public bucket's data needs no Data Link; it is served at its own URL. */
-  const isBucketDataset = useCallback(
-    (ds: Pick<CartItem, 'fsp_name'>): boolean => bucketFor(ds) !== null,
-    [bucketFor]
+  const bucketFor = useCallback(
+    (ds: Pick<CartItem, 'fsp_name'>): FileSharePath | null => {
+      const fsp = fspFor(ds);
+      return isReadOnlyFsp(fsp) ? fsp! : null;
+    },
+    [fspFor]
+  );
+
+  /** The URL an external bucket mapping serves this dataset at, if any. */
+  const externalUrlFor = useCallback(
+    async (ds: Pick<CartItem, 'fsp_name' | 'path'>): Promise<string | null> => {
+      try {
+        const bucket = await queryClient.fetchQuery({
+          queryKey: externalBucketQueryKeys.byFsp(ds.fsp_name),
+          queryFn: ({ signal }) => fetchExternalBucket(ds.fsp_name, signal),
+          staleTime: 5 * 60 * 1000
+        });
+        return transformBucketToDataUrl(bucket, ds.path, ds.fsp_name);
+      } catch (error) {
+        // Like the file browser, a failed lookup means "no mapping": fall
+        // back to a Data Link rather than failing the whole checkout.
+        log.warn(`External bucket lookup failed for ${ds.fsp_name}`, error);
+        return null;
+      }
+    },
+    [queryClient]
+  );
+
+  /**
+   * Public buckets and externally mapped paths need no Data Link; they are
+   * served at their own URL.
+   */
+  const isServedWithoutLink = useCallback(
+    async (ds: Pick<CartItem, 'fsp_name' | 'path'>): Promise<boolean> =>
+      bucketFor(ds) !== null || (await externalUrlFor(ds)) !== null,
+    [bucketFor, externalUrlFor]
   );
 
   // Finds or creates one Data Link per dataset. Shared by checkout and
   // "Add to this View".
   const resolveCartDatasets = useCallback(
-    async (rawDatasets: CartItem[]): Promise<ResolvedCheckoutDataset[]> => {
+    async (
+      rawDatasets: CartItem[],
+      urlPrefixes?: UrlPrefixes
+    ): Promise<ResolvedCheckoutDataset[]> => {
       const datasets = dropShadowedBaseEntries(rawDatasets);
       const existing = new Map<string, ProxiedPath>(
         (allProxiedPathsQuery.data ?? []).map(p => [
@@ -91,17 +137,40 @@ export function useCartCheckout() {
           continue;
         }
         const bucket = bucketFor(ds);
-        const link: ResolvedLink = bucket
-          ? {
-              url: bucketDatasetUrl(bucket, ds.path),
-              sharing_key: null,
-              url_prefix: ''
-            }
-          : (existing.get(key) ??
-            (await createProxiedPath.mutateAsync({
-              fsp_name: ds.fsp_name,
-              path: normalizeFspRootPath(ds.path)
-            })));
+        // Like the file browser's data tools, an external URL wins over a
+        // Data Link.
+        const ownUrl = bucket
+          ? bucketDatasetUrl(bucket, ds.path)
+          : await externalUrlFor(ds);
+        if (ownUrl) {
+          linkByKey.set(key, {
+            url: ownUrl,
+            sharing_key: null,
+            url_prefix: ''
+          });
+          continue;
+        }
+        const path = normalizeFspRootPath(ds.path);
+        let link = existing.get(key);
+        if (!link) {
+          const url_prefix =
+            urlPrefixes?.[key] ??
+            defaultUrlPrefix(
+              dataLinkSubpathMode,
+              path,
+              ds.fsp_name,
+              fspFor(ds)?.linux_path
+            );
+          const prefixError = validateUrlPrefix(url_prefix);
+          if (prefixError) {
+            throw new Error(prefixError);
+          }
+          link = await createProxiedPath.mutateAsync({
+            fsp_name: ds.fsp_name,
+            path,
+            url_prefix
+          });
+        }
         linkByKey.set(key, link);
       }
 
@@ -124,12 +193,23 @@ export function useCartCheckout() {
         };
       });
     },
-    [allProxiedPathsQuery.data, createProxiedPath, bucketFor]
+    [
+      allProxiedPathsQuery.data,
+      createProxiedPath,
+      bucketFor,
+      externalUrlFor,
+      fspFor,
+      dataLinkSubpathMode
+    ]
   );
 
   const checkout = useCallback(
-    async (rawDatasets: CartItem[], name: string): Promise<View> => {
-      const resolved = await resolveCartDatasets(rawDatasets);
+    async (
+      rawDatasets: CartItem[],
+      name: string,
+      urlPrefixes?: UrlPrefixes
+    ): Promise<View> => {
+      const resolved = await resolveCartDatasets(rawDatasets, urlPrefixes);
       const { ng_state, layers } = await buildViewState(
         resolved,
         !disableHeuristicalLayerTypeDetection
@@ -143,5 +223,5 @@ export function useCartCheckout() {
     ]
   );
 
-  return { checkout, resolveCartDatasets, isBucketDataset };
+  return { checkout, resolveCartDatasets, isServedWithoutLink };
 }

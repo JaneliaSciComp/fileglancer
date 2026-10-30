@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
 import { makeFakeBridge } from '@/__tests__/mocks/fakeNeuroglancer';
@@ -98,14 +99,16 @@ function setup() {
     selectedLayer: { layer: 'a GFP', visible: true }
   });
   render(
-    <ViewerSidebar
-      bridge={fake.bridge}
-      editState={editState}
-      onClose={vi.fn()}
-      onTabChange={vi.fn()}
-      tab="sources"
-      viewLayers={VIEW_LAYERS}
-    />
+    <QueryClientProvider client={new QueryClient()}>
+      <ViewerSidebar
+        bridge={fake.bridge}
+        editState={editState}
+        onClose={vi.fn()}
+        onTabChange={vi.fn()}
+        tab="sources"
+        viewLayers={VIEW_LAYERS}
+      />
+    </QueryClientProvider>
   );
   return fake;
 }

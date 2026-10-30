@@ -797,9 +797,11 @@ async function getZarrArray(
   dataUrl: string,
   zarrVersion: 2 | 3
 ): Promise<zarr.Array<any>> {
+  // 'same-origin', not 'include': public buckets answer CORS with
+  // Allow-Origin '*', which browsers reject for credentialed requests.
   const store = new zarr.FetchStore(dataUrl, {
     overrides: {
-      credentials: 'include'
+      credentials: 'same-origin'
     }
   });
   return await omezarr.getArray(store, '/', zarrVersion);
@@ -811,7 +813,7 @@ async function getZarrArray(
 async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
   const store = new zarr.FetchStore(dataUrl, {
     overrides: {
-      credentials: 'include'
+      credentials: 'same-origin'
     }
   });
   const { arr, shapes, multiscale, omero, scales, zarr_version } =
@@ -946,7 +948,7 @@ async function getOmeZarrThumbnail(
 ): Promise<ThumbnailResult> {
   const store = new zarr.FetchStore(dataUrl, {
     overrides: {
-      credentials: 'include',
+      credentials: 'same-origin',
       signal
     }
   });

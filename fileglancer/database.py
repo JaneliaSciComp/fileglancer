@@ -597,9 +597,13 @@ def get_cloud_buckets(session: Session, username: str) -> List[CloudBucketDB]:
     return session.query(CloudBucketDB).filter_by(username=username).order_by(CloudBucketDB.name).all()
 
 
-def bucket_url_roots(session: Session, username: str) -> List[Tuple[str, str]]:
-    """(fsp_name, public base URL) of each of the user's buckets, for ngstate.bucket_source."""
-    return [(b.name, s3_public_url(b.bucket, b.endpoint_url, b.prefix)) for b in get_cloud_buckets(session, username)]
+def bucket_url_roots(session: Session, username: str) -> List[Tuple[str, str, str]]:
+    """(fsp_name, public base URL, path it serves) of each of the user's buckets
+    and each externally mapped path, for ngstate.bucket_source."""
+    return ([(b.name, s3_public_url(b.bucket, b.endpoint_url, b.prefix), '')
+             for b in get_cloud_buckets(session, username)]
+            + [(e.fsp_name, e.external_url, e.relative_path or '')
+               for e in get_external_buckets(session) if e.external_url])
 
 
 def get_cloud_bucket(session: Session, username: str, name: str) -> Optional[CloudBucketDB]:
@@ -1326,6 +1330,24 @@ def get_views_for_data_link(session: Session, data_link_id: int, owner: Optional
 def _path_aliases(path: str) -> List[str]:
     """Stored spellings of a normalized path: legacy rows wrote the FSP root as "."."""
     return ["", "."] if path == "" else [path]
+
+
+def get_views_for_dataset(session: Session, owner: str, fsp_name: str, path: str) -> List[ViewDB]:
+    """The owner's Views with a working layer on this dataset, matched by
+    (fsp_name, path) so layers without a Data Link (cloud buckets, externally
+    mapped paths) count too. IN-subquery for the reason in get_views_for_data_link."""
+    layer_view_ids = (
+        session.query(ViewLayerDB.view_id)
+        .filter(ViewLayerDB.broken.is_(False),
+                ViewLayerDB.fsp_name == fsp_name,
+                ViewLayerDB.path.in_(_path_aliases(path)))
+    )
+    return (
+        session.query(ViewDB)
+        .filter(ViewDB.id.in_(layer_view_ids), ViewDB.owner == owner)
+        .order_by(ViewDB.created_at.desc())
+        .all()
+    )
 
 
 def get_relinkable_views(session: Session, owner: str, fsp_name: str, path: str) -> List[ViewDB]:

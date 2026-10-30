@@ -123,17 +123,19 @@ function BtnContainer({ children }: { readonly children: ReactNode }) {
   return <div className="flex gap-4">{children}</div>;
 }
 
-function CustomSubpathInput({
+export function CustomSubpathInput({
   value,
   error,
-  onChange
+  onChange,
+  label = 'Data link name'
 }: {
   readonly value: string;
   readonly error: string | null;
   readonly onChange: (value: string) => void;
+  readonly label?: string;
 }) {
   return (
-    <FgFormField error={error ?? undefined} label="Data link name">
+    <FgFormField error={error ?? undefined} label={label}>
       <FgInput
         className="font-mono"
         onChange={e => onChange(e.target.value)}
