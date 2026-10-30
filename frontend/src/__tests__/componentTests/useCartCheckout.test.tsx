@@ -7,6 +7,7 @@ const createProxied = vi.fn();
 const createViewAsync = vi.fn();
 const buildViewState = vi.hoisted(() => vi.fn());
 const fetchExternalBucket = vi.hoisted(() => vi.fn());
+let subpathMode = 'name';
 
 vi.mock('@/queries/proxiedPathQueries', () => ({
   useAllProxiedPathsQuery: () => ({
@@ -20,7 +21,10 @@ vi.mock('@/contexts/ViewsContext', () => ({
   })
 }));
 vi.mock('@/contexts/PreferencesContext', () => ({
-  usePreferencesContext: () => ({ disableHeuristicalLayerTypeDetection: false })
+  usePreferencesContext: () => ({
+    disableHeuristicalLayerTypeDetection: false,
+    dataLinkSubpathMode: subpathMode
+  })
 }));
 vi.mock('@/queries/externalBucketQueries', async importOriginal => ({
   ...(await importOriginal<object>()),
@@ -33,7 +37,12 @@ vi.mock('@/contexts/ZonesAndFspMapContext', () => ({
   useZoneAndFspMapContext: () => ({
     zonesAndFspQuery: {
       data: {
-        fsp_f: { name: 'f', protocol: 'file', mount_path: '/f' },
+        fsp_f: {
+          name: 'f',
+          protocol: 'file',
+          mount_path: '/f',
+          linux_path: '/groups/f'
+        },
         fsp_bucket: {
           name: 'bucket',
           protocol: 's3',
@@ -54,6 +63,7 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 beforeEach(() => {
+  subpathMode = 'name';
   fetchExternalBucket.mockReset().mockResolvedValue(null);
   createProxied.mockReset().mockResolvedValue({
     fsp_name: 'f',
@@ -129,6 +139,19 @@ describe('useCartCheckout', () => {
     expect(
       await result.current.isServedWithoutLink({ fsp_name: 'f', path: '/b' })
     ).toBe(false);
+  });
+
+  it('names new Data Links by the subpath-mode preference', async () => {
+    subpathMode = 'full_path';
+    const { result } = renderHook(() => useCartCheckout(), { wrapper });
+    await result.current.resolveCartDatasets([
+      { fsp_name: 'f', path: 'x/b.zarr', label: 'B' }
+    ]);
+    expect(createProxied).toHaveBeenLastCalledWith({
+      fsp_name: 'f',
+      path: 'x/b.zarr',
+      url_prefix: 'groups/f/x/b.zarr'
+    });
   });
 
   it('uses an external bucket URL instead of a Data Link', async () => {

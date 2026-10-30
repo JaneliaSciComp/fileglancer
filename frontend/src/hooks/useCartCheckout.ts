@@ -21,6 +21,7 @@ import {
   normalizeFspRootPath
 } from '@/utils/pathHandling';
 import { isReadOnlyFsp } from '@/utils/cloudStorage';
+import { defaultUrlPrefix } from '@/hooks/useDataToolLinks';
 import { default as log } from '@/logger';
 import { makeMapKey } from '@/utils';
 import type { CartItem } from '@/queries/preferencesQueries';
@@ -60,17 +61,24 @@ export function useCartCheckout() {
   const createProxiedPath = useCreateProxiedPathMutation();
   const { createViewMutation } = useViewsContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
-  const { disableHeuristicalLayerTypeDetection } = usePreferencesContext();
+  const { disableHeuristicalLayerTypeDetection, dataLinkSubpathMode } =
+    usePreferencesContext();
   const queryClient = useQueryClient();
+
+  const fspFor = useCallback(
+    (ds: Pick<CartItem, 'fsp_name'>): FileSharePath | undefined =>
+      zonesAndFspQuery.data?.[makeMapKey('fsp', ds.fsp_name)] as
+        | FileSharePath
+        | undefined,
+    [zonesAndFspQuery.data]
+  );
 
   const bucketFor = useCallback(
     (ds: Pick<CartItem, 'fsp_name'>): FileSharePath | null => {
-      const fsp = zonesAndFspQuery.data?.[makeMapKey('fsp', ds.fsp_name)] as
-        | FileSharePath
-        | undefined;
+      const fsp = fspFor(ds);
       return isReadOnlyFsp(fsp) ? fsp! : null;
     },
-    [zonesAndFspQuery.data]
+    [fspFor]
   );
 
   /** The URL an external bucket mapping serves this dataset at, if any. */
@@ -136,11 +144,18 @@ export function useCartCheckout() {
           });
           continue;
         }
+        const path = normalizeFspRootPath(ds.path);
         const link =
           existing.get(key) ??
           (await createProxiedPath.mutateAsync({
             fsp_name: ds.fsp_name,
-            path: normalizeFspRootPath(ds.path)
+            path,
+            url_prefix: defaultUrlPrefix(
+              dataLinkSubpathMode,
+              path,
+              ds.fsp_name,
+              fspFor(ds)?.linux_path
+            )
           }));
         linkByKey.set(key, link);
       }
@@ -164,7 +179,14 @@ export function useCartCheckout() {
         };
       });
     },
-    [allProxiedPathsQuery.data, createProxiedPath, bucketFor, externalUrlFor]
+    [
+      allProxiedPathsQuery.data,
+      createProxiedPath,
+      bucketFor,
+      externalUrlFor,
+      fspFor,
+      dataLinkSubpathMode
+    ]
   );
 
   const checkout = useCallback(
