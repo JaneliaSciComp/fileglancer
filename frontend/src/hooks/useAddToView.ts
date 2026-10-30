@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 
 import { useCartCheckout } from '@/hooks/useCartCheckout';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { isRelinkableLayer } from '@/queries/viewQueries';
 import {
   appendLayers,
@@ -39,6 +40,7 @@ export function useAddToView(
   }
 ): (items: CartItem[], options?: { shown?: boolean }) => Promise<void> {
   const { resolveCartDatasets } = useCartCheckout();
+  const { disableHeuristicalLayerTypeDetection } = usePreferencesContext();
   // The sidebar unmounts when NG reloads (the bridge leaves `ready`). An add
   // still in flight then holds the dead viewer, so it must stop.
   const mounted = useRef(true);
@@ -55,7 +57,10 @@ export function useAddToView(
       // broken layers on that dataset server-side and refetches the rows.
       const broken = viewLayers.filter(isRelinkableLayer);
       const resolved = await resolveCartDatasets(items);
-      const { ng_state, layers } = await buildViewState(resolved);
+      const { ng_state, layers } = await buildViewState(
+        resolved,
+        !disableHeuristicalLayerTypeDetection
+      );
       const added = (ng_state.layers ?? []) as NgLayer[];
       const unsupportedKeys = [
         ...new Set(
@@ -117,6 +122,14 @@ export function useAddToView(
         `Added ${count} ${noun}${count === 1 ? '' : 's'}. Save to keep ${count === 1 ? 'it' : 'them'}.${skipped}`
       );
     },
-    [resolveCartDatasets, bridge, viewLayers, onEdited, onAddSources, onAdded]
+    [
+      resolveCartDatasets,
+      disableHeuristicalLayerTypeDetection,
+      bridge,
+      viewLayers,
+      onEdited,
+      onAddSources,
+      onAdded
+    ]
   );
 }

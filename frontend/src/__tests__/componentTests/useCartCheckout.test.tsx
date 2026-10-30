@@ -18,6 +18,9 @@ vi.mock('@/contexts/ViewsContext', () => ({
     createViewMutation: { mutateAsync: createViewAsync }
   })
 }));
+vi.mock('@/contexts/PreferencesContext', () => ({
+  usePreferencesContext: () => ({ disableHeuristicalLayerTypeDetection: false })
+}));
 vi.mock('@/utils/viewCheckout', () => ({
   buildViewState
 }));

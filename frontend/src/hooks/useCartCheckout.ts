@@ -4,6 +4,7 @@ import {
   useAllProxiedPathsQuery,
   useCreateProxiedPathMutation
 } from '@/queries/proxiedPathQueries';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useViewsContext } from '@/contexts/ViewsContext';
 import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { buildViewState } from '@/utils/viewCheckout';
@@ -52,6 +53,7 @@ export function useCartCheckout() {
   const createProxiedPath = useCreateProxiedPathMutation();
   const { createViewMutation } = useViewsContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
+  const { disableHeuristicalLayerTypeDetection } = usePreferencesContext();
 
   const bucketFor = useCallback(
     (ds: Pick<CartItem, 'fsp_name'>): FileSharePath | null => {
@@ -128,10 +130,17 @@ export function useCartCheckout() {
   const checkout = useCallback(
     async (rawDatasets: CartItem[], name: string): Promise<View> => {
       const resolved = await resolveCartDatasets(rawDatasets);
-      const { ng_state, layers } = await buildViewState(resolved);
+      const { ng_state, layers } = await buildViewState(
+        resolved,
+        !disableHeuristicalLayerTypeDetection
+      );
       return createViewMutation.mutateAsync({ name, ng_state, layers });
     },
-    [resolveCartDatasets, createViewMutation]
+    [
+      resolveCartDatasets,
+      createViewMutation,
+      disableHeuristicalLayerTypeDetection
+    ]
   );
 
   return { checkout, resolveCartDatasets, isBucketDataset };
