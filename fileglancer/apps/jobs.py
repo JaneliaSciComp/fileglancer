@@ -940,6 +940,16 @@ async def submit_job(
         if entry_point.type == "service":
             preamble_lines.append('export SERVICE_URL_PATH="$FG_WORK_DIR/service_url"')
             preamble_lines.append(_SERVICE_PORT_HELPER)
+            # Tell a proxied service where its connections will come from, so
+            # it can accept only the proxy. Skipped when the proxy is off, the
+            # entry point opted out, or no address is configured.
+            if (settings.apps.service_proxy_domain
+                    and settings.apps.service_proxy_address
+                    and entry_point.service_proxy):
+                preamble_lines.append(
+                    "export FG_SERVICE_PROXY_ADDRESS="
+                    f"{shlex.quote(settings.apps.service_proxy_address)}"
+                )
             # With auto_url, Fileglancer publishes the URL for the author: a
             # background probe waits for $FG_SERVICE_PORT to accept connections and
             # then writes http://$FG_HOSTNAME:$FG_SERVICE_PORT plus the optional

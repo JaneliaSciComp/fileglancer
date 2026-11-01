@@ -2866,7 +2866,8 @@ class TestSubmitJobAssembly:
     }
 
     def _submit(self, tmp_path, monkeypatch, entry_point=None, cluster=None,
-                file_share_mounts=None, validate_errors=None, **submit_kwargs):
+                file_share_mounts=None, validate_errors=None, apps=None,
+                **submit_kwargs):
         """Run submit_job with worker seams mocked; return (job, dispatch calls)."""
         import asyncio
         from unittest.mock import AsyncMock
@@ -2879,7 +2880,9 @@ class TestSubmitJobAssembly:
         settings = Settings(db_url=db_url,
                             file_share_mounts=file_share_mounts or [],
                             cli_mode=True,
-                            cluster=cluster or {})
+                            cluster=cluster or {},
+                            session_secret_key="test-secret",
+                            apps=apps or {})
         monkeypatch.setattr(jobs_mod, "get_settings", lambda: settings)
         # build_command validates path params against the file shares, which
         # get_file_share_paths reads from settings.
@@ -3032,6 +3035,30 @@ class TestSubmitJobAssembly:
         script = self._submitted(calls)["command"]
         assert 'export SERVICE_URL_PATH="$FG_WORK_DIR/service_url"' in script
         assert "FG_SERVICE_PORT" in script
+
+    @pytest.mark.parametrize("apps,entry_point,expected", [
+        ({"service_proxy_domain": "svc.example.org",
+          "service_proxy_address": "10.1.2.3,10.9.0.0/16"},
+         {}, True),
+        # No domain: the proxy is not in use.
+        ({"service_proxy_address": "10.1.2.3"}, {}, False),
+        # No address configured.
+        ({"service_proxy_domain": "svc.example.org"}, {}, False),
+        # Entry point opted out of the proxy.
+        ({"service_proxy_domain": "svc.example.org",
+          "service_proxy_address": "10.1.2.3"},
+         {"service_proxy": False}, False),
+    ])
+    def test_service_proxy_address_export(self, tmp_path, monkeypatch,
+                                          apps, entry_point, expected):
+        _, calls = self._submit(
+            tmp_path, monkeypatch, apps=apps,
+            entry_point={"type": "service", "auto_url": True, **entry_point},
+        )
+        script = self._submitted(calls)["command"]
+        assert ("export FG_SERVICE_PROXY_ADDRESS=" in script) is expected
+        if expected:
+            assert "export FG_SERVICE_PROXY_ADDRESS=10.1.2.3,10.9.0.0/16" in script
 
     def test_container_wraps_command_and_binds_default_paths(self, tmp_path, monkeypatch):
         input_file = tmp_path / "input.txt"
