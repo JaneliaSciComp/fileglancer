@@ -23,6 +23,7 @@ import type { OutletContextType } from '@/layouts/BrowseLayout';
 
 type ZarrPreviewProps = {
   readonly fspName: string;
+  readonly incompatibleViewers?: Record<string, string[]>;
   readonly layerType: 'auto' | 'image' | 'segmentation' | null;
   readonly mainPanelWidth: number;
   readonly openWithToolUrls: OpenWithToolUrls | null;
@@ -38,6 +39,7 @@ type ZarrPreviewProps = {
 export default function ZarrPreview({
   availableZarrVersions,
   fspName,
+  incompatibleViewers,
   layerType,
   mainPanelWidth,
   openWithToolUrls,
@@ -141,6 +143,7 @@ export default function ZarrPreview({
               compact={mainPanelWidth <= 1000}
               dataLinkUrl={openWithToolUrls.copy || undefined}
               fspName={fspName}
+              incompatibleViewers={incompatibleViewers}
               onAddToCart={() => void handleAddToCart()}
               onOpenNeuroglancer={
                 neuroglancerButtonTarget === 'views'

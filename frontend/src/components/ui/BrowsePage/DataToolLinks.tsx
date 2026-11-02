@@ -64,6 +64,7 @@ export default function DataToolLinks({
   compact = false,
   dataLinkUrl,
   fspName,
+  incompatibleViewers,
   onAddToCart,
   onOpenNeuroglancer,
   onToolClick,
@@ -75,6 +76,9 @@ export default function DataToolLinks({
   readonly compact?: boolean;
   readonly dataLinkUrl?: string;
   readonly fspName?: string;
+  // Viewer key -> reasons the capability manifest rejected the dataset.
+  // These viewers are shown in a collapsed section instead of the main row.
+  readonly incompatibleViewers?: Record<string, string[]>;
   readonly onAddToCart?: () => void;
   // Replaces the Neuroglancer link (e.g. to create a View instead).
   readonly onOpenNeuroglancer?: () => void;
@@ -90,6 +94,13 @@ export default function DataToolLinks({
     return null;
   }
 
+  const incompatible = validViewers.filter(
+    viewer =>
+      incompatibleViewers?.[viewer.key] &&
+      urls[viewer.key] !== null &&
+      urls[viewer.key] !== undefined
+  );
+
   return (
     <div className="my-1" data-tour="data-tool-links">
       <Typography className="font-semibold text-sm text-surface-foreground mb-1">
@@ -101,8 +112,13 @@ export default function DataToolLinks({
         {validViewers.map(viewer => {
           const url = urls[viewer.key];
 
-          // null means incompatible, don't show
-          if (url === null || url === undefined) {
+          // null means no URL for this viewer, don't show; viewers the
+          // capability manifest rejected go in the collapsed section below
+          if (
+            url === null ||
+            url === undefined ||
+            incompatibleViewers?.[viewer.key]
+          ) {
             return null;
           }
 
@@ -178,6 +194,37 @@ export default function DataToolLinks({
           </div>
         ) : null}
       </div>
+
+      {incompatible.length > 0 ? (
+        <details className="mt-2">
+          <summary className="text-xs text-foreground/70 cursor-pointer select-none hover:text-foreground">
+            {incompatible.length} incompatible viewer
+            {incompatible.length > 1 ? 's' : ''}
+          </summary>
+          <Typography className="text-xs text-foreground/70 mt-1">
+            These viewers report that they do not support this dataset, but they
+            may still work. Hover over a viewer to see why it was excluded.
+          </Typography>
+          <div
+            className={`flex flex-wrap gap-2 items-start mt-2 opacity-60 ${compact ? 'max-w-[13.5rem]' : ''}`}
+          >
+            {incompatible.map(viewer => (
+              <ToolLink
+                key={viewer.key}
+                label={viewer.displayName}
+                logoAlt={viewer.label}
+                logoSrc={viewer.logoPath}
+                onToolClick={onToolClick}
+                toolKey={viewer.key as PendingToolKey}
+                tooltipLabel={(incompatibleViewers?.[viewer.key] ?? []).join(
+                  '; '
+                )}
+                url={urls[viewer.key] as string}
+              />
+            ))}
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }
