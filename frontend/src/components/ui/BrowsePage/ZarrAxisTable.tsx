@@ -24,7 +24,7 @@ function getAxisData(metadata: Metadata) {
       const shape = shapes[0][index] || 'Unknown';
       const chunkSize = arr.chunks[index] || 'Unknown';
       const scale =
-        resolvedScales?.[index] !== null
+        resolvedScales[index] !== undefined && resolvedScales[index] !== null
           ? Number.isInteger(resolvedScales[index])
             ? resolvedScales[index].toString()
             : resolvedScales[index].toFixed(4)

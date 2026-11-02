@@ -290,7 +290,14 @@ function toNeuroglancerDimension(
 function getScaleTransform(
   coordinateTransformations: CoordinateTransformation[] | undefined
 ) {
-  return coordinateTransformations?.find(ct => ct.type === 'scale') as {
+  // OME-Zarr 0.6 (RFC-5) wraps the scale in a `sequence` transformation, so
+  // search one level inside those too.
+  const flattened = coordinateTransformations?.flatMap(
+    ct =>
+      (ct as { transformations?: CoordinateTransformation[] })
+        .transformations ?? [ct]
+  );
+  return flattened?.find(ct => ct.type === 'scale') as {
     scale: number[];
   };
 }

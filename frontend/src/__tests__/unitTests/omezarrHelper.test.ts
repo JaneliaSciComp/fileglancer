@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   generateNeuroglancerStateForOmeZarr,
   getNeuroglancerSource,
+  getResolvedScales,
   toNeuroglancerDimension,
   translateUnitToNeuroglancer
 } from '@/omezarr-helper';
@@ -66,6 +67,42 @@ describe('translateUnitToNeuroglancer', () => {
     expect(translateUnitToNeuroglancer('minute')).toBe('minute');
     expect(translateUnitToNeuroglancer('angstrom')).toBe('angstrom');
     expect(translateUnitToNeuroglancer('picometer')).toBe('pm');
+  });
+});
+
+describe('getResolvedScales', () => {
+  it('reads a direct scale transform (OME-Zarr <= 0.5)', () => {
+    const multiscale = {
+      datasets: [
+        {
+          path: '0',
+          coordinateTransformations: [{ type: 'scale', scale: [2, 3] }]
+        }
+      ]
+    };
+    expect(getResolvedScales(multiscale as any)).toEqual([2, 3]);
+  });
+
+  it('reads a scale nested in a sequence transform (OME-Zarr 0.6)', () => {
+    const multiscale = {
+      datasets: [
+        {
+          path: 'raw/s0',
+          coordinateTransformations: [
+            {
+              type: 'sequence',
+              input: { path: 'raw/s0' },
+              output: { name: 'cs' },
+              transformations: [
+                { type: 'scale', scale: [20, 20] },
+                { type: 'translation', translation: [2560, 2560] }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    expect(getResolvedScales(multiscale as any)).toEqual([20, 20]);
   });
 });
 
