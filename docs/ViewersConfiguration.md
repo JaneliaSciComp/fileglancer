@@ -145,6 +145,8 @@ The host in that URL must match the address in the browser exactly, including
 | Dev or staging host without a build | nginx proxies the production host's `/neuroglancer/` under the dev origin. |
 | Local development | The app's `FGC_NEUROGLANCER_URL` passthrough proxies an external Neuroglancer. |
 
+When nginx serves the build from disk, the `.wasm` files must go out as `application/wasm`, or Neuroglancer's Draco mesh decoder fails to compile and meshes never render (the console shows `Incorrect response MIME type. Expected 'application/wasm'`). nginx added that type to its default `mime.types` in 1.21.0; on older versions add `include /etc/nginx/mime.types; types { application/wasm wasm; }` to the `location /neuroglancer/` block (both lines: a `types` block alone replaces the inherited map and breaks `.js` and `.css`). A dev host that proxies production needs the nested `.wasm` location shown below instead, because `types` has no effect on proxied responses.
+
 The nginx block for a dev host:
 
 ```nginx
@@ -154,6 +156,19 @@ location /neuroglancer/ {
   proxy_ssl_server_name on;
   proxy_hide_header Set-Cookie;
   expires max;
+
+  # Relay .wasm as application/wasm even when production sends
+  # application/octet-stream (nginx < 1.21). `types` does not apply to
+  # proxied responses, so override the header instead.
+  location ~ \.wasm$ {
+    proxy_pass https://fileglancer.example.org;
+    proxy_set_header Host fileglancer.example.org;
+    proxy_ssl_server_name on;
+    proxy_hide_header Set-Cookie;
+    proxy_hide_header Content-Type;
+    add_header Content-Type application/wasm;
+    expires max;
+  }
 }
 ```
 
