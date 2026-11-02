@@ -201,12 +201,8 @@ export default function DataToolLinks({
             {incompatible.length} incompatible viewer
             {incompatible.length > 1 ? 's' : ''}
           </summary>
-          <Typography className="text-xs text-foreground/70 mt-1">
-            These viewers report that they do not support this dataset, but they
-            may still work. Hover over a viewer to see why it was excluded.
-          </Typography>
           <div
-            className={`flex flex-wrap gap-2 items-start mt-2 opacity-60 ${compact ? 'max-w-[13.5rem]' : ''}`}
+            className={`flex flex-wrap gap-2 items-start mt-2 ${compact ? 'max-w-[13.5rem]' : ''}`}
           >
             {incompatible.map(viewer => (
               <ToolLink
