@@ -178,6 +178,9 @@ def _task_description(task: dict, package_dir: Path) -> str | None:
             if task.get(field)]
     if tags:
         parts.append(" | ".join(tags))
+    metas = (task.get("meta_non_parallel") or {}, task.get("meta_parallel") or {})
+    if any(m.get("needs_gpu") for m in metas):
+        parts.append("Requires a GPU — select a GPU queue on the Cluster tab.")
     return "\n\n".join(parts) or None
 
 
@@ -369,13 +372,19 @@ flock 9
 if [ ! -f "$ENV_DIR/.ok" ]; then
   echo "Building Fractal task environment in $ENV_DIR (one-time for this version)..."
   rm -rf "$ENV_DIR"
+  # pip builds local directories in-tree (build/, *.egg-info), which would
+  # pollute the immutable snapshot every job's repo symlink exposes — so
+  # install from a throwaway copy instead.
+  __fg_src="$(mktemp -d)"
   # ponytail: fixed python=3.12; parse requires-python from pyproject if it bites
-  if ! conda create -y -p "$ENV_DIR" python=3.12 pip \\
-      || ! "$ENV_DIR/bin/pip" install "$__fg_snapshot"; then
-    rm -rf "$ENV_DIR"
+  if ! cp -a "$__fg_snapshot/." "$__fg_src" \\
+      || ! conda create -y -p "$ENV_DIR" python=3.12 pip \\
+      || ! "$ENV_DIR/bin/pip" install "$__fg_src"; then
+    rm -rf "$ENV_DIR" "$__fg_src"
     echo "ERROR: failed to build the Fractal task environment" >&2
     exit 1
   fi
+  rm -rf "$__fg_src"
   touch "$ENV_DIR/.ok"
   # ponytail: no env eviction; GC alongside gc_repo_snapshots when quota bites
 fi
@@ -470,8 +479,10 @@ class FractalAdapter:
         if not runnables:
             raise ValueError("Fractal manifest contains no tasks")
 
+        description = (runnables[0].description or "").split("\n")[0] or None
         return AppManifest(
             name=name,
+            description=description,
             source_filename=_FRACTAL_MANIFEST_FILENAME,
             requirements=["miniforge"],
             runnables=runnables,
