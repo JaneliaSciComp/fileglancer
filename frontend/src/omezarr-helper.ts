@@ -800,13 +800,25 @@ function generateNeuroglancerStateForOmeZarr(
   );
 }
 
+/**
+ * Fetch credentials for a data URL: fileglancer's own endpoints need the
+ * session cookie, but a credentialed cross-origin request to a public bucket
+ * answering `Access-Control-Allow-Origin: *` is blocked by the browser.
+ */
+function credentialsForUrl(dataUrl: string): RequestCredentials {
+  return new URL(dataUrl, window.location.origin).origin ===
+    window.location.origin
+    ? 'include'
+    : 'omit';
+}
+
 async function getZarrArray(
   dataUrl: string,
   zarrVersion: 2 | 3
 ): Promise<zarr.Array<any>> {
   const store = new zarr.FetchStore(dataUrl, {
     overrides: {
-      credentials: 'include'
+      credentials: credentialsForUrl(dataUrl)
     }
   });
   return await omezarr.getArray(store, '/', zarrVersion);
@@ -818,7 +830,7 @@ async function getZarrArray(
 async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
   const store = new zarr.FetchStore(dataUrl, {
     overrides: {
-      credentials: 'include'
+      credentials: credentialsForUrl(dataUrl)
     }
   });
   const { arr, shapes, multiscale, omero, scales, zarr_version } =
@@ -969,7 +981,7 @@ async function getOmeZarrThumbnail(
 ): Promise<ThumbnailResult> {
   const store = new zarr.FetchStore(dataUrl, {
     overrides: {
-      credentials: 'include',
+      credentials: credentialsForUrl(dataUrl),
       signal
     }
   });
@@ -1095,6 +1107,7 @@ async function determineLayerType(
 }
 
 export {
+  credentialsForUrl,
   getScaleTransform,
   getResolvedScales,
   getAxesMap,

@@ -1,11 +1,32 @@
 import { describe, it, expect } from 'vitest';
 import {
+  credentialsForUrl,
   generateNeuroglancerStateForOmeZarr,
   getNeuroglancerSource,
   getResolvedScales,
   toNeuroglancerDimension,
   translateUnitToNeuroglancer
 } from '@/omezarr-helper';
+
+describe('credentialsForUrl', () => {
+  it('includes credentials for relative URLs', () => {
+    expect(credentialsForUrl('/api/content/fsp/data.zarr')).toBe('include');
+  });
+
+  it('includes credentials for same-origin absolute URLs', () => {
+    expect(
+      credentialsForUrl(`${window.location.origin}/api/content/data.zarr`)
+    ).toBe('include');
+  });
+
+  it('omits credentials for cross-origin URLs', () => {
+    // A credentialed request to a bucket serving Access-Control-Allow-Origin: *
+    // is blocked by the browser, so public bucket fetches must not send them.
+    expect(
+      credentialsForUrl('https://ome-zarr-scivis.s3.amazonaws.com/f.ome.zarr')
+    ).toBe('omit');
+  });
+});
 
 describe('getNeuroglancerSource with version selection', () => {
   it('should generate v3 source URL when v3 is selected', () => {
