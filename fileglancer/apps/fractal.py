@@ -244,26 +244,33 @@ def _io_section(task_type: str, np_schema: dict | None,
     return AppParameterSection(section="Input / Output", parameters=params)
 
 
-def _strip_markdown(text: str, task_name: str) -> str:
-    """Flatten docs_info markdown to plain text (the UI renders descriptions verbatim).
+def _drop_title_echo(text: str, task_name: str) -> str:
+    """Drop a leading heading that just repeats the task name.
 
-    Headings lose their # markers, and a leading heading that just repeats the
-    task name is dropped. Only unambiguous inline markup is unwrapped — single
-    * / _ are left alone so globs and snake_case names survive.
+    Descriptions stay markdown — the UI renders them — but the title echo
+    would duplicate the entry point name shown right above.
     """
-    lines: list[str] = []
-    for line in text.splitlines():
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if not line.strip():
+            continue
         heading = re.match(r"\s*#{1,6}\s+(.*)", line)
-        if heading:
-            line = heading.group(1).strip()
-            if not any(l.strip() for l in lines) and _slugify(line) == _slugify(task_name):
-                continue
-        lines.append(line)
-    text = "\n".join(lines)
-    text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1 (\2)", text)
-    text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
-    text = re.sub(r"`([^`]*)`", r"\1", text)
-    return text.strip()
+        if heading and _slugify(heading.group(1)) == _slugify(task_name):
+            lines = lines[i + 1:]
+        break
+    return "\n".join(lines).strip()
+
+
+def _plain_summary(text: str) -> str:
+    """First line of a markdown description, flattened to plain text, for the
+    one-line manifest description. Single * / _ are left alone so globs and
+    snake_case names survive."""
+    line = text.strip().splitlines()[0] if text.strip() else ""
+    line = re.sub(r"^\s*#{1,6}\s+", "", line)
+    line = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1 (\2)", line)
+    line = re.sub(r"\*\*([^*]+)\*\*", r"\1", line)
+    line = re.sub(r"`([^`]*)`", r"\1", line)
+    return line.strip()
 
 
 def _task_description(task: dict, package_dir: Path) -> str | None:
@@ -273,7 +280,7 @@ def _task_description(task: dict, package_dir: Path) -> str | None:
             docs_info = (package_dir / docs_info[len("file:"):]).read_text()
         except Exception:
             docs_info = ""
-    docs_info = _strip_markdown(docs_info, task.get("name", ""))
+    docs_info = _drop_title_echo(docs_info, task.get("name", ""))
     parts = [docs_info] if docs_info else []
     if task.get("docs_link"):
         parts.append(task["docs_link"])
@@ -602,7 +609,7 @@ class FractalAdapter:
         if not runnables:
             raise ValueError("Fractal manifest contains no tasks")
 
-        description = (runnables[0].description or "").split("\n")[0] or None
+        description = _plain_summary(runnables[0].description or "") or None
         return AppManifest(
             name=name,
             description=description,
