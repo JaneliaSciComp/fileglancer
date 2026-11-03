@@ -109,9 +109,8 @@ def test_parallel_task_params(fixture_manifest):
     assert params["mode"].options == ["fast", "good"]
     assert params["label"].type == "string"
     assert not params["label"].required
-    assert params["channel"].type == "string"
-    assert params["channel"].default == json.dumps({"index": 0})
-    assert params["channel"].description.startswith("(JSON)")
+    assert params["channel"].type == "json"
+    assert params["channel"].default == json.dumps({"index": 0}, indent=2)
 
 
 def test_ref_to_enum_becomes_enum_param(fixture_manifest):
@@ -380,3 +379,13 @@ def test_build_command_round_trip(fixture_manifest):
     assert "--task-name 'Make Thumbnail'" in command
     assert "--zarr_urls /data/a.zarr,/data/b.zarr" in command
     assert """--channel '{"index": 1}'""" in command
+
+
+def test_json_param_rejects_invalid_json(fixture_manifest):
+    from fileglancer.apps.command import build_command
+    ep = _entry_point(fixture_manifest, "Make Thumbnail")
+    with pytest.raises(ValueError, match="(?i)valid JSON"):
+        build_command(
+            ep,
+            {"zarr_urls": "/data/a.zarr", "channel": '{"index": }'},
+            session=None)

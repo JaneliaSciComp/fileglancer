@@ -1,5 +1,6 @@
 """Requirement-check generation, path/parameter validation, and command building."""
 
+import json
 import os
 import re
 import shlex
@@ -366,6 +367,14 @@ def _validate_parameter_value(param: AppParameter, value, session=None, username
         str_val = str(value)
         if param.options and str_val not in param.options:
             raise ValueError(f"Parameter '{param.name}' must be one of {param.options}")
+        return str_val
+
+    if param.type == "json":
+        str_val = str(value)
+        try:
+            json.loads(str_val)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Parameter '{param.name}' must be valid JSON: {e}")
         return str_val
 
     # string, file, directory

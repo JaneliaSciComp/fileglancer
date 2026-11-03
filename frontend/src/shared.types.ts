@@ -70,7 +70,8 @@ type AppParameter = {
     | 'boolean'
     | 'file'
     | 'directory'
-    | 'enum';
+    | 'enum'
+    | 'json';
   description?: string;
   required?: boolean;
   default?: unknown;

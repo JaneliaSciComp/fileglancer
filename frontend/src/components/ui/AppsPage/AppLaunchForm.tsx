@@ -166,6 +166,24 @@ function ParameterField({
         </select>
       );
 
+    case 'json': {
+      // JSON documents (e.g. Fractal nested-model args) need room and a
+      // monospace face; size the box to the content within sane bounds.
+      const text = value !== undefined && value !== null ? String(value) : '';
+      const rows = Math.min(14, Math.max(4, text.split('\n').length + 1));
+      return (
+        <textarea
+          className={`${baseInputClass} font-mono`}
+          id={inputId}
+          onChange={e => onChange(e.target.value)}
+          placeholder={param.name}
+          rows={rows}
+          spellCheck={false}
+          value={text}
+        />
+      );
+    }
+
     case 'file':
     case 'directory':
       return (
