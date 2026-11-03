@@ -173,3 +173,156 @@ def test_command_quotes_task_name(fixture_manifest):
     assert "--task-name 'Make Thumbnail'" in ep.command
     assert "--package-dir pkg" in ep.command
     assert ep.working_dir == "work"
+
+
+# --- Task 3: runtime shim + pre_run ---
+
+
+@pytest.fixture
+def tmp_work(tmp_path):
+    """A job work dir: repo symlink to the fixture repo, shim materialized."""
+    from fileglancer.apps.fractal import _SHIM
+    (tmp_path / "repo").symlink_to(FIXTURE_REPO)
+    (tmp_path / "fractal_run.py").write_text(_SHIM)
+    return tmp_path
+
+
+def _run_shim(tmp_work, *args, check=False):
+    import subprocess
+    import sys
+    result = subprocess.run(
+        [sys.executable, "fractal_run.py", "--package-dir", "pkg", *args],
+        cwd=tmp_work, capture_output=True, text=True)
+    if check:
+        assert result.returncode == 0, result.stderr
+    return result
+
+
+def _runs(tmp_work, name):
+    marker = tmp_work / f"ran_{name}.json"
+    return json.loads(marker.read_text()) if marker.exists() else []
+
+
+def test_shim_parallel_fan_out(tmp_work):
+    (tmp_work / "img_a").mkdir()
+    (tmp_work / "img_b").mkdir()
+    _run_shim(
+        tmp_work, "--task-name", "Make Thumbnail",
+        "--zarr_urls", f"{tmp_work}/img_a,{tmp_work}/img_b",
+        "--level", "2", "--overwrite", "false",
+        "--channel", '{"index": 1}',
+        check=True)
+    runs = _runs(tmp_work, "thumbnail")
+    assert len(runs) == 2
+    assert [r["args"]["zarr_url"] for r in runs] == [
+        f"{tmp_work}/img_a", f"{tmp_work}/img_b"]
+    args = runs[0]["args"]
+    assert args["level"] == 2
+    assert args["overwrite"] is False
+    assert args["channel"] == {"index": 1}
+    assert "zarr_urls" not in args
+
+
+def test_shim_zarr_urls_splitting(tmp_work):
+    (tmp_work / "img_a").mkdir()
+    (tmp_work / "img_b").mkdir()
+    _run_shim(
+        tmp_work, "--task-name", "Make Thumbnail",
+        "--zarr_urls", f" {tmp_work}/img_a , {tmp_work}/img_b ,",
+        check=True)
+    assert len(_runs(tmp_work, "thumbnail")) == 2
+
+
+def test_shim_missing_zarr_dir_fails(tmp_work):
+    result = _run_shim(
+        tmp_work, "--task-name", "Make Thumbnail",
+        "--zarr_urls", f"{tmp_work}/does_not_exist")
+    assert result.returncode == 1
+    assert "does_not_exist" in result.stderr
+    assert not _runs(tmp_work, "thumbnail")
+
+
+def test_shim_non_parallel(tmp_work):
+    (tmp_work / "img_a").mkdir()
+    out_dir = tmp_work / "out"
+    _run_shim(
+        tmp_work, "--task-name", "Aggregate Stats",
+        "--zarr_urls", f"{tmp_work}/img_a",
+        "--zarr_dir", str(out_dir),
+        "--table_name", "mystats",
+        check=True)
+    runs = _runs(tmp_work, "aggregate")
+    assert len(runs) == 1
+    args = runs[0]["args"]
+    assert args["zarr_urls"] == [f"{tmp_work}/img_a"]
+    assert args["zarr_dir"] == str(out_dir)
+    assert args["table_name"] == "mystats"
+
+
+def test_shim_compound(tmp_work):
+    out_dir = tmp_work / "plate_out"
+    _run_shim(
+        tmp_work, "--task-name", "Convert Fake Plate",
+        "--zarr_dir", str(out_dir),
+        "--init.plate_glob", "*.special",
+        "--compression", "lz4",
+        check=True)
+    init_runs = _runs(tmp_work, "init_convert")
+    assert len(init_runs) == 1
+    assert init_runs[0]["args"]["plate_glob"] == "*.special"
+    assert init_runs[0]["args"]["zarr_dir"] == str(out_dir)
+    assert "compression" not in init_runs[0]["args"]
+    compute_runs = _runs(tmp_work, "compute_convert")
+    assert [r["args"]["init_args"] for r in compute_runs] == [{"n": 1}, {"n": 2}]
+    assert [r["args"]["zarr_url"] for r in compute_runs] == [
+        f"{out_dir}/a", f"{out_dir}/b"]
+    assert all(r["args"]["compression"] == "lz4" for r in compute_runs)
+
+
+def test_shim_compound_empty_parallelization(tmp_work):
+    result = _run_shim(
+        tmp_work, "--task-name", "Convert Fake Plate",
+        "--zarr_dir", str(tmp_work / "out"),
+        "--init.plate_glob", "NONE")
+    assert result.returncode == 0
+    assert not _runs(tmp_work, "compute_convert")
+
+
+def test_shim_failure_propagates(tmp_work):
+    (tmp_work / "img_a").mkdir()
+    (tmp_work / "img_b").mkdir()
+    result = _run_shim(
+        tmp_work, "--task-name", "Make Thumbnail",
+        "--zarr_urls", f"{tmp_work}/img_a,{tmp_work}/img_b",
+        "--label", "FAIL")
+    assert result.returncode == 3
+    assert len(_runs(tmp_work, "thumbnail")) == 1
+
+
+def test_shim_dangling_flag_fails(tmp_work):
+    result = _run_shim(tmp_work, "--task-name", "Make Thumbnail", "--level")
+    assert result.returncode == 1
+    assert "--level" in result.stderr
+
+
+def test_pre_run_shape(fixture_manifest):
+    from fileglancer.apps.fractal import _SHIM
+    pre_run = _entry_point(fixture_manifest, "Make Thumbnail").pre_run
+    assert "conda create" in pre_run
+    assert "flock" in pre_run
+    assert "<<'FRACTAL_SHIM_EOF'" in pre_run
+    assert 'export PATH="$ENV_DIR/bin:$PATH"' in pre_run
+    assert not any(line.strip() == "FRACTAL_SHIM_EOF" for line in _SHIM.splitlines())
+
+
+def test_build_command_round_trip(fixture_manifest):
+    from fileglancer.apps.command import build_command
+    ep = _entry_point(fixture_manifest, "Make Thumbnail")
+    command = build_command(
+        ep,
+        {"zarr_urls": "/data/a.zarr,/data/b.zarr",
+         "channel": '{"index": 1}'},
+        session=None)
+    assert "--task-name 'Make Thumbnail'" in command
+    assert "--zarr_urls /data/a.zarr,/data/b.zarr" in command
+    assert """--channel '{"index": 1}'""" in command
