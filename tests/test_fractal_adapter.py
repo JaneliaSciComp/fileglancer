@@ -334,6 +334,27 @@ def test_manifest_description_from_first_task(fixture_manifest):
     assert fixture_manifest.description == "Makes a thumbnail of one OME-Zarr image."
 
 
+def test_description_strips_markdown(tmp_path):
+    # Fractal docs_info is markdown by convention; the UI renders plain text.
+    from fileglancer.apps.fractal import _task_description
+    task = {
+        "name": "Generic Task",
+        "docs_info": (
+            "## generic_task\n"
+            "Does **something** with `zarr`.\n"
+            "### Limitations\n"
+            "- See [docs](https://example.org)\n"
+        ),
+    }
+    desc = _task_description(task, tmp_path)
+    assert desc.startswith("Does something with zarr.")  # name-echo heading dropped
+    assert "#" not in desc
+    assert "**" not in desc
+    assert "`" not in desc
+    assert "Limitations" in desc
+    assert "docs (https://example.org)" in desc
+
+
 def test_build_command_round_trip(fixture_manifest):
     from fileglancer.apps.command import build_command
     ep = _entry_point(fixture_manifest, "Make Thumbnail")

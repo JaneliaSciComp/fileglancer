@@ -163,6 +163,28 @@ def _io_section(task_type: str, np_schema: dict | None,
     return AppParameterSection(section="Input / Output", parameters=params)
 
 
+def _strip_markdown(text: str, task_name: str) -> str:
+    """Flatten docs_info markdown to plain text (the UI renders descriptions verbatim).
+
+    Headings lose their # markers, and a leading heading that just repeats the
+    task name is dropped. Only unambiguous inline markup is unwrapped — single
+    * / _ are left alone so globs and snake_case names survive.
+    """
+    lines: list[str] = []
+    for line in text.splitlines():
+        heading = re.match(r"\s*#{1,6}\s+(.*)", line)
+        if heading:
+            line = heading.group(1).strip()
+            if not any(l.strip() for l in lines) and _slugify(line) == _slugify(task_name):
+                continue
+        lines.append(line)
+    text = "\n".join(lines)
+    text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1 (\2)", text)
+    text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
+    text = re.sub(r"`([^`]*)`", r"\1", text)
+    return text.strip()
+
+
 def _task_description(task: dict, package_dir: Path) -> str | None:
     docs_info = task.get("docs_info") or ""
     if docs_info.startswith("file:"):
@@ -170,7 +192,8 @@ def _task_description(task: dict, package_dir: Path) -> str | None:
             docs_info = (package_dir / docs_info[len("file:"):]).read_text()
         except Exception:
             docs_info = ""
-    parts = [docs_info.strip()] if docs_info.strip() else []
+    docs_info = _strip_markdown(docs_info, task.get("name", ""))
+    parts = [docs_info] if docs_info else []
     if task.get("docs_link"):
         parts.append(task["docs_link"])
     tags = [f"{label}: {task[field]}"
