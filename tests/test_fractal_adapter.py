@@ -113,6 +113,19 @@ def test_parallel_task_params(fixture_manifest):
     assert params["channel"].default == json.dumps({"index": 0}, indent=2)
 
 
+def test_json_param_without_default_gets_example_hint(fixture_manifest):
+    # A JSON param with no default is an empty box; the description must say
+    # what shape to type: a skeleton of required fields plus the optional ones.
+    params = _params_by_key(_entry_point(fixture_manifest, "Make Thumbnail"))
+    rois = params["rois"]
+    assert rois.type == "json"
+    assert 'Example: [{"name": "..."}]' in rois.description
+    assert "Optional fields: start" in rois.description
+    assert rois.description.startswith("Regions to process.")
+    # a prefilled default already shows the shape — no example appended
+    assert "Example:" not in (params["channel"].description or "")
+
+
 def test_ref_to_enum_becomes_enum_param(fixture_manifest):
     # A $ref to a plain string enum (pydantic StrEnum) is a controlled
     # vocabulary, not a nested model: render it as a dropdown, not JSON.
