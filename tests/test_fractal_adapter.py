@@ -1,6 +1,7 @@
 """Tests for the Fractal manifest adapter."""
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -349,6 +350,47 @@ def test_pre_run_installs_from_temp_copy(fixture_manifest):
     pre_run = _entry_point(fixture_manifest, "Make Thumbnail").pre_run
     assert 'pip" install "$__fg_snapshot"' not in pre_run
     assert "mktemp -d" in pre_run
+
+
+def _pixi_repo(tmp_path):
+    repo = tmp_path / "repo"
+    shutil.copytree(FIXTURE_REPO, repo)
+    (repo / "pyproject.toml").write_text(
+        '[project]\nname = "pkg"\n\n'
+        '[tool.pixi.workspace]\nchannels = ["conda-forge"]\n'
+    )
+    return repo
+
+
+def test_pixi_lock_switches_env_to_pixi(tmp_path):
+    # A repo with pixi config and a lock file gets its env from
+    # `pixi install --frozen` — the locked dependency set, not a pip resolve.
+    repo = _pixi_repo(tmp_path)
+    (repo / "pixi.lock").write_text("version: 6\n")
+    manifest = FractalAdapter().convert(repo)
+    assert manifest.requirements == ["pixi"]
+    pre_run = manifest.runnables[0].pre_run
+    assert "pixi install --frozen" in pre_run
+    assert "conda create" not in pre_run
+    assert 'export PATH="$ENV_DIR/.pixi/envs/default/bin:$PATH"' in pre_run
+    # Separate env dir so a conda env already built for this SHA isn't reused.
+    assert '-pixi"' in pre_run
+    assert "<<'FRACTAL_SHIM_EOF'" in pre_run
+
+
+def test_pixi_config_without_lock_stays_conda(tmp_path):
+    repo = _pixi_repo(tmp_path)
+    manifest = FractalAdapter().convert(repo)
+    assert manifest.requirements == ["miniforge"]
+    assert "conda create" in manifest.runnables[0].pre_run
+
+
+def test_pixi_lock_without_config_stays_conda(tmp_path):
+    repo = tmp_path / "repo"
+    shutil.copytree(FIXTURE_REPO, repo)
+    (repo / "pixi.lock").write_text("version: 6\n")
+    manifest = FractalAdapter().convert(repo)
+    assert manifest.requirements == ["miniforge"]
 
 
 def test_needs_gpu_surfaced_in_description(fixture_manifest):
