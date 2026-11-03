@@ -110,10 +110,11 @@ def _convert_property(key: str, prop: dict, required: bool,
     desc = prop.get("description")
 
     if _is_complex(prop):
-        kwargs["type"] = "string"
-        kwargs["description"] = f"(JSON) {desc}" if desc else "(JSON)"
+        kwargs["type"] = "json"
+        if desc:
+            kwargs["description"] = desc
         if "default" in prop and prop["default"] is not None:
-            kwargs["default"] = json.dumps(prop["default"])
+            kwargs["default"] = json.dumps(prop["default"], indent=2)
         return AppParameter(**kwargs)
 
     if desc:

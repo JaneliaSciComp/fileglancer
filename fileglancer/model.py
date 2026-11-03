@@ -542,7 +542,7 @@ class AppParameter(BaseModel):
         default="",
     )
     name: str = Field(description="Display name of the parameter")
-    type: Literal["string", "integer", "number", "boolean", "file", "directory", "enum"] = Field(
+    type: Literal["string", "integer", "number", "boolean", "file", "directory", "enum", "json"] = Field(
         description="The data type of the parameter"
     )
     description: Optional[str] = Field(description="Description of the parameter", default=None)
