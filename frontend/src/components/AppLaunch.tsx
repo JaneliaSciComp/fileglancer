@@ -20,6 +20,7 @@ import {
   getEntryPointTypeIconType
 } from '@/utils';
 import { showErrorToast } from '@/utils/errorToast';
+import { summarizeMarkdown } from '@/utils/markdown';
 import {
   useAppsQuery,
   useAddAppMutation,
@@ -343,7 +344,7 @@ export default function AppLaunch() {
                 </div>
                 {ep.description ? (
                   <Typography className="text-sm md:text-base text-foreground">
-                    {ep.description}
+                    {summarizeMarkdown(ep.description)}
                   </Typography>
                 ) : null}
                 <FgButton

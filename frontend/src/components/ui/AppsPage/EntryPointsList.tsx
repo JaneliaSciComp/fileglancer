@@ -4,6 +4,7 @@ import { HiOutlinePlay } from 'react-icons/hi';
 import FgButton from '@/components/designSystem/atoms/FgButton';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import { getEntryPointIconType } from '@/utils';
+import { summarizeMarkdown } from '@/utils/markdown';
 import type { AppEntryPoint } from '@/shared.types';
 
 interface EntryPointsListProps {
@@ -50,7 +51,7 @@ export default function EntryPointsList({
             </div>
             {ep.description ? (
               <Typography className="text-sm md:text-base text-foreground">
-                {ep.description}
+                {summarizeMarkdown(ep.description)}
               </Typography>
             ) : null}
             <FgButton

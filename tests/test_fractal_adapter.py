@@ -362,8 +362,9 @@ def test_manifest_description_from_first_task(fixture_manifest):
     assert fixture_manifest.description == "Makes a thumbnail of one OME-Zarr image."
 
 
-def test_description_strips_markdown(tmp_path):
-    # Fractal docs_info is markdown by convention; the UI renders plain text.
+def test_description_keeps_markdown_without_title_echo(tmp_path):
+    # Fractal docs_info is markdown; the UI renders it, so only the leading
+    # heading that just repeats the task name is dropped.
     from fileglancer.apps.fractal import _task_description
     task = {
         "name": "Generic Task",
@@ -371,16 +372,24 @@ def test_description_strips_markdown(tmp_path):
             "## generic_task\n"
             "Does **something** with `zarr`.\n"
             "### Limitations\n"
+            "| a | b |\n|---|---|\n| 1 | 2 |\n"
             "- See [docs](https://example.org)\n"
         ),
     }
     desc = _task_description(task, tmp_path)
-    assert desc.startswith("Does something with zarr.")  # name-echo heading dropped
-    assert "#" not in desc
-    assert "**" not in desc
-    assert "`" not in desc
-    assert "Limitations" in desc
-    assert "docs (https://example.org)" in desc
+    assert desc.startswith("Does **something** with `zarr`.")
+    assert "generic_task" not in desc
+    assert "### Limitations" in desc
+    assert "| a | b |" in desc
+    assert "[docs](https://example.org)" in desc
+
+
+def test_plain_summary_flattens_markdown():
+    # The manifest-level description is a one-line plain-text summary.
+    from fileglancer.apps.fractal import _plain_summary
+    text = "Does **something** with `zarr` per [docs](https://example.org).\nMore."
+    assert _plain_summary(text) == (
+        "Does something with zarr per docs (https://example.org).")
 
 
 def test_build_command_round_trip(fixture_manifest):

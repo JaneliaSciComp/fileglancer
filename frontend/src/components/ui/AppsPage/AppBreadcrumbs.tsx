@@ -9,6 +9,7 @@ import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgLink from '@/components/designSystem/atoms/FgLink';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
+import MarkdownText from '@/components/ui/MarkdownText';
 import InlineNameEditor from '@/components/ui/widgets/InlineNameEditor';
 
 interface AppBreadcrumbsProps {
@@ -130,11 +131,7 @@ export default function AppBreadcrumbs({
           <div className="flex items-center gap-2 flex-shrink-0">{actions}</div>
         ) : null}
       </div>
-      {description ? (
-        <Typography className="text-foreground" type="small">
-          {description}
-        </Typography>
-      ) : null}
+      <MarkdownText className="text-sm" text={description} />
       {githubUrl ? (
         <div className="mt-3 flex items-center gap-1.5 text-foreground">
           <FgIcon className="shrink-0" icon={TbBrandGithub} size="sm" />
