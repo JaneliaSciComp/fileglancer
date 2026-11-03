@@ -494,8 +494,8 @@ export default function NeuroglancerView() {
             <PanelGroup autoSaveId="viewer-sidebar" direction="horizontal">
               <Panel id="viewer-spacer" order={1} />
               <PanelResizeHandle
-                onDragging={setResizing}
                 className="group pointer-events-auto relative w-3 bg-surface border-l border-surface hover:border-secondary/60"
+                onDragging={setResizing}
               >
                 <FgIcon
                   className="stroke-2 absolute -left-1 top-1/2 stroke-surface-foreground pointer-events-none"
