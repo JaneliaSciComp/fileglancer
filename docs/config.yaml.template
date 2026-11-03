@@ -31,10 +31,22 @@ db_url: sqlite:///fileglancer.db
 # db_pool_size: 5          # Number of connections to keep in the pool
 # db_max_overflow: 0       # Number of additional connections allowed beyond pool_size
 
-# If true, use seteuid/setegid for file access
+# If true, per-user workers run with the target user's uid/gid for file
+# access (requires a privileged fileglancer-supervisor).
 # Set to False for local testing
 #
 use_access_flags: False
+
+# How the web app obtains per-user workers. Defaults to external when
+# use_access_flags is true, else embedded.
+#
+# supervisor_mode: external      # external | embedded | inprocess | legacy
+# supervisor_socket: /run/fileglancer/supervisor.sock
+#                                # Socket of the external supervisor; embedded
+#                                # mode derives its own path if unset
+# supervisor_acquire_timeout: 10 # Seconds an acquire may wait for a worker
+# supervisor_embedded_args: []   # Extra flags for the embedded supervisor,
+#                                # e.g. ["--workers-per-user", "2"]
 
 #
 # File share mount paths to view in the UI. 
@@ -204,6 +216,10 @@ session_cookie_secure: true
 #                               # env is an allowlist so no server secret leaks
 #                               # to the user; add only non-secret vars your
 #                               # scheduler or tools need. FGC_* is never passed.
+#                               # With an external supervisor, pass
+#                               # --env-passthrough to fileglancer-supervisor
+#                               # instead (this setting only reaches embedded
+#                               # supervisors).
 #   unknown_timeout_hours: 24    # Give up polling a job stuck in UNKNOWN after
 #                               # this many hours and mark it FAILED (the
 #                               # scheduler can no longer report it). 0 disables.

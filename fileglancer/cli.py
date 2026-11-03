@@ -135,11 +135,19 @@ def cli():
               help='Automatically find an available port if the specified port is in use.')
 @click.option('--no-browser', is_flag=True, default=False,
               help='Do not open web browser automatically.')
+@click.option('--inprocess', is_flag=True, default=False,
+              help='Run worker actions in-process instead of through an '
+                   'embedded supervisor (debugging).')
 
 def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
           ssl_ca_certs, ssl_version, ssl_cert_reqs, ssl_ciphers, timeout_keep_alive, auto_port, no_browser,
-          file_share_mounts):
+          inprocess, file_share_mounts):
     """Start the Fileglancer server using uvicorn."""
+
+    # Workers come from an embedded (unprivileged) supervisor by default;
+    # --inprocess keeps the old single-process shortcut for debugging.
+    if 'FGC_SUPERVISOR_MODE' not in os.environ:
+        os.environ['FGC_SUPERVISOR_MODE'] = 'inprocess' if inprocess else 'embedded'
 
     # Set file share mounts from CLI if provided
     if file_share_mounts:

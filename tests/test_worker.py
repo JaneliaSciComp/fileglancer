@@ -1,16 +1,14 @@
 """Tests for the per-user persistent worker infrastructure.
 
-Tests the IPC protocol (length-prefixed JSON, SCM_RIGHTS fd passing),
-worker lifecycle (spawn, execute, shutdown, crash recovery),
-and the in-process dev-mode fallback.
+Tests the worker request/response loop (serve_lease), the legacy pool's
+client side (UserWorker), and the action handlers run in-process.
+Protocol framing and supervisor lifecycle tests live in test_supervisor.py.
 """
 
 import asyncio
 import inspect
-import json
 import os
 import socket
-import struct
 import tempfile
 import time
 
@@ -18,32 +16,41 @@ import pytest
 
 from conftest import requires_symlinks
 from fileglancer.user_worker import (
-    _send,
-    _send_with_fd,
-    _recv,
     _ACTIONS,
     ACTIONS_NEEDING_FSPS,
     _action_validate_proxied_path,
     _action_create_dirs,
     _action_validate_paths,
     _action_cancel,
+    serve_lease,
     WorkerContext,
-    _HEADER_FMT,
-    _HEADER_SIZE,
 )
 from fileglancer.filestore import Filestore
 from fileglancer.model import FileSharePath
+from fileglancer.supervisor.protocol import recv_msg, send_msg
 from fileglancer import worker_pool as worker_pool_module
 from fileglancer.worker_pool import (
     UserWorker,
-    WorkerPool,
     WorkerError,
     WorkerDead,
-    _build_worker_env,
+    _send_and_recv,
     _timeout_for_action,
     _DEFAULT_REQUEST_TIMEOUT,
     _GIT_ACTION_TIMEOUT,
 )
+
+
+def _send(sock, msg, fd=None):
+    send_msg(sock, msg, fd=fd)
+
+
+def _recv(sock):
+    msg, fds = recv_msg(sock)
+    if msg is None:
+        raise ConnectionError("peer closed")
+    for fd in fds:
+        os.close(fd)
+    return msg
 
 
 def _fsp_rows(*fsps):
@@ -67,104 +74,6 @@ def test_fsp_registry_covers_every_handler_that_reads_the_list():
         reads_directly = "_file_share_paths_from_request" in inspect.getsource(handler)
         via_decorator = getattr(handler, "_needs_fsps", False)
         assert (reads_directly or via_decorator) == (name in ACTIONS_NEEDING_FSPS), name
-
-
-# ---------------------------------------------------------------------------
-# IPC protocol tests (user_worker.py _send/_recv/_send_with_fd)
-# ---------------------------------------------------------------------------
-
-class TestBuildWorkerEnv:
-    """Worker environment is an allowlist: no server secret reaches the user."""
-
-    def test_strips_all_fgc_variables(self):
-        base = {
-            "PATH": "/usr/bin",
-            "FGC_DB_URL": "postgresql://admin:pw@db/fg",
-            "FGC_SESSION_SECRET_KEY": "super-secret",
-            "FGC_OKTA_CLIENT_SECRET": "okta-secret",
-            "FGC_ATLASSIAN_TOKEN": "atlassian-secret",
-            "fgc_test_api_key": "lowercase-secret",
-        }
-        env = _build_worker_env(base, "/home/user", "INFO", 7)
-        for key in list(env):
-            assert not key.upper().startswith("FGC_") or key in (
-                "FGC_LOG_LEVEL",
-                "FGC_LOG_FORMAT",
-                "FGC_WORKER_FD",
-            ), f"secret leaked: {key}"
-        # The specific secrets are gone regardless of case.
-        assert "FGC_DB_URL" not in env
-        assert "FGC_SESSION_SECRET_KEY" not in env
-        assert "FGC_OKTA_CLIENT_SECRET" not in env
-        assert "FGC_ATLASSIAN_TOKEN" not in env
-        assert "fgc_test_api_key" not in env
-
-    def test_drops_generic_deployment_secrets(self):
-        # Non-FGC secrets that may sit in a server's environment must not reach
-        # the user's worker either.
-        base = {
-            "PATH": "/usr/bin:/bin",
-            "AWS_SECRET_ACCESS_KEY": "aws-secret",
-            "AWS_SESSION_TOKEN": "aws-token",
-            "GITHUB_TOKEN": "gh-secret",
-            "DATABASE_URL": "postgres://u:pw@h/db",
-            "MY_APP_CREDENTIALS": "creds",
-        }
-        env = _build_worker_env(base, "/home/user", "INFO", 7)
-        assert env["PATH"] == "/usr/bin:/bin"  # allowlisted, kept
-        assert "AWS_SECRET_ACCESS_KEY" not in env
-        assert "AWS_SESSION_TOKEN" not in env
-        assert "GITHUB_TOKEN" not in env
-        assert "DATABASE_URL" not in env
-        assert "MY_APP_CREDENTIALS" not in env
-
-    def test_preserves_allowlisted_and_sets_operational_vars(self):
-        base = {
-            "PATH": "/usr/bin:/bin",
-            "LSF_ENVDIR": "/opt/lsf/conf",       # LSF_ prefix
-            "LSB_JOBID": "42",                    # LSB_ prefix
-            "SLURM_CONF": "/etc/slurm.conf",      # SLURM_ prefix
-            "MODULEPATH": "/opt/modules",         # MODULE prefix
-            "CONDA_EXE": "/opt/conda/bin/conda",  # CONDA_ prefix
-            "APPTAINER_CACHEDIR": "/scratch/ac",  # APPTAINER_ prefix
-            "LANG": "en_US.UTF-8",
-            "LC_ALL": "en_US.UTF-8",              # LC_ prefix
-            "SSH_AUTH_SOCK": "/tmp/ssh-agent.sock",
-            "HTTPS_PROXY": "http://proxy:8080",
-        }
-        env = _build_worker_env(base, "/home/alice", "DEBUG", 9)
-        for key in base:
-            assert key in env, f"{key} should be allowlisted"
-        # Operational vars the worker needs are set explicitly.
-        assert env["HOME"] == "/home/alice"
-        assert env["FGC_LOG_LEVEL"] == "DEBUG"
-        assert env["FGC_LOG_FORMAT"] == "text"
-        assert env["FGC_WORKER_FD"] == "9"
-
-    def test_passthrough_allows_site_specific_names_and_prefixes(self):
-        base = {
-            "PATH": "/usr/bin",
-            "SITE_LICENSE_SERVER": "27000@lic",  # exact name
-            "ACME_FOO": "a",                       # ACME_ prefix
-            "ACME_BAR": "b",
-            "OTHER_VAR": "dropped",
-        }
-        env = _build_worker_env(
-            base, "/home/user", "INFO", 7,
-            passthrough=["SITE_LICENSE_SERVER", "ACME_"],
-        )
-        assert env["SITE_LICENSE_SERVER"] == "27000@lic"
-        assert env["ACME_FOO"] == "a"
-        assert env["ACME_BAR"] == "b"
-        assert "OTHER_VAR" not in env  # not allowlisted, not in passthrough
-
-    def test_passthrough_cannot_reintroduce_fgc_secrets(self):
-        base = {"FGC_SESSION_SECRET_KEY": "super-secret"}
-        env = _build_worker_env(
-            base, "/home/user", "INFO", 7,
-            passthrough=["FGC_SESSION_SECRET_KEY", "FGC_"],
-        )
-        assert "FGC_SESSION_SECRET_KEY" not in env
 
 
 class TestActionTimeout:
@@ -251,132 +160,6 @@ class TestCancelAction:
         assert result == {"status": "ok"}
 
 
-class TestIPCProtocol:
-    """Test the length-prefixed JSON wire protocol."""
-
-    def test_send_recv_roundtrip(self):
-        """A message sent with _send can be read back with _recv."""
-        a, b = socket.socketpair()
-        try:
-            msg = {"action": "test", "value": 42, "nested": {"key": "val"}}
-            _send(a, msg)
-            result = _recv(b)
-            assert result == msg
-        finally:
-            a.close()
-            b.close()
-
-    def test_send_recv_empty_dict(self):
-        """Empty dicts round-trip correctly."""
-        a, b = socket.socketpair()
-        try:
-            _send(a, {})
-            assert _recv(b) == {}
-        finally:
-            a.close()
-            b.close()
-
-    def test_send_recv_large_message(self):
-        """Messages larger than a single recv buffer work."""
-        import threading
-
-        a, b = socket.socketpair()
-        try:
-            # Larger than the default AF_UNIX socketpair buffer on macOS (~8KB),
-            # so the send must run concurrently with the recv to avoid deadlock.
-            big_value = "x" * 100_000
-            msg = {"data": big_value}
-            t = threading.Thread(target=_send, args=(a, msg))
-            t.start()
-            result = _recv(b)
-            t.join()
-            assert result["data"] == big_value
-        finally:
-            a.close()
-            b.close()
-
-    def test_send_recv_multiple_messages(self):
-        """Multiple sequential messages on the same socket."""
-        a, b = socket.socketpair()
-        try:
-            for i in range(10):
-                _send(a, {"seq": i})
-            for i in range(10):
-                result = _recv(b)
-                assert result == {"seq": i}
-        finally:
-            a.close()
-            b.close()
-
-    def test_recv_connection_closed(self):
-        """_recv raises ConnectionError when the peer closes the socket."""
-        a, b = socket.socketpair()
-        a.close()
-        with pytest.raises(ConnectionError):
-            _recv(b)
-        b.close()
-
-    def test_send_with_fd_passes_file_descriptor(self):
-        """_send_with_fd sends a file descriptor via SCM_RIGHTS."""
-        import array
-
-        a, b = socket.socketpair()
-        try:
-            # Create a temp file and send its fd
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-                f.write("hello from fd passing")
-                temp_path = f.name
-
-            fd_to_send = os.open(temp_path, os.O_RDONLY)
-            try:
-                msg = {"type": "handle", "size": 21}
-                _send_with_fd(a, msg, fd_to_send)
-
-                # Receive using recvmsg for EVERYTHING (header + payload + ancillary)
-                # The fd arrives with the first bytes, so we must use recvmsg from the start
-                fds = array.array("i")
-                raw = b""
-                total_header = _HEADER_SIZE
-                while len(raw) < total_header:
-                    data, ancdata, flags, addr = b.recvmsg(
-                        4096,
-                        socket.CMSG_LEN(struct.calcsize("i")),
-                    )
-                    raw += data
-                    for cmsg_level, cmsg_type, cmsg_data in ancdata:
-                        if cmsg_level == socket.SOL_SOCKET and cmsg_type == socket.SCM_RIGHTS:
-                            fds.frombytes(cmsg_data[:len(cmsg_data) - (len(cmsg_data) % fds.itemsize)])
-
-                (length,) = struct.unpack(_HEADER_FMT, raw[:_HEADER_SIZE])
-                total_needed = _HEADER_SIZE + length
-                while len(raw) < total_needed:
-                    data, ancdata, flags, addr = b.recvmsg(
-                        total_needed - len(raw),
-                        socket.CMSG_LEN(struct.calcsize("i")),
-                    )
-                    raw += data
-                    for cmsg_level, cmsg_type, cmsg_data in ancdata:
-                        if cmsg_level == socket.SOL_SOCKET and cmsg_type == socket.SCM_RIGHTS:
-                            fds.frombytes(cmsg_data[:len(cmsg_data) - (len(cmsg_data) % fds.itemsize)])
-
-                payload = raw[_HEADER_SIZE:_HEADER_SIZE + length]
-                result = json.loads(payload)
-                assert result == {"type": "handle", "size": 21}
-                assert len(fds) == 1
-
-                # Read from the received fd
-                received_fd = fds[0]
-                with os.fdopen(received_fd, 'r') as f:
-                    content = f.read()
-                assert content == "hello from fd passing"
-            finally:
-                os.close(fd_to_send)
-                os.unlink(temp_path)
-        finally:
-            a.close()
-            b.close()
-
-
 # ---------------------------------------------------------------------------
 # UserWorker IPC integration tests (worker_pool.py _send_and_recv)
 # ---------------------------------------------------------------------------
@@ -419,7 +202,7 @@ class TestUserWorkerIPC:
             t = threading.Thread(target=mock_worker)
             t.start()
 
-            result = worker._send_and_recv({"action": "ping"})
+            result = _send_and_recv(worker.sock, worker.username, {"action": "ping"}, worker.db_url, 5)
             assert result == {"status": "pong"}
             t.join()
         finally:
@@ -457,7 +240,7 @@ class TestUserWorkerIPC:
             t = threading.Thread(target=mock_worker)
             t.start()
 
-            result = worker._send_and_recv({"action": "get_profile"})
+            result = _send_and_recv(worker.sock, worker.username, {"action": "get_profile"}, worker.db_url, 5)
             assert result == {"ok": True}
             t.join()
         finally:
@@ -475,14 +258,14 @@ class TestUserWorkerIPC:
             def mock_worker():
                 req = _recv(child)
                 fd = os.open(temp_path, os.O_RDONLY)
-                _send_with_fd(child, {"type": "handle", "size": 15}, fd)
+                _send(child, {"type": "handle", "size": 15}, fd=fd)
                 os.close(fd)
 
             import threading
             t = threading.Thread(target=mock_worker)
             t.start()
 
-            result = worker._send_and_recv({"action": "open_file"})
+            result = _send_and_recv(worker.sock, worker.username, {"action": "open_file"}, worker.db_url, 5)
             assert result["type"] == "handle"
             assert "_file_handle" in result
 
@@ -509,7 +292,7 @@ class TestUserWorkerIPC:
             t = threading.Thread(target=mock_worker)
             t.start()
 
-            result = worker._send_and_recv({"action": "list_dir"})
+            result = _send_and_recv(worker.sock, worker.username, {"action": "list_dir"}, worker.db_url, 5)
             assert result == {"files": [1, 2, 3]}
             assert "_file_handle" not in result
             t.join()
@@ -612,7 +395,7 @@ class TestUserWorkerExecute:
             def mock_worker():
                 _recv(child)
                 fd = os.open(temp_path, os.O_RDONLY)
-                _send_with_fd(child, {"content_type": "text/plain"}, fd)
+                _send(child, {"content_type": "text/plain"}, fd=fd)
                 os.close(fd)
 
             t = threading.Thread(target=mock_worker)
@@ -721,56 +504,21 @@ class TestActionHandlers:
 
 
 # ---------------------------------------------------------------------------
-# Worker main loop integration test
+# Worker request/response loop integration test (serve_lease, the real code)
 # ---------------------------------------------------------------------------
 
 class TestWorkerMainLoop:
-    """Test the worker subprocess main loop via socketpair (no actual subprocess)."""
+    """Test the worker's request/response loop via socketpair (no subprocess)."""
 
     def _run_worker_loop(self, child_sock):
-        """Run the worker main loop in a thread using the given socket."""
+        """Run serve_lease in a thread using the given socket."""
         import threading
 
+        ctx = WorkerContext(username=os.environ.get("USER", str(os.getuid())))
+
         def target():
-            # Simulate what main() does, but with our socket
-            sock = child_sock
-            uid = os.getuid()
-            try:
-                username = os.environ.get("USER", str(uid))
-            except KeyError:
-                username = str(uid)
-
-            ctx = WorkerContext(username=username)
-
-            while True:
-                try:
-                    request = _recv(sock)
-                except ConnectionError:
-                    break
-
-                action = request.get("action")
-                if action == "shutdown":
-                    break
-
-                handler = _ACTIONS.get(action)
-                if handler is None:
-                    _send(sock, {"error": f"Unknown action: {action}"})
-                    continue
-
-                try:
-                    result = handler(request, ctx)
-                    fd = result.pop("_fd", None)
-                    file_handle = result.pop("_file_handle", None)
-                    if fd is not None:
-                        _send_with_fd(sock, result, fd)
-                        if file_handle is not None:
-                            file_handle.close()
-                    else:
-                        _send(sock, result)
-                except Exception as e:
-                    _send(sock, {"error": str(e)})
-
-            sock.close()
+            serve_lease(child_sock, ctx)
+            child_sock.close()
 
         t = threading.Thread(target=target, daemon=True)
         t.start()

@@ -64,6 +64,9 @@ def pytest_sessionstart(session):
     """
     os.environ['FGC_EXTERNAL_PROXY_URL'] = 'http://localhost/files'
     os.environ['FGC_USE_ACCESS_FLAGS'] = 'false'
+    # Endpoint tests are single-user and run actions in-process; worker and
+    # supervisor tests opt into embedded mode explicitly.
+    os.environ['FGC_SUPERVISOR_MODE'] = 'inprocess'
 
 def same_path(a: str, b: str) -> bool:
     """Compare two paths that should point at the same place.
