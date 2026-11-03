@@ -58,8 +58,33 @@ def _unwrap_nullable(prop: dict) -> tuple[dict, bool]:
     return prop, False
 
 
+def _resolve_ref(prop: dict, schema: dict) -> dict:
+    """Resolve a local $ref against the schema, property-level keys winning.
+
+    Pydantic emits StrEnums and nested models as $defs entries referenced by
+    $ref, with the field's own title/description/default as siblings. A $ref
+    that resolves to a plain enum is a controlled vocabulary, so it must come
+    back as an enum shape rather than falling into the JSON-string catch-all.
+    """
+    for _ in range(5):
+        ref = prop.get("$ref")
+        if not ref or not ref.startswith("#/"):
+            return prop
+        target = schema
+        for part in ref[2:].split("/"):
+            target = target.get(part) if isinstance(target, dict) else None
+            if target is None:
+                return prop
+        merged = dict(target)
+        merged.update({k: v for k, v in prop.items() if k != "$ref"})
+        prop = merged
+    return prop
+
+
 def _is_complex(prop: dict) -> bool:
     """True for schema shapes the flat parameter model can't express natively."""
+    if "enum" in prop:
+        return False
     if any(k in prop for k in ("$ref", "oneOf", "allOf", "anyOf")):
         return True
     return prop.get("type") in ("array", "object")
@@ -70,11 +95,12 @@ def _slugify(name: str) -> str:
 
 
 def _convert_property(key: str, prop: dict, required: bool,
-                      key_prefix: str = "") -> AppParameter:
+                      key_prefix: str = "", schema: dict | None = None) -> AppParameter:
     """Convert one args-schema property to an AppParameter."""
     prop, nullable = _unwrap_nullable(prop)
     if nullable:
         required = False
+    prop = _resolve_ref(prop, schema or {})
 
     kwargs: dict = {
         "flag": f"--{key_prefix}{key}",
@@ -119,7 +145,7 @@ def _schema_params(schema: dict, key_prefix: str = "") -> list[AppParameter]:
     """Convert a task args schema's non-reserved properties to parameters."""
     required = set(schema.get("required", []))
     return [
-        _convert_property(key, prop, key in required, key_prefix)
+        _convert_property(key, prop, key in required, key_prefix, schema)
         for key, prop in schema.get("properties", {}).items()
         if key not in _RESERVED_KEYS
     ]
@@ -246,7 +272,25 @@ def unwrap_nullable(prop):
     return prop
 
 
+def resolve_ref(prop, schema):
+    for _ in range(5):
+        ref = prop.get("$ref")
+        if not ref or not ref.startswith("#/"):
+            return prop
+        target = schema
+        for part in ref[2:].split("/"):
+            target = target.get(part) if isinstance(target, dict) else None
+            if target is None:
+                return prop
+        merged = dict(target)
+        merged.update({k: v for k, v in prop.items() if k != "$ref"})
+        prop = merged
+    return prop
+
+
 def is_complex(prop):
+    if "enum" in prop:
+        return False
     if any(k in prop for k in ("$ref", "oneOf", "allOf", "anyOf")):
         return True
     return prop.get("type") in ("array", "object")
@@ -257,6 +301,7 @@ def coerce(key, value, schema):
     if prop is None:
         return value  # unknown keys were already rejected server-side
     prop = unwrap_nullable(prop)
+    prop = resolve_ref(prop, schema)
     if is_complex(prop):
         try:
             return json.loads(value)

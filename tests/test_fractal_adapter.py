@@ -114,6 +114,18 @@ def test_parallel_task_params(fixture_manifest):
     assert params["channel"].description.startswith("(JSON)")
 
 
+def test_ref_to_enum_becomes_enum_param(fixture_manifest):
+    # A $ref to a plain string enum (pydantic StrEnum) is a controlled
+    # vocabulary, not a nested model: render it as a dropdown, not JSON.
+    params = _params_by_key(_entry_point(fixture_manifest, "Make Thumbnail"))
+    p = params["overwrite_mode"]
+    assert p.type == "enum"
+    assert p.options == ["No Overwrite", "Overwrite", "Extend"]
+    assert p.default == "No Overwrite"
+    # the property's own description wins over the $defs placeholder
+    assert p.description == "Overwrite mode for existing data."
+
+
 def test_non_parallel_task_params(fixture_manifest):
     ep = _entry_point(fixture_manifest, "Aggregate Stats")
     params = _params_by_key(ep)
@@ -211,6 +223,7 @@ def test_shim_parallel_fan_out(tmp_work):
         "--zarr_urls", f"{tmp_work}/img_a,{tmp_work}/img_b",
         "--level", "2", "--overwrite", "false",
         "--channel", '{"index": 1}',
+        "--overwrite_mode", "Extend",
         check=True)
     runs = _runs(tmp_work, "thumbnail")
     assert len(runs) == 2
@@ -220,6 +233,7 @@ def test_shim_parallel_fan_out(tmp_work):
     assert args["level"] == 2
     assert args["overwrite"] is False
     assert args["channel"] == {"index": 1}
+    assert args["overwrite_mode"] == "Extend"  # enum via $ref: plain string, not JSON
     assert "zarr_urls" not in args
 
 

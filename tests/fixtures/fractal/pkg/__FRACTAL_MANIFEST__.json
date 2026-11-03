@@ -24,6 +24,12 @@
               "wavelength_id": {"type": "string", "title": "Wavelength Id"},
               "index": {"type": "integer", "title": "Index"}
             }
+          },
+          "OverwriteMode": {
+            "enum": ["No Overwrite", "Overwrite", "Extend"],
+            "title": "OverwriteMode",
+            "type": "string",
+            "description": "Missing description for OverwriteMode."
           }
         },
         "properties": {
@@ -32,7 +38,8 @@
           "overwrite": {"type": "boolean", "title": "Overwrite", "default": true},
           "mode": {"enum": ["fast", "good"], "title": "Mode", "default": "fast"},
           "label": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Label", "default": null},
-          "channel": {"$ref": "#/$defs/Channel", "title": "Channel", "default": {"index": 0}}
+          "channel": {"$ref": "#/$defs/Channel", "title": "Channel", "default": {"index": 0}},
+          "overwrite_mode": {"$ref": "#/$defs/OverwriteMode", "title": "Overwrite Mode", "default": "No Overwrite", "description": "Overwrite mode for existing data."}
         }
       }
     },
