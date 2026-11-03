@@ -115,16 +115,16 @@ def test_parallel_task_params(fixture_manifest):
 
 
 def test_json_param_without_default_gets_example_hint(fixture_manifest):
-    # A JSON param with no default is an empty box; the description must say
-    # what shape to type: a skeleton of required fields plus the optional ones.
+    # A JSON param with no default is an empty box; ghost an example skeleton
+    # in the input itself and list the optional fields in the description.
     params = _params_by_key(_entry_point(fixture_manifest, "Make Thumbnail"))
     rois = params["rois"]
     assert rois.type == "json"
-    assert 'Example: [{"name": "..."}]' in rois.description
+    assert rois.placeholder == json.dumps([{"name": "..."}], indent=2)
     assert "Optional fields: start" in rois.description
     assert rois.description.startswith("Regions to process.")
-    # a prefilled default already shows the shape — no example appended
-    assert "Example:" not in (params["channel"].description or "")
+    # a prefilled default already shows the shape — no ghost example
+    assert params["channel"].placeholder is None
 
 
 def test_ref_to_enum_becomes_enum_param(fixture_manifest):
