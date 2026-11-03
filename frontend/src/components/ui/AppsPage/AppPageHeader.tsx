@@ -8,6 +8,7 @@ import type { IconType } from 'react-icons';
 import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
+import MarkdownText from '@/components/ui/MarkdownText';
 
 interface AppPageHeaderProps {
   readonly title?: ReactNode;
@@ -71,11 +72,7 @@ export default function AppPageHeader({
           <div className="flex items-center gap-2 flex-shrink-0">{actions}</div>
         ) : null}
       </div>
-      {description ? (
-        <Typography className="text-foreground" type="small">
-          {description}
-        </Typography>
-      ) : null}
+      <MarkdownText className="text-sm" text={description} />
       {githubUrl ? (
         <div className="mt-3 flex items-center gap-1.5 text-foreground">
           <FgIcon className="shrink-0" icon={TbBrandGithub} size="sm" />
