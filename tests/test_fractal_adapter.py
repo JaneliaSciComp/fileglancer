@@ -95,7 +95,8 @@ def test_parallel_task_params(fixture_manifest):
     params = _params_by_key(ep)
 
     assert ep.parameters[0].section == "Input / Output"
-    assert params["zarr_urls"].type == "string"
+    assert params["zarr_urls"].type == "directory"
+    assert params["zarr_urls"].exists is True
     assert params["zarr_urls"].required
     assert "zarr_dir" not in params
     assert "zarr_url" not in params
@@ -142,6 +143,7 @@ def test_non_parallel_task_params(fixture_manifest):
     ep = _entry_point(fixture_manifest, "Aggregate Stats")
     params = _params_by_key(ep)
     assert params["zarr_urls"].required
+    assert params["zarr_urls"].type == "directory"
     assert params["zarr_dir"].type == "directory"
     assert params["zarr_dir"].exists is False
     assert params["zarr_dir"].required
@@ -386,11 +388,11 @@ def test_build_command_round_trip(fixture_manifest):
     ep = _entry_point(fixture_manifest, "Make Thumbnail")
     command = build_command(
         ep,
-        {"zarr_urls": "/data/a.zarr,/data/b.zarr",
+        {"zarr_urls": "/data/a.zarr",
          "channel": '{"index": 1}'},
         session=None)
     assert "--task-name 'Make Thumbnail'" in command
-    assert "--zarr_urls /data/a.zarr,/data/b.zarr" in command
+    assert "--zarr_urls /data/a.zarr" in command
     assert """--channel '{"index": 1}'""" in command
 
 
@@ -402,3 +404,14 @@ def test_json_param_rejects_invalid_json(fixture_manifest):
             ep,
             {"zarr_urls": "/data/a.zarr", "channel": '{"index": }'},
             session=None)
+
+
+def test_zarr_urls_is_single_browsable_path(fixture_manifest):
+    # ponytail: single image per launch; multipath param per
+    # notes/multipath-param-plan.md when multi-image runs matter. The shim
+    # still splits on commas, so the swap won't change the CLI contract.
+    params = _params_by_key(_entry_point(fixture_manifest, "Make Thumbnail"))
+    p = params["zarr_urls"]
+    assert p.type == "directory"
+    assert p.name == "OME-Zarr Image"
+    assert "image" in p.description.lower()

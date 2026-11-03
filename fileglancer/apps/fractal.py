@@ -218,12 +218,16 @@ def _io_section(task_type: str, np_schema: dict | None,
 
     if "zarr_url" in props or "zarr_urls" in props:
         reserved_key = "zarr_urls" if "zarr_urls" in props else "zarr_url"
+        # ponytail: one image per launch; a multipath param type
+        # (notes/multipath-param-plan.md) is the upgrade for multi-image runs.
+        # The shim splits its value on commas either way, so swapping types
+        # later won't change the CLI contract.
         params.append(AppParameter(
             flag="--zarr_urls",
-            name="OME-Zarr Images",
-            type="string",
+            name="OME-Zarr Image",
+            type="directory",
             required=reserved_key in required,
-            description="Comma-separated paths to OME-Zarr images",
+            description="Path to an OME-Zarr image",
         ))
     if "zarr_dir" in props:
         params.append(AppParameter(
