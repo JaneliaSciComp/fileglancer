@@ -94,6 +94,47 @@ def _slugify(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
 
+def _example_value(prop: dict, schema: dict, depth: int = 0):
+    """A minimal example value for a schema shape, for json-param hints.
+
+    Objects show required fields only (all fields when nothing is required);
+    scalars become obvious fillers. Depth-capped against recursive models.
+    """
+    prop = _resolve_ref(_unwrap_nullable(prop)[0], schema)
+    if "default" in prop and prop["default"] is not None:
+        return prop["default"]
+    if "enum" in prop:
+        return prop["enum"][0]
+    prop_type = prop.get("type")
+    if depth >= 3:
+        return [] if prop_type == "array" else {}
+    if prop_type == "array":
+        return [_example_value(prop.get("items", {}), schema, depth + 1)]
+    if prop_type == "object" or "properties" in prop:
+        props = prop.get("properties", {})
+        keys = set(prop.get("required", [])) or set(props)
+        return {k: _example_value(v, schema, depth + 1)
+                for k, v in props.items() if k in keys}
+    if prop_type == "integer":
+        return 0
+    if prop_type == "number":
+        return 0.0
+    if prop_type == "boolean":
+        return False
+    return "..."
+
+
+def _optional_fields(prop: dict, schema: dict) -> list[str]:
+    """The fields the example skeleton left out of the (item) model, if any."""
+    prop = _resolve_ref(_unwrap_nullable(prop)[0], schema)
+    if prop.get("type") == "array":
+        prop = _resolve_ref(_unwrap_nullable(prop.get("items", {}))[0], schema)
+    required = set(prop.get("required", []))
+    if not required:
+        return []
+    return [k for k in prop.get("properties", {}) if k not in required]
+
+
 def _convert_property(key: str, prop: dict, required: bool,
                       key_prefix: str = "", schema: dict | None = None) -> AppParameter:
     """Convert one args-schema property to an AppParameter."""
@@ -111,10 +152,19 @@ def _convert_property(key: str, prop: dict, required: bool,
 
     if _is_complex(prop):
         kwargs["type"] = "json"
-        if desc:
-            kwargs["description"] = desc
         if "default" in prop and prop["default"] is not None:
             kwargs["default"] = json.dumps(prop["default"], indent=2)
+        else:
+            # An empty box with no shape hint is unanswerable; show a skeleton.
+            desc_parts = [desc] if desc else []
+            desc_parts.append(
+                "Example: " + json.dumps(_example_value(prop, schema or {})))
+            optional = _optional_fields(prop, schema or {})
+            if optional:
+                desc_parts.append("Optional fields: " + ", ".join(optional))
+            desc = "\n\n".join(desc_parts)
+        if desc:
+            kwargs["description"] = desc
         return AppParameter(**kwargs)
 
     if desc:

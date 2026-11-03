@@ -30,6 +30,15 @@
             "title": "OverwriteMode",
             "type": "string",
             "description": "Missing description for OverwriteMode."
+          },
+          "Roi": {
+            "title": "Roi",
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": {"type": "string", "title": "Name"},
+              "start": {"type": "integer", "title": "Start"}
+            }
           }
         },
         "properties": {
@@ -39,7 +48,8 @@
           "mode": {"enum": ["fast", "good"], "title": "Mode", "default": "fast"},
           "label": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Label", "default": null},
           "channel": {"$ref": "#/$defs/Channel", "title": "Channel", "default": {"index": 0}},
-          "overwrite_mode": {"$ref": "#/$defs/OverwriteMode", "title": "Overwrite Mode", "default": "No Overwrite", "description": "Overwrite mode for existing data."}
+          "overwrite_mode": {"$ref": "#/$defs/OverwriteMode", "title": "Overwrite Mode", "default": "No Overwrite", "description": "Overwrite mode for existing data."},
+          "rois": {"type": "array", "items": {"$ref": "#/$defs/Roi"}, "title": "ROIs", "description": "Regions to process."}
         }
       }
     },
