@@ -315,6 +315,25 @@ def test_pre_run_shape(fixture_manifest):
     assert not any(line.strip() == "FRACTAL_SHIM_EOF" for line in _SHIM.splitlines())
 
 
+def test_pre_run_installs_from_temp_copy(fixture_manifest):
+    # pip's in-tree build would drop build/ and *.egg-info into the immutable
+    # snapshot, so the install must run against a temporary copy of it.
+    pre_run = _entry_point(fixture_manifest, "Make Thumbnail").pre_run
+    assert 'pip" install "$__fg_snapshot"' not in pre_run
+    assert "mktemp -d" in pre_run
+
+
+def test_needs_gpu_surfaced_in_description(fixture_manifest):
+    ep = _entry_point(fixture_manifest, "Make Thumbnail")
+    assert "GPU" in ep.description
+    ep = _entry_point(fixture_manifest, "Aggregate Stats")
+    assert not (ep.description or "").count("GPU")
+
+
+def test_manifest_description_from_first_task(fixture_manifest):
+    assert fixture_manifest.description == "Makes a thumbnail of one OME-Zarr image."
+
+
 def test_build_command_round_trip(fixture_manifest):
     from fileglancer.apps.command import build_command
     ep = _entry_point(fixture_manifest, "Make Thumbnail")

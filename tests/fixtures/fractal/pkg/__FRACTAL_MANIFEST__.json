@@ -8,7 +8,7 @@
       "name": "Make Thumbnail",
       "type": "parallel",
       "executable_parallel": "thumbnail.py",
-      "meta_parallel": {"cpus_per_task": 2, "mem": 8000},
+      "meta_parallel": {"cpus_per_task": 2, "mem": 8000, "needs_gpu": true},
       "category": "Image Processing",
       "docs_info": "Makes a thumbnail of one OME-Zarr image.",
       "args_schema_parallel": {
