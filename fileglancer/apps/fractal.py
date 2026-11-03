@@ -262,15 +262,23 @@ def _drop_title_echo(text: str, task_name: str) -> str:
 
 
 def _plain_summary(text: str) -> str:
-    """First line of a markdown description, flattened to plain text, for the
-    one-line manifest description. Single * / _ are left alone so globs and
-    snake_case names survive."""
-    line = text.strip().splitlines()[0] if text.strip() else ""
-    line = re.sub(r"^\s*#{1,6}\s+", "", line)
-    line = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1 (\2)", line)
-    line = re.sub(r"\*\*([^*]+)\*\*", r"\1", line)
-    line = re.sub(r"`([^`]*)`", r"\1", line)
-    return line.strip()
+    """First prose line of a markdown description, flattened to plain text,
+    for the one-line manifest description. Headings, table rows, and fenced
+    code are skipped; a list marker is dropped. Single * / _ are left alone
+    so globs and snake_case names survive."""
+    in_fence = False
+    for line in text.splitlines():
+        if re.match(r"\s*(```|~~~)", line):
+            in_fence = not in_fence
+            continue
+        if in_fence or not line.strip() or re.match(r"\s*(#{1,6}\s|\|)", line):
+            continue
+        line = re.sub(r"^\s*(?:[-*+]|\d+\.)\s+", "", line)
+        line = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1 (\2)", line)
+        line = re.sub(r"\*\*([^*]+)\*\*", r"\1", line)
+        line = re.sub(r"`([^`]*)`", r"\1", line)
+        return line.strip()
+    return ""
 
 
 def _task_description(task: dict, package_dir: Path) -> str | None:

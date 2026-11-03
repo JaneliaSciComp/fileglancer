@@ -392,6 +392,15 @@ def test_plain_summary_flattens_markdown():
         "Does something with zarr per docs (https://example.org).")
 
 
+def test_plain_summary_skips_headings_to_first_prose_line():
+    # A docs_info that opens with a section heading must not summarize to
+    # just the heading text ("Purpose").
+    from fileglancer.apps.fractal import _plain_summary
+    text = "### Purpose\n- Converts a `.czi` file into OME-Zarr.\n| a |\n"
+    assert _plain_summary(text) == "Converts a .czi file into OME-Zarr."
+    assert _plain_summary("## Only A Heading") == ""
+
+
 def test_build_command_round_trip(fixture_manifest):
     from fileglancer.apps.command import build_command
     ep = _entry_point(fixture_manifest, "Make Thumbnail")
