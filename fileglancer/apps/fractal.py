@@ -192,6 +192,201 @@ def _task_resources(task: dict) -> AppResourceDefaults | None:
         cpus=cpus, memory=f"{mem} MB" if mem is not None else None)
 
 
+# The runtime bridge between Fileglancer's flag-style command and Fractal's
+# `--args-json/--out-json` task contract. Written by pre_run into the job work
+# dir and run from there (cwd holds the `repo` snapshot symlink). Stdlib only.
+# Its schema handling (nullable unwrap, complex detection, reserved keys, init.
+# prefix) must mirror the conversion rules above.
+_SHIM = '''"""Fileglancer-generated runner for Fractal tasks (see fileglancer/apps/fractal.py)."""
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+
+def fail(message):
+    print(message, file=sys.stderr)
+    sys.exit(1)
+
+
+def unwrap_nullable(prop):
+    any_of = prop.get("anyOf")
+    if any_of and len(any_of) == 2:
+        non_null = [s for s in any_of if s.get("type") != "null"]
+        if len(non_null) == 1:
+            inner = {k: v for k, v in prop.items() if k != "anyOf"}
+            inner.update(non_null[0])
+            return inner
+    return prop
+
+
+def is_complex(prop):
+    if any(k in prop for k in ("$ref", "oneOf", "allOf", "anyOf")):
+        return True
+    return prop.get("type") in ("array", "object")
+
+
+def coerce(key, value, schema):
+    prop = schema.get("properties", {}).get(key)
+    if prop is None:
+        return value  # unknown keys were already rejected server-side
+    prop = unwrap_nullable(prop)
+    if is_complex(prop):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError as e:
+            fail(f"Parameter --{key} is not valid JSON: {e}")
+    if "enum" in prop:
+        return next((m for m in prop["enum"] if str(m) == value), value)
+    prop_type = prop.get("type")
+    if prop_type == "integer":
+        return int(value)
+    if prop_type == "number":
+        return float(value)
+    if prop_type == "boolean":
+        return value == "true"
+    return value
+
+
+def parse_argv(argv):
+    pairs = {}
+    i = 0
+    while i < len(argv):
+        flag = argv[i]
+        if not flag.startswith("--") or i + 1 >= len(argv):
+            fail(f"Expected --key value pairs, got dangling {flag}")
+        pairs[flag[2:]] = argv[i + 1]
+        i += 2
+    return pairs
+
+
+def run_unit(executable, args, n, label):
+    args_path = Path(f"args_{n}.json")
+    out_path = Path(f"out_{n}.json")
+    args_path.write_text(json.dumps(args, indent=2))
+    print(f"[fractal_run] {label}", flush=True)
+    result = subprocess.run([sys.executable, str(executable),
+                             "--args-json", str(args_path),
+                             "--out-json", str(out_path)])
+    if result.returncode != 0:
+        sys.exit(result.returncode)
+    return json.loads(out_path.read_text()) if out_path.exists() else {}
+
+
+def main():
+    pairs = parse_argv(sys.argv[1:])
+    task_name = pairs.pop("task-name", None)
+    package_dir = pairs.pop("package-dir", None)
+    if not task_name or not package_dir:
+        fail("--task-name and --package-dir are required")
+    pkg = Path("repo") / package_dir
+    manifest = json.loads((pkg / "__FRACTAL_MANIFEST__.json").read_text())
+    task = next((t for t in manifest["task_list"] if t["name"] == task_name), None)
+    if task is None:
+        fail(f"Task {task_name!r} not found in the Fractal manifest")
+
+    task_type = task.get("type")
+    if not task_type:
+        if task.get("executable_non_parallel") and task.get("executable_parallel"):
+            task_type = "compound"
+        elif task.get("executable_parallel"):
+            task_type = "parallel"
+        else:
+            task_type = "non_parallel"
+
+    np_schema = task.get("args_schema_non_parallel") or {}
+    p_schema = task.get("args_schema_parallel") or {}
+    main_schema = p_schema if task.get("executable_parallel") else np_schema
+
+    zarr_urls_raw = pairs.pop("zarr_urls", None)
+    zarr_dir = pairs.pop("zarr_dir", None)
+    init_args, main_args = {}, {}
+    for key, value in pairs.items():
+        if key.startswith("init."):
+            stripped = key[len("init."):]
+            init_args[stripped] = coerce(stripped, value, np_schema)
+        else:
+            main_args[key] = coerce(key, value, main_schema)
+
+    zarr_urls = []
+    if zarr_urls_raw is not None:
+        zarr_urls = [u.strip() for u in zarr_urls_raw.split(",") if u.strip()]
+        for url in zarr_urls:
+            if not Path(url).is_dir():
+                fail(f"OME-Zarr image path is not an existing directory: {url}")
+
+    exec_np = task.get("executable_non_parallel")
+    exec_p = task.get("executable_parallel")
+
+    if task_type == "parallel":
+        for i, url in enumerate(zarr_urls):
+            run_unit(pkg / exec_p, {"zarr_url": url, **main_args}, i,
+                     f"{task_name} [{i + 1}/{len(zarr_urls)}] {url}")
+    elif task_type == "non_parallel":
+        run_unit(pkg / exec_np,
+                 {"zarr_urls": zarr_urls, "zarr_dir": zarr_dir, **main_args},
+                 0, task_name)
+    elif task_type == "converter_non_parallel":
+        run_unit(pkg / exec_np, {"zarr_dir": zarr_dir, **main_args}, 0, task_name)
+    elif task_type in ("compound", "converter_compound"):
+        init_payload = {"zarr_dir": zarr_dir, **init_args}
+        if task_type == "compound":
+            init_payload["zarr_urls"] = zarr_urls
+        out = run_unit(pkg / exec_np, init_payload, 0, f"{task_name} (init)")
+        plist = out.get("parallelization_list") or []
+        if not plist:
+            print("[fractal_run] init produced an empty parallelization list; "
+                  "nothing to compute", flush=True)
+            return
+        for i, entry in enumerate(plist):
+            run_unit(pkg / exec_p,
+                     {"zarr_url": entry["zarr_url"],
+                      "init_args": entry.get("init_args", {}), **main_args},
+                     i + 1,
+                     f"{task_name} [{i + 1}/{len(plist)}] {entry['zarr_url']}")
+    else:
+        fail(f"Unsupported Fractal task type: {task_type}")
+
+
+main()
+'''
+
+
+def _build_pre_run() -> str:
+    """Bash that builds the per-SHA task env and writes the shim.
+
+    Runs inside the job script after `cd` into the work dir, in the same shell
+    as the command, so the PATH export carries over. The env lives next to the
+    repo's .snapshots cache, keyed by the pinned commit, and is built at most
+    once per SHA (flock-guarded for concurrent first launches).
+    """
+    return f'''# --- Fractal task environment (generated by Fileglancer) ---
+__fg_snapshot="$(readlink -f "$FG_WORK_DIR/repo")"
+ENV_DIR="$(dirname "$(dirname "$__fg_snapshot")")/.envs/$(basename "$__fg_snapshot")"
+mkdir -p "$(dirname "$ENV_DIR")"
+exec 9>"$ENV_DIR.lock"
+flock 9
+if [ ! -f "$ENV_DIR/.ok" ]; then
+  echo "Building Fractal task environment in $ENV_DIR (one-time for this version)..."
+  rm -rf "$ENV_DIR"
+  # ponytail: fixed python=3.12; parse requires-python from pyproject if it bites
+  if ! conda create -y -p "$ENV_DIR" python=3.12 pip \\
+      || ! "$ENV_DIR/bin/pip" install "$__fg_snapshot"; then
+    rm -rf "$ENV_DIR"
+    echo "ERROR: failed to build the Fractal task environment" >&2
+    exit 1
+  fi
+  touch "$ENV_DIR/.ok"
+  # ponytail: no env eviction; GC alongside gc_repo_snapshots when quota bites
+fi
+flock -u 9
+exec 9>&-
+export PATH="$ENV_DIR/bin:$PATH"
+cat > "$FG_WORK_DIR/fractal_run.py" <<'FRACTAL_SHIM_EOF'
+{_SHIM}FRACTAL_SHIM_EOF
+'''
+
+
 class FractalAdapter:
     """Generate an AppManifest from a Fractal task package."""
 
@@ -226,6 +421,7 @@ class FractalAdapter:
         except Exception:
             name = directory.name
 
+        pre_run = _build_pre_run()
         runnables = []
         seen_ids: set[str] = set()
         for task in manifest.get("task_list", []):
@@ -266,7 +462,7 @@ class FractalAdapter:
                     f" --package-dir {shlex.quote(package_rel)}"
                 ),
                 working_dir="work",
-                pre_run="",
+                pre_run=pre_run,
                 parameters=sections,
                 resources=_task_resources(task),
             ))
