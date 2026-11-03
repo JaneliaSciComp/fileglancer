@@ -155,14 +155,14 @@ def _convert_property(key: str, prop: dict, required: bool,
         if "default" in prop and prop["default"] is not None:
             kwargs["default"] = json.dumps(prop["default"], indent=2)
         else:
-            # An empty box with no shape hint is unanswerable; show a skeleton.
-            desc_parts = [desc] if desc else []
-            desc_parts.append(
-                "Example: " + json.dumps(_example_value(prop, schema or {})))
+            # An empty box with no shape hint is unanswerable; ghost a skeleton.
+            kwargs["placeholder"] = json.dumps(
+                _example_value(prop, schema or {}), indent=2)
             optional = _optional_fields(prop, schema or {})
             if optional:
+                desc_parts = [desc] if desc else []
                 desc_parts.append("Optional fields: " + ", ".join(optional))
-            desc = "\n\n".join(desc_parts)
+                desc = "\n\n".join(desc_parts)
         if desc:
             kwargs["description"] = desc
         return AppParameter(**kwargs)

@@ -73,6 +73,7 @@ type AppParameter = {
     | 'enum'
     | 'json';
   description?: string;
+  placeholder?: string;
   required?: boolean;
   default?: unknown;
   options?: string[];

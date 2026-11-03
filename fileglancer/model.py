@@ -546,6 +546,10 @@ class AppParameter(BaseModel):
         description="The data type of the parameter"
     )
     description: Optional[str] = Field(description="Description of the parameter", default=None)
+    placeholder: Optional[str] = Field(
+        description="Ghost text shown in an empty input, e.g. an example value",
+        default=None,
+    )
     required: bool = Field(description="Whether the parameter is required", default=False)
     default: Optional[Any] = Field(description="Default value for the parameter", default=None)
     options: Optional[List[str]] = Field(description="Allowed values for enum type", default=None)

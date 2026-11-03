@@ -168,15 +168,17 @@ function ParameterField({
 
     case 'json': {
       // JSON documents (e.g. Fractal nested-model args) need room and a
-      // monospace face; size the box to the content within sane bounds.
+      // monospace face; size the box to the content — or to the ghosted
+      // example when empty — within sane bounds.
       const text = value !== undefined && value !== null ? String(value) : '';
-      const rows = Math.min(14, Math.max(4, text.split('\n').length + 1));
+      const sizingText = text || param.placeholder || '';
+      const rows = Math.min(14, Math.max(4, sizingText.split('\n').length + 1));
       return (
         <textarea
           className={`${baseInputClass} font-mono`}
           id={inputId}
           onChange={e => onChange(e.target.value)}
-          placeholder={param.name}
+          placeholder={param.placeholder ?? param.name}
           rows={rows}
           spellCheck={false}
           value={text}
@@ -240,7 +242,7 @@ function ParameterField({
           className={baseInputClass}
           id={inputId}
           onChange={e => onChange(e.target.value)}
-          placeholder={param.name}
+          placeholder={param.placeholder ?? param.name}
           type="text"
           value={value !== undefined && value !== null ? String(value) : ''}
         />
