@@ -166,6 +166,26 @@ function ParameterField({
         </select>
       );
 
+    case 'json': {
+      // JSON documents (e.g. Fractal nested-model args) need room and a
+      // monospace face; size the box to the content — or to the ghosted
+      // example when empty — within sane bounds.
+      const text = value !== undefined && value !== null ? String(value) : '';
+      const sizingText = text || param.placeholder || '';
+      const rows = Math.min(14, Math.max(4, sizingText.split('\n').length + 1));
+      return (
+        <textarea
+          className={`${baseInputClass} font-mono`}
+          id={inputId}
+          onChange={e => onChange(e.target.value)}
+          placeholder={param.placeholder ?? param.name}
+          rows={rows}
+          spellCheck={false}
+          value={text}
+        />
+      );
+    }
+
     case 'file':
     case 'directory':
       return (
@@ -222,7 +242,7 @@ function ParameterField({
           className={baseInputClass}
           id={inputId}
           onChange={e => onChange(e.target.value)}
-          placeholder={param.name}
+          placeholder={param.placeholder ?? param.name}
           type="text"
           value={value !== undefined && value !== null ? String(value) : ''}
         />
@@ -301,7 +321,7 @@ function SectionTrigger({
   readonly isOpen: boolean;
 }) {
   return (
-    <Accordion.Trigger className="flex w-full items-start justify-between gap-2 py-4">
+    <Accordion.Trigger className="flex w-full cursor-pointer items-start justify-between gap-2 py-4">
       <div className="text-left">
         <div className="text-foreground font-bold text-sm">{title}</div>
         {description ? (
@@ -670,7 +690,7 @@ function EnvironmentTabContent({
       type="multiple"
       value={openEnvSections}
     >
-      <Accordion.Item value="environment">
+      <Accordion.Item className="cursor-auto" value="environment">
         <SectionTrigger
           description="Set up the environment that the job runs in. This controls the script that is submitted to the cluster."
           isOpen={openEnvSections.includes('environment')}
@@ -691,7 +711,7 @@ function EnvironmentTabContent({
       </Accordion.Item>
 
       {entryPoint.container ? (
-        <Accordion.Item value="apptainer">
+        <Accordion.Item className="cursor-auto" value="apptainer">
           <SectionTrigger
             description="Run the command inside an Apptainer (Singularity) container image."
             isOpen={openEnvSections.includes('apptainer')}
@@ -757,7 +777,7 @@ function ClusterTabContent({
       type="multiple"
       value={openClusterSections}
     >
-      <Accordion.Item value="resources">
+      <Accordion.Item className="cursor-auto" value="resources">
         <SectionTrigger
           description="These resources are requested for the single process that runs your command. These apply to the main job only, not to any jobs it submits on its own."
           isOpen={openClusterSections.includes('resources')}
@@ -771,7 +791,7 @@ function ClusterTabContent({
         </Accordion.Content>
       </Accordion.Item>
 
-      <Accordion.Item value="submitOptions">
+      <Accordion.Item className="cursor-auto" value="submitOptions">
         <SectionTrigger
           description="Controls how the main job is submitted to the cluster scheduler, such as the queue and any extra scheduler options. These apply to the main job only, not to any jobs it submits on its own."
           isOpen={openClusterSections.includes('submitOptions')}
@@ -1514,6 +1534,7 @@ export default function AppLaunchForm({
                   {visibleParameters.map(item =>
                     isParameterSection(item) ? (
                       <Accordion.Item
+                        className="cursor-auto"
                         key={`section-${item.section}`}
                         value={item.section}
                       >
@@ -1606,6 +1627,7 @@ export default function AppLaunchForm({
                   {(entryPoint.env_parameters ?? []).map(item =>
                     isParameterSection(item) ? (
                       <Accordion.Item
+                        className="cursor-auto"
                         key={`env-section-${item.section}`}
                         value={item.section}
                       >
