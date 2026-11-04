@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 
 import { useCartCheckout } from '@/hooks/useCartCheckout';
+import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { isRelinkableLayer } from '@/queries/viewQueries';
 import {
   appendLayers,
@@ -12,6 +13,7 @@ import {
 } from '@/utils/viewCheckout';
 import { datasetKey } from '@/utils/pathHandling';
 import type { CartItem } from '@/contexts/CartContext';
+import type { UrlPrefixes } from '@/hooks/useCartCheckout';
 import type { NeuroglancerBridge } from '@/hooks/useNeuroglancerViewer';
 import type { ViewLayer } from '@/queries/viewQueries';
 import type { NgLayer, ResolvedCheckoutDataset } from '@/utils/viewCheckout';
@@ -37,8 +39,12 @@ export function useAddToView(
     readonly onAddSources: (sharingKeys: string[]) => void;
     readonly onAdded: (datasets: ResolvedCheckoutDataset[]) => void;
   }
-): (items: CartItem[], options?: { shown?: boolean }) => Promise<void> {
+): (
+  items: CartItem[],
+  options?: { shown?: boolean; urlPrefixes?: UrlPrefixes }
+) => Promise<void> {
   const { resolveCartDatasets } = useCartCheckout();
+  const { disableHeuristicalLayerTypeDetection } = usePreferencesContext();
   // The sidebar unmounts when NG reloads (the bridge leaves `ready`). An add
   // still in flight then holds the dead viewer, so it must stop.
   const mounted = useRef(true);
@@ -50,12 +56,18 @@ export function useAddToView(
   }, []);
 
   return useCallback(
-    async (items: CartItem[], options?: { shown?: boolean }) => {
+    async (
+      items: CartItem[],
+      options?: { shown?: boolean; urlPrefixes?: UrlPrefixes }
+    ) => {
       // Snapshot before resolving: creating a Data Link relinks this View's
       // broken layers on that dataset server-side and refetches the rows.
       const broken = viewLayers.filter(isRelinkableLayer);
-      const resolved = await resolveCartDatasets(items);
-      const { ng_state, layers } = await buildViewState(resolved);
+      const resolved = await resolveCartDatasets(items, options?.urlPrefixes);
+      const { ng_state, layers } = await buildViewState(
+        resolved,
+        !disableHeuristicalLayerTypeDetection
+      );
       const added = (ng_state.layers ?? []) as NgLayer[];
       const unsupportedKeys = [
         ...new Set(
@@ -117,6 +129,14 @@ export function useAddToView(
         `Added ${count} ${noun}${count === 1 ? '' : 's'}. Save to keep ${count === 1 ? 'it' : 'them'}.${skipped}`
       );
     },
-    [resolveCartDatasets, bridge, viewLayers, onEdited, onAddSources, onAdded]
+    [
+      resolveCartDatasets,
+      disableHeuristicalLayerTypeDetection,
+      bridge,
+      viewLayers,
+      onEdited,
+      onAddSources,
+      onAdded
+    ]
   );
 }

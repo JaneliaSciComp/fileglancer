@@ -1,14 +1,33 @@
 import { Typography } from '@material-tailwind/react';
 import { Link } from 'react-router';
 
-import { useViewsForDataLinkQuery } from '@/queries/viewQueries';
+import {
+  useViewsForDataLinkQuery,
+  useViewsForDatasetQuery
+} from '@/queries/viewQueries';
 
-interface AppearsInViewsProps {
-  readonly sharingKey: string;
-}
+// A Data Link's list, or a dataset's (fspName + path) when it has no Data Link
+type AppearsInViewsProps =
+  | {
+      readonly sharingKey: string;
+      readonly fspName?: never;
+      readonly path?: never;
+    }
+  | {
+      readonly sharingKey?: never;
+      readonly fspName: string;
+      readonly path: string;
+    };
 
-export default function AppearsInViews({ sharingKey }: AppearsInViewsProps) {
-  const viewsQuery = useViewsForDataLinkQuery(sharingKey);
+export default function AppearsInViews({
+  sharingKey,
+  fspName,
+  path
+}: AppearsInViewsProps) {
+  const dataLinkQuery = useViewsForDataLinkQuery(sharingKey);
+  const datasetQuery = useViewsForDatasetQuery(fspName, path);
+  // The unused query is disabled, and a disabled query stays pending
+  const viewsQuery = sharingKey ? dataLinkQuery : datasetQuery;
 
   // Stay quiet while loading / on error / when unused — this is a
   // supplementary read-only hint, not a primary control.

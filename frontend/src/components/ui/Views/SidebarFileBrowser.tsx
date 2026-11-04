@@ -8,12 +8,16 @@ import { useCreateViewFlow } from '@/hooks/useCreateViewFlow';
 import useFileSelector from '@/hooks/useFileSelector';
 import type { CartItem } from '@/contexts/CartContext';
 import type { DatasetRef } from '@/hooks/useCartDimensionCheck';
+import type { UrlPrefixes } from '@/hooks/useCartCheckout';
 import type { FileOrFolder } from '@/shared.types';
 
 type SidebarFileBrowserProps = {
   /** The datasets in the viewer now, in layer order: the dimension reference. */
   readonly viewSources: DatasetRef[];
-  readonly addToView: (items: CartItem[]) => Promise<void>;
+  readonly addToView: (
+    items: CartItem[],
+    options?: { urlPrefixes?: UrlPrefixes }
+  ) => Promise<void>;
 };
 
 /**
@@ -83,8 +87,8 @@ export default function SidebarFileBrowser({
     });
 
   const add = () =>
-    startAddToView(items, hasMismatch, async datasets => {
-      await addToView(datasets);
+    startAddToView(items, hasMismatch, async (datasets, urlPrefixes) => {
+      await addToView(datasets, { urlPrefixes });
       setChecked(new Set());
     });
 

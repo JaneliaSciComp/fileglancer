@@ -1,10 +1,12 @@
 import {
   getOmeZarrMetadata,
+  getOmeZarrThumbnail,
+  determineLayerType,
   generateNeuroglancerStateForOmeZarr,
   generateNeuroglancerStateForDataURL,
   generateStateForPlainZarr
 } from '@/omezarr-helper';
-import type { Metadata } from '@/omezarr-helper';
+import type { LayerType, Metadata } from '@/omezarr-helper';
 import type { ViewLayer, ViewLayerInput } from '@/queries/viewQueries';
 import { default as log } from '@/logger';
 
@@ -63,8 +65,21 @@ function decodeState(encoded: string | null): NgState | null {
   }
 }
 
+// Same thumbnail-edge heuristic the single-dataset preview uses, so the
+// metadata panel and the View agree on image vs segmentation.
+// ponytail: renders a fresh thumbnail per dataset (not the preview's cached
+// one, whose URL differs); cache by dataset if checkout of big carts drags.
+async function inferLayerType(url: string): Promise<LayerType> {
+  const [thumbnail, error] = await getOmeZarrThumbnail(url);
+  if (error) {
+    log.debug(`No thumbnail for ${url}, using image layer type: ${error}`);
+  }
+  return determineLayerType(true, thumbnail);
+}
+
 async function generateStateForDataset(
-  ds: ResolvedCheckoutDataset
+  ds: ResolvedCheckoutDataset,
+  detectLayerType: boolean
 ): Promise<NgState | null> {
   const probe = await probeDataset(ds.url);
   if (probe.kind === 'unsupported') {
@@ -80,13 +95,13 @@ async function generateStateForDataset(
     }
     const { metadata } = probe;
     const multiscale = metadata.multiscales?.[0];
-    // ponytail: default layerType 'image' — the thumbnail-edge heuristic used
-    // for the single-dir preview needs a rendered thumbnail we don't have here.
+    const layerType =
+      multiscale && detectLayerType ? await inferLayerType(ds.url) : 'image';
     const encoded = multiscale
       ? generateNeuroglancerStateForOmeZarr(
           ds.url,
           metadata.zarrVersion,
-          'image',
+          layerType,
           multiscale,
           metadata.arr,
           metadata.labels,
@@ -129,7 +144,9 @@ function startsArchived(layer: NgLayer, index: number): boolean {
   return layer.type !== 'segmentation' && index >= 4;
 }
 export async function buildViewState(
-  datasets: ResolvedCheckoutDataset[]
+  datasets: ResolvedCheckoutDataset[],
+  // Mirrors the disableHeuristicalLayerTypeDetection preference (inverted).
+  detectLayerType: boolean
 ): Promise<{ ng_state: Record<string, unknown>; layers: ViewLayerInput[] }> {
   const combinedLayers: NgLayer[] = [];
   const viewLayers: ViewLayerInput[] = [];
@@ -138,17 +155,23 @@ export async function buildViewState(
   const taken = new Set<string>();
 
   // Every channel entry of a dataset generates the same state; generate it
-  // once per dataset and layer path, then slice it per entry.
+  // once per dataset and layer path, then slice it per entry. All datasets
+  // start up front: each one probes metadata and renders a thumbnail, so
+  // awaiting them one at a time would make checkout time grow with cart size.
   const stateCache = new Map<string, Promise<NgState | null>>();
+  const cacheKeyFor = (ds: ResolvedCheckoutDataset) =>
+    `${ds.url}::${ds.channel !== undefined}`;
+  for (const ds of datasets) {
+    if (!stateCache.has(cacheKeyFor(ds))) {
+      stateCache.set(
+        cacheKeyFor(ds),
+        generateStateForDataset(ds, detectLayerType)
+      );
+    }
+  }
 
   for (const ds of datasets) {
-    const cacheKey = `${ds.url}::${ds.channel !== undefined}`;
-    let pending = stateCache.get(cacheKey);
-    if (!pending) {
-      pending = generateStateForDataset(ds);
-      stateCache.set(cacheKey, pending);
-    }
-    const state = await pending;
+    const state = await stateCache.get(cacheKeyFor(ds))!;
     if (!state) {
       unsupported.push(ds);
       continue;
