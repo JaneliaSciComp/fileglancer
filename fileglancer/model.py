@@ -542,10 +542,14 @@ class AppParameter(BaseModel):
         default="",
     )
     name: str = Field(description="Display name of the parameter")
-    type: Literal["string", "integer", "number", "boolean", "file", "directory", "enum"] = Field(
+    type: Literal["string", "integer", "number", "boolean", "file", "directory", "enum", "json"] = Field(
         description="The data type of the parameter"
     )
     description: Optional[str] = Field(description="Description of the parameter", default=None)
+    placeholder: Optional[str] = Field(
+        description="Ghost text shown in an empty input, e.g. an example value",
+        default=None,
+    )
     required: bool = Field(description="Whether the parameter is required", default=False)
     default: Optional[Any] = Field(description="Default value for the parameter", default=None)
     options: Optional[List[str]] = Field(description="Allowed values for enum type", default=None)

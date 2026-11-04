@@ -1,0 +1,102 @@
+{
+  "manifest_version": "2",
+  "has_args_schemas": true,
+  "args_schema_version": "pydantic_v2",
+  "authors": "Fixture Authors",
+  "task_list": [
+    {
+      "name": "Make Thumbnail",
+      "type": "parallel",
+      "executable_parallel": "thumbnail.py",
+      "meta_parallel": {"cpus_per_task": 2, "mem": 8000, "needs_gpu": true},
+      "category": "Image Processing",
+      "docs_info": "Makes a thumbnail of one OME-Zarr image.",
+      "args_schema_parallel": {
+        "title": "MakeThumbnail",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["zarr_url"],
+        "$defs": {
+          "Channel": {
+            "title": "Channel",
+            "type": "object",
+            "properties": {
+              "wavelength_id": {"type": "string", "title": "Wavelength Id"},
+              "index": {"type": "integer", "title": "Index"}
+            }
+          },
+          "OverwriteMode": {
+            "enum": ["No Overwrite", "Overwrite", "Extend"],
+            "title": "OverwriteMode",
+            "type": "string",
+            "description": "Missing description for OverwriteMode."
+          },
+          "Roi": {
+            "title": "Roi",
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": {"type": "string", "title": "Name"},
+              "start": {"type": "integer", "title": "Start"}
+            }
+          }
+        },
+        "properties": {
+          "zarr_url": {"type": "string", "title": "Zarr Url", "description": "URL to the OME-Zarr image."},
+          "level": {"type": "integer", "title": "Level", "default": 0, "minimum": 0, "description": "Resolution level."},
+          "overwrite": {"type": "boolean", "title": "Overwrite", "default": true},
+          "mode": {"enum": ["fast", "good"], "title": "Mode", "default": "fast"},
+          "label": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Label", "default": null},
+          "channel": {"$ref": "#/$defs/Channel", "title": "Channel", "default": {"index": 0}},
+          "overwrite_mode": {"$ref": "#/$defs/OverwriteMode", "title": "Overwrite Mode", "default": "No Overwrite", "description": "Overwrite mode for existing data."},
+          "rois": {"type": "array", "items": {"$ref": "#/$defs/Roi"}, "title": "ROIs", "description": "Regions to process."}
+        }
+      }
+    },
+    {
+      "name": "Aggregate Stats",
+      "executable_non_parallel": "aggregate.py",
+      "meta_non_parallel": {"cpus_per_task": 1, "mem": 4000},
+      "args_schema_non_parallel": {
+        "title": "AggregateStats",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["zarr_urls", "zarr_dir"],
+        "properties": {
+          "zarr_urls": {"type": "array", "items": {"type": "string"}, "title": "Zarr Urls"},
+          "zarr_dir": {"type": "string", "title": "Zarr Dir"},
+          "table_name": {"type": "string", "title": "Table Name", "default": "stats"}
+        }
+      }
+    },
+    {
+      "name": "Convert Fake Plate",
+      "type": "converter_compound",
+      "executable_non_parallel": "init_convert.py",
+      "executable_parallel": "compute_convert.py",
+      "meta_non_parallel": {"cpus_per_task": 1, "mem": 1000},
+      "meta_parallel": {"cpus_per_task": 4, "mem": 16000},
+      "args_schema_non_parallel": {
+        "title": "InitConvert",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["zarr_dir"],
+        "properties": {
+          "zarr_dir": {"type": "string", "title": "Zarr Dir"},
+          "plate_glob": {"type": "string", "title": "Plate Glob", "default": "*.fake"}
+        }
+      },
+      "args_schema_parallel": {
+        "title": "ComputeConvert",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["zarr_url", "init_args"],
+        "properties": {
+          "zarr_url": {"type": "string", "title": "Zarr Url"},
+          "init_args": {"type": "object", "title": "Init Args"},
+          "compression": {"type": "string", "title": "Compression", "default": "zstd"}
+        }
+      }
+    }
+  ]
+}

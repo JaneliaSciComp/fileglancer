@@ -356,8 +356,8 @@ export default function DataLinkDialog(props: DataLinkDialogProps) {
                 type="multiple"
                 value={openAdvancedSections}
               >
-                <Accordion.Item value="advanced">
-                  <Accordion.Trigger className="flex w-full items-center justify-between py-2">
+                <Accordion.Item className="cursor-auto" value="advanced">
+                  <Accordion.Trigger className="flex w-full cursor-pointer items-center justify-between py-2">
                     <div className="text-foreground font-semibold text-sm">
                       Advanced settings
                     </div>
