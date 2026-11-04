@@ -38,7 +38,7 @@ export default function useZarrMetadata() {
   const {
     validViewers,
     isInitialized: viewersInitialized,
-    getViewersCompatibleWithImage
+    getViewerCompatibility
   } = useViewersContext();
 
   // Fetch Zarr metadata
@@ -97,9 +97,11 @@ export default function useZarrMetadata() {
     };
   }, [thumbnailSrc, disableHeuristicalLayerTypeDetection]);
 
-  const openWithToolUrls = useMemo(() => {
+  const { openWithToolUrls, incompatibleViewers } = useMemo(() => {
+    // Viewer key -> reasons the capability manifest rejected the dataset.
+    const incompatibleViewers: Record<string, string[]> = {};
     if (!metadata || !viewersInitialized) {
-      return null;
+      return { openWithToolUrls: null, incompatibleViewers };
     }
 
     const url =
@@ -109,28 +111,24 @@ export default function useZarrMetadata() {
       copy: url || ''
     } as OpenWithToolUrls;
 
-    // Get compatible viewers for this dataset
-    let compatibleViewers = validViewers;
-
     // If we have multiscales metadata (OME-Zarr), use capability checking to
-    // filter. `metadata` is already an OmeZarrMetadata (plus fileglancer's
-    // runtime handles), so it is passed straight to the capability check.
+    // partition viewers. `metadata` is already an OmeZarrMetadata (plus
+    // fileglancer's runtime handles), so it is passed straight to the
+    // capability check.
     const primaryMultiscale = metadata.multiscales?.[0];
     if (primaryMultiscale) {
-      compatibleViewers = getViewersCompatibleWithImage(metadata);
-
-      // Create a Set for lookup of compatible viewer keys
-      // Needed to mark incompatible but valid (as defined by the viewer config) viewers as null in openWithToolUrls
-      const compatibleKeys = new Set(compatibleViewers.map(v => v.key));
-
-      for (const viewer of validViewers) {
-        if (!compatibleKeys.has(viewer.key)) {
-          openWithToolUrls[viewer.key] = null;
-        }
+      const { compatible, incompatible } = getViewerCompatibility(metadata);
+      for (const entry of incompatible) {
+        incompatibleViewers[entry.viewer.key] = entry.reasons;
       }
 
-      // For compatible viewers, generate URLs
-      for (const viewer of compatibleViewers) {
+      // Generate URLs for every configured viewer, including incompatible
+      // ones: the manifest may be wrong, so the UI still offers them
+      // (collapsed) and clicking must work.
+      for (const viewer of [
+        ...compatible,
+        ...incompatible.map(entry => entry.viewer)
+      ]) {
         if (!url) {
           // Compatible but no data URL yet - show as available (empty string)
           openWithToolUrls[viewer.key] = '';
@@ -234,7 +232,7 @@ export default function useZarrMetadata() {
         }
       }
     }
-    return openWithToolUrls;
+    return { openWithToolUrls, incompatibleViewers };
   }, [
     metadata,
     currentDirProxiedPathQuery.data?.url,
@@ -246,13 +244,14 @@ export default function useZarrMetadata() {
     effectiveZarrVersion,
     validViewers,
     viewersInitialized,
-    getViewersCompatibleWithImage
+    getViewerCompatibility
   ]);
 
   return {
     zarrMetadataQuery,
     thumbnailQuery,
     openWithToolUrls,
+    incompatibleViewers,
     layerType,
     availableZarrVersions: zarrMetadataQuery.data?.availableZarrVersions || []
   };

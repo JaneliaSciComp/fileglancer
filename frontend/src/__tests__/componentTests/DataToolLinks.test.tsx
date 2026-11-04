@@ -258,6 +258,45 @@ describe('DataToolLinks - Edge Cases', () => {
       expect(screen.queryByText('Test Tools')).not.toBeInTheDocument();
     });
   });
+
+  describe('Incompatible viewers section', () => {
+    it('moves incompatible viewers into a collapsed section with reasons', async () => {
+      const urls: OpenWithToolUrls = {
+        copy: 'http://localhost:3000/copy',
+        neuroglancer: 'http://localhost:3000/neuroglancer',
+        avivator: 'http://localhost:3000/avivator'
+      };
+
+      render(
+        <ViewersProvider>
+          <DataToolLinks
+            incompatibleViewers={{
+              avivator: ['Viewer does not support OME-Zarr v0.6']
+            }}
+            onToolClick={vi.fn()}
+            showCopiedTooltip={false}
+            title="Test Tools"
+            urls={urls}
+          />
+        </ViewersProvider>,
+        { initialEntries: ['/browse/test_fsp/test_file'] }
+      );
+
+      // Compatible viewer renders in the main row
+      await screen.findByAltText('View in Neuroglancer', {}, { timeout: 3000 });
+
+      // Incompatible viewer is behind the collapsed section, still clickable
+      expect(screen.getByText('1 incompatible viewer')).toBeInTheDocument();
+      expect(screen.getByAltText('View in Avivator')).toBeInTheDocument();
+    });
+
+    it('renders no collapsed section when all viewers are compatible', async () => {
+      renderDataToolLinks();
+
+      await screen.findByAltText('View in Neuroglancer', {}, { timeout: 3000 });
+      expect(screen.queryByText(/incompatible viewer/)).toBeNull();
+    });
+  });
 });
 
 describe('DataToolLinks - Expected Behavior', () => {

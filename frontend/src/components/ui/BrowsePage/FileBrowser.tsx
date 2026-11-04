@@ -84,6 +84,7 @@ export default function FileBrowser({
     zarrMetadataQuery,
     thumbnailQuery,
     openWithToolUrls,
+    incompatibleViewers,
     layerType,
     availableZarrVersions
   } = useZarrMetadata();
@@ -271,6 +272,7 @@ export default function FileBrowser({
         <ZarrPreview
           availableZarrVersions={availableZarrVersions}
           fspName={fileQuery.data?.currentFileSharePath?.name ?? ''}
+          incompatibleViewers={incompatibleViewers}
           layerType={layerType}
           mainPanelWidth={mainPanelWidth}
           openWithToolUrls={openWithToolUrls}
