@@ -82,6 +82,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/openldap-2.6.13-hbde042b_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/openssl-3.6.5-h781a0a9_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pandas-2.3.3-py313h08cd8bf_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/psycopg-c-3.3.4-py313hd8e328e_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/psycopg2-2.9.12-py313h974b2d7_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pydantic-core-2.50.2-py313ha296275_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pykrb5-0.10.0-py313h4a32529_0.conda
@@ -143,6 +144,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/oauthlib-4.0.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/packaging-26.3-pyhc364b38_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pip-25.3-pyh145f28c_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg-3.3.4-pyh848bd53_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg2-binary-2.9.12-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyasn1-0.6.5-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-3.12-pyh5ded981_1.conda
@@ -251,6 +253,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/openldap-2.6.13-h2fb54aa_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/openssl-3.6.5-he6ad1d5_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pandas-2.3.3-py314h91eeaa4_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/psycopg-c-3.3.4-py314h3076274_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/psycopg2-2.9.12-py314h1563c59_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pydantic-core-2.50.2-py314h231d840_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyspnego-0.12.4-py314ha42fa4b_0.conda
@@ -311,6 +314,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/oauthlib-4.0.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/packaging-26.3-pyhc364b38_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pip-25.3-pyh145f28c_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg-3.3.4-pyh848bd53_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg2-binary-2.9.12-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyasn1-0.6.5-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-3.12-pyh5ded981_1.conda
@@ -413,6 +417,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/oauthlib-4.0.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/packaging-26.3-pyhc364b38_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pip-25.3-pyh145f28c_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg-3.3.4-pyh848bd53_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg2-binary-2.9.12-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyasn1-0.6.5-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-3.12-pyh5ded981_1.conda
@@ -500,6 +505,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/openldap-2.6.13-h2f5043c_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/openssl-3.6.5-h332eb6d_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pandas-2.3.3-py314hc4308db_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-64/psycopg-c-3.3.4-py314hc24493c_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/psycopg2-2.9.12-py314h9276055_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pydantic-core-2.50.2-py314hecac465_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pykrb5-0.10.0-py314hf3b9d4f_0.conda
@@ -580,6 +586,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/oauthlib-4.0.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/packaging-26.3-pyhc364b38_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pip-25.3-pyh145f28c_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg-3.3.4-pyh848bd53_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg2-binary-2.9.12-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyasn1-0.6.5-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pycparser-3.12-pyh5ded981_1.conda
@@ -666,6 +673,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/openldap-2.6.13-hf7f56bc_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/openssl-3.6.5-h55eecbc_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pandas-2.3.3-py314ha3d490a_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/psycopg-c-3.3.4-py314h5f75c58_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/psycopg2-2.9.12-py314h96bd916_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pydantic-core-2.50.2-py314h50bbb68_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pykrb5-0.10.0-py314hf047f6e_0.conda
@@ -763,6 +771,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/openssl-3.6.5-h781a0a9_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pandas-2.3.3-py313h08cd8bf_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pcre2-10.47-h8b3dc9c_1.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/psycopg-c-3.3.4-py313hd8e328e_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/psycopg2-2.9.12-py313h974b2d7_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pydantic-core-2.50.2-py313ha296275_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pykrb5-0.10.0-py313h4a32529_0.conda
@@ -849,6 +858,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/pip-25.3-pyh145f28c_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/platformdirs-4.14.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.7.0-pyh5ded981_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg-3.3.4-pyh848bd53_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg2-binary-2.9.12-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ptyprocess-0.7.0-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyasn1-0.6.5-pyh5ded981_0.conda
@@ -979,6 +989,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/openssl-3.6.5-he6ad1d5_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pandas-2.3.3-py314h91eeaa4_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pcre2-10.47-he574923_1.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/psycopg-c-3.3.4-py314h3076274_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/psycopg2-2.9.12-py314h1563c59_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pydantic-core-2.50.2-py314h231d840_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyspnego-0.12.4-py314ha42fa4b_0.conda
@@ -1064,6 +1075,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/pip-25.3-pyh145f28c_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/platformdirs-4.14.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.7.0-pyh5ded981_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg-3.3.4-pyh848bd53_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg2-binary-2.9.12-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ptyprocess-0.7.0-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyasn1-0.6.5-pyh5ded981_0.conda
@@ -1206,6 +1218,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/pip-25.3-pyh145f28c_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/platformdirs-4.14.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.7.0-pyh5ded981_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg-3.3.4-pyh848bd53_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg2-binary-2.9.12-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ptyprocess-0.7.0-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyasn1-0.6.5-pyh5ded981_0.conda
@@ -1309,6 +1322,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/openldap-2.6.13-h2f5043c_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/openssl-3.6.5-h332eb6d_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pandas-2.3.3-py314hc4308db_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-64/psycopg-c-3.3.4-py314hc24493c_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/psycopg2-2.9.12-py314h9276055_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pydantic-core-2.50.2-py314hecac465_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pykrb5-0.10.0-py314hf3b9d4f_0.conda
@@ -1415,6 +1429,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/pip-25.3-pyh145f28c_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/platformdirs-4.14.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.7.0-pyh5ded981_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg-3.3.4-pyh848bd53_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg2-binary-2.9.12-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ptyprocess-0.7.0-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyasn1-0.6.5-pyh5ded981_0.conda
@@ -1517,6 +1532,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/openldap-2.6.13-hf7f56bc_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/openssl-3.6.5-h55eecbc_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pandas-2.3.3-py314ha3d490a_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/psycopg-c-3.3.4-py314h5f75c58_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/psycopg2-2.9.12-py314h96bd916_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pydantic-core-2.50.2-py314h50bbb68_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pykrb5-0.10.0-py314hf047f6e_0.conda
@@ -1617,6 +1633,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/openssl-3.6.5-h781a0a9_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pandas-2.3.3-py313h08cd8bf_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/psutil-7.2.2-py313hd42f317_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/psycopg-c-3.3.4-py313hd8e328e_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/psycopg2-2.9.12-py313h974b2d7_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pydantic-core-2.50.2-py313ha296275_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pykrb5-0.10.0-py313h4a32529_0.conda
@@ -1726,6 +1743,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.7.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prometheus_client-0.26.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prompt-toolkit-3.0.53-pyha770c72_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg-3.3.4-pyh848bd53_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg2-binary-2.9.12-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ptyprocess-0.7.0-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pure_eval-0.2.4-pyhd8ed1ab_0.conda
@@ -1867,6 +1885,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/openssl-3.6.5-he6ad1d5_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pandas-2.3.3-py314h91eeaa4_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/psutil-7.2.2-py314ha22a00f_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/psycopg-c-3.3.4-py314h3076274_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/psycopg2-2.9.12-py314h1563c59_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pydantic-core-2.50.2-py314h231d840_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyspnego-0.12.4-py314ha42fa4b_0.conda
@@ -1975,6 +1994,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.7.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prometheus_client-0.26.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prompt-toolkit-3.0.53-pyha770c72_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg-3.3.4-pyh848bd53_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg2-binary-2.9.12-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ptyprocess-0.7.0-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pure_eval-0.2.4-pyhd8ed1ab_0.conda
@@ -2149,6 +2169,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.7.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prometheus_client-0.26.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prompt-toolkit-3.0.53-pyha770c72_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg-3.3.4-pyh848bd53_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg2-binary-2.9.12-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ptyprocess-0.7.0-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pure_eval-0.2.4-pyhd8ed1ab_0.conda
@@ -2268,6 +2289,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/openssl-3.6.5-h332eb6d_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pandas-2.3.3-py314hc4308db_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/psutil-7.2.2-py314h17af80e_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-64/psycopg-c-3.3.4-py314hc24493c_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/psycopg2-2.9.12-py314h9276055_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pydantic-core-2.50.2-py314hecac465_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pykrb5-0.10.0-py314hf3b9d4f_0.conda
@@ -2401,6 +2423,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.7.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prometheus_client-0.26.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prompt-toolkit-3.0.53-pyha770c72_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg-3.3.4-pyh848bd53_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg2-binary-2.9.12-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ptyprocess-0.7.0-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pure_eval-0.2.4-pyhd8ed1ab_0.conda
@@ -2519,6 +2542,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/openssl-3.6.5-h55eecbc_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pandas-2.3.3-py314ha3d490a_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/psutil-7.2.2-py314hd98292b_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/psycopg-c-3.3.4-py314h5f75c58_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/psycopg2-2.9.12-py314h96bd916_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pydantic-core-2.50.2-py314h50bbb68_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pykrb5-0.10.0-py314hf047f6e_0.conda
@@ -2625,6 +2649,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/openssl-3.6.5-h781a0a9_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pandas-2.3.3-py312hf79963d_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/psutil-7.2.2-py312h1b36aeb_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/psycopg-c-3.3.4-py312hc3ef785_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/psycopg2-2.9.12-py312ha13dc4e_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pydantic-core-2.50.2-py312hc767a74_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pykrb5-0.10.0-py312h5b8417d_0.conda
@@ -2734,6 +2759,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.7.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prometheus_client-0.26.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prompt-toolkit-3.0.53-pyha770c72_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg-3.3.4-pyh848bd53_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg2-binary-2.9.12-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ptyprocess-0.7.0-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pure_eval-0.2.4-pyhd8ed1ab_0.conda
@@ -2878,6 +2904,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/openssl-3.6.5-he6ad1d5_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pandas-2.3.3-py312hdc0efb6_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/psutil-7.2.2-py312h898233f_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/psycopg-c-3.3.4-py312h1f8c3d6_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/psycopg2-2.9.12-py312h0f85bcc_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pydantic-core-2.50.2-py312h67c44d3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyspnego-0.12.4-py312h8025657_0.conda
@@ -2985,6 +3012,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.7.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prometheus_client-0.26.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prompt-toolkit-3.0.53-pyha770c72_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg-3.3.4-pyh848bd53_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg2-binary-2.9.12-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ptyprocess-0.7.0-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pure_eval-0.2.4-pyhd8ed1ab_0.conda
@@ -3160,6 +3188,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.7.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prometheus_client-0.26.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prompt-toolkit-3.0.53-pyha770c72_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg-3.3.4-pyh848bd53_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg2-binary-2.9.12-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ptyprocess-0.7.0-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pure_eval-0.2.4-pyhd8ed1ab_0.conda
@@ -3280,6 +3309,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/openssl-3.6.5-h332eb6d_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pandas-2.3.3-py312h86abcb1_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/psutil-7.2.2-py312hdc27ec5_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-64/psycopg-c-3.3.4-py312h87b31b3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/psycopg2-2.9.12-py312h4f5ae36_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pydantic-core-2.50.2-py312h18719b2_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pykrb5-0.10.0-py312hfacfd9c_0.conda
@@ -3412,6 +3442,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.7.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prometheus_client-0.26.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prompt-toolkit-3.0.53-pyha770c72_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg-3.3.4-pyh848bd53_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg2-binary-2.9.12-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ptyprocess-0.7.0-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pure_eval-0.2.4-pyhd8ed1ab_0.conda
@@ -3531,6 +3562,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/openssl-3.6.5-h55eecbc_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pandas-2.3.3-py312h5978115_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/psutil-7.2.2-py312hbd136b4_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/psycopg-c-3.3.4-py312hf1f24e4_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/psycopg2-2.9.12-py312h94b53c7_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pydantic-core-2.50.2-py312h674f3b0_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pykrb5-0.10.0-py312ha6f11d7_0.conda
@@ -4904,6 +4936,38 @@ packages:
   run_exports: {}
   size: 228778
   timestamp: 1789682033076
+- conda: https://conda.anaconda.org/conda-forge/linux-64/psycopg-c-3.3.4-py312hc3ef785_0.conda
+  sha256: fb1cbf2dc7abc95a68f7e09f200c047d6e4875c07bcee0dbd682b47c934e496c
+  md5: 31f8e3d14c3a7290b836c5fb68d61d9e
+  depends:
+  - __glibc >=2.17,<3.0.a0
+  - libgcc >=14
+  - libpq >=18.3,<19.0a0
+  - python >=3.12,<3.13.0a0
+  - python_abi 3.12.* *_cp312
+  license: LGPL-3.0-only
+  license_family: LGPL
+  purls:
+  - pkg:pypi/psycopg-c?source=hash-mapping
+  run_exports: {}
+  size: 707882
+  timestamp: 1777719866638
+- conda: https://conda.anaconda.org/conda-forge/linux-64/psycopg-c-3.3.4-py313hd8e328e_0.conda
+  sha256: ed68f441f0113be7225be914a7189df6c63e531b64924c5437195f2cbcc6c77d
+  md5: 0805e178046bf3f381e373c2312d5da4
+  depends:
+  - __glibc >=2.17,<3.0.a0
+  - libgcc >=14
+  - libpq >=18.3,<19.0a0
+  - python >=3.13,<3.14.0a0
+  - python_abi 3.13.* *_cp313
+  license: LGPL-3.0-only
+  license_family: LGPL
+  purls:
+  - pkg:pypi/psycopg-c?source=hash-mapping
+  run_exports: {}
+  size: 709536
+  timestamp: 1777719860180
 - conda: https://conda.anaconda.org/conda-forge/linux-64/psycopg2-2.9.12-py312ha13dc4e_2.conda
   sha256: 724ee712dddbf096d70be251b7d7cedba2c64ffb89ae8a877937660d9133029c
   md5: afdec5f506213bfa92abb338599f1b38
@@ -6778,6 +6842,36 @@ packages:
   run_exports: {}
   size: 232673
   timestamp: 1789682030454
+- conda: https://conda.anaconda.org/conda-forge/linux-aarch64/psycopg-c-3.3.4-py312h1f8c3d6_0.conda
+  sha256: d684429c990ee643076c62504c928e84f1eb165e9d63008526fbbd5486f345c2
+  md5: 9bc4abd60738dad5f0a569ac7ede3bb7
+  depends:
+  - libgcc >=14
+  - libpq >=18.3,<19.0a0
+  - python >=3.12,<3.13.0a0
+  - python_abi 3.12.* *_cp312
+  license: LGPL-3.0-only
+  license_family: LGPL
+  purls:
+  - pkg:pypi/psycopg-c?source=hash-mapping
+  run_exports: {}
+  size: 681702
+  timestamp: 1777721052302
+- conda: https://conda.anaconda.org/conda-forge/linux-aarch64/psycopg-c-3.3.4-py314h3076274_0.conda
+  sha256: 81137557ec081063caa4d80a15da227d570717e97a0aa9550931d8e5775fad97
+  md5: 44b6958aa1196d74f490f3f5575582e2
+  depends:
+  - libgcc >=14
+  - libpq >=18.3,<19.0a0
+  - python >=3.14,<3.15.0a0
+  - python_abi 3.14.* *_cp314
+  license: LGPL-3.0-only
+  license_family: LGPL
+  purls:
+  - pkg:pypi/psycopg-c?source=hash-mapping
+  run_exports: {}
+  size: 688490
+  timestamp: 1777721104987
 - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/psycopg2-2.9.12-py312h0f85bcc_2.conda
   sha256: 7b9cd465d673e71cba29267bc0b4a19ac3e79d5d2acd8a6b13e8954e721ef982
   md5: 3c1f31457c388fedab7b5ff5cc9752a5
@@ -9027,6 +9121,21 @@ packages:
   run_exports: {}
   size: 276081
   timestamp: 1785160613307
+- conda: https://conda.anaconda.org/conda-forge/noarch/psycopg-3.3.4-pyh848bd53_0.conda
+  sha256: e8cbb240d4bef72b9e11dbc6436576f374107708a24be3e0ad9a26663779c481
+  md5: 5caff70854d82aa5b51d595b1a2e0e7b
+  depends:
+  - libpq
+  - psycopg-c >=3.3.4,<3.3.5.0a0
+  - python >=3.10
+  - typing-extensions >=4.6
+  license: LGPL-3.0-only
+  license_family: LGPL
+  purls:
+  - pkg:pypi/psycopg?source=hash-mapping
+  run_exports: {}
+  size: 146679
+  timestamp: 1777719871089
 - conda: https://conda.anaconda.org/conda-forge/noarch/psycopg2-binary-2.9.12-pyhd8ed1ab_1.conda
   sha256: d5dad093e3767d251cc1cc557ec873d7d610706adb516b30d2876b2966714f6f
   md5: dd9fc936bf934700aaa06d48d5ff80b6
@@ -11405,6 +11514,36 @@ packages:
   run_exports: {}
   size: 243244
   timestamp: 1789682189096
+- conda: https://conda.anaconda.org/conda-forge/osx-64/psycopg-c-3.3.4-py312h87b31b3_0.conda
+  sha256: f3d53de9bdb5084dad98e3ccdbfac3db3e664b50f7cd477c0a458631ddfe27cb
+  md5: 4605248a82bbbf5a9870980cec6a7fba
+  depends:
+  - __osx >=11.0
+  - libpq >=18.3,<19.0a0
+  - python >=3.12,<3.13.0a0
+  - python_abi 3.12.* *_cp312
+  license: LGPL-3.0-only
+  license_family: LGPL
+  purls:
+  - pkg:pypi/psycopg-c?source=hash-mapping
+  run_exports: {}
+  size: 655228
+  timestamp: 1777720137266
+- conda: https://conda.anaconda.org/conda-forge/osx-64/psycopg-c-3.3.4-py314hc24493c_0.conda
+  sha256: d537e93663a3cafc19cb203dfba0ab42e3d8934c57aee694025b1ceeb81582aa
+  md5: 687286c535d67db49f0322480394b3ee
+  depends:
+  - __osx >=11.0
+  - libpq >=18.3,<19.0a0
+  - python >=3.14,<3.15.0a0
+  - python_abi 3.14.* *_cp314
+  license: LGPL-3.0-only
+  license_family: LGPL
+  purls:
+  - pkg:pypi/psycopg-c?source=hash-mapping
+  run_exports: {}
+  size: 657499
+  timestamp: 1777720161621
 - conda: https://conda.anaconda.org/conda-forge/osx-64/psycopg2-2.9.12-py312h4f5ae36_0.conda
   sha256: f507c6153d60bd83adc8f99a2749bda31030bdec0ee8eca276fed7bf303ca35b
   md5: 588d62f7a33f629280938db84da85378
@@ -13180,6 +13319,38 @@ packages:
   run_exports: {}
   size: 242734
   timestamp: 1789682096175
+- conda: https://conda.anaconda.org/conda-forge/osx-arm64/psycopg-c-3.3.4-py312hf1f24e4_0.conda
+  sha256: b3587efb4592099f6d95732b8b4cde84460a4f79f6e3a506bf6b54ff5ac113d0
+  md5: 26bd51160a7294b7db617a4142e2d85b
+  depends:
+  - __osx >=11.0
+  - libpq >=18.3,<19.0a0
+  - python >=3.12,<3.13.0a0
+  - python >=3.12,<3.13.0a0 *_cpython
+  - python_abi 3.12.* *_cp312
+  license: LGPL-3.0-only
+  license_family: LGPL
+  purls:
+  - pkg:pypi/psycopg-c?source=hash-mapping
+  run_exports: {}
+  size: 647122
+  timestamp: 1777720322343
+- conda: https://conda.anaconda.org/conda-forge/osx-arm64/psycopg-c-3.3.4-py314h5f75c58_0.conda
+  sha256: 5bf52c3bb72bed46b0e912b86c46c7f4f85e9ff7ec4b3460b24ce9d73cf848c6
+  md5: cc1284d1da53429797781d423cbbdffb
+  depends:
+  - __osx >=11.0
+  - libpq >=18.3,<19.0a0
+  - python >=3.14,<3.15.0a0
+  - python >=3.14,<3.15.0a0 *_cp314
+  - python_abi 3.14.* *_cp314
+  license: LGPL-3.0-only
+  license_family: LGPL
+  purls:
+  - pkg:pypi/psycopg-c?source=hash-mapping
+  run_exports: {}
+  size: 650478
+  timestamp: 1777720181643
 - conda: https://conda.anaconda.org/conda-forge/osx-arm64/psycopg2-2.9.12-py312h94b53c7_0.conda
   sha256: 69af980575fe8f761f9bc772530f319e3d76ff232238b81bd44d829d9da4eb19
   md5: 5dec28f412818e5dbcee76fe427d8c61
@@ -13867,6 +14038,7 @@ packages:
   - packaging==26.3
   - pandas==2.3.3
   - psycopg2-binary==2.9.12
+  - psycopg[binary]==3.3.4
   - py-cluster-api==0.8.1
   - pydantic-settings==2.16.2
   - pydantic==2.14.2

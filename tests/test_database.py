@@ -1192,3 +1192,11 @@ def test_get_views_for_dataset_skips_broken_layers_and_matches_legacy_root(db_se
     v.layers[0].broken = True
     db_session.commit()
     assert get_views_for_dataset(db_session, "u", "nrs", "") == []
+
+
+def test_plain_postgresql_url_loads_installed_driver():
+    """SQLAlchemy 2.1 maps postgresql:// to psycopg (v3); it must be installed."""
+    from sqlalchemy.engine import make_url
+    dialect = make_url("postgresql://u:p@host/db").get_dialect()
+    assert dialect.driver == "psycopg"
+    dialect.import_dbapi()
