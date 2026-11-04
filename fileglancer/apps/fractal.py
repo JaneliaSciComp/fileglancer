@@ -11,6 +11,7 @@ the flag-style parameters Fileglancer builds back into the task's args JSON.
 import json
 import re
 import shlex
+import tomllib
 from pathlib import Path
 
 from fileglancer.model import (
@@ -259,26 +260,6 @@ def _drop_title_echo(text: str, task_name: str) -> str:
             lines = lines[i + 1:]
         break
     return "\n".join(lines).strip()
-
-
-def _plain_summary(text: str) -> str:
-    """First prose line of a markdown description, flattened to plain text,
-    for the one-line manifest description. Headings, table rows, and fenced
-    code are skipped; a list marker is dropped. Single * / _ are left alone
-    so globs and snake_case names survive."""
-    in_fence = False
-    for line in text.splitlines():
-        if re.match(r"\s*(```|~~~)", line):
-            in_fence = not in_fence
-            continue
-        if in_fence or not line.strip() or re.match(r"\s*(#{1,6}\s|\|)", line):
-            continue
-        line = re.sub(r"^\s*(?:[-*+]|\d+\.)\s+", "", line)
-        line = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1 (\2)", line)
-        line = re.sub(r"\*\*([^*]+)\*\*", r"\1", line)
-        line = re.sub(r"`([^`]*)`", r"\1", line)
-        return line.strip()
-    return ""
 
 
 def _task_description(task: dict, package_dir: Path) -> str | None:
@@ -651,7 +632,14 @@ class FractalAdapter:
         if not runnables:
             raise ValueError("Fractal manifest contains no tasks")
 
-        description = _plain_summary(runnables[0].description or "") or None
+        # The Fractal manifest has no package description, so use pyproject's.
+        # Not a task's: that would make a multi-task app look like one task.
+        description = None
+        try:
+            project = tomllib.loads((directory / "pyproject.toml").read_text()).get("project", {})
+            description = project.get("description") or None
+        except (OSError, tomllib.TOMLDecodeError):
+            pass
         return AppManifest(
             name=name,
             description=description,

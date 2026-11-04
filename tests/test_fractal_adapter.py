@@ -400,8 +400,18 @@ def test_needs_gpu_surfaced_in_description(fixture_manifest):
     assert not (ep.description or "").count("GPU")
 
 
-def test_manifest_description_from_first_task(fixture_manifest):
-    assert fixture_manifest.description == "Makes a thumbnail of one OME-Zarr image."
+def test_manifest_description_not_taken_from_a_task(fixture_manifest):
+    # A task's description would make the app look like that single task.
+    assert fixture_manifest.description is None
+
+
+def test_manifest_description_from_pyproject(tmp_path):
+    repo = tmp_path / "repo"
+    shutil.copytree(FIXTURE_REPO, repo)
+    (repo / "pyproject.toml").write_text(
+        '[project]\nname = "pkg"\ndescription = "Collection of tasks"\n'
+    )
+    assert FractalAdapter().convert(repo).description == "Collection of tasks"
 
 
 def test_description_keeps_markdown_without_title_echo(tmp_path):
@@ -424,23 +434,6 @@ def test_description_keeps_markdown_without_title_echo(tmp_path):
     assert "### Limitations" in desc
     assert "| a | b |" in desc
     assert "[docs](https://example.org)" in desc
-
-
-def test_plain_summary_flattens_markdown():
-    # The manifest-level description is a one-line plain-text summary.
-    from fileglancer.apps.fractal import _plain_summary
-    text = "Does **something** with `zarr` per [docs](https://example.org).\nMore."
-    assert _plain_summary(text) == (
-        "Does something with zarr per docs (https://example.org).")
-
-
-def test_plain_summary_skips_headings_to_first_prose_line():
-    # A docs_info that opens with a section heading must not summarize to
-    # just the heading text ("Purpose").
-    from fileglancer.apps.fractal import _plain_summary
-    text = "### Purpose\n- Converts a `.czi` file into OME-Zarr.\n| a |\n"
-    assert _plain_summary(text) == "Converts a .czi file into OME-Zarr."
-    assert _plain_summary("## Only A Heading") == ""
 
 
 def test_build_command_round_trip(fixture_manifest):
