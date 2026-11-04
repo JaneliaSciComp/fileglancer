@@ -777,11 +777,15 @@ def _find_manifests_in_repo(repo_dir: Path) -> list[tuple[str, AppManifest]]:
     # Collect any conversion errors rather than raising on the first one, so a
     # single adapter's failure doesn't prevent a later adapter from handling the
     # repo. Errors are only surfaced if no adapter ultimately produced a manifest.
+    # The first adapter that succeeds wins (MANIFEST_ADAPTERS is in priority
+    # order): every adapter result shares manifest_path "", so keeping more
+    # than one would yield duplicate apps (e.g. a Fractal repo with pixi config).
     adapter_errors: list[str] = []
     for adapter in MANIFEST_ADAPTERS:
         try:
             if adapter.can_handle(repo_dir):
                 results.append(("", adapter.convert(repo_dir)))
+                break
         except Exception as e:
             adapter_errors.append(f"{type(adapter).__name__}: {e}")
 
