@@ -990,6 +990,21 @@ def test_get_content_emits_etag_and_last_modified(test_client, temp_dir):
     assert response.headers.get("Last-Modified")
 
 
+def test_content_is_not_browser_cacheable(test_client, temp_dir):
+    """GET and HEAD content carry Cache-Control: no-store.
+
+    Without it, Last-Modified alone lets browsers apply heuristic freshness
+    (about 10% of the file's age), so an old file edited on disk kept showing
+    its previous contents in the file viewer for days.
+    """
+    with open(os.path.join(temp_dir, "nocache.txt"), "w") as f:
+        f.write("v1")
+    for method in (test_client.get, test_client.head):
+        response = method("/api/content/tempdir?subpath=nocache.txt")
+        assert response.status_code == 200
+        assert response.headers.get("Cache-Control") == "no-store"
+
+
 def test_put_if_match_matches_succeeds(test_client, temp_dir):
     """PUT with a current If-Match ETag succeeds."""
     with open(os.path.join(temp_dir, "oc.txt"), "w") as f:
