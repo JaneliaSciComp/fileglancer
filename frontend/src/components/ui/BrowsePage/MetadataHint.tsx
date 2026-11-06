@@ -166,7 +166,7 @@ export default function MetadataHint({ variant }: MetadataHintProps) {
   if (href) {
     return (
       <FgExternalLink
-        className={`${styles.container} group block p-4 rounded-md hover:brightness-95 dark:hover:brightness-125 transition-[filter]`}
+        className={`${styles.container} group block p-4 mb-3 rounded-md hover:brightness-95 dark:hover:brightness-125 transition-[filter]`}
         href={href}
         showIcon={false}
       >
@@ -176,6 +176,8 @@ export default function MetadataHint({ variant }: MetadataHintProps) {
   }
 
   return (
-    <div className={`${styles.container} p-4 rounded-md`}>{notification}</div>
+    <div className={`${styles.container} p-4 mb-3 rounded-md`}>
+      {notification}
+    </div>
   );
 }

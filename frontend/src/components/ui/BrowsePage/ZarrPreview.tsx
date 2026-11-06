@@ -91,7 +91,7 @@ export default function ZarrPreview({
   return (
     <div className="min-w-full p-4 shadow-sm rounded-md bg-primary-light/30">
       {warnings.length > 0 ? (
-        <div className="flex flex-col gap-2 mb-4">
+        <div className="flex flex-col mb-1">
           {warnings.map(warning => (
             <MetadataHint key={warning.case} variant={warning} />
           ))}
