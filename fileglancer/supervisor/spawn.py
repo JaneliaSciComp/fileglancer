@@ -79,6 +79,16 @@ def build_worker_env(base_env: dict, home_dir: str, log_level: str,
     return env
 
 
+def _identity(username: str, privileged: bool) -> tuple[dict, str, int]:
+    """(Popen identity kwargs, home dir, uid) for a child running as ``username``."""
+    if not privileged:
+        return {}, os.path.expanduser("~"), os.getuid()
+    pw = pwd.getpwnam(username)
+    groups = os.getgrouplist(username, pw.pw_gid)
+    return ({"user": pw.pw_uid, "group": pw.pw_gid, "extra_groups": groups,
+             "cwd": pw.pw_dir}, pw.pw_dir, pw.pw_uid)
+
+
 def spawn_worker(username: str, *, privileged: bool,
                  env_passthrough: Optional[list] = None,
                  log_level: str = "INFO", log_format: str = "text",
@@ -92,21 +102,7 @@ def spawn_worker(username: str, *, privileged: bool,
     as the current process's user. The returned socket is the parent's end of
     the control socketpair; the child's end is already closed here.
     """
-    identity_kwargs: dict = {}
-    if privileged:
-        pw = pwd.getpwnam(username)
-        groups = os.getgrouplist(username, pw.pw_gid)
-        identity_kwargs = {
-            "user": pw.pw_uid,
-            "group": pw.pw_gid,
-            "extra_groups": groups,
-            "cwd": pw.pw_dir,
-        }
-        home_dir = pw.pw_dir
-        uid = pw.pw_uid
-    else:
-        home_dir = os.path.expanduser("~")
-        uid = os.getuid()
+    identity_kwargs, home_dir, uid = _identity(username, privileged)
 
     parent_sock, child_sock = socket.socketpair()
     try:
@@ -130,3 +126,35 @@ def spawn_worker(username: str, *, privileged: bool,
 
     parent_sock.setblocking(True)
     return process, parent_sock, uid
+
+
+DATASERVER_HEADER = "X-Fg-Resolved-Path"
+
+
+def spawn_dataserver(username: str, listen_fd: int, *, privileged: bool,
+                     env_passthrough: Optional[list] = None,
+                     log_level: str = "INFO", log_format: str = "text",
+                     worker_python: str = sys.executable,
+                     ) -> tuple[subprocess.Popen, int]:
+    """Spawn one zarrbridge data server on an already-listening socket.
+
+    Same identity and environment rules as ``spawn_worker``. The supervisor
+    binds the socket (so it controls the path and permissions) and the child
+    only serves on it. ``--allow-prefix /`` is deliberate: the process runs as
+    the user, so the uid is the containment, and the trusted-path header is
+    only ever set by the web app after it resolved the path inside a share.
+    """
+    identity_kwargs, home_dir, uid = _identity(username, privileged)
+    env = build_worker_env(os.environ, home_dir, log_level, listen_fd,
+                           passthrough=env_passthrough, log_format=log_format)
+    process = subprocess.Popen(
+        [worker_python, "-m", "zarrbridge", "--log-format", log_format,
+         "serve", "--fd", str(listen_fd),
+         "--trusted-path-header", DATASERVER_HEADER,
+         "--allow-prefix", "/", "--no-browse", "--build-auto", "on"],
+        env=env,
+        pass_fds=(listen_fd,),
+        stderr=subprocess.PIPE,
+        **identity_kwargs,
+    )
+    return process, uid

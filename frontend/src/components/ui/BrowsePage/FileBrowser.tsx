@@ -25,7 +25,10 @@ import type { OutletContextType } from '@/layouts/BrowseLayout';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
 import { useHandleDownload } from '@/hooks/useHandleDownload';
 import { useHandleView } from '@/hooks/useHandleView';
-import { areZarrMetadataFilesPresent } from '@/queries/zarrQueries';
+import {
+  areZarrMetadataFilesPresent,
+  useZarrbridgeStatusQuery
+} from '@/queries/zarrQueries';
 import { getBrowserRenderableType } from '@/utils/fileTypes';
 import { detectN5, getN5DetectionSignals } from '@/queries/n5Queries';
 import { makeMapKey } from '@/utils';
@@ -96,6 +99,15 @@ export default function FileBrowser({
   const readOnly = isReadOnlyFsp(fileQuery.data?.currentFileSharePath);
 
   const isZarrDir = areZarrMetadataFilesPresent(files);
+  // An image file (TIFF, MRC, ...) served as virtual OME-Zarr through
+  // zarrbridge, or any group inside it: the backend flags every such node.
+  const isVirtualZarr =
+    isZarrDir && fileQuery.data?.currentFileOrFolder?.virtual_zarr === true;
+  const zarrbridgeStatusQuery = useZarrbridgeStatusQuery(
+    fileQuery.data?.currentFileSharePath?.name,
+    fileQuery.data?.currentFileOrFolder?.path,
+    isVirtualZarr
+  );
   const isN5Dir = detectN5(files);
 
   const hasZarrExt = currentName.endsWith('.zarr');
@@ -254,6 +266,14 @@ export default function FileBrowser({
   return (
     <>
       <Crumbs />
+      {isVirtualZarr && zarrbridgeStatusQuery.data ? (
+        <MetadataHint
+          variant={{
+            case: 'virtual-zarr',
+            state: zarrbridgeStatusQuery.data.levels?.state
+          }}
+        />
+      ) : null}
       {isZarrDir && zarrMetadataQuery.isPending ? (
         <div className="flex shadow-sm rounded-md w-full min-h-96 bg-surface animate-appear animate-pulse animate-delay-150 opacity-0">
           <Typography className="place-self-center text-center w-full">
@@ -345,7 +365,8 @@ export default function FileBrowser({
           </Typography>
         </div>
       ) : fileQuery.data.currentFileOrFolder &&
-        !fileQuery.data.currentFileOrFolder.is_dir ? (
+        !fileQuery.data.currentFileOrFolder.is_dir &&
+        !isZarrDir ? (
         // If current item is a file, render the FileViewer instead of the file browser
         <div className="relative flex-1 min-h-0 overflow-hidden">
           <div className="absolute inset-0">

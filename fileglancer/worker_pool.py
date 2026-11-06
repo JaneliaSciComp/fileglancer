@@ -252,6 +252,7 @@ class SupervisedWorkerPool:
         self.mode = settings.supervisor_mode  # "external" or "embedded"
         self._idle: list[socket.socket] = []
         self._slots = asyncio.Semaphore(self.POOL_SIZE)
+        self._dataserver_cache: dict[str, tuple[str, float]] = {}  # user -> (socket path, expiry)
         self._reconnect_task: Optional[asyncio.Task] = None
         self._child: Optional[subprocess.Popen] = None
         self._lock_file = None
@@ -455,6 +456,40 @@ class SupervisedWorkerPool:
         """Acquire a lease, run one action, release the lease."""
         async with self.lease(username) as lease:
             return await lease.execute(action, **kwargs)
+
+    # How long a user's zarrbridge socket path is reused without asking the
+    # supervisor again. Viewers fetch chunks in bursts; one acquire per burst
+    # is plenty to keep the idle reaper informed.
+    DATASERVER_CACHE_SECONDS = 5.0
+
+    def _acquire_dataserver_blocking(self, sock: socket.socket, username: str) -> dict:
+        sock.settimeout(self.settings.supervisor_acquire_timeout + 5)
+        send_msg(sock, {"op": "acquire", "kind": "dataserver", "user": username})
+        reply, fds = recv_msg(sock)
+        for fd in fds:
+            os.close(fd)
+        if reply is None:
+            raise ConnectionError("Supervisor closed connection")
+        return reply
+
+    async def dataserver(self, username: str) -> str:
+        """The unix socket of this user's zarrbridge, spawned on first use.
+
+        Called before every proxied request; the acquire is how the supervisor
+        learns the server is still in use, so the answer is cached only briefly.
+        """
+        cached = self._dataserver_cache.get(username)
+        if cached and cached[1] > time.monotonic():
+            return cached[0]
+        reply = await self._call(lambda sock: self._acquire_dataserver_blocking(sock, username))
+        if not reply.get("ok"):
+            code = reply.get("code", "error")
+            status = 403 if code in ("invalid_user", "denied") else 503
+            raise WorkerError(f"Data server unavailable ({code}): {reply.get('error')}",
+                              status_code=status)
+        self._dataserver_cache[username] = (reply["socket"],
+                                            time.monotonic() + self.DATASERVER_CACHE_SECONDS)
+        return reply["socket"]
 
     async def status(self) -> dict:
         """Fetch the supervisor's status payload."""

@@ -423,6 +423,43 @@ export function useZarrMetadataQuery(
   });
 }
 
+/**
+ * zarrbridge's status for an image file served as virtual OME-Zarr. The
+ * `_status` key is reserved by zarrbridge and proxied like any other key.
+ */
+export type ZarrbridgeStatus = {
+  classification?: string;
+  reader?: string | null;
+  levels?: {
+    state: string;
+    built?: number;
+    planned?: number | null;
+    progress?: number;
+    reason?: string;
+  };
+};
+
+const BUILDING_STATES = new Set(['indexing', 'queued', 'building']);
+
+export function useZarrbridgeStatusQuery(
+  fspName: string | undefined,
+  path: string | undefined,
+  enabled: boolean
+): UseQueryResult<ZarrbridgeStatus, Error> {
+  return useQuery({
+    queryKey: ['zarr', 'zarrbridge-status', fspName || '', path || ''],
+    queryFn: async () =>
+      (await fetchFileAsJson(fspName!, `${path}/_status`)) as ZarrbridgeStatus,
+    enabled: enabled && !!fspName && !!path,
+    // Keep polling while a pyramid is being built so the badge flips over.
+    refetchInterval: query => {
+      const state = query.state.data?.levels?.state;
+      return state && BUILDING_STATES.has(state) ? 5000 : false;
+    },
+    retry: false
+  });
+}
+
 async function fetchOmeZarrThumbnail(
   omeZarrUrl: string,
   signal: AbortSignal

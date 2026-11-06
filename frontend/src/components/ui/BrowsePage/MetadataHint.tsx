@@ -12,6 +12,8 @@ type MetadataHintVariant =
   | { case: 'zarr-v2-no-multiscales' }
   | { case: 'zarr-v3-no-multiscales' }
   | { case: 'zarr-query-error'; errorMessage?: string }
+  // Zarr - an image file served as virtual OME-Zarr by zarrbridge
+  | { case: 'virtual-zarr'; state?: string }
   // Zarr - metadata is valid, but the layout will make viewing awkward
   | { case: 'zarr-single-level'; size: string }
   | {
@@ -55,6 +57,22 @@ const n5Hint: HintConfig = {
   href: 'https://fileglancer-docs.janelia.org/features/image-support/#when-the-n5-preview-panel-appears'
 };
 
+function virtualZarrDescription(state: string | undefined): string {
+  switch (state) {
+    case 'multiscale':
+      return `This image file is served as OME-Zarr without conversion. A multiscale pyramid is cached beside it, so viewers can zoom out quickly.`;
+    case 'indexing':
+    case 'queued':
+    case 'building':
+      return `This image file is served as OME-Zarr without conversion. A multiscale pyramid is being built in the background; until it is done, viewers read full resolution at every zoom level.`;
+    case 'failed':
+    case 'unservable':
+      return `This image file is served as OME-Zarr without conversion, but no multiscale pyramid could be built (${state}). Viewers read full resolution at every zoom level.`;
+    default:
+      return `This image file is served as OME-Zarr without conversion. Only the native resolution is available, so viewers read full resolution at every zoom level.`;
+  }
+}
+
 function getHintConfig(variant: MetadataHintVariant): HintConfig {
   switch (variant.case) {
     case 'zarr-extension-no-markers':
@@ -79,6 +97,12 @@ function getHintConfig(variant: MetadataHintVariant): HintConfig {
         description: variant.errorMessage
           ? `Could not read Zarr metadata. ${variant.errorMessage}`
           : 'Could not read Zarr metadata.'
+      };
+    case 'virtual-zarr':
+      return {
+        kind: 'info',
+        title: 'Virtual OME-Zarr',
+        description: virtualZarrDescription(variant.state)
       };
     case 'zarr-single-level':
       return {
@@ -122,32 +146,21 @@ export default function MetadataHint({ variant }: MetadataHintProps) {
   const { kind, title, description, href } = getHintConfig(variant);
   const styles = getNotificationStyles(kind);
 
-  const descriptionContent = (
-    <span className="inline-flex items-center gap-1">
-      <span className="group-hover:underline">{description}</span>
-    </span>
+  // Only the description is a link, so the rest of the box stays selectable.
+  const message = href ? (
+    <FgExternalLink href={href} size="sm">
+      {description}
+    </FgExternalLink>
+  ) : (
+    description
   );
-
-  const notification = (
-    <NotificationItem
-      notification={{ id: 0, type: kind, title, message: descriptionContent }}
-      showDismissButton={false}
-    />
-  );
-
-  if (href) {
-    return (
-      <FgExternalLink
-        className={`${styles.container} group block p-4 rounded-md hover:brightness-95 dark:hover:brightness-125 transition-[filter]`}
-        href={href}
-        showIcon={false}
-      >
-        {notification}
-      </FgExternalLink>
-    );
-  }
 
   return (
-    <div className={`${styles.container} p-4 rounded-md`}>{notification}</div>
+    <div className={`${styles.container} p-4 mb-3 rounded-md`}>
+      <NotificationItem
+        notification={{ id: 0, type: kind, title, message }}
+        showDismissButton={false}
+      />
+    </div>
   );
 }

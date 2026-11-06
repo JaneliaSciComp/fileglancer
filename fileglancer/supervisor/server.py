@@ -25,7 +25,7 @@ from collections import deque
 from fileglancer.supervisor import PROTOCOL_VERSION
 from fileglancer.supervisor.config import SupervisorConfig
 from fileglancer.supervisor.protocol import recv_msg, send_msg
-from fileglancer.supervisor.spawn import spawn_worker
+from fileglancer.supervisor.spawn import spawn_dataserver, spawn_worker
 
 logger = logging.getLogger("fileglancer.supervisor")
 
@@ -76,6 +76,27 @@ class Worker:
         return self.process.pid
 
 
+class DataServer:
+    """One per-user zarrbridge process serving on a supervisor-bound socket.
+
+    Unlike workers it is not leased: the web app connects to the socket
+    directly, as often as it likes, and re-acquires before each request so
+    the supervisor sees it is in use.
+    """
+
+    def __init__(self, user: str, uid: int, process, socket_path: str):
+        self.user = user
+        self.uid = uid
+        self.process = process
+        self.socket_path = socket_path
+        self.spawned_at = time.monotonic()
+        self.last_used = time.monotonic()
+
+    @property
+    def pid(self):
+        return self.process.pid
+
+
 class ClientConn:
     def __init__(self, sock: socket.socket):
         self.sock = sock
@@ -90,6 +111,7 @@ class Supervisor:
         self.privileged = not cfg.unprivileged
         self._lock = threading.Condition()
         self._workers: dict[str, list[Worker]] = {}
+        self._dataservers: dict[str, DataServer] = {}
         self._waiters: dict[str, deque] = {}
         self._queued: dict[str, int] = {}
         self._spawns_total = 0
@@ -202,15 +224,25 @@ class Supervisor:
         with self._lock:
             workers = [w for ws in self._workers.values() for w in ws]
             self._workers.clear()
+            dataservers = list(self._dataservers.values())
+            self._dataservers.clear()
             self._lock.notify_all()
         for w in workers:
             self._ask_shutdown(w)
+        for d in dataservers:
+            d.process.terminate()
         deadline = time.monotonic() + 10
         for w in workers:
             try:
                 w.process.wait(timeout=max(0.1, deadline - time.monotonic()))
             except Exception:
                 w.process.kill()
+        for d in dataservers:
+            try:
+                d.process.wait(timeout=max(0.1, deadline - time.monotonic()))
+            except Exception:
+                d.process.kill()
+            self._unlink(d.socket_path)
 
     # -- client connections ---------------------------------------------------
 
@@ -275,9 +307,10 @@ class Supervisor:
     # -- acquire --------------------------------------------------------------
 
     def _acquire(self, conn: ClientConn, msg: dict) -> tuple[dict, int | None]:
-        if msg.get("kind") != "worker":
+        kind = msg.get("kind")
+        if kind not in ("worker", "dataserver"):
             return {"ok": False, "code": "unsupported_kind",
-                    "error": f"unsupported kind: {msg.get('kind')}"}, None
+                    "error": f"unsupported kind: {kind}"}, None
         user = msg.get("user")
         err = self._validate_user(user)
         if err is not None:
@@ -285,6 +318,8 @@ class Supervisor:
             logger.info("acquire denied user=%s client=%s code=%s: %s",
                         user, conn.pid, code, text)
             return {"ok": False, "code": code, "error": text}, None
+        if kind == "dataserver":
+            return self._acquire_dataserver(conn, user), None
 
         timeout = max(0.0, float(msg.get("timeout_ms", 10000)) / 1000.0)
         deadline = time.monotonic() + timeout
@@ -379,6 +414,99 @@ class Supervisor:
     def _lru_idle_worker(self) -> Worker | None:
         idle = [w for ws in self._workers.values() for w in ws if w.state == "idle"]
         return min(idle, key=lambda w: w.last_idle) if idle else None
+
+    # -- data servers ---------------------------------------------------------
+
+    def _acquire_dataserver(self, conn: ClientConn, user: str) -> dict:
+        """Return the user's zarrbridge socket, spawning the server if needed.
+
+        The supervisor binds and listens before spawning, so the client may
+        connect at once: connections queue in the backlog until uvicorn is up.
+        """
+        with self._lock:
+            ds = self._dataservers.get(user)
+            if ds is not None and ds.process.poll() is not None:
+                self._remove_dataserver_locked(ds, f"exited rc={ds.process.returncode}")
+                ds = None
+            if ds is None:
+                try:
+                    ds = self._spawn_dataserver(user, conn)
+                except Exception as e:
+                    logger.exception("dataserver spawn failed for %s", user)
+                    return {"ok": False, "code": "spawn_failed", "error": str(e)}
+                self._dataservers[user] = ds
+            ds.last_used = time.monotonic()
+            return {"ok": True, "socket": ds.socket_path, "pid": ds.pid}
+
+    def _dataserver_socket_path(self, user: str) -> str:
+        return os.path.join(os.path.dirname(self.cfg.socket_path) or ".", f"zb-{user}.sock")
+
+    def _spawn_dataserver(self, user: str, conn: ClientConn) -> DataServer:
+        path = self._dataserver_socket_path(user)
+        self._unlink(path)
+        listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            listener.bind(path)
+            if self.cfg.socket_group:
+                os.chown(path, -1, grp.getgrnam(self.cfg.socket_group).gr_gid)
+                os.chmod(path, 0o660)
+            listener.listen(128)
+            process, uid = spawn_dataserver(
+                user, listener.fileno(),
+                privileged=self.privileged,
+                env_passthrough=self.cfg.env_passthrough,
+                log_level=self.cfg.log_level,
+                log_format=self.cfg.log_format,
+                worker_python=self.cfg.worker_python,
+            )
+        except Exception:
+            self._unlink(path)
+            raise
+        finally:
+            listener.close()
+        ds = DataServer(user, uid, process, path)
+        self._spawns_total += 1
+        logger.info("spawned dataserver user=%s pid=%s uid=%s socket=%s client=%s",
+                    user, process.pid, uid, path, conn.pid)
+        threading.Thread(target=self._dataserver_waiter, args=(ds,),
+                         daemon=True, name=f"dataserver-{process.pid}").start()
+        threading.Thread(target=self._forward_stderr, args=(ds,),
+                         daemon=True, name=f"stderr-{process.pid}").start()
+        return ds
+
+    def _dataserver_waiter(self, ds: DataServer) -> None:
+        ds.process.wait()
+        self._remove_dataserver(ds, f"exited rc={ds.process.returncode}")
+
+    def _remove_dataserver(self, ds: DataServer, reason: str) -> None:
+        with self._lock:
+            self._remove_dataserver_locked(ds, reason)
+
+    def _remove_dataserver_locked(self, ds: DataServer, reason: str) -> None:
+        if self._dataservers.get(ds.user) is not ds:
+            return  # already removed
+        del self._dataservers[ds.user]
+        logger.info("dataserver removed user=%s pid=%s reason=%s", ds.user, ds.pid, reason)
+        if ds.process.poll() is None:
+            threading.Thread(target=self._kill_process, args=(ds.process,),
+                             daemon=True).start()
+        self._unlink(ds.socket_path)
+
+    @staticmethod
+    def _unlink(path: str) -> None:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+    @staticmethod
+    def _kill_process(process) -> None:
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except Exception:
+            process.kill()
+            process.wait()
 
     # -- validation -----------------------------------------------------------
 
@@ -533,6 +661,9 @@ class Supervisor:
                             stale.append((w, "client disconnected"))
                 for w, reason in stale:
                     self._remove_worker_locked(w, reason)
+                for ds in list(self._dataservers.values()):
+                    if now - ds.last_used > self.cfg.idle_timeout:
+                        self._remove_dataserver_locked(ds, "idle timeout")
 
     # -- status ---------------------------------------------------------------
 
@@ -555,10 +686,16 @@ class Supervisor:
                         "age": round(now - w.spawned_at, 1),
                     })
             queued = {u: n for u, n in self._queued.items() if n}
+            dataservers = [{
+                "user": d.user, "pid": d.pid, "uid": d.uid, "socket": d.socket_path,
+                "idle_for": round(now - d.last_used, 1),
+                "age": round(now - d.spawned_at, 1),
+            } for d in self._dataservers.values()]
             return {
                 "ok": True,
                 "privileged": self.privileged,
                 "workers": workers,
+                "dataservers": dataservers,
                 "queued": queued,
                 "leases": leases,
                 "spawns_total": self._spawns_total,

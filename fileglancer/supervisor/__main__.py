@@ -37,6 +37,9 @@ def _status(socket_path: str, as_json: bool) -> int:
     for w in status["workers"]:
         print(f"  {w['user']:<16} pid={w['pid']:<8} {w['state']:<6} "
               f"lease={w['lease'] or '-':<10} idle_for={w['idle_for']}s age={w['age']}s")
+    for d in status.get("dataservers", []):
+        print(f"  {d['user']:<16} pid={d['pid']:<8} dataserver "
+              f"idle_for={d['idle_for']}s age={d['age']}s {d['socket']}")
     for user, n in status["queued"].items():
         print(f"  queued: {user} x{n}")
     return 0
