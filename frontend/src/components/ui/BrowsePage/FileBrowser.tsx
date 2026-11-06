@@ -99,10 +99,10 @@ export default function FileBrowser({
   const readOnly = isReadOnlyFsp(fileQuery.data?.currentFileSharePath);
 
   const isZarrDir = areZarrMetadataFilesPresent(files);
-  // An image file (TIFF, MRC, ...) listed with synthetic Zarr entries: the
-  // backend serves it as virtual OME-Zarr through zarrbridge.
+  // An image file (TIFF, MRC, ...) served as virtual OME-Zarr through
+  // zarrbridge, or any group inside it: the backend flags every such node.
   const isVirtualZarr =
-    isZarrDir && fileQuery.data?.currentFileOrFolder?.is_dir === false;
+    isZarrDir && fileQuery.data?.currentFileOrFolder?.virtual_zarr === true;
   const zarrbridgeStatusQuery = useZarrbridgeStatusQuery(
     fileQuery.data?.currentFileSharePath?.name,
     fileQuery.data?.currentFileOrFolder?.path,

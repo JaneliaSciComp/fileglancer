@@ -14,6 +14,9 @@ type FileOrFolder = {
     fsp_name: string;
     subpath: string;
   } | null;
+  // Set by the backend on an image file served as virtual OME-Zarr and on
+  // every node inside it.
+  virtual_zarr?: boolean;
 };
 
 type FileSharePath = {

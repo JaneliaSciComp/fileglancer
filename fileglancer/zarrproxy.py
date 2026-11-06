@@ -34,6 +34,8 @@ SUFFIXES = frozenset({
     ".dcm", ".nii", ".nii.gz", ".nrrd", ".nhdr", ".fits", ".fit", ".fts",
 })
 
+STATUS_KEY = "_status"  # zarrbridge's reserved key for the file's build status
+
 _PASS_UP = ("range", "if-none-match", "accept-encoding")
 _PASS_DOWN = ("content-type", "content-length", "content-range", "accept-ranges",
               "etag", "cache-control", "x-zarrbridge-source", "x-zarrbridge-read")
@@ -86,6 +88,8 @@ async def proxy(socket_path: str, abs_path: str, key: str, request: Request) -> 
     """Stream one GET/HEAD for ``key`` of the file at ``abs_path``."""
     headers = {k: v for k, v in request.headers.items() if k.lower() in _PASS_UP}
     headers.update(_path_header(abs_path))
+    if posixpath.basename(key) == STATUS_KEY:
+        key = STATUS_KEY  # status is per file; reachable from any level of the hierarchy
     client = _client(socket_path)
     req = client.build_request(request.method, "/" + quote(key), headers=headers)
     try:
@@ -141,10 +145,11 @@ async def virtual_node(socket_path: str, abs_path: str, info: dict, key: str = "
             images = status.json().get("images", []) if status.status_code == 200 else []
         files = _entries(info, key, meta, images, len(resp.content))
         if not key:
-            return {"info": info, "files": files}
+            return {"info": {**info, "virtual_zarr": True}, "files": files}
         node = {**info, "name": posixpath.basename(key), "path": posixpath.join(info["path"], key),
                 "absolute_path": posixpath.join(info.get("absolute_path") or "", key),
-                "is_dir": True, "size": 0, "is_symlink": False, "symlink_target_fsp": None}
+                "is_dir": True, "size": 0, "is_symlink": False, "symlink_target_fsp": None,
+                "virtual_zarr": True}
         return {"info": node, "files": files}
     if not key:
         raise ValueError(f"zarrbridge {resp.status_code}: {resp.text[:200]}")
@@ -154,5 +159,5 @@ async def virtual_node(socket_path: str, abs_path: str, info: dict, key: str = "
     leaf = {**info, "name": posixpath.basename(key), "path": posixpath.join(info["path"], key),
             "absolute_path": posixpath.join(info.get("absolute_path") or "", key),
             "is_dir": False, "size": int(head.headers.get("content-length") or 0),
-            "is_symlink": False, "symlink_target_fsp": None}
+            "is_symlink": False, "symlink_target_fsp": None, "virtual_zarr": True}
     return {"info": leaf}

@@ -102,7 +102,7 @@ class TestVirtualZarr:
         r = zarr_app.get("/api/files/share", params={"subpath": "data/tiny.tif"})
         assert r.status_code == 200, r.text
         body = r.json()
-        assert body["info"]["is_dir"] is False
+        assert body["info"]["is_dir"] is False and body["info"]["virtual_zarr"] is True
         names = {f["name"]: f for f in body["files"]}
         assert "zarr.json" in names and names["zarr.json"]["path"] == "data/tiny.tif/zarr.json"
         assert names["0"]["is_dir"] is True
@@ -112,7 +112,11 @@ class TestVirtualZarr:
         assert r.status_code == 200, r.text
         body = r.json()
         assert body["info"]["is_dir"] is True and body["info"]["path"] == "data/tiny.tif/0"
+        assert body["info"]["virtual_zarr"] is True
         assert [f["name"] for f in body["files"]] == ["zarr.json"]
+        # Status is per file and reachable from inside the hierarchy too.
+        nested = zarr_app.get("/api/content/share/data/tiny.tif/0/_status")
+        assert nested.status_code == 200 and nested.json()["reader"] in ("tiff", "refkv")
         r = zarr_app.get("/api/files/share", params={"subpath": "data/tiny.tif/zarr.json"})
         assert r.status_code == 200, r.text
         assert r.json()["info"]["is_dir"] is False and r.json()["info"]["size"] > 0
