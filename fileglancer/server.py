@@ -45,7 +45,8 @@ from fileglancer.store import ReadStore, StoreError, StoreRedirect, WorkerStore,
 from fileglancer.log import AccessLogMiddleware
 from fileglancer.logconf import configure_logging, disable_uvicorn_access_log
 from fileglancer.worker_pool import (
-    WorkerPool, WorkerError, WorkerDead, prepare_worker_request)
+    LegacyWorkerPool, SupervisedWorkerPool, WorkerError, WorkerDead,
+    prepare_worker_request)
 from fileglancer.user_worker import serialize_job_for_worker
 from fileglancer import sshkeys
 
@@ -460,23 +461,30 @@ def create_app(settings):
     # Define ui_dir for serving static files and SPA
     ui_dir = PathLib(__file__).parent / "ui"
 
-    # Per-user persistent worker pool. Always used in server mode; in CLI mode
-    # actions run directly in-process since the local user is the only user.
+    # Per-user worker dispatch, selected by supervisor_mode:
+    #   external/embedded — lease workers from a (possibly embedded) supervisor
+    #   legacy            — fork+setuid in this process (rollback path)
+    #   inprocess         — run actions directly in this process (debugging)
     # use_access_flags preconditions are validated in the lifespan handler
     # below so failures surface as clean startup errors (not import-time
     # tracebacks that confuse uvicorn's --reload watcher).
-    worker_pool = WorkerPool(settings) if not settings.cli_mode else None
+    if settings.supervisor_mode == "inprocess":
+        worker_pool = None
+    elif settings.supervisor_mode == "legacy":
+        worker_pool = LegacyWorkerPool(settings)
+    else:
+        worker_pool = SupervisedWorkerPool(settings)
 
     async def _worker_exec(username: str, action: str, **kwargs):
         """Dispatch an action to the per-user worker and return the result.
 
-        In server mode dispatches to the persistent worker pool. Workers
-        setuid to the target user iff use_access_flags=True (which requires
-        running as root). Without use_access_flags they run as the parent
-        process's user — useful for debugging the worker code path locally.
+        Workers run as the target user iff use_access_flags=True (which
+        requires a privileged supervisor, or root in legacy mode). Without
+        use_access_flags they run as the server's own user — fine for
+        personal deployments and local debugging of the worker code path.
 
-        In CLI mode (settings.cli_mode=True) the action runs directly in the
-        current process, since CLI is single-user.
+        In in-process mode the action runs directly in the current process,
+        since that mode is single-user.
 
         If the worker opens a file and passes back a file descriptor (e.g.
         open_file, s3_open_object), the response dict will contain a
@@ -487,8 +495,7 @@ def create_app(settings):
         """
         if worker_pool is not None:
             try:
-                worker = await worker_pool.get_worker(username)
-                return await worker.execute(action, **kwargs)
+                return await worker_pool.execute(username, action, **kwargs)
             except WorkerDead as e:
                 logger.error(f"Worker dead for {username}: {e}")
                 raise HTTPException(status_code=503, detail="Service temporarily unavailable")
@@ -497,7 +504,7 @@ def create_app(settings):
                     logger.error(f"Worker error for {username} action={action}: {e}")
                 raise HTTPException(status_code=e.status_code, detail=str(e))
         else:
-            # CLI mode: run action directly in-process (single-user, no setuid)
+            # In-process mode: run action directly (single-user, no setuid)
             from fileglancer.user_worker import _ACTIONS, WorkerContext
             handler = _ACTIONS.get(action)
             if handler is None:
@@ -642,29 +649,43 @@ def create_app(settings):
         # Configure logging based on the log level/format in the settings
         configure_logging(settings.log_level, settings.log_format)
 
-        # use_access_flags requires root + non-CLI mode. Workers themselves
-        # are used in any server mode (CLI mode runs in-process).
+        def _config_error(msg: str):
+            print(f"\n❌ Configuration Error:\n  {msg}\n", file=sys.stderr)
+            raise RuntimeError(msg)
+
+        # use_access_flags needs a mode that can actually setuid: a privileged
+        # external supervisor (verified after connecting, below) or legacy
+        # root forking. In-process dispatch can never serve multiple users.
         if settings.use_access_flags:
-            if settings.cli_mode:
-                msg = (
-                    "use_access_flags=True cannot be used with the `fileglancer` "
-                    "CLI (single-user mode).\n"
-                    "  Fix: remove use_access_flags from your config, or start "
-                    "the server directly with uvicorn."
-                )
-                print(f"\n❌ Configuration Error:\n  {msg}\n", file=sys.stderr)
-                raise RuntimeError(msg)
-            if os.geteuid() != 0:
-                msg = (
-                    f"use_access_flags=True requires running the server as root, "
-                    f"but the current user is uid={os.geteuid()}.\n"
-                    f"  Fix: either run as root (so per-user workers can setuid "
-                    f"for file access), or set use_access_flags=false (workers "
-                    f"will then run as the current user — fine for local "
-                    f"development but not for serving multiple users)."
-                )
-                print(f"\n❌ Configuration Error:\n  {msg}\n", file=sys.stderr)
-                raise RuntimeError(msg)
+            if settings.supervisor_mode == "inprocess":
+                _config_error(
+                    "use_access_flags=True cannot be used with "
+                    "supervisor_mode=inprocess (single-user mode).\n"
+                    "  Fix: remove use_access_flags from your config, or use "
+                    "an external supervisor.")
+            if settings.supervisor_mode == "legacy" and os.geteuid() != 0:
+                _config_error(
+                    f"use_access_flags=True with supervisor_mode=legacy requires "
+                    f"running the server as root, but the current user is "
+                    f"uid={os.geteuid()}.\n"
+                    f"  Fix: use supervisor_mode=external with a root "
+                    f"fileglancer-supervisor, or set use_access_flags=false.")
+        if os.geteuid() == 0 and settings.supervisor_mode != "legacy":
+            logger.warning(
+                "Running as root is no longer required: workers are spawned "
+                "by fileglancer-supervisor. Run the server as an unprivileged "
+                "service account.")
+
+        for deprecated in ("worker_pool_max_workers", "worker_pool_idle_timeout"):
+            if deprecated in settings.model_fields_set:
+                logger.warning(
+                    f"Setting {deprecated} is deprecated: it now belongs to "
+                    f"the supervisor (forwarded automatically in embedded mode)")
+        if settings.apps.worker_env_passthrough and settings.supervisor_mode == "external":
+            logger.warning(
+                "apps.worker_env_passthrough has no effect with an external "
+                "supervisor: pass --env-passthrough to fileglancer-supervisor "
+                "instead")
 
         def mask_password(url: str) -> str:
             """Mask password in database URL for logging"""
@@ -730,10 +751,21 @@ def create_app(settings):
         else:
             logger.debug(f"No notifications file found at {notifications_file}")
 
-        # Start worker pool eviction loop (only when using access flags)
-        if worker_pool is not None:
+        # Start the worker pool
+        if isinstance(worker_pool, SupervisedWorkerPool):
+            await worker_pool.start()
+            if settings.use_access_flags and not worker_pool.hello.get("privileged"):
+                await worker_pool.stop()
+                _config_error(
+                    f"use_access_flags=True requires a privileged supervisor, "
+                    f"but the one on {settings.supervisor_socket} "
+                    f"(mode={settings.supervisor_mode}) reports privileged=false.\n"
+                    f"  Fix: run fileglancer-supervisor as root, or set "
+                    f"use_access_flags=false.")
+            logger.info("Worker pool started (supervised)")
+        elif worker_pool is not None:
             await worker_pool.start_eviction_loop()
-            logger.info("Worker pool started")
+            logger.info("Worker pool started (legacy)")
 
         # Wire the apps module to dispatch through the persistent worker
         # pool (or in-process in dev mode).
@@ -758,7 +790,10 @@ def create_app(settings):
         # Cleanup: shut down all workers
         if worker_pool is not None:
             try:
-                await worker_pool.shutdown_all()
+                if isinstance(worker_pool, SupervisedWorkerPool):
+                    await worker_pool.stop()
+                else:
+                    await worker_pool.shutdown_all()
                 logger.info("Worker pool shut down")
             except Exception as e:
                 logger.warning(f"Error shutting down worker pool: {e}")

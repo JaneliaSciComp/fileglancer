@@ -1,22 +1,27 @@
 """Persistent per-user worker subprocess.
 
 This module is the entry point for long-lived worker subprocesses spawned by
-WorkerPool. With use_access_flags=True (production, requires root), each
-worker setuids to the target user at fork time. Without use_access_flags
-the worker runs as the parent process's user. Either way the worker handles
-all user-scoped operations: file I/O, cluster jobs, git ops, SSH keys, etc.
+the supervisor (or, in legacy mode, by the web app directly). In a privileged
+deployment each worker runs with the target user's uid/gid set at fork time;
+otherwise the worker runs as the spawning process's user. Either way the
+worker handles all user-scoped operations: file I/O, cluster jobs, git ops,
+SSH keys, etc.
 
-Protocol:
-    - IPC over a Unix socketpair (fd passed via FGC_WORKER_FD env var)
-    - Messages are length-prefixed JSON: 4-byte big-endian length + JSON body
-    - Worker reads requests, dispatches to action handlers, writes responses
-    - {"action": "shutdown"} triggers a clean exit
+Protocol (see fileglancer.supervisor.protocol for framing):
+    - A control socket to the supervisor arrives as the FGC_WORKER_FD fd.
+    - The worker announces {"op": "ready"}, then serves one lease socket at a
+      time: {"op": "serve"} delivers a lease fd via SCM_RIGHTS, the worker
+      runs the request/response loop on it until the client closes it, then
+      reports {"op": "idle"}. {"op": "shutdown"} exits.
+    - With FGC_WORKER_MODE=legacy the request/response loop runs directly on
+      the FGC_WORKER_FD socket (the pre-supervisor layout), where
+      {"action": "shutdown"} triggers a clean exit.
 
 The worker runs a synchronous request/response loop.  Cluster operations
 that use py-cluster-api's async API are run via _run_async() per-request.
 
-In CLI mode (settings.cli_mode=True), no worker subprocess is spawned;
-action handlers are called directly in-process from server.py, so
+In in-process mode (settings.supervisor_mode=inprocess), no worker subprocess
+is spawned; action handlers are called directly in-process from server.py, so
 _run_async() must handle being called from within an existing event loop.
 """
 
@@ -26,12 +31,10 @@ import asyncio
 import ctypes
 import ctypes.util
 import functools
-import json
 import logging
 import os
 import pwd
 import socket
-import struct
 import sys
 from pathlib import Path
 from typing import Any, Optional
@@ -39,11 +42,7 @@ from typing import Any, Optional
 from loguru import logger
 
 from fileglancer.logconf import InterceptHandler, configure_logging
-
-
-# Length-prefix format: 4-byte big-endian unsigned int
-_HEADER_FMT = "!I"
-_HEADER_SIZE = struct.calcsize(_HEADER_FMT)
+from fileglancer.supervisor.protocol import recv_msg, send_msg
 
 
 def _run_async(coro):
@@ -81,51 +80,6 @@ def _set_pdeathsig():
             logger.warning(f"prctl(PR_SET_PDEATHSIG) failed: errno={ctypes.get_errno()}")
     except Exception as e:
         logger.warning(f"Could not set PR_SET_PDEATHSIG: {e}")
-
-
-def _send(sock: socket.socket, data: dict):
-    """Send a length-prefixed JSON message."""
-    payload = json.dumps(data, default=str).encode()
-    header = struct.pack(_HEADER_FMT, len(payload))
-    sock.sendall(header + payload)
-
-
-def _send_with_fd(sock: socket.socket, data: dict, fd: int):
-    """Send a length-prefixed JSON message with a file descriptor via SCM_RIGHTS."""
-    import array as _array
-
-    payload = json.dumps(data, default=str).encode()
-    header = struct.pack(_HEADER_FMT, len(payload))
-    full_msg = header + payload
-
-    fds = _array.array("i", [fd])
-    sock.sendmsg(
-        [full_msg],
-        [(socket.SOL_SOCKET, socket.SCM_RIGHTS, fds)],
-    )
-
-
-def _recv(sock: socket.socket) -> dict:
-    """Receive a length-prefixed JSON message."""
-    header = _recvall(sock, _HEADER_SIZE)
-    if header is None:
-        raise ConnectionError("Parent closed connection")
-    (length,) = struct.unpack(_HEADER_FMT, header)
-    payload = _recvall(sock, length)
-    if payload is None:
-        raise ConnectionError("Parent closed connection mid-message")
-    return json.loads(payload)
-
-
-def _recvall(sock: socket.socket, n: int) -> Optional[bytes]:
-    """Read exactly n bytes from socket."""
-    data = bytearray()
-    while len(data) < n:
-        chunk = sock.recv(n - len(data))
-        if not chunk:
-            return None
-        data.extend(chunk)
-    return bytes(data)
 
 
 # ---------------------------------------------------------------------------
@@ -430,7 +384,7 @@ def _action_open_file(request: dict, ctx: WorkerContext, filestore, fsps) -> dic
 
     The worker opens the file as the user and passes the fd back to the
     main process via SCM_RIGHTS.  The response includes "_fd" key with the
-    fd number — the main loop uses _send_with_fd() for these responses.
+    fd number — the request loop sends these responses with the fd attached.
     """
     fsp_name = request["fsp_name"]
     subpath = request.get("subpath", "")
@@ -1256,13 +1210,57 @@ class WorkerContext:
         self.username = username
 
 
+def serve_lease(sock: socket.socket, ctx: WorkerContext) -> None:
+    """Run the request/response loop on one lease socket until the peer closes.
+
+    Handlers must remain stateless across leases; the only per-worker state is
+    the username on ctx and the module-level caches, which are keyed safely.
+    """
+    while True:
+        try:
+            request, fds = recv_msg(sock)
+        except (ConnectionError, OSError):
+            break
+        for extra in fds:  # requests never carry fds; close defensively
+            os.close(extra)
+        if request is None:
+            break
+
+        action = request.get("action")
+        if action == "shutdown":
+            # Legacy clients end the session with an explicit action.
+            break
+
+        handler = _ACTIONS.get(action)
+        if handler is None:
+            send_msg(sock, {"error": f"Unknown action: {action}"})
+            continue
+
+        try:
+            result = handler(request, ctx)
+
+            # If the result contains a file descriptor, send it via SCM_RIGHTS
+            fd = result.pop("_fd", None)
+            file_handle = result.pop("_file_handle", None)
+            if fd is not None:
+                send_msg(sock, result, fd=fd)
+                # Close our copy of the fd — the receiver has its own now
+                if file_handle is not None:
+                    file_handle.close()
+            else:
+                send_msg(sock, result)
+        except Exception as e:
+            logger.exception(f"Error handling action {action}")
+            send_msg(sock, {"error": str(e)})
+
+
 def main():
-    """Worker entry point — run the request/response loop."""
+    """Worker entry point."""
 
     # Set up orphan prevention
     _set_pdeathsig()
 
-    # Configure logging. In text mode this goes to stderr, which the parent
+    # Configure logging. In text mode this goes to stderr, which the supervisor
     # forwards into its own log tagged with the worker's username. In JSON
     # mode it goes to the inherited stdout instead, so each record reaches the
     # shipper as the complete JSON object the worker wrote, rather than being
@@ -1278,7 +1276,7 @@ def main():
 
     # Get the socket fd from environment
     fd = int(os.environ["FGC_WORKER_FD"])
-    sock = socket.fromfd(fd, socket.AF_UNIX, socket.SOCK_STREAM)
+    control = socket.fromfd(fd, socket.AF_UNIX, socket.SOCK_STREAM)
     os.close(fd)  # close the original fd, we have a dup now
 
     # Determine username
@@ -1297,43 +1295,32 @@ def main():
         f"(uid={uid} euid={os.geteuid()} pid={os.getpid()})"
     )
 
-    # Main request/response loop
-    while True:
-        try:
-            request = _recv(sock)
-        except ConnectionError:
-            logger.info("Parent connection closed, exiting")
-            break
+    if os.environ.get("FGC_WORKER_MODE") == "legacy":
+        # Pre-supervisor layout: the control socket is the request socket.
+        serve_lease(control, ctx)
+    else:
+        send_msg(control, {"op": "ready", "pid": os.getpid(), "uid": uid})
+        while True:
+            try:
+                msg, fds = recv_msg(control)
+            except (ConnectionError, OSError):
+                msg, fds = None, []
+            if msg is None or msg.get("op") == "shutdown":
+                for extra in fds:
+                    os.close(extra)
+                break
+            if msg.get("op") != "serve" or not fds:
+                for extra in fds:
+                    os.close(extra)
+                continue
+            lease_sock = socket.fromfd(fds[0], socket.AF_UNIX, socket.SOCK_STREAM)
+            for extra in fds:
+                os.close(extra)
+            serve_lease(lease_sock, ctx)
+            lease_sock.close()
+            send_msg(control, {"op": "idle", "lease": msg.get("lease")})
 
-        action = request.get("action")
-
-        if action == "shutdown":
-            logger.info(f"Shutdown requested, exiting")
-            break
-
-        handler = _ACTIONS.get(action)
-        if handler is None:
-            _send(sock, {"error": f"Unknown action: {action}"})
-            continue
-
-        try:
-            result = handler(request, ctx)
-
-            # If the result contains a file descriptor, send it via SCM_RIGHTS
-            fd = result.pop("_fd", None)
-            file_handle = result.pop("_file_handle", None)
-            if fd is not None:
-                _send_with_fd(sock, result, fd)
-                # Close our copy of the fd — the main process has its own now
-                if file_handle is not None:
-                    file_handle.close()
-            else:
-                _send(sock, result)
-        except Exception as e:
-            logger.exception(f"Error handling action {action}")
-            _send(sock, {"error": str(e)})
-
-    sock.close()
+    control.close()
     logger.info("Worker exiting")
 
 

@@ -48,6 +48,7 @@ dependencies = [
 
 [project.scripts]
 fileglancer = "fileglancer.cli:cli"
+fileglancer-supervisor = "fileglancer.supervisor.__main__:main"
 
 [project.optional-dependencies]
 test = [

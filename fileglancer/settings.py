@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 from functools import cache
 import ipaddress
 import sys
@@ -130,10 +130,27 @@ class Settings(BaseSettings):
     db_max_overflow: int = 0
 
     # If true, each per-user worker subprocess setuids to the target user
-    # before handling requests. Requires root + non-CLI mode (validated at
-    # app startup). When false, workers run as the parent process's user —
-    # useful for local debugging of the worker code path without root.
+    # before handling requests (spawned by a privileged supervisor, or in
+    # legacy mode by forking as root; validated at app startup). When false,
+    # workers run as the current user — fine for personal deployments and
+    # for debugging the worker code path, but not for serving multiple users.
     use_access_flags: bool = False
+
+    # How the web app obtains per-user workers:
+    #   external  — connect to a separately deployed fileglancer-supervisor
+    #               (production; the only privileged process on the host)
+    #   embedded  — launch an unprivileged supervisor child at startup
+    #               (personal deployments, dev server, CI)
+    #   inprocess — run actions directly in the web app process (debugging)
+    #   legacy    — fork+setuid in-process (rollback path, one release only)
+    # Default: external when use_access_flags is set, else embedded.
+    supervisor_mode: Optional[Literal["external", "embedded", "inprocess", "legacy"]] = None
+    supervisor_socket: str = "/run/fileglancer/supervisor.sock"
+    # Seconds an acquire may wait for a worker before failing with 503.
+    supervisor_acquire_timeout: float = 10.0
+    # Extra flags passed to the embedded supervisor child
+    # (e.g. ["--workers-per-user", "2"]).
+    supervisor_embedded_args: List[str] = []
 
     # Atlassian settings for accessing JIRA services
     atlassian_url: Optional[HttpUrl] = None
@@ -217,7 +234,9 @@ class Settings(BaseSettings):
     # Useful for setting up scheduler env (e.g., /misc/lsf/conf/profile.lsf).
     env_source_script: Optional[str] = None
 
-    # Worker pool settings
+    # Worker pool settings. Deprecated: these now belong to the supervisor
+    # (--max-workers / --idle-timeout). Still accepted; in embedded mode they
+    # are forwarded to the supervisor child so old config files keep working.
     worker_pool_max_workers: int = 50
     worker_pool_idle_timeout: int = 300  # seconds
 
@@ -314,6 +333,12 @@ class Settings(BaseSettings):
                 "apps.service_proxy_domain requires session_secret_key to be "
                 "set: service proxy hostnames are signed with it, and a "
                 "per-process random key breaks resolution across workers")
+        return self
+
+    @model_validator(mode='after')
+    def resolve_supervisor_mode(self):
+        if self.supervisor_mode is None:
+            self.supervisor_mode = "external" if self.use_access_flags else "embedded"
         return self
 
     @model_validator(mode='after')
