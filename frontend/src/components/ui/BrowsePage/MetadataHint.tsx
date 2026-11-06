@@ -146,34 +146,21 @@ export default function MetadataHint({ variant }: MetadataHintProps) {
   const { kind, title, description, href } = getHintConfig(variant);
   const styles = getNotificationStyles(kind);
 
-  const descriptionContent = (
-    <span className="inline-flex items-center gap-1">
-      <span className="group-hover:underline">{description}</span>
-    </span>
+  // Only the description is a link, so the rest of the box stays selectable.
+  const message = href ? (
+    <FgExternalLink href={href} size="sm">
+      {description}
+    </FgExternalLink>
+  ) : (
+    description
   );
-
-  const notification = (
-    <NotificationItem
-      notification={{ id: 0, type: kind, title, message: descriptionContent }}
-      showDismissButton={false}
-    />
-  );
-
-  if (href) {
-    return (
-      <FgExternalLink
-        className={`${styles.container} group block p-4 mb-3 rounded-md hover:brightness-95 dark:hover:brightness-125 transition-[filter]`}
-        href={href}
-        showIcon={false}
-      >
-        {notification}
-      </FgExternalLink>
-    );
-  }
 
   return (
     <div className={`${styles.container} p-4 mb-3 rounded-md`}>
-      {notification}
+      <NotificationItem
+        notification={{ id: 0, type: kind, title, message }}
+        showDismissButton={false}
+      />
     </div>
   );
 }
