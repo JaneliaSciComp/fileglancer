@@ -37,6 +37,7 @@ import {
   getNotificationStyles
 } from '@/components/ui/Notifications/NotificationItem';
 import {
+  COLUMN_MIN_WIDTH,
   typeColumn,
   lastModifiedColumn,
   sizeColumn
@@ -172,7 +173,7 @@ export default function Table({
       {
         accessorKey: 'name',
         header: 'Name',
-        minSize: 100,
+        minSize: COLUMN_MIN_WIDTH,
         size: 500,
         cell: ({ getValue, row }) => {
           const file = row.original;
@@ -261,7 +262,7 @@ export default function Table({
           );
         },
         size: 90,
-        minSize: 80,
+        minSize: COLUMN_MIN_WIDTH,
         enableSorting: false,
         // Last column: no right neighbour to trade width with
         enableResizing: false
@@ -545,10 +546,12 @@ export default function Table({
                         : undefined
                     }
                   >
-                    {flexRender(
-                      header.column.columnDef.header,
-                      header.getContext()
-                    )}
+                    <span className="truncate">
+                      {flexRender(
+                        header.column.columnDef.header,
+                        header.getContext()
+                      )}
+                    </span>
                     {header.column.columnDef.enableSorting !== false ? (
                       sortingEnabled ? (
                         <SortIcons header={header} />
