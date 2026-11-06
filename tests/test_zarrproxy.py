@@ -53,6 +53,8 @@ def zarr_app():
                      np.arange(64 * 64, dtype=np.uint16).reshape(64, 64))
     with open(os.path.join(temp_dir, "data", "notes.tif"), "w") as f:
         f.write("not a tiff at all")
+    tifffile.imwrite(os.path.join(temp_dir, "data", "échantillon 100%.tif"),
+                     np.arange(16 * 16, dtype=np.uint8).reshape(16, 16))
     # An image outside the share, plus a symlink to it from inside: neither may be served.
     outside = tempfile.mkdtemp(prefix="fgzbout")
     tifffile.imwrite(os.path.join(outside, "secret.tif"), np.zeros((8, 8), dtype=np.uint8))
@@ -169,6 +171,16 @@ class TestVirtualZarr:
                      f"data/../{os.path.basename(zarr_app.outside)}/secret.tif/zarr.json"):
             r = zarr_app.get(f"/files/{key}/{path}")
             assert r.status_code == 404, (path, r.status_code, r.text)
+
+    def test_non_ascii_filename(self, zarr_app):
+        name = "data/échantillon 100%.tif"
+        r = zarr_app.get("/api/files/share", params={"subpath": name})
+        assert r.status_code == 200, r.text
+        assert "zarr.json" in {f["name"] for f in r.json()["files"]}
+        r = zarr_app.get("/api/content/share", params={"subpath": f"{name}/zarr.json"})
+        assert r.status_code == 200, r.text
+        assert r.json()["node_type"] == "group"
+        assert zarr_app.get("/api/content/share", params={"subpath": f"{name}/0/c/0/0"}).status_code == 200
 
     def test_unservable_file_lists_as_plain_file(self, zarr_app):
         r = zarr_app.get("/api/files/share", params={"subpath": "data/notes.tif"})

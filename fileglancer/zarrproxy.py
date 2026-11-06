@@ -76,10 +76,16 @@ def _client(socket_path: str) -> httpx.AsyncClient:
     return client
 
 
+def _path_header(abs_path: str) -> dict[str, str]:
+    """Header values are ASCII, so the path travels percent-encoded (UTF-8);
+    zarrbridge unquotes it."""
+    return {DATASERVER_HEADER: quote(abs_path, safe="/")}
+
+
 async def proxy(socket_path: str, abs_path: str, key: str, request: Request) -> Response:
     """Stream one GET/HEAD for ``key`` of the file at ``abs_path``."""
     headers = {k: v for k, v in request.headers.items() if k.lower() in _PASS_UP}
-    headers[DATASERVER_HEADER] = abs_path
+    headers.update(_path_header(abs_path))
     client = _client(socket_path)
     req = client.build_request(request.method, "/" + quote(key), headers=headers)
     try:
@@ -125,7 +131,7 @@ async def virtual_node(socket_path: str, abs_path: str, info: dict, key: str = "
     when it does not serve this file.
     """
     client = _client(socket_path)
-    headers = {DATASERVER_HEADER: abs_path}
+    headers = _path_header(abs_path)
     resp = await client.get("/" + quote(posixpath.join(key, "zarr.json")), headers=headers)
     if resp.status_code == 200:
         images = []
