@@ -59,6 +59,9 @@ test = [
     "requests-mock ==1.12.1",
     "httpx2 ==2.12.0"
 ]
+# Virtual OME-Zarr for image files (TIFF, MRC, CZI, ...): the supervisor runs
+# one zarrbridge per user. Not on PyPI yet: `pixi run pip install -e ../zarrbridge`.
+zarrbridge = ["zarrbridge >=0.1.0"]
 release = [
     "twine ==7.0.0",
     "hatch ==1.17.1"

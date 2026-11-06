@@ -456,6 +456,43 @@ class SupervisedWorkerPool:
         async with self.lease(username) as lease:
             return await lease.execute(action, **kwargs)
 
+    def _acquire_dataserver_blocking(self, username: str) -> dict:
+        sock = self._sock
+        if sock is None:
+            raise ConnectionError("Not connected to supervisor")
+        sock.settimeout(self.settings.supervisor_acquire_timeout + 5)
+        send_msg(sock, {"op": "acquire", "kind": "dataserver", "user": username})
+        reply, fds = recv_msg(sock)
+        for fd in fds:
+            os.close(fd)
+        if reply is None:
+            raise ConnectionError("Supervisor closed connection")
+        return reply
+
+    async def dataserver(self, username: str) -> str:
+        """The unix socket of this user's zarrbridge, spawned on first use.
+
+        Called before every proxied request: the acquire is one round trip and
+        it is how the supervisor learns the server is still in use.
+        """
+        loop = asyncio.get_event_loop()
+        async with self._conn_lock:
+            try:
+                reply = await loop.run_in_executor(
+                    None, self._acquire_dataserver_blocking, username)
+            except (ConnectionError, OSError) as e:
+                if self._sock is not None:
+                    self._sock.close()
+                    self._sock = None
+                self._kick_reconnect()
+                raise WorkerDead(f"Supervisor unavailable: {e}") from e
+        if not reply.get("ok"):
+            code = reply.get("code", "error")
+            status = 403 if code in ("invalid_user", "denied") else 503
+            raise WorkerError(f"Data server unavailable ({code}): {reply.get('error')}",
+                              status_code=status)
+        return reply["socket"]
+
     async def status(self) -> dict:
         """Fetch the supervisor's status payload."""
         def _status_blocking(sock: socket.socket) -> dict:

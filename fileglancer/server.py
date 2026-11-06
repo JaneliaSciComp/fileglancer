@@ -1,5 +1,6 @@
 import asyncio
 import os
+import posixpath
 import re
 import shlex
 import sys
@@ -49,6 +50,7 @@ from fileglancer.worker_pool import (
     prepare_worker_request)
 from fileglancer.user_worker import serialize_job_for_worker
 from fileglancer import sshkeys
+from fileglancer import zarrproxy
 
 from x2s3.utils import get_read_access_acl, get_nosuchbucket_response, get_error_response, generate_request_id, get_list_xml
 
@@ -548,6 +550,62 @@ def create_app(settings):
         if enforce_endpoint and store.endpoint_url and allowed is not None and store.endpoint_url not in allowed:
             raise HTTPException(status_code=403, detail="Endpoint no longer allowed on this server")
         return store
+
+    def _mount_path_for(fsp_name: str) -> str:
+        with db.get_db_session(settings.db_url) as session:
+            fsp = db.get_file_share_path(session, fsp_name)
+            if not fsp:
+                raise HTTPException(status_code=404, detail=f"File share path {fsp_name} not found")
+            return os.path.expanduser(fsp.mount_path)
+
+    async def _dataserver_socket(username: str) -> str:
+        """Socket of the user's zarrbridge; 501 when this deployment has no supervisor."""
+        if not isinstance(worker_pool, SupervisedWorkerPool):
+            raise HTTPException(status_code=501, detail="Virtual Zarr needs a supervisor (external or embedded mode)")
+        try:
+            return await worker_pool.dataserver(username)
+        except WorkerDead as e:
+            logger.error(f"Supervisor unavailable for dataserver of {username}: {e}")
+            raise HTTPException(status_code=503, detail="Service temporarily unavailable")
+        except WorkerError as e:
+            raise HTTPException(status_code=e.status_code, detail=str(e))
+
+    async def _zarr_proxy(request: Request, username: str, mount_path: str,
+                          split: tuple[str, str]) -> Response:
+        file_subpath, key = split
+        sock = await _dataserver_socket(username)
+        return await zarrproxy.proxy(sock, posixpath.join(mount_path, file_subpath), key, request)
+
+    def _link_virtual_split(info: dict, subpath: str) -> Optional[tuple[str, str]]:
+        """(absolute image file, zarr key) under a data link, or None for a plain object.
+
+        The link's own path may sit on the file or anywhere inside its virtual
+        Zarr, so the split runs over the full path, not just subpath. Pass the
+        result to ``_zarr_proxy`` with an empty mount_path.
+        """
+        return zarrproxy.split_virtual_path(posixpath.join(info["mount_path"], subpath))
+
+    async def _virtual_node(username: str, mount_path: str, store: ReadStore,
+                            file_subpath: str, key: str = "", result: Optional[dict] = None) -> Optional[dict]:
+        """Listing for ``key`` inside an image file zarrbridge can serve.
+
+        At the root (no key) returns ``result`` with synthetic entries added, or
+        unchanged when the file is not servable. Below the root returns the
+        node, or None when zarrbridge has nothing there.
+        """
+        if result is None:
+            result = await store.list_dir(file_subpath)
+        info = result.get("info")
+        if not info or info.get("is_dir") or "files" in result or not zarrproxy.is_image_file(info["name"]):
+            return result if not key else None
+        if not isinstance(worker_pool, SupervisedWorkerPool):
+            return result if not key else None
+        try:
+            sock = await worker_pool.dataserver(username)
+            return await zarrproxy.virtual_node(sock, posixpath.join(mount_path, info["path"]), info, key)
+        except Exception as e:  # not servable, or no zarrbridge: plain file
+            logger.info(f"No virtual Zarr for {info['path']}: {e}")
+            return result if not key else None
 
     def _writable_store(username: str, fsp_name: str) -> WriteStore:
         """Like _store_for, but 405 before anything touches a read-only backend."""
@@ -1483,7 +1541,8 @@ def create_app(settings):
         # A public bucket is its own data link (see /api/external-buckets/{fsp_name})
         _writable_store(username, fsp_name)
         # Validate the user can access the path via worker
-        validation = await _worker_exec(username, "validate_proxied_path", fsp_name=fsp_name, path=path)
+        validation = await _worker_exec(username, "validate_proxied_path", fsp_name=fsp_name,
+                                        path=zarrproxy.link_target(path))
         if "error" in validation:
             raise HTTPException(status_code=400, detail=validation["error"])
 
@@ -1570,7 +1629,8 @@ def create_app(settings):
                     if any(p.sharing_key != sharing_key for p in conflicts):
                         raise HTTPException(status_code=409, detail="A data link already exists for this path")
             if existing:
-                validation = await _worker_exec(username, "validate_proxied_path", fsp_name=validate_fsp, path=validate_path)
+                validation = await _worker_exec(username, "validate_proxied_path", fsp_name=validate_fsp,
+                                                path=zarrproxy.link_target(validate_path))
                 if "error" in validation:
                     raise HTTPException(status_code=400, detail=validation["error"])
 
@@ -1907,6 +1967,10 @@ def create_app(settings):
             if isinstance(info, Response):
                 return info
 
+            split = _link_virtual_split(info, subpath)
+            if split:
+                return await _zarr_proxy(request, info["username"], "", split)
+
             range_header = request.headers.get("range")
 
             result = await _worker_exec(
@@ -1947,11 +2011,14 @@ def create_app(settings):
 
 
     @app.head("/files/{sharing_key}/{path:path}")
-    async def head_object(sharing_key: str, path: str = ''):
+    async def head_object(request: Request, sharing_key: str, path: str = ''):
         try:
             info, subpath = _resolve_proxy_info(sharing_key, path)
             if isinstance(info, Response):
                 return info
+            split = _link_virtual_split(info, subpath)
+            if split:
+                return await _zarr_proxy(request, info["username"], "", split)
             result = await _worker_exec(info["username"], "s3_head_object",
                                         mount_path=info["mount_path"],
                                         target_name=info["target_name"],
@@ -2077,7 +2144,7 @@ def create_app(settings):
 
     # File content endpoint
     @app.head("/api/content/{path_name:path}")
-    async def head_file_content(path_name: str,
+    async def head_file_content(request: Request, path_name: str,
                                 subpath: Optional[str] = Query(''),
                                 username: str = Depends(get_current_user)):
         """Handle HEAD requests to get file metadata without content"""
@@ -2087,7 +2154,11 @@ def create_app(settings):
         else:
             filestore_name, _, subpath = path_name.partition('/')
 
-        result = await _store_for(username, filestore_name).head_file(subpath)
+        store = _store_for(username, filestore_name)
+        split = zarrproxy.split_virtual_path(subpath)
+        if split and isinstance(store, WorkerStore):
+            return await _zarr_proxy(request, username, _mount_path_for(filestore_name), split)
+        result = await store.head_file(subpath)
         if "error" in result:
             raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
 
@@ -2122,6 +2193,9 @@ def create_app(settings):
             filestore_name, _, subpath = path_name.partition('/')
 
         store = _store_for(username, filestore_name)
+        split = zarrproxy.split_virtual_path(subpath)
+        if split and isinstance(store, WorkerStore):
+            return await _zarr_proxy(request, username, _mount_path_for(filestore_name), split)
         try:
             status, headers, body = await store.open_range(subpath, request.headers.get('Range'))
         except StoreError as e:
@@ -2220,6 +2294,12 @@ def create_app(settings):
             filestore_name, _, subpath = path_name.partition('/')
 
         store = _store_for(username, filestore_name)
+        split = zarrproxy.split_virtual_path(subpath)
+        if split and isinstance(store, WorkerStore):
+            node = await _virtual_node(username, _mount_path_for(filestore_name), store, *split)
+            if node is None:
+                return JSONResponse(content={"error": "File or directory not found", "status_code": 404}, status_code=404)
+            return node
         if limit is not None:
             result = await store.list_dir_paged(subpath, limit, cursor, settings.max_directory_count)
         else:
@@ -2231,6 +2311,8 @@ def create_app(settings):
             raise HTTPException(status_code=status_code, detail=result["error"])
         if "error" in result:
             raise HTTPException(status_code=500, detail=result["error"])
+        if isinstance(store, WorkerStore):
+            result = await _virtual_node(username, _mount_path_for(filestore_name), store, subpath, result=result)
         return result
 
 

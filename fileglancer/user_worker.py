@@ -928,7 +928,7 @@ def _action_validate_proxied_path(request: dict, ctx: WorkerContext, filestore, 
 
     try:
         filestore.get_file_info(path)
-    except (FileNotFoundError, PermissionError) as e:
+    except OSError as e:  # missing, denied, or a path through a regular file
         return {"error": str(e), "status_code": 400}
 
     return {"ok": True}

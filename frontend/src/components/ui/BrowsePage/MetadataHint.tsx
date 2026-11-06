@@ -12,6 +12,8 @@ type MetadataHintVariant =
   | { case: 'zarr-v2-no-multiscales' }
   | { case: 'zarr-v3-no-multiscales' }
   | { case: 'zarr-query-error'; errorMessage?: string }
+  // Zarr - an image file served as virtual OME-Zarr by zarrbridge
+  | { case: 'virtual-zarr'; state?: string; reader?: string | null }
   // Zarr - metadata is valid, but the layout will make viewing awkward
   | { case: 'zarr-single-level'; size: string }
   | {
@@ -55,6 +57,26 @@ const n5Hint: HintConfig = {
   href: 'https://fileglancer-docs.janelia.org/features/image-support/#when-the-n5-preview-panel-appears'
 };
 
+function virtualZarrDescription(
+  state: string | undefined,
+  reader: string | null | undefined
+): string {
+  const via = reader ? ` (read with the ${reader} reader)` : '';
+  switch (state) {
+    case 'multiscale':
+      return `This image file is served as OME-Zarr without conversion${via}. A multiscale pyramid is cached beside it, so viewers can zoom out quickly.`;
+    case 'indexing':
+    case 'queued':
+    case 'building':
+      return `This image file is served as OME-Zarr without conversion${via}. A multiscale pyramid is being built in the background; until it is done, viewers read full resolution at every zoom level.`;
+    case 'failed':
+    case 'unservable':
+      return `This image file is served as OME-Zarr without conversion${via}, but no multiscale pyramid could be built (${state}). Viewers read full resolution at every zoom level.`;
+    default:
+      return `This image file is served as OME-Zarr without conversion${via}. Only the native resolution is available, so viewers read full resolution at every zoom level.`;
+  }
+}
+
 function getHintConfig(variant: MetadataHintVariant): HintConfig {
   switch (variant.case) {
     case 'zarr-extension-no-markers':
@@ -79,6 +101,12 @@ function getHintConfig(variant: MetadataHintVariant): HintConfig {
         description: variant.errorMessage
           ? `Could not read Zarr metadata. ${variant.errorMessage}`
           : 'Could not read Zarr metadata.'
+      };
+    case 'virtual-zarr':
+      return {
+        kind: 'info',
+        title: 'Virtual OME-Zarr',
+        description: virtualZarrDescription(variant.state, variant.reader)
       };
     case 'zarr-single-level':
       return {

@@ -14028,6 +14028,7 @@ packages:
   - pytest-html==4.2.0 ; extra == 'test'
   - pytest==9.1.1 ; extra == 'test'
   - requests-mock==1.12.1 ; extra == 'test'
+  - zarrbridge>=0.1.0 ; extra == 'zarrbridge'
   requires_python: '>=3.12.0'
 - pypi: https://files.pythonhosted.org/packages/03/4d/8ad27f9a1b7e69313cca5d695b925b48efe51208d3490e0844bae97cabc0/yarl-1.24.5-cp312-cp312-macosx_10_13_x86_64.whl
   name: yarl
