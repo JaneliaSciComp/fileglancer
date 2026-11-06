@@ -10,6 +10,7 @@ import struct
 import subprocess
 import sys
 import threading
+import asyncio
 import time
 
 import pytest
@@ -690,6 +691,29 @@ class TestSupervisedWorkerPool:
         finally:
             await pool2.stop()
             await pool1.stop()
+
+    @pytest.mark.asyncio
+    async def test_busy_user_does_not_block_other_users(self, embedded_settings):
+        """An acquire parked behind alice's busy worker must not hold up bob."""
+        from fileglancer.worker_pool import SupervisedWorkerPool, WorkerError
+        settings = embedded_settings.model_copy(update={"supervisor_acquire_timeout": 3.0})
+        pool = SupervisedWorkerPool(settings)
+        await pool.start()
+        try:
+            async with pool.lease("alice"):
+                async def alice_again():
+                    with pytest.raises(WorkerError, match="timeout"):
+                        async with pool.lease("alice"):
+                            pass
+                waiting = asyncio.create_task(alice_again())
+                await asyncio.sleep(0.5)  # alice's second acquire is parked in the supervisor
+                t0 = time.monotonic()
+                async with pool.lease("bob"):
+                    pass
+                assert time.monotonic() - t0 < 1.5
+                await waiting
+        finally:
+            await pool.stop()
 
     @pytest.mark.asyncio
     async def test_acquire_after_supervisor_death_is_503(self, embedded_settings):

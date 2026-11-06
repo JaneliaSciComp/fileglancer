@@ -233,18 +233,25 @@ class Lease:
 class SupervisedWorkerPool:
     """Obtains per-user workers from a fileglancer-supervisor over its socket.
 
-    Keeps one long-lived connection per process; ``acquire`` requests are
-    serialized on it (pipelining is permitted by the protocol, not required).
-    On connection loss, in-flight acquires fail with WorkerDead (503) and a
-    background task reconnects with exponential backoff. Leases already
+    Keeps a small pool of long-lived control connections; each request takes
+    one for its duration. An acquire for a user whose workers are all busy
+    parks inside the supervisor until one frees up or the timeout passes, so
+    it occupies one connection while unrelated users' requests go over the
+    others. On connection loss, in-flight requests fail with WorkerDead (503)
+    and a background task reconnects with exponential backoff. Leases already
     granted don't route through the supervisor and are unaffected.
     """
+
+    # Control connections. Each waiting acquire holds one; beyond this many,
+    # requests queue in the app. The supervisor's spawn rate limit is per
+    # connection, so the effective limit is this many times higher.
+    POOL_SIZE = 8
 
     def __init__(self, settings: Settings):
         self.settings = settings
         self.mode = settings.supervisor_mode  # "external" or "embedded"
-        self._sock: Optional[socket.socket] = None
-        self._conn_lock = asyncio.Lock()
+        self._idle: list[socket.socket] = []
+        self._slots = asyncio.Semaphore(self.POOL_SIZE)
         self._reconnect_task: Optional[asyncio.Task] = None
         self._child: Optional[subprocess.Popen] = None
         self._lock_file = None
@@ -304,7 +311,7 @@ class SupervisedWorkerPool:
 
     # -- connection ----------------------------------------------------------
 
-    def _connect_blocking(self) -> None:
+    def _connect_blocking(self) -> socket.socket:
         socket_path = self._socket_path()
         if self.mode == "embedded":
             self._ensure_embedded(socket_path)
@@ -329,23 +336,53 @@ class SupervisedWorkerPool:
         if not hello or not hello.get("ok"):
             sock.close()
             raise ConnectionError(f"Supervisor rejected hello: {hello}")
-        self._sock = sock
+        if not self.hello:
+            logger.info(f"Connected to supervisor at {socket_path} "
+                        f"(privileged={hello.get('privileged')}, "
+                        f"version={hello.get('version')})")
         self.hello = hello
-        logger.info(f"Connected to supervisor at {socket_path} "
-                    f"(privileged={hello.get('privileged')}, "
-                    f"version={hello.get('version')})")
+        return sock
 
     async def start(self):
         """Connect (external) or ensure a child and connect (embedded)."""
-        await asyncio.get_event_loop().run_in_executor(None, self._connect_blocking)
+        self._idle.append(await asyncio.get_event_loop().run_in_executor(
+            None, self._connect_blocking))
+
+    def _drop_idle(self) -> None:
+        for sock in self._idle:
+            sock.close()
+        self._idle.clear()
+
+    async def _call(self, fn):
+        """Run blocking ``fn(sock)`` on a pooled control connection.
+
+        Connections are opened on demand up to POOL_SIZE. A failure closes the
+        connection, drops the idle ones (they share the supervisor's fate),
+        and starts the reconnect loop; until it succeeds, calls fail fast.
+        """
+        async with self._slots:
+            if self._reconnect_task is not None and not self._reconnect_task.done():
+                raise WorkerDead("Supervisor unavailable: reconnecting")
+            loop = asyncio.get_event_loop()
+            sock = self._idle.pop() if self._idle else None
+            try:
+                if sock is None:
+                    sock = await loop.run_in_executor(None, self._connect_blocking)
+                result = await loop.run_in_executor(None, fn, sock)
+            except (ConnectionError, OSError) as e:
+                if sock is not None:
+                    sock.close()
+                self._drop_idle()
+                self._kick_reconnect()
+                raise WorkerDead(f"Supervisor unavailable: {e}") from e
+            self._idle.append(sock)
+            return result
 
     async def stop(self):
-        """Close the connection; terminate the embedded child if we spawned it."""
+        """Close the connections; terminate the embedded child if we spawned it."""
         if self._reconnect_task is not None:
             self._reconnect_task.cancel()
-        if self._sock is not None:
-            self._sock.close()
-            self._sock = None
+        self._drop_idle()
         if self._child is not None and self._child.poll() is None:
             self._child.terminate()
             try:
@@ -366,8 +403,8 @@ class SupervisedWorkerPool:
         while True:
             await asyncio.sleep(delay)
             try:
-                await asyncio.get_event_loop().run_in_executor(
-                    None, self._connect_blocking)
+                self._idle.append(await asyncio.get_event_loop().run_in_executor(
+                    None, self._connect_blocking))
                 logger.info("Reconnected to supervisor")
                 return
             except Exception as e:
@@ -376,10 +413,7 @@ class SupervisedWorkerPool:
 
     # -- leasing -------------------------------------------------------------
 
-    def _acquire_blocking(self, username: str) -> tuple[dict, list[int]]:
-        sock = self._sock
-        if sock is None:
-            raise ConnectionError("Not connected to supervisor")
+    def _acquire_blocking(self, sock: socket.socket, username: str) -> tuple[dict, list[int]]:
         timeout = self.settings.supervisor_acquire_timeout
         sock.settimeout(timeout + 5)
         send_msg(sock, {"op": "acquire", "kind": "worker", "user": username,
@@ -396,17 +430,7 @@ class SupervisedWorkerPool:
         A lease must not outlive its HTTP request: nothing may store it on a
         long-lived object.
         """
-        loop = asyncio.get_event_loop()
-        async with self._conn_lock:
-            try:
-                reply, fds = await loop.run_in_executor(
-                    None, self._acquire_blocking, username)
-            except (ConnectionError, OSError) as e:
-                if self._sock is not None:
-                    self._sock.close()
-                    self._sock = None
-                self._kick_reconnect()
-                raise WorkerDead(f"Supervisor unavailable: {e}") from e
+        reply, fds = await self._call(lambda sock: self._acquire_blocking(sock, username))
         if not reply.get("ok"):
             for fd in fds:
                 os.close(fd)
@@ -434,10 +458,7 @@ class SupervisedWorkerPool:
 
     async def status(self) -> dict:
         """Fetch the supervisor's status payload."""
-        def _status_blocking() -> dict:
-            sock = self._sock
-            if sock is None:
-                raise ConnectionError("Not connected to supervisor")
+        def _status_blocking(sock: socket.socket) -> dict:
             sock.settimeout(10)
             send_msg(sock, {"op": "status"})
             reply, _fds = recv_msg(sock)
@@ -445,9 +466,7 @@ class SupervisedWorkerPool:
                 raise ConnectionError("Supervisor closed connection")
             return reply
 
-        async with self._conn_lock:
-            return await asyncio.get_event_loop().run_in_executor(
-                None, _status_blocking)
+        return await self._call(_status_blocking)
 
 
 # ---------------------------------------------------------------------------
