@@ -69,7 +69,7 @@ describe('FileTable column resize', () => {
     const nameHandle = screen
       .getByText('Name')
       .closest('.relative')!
-      .querySelector('.cursor-col-resize')!;
+      .querySelector('[class*="-resize"]')!;
     // Shrink Name by 60px: Name loses 60, Type gains 60, nothing else moves
     fireEvent.mouseDown(nameHandle, { clientX: 160 });
     fireEvent.mouseMove(document, { clientX: 100 });

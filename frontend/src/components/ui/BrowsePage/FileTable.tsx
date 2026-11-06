@@ -372,6 +372,31 @@ export default function Table({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Cursor shows which way a divider can still move: the column on its
+  // left can shrink down to minSize, the one on its right can shrink to
+  // let it grow.
+  const leafColumns = table.getVisibleLeafColumns();
+  const resizeCursor = (index: number) => {
+    const left = leafColumns[index];
+    const right = leafColumns[index + 1];
+    const canShrink = left.getSize() > (left.columnDef.minSize ?? 0);
+    const canGrow = right
+      ? right.getSize() > (right.columnDef.minSize ?? 0)
+      : false;
+    if (canShrink && canGrow) {
+      return 'cursor-col-resize';
+    }
+    if (canShrink) {
+      return 'cursor-w-resize';
+    }
+    if (canGrow) {
+      return 'cursor-e-resize';
+    }
+    // Nothing to move: let hover and drags pass through so the divider
+    // does not light up
+    return 'pointer-events-none';
+  };
+
   const gridTemplateColumns = table
     .getVisibleLeafColumns()
     .map(col => `${col.getSize()}px`)
@@ -502,7 +527,7 @@ export default function Table({
             key={headerGroup.id}
             style={{ gridTemplateColumns, width: tableWidth }}
           >
-            {headerGroup.headers.map(header => (
+            {headerGroup.headers.map((header, index) => (
               <div
                 className="text-left p-3 font-bold text-sm relative min-w-0"
                 key={header.id}
@@ -539,7 +564,7 @@ export default function Table({
                 )}
                 {header.column.getCanResize() ? (
                   <div
-                    className="cursor-col-resize absolute z-10 -right-1 top-0 h-full w-3 bg-transparent group"
+                    className={`${resizeCursor(index)} absolute z-10 -right-1 top-0 h-full w-3 bg-transparent group`}
                     onMouseDown={header.getResizeHandler()}
                     onTouchStart={header.getResizeHandler()}
                   >
