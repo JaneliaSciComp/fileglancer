@@ -362,6 +362,21 @@ def _action_get_file_info(request: dict, ctx: WorkerContext, filestore, fsps) ->
         return {"error": "Permission denied", "status_code": 403}
 
 
+@action("resolve_image")
+@with_filestore
+def _action_resolve_image(request: dict, ctx: WorkerContext, filestore, fsps) -> dict:
+    """Real path of an image file for the user's zarrbridge, confined to the share
+    and to request["within"] (a data link's path). Runs as the user, so this is
+    where the trust boundary for the dataserver's path header lives."""
+    from fileglancer.filestore import RootCheckError
+    try:
+        return {"path": filestore.resolve_file(request["path"], request.get("within"))}
+    except (RootCheckError, FileNotFoundError):
+        return {"error": "File or directory not found", "status_code": 404}
+    except PermissionError:
+        return {"error": "Permission denied", "status_code": 403}
+
+
 @action("check_binary")
 @with_filestore
 def _action_check_binary(request: dict, ctx: WorkerContext, filestore, fsps) -> dict:

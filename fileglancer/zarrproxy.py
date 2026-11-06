@@ -7,7 +7,8 @@ streams them through: a path like ``dir/image.tif/0/c/0/0`` is the file
 to zarrbridge in a trusted header; the URL path it sees is the key only.
 
 Nothing here touches the filesystem: the app cannot read the user's files,
-so the split is syntactic.
+so the split is syntactic and the absolute path comes from the user's worker
+(``resolve_image``), which confines it to the share and the data link.
 """
 
 from __future__ import annotations
@@ -49,11 +50,10 @@ def split_virtual_path(subpath: str) -> Optional[tuple[str, str]]:
     The first segment with a supported suffix that has anything after it is
     the file. ``image.tif`` alone is None: that is the raw file.
     """
-    lead = "/" if subpath.startswith("/") else ""
     parts = [p for p in subpath.split("/") if p]
     for i, part in enumerate(parts[:-1]):
         if is_image_file(part):
-            return lead + "/".join(parts[:i + 1]), "/".join(parts[i + 1:])
+            return "/".join(parts[:i + 1]), "/".join(parts[i + 1:])
     return None
 
 

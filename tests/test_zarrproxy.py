@@ -23,7 +23,7 @@ needs_zarrbridge = pytest.mark.skipif(
     ("a/B.TIFF/0/c/0/0", ("a/B.TIFF", "0/c/0/0")),
     ("x.nii.gz/0/c/0", ("x.nii.gz", "0/c/0")),
     ("tomo.mrc/_status", ("tomo.mrc", "_status")),
-    ("/abs/dir/a.czi/0/zarr.json", ("/abs/dir/a.czi", "0/zarr.json")),
+    ("/abs/dir/a.czi/0/zarr.json", ("abs/dir/a.czi", "0/zarr.json")),
     ("a.zarr/0/c/0", None),
     ("plain/dir/file.txt", None),
     ("", None),
@@ -53,6 +53,10 @@ def zarr_app():
                      np.arange(64 * 64, dtype=np.uint16).reshape(64, 64))
     with open(os.path.join(temp_dir, "data", "notes.tif"), "w") as f:
         f.write("not a tiff at all")
+    # An image outside the share, plus a symlink to it from inside: neither may be served.
+    outside = tempfile.mkdtemp(prefix="fgzbout")
+    tifffile.imwrite(os.path.join(outside, "secret.tif"), np.zeros((8, 8), dtype=np.uint8))
+    os.symlink(os.path.join(outside, "secret.tif"), os.path.join(temp_dir, "data", "escape.tif"))
 
     db_url = f"sqlite:///{os.path.join(temp_dir, 'test.db')}"
     engine = create_engine(db_url)
@@ -78,6 +82,7 @@ def zarr_app():
     app.dependency_overrides[get_current_user] = lambda: TEST_USERNAME
     try:
         with TestClient(app) as client:  # runs lifespan: starts the embedded supervisor
+            client.outside = outside
             yield client
     finally:
         engine.dispose()
@@ -132,6 +137,38 @@ class TestVirtualZarr:
         assert r.status_code == 200, r.text  # validation is syntactic; serving decides
         r = zarr_app.post("/api/proxied-path", params={"fsp_name": "share", "path": "data/notes.txt/x"})
         assert r.status_code == 400, r.text
+
+    def test_virtual_zarr_is_confined_to_share_and_link(self, zarr_app):
+        secret = os.path.join(zarr_app.outside, "secret.tif")
+        # Absolute and traversing subpaths stay inside the share.
+        for sub in (f"{secret}/zarr.json", f"data/{secret}/zarr.json",
+                    f"../{os.path.basename(zarr_app.outside)}/secret.tif/zarr.json"):
+            r = zarr_app.get("/api/content/share", params={"subpath": sub})
+            assert r.status_code == 404, (sub, r.status_code, r.text)
+            assert zarr_app.head("/api/content/share", params={"subpath": sub}).status_code == 404
+            assert zarr_app.get("/api/files/share", params={"subpath": sub}).status_code in (400, 404)
+        # A symlink pointing out of the share is a plain file, never a virtual Zarr.
+        r = zarr_app.get("/api/content/share", params={"subpath": "data/escape.tif/zarr.json"})
+        assert r.status_code == 404, r.text
+        r = zarr_app.get("/api/files/share", params={"subpath": "data/escape.tif"})
+        assert r.status_code == 404 or "files" not in r.json()
+        # A data link is confined to its own path: not the share, not the link owner's other files.
+        r = zarr_app.post("/api/proxied-path", params={"fsp_name": "share", "path": "data/tiny.tif/0"})
+        key = r.json()["sharing_key"]
+        assert zarr_app.get(f"/files/{key}/0/zarr.json").status_code == 200
+        for path in (f"0/{secret}/zarr.json", f"0//{secret}/zarr.json", "0//data/tiny.tif/zarr.json",
+                     "0/data/escape.tif/zarr.json"):
+            r = zarr_app.get(f"/files/{key}/{path}")
+            assert r.status_code == 404, (path, r.status_code, r.text)
+            assert zarr_app.head(f"/files/{key}/{path}").status_code == 404
+        # A link on a directory: the reported bypass (absolute subpath) and the symlink.
+        r = zarr_app.post("/api/proxied-path", params={"fsp_name": "share", "path": "data"})
+        key = r.json()["sharing_key"]
+        assert zarr_app.get(f"/files/{key}/data/tiny.tif/zarr.json").status_code == 200
+        for path in (f"data/{secret}/zarr.json", f"data//{secret}/zarr.json", "data/escape.tif/zarr.json",
+                     f"data/../{os.path.basename(zarr_app.outside)}/secret.tif/zarr.json"):
+            r = zarr_app.get(f"/files/{key}/{path}")
+            assert r.status_code == 404, (path, r.status_code, r.text)
 
     def test_unservable_file_lists_as_plain_file(self, zarr_app):
         r = zarr_app.get("/api/files/share", params={"subpath": "data/notes.tif"})

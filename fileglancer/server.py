@@ -551,13 +551,6 @@ def create_app(settings):
             raise HTTPException(status_code=403, detail="Endpoint no longer allowed on this server")
         return store
 
-    def _mount_path_for(fsp_name: str) -> str:
-        with db.get_db_session(settings.db_url) as session:
-            fsp = db.get_file_share_path(session, fsp_name)
-            if not fsp:
-                raise HTTPException(status_code=404, detail=f"File share path {fsp_name} not found")
-            return os.path.expanduser(fsp.mount_path)
-
     async def _dataserver_socket(username: str) -> str:
         """Socket of the user's zarrbridge; 501 when this deployment has no supervisor."""
         if not isinstance(worker_pool, SupervisedWorkerPool):
@@ -570,22 +563,44 @@ def create_app(settings):
         except WorkerError as e:
             raise HTTPException(status_code=e.status_code, detail=str(e))
 
-    async def _zarr_proxy(request: Request, username: str, mount_path: str,
-                          split: tuple[str, str]) -> Response:
+    async def _resolve_image(username: str, fsp_name: str, file_subpath: str, within: str = "") -> dict:
+        """The worker, as the user, turns a share-relative image path into the real
+        absolute path zarrbridge may open, or returns an error dict. Nothing else
+        may feed the dataserver's path header."""
+        return await _worker_exec(username, "resolve_image", fsp_name=fsp_name,
+                                  path=file_subpath, within=within)
+
+    async def _zarr_proxy(request: Request, username: str, fsp_name: str,
+                          split: tuple[str, str], within: str = "") -> Response:
         file_subpath, key = split
+        resolved = await _resolve_image(username, fsp_name, file_subpath, within)
+        if "error" in resolved:
+            raise HTTPException(status_code=resolved.get("status_code", 400), detail=resolved["error"])
         sock = await _dataserver_socket(username)
-        return await zarrproxy.proxy(sock, posixpath.join(mount_path, file_subpath), key, request)
+        return await zarrproxy.proxy(sock, resolved["path"], key, request)
 
-    def _link_virtual_split(info: dict, subpath: str) -> Optional[tuple[str, str]]:
-        """(absolute image file, zarr key) under a data link, or None for a plain object.
+    def _link_virtual_split(info: dict, subpath: str) -> Optional[tuple[str, str, str]]:
+        """(share-relative image file, zarr key, within) under a data link, or None
+        for a plain object.
 
-        The link's own path may sit on the file or anywhere inside its virtual
-        Zarr, so the split runs over the full path, not just subpath. Pass the
-        result to ``_zarr_proxy`` with an empty mount_path.
+        The link may sit on a directory above the image, on the file, or inside
+        its virtual Zarr. The split runs over link path plus subpath, taken
+        lexically (empty segments dropped, ``..`` refused) so the request cannot
+        leave the link. ``within`` is the link path when it lies above the file
+        and the worker must confine the real file to it; empty otherwise.
         """
-        return zarrproxy.split_virtual_path(posixpath.join(info["mount_path"], subpath))
+        link_path = info["link_path"]
+        parts = [p for p in f"{link_path}/{subpath}".split("/") if p]
+        if ".." in parts:
+            return None
+        split = zarrproxy.split_virtual_path("/".join(parts))
+        if not split:
+            return None
+        file_subpath, key = split
+        inside = link_path == file_subpath or link_path.startswith(file_subpath + "/")
+        return file_subpath, key, "" if inside else link_path
 
-    async def _virtual_node(username: str, mount_path: str, store: ReadStore,
+    async def _virtual_node(username: str, fsp_name: str, store: ReadStore,
                             file_subpath: str, key: str = "", result: Optional[dict] = None) -> Optional[dict]:
         """Listing for ``key`` inside an image file zarrbridge can serve.
 
@@ -600,9 +615,12 @@ def create_app(settings):
             return result if not key else None
         if not isinstance(worker_pool, SupervisedWorkerPool):
             return result if not key else None
+        resolved = await _resolve_image(username, fsp_name, info["path"])
+        if "error" in resolved:
+            return result if not key else None
         try:
             sock = await worker_pool.dataserver(username)
-            return await zarrproxy.virtual_node(sock, posixpath.join(mount_path, info["path"]), info, key)
+            return await zarrproxy.virtual_node(sock, resolved["path"], info, key)
         except Exception as e:  # not servable, or no zarrbridge: plain file
             logger.info(f"No virtual Zarr for {info['path']}: {e}")
             return result if not key else None
@@ -643,6 +661,8 @@ def create_app(settings):
                 "username": proxied_path.username,
                 "url_prefix": stored_prefix,
                 "default_name": os.path.basename(stored_path) or fsp.name,
+                "fsp_name": proxied_path.fsp_name,
+                "link_path": stored_path,
             }
 
 
@@ -698,6 +718,8 @@ def create_app(settings):
             "target_name": target_name,
             "username": link["username"],
             "url_prefix": stored_prefix,
+            "fsp_name": link["fsp_name"],
+            "link_path": link["link_path"],
         }, subpath
 
 
@@ -1969,7 +1991,8 @@ def create_app(settings):
 
             split = _link_virtual_split(info, subpath)
             if split:
-                return await _zarr_proxy(request, info["username"], "", split)
+                return await _zarr_proxy(request, info["username"], info["fsp_name"], split[:2],
+                                         within=split[2])
 
             range_header = request.headers.get("range")
 
@@ -2018,7 +2041,8 @@ def create_app(settings):
                 return info
             split = _link_virtual_split(info, subpath)
             if split:
-                return await _zarr_proxy(request, info["username"], "", split)
+                return await _zarr_proxy(request, info["username"], info["fsp_name"], split[:2],
+                                         within=split[2])
             result = await _worker_exec(info["username"], "s3_head_object",
                                         mount_path=info["mount_path"],
                                         target_name=info["target_name"],
@@ -2157,7 +2181,7 @@ def create_app(settings):
         store = _store_for(username, filestore_name)
         split = zarrproxy.split_virtual_path(subpath)
         if split and isinstance(store, WorkerStore):
-            return await _zarr_proxy(request, username, _mount_path_for(filestore_name), split)
+            return await _zarr_proxy(request, username, filestore_name, split)
         result = await store.head_file(subpath)
         if "error" in result:
             raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
@@ -2195,7 +2219,7 @@ def create_app(settings):
         store = _store_for(username, filestore_name)
         split = zarrproxy.split_virtual_path(subpath)
         if split and isinstance(store, WorkerStore):
-            return await _zarr_proxy(request, username, _mount_path_for(filestore_name), split)
+            return await _zarr_proxy(request, username, filestore_name, split)
         try:
             status, headers, body = await store.open_range(subpath, request.headers.get('Range'))
         except StoreError as e:
@@ -2296,7 +2320,7 @@ def create_app(settings):
         store = _store_for(username, filestore_name)
         split = zarrproxy.split_virtual_path(subpath)
         if split and isinstance(store, WorkerStore):
-            node = await _virtual_node(username, _mount_path_for(filestore_name), store, *split)
+            node = await _virtual_node(username, filestore_name, store, *split)
             if node is None:
                 return JSONResponse(content={"error": "File or directory not found", "status_code": 404}, status_code=404)
             return node
@@ -2312,7 +2336,7 @@ def create_app(settings):
         if "error" in result:
             raise HTTPException(status_code=500, detail=result["error"])
         if isinstance(store, WorkerStore):
-            result = await _virtual_node(username, _mount_path_for(filestore_name), store, subpath, result=result)
+            result = await _virtual_node(username, filestore_name, store, subpath, result=result)
         return result
 
 
