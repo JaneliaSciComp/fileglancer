@@ -707,6 +707,25 @@ class TestSupervisedWorkerPool:
             await pool.stop()
 
     @pytest.mark.asyncio
+    async def test_dataserver_socket_is_cached_briefly(self, embedded_settings, monkeypatch):
+        from fileglancer.worker_pool import SupervisedWorkerPool
+        pool = SupervisedWorkerPool(embedded_settings)
+        await pool.start()
+        try:
+            calls = []
+            monkeypatch.setattr(pool, "_acquire_dataserver_blocking",
+                                lambda sock, user: calls.append(user) or {"ok": True, "socket": f"/zb-{user}", "pid": 1})
+            assert await pool.dataserver("alice") == "/zb-alice"
+            assert await pool.dataserver("alice") == "/zb-alice"
+            assert await pool.dataserver("bob") == "/zb-bob"
+            assert calls == ["alice", "bob"]
+            pool._dataserver_cache["alice"] = ("/zb-alice", 0.0)  # expired
+            await pool.dataserver("alice")
+            assert calls == ["alice", "bob", "alice"]
+        finally:
+            await pool.stop()
+
+    @pytest.mark.asyncio
     async def test_acquire_after_supervisor_death_is_503(self, embedded_settings):
         from fileglancer.worker_pool import SupervisedWorkerPool, WorkerDead
         pool = SupervisedWorkerPool(embedded_settings)
