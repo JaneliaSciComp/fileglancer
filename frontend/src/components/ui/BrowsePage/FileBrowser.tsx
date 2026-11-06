@@ -270,8 +270,7 @@ export default function FileBrowser({
         <MetadataHint
           variant={{
             case: 'virtual-zarr',
-            state: zarrbridgeStatusQuery.data.levels?.state,
-            reader: zarrbridgeStatusQuery.data.reader
+            state: zarrbridgeStatusQuery.data.levels?.state
           }}
         />
       ) : null}
