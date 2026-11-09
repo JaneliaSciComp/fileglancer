@@ -145,6 +145,25 @@ The host in that URL must match the address in the browser exactly, including
 | Dev or staging host without a build | nginx proxies the production host's `/neuroglancer/` under the dev origin. |
 | Local development | The app's `FGC_NEUROGLANCER_URL` passthrough proxies an external Neuroglancer. |
 
+The production block serves hashed assets with `expires max`, but the entry point
+`index.html` is unhashed. After a redeploy, a browser holding a cached index keeps
+requesting the deleted `main.<oldhash>.js` and Neuroglancer renders black. Exempt
+the entry point before the existing `location /neuroglancer/`:
+
+```nginx
+# The entry point is unhashed: revalidate it on every load, or a redeploy
+# leaves browsers requesting the old bundle hash (black Neuroglancer).
+location ~ ^/neuroglancer/(index\.html)?$ {
+  alias /opt/deploy/neuroglancer/dist/client/index.html;
+  add_header Cache-Control "no-cache";
+}
+
+location /neuroglancer/ {
+  alias /opt/deploy/neuroglancer/dist/client/;
+  expires max;
+}
+```
+
 When nginx serves the build from disk, the `.wasm` files must go out as `application/wasm`, or Neuroglancer's Draco mesh decoder fails to compile and meshes never render (the console shows `Incorrect response MIME type. Expected 'application/wasm'`). nginx added that type to its default `mime.types` in 1.21.0; on older versions add `include /etc/nginx/mime.types; types { application/wasm wasm; }` to the `location /neuroglancer/` block (both lines: a `types` block alone replaces the inherited map and breaks `.js` and `.css`). A dev host that proxies production needs the nested `.wasm` location shown below instead, because `types` has no effect on proxied responses.
 
 The nginx block for a dev host:
@@ -156,6 +175,19 @@ location /neuroglancer/ {
   proxy_ssl_server_name on;
   proxy_hide_header Set-Cookie;
   expires max;
+
+  # Revalidate the unhashed entry point (see the production block above).
+  # `expires` replaces the upstream Cache-Control, so override it here
+  # rather than relying on what production sends through the proxy.
+  location ~ ^/neuroglancer/(index\.html)?$ {
+    proxy_pass https://fileglancer.example.org;
+    proxy_set_header Host fileglancer.example.org;
+    proxy_ssl_server_name on;
+    proxy_hide_header Set-Cookie;
+    proxy_hide_header Expires;
+    proxy_hide_header Cache-Control;
+    add_header Cache-Control "no-cache";
+  }
 
   # Relay .wasm as application/wasm even when production sends
   # application/octet-stream (nginx < 1.21). `types` does not apply to
@@ -172,8 +204,18 @@ location /neuroglancer/ {
 }
 ```
 
-Reload nginx, then check that `curl -sk https://<dev-host>/neuroglancer/`
-returns a page titled `neuroglancer` rather than Fileglancer's own HTML.
+Run `nginx -t`, reload nginx, then check that `curl -sk https://<dev-host>/neuroglancer/`
+returns a page titled `neuroglancer` rather than Fileglancer's own HTML, and that
+only the entry point is revalidated:
+
+```
+curl -skI https://<host>/neuroglancer/ | grep -i cache-control   # expect no-cache
+curl -skI https://<host>/neuroglancer/main.<hash>.js | grep -i cache-control   # expect max-age=315360000
+```
+
+A hard reload of a Fileglancer page does not refresh the iframe document. A user
+already holding a stale index must open `/neuroglancer/` as a top-level page and
+hard-reload it there, or use DevTools "Empty Cache and Hard Reload".
 
 Behind a reverse proxy, `FGC_NEUROGLANCER_URL` has no effect: nginx answers
 `/neuroglancer/` before the request reaches the app. It is a local-development
