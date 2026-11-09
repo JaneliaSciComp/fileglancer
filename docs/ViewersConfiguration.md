@@ -125,6 +125,21 @@ Fileglancer; otherwise the viewer is read-only with a note. See
 below, and [Development.md](Development.md#testing-view-editing-locally) for
 testing locally.
 
+#### Per-user WEBKNOSSOS host
+
+The WEBKNOSSOS button opens the WEBKNOSSOS import page with the data link filled in. The deployment sets the default server with `instance_template_url`:
+
+```yaml
+viewers:
+  - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/webknossos.yaml"
+    instance_template_url: "https://wk.janelia.org/import?url={dataLink}"
+    label: "Import into WEBKNOSSOS"
+```
+
+Users can point their own button at a different WEBKNOSSOS server from **Preferences → WEBKNOSSOS**. The field takes a host name, such as `webknossos.example.org`, and keeps the path and query of the configured template. Fileglancer accepts only `https` hosts. Saving the default host clears the override. Like the Neuroglancer choice above, this is stored in `viewerUrlSources` and affects only the user who sets it.
+
+Importing requires an admin, dataset manager or team manager role in the WEBKNOSSOS organization, and the WEBKNOSSOS server must be able to reach the data link.
+
 ### Serving Neuroglancer for View editing
 
 The View page reads the Neuroglancer iframe's `window.viewer` to save and
