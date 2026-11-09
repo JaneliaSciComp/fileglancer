@@ -4,27 +4,35 @@ The `fileglancer` command-line tool starts a local Fileglancer server for browsi
 
 ## Installation
 
-The best practice is to install Fileglancer into a dedicated environment using your preferred Python package manager, e.g., [Pixi](https://pixi.prefix.dev/dev/installation/) or [uv](https://docs.astral.sh/uv/getting-started/installation/):
+Install Fileglancer as a standalone command-line tool. This creates an isolated environment for it and puts the `fileglancer` command on your PATH, the same way JupyterLab is installed.
+
+With [uv](https://docs.astral.sh/uv/getting-started/installation/) (0.3 or newer):
 
 ```bash
-# pixi
-pixi add fileglancer
-
-# uv
-uv venv fileglancer-env
-source fileglancer-env/bin/activate
-uv pip install fileglancer
+uv tool install fileglancer
 ```
 
-If you have uv installed and want a quick one-liner to try Fileglancer in a temporary environment:
+Or with [pipx](https://pipx.pypa.io/):
 
 ```bash
-uvx fileglancer start
+pipx install fileglancer
 ```
+
+If you already manage Python environments yourself, you can instead `pip install fileglancer` into a virtual environment, or `pixi add fileglancer` to a Pixi project, and run `fileglancer` from inside that environment.
+
+### Upgrading
+
+```bash
+uv tool upgrade fileglancer   # or: pipx upgrade fileglancer
+```
+
+### Why not `uvx fileglancer`?
+
+`uvx` runs a tool from a disposable cached environment. If that environment was interrupted while being built, or is shared between machines or uv versions, later runs fail with `Package fileglancer does not provide any executables`. Running `uv cache clean fileglancer` clears the bad cache, but a persistent `uv tool install` avoids the problem entirely.
 
 ## Start Fileglancer
 
-From inside the environment you just created, run:
+Once installed, run:
 
 ```bash
 fileglancer start
