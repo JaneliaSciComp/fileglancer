@@ -84,6 +84,22 @@ describe('parseS3Url', () => {
         prefix: 'with space',
         endpointUrl: 'https://store.example.org'
       }
+    ],
+    [
+      'https://spatial_demo_datasets.cog.sanger.ac.uk/spatialdata.sdata.zarr/',
+      {
+        bucket: 'spatial_demo_datasets',
+        prefix: 'spatialdata.sdata.zarr',
+        endpointUrl: 'https://cog.sanger.ac.uk'
+      }
+    ],
+    [
+      'https://spatial_demo_datasets.cog.sanger.ac.uk',
+      {
+        bucket: 'spatial_demo_datasets',
+        prefix: '',
+        endpointUrl: 'https://cog.sanger.ac.uk'
+      }
     ]
   ])('parses %s', (input, expected) =>
     expect(parseS3Url(input)).toEqual(expected)
