@@ -214,6 +214,8 @@ def test_validate_endpoint_url_normalizes(url, allowed, expected, monkeypatch):
     ("https://s3.example.org", None, [], "not a public host"),
     ("https://other.example.org", ["https://s3.example.org"], ["93.184.216.34"], "not allowed on this server"),
     ("https://s3.example.org", [], ["93.184.216.34"], "not allowed on this server"),
+    # botocore rejects underscores in endpoint hosts; a bucket-as-subdomain URL must be split instead
+    ("https://my_bucket.s3.example.org", None, ["93.184.216.34"], "not a valid host name"),
 ])
 def test_validate_endpoint_url_rejects(url, allowed, addrs, message, monkeypatch):
     monkeypatch.setattr(s3store, "_resolve_host", lambda h: addrs)
