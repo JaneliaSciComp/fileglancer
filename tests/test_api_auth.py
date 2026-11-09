@@ -137,7 +137,6 @@ def make_auth_app():
             "cli_mode": True,
             "enable_okta_auth": False,
             "session_secret_key": "test-secret-key",
-            "session_cookie_secure": False,  # TestClient uses http; allow cookie round-trip
             "api_allowed_origins": ["https://ai-cryoet.int.janelia.org"],
             "simple_auth_password": "hunter2",
             **overrides,
@@ -217,6 +216,24 @@ def test_login_fails_closed_without_a_password(make_auth_app):
     client = TestClient(make_auth_app(simple_auth_password=None))
     resp = client.post("/api/auth/simple-login", json={"password": ""})
     assert resp.status_code == 401
+
+
+def test_cookie_secure_follows_the_request_scheme(auth_app):
+    # Unset session_cookie_secure: plain http gets a cookie it can send back,
+    # https gets a Secure one. No configuration needed for either.
+    plain = TestClient(auth_app).post("/api/auth/simple-login", json={"password": "hunter2"})
+    assert "secure" not in plain.headers["set-cookie"].lower()
+    tls = TestClient(auth_app, base_url="https://testserver").post(
+        "/api/auth/simple-login", json={"password": "hunter2"})
+    assert "secure" in tls.headers["set-cookie"].lower()
+
+
+def test_data_link_url_defaults_to_the_request_origin(make_auth_app):
+    client = TestClient(make_auth_app(external_proxy_url=None))
+    client.post("/api/auth/simple-login", json={"password": "hunter2"})
+    resp = client.post("/api/proxied-path", params={"fsp_name": "tempdir", "path": "."})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["url"].startswith("http://testserver/files/")
 
 
 def test_access_flags_require_okta():
