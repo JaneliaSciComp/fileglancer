@@ -11,11 +11,11 @@ export type AuthStatus = {
   authenticated: boolean;
   username?: string;
   email?: string;
-  auth_method?: 'simple' | 'okta';
+  auth_method?: 'simple' | 'okta' | 'single_user';
 };
 
 export type SimpleLoginPayload = {
-  username: string;
+  username?: string;
   password: string;
   next?: string;
 };

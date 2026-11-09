@@ -91,12 +91,15 @@ sharing_key_cache_size: 1000
 # OKTA OAuth/OIDC Authentication Settings
 # Set enable_okta_auth to true to require OKTA authentication.
 # When false, the simple login form is used, gated by simple_auth_password.
+# Without use_access_flags the server is single-user (every request runs as
+# the process's own OS user) and the form asks for the password only.
 #
 # enable_okta_auth: false
 #
 # Shared password for the simple login form. When unset, a random one is
 # generated at startup and printed to the server log. This is only a gate
-# for development servers: anyone who knows it can log in as any username.
+# for development servers; in multi-user mode anyone who knows it can log
+# in as any username.
 #
 # simple_auth_password: change-me
 

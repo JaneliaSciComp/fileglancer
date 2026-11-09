@@ -182,7 +182,8 @@ class Settings(BaseSettings):
     session_cookie_secure: bool = True  # Set to False for development with self-signed certs
 
     # Authentication toggle. When False the simple login form is used, gated
-    # by simple_auth_password.
+    # by simple_auth_password. In single_user_mode the form asks for the
+    # password only: the username is always the server's own OS user.
     enable_okta_auth: bool = False
 
     # Shared password for the simple login form. Without Okta this is the only
@@ -190,9 +191,22 @@ class Settings(BaseSettings):
     # so it is always enforced: when unset, a random one is generated at
     # startup and printed to the server log. Set it explicitly when running
     # more than one worker, since each worker would otherwise generate its
-    # own. This is a dev-server gate, not per-user authentication: anyone
-    # who knows it can log in as anyone. Use Okta for real deployments.
+    # own. This is a dev-server gate, not per-user authentication: in
+    # multi-user mode anyone who knows it can log in as anyone. Use Okta for
+    # real deployments.
     simple_auth_password: Optional[str] = None
+
+    @property
+    def single_user_mode(self) -> bool:
+        """True when every request runs as the server's own OS user.
+
+        Without Okta and without setuid workers there is only one identity a
+        request can have, so asking for a username is both pointless and
+        harmful: a mistyped name silently splits preferences, tokens and jobs
+        from the files they belong to. The login form still asks for the
+        password, because the server may be reachable by other people.
+        """
+        return not self.enable_okta_auth and not self.use_access_flags
 
     # Cross-origin browser apps allowed to call the authenticated API using the
     # logged-in user's session cookie. List full origins (scheme + host + optional

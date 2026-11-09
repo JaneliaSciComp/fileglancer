@@ -19,9 +19,8 @@ const openFileglancer = async (page: Page) => {
   await page.goto('/', {
     waitUntil: 'domcontentloaded'
   });
-  // Perform login
+  // The test server runs in single-user mode: password only, no username.
   await page.waitForSelector('text=Log In', { timeout: 10000 });
-  await page.getByRole('textbox', { name: 'Username' }).fill('testUser');
   await page.getByRole('textbox', { name: 'Password' }).fill('playwright');
   await page.getByRole('button', { name: 'Log In' }).click();
 

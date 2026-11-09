@@ -15,7 +15,10 @@ export default function Login() {
   const { authStatus, loading } = useAuthContext();
   const navigate = useNavigate();
   const isAuthenticated = authStatus?.authenticated;
-  const isSimpleAuth = authStatus?.auth_method === 'simple';
+  // 'single_user' is simple auth where the server already knows who you are
+  // (its own OS user), so only the password is asked for.
+  const isSingleUser = authStatus?.auth_method === 'single_user';
+  const isSimpleAuth = authStatus?.auth_method === 'simple' || isSingleUser;
   const simpleLoginMutation = useSimpleLoginMutation();
 
   // Get the 'next' parameter from URL to redirect after login
@@ -32,7 +35,7 @@ export default function Login() {
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const username = formData.get('username') as string;
+    const username = (formData.get('username') as string | null) ?? undefined;
     const password = formData.get('password') as string;
 
     simpleLoginMutation.mutate(
@@ -77,12 +80,16 @@ export default function Login() {
           <div className="p-6 border-2 border-primary rounded-lg">
             <h2 className="text-xl font-semibold mb-4 text-primary">Log In</h2>
             <p className="text-muted-foreground mb-4">
-              Enter your username and the server password to access your files
+              {isSingleUser
+                ? 'Enter the password printed when the server started'
+                : 'Enter your username and the server password to access your files'}
             </p>
             <form className="space-y-4 " onSubmit={handleLogin}>
-              <FgFormField label="Username">
-                <FgInput name="username" />
-              </FgFormField>
+              {isSingleUser ? null : (
+                <FgFormField label="Username">
+                  <FgInput name="username" />
+                </FgFormField>
+              )}
               <FgFormField
                 error={simpleLoginMutation.error?.message}
                 label="Password"

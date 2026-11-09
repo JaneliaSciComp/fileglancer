@@ -1,4 +1,5 @@
 import asyncio
+import getpass
 import os
 import re
 import shlex
@@ -1007,10 +1008,16 @@ def create_app(settings):
     @app.get("/api/auth/status", description="Check authentication status")
     async def auth_status(request: Request):
         """Check if user is authenticated"""
+        if settings.enable_okta_auth:
+            auth_method = "okta"
+        elif settings.single_user_mode:
+            auth_method = "single_user"  # simple login, password only
+        else:
+            auth_method = "simple"
+
         user_session = auth.get_session_from_cookie(request, settings)
 
         if user_session:
-            auth_method = "okta" if settings.enable_okta_auth else "simple"
             return {
                 "authenticated": True,
                 "username": user_session.username,
@@ -1018,7 +1025,6 @@ def create_app(settings):
                 "auth_method": auth_method
             }
 
-        auth_method = "okta" if settings.enable_okta_auth else "simple"
         return {"authenticated": False, "auth_method": auth_method}
 
 
@@ -3260,9 +3266,14 @@ def create_app(settings):
                 password.encode(), settings.simple_auth_password.encode()):
             raise HTTPException(status_code=401, detail="Incorrect password")
 
-        username = body.get("username")
-        if not username or not username.strip():
-            raise HTTPException(status_code=400, detail="Username is required")
+        if settings.single_user_mode:
+            # Every request runs as the server's OS user; a typed username
+            # would only split this user's DB rows from their files.
+            username = getpass.getuser()
+        else:
+            username = body.get("username")
+            if not username or not username.strip():
+                raise HTTPException(status_code=400, detail="Username is required")
 
         username = username.strip()
 
