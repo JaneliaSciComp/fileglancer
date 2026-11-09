@@ -42,20 +42,25 @@ This starts the server on `http://127.0.0.1:8000`, opens your browser, and serve
 
 ## Configuration
 
-Fileglancer looks for configuration in the current working directory. Settings are loaded from multiple sources, in priority order (highest first):
+The first `fileglancer start` writes a commented default config to `~/.config/fileglancer/config.yaml` (or `$XDG_CONFIG_HOME/fileglancer/config.yaml` when that variable is set). Every start logs the path of the config it read. Edit that file and restart the server to apply changes.
+
+To read a different file, pass `--config PATH` or set the `FGC_CONFIG_FILE` environment variable.
+
+Settings are loaded from multiple sources, in priority order (highest first):
 
 1. **CLI flags** (e.g., `--port 9000`)
 2. **Environment variables** — prefixed with `FGC_` (case-insensitive)
-3. **`.env` file** — in the current directory
-4. **`config.yaml`** — in the current directory
+3. **`.env` file** — next to the config file
+4. **The config file**
 
-If no configuration is found, sensible defaults are used.
+Every setting is optional. The personal server runs as the user who started it, and the login page asks for a password: set `simple_auth_password` in the config to pin one, or read the password the server prints at each start. The browser that `fileglancer start` opens is logged in automatically.
 
 ### Using a config file
 
-Create a `config.yaml` in the directory you plan to run `fileglancer start` from:
-
 ```yaml
+# Password for the login page
+simple_auth_password: change-me
+
 # Directories to expose in the file browser
 file_share_mounts:
   - "~/"
@@ -63,12 +68,6 @@ file_share_mounts:
 
 # Logging level (ERROR, WARNING, INFO, DEBUG, TRACE)
 log_level: INFO
-
-# Database URL (defaults to ~/.local/share/fileglancer/fileglancer.db)
-db_url: sqlite:///fileglancer.db
-
-# External proxy URL for shared file links
-external_proxy_url: http://localhost:8000/files
 ```
 
 A full template with all available options is available at [`docs/config.yaml.template`](config.yaml.template) in the source repository.
@@ -92,11 +91,11 @@ export FGC_CLUSTER__QUEUE=normal
 
 ### Using a .env file
 
-You can also place environment variables in a `.env` file in the current directory:
+You can also place environment variables in a `.env` file next to the config file:
 
 ```
 FGC_LOG_LEVEL=DEBUG
-FGC_DB_URL=sqlite:///fileglancer.db
+FGC_SIMPLE_AUTH_PASSWORD=change-me
 ```
 
 ## Command Reference
@@ -117,6 +116,7 @@ fileglancer start [OPTIONS]
 | `--port` | `8000` | Port to bind to |
 | `-f` / `--file-share-mounts` | — | File share path to mount (repeatable) |
 | `--no-browser` | off | Don't open a browser automatically |
+| `--config` | `~/.config/fileglancer/config.yaml` | Config file to read |
 | `--auto-port` | `true` | Find an available port if the specified one is in use |
 | `--reload` | off | Enable auto-reload on code changes |
 | `--workers` | — | Number of worker processes |
@@ -160,4 +160,4 @@ By default, Fileglancer stores its database at:
 ~/.local/share/fileglancer/fileglancer.db
 ```
 
-This can be overridden with the `db_url` setting in `config.yaml` or the `FGC_DB_URL` environment variable.
+This can be overridden with the `db_url` setting in the config file or the `FGC_DB_URL` environment variable. The same directory holds the key that signs session cookies, so a browser stays logged in across server restarts.
