@@ -167,6 +167,53 @@ class TestBuildWorkerEnv:
         assert "FGC_SESSION_SECRET_KEY" not in env
 
 
+class TestSubmitEnvFlags:
+    """_action_submit forwards the env-construction flags to the executor."""
+
+    def _submit(self, tmp_path, monkeypatch, **flags):
+        from unittest.mock import MagicMock
+        from fileglancer import user_worker
+
+        seen = {}
+
+        async def fake_submit(**kwargs):
+            seen.update(kwargs)
+            return MagicMock(job_id="1", script_path=None)
+
+        executor = MagicMock()
+        executor.submit = fake_submit
+        del executor._processes
+        monkeypatch.setattr(user_worker, "_get_executor", lambda request: executor)
+        monkeypatch.setattr(user_worker, "_file_share_paths_from_request", lambda r: [])
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        request = {
+            "action": "submit",
+            "cluster_config": {"executor": "local"},
+            "command": "true",
+            "job_name": "demo",
+            "resources": {"work_dir": str(tmp_path / "work")},
+            "work_dir": str(tmp_path / "work"),
+            "cached_repo_dir": str(repo),
+            **flags,
+        }
+        user_worker._action_submit(request, WorkerContext(username="test"))
+        return seen
+
+    @requires_symlinks
+    def test_defaults_are_constructed_login_env(self, tmp_path, monkeypatch):
+        seen = self._submit(tmp_path, monkeypatch)
+        assert seen["inherit_env"] is False
+        assert seen["login_shell"] is True
+
+    @requires_symlinks
+    def test_flags_are_forwarded(self, tmp_path, monkeypatch):
+        seen = self._submit(tmp_path, monkeypatch, inherit_env=True, login_shell=False)
+        assert seen["inherit_env"] is True
+        assert seen["login_shell"] is False
+
+
 class TestActionTimeout:
     """Git-heavy actions get a longer receive timeout than the default."""
 
