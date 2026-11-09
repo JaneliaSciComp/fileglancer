@@ -19,14 +19,11 @@ const openFileglancer = async (page: Page) => {
   await page.goto('/', {
     waitUntil: 'domcontentloaded'
   });
-  // Wait for the app to be ready
-  await page.waitForSelector('text=Log In', { timeout: 10000 });
-
   // Perform login
-  const loginForm = page.getByRole('textbox', { name: 'Username' });
-  const loginSubmitBtn = page.getByRole('button', { name: 'Log In' });
-  await loginForm.fill('testUser');
-  await loginSubmitBtn.click();
+  await page.waitForSelector('text=Log In', { timeout: 10000 });
+  await page.getByRole('textbox', { name: 'Username' }).fill('testUser');
+  await page.getByRole('textbox', { name: 'Password' }).fill('playwright');
+  await page.getByRole('button', { name: 'Log In' }).click();
 
   // Wait for the main UI to load
   await page.waitForSelector('text=Zones', { timeout: 10000 });

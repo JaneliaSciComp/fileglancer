@@ -284,7 +284,9 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
     browser_host = '127.0.0.1' if host == '0.0.0.0' else host
 
     if not no_browser:
-        # Create auto-login session for the system user
+        # Create auto-login session for the system user. The session id in the
+        # URL is what lets the browser we open skip the password prompt; any
+        # other browser logs in with the password the server prints at startup.
         system_username = getpass.getuser()
         expires_at = datetime.now(UTC) + timedelta(hours=settings.session_expiry_hours)
 

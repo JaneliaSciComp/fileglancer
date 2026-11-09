@@ -111,64 +111,109 @@ def test_origin_scheme_matters():
 # --- Integration test: enforcement through get_current_user ------------------
 
 @pytest.fixture
-def auth_app():
-    """A real app with simple auth, a stable session key, and an allowlist."""
-    temp_dir = tempfile.mkdtemp()
-    db_path = os.path.join(temp_dir, "test.db")
-    db_url = f"sqlite:///{db_path}"
+def make_auth_app():
+    """Factory for a real app with simple auth, a stable session key and an allowlist."""
+    cleanups = []
 
-    engine = create_engine(db_url)
-    Session = sessionmaker(bind=engine)
-    db_session = Session()
-    Base.metadata.create_all(engine)
-    db_session.add(FileSharePathDB(
-        name="tempdir", zone="z", group="g", storage="local",
-        mount_path=temp_dir, mac_path="", windows_path="", linux_path="",
-    ))
-    db_session.commit()
+    def _make(**overrides):
+        temp_dir = tempfile.mkdtemp()
+        db_path = os.path.join(temp_dir, "test.db")
+        db_url = f"sqlite:///{db_path}"
 
-    settings = Settings(
-        db_url=db_url,
-        file_share_mounts=[],
-        cli_mode=True,
-        enable_okta_auth=False,
-        session_secret_key="test-secret-key",
-        session_cookie_secure=False,  # TestClient uses http; allow cookie round-trip
-        api_allowed_origins=["https://ai-cryoet.int.janelia.org"],
-    )
+        engine = create_engine(db_url)
+        Session = sessionmaker(bind=engine)
+        db_session = Session()
+        Base.metadata.create_all(engine)
+        db_session.add(FileSharePathDB(
+            name="tempdir", zone="z", group="g", storage="local",
+            mount_path=temp_dir, mac_path="", windows_path="", linux_path="",
+        ))
+        db_session.commit()
 
-    # get_current_user resolves settings via get_settings() at request time.
-    # server.py binds that name at import, so patch it there too (not just in
-    # the settings/database modules) — otherwise the real endpoint would look up
-    # the session in the default database instead of this test's.
-    import fileglancer.settings
-    import fileglancer.database
-    import fileglancer.server
-    original = fileglancer.settings.get_settings
-    fileglancer.settings.get_settings = lambda: settings
-    fileglancer.database.get_settings = lambda: settings
-    fileglancer.server.get_settings = lambda: settings
+        settings = Settings(**{
+            "db_url": db_url,
+            "file_share_mounts": [],
+            "cli_mode": True,
+            "enable_okta_auth": False,
+            "session_secret_key": "test-secret-key",
+            "session_cookie_secure": False,  # TestClient uses http; allow cookie round-trip
+            "api_allowed_origins": ["https://ai-cryoet.int.janelia.org"],
+            "simple_auth_password": "hunter2",
+            **overrides,
+        })
 
-    app = create_app(settings)
-    yield app
+        # get_current_user resolves settings via get_settings() at request time.
+        # server.py binds that name at import, so patch it there too (not just in
+        # the settings/database modules) — otherwise the real endpoint would look up
+        # the session in the default database instead of this test's.
+        import fileglancer.settings
+        import fileglancer.database
+        import fileglancer.server
+        original = fileglancer.settings.get_settings
+        fileglancer.settings.get_settings = lambda: settings
+        fileglancer.database.get_settings = lambda: settings
+        fileglancer.server.get_settings = lambda: settings
 
-    db_session.close()
-    engine.dispose()
-    from fileglancer.database import dispose_engine
-    dispose_engine(db_url)
-    fileglancer.settings.get_settings = original
-    fileglancer.database.get_settings = original
-    fileglancer.server.get_settings = original
-    shutil.rmtree(temp_dir)
+        def cleanup():
+            db_session.close()
+            engine.dispose()
+            from fileglancer.database import dispose_engine
+            dispose_engine(db_url)
+            fileglancer.settings.get_settings = original
+            fileglancer.database.get_settings = original
+            fileglancer.server.get_settings = original
+            shutil.rmtree(temp_dir)
+        cleanups.append(cleanup)
+
+        return create_app(settings)
+
+    yield _make
+    for cleanup in reversed(cleanups):
+        cleanup()
+
+
+@pytest.fixture
+def auth_app(make_auth_app):
+    """A single-user app: every request is the OS user."""
+    return make_auth_app()
 
 
 @pytest.fixture
 def authed_client(auth_app):
     """A TestClient that has logged in via simple auth (cookie in jar)."""
     client = TestClient(auth_app)
-    resp = client.post("/api/auth/simple-login", json={"username": "testuser"})
+    resp = client.post("/api/auth/simple-login",
+                       json={"username": "testuser", "password": "hunter2"})
     assert resp.status_code == 200
     return client
+
+
+def test_simple_login_checks_the_password(auth_app):
+    client = TestClient(auth_app)
+    assert client.get("/api/profile").status_code == 401
+
+    resp = client.post("/api/auth/simple-login",
+                       json={"username": "alice", "password": "wrong"})
+    assert resp.status_code == 401
+    assert client.get("/api/profile").status_code == 401
+
+    resp = client.post("/api/auth/simple-login",
+                       json={"username": "alice", "password": "hunter2"})
+    assert resp.status_code == 200
+    assert client.get("/api/profile").json()["username"] == "alice"
+
+
+def test_password_is_generated_when_not_configured():
+    settings = Settings(db_url="sqlite://", file_share_mounts=[], cli_mode=True)
+    assert settings.simple_auth_password is None
+    with TestClient(create_app(settings)):  # runs the lifespan
+        assert settings.simple_auth_password
+
+
+def test_login_fails_closed_without_a_password(make_auth_app):
+    client = TestClient(make_auth_app(simple_auth_password=None))
+    resp = client.post("/api/auth/simple-login", json={"password": ""})
+    assert resp.status_code == 401
 
 
 def test_allowed_origins_endpoint_is_public(auth_app):
@@ -216,3 +261,4 @@ def test_disallowed_origin_rejected_before_auth(auth_app):
         headers={"Origin": "https://evil.example.com"},
     )
     assert resp.status_code == 403
+

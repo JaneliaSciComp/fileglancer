@@ -181,8 +181,18 @@ class Settings(BaseSettings):
     session_cookie_name: str = 'fg_session'
     session_cookie_secure: bool = True  # Set to False for development with self-signed certs
 
-    # Authentication toggle - if False, falls back to $USER environment variable
+    # Authentication toggle. When False the simple login form is used, gated
+    # by simple_auth_password.
     enable_okta_auth: bool = False
+
+    # Shared password for the simple login form. Without Okta this is the only
+    # thing standing between anyone who can reach the server and your files,
+    # so it is always enforced: when unset, a random one is generated at
+    # startup and printed to the server log. Set it explicitly when running
+    # more than one worker, since each worker would otherwise generate its
+    # own. This is a dev-server gate, not per-user authentication: anyone
+    # who knows it can log in as anyone. Use Okta for real deployments.
+    simple_auth_password: Optional[str] = None
 
     # Cross-origin browser apps allowed to call the authenticated API using the
     # logged-in user's session cookie. List full origins (scheme + host + optional

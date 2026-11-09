@@ -642,6 +642,13 @@ def create_app(settings):
         # Configure logging based on the log level/format in the settings
         configure_logging(settings.log_level, settings.log_format)
 
+        if not settings.enable_okta_auth and not settings.simple_auth_password:
+            settings.simple_auth_password = secrets.token_urlsafe(12)
+            logger.info(
+                f"No simple_auth_password configured. Log in with this "
+                f"password for the lifetime of this process:\n\n"
+                f"        {settings.simple_auth_password}\n")
+
         # use_access_flags requires root + non-CLI mode. Workers themselves
         # are used in any server mode (CLI mode runs in-process).
         if settings.use_access_flags:
@@ -3244,9 +3251,16 @@ def create_app(settings):
             raise HTTPException(status_code=404, detail="Use OKTA authentication")
 
         # Parse JSON body
-        username = body.get("username")
+        password = body.get("password") or ""
         next_url = body.get("next", "/browse")
 
+        # The lifespan generates a password when none is configured, so this
+        # only trips for an app whose lifespan never ran: fail closed.
+        if not settings.simple_auth_password or not secrets.compare_digest(
+                password.encode(), settings.simple_auth_password.encode()):
+            raise HTTPException(status_code=401, detail="Incorrect password")
+
+        username = body.get("username")
         if not username or not username.strip():
             raise HTTPException(status_code=400, detail="Username is required")
 

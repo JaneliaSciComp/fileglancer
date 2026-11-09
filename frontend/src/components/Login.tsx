@@ -33,9 +33,10 @@ export default function Login() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const username = formData.get('username') as string;
+    const password = formData.get('password') as string;
 
     simpleLoginMutation.mutate(
-      { username, next: nextUrl },
+      { username, password, next: nextUrl },
       {
         onSuccess: data => {
           // Redirect to root with next parameter
@@ -76,14 +77,17 @@ export default function Login() {
           <div className="p-6 border-2 border-primary rounded-lg">
             <h2 className="text-xl font-semibold mb-4 text-primary">Log In</h2>
             <p className="text-muted-foreground mb-4">
-              Enter your username to access your files
+              Enter your username and the server password to access your files
             </p>
             <form className="space-y-4 " onSubmit={handleLogin}>
+              <FgFormField label="Username">
+                <FgInput name="username" />
+              </FgFormField>
               <FgFormField
                 error={simpleLoginMutation.error?.message}
-                label="Username"
+                label="Password"
               >
-                <FgInput name="username" />
+                <FgInput name="password" type="password" />
               </FgFormField>
               <FgButton
                 className="w-full"
