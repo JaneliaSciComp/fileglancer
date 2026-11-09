@@ -66,7 +66,7 @@ The configuration file has a single top-level key, `viewers`, containing a list 
 
 ### Default Configuration
 
-The default `viewers.config.yaml` configures four viewers:
+The default `viewers.config.yaml` configures six viewers:
 
 ```yaml
 viewers:
@@ -77,6 +77,10 @@ viewers:
   - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/validator.yaml"
 
   - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/vole.yaml"
+
+  - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/vizarr.yaml"
+
+  - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/fiji.yaml"
 ```
 
 ## Capability Manifest Files
