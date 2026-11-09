@@ -70,13 +70,13 @@ The default `viewers.config.yaml` configures six viewers:
 
 ```yaml
 viewers:
-  - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/neuroglancer.yaml"
+  - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/neuroglancer.yaml"
 
-  - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/avivator.yaml"
+  - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/avivator.yaml"
 
-  - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/validator.yaml"
+  - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/validator.yaml"
 
-  - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/vole.yaml"
+  - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/vole.yaml"
 
   - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/vizarr.yaml"
 
@@ -93,7 +93,7 @@ Manifest files describe a viewer's identity and capabilities. The default manife
 
 ```yaml
 viewers:
-  - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/neuroglancer.yaml"
+  - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/neuroglancer.yaml"
 ```
 
 ### Override a viewer's URL
@@ -102,7 +102,7 @@ Use `instance_template_url` to point to a custom deployment of a viewer while st
 
 ```yaml
 viewers:
-  - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/host-manifests-and-docs/manifests/avivator.yaml"
+  - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/avivator.yaml"
     instance_template_url: "https://my-avivator-instance.example.com/?image_url={dataLink}"
 
 ```
