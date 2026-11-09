@@ -66,7 +66,7 @@ The configuration file has a single top-level key, `viewers`, containing a list 
 
 ### Default Configuration
 
-The default `viewers.config.yaml` configures six viewers:
+The default `viewers.config.yaml` configures seven viewers:
 
 ```yaml
 viewers:
@@ -81,6 +81,10 @@ viewers:
   - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/vizarr.yaml"
 
   - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/fiji.yaml"
+
+  - manifest_url: "https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/webknossos.yaml"
+    instance_template_url: "https://wk.janelia.org/import?url={dataLink}"
+    label: "Import into WEBKNOSSOS"
 ```
 
 ## Capability Manifest Files
