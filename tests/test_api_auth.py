@@ -11,7 +11,6 @@ import shutil
 from types import SimpleNamespace
 
 import pytest
-from fastapi import HTTPException, Request
 from fastapi.testclient import TestClient
 
 from fileglancer import auth
@@ -114,10 +113,7 @@ def test_origin_scheme_matters():
 
 @pytest.fixture
 def make_auth_app():
-    """Factory for a real app with a stable session key and an allowlist.
-
-    Defaults to single-user mode; pass Settings overrides for other modes.
-    """
+    """Factory for a real single-user app with a stable session key and an allowlist."""
     cleanups = []
 
     def _make(**overrides):
@@ -179,7 +175,6 @@ def make_auth_app():
 
 @pytest.fixture
 def auth_app(make_auth_app):
-    """A single-user app: every request is the OS user."""
     return make_auth_app()
 
 
@@ -192,10 +187,10 @@ def authed_client(auth_app):
     return client
 
 
-def test_single_user_login_needs_only_the_password(auth_app):
+def test_login_needs_only_the_password(auth_app):
     client = TestClient(auth_app)
     assert client.get("/api/auth/status").json() == {
-        "authenticated": False, "auth_method": "single_user"}
+        "authenticated": False, "auth_method": "simple"}
     assert client.get("/api/profile").status_code == 401
 
     resp = client.post("/api/auth/simple-login", json={"password": "wrong"})
@@ -224,17 +219,10 @@ def test_login_fails_closed_without_a_password(make_auth_app):
     assert resp.status_code == 401
 
 
-def test_multi_user_simple_auth_still_requires_a_session():
-    settings = Settings(
-        db_url="sqlite://", file_share_mounts=[],
-        enable_okta_auth=False, use_access_flags=True,
-    )
-    assert settings.single_user_mode is False
-    request = Request({"type": "http", "method": "GET", "path": "/api/profile",
-                       "headers": [], "query_string": b""})
-    with pytest.raises(HTTPException) as exc:
-        auth.get_current_user(request, settings)
-    assert exc.value.status_code == 401
+def test_access_flags_require_okta():
+    with pytest.raises(ValueError, match="use_access_flags requires enable_okta_auth"):
+        Settings(db_url="sqlite://", file_share_mounts=[],
+                 enable_okta_auth=False, use_access_flags=True)
 
 
 def test_allowed_origins_endpoint_is_public(auth_app):
@@ -283,22 +271,3 @@ def test_disallowed_origin_rejected_before_auth(auth_app):
     )
     assert resp.status_code == 403
 
-
-def test_multi_user_login_checks_the_password_and_takes_a_username(make_auth_app):
-    # cli_mode stays True so the action path runs in-process; the
-    # cli_mode/use_access_flags conflict is only checked in the lifespan,
-    # which TestClient does not run here.
-    app = make_auth_app(use_access_flags=True)
-    client = TestClient(app)
-
-    assert client.get("/api/profile").status_code == 401
-
-    resp = client.post("/api/auth/simple-login",
-                       json={"username": "alice", "password": "wrong"})
-    assert resp.status_code == 401
-    assert client.get("/api/profile").status_code == 401
-
-    resp = client.post("/api/auth/simple-login",
-                       json={"username": "alice", "password": "hunter2"})
-    assert resp.status_code == 200
-    assert client.get("/api/profile").json()["username"] == "alice"

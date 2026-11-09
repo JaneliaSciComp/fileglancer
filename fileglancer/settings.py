@@ -131,8 +131,11 @@ class Settings(BaseSettings):
 
     # If true, each per-user worker subprocess setuids to the target user
     # before handling requests. Requires root + non-CLI mode (validated at
-    # app startup). When false, workers run as the parent process's user —
-    # useful for local debugging of the worker code path without root.
+    # app startup) and enable_okta_auth (validated here): acting as other
+    # users is only safe when an identity provider vouches for who is asking.
+    # When false, workers run as the parent process's user — the server is
+    # then single-user, which is what the `fileglancer` CLI and local
+    # development use.
     use_access_flags: bool = False
 
     # Atlassian settings for accessing JIRA services
@@ -181,32 +184,19 @@ class Settings(BaseSettings):
     session_cookie_name: str = 'fg_session'
     session_cookie_secure: bool = True  # Set to False for development with self-signed certs
 
-    # Authentication toggle. When False the simple login form is used, gated
-    # by simple_auth_password. In single_user_mode the form asks for the
-    # password only: the username is always the server's own OS user.
+    # Authentication toggle. When False the server is single-user: every
+    # request runs as the server's own OS user, and the login form asks for
+    # simple_auth_password only. There is deliberately no way to pick a
+    # username without Okta.
     enable_okta_auth: bool = False
 
-    # Shared password for the simple login form. Without Okta this is the only
+    # Password for the single-user login form. Without Okta this is the only
     # thing standing between anyone who can reach the server and your files,
     # so it is always enforced: when unset, a random one is generated at
     # startup and printed to the server log. Set it explicitly when running
     # more than one worker, since each worker would otherwise generate its
-    # own. This is a dev-server gate, not per-user authentication: in
-    # multi-user mode anyone who knows it can log in as anyone. Use Okta for
-    # real deployments.
+    # own.
     simple_auth_password: Optional[str] = None
-
-    @property
-    def single_user_mode(self) -> bool:
-        """True when every request runs as the server's own OS user.
-
-        Without Okta and without setuid workers there is only one identity a
-        request can have, so asking for a username is both pointless and
-        harmful: a mistyped name silently splits preferences, tokens and jobs
-        from the files they belong to. The login form still asks for the
-        password, because the server may be reachable by other people.
-        """
-        return not self.enable_okta_auth and not self.use_access_flags
 
     # Cross-origin browser apps allowed to call the authenticated API using the
     # logged-in user's session cookie. List full origins (scheme + host + optional
@@ -338,6 +328,21 @@ class Settings(BaseSettings):
                 "apps.service_proxy_domain requires session_secret_key to be "
                 "set: service proxy hostnames are signed with it, and a "
                 "per-process random key breaks resolution across workers")
+        return self
+
+    @model_validator(mode='after')
+    def validate_access_flags_need_okta(self):
+        """Running as other users requires knowing who is asking.
+
+        A shared password cannot establish that, so setuid workers are only
+        allowed behind Okta. Fail at startup, where the cause is obvious.
+        """
+        if self.use_access_flags and not self.enable_okta_auth:
+            raise ValueError(
+                "use_access_flags requires enable_okta_auth: without an "
+                "identity provider anyone with the login password could act "
+                "as any user. Set enable_okta_auth=true, or set "
+                "use_access_flags=false to run as a single user")
         return self
 
     @model_validator(mode='after')

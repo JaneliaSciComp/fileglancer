@@ -1008,12 +1008,7 @@ def create_app(settings):
     @app.get("/api/auth/status", description="Check authentication status")
     async def auth_status(request: Request):
         """Check if user is authenticated"""
-        if settings.enable_okta_auth:
-            auth_method = "okta"
-        elif settings.single_user_mode:
-            auth_method = "single_user"  # simple login, password only
-        else:
-            auth_method = "simple"
+        auth_method = "okta" if settings.enable_okta_auth else "simple"
 
         user_session = auth.get_session_from_cookie(request, settings)
 
@@ -3252,7 +3247,7 @@ def create_app(settings):
 
     @app.post("/api/auth/simple-login", include_in_schema=not settings.enable_okta_auth)
     async def simple_login_handler(request: Request, body: dict = Body(...)):
-        """Handle simple login JSON submission"""
+        """Handle the single-user password login"""
         if settings.enable_okta_auth:
             raise HTTPException(status_code=404, detail="Use OKTA authentication")
 
@@ -3266,16 +3261,10 @@ def create_app(settings):
                 password.encode(), settings.simple_auth_password.encode()):
             raise HTTPException(status_code=401, detail="Incorrect password")
 
-        if settings.single_user_mode:
-            # Every request runs as the server's OS user; a typed username
-            # would only split this user's DB rows from their files.
-            username = getpass.getuser()
-        else:
-            username = body.get("username")
-            if not username or not username.strip():
-                raise HTTPException(status_code=400, detail="Username is required")
-
-        username = username.strip()
+        # Every request runs as the server's OS user, so the body carries no
+        # username: a typed one could only split this user's DB rows from
+        # the files they belong to.
+        username = getpass.getuser()
 
         # Validate next_url to prevent open redirect vulnerabilities
         # Only allow relative URLs that start with /

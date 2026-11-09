@@ -15,10 +15,7 @@ export default function Login() {
   const { authStatus, loading } = useAuthContext();
   const navigate = useNavigate();
   const isAuthenticated = authStatus?.authenticated;
-  // 'single_user' is simple auth where the server already knows who you are
-  // (its own OS user), so only the password is asked for.
-  const isSingleUser = authStatus?.auth_method === 'single_user';
-  const isSimpleAuth = authStatus?.auth_method === 'simple' || isSingleUser;
+  const isSimpleAuth = authStatus?.auth_method === 'simple';
   const simpleLoginMutation = useSimpleLoginMutation();
 
   // Get the 'next' parameter from URL to redirect after login
@@ -35,11 +32,10 @@ export default function Login() {
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const username = (formData.get('username') as string | null) ?? undefined;
     const password = formData.get('password') as string;
 
     simpleLoginMutation.mutate(
-      { username, password, next: nextUrl },
+      { password, next: nextUrl },
       {
         onSuccess: data => {
           // Redirect to root with next parameter
@@ -80,16 +76,10 @@ export default function Login() {
           <div className="p-6 border-2 border-primary rounded-lg">
             <h2 className="text-xl font-semibold mb-4 text-primary">Log In</h2>
             <p className="text-muted-foreground mb-4">
-              {isSingleUser
-                ? 'Enter the password printed when the server started'
-                : 'Enter your username and the server password to access your files'}
+              Enter the server password (printed in the server log at startup if
+              none was configured)
             </p>
             <form className="space-y-4 " onSubmit={handleLogin}>
-              {isSingleUser ? null : (
-                <FgFormField label="Username">
-                  <FgInput name="username" />
-                </FgFormField>
-              )}
               <FgFormField
                 error={simpleLoginMutation.error?.message}
                 label="Password"
