@@ -14,7 +14,8 @@ import type { FileOrFolder } from '@/shared.types';
 import {
   useFileContentQuery,
   useFileMetadataQuery,
-  useFileBinaryPreviewQuery
+  useFileBinaryPreviewQuery,
+  TEXT_PREVIEW_BYTES
 } from '@/queries/fileContentQueries';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import HexDump from './HexDump';
@@ -165,6 +166,8 @@ export default function FileViewer({ file }: FileViewerProps) {
     }
 
     const content = contentQuery.data ?? '';
+    const totalSize = metadataQuery.data?.size ?? file.size ?? 0;
+    const truncated = totalSize > TEXT_PREVIEW_BYTES;
 
     // Format JSON if toggle is enabled and content is valid JSON
     let displayContent = content;
@@ -193,30 +196,38 @@ export default function FileViewer({ file }: FileViewerProps) {
     };
 
     return (
-      <SyntaxHighlighter
-        codeTagProps={mergedCodeTagProps}
-        customStyle={{
-          margin: 0,
-          paddingTop: '1em',
-          paddingRight: '1em',
-          paddingBottom: '0',
-          paddingLeft: '1em',
-          fontSize: '14px',
-          lineHeight: '1.5',
-          overflow: 'visible',
-          width: '100%',
-          boxSizing: 'border-box',
-          minHeight: 'fit-content',
-          background: 'transparent'
-        }}
-        language={language}
-        showLineNumbers={false}
-        style={isDarkMode ? materialDark : coy}
-        wrapLines={true}
-        wrapLongLines={true}
-      >
-        {displayContent}
-      </SyntaxHighlighter>
+      <>
+        {truncated ? (
+          <Typography className="px-4 pt-3 text-foreground/70" type="small">
+            Showing the first {formatFileSize(TEXT_PREVIEW_BYTES)} of{' '}
+            {formatFileSize(totalSize)}. Download the file to see all of it.
+          </Typography>
+        ) : null}
+        <SyntaxHighlighter
+          codeTagProps={mergedCodeTagProps}
+          customStyle={{
+            margin: 0,
+            paddingTop: '1em',
+            paddingRight: '1em',
+            paddingBottom: '0',
+            paddingLeft: '1em',
+            fontSize: '14px',
+            lineHeight: '1.5',
+            overflow: 'visible',
+            width: '100%',
+            boxSizing: 'border-box',
+            minHeight: 'fit-content',
+            background: 'transparent'
+          }}
+          language={language}
+          showLineNumbers={false}
+          style={isDarkMode ? materialDark : coy}
+          wrapLines={true}
+          wrapLongLines={true}
+        >
+          {displayContent}
+        </SyntaxHighlighter>
+      </>
     );
   };
 

@@ -10,6 +10,8 @@ import type { FetchRequestOptions } from '@/shared.types';
 
 // Number of bytes to fetch for binary hex preview
 const BINARY_PREVIEW_BYTES = 512;
+// A text preview never downloads more than this; the viewer says when it is cut.
+export const TEXT_PREVIEW_BYTES = 1024 * 1024;
 
 // Query keys for file content and metadata
 export const fileContentQueryKeys = {
@@ -79,8 +81,9 @@ export function useFileMetadataQuery(
   });
 }
 
-// Hook to fetch file content (GET request)
-// Now simplified - just fetches and decodes as UTF-8
+// Hook to fetch file content (GET request) for the text preview. Asks for the
+// first TEXT_PREVIEW_BYTES only: a file the binary heuristic missed must never
+// be downloaded whole into the page.
 export function useFileContentQuery(
   fspName: string | undefined,
   filePath: string
@@ -88,7 +91,10 @@ export function useFileContentQuery(
   return useQuery<string, Error>({
     queryKey: fileContentQueryKeys.detail(fspName || '', filePath),
     queryFn: async ({ signal }: QueryFunctionContext) => {
-      const rawData = await fetchFileContent(fspName!, filePath, { signal });
+      const rawData = await fetchFileContent(fspName!, filePath, {
+        signal,
+        headers: { Range: `bytes=0-${TEXT_PREVIEW_BYTES - 1}` }
+      });
       return new TextDecoder('utf-8', { fatal: false }).decode(rawData);
     },
     enabled: !!fspName && !!filePath,
