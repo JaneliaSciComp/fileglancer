@@ -469,6 +469,21 @@ export function shouldRefreshListing(
   return nodeState !== undefined || isZarrbridgeBusy(prevState);
 }
 
+/**
+ * The root of an image file zarrbridge has no hierarchy for yet: still
+ * indexing it, or gave up. Only such a root carries `zarrbridge_state`;
+ * zarr.json and chunk leaves inside a virtual Zarr are flagged `virtual_zarr`
+ * but have no state and are ordinary viewable files.
+ */
+export function isPendingVirtualZarr(
+  node:
+    | Pick<FileOrFolder, 'virtual_zarr' | 'zarrbridge_state'>
+    | null
+    | undefined
+): boolean {
+  return node?.virtual_zarr === true && node.zarrbridge_state !== undefined;
+}
+
 export function zarrbridgePollInterval(
   status: ZarrbridgeStatus | undefined,
   error: unknown

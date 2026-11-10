@@ -30,7 +30,8 @@ import { useHandleView } from '@/hooks/useHandleView';
 import {
   areZarrMetadataFilesPresent,
   useZarrbridgeStatusQuery,
-  shouldRefreshListing
+  shouldRefreshListing,
+  isPendingVirtualZarr
 } from '@/queries/zarrQueries';
 import { getBrowserRenderableType } from '@/utils/fileTypes';
 import { detectN5, getN5DetectionSignals } from '@/queries/n5Queries';
@@ -406,10 +407,11 @@ export default function FileBrowser({
             {fileQuery.data.errorMessage}
           </Typography>
         </div>
-      ) : isVirtualZarr && !isZarrDir ? (
+      ) : isPendingVirtualZarr(fileQuery.data.currentFileOrFolder) ? (
         // zarrbridge is still indexing this image (or gave up): the hint
         // above says so; there is nothing to list and the bytes are not for
-        // the file viewer.
+        // the file viewer. Leaves inside a virtual Zarr (zarr.json, chunks)
+        // carry no state and fall through to the viewer below.
         <div className="pl-3 py-1" />
       ) : fileQuery.data.currentFileOrFolder &&
         !fileQuery.data.currentFileOrFolder.is_dir &&
