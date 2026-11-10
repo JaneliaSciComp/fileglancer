@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   shouldRefreshListing,
-  isPendingVirtualZarr
+  isPendingVirtualZarr,
+  pyramidJustFinished
 } from '@/queries/zarrQueries';
 
 describe('shouldRefreshListing', () => {
@@ -44,5 +45,15 @@ describe('isPendingVirtualZarr', () => {
     expect(isPendingVirtualZarr(node({ virtual_zarr: true }))).toBe(false);
     expect(isPendingVirtualZarr(node({}))).toBe(false);
     expect(isPendingVirtualZarr(undefined)).toBe(false);
+  });
+});
+
+describe('pyramidJustFinished', () => {
+  it('is true only on the transition from a busy state to multiscale', () => {
+    expect(pyramidJustFinished('building', 'multiscale')).toBe(true);
+    expect(pyramidJustFinished('queued', 'multiscale')).toBe(true);
+    expect(pyramidJustFinished('indexing', 'native')).toBe(false);
+    expect(pyramidJustFinished(undefined, 'multiscale')).toBe(false);
+    expect(pyramidJustFinished('multiscale', 'multiscale')).toBe(false);
   });
 });

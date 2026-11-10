@@ -5,6 +5,9 @@ import {
 import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
 import { Spinner } from '@/components/ui/widgets/Loaders';
 import logger from '@/logger';
+import { formatFileSize } from '@/utils';
+import type { ZarrbridgeStatus } from '@/queries/zarrQueries';
+import type { ReactNode } from 'react';
 
 type MetadataHintVariant =
   // Zarr - query never fired
@@ -16,9 +19,9 @@ type MetadataHintVariant =
   // Zarr - an image file served as virtual OME-Zarr by zarrbridge
   | {
       case: 'virtual-zarr';
-      state?: string;
-      reason?: string | null;
-      progress?: number;
+      status?: ZarrbridgeStatus;
+      cacheHref?: string | null;
+      error?: string;
     }
   // Zarr - metadata is valid, but the layout will make viewing awkward
   | { case: 'zarr-single-level'; size: string }
@@ -41,7 +44,7 @@ interface MetadataHintProps {
 type HintConfig = {
   kind: 'info' | 'warning';
   title: string;
-  description: string;
+  description: string | ReactNode;
   href?: string;
   // zarrbridge is working on the file in the background: show a spinner.
   busy?: boolean;
@@ -66,71 +69,110 @@ const n5Hint: HintConfig = {
 };
 
 const VIRTUAL_ZARR_TITLE = 'Virtual OME-Zarr';
+const BUSY = new Set(['reading', 'queued', 'building']);
+
+function indexLine(
+  status: ZarrbridgeStatus,
+  cacheHref: string | null | undefined
+): ReactNode {
+  const index = status.index;
+  const reason = index?.reason ? ` ${index.reason}` : '';
+  switch (index?.state) {
+    case 'reading':
+      return <>reading.{reason}</>;
+    case 'saved': {
+      const where =
+        status.cache?.mode === 'beside'
+          ? 'cache beside the data'
+          : 'personal cache';
+      const size =
+        index.bytes === null ? '' : `${formatFileSize(index.bytes)} in your `;
+      return (
+        <>
+          saved. {size}
+          {cacheHref ? (
+            <a className="underline" href={cacheHref}>
+              {where}
+            </a>
+          ) : (
+            where
+          )}
+          .
+        </>
+      );
+    }
+    case 'unsaved':
+      return <>not saved. The file opens quickly enough to read directly.</>;
+    case 'failed':
+      return <>failed.{reason}</>;
+    default:
+      return <>not needed for this format.</>;
+  }
+}
+
+function pyramidLine(status: ZarrbridgeStatus): ReactNode {
+  const pyramid = status.pyramid;
+  const reason = pyramid?.reason ? ` ${pyramid.reason}` : '';
+  switch (pyramid?.state) {
+    case 'queued':
+      return <>queued.</>;
+    case 'building':
+      return <>building, {Math.round((pyramid.progress ?? 0) * 100)}% done.</>;
+    case 'built':
+      return (
+        <>
+          built.{pyramid.levels ? ` ${pyramid.levels} levels,` : ''}{' '}
+          {formatFileSize(pyramid.bytes)}.
+        </>
+      );
+    case 'failed':
+      return <>failed.{reason}</>;
+    default:
+      return (
+        <>
+          not built. Viewers read full resolution at every zoom level.{reason}
+        </>
+      );
+  }
+}
 
 function virtualZarrHint(
-  state: string | undefined,
-  reason: string | null | undefined,
-  progress: number | undefined
+  status: ZarrbridgeStatus | undefined,
+  cacheHref: string | null | undefined,
+  error: string | undefined
 ): HintConfig {
-  switch (state) {
-    case 'indexing':
-      return {
-        kind: 'info',
-        busy: true,
-        title: 'Reading image structure',
-        description:
-          'zarrbridge is indexing this image file so it can be served as OME-Zarr. This usually takes seconds and is given up after a minute.'
-      };
-    case 'queued':
-      return {
-        kind: 'info',
-        busy: true,
-        title: 'Multiscale pyramid queued',
-        description:
-          'A multiscale pyramid will be built in the background. Until it is done, viewers read full resolution at every zoom level.'
-      };
-    case 'building':
-      return {
-        kind: 'info',
-        busy: true,
-        title: 'Building multiscale pyramid',
-        description: `${progress === undefined ? '' : `${Math.round(progress * 100)}% done. `}Until it finishes, viewers read full resolution at every zoom level.`
-      };
-    case 'unindexed':
-      return {
-        kind: 'warning',
-        title: 'Too large to index automatically',
-        description:
-          reason ??
-          'Indexing did not finish in time, so this file must be indexed manually.'
-      };
-    case 'failed':
-    case 'unservable':
-      return {
-        kind: 'warning',
-        title: VIRTUAL_ZARR_TITLE,
-        description: `This image file is served as OME-Zarr without conversion, but no multiscale pyramid could be built${reason ? `: ${reason}` : ` (${state})`}. Viewers read full resolution at every zoom level.`
-      };
-    case 'multiscale':
-      return {
-        kind: 'info',
-        title: VIRTUAL_ZARR_TITLE,
-        description:
-          'This image file is served as OME-Zarr without conversion. A multiscale pyramid is cached beside it, so viewers can zoom out quickly.'
-      };
-    case 'error':
-      return {
-        kind: 'warning',
-        title: 'Virtual OME-Zarr status unavailable',
-        description: reason ?? 'zarrbridge did not answer.'
-      };
-    default:
-      return {
-        kind: 'info',
-        title: VIRTUAL_ZARR_TITLE,
-        description: `This image file is served as OME-Zarr without conversion. Only the native resolution is available, so viewers read full resolution at every zoom level.${reason ? ` ${reason}` : ''}`
-      };
+  if (error !== undefined || !status) {
+    return {
+      kind: 'warning',
+      title: 'Virtual OME-Zarr status unavailable',
+      description: error ?? 'zarrbridge did not answer.'
+    };
   }
+  const indexState = status.index?.state;
+  const pyramidState = status.pyramid?.state;
+  // While the file is still being read, or could not be, there is no pyramid to talk about.
+  const showPyramid = indexState !== 'reading' && indexState !== 'failed';
+  const failed = indexState === 'failed' || pyramidState === 'failed';
+  const busy =
+    BUSY.has(indexState ?? '') || (showPyramid && BUSY.has(pyramidState ?? ''));
+  return {
+    kind: failed ? 'warning' : 'info',
+    title: VIRTUAL_ZARR_TITLE,
+    busy,
+    description: (
+      <div className="flex flex-col gap-1" data-testid="virtual-zarr-hint">
+        <span>This image file is served as OME-Zarr without conversion.</span>
+        <span>
+          <strong>Index:</strong> {indexLine(status, cacheHref)}
+        </span>
+        {showPyramid ? (
+          <span>
+            <strong>Multiscale pyramid:</strong> {pyramidLine(status)}
+          </span>
+        ) : null}
+      </div>
+    )
+  };
 }
 
 function getHintConfig(variant: MetadataHintVariant): HintConfig {
@@ -159,7 +201,7 @@ function getHintConfig(variant: MetadataHintVariant): HintConfig {
           : 'Could not read Zarr metadata.'
       };
     case 'virtual-zarr':
-      return virtualZarrHint(variant.state, variant.reason, variant.progress);
+      return virtualZarrHint(variant.status, variant.cacheHref, variant.error);
     case 'zarr-single-level':
       return {
         kind: 'warning',

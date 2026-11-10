@@ -430,6 +430,7 @@ export function useZarrMetadataQuery(
 export type ZarrbridgeStatus = {
   classification?: string;
   reader?: string | null;
+  // The polling contract: see zarrbridgePollInterval.
   levels?: {
     state: string;
     built?: number;
@@ -437,7 +438,32 @@ export type ZarrbridgeStatus = {
     progress?: number;
     eta_s?: number | null;
     elapsed_s?: number;
-    reason?: string;
+    reason?: string | null;
+  };
+  // The refkv index: reading | saved | unsaved | none | failed.
+  index?: {
+    state: string;
+    bytes: number | null;
+    reason: string | null;
+  };
+  // The multiscale cache: queued | building | built | failed | not_built.
+  pyramid?: {
+    state: string;
+    reason: string | null;
+    progress: number;
+    eta_s: number | null;
+    built: number;
+    planned: number | null;
+    levels: number | null;
+    bytes: number;
+  };
+  cache?: {
+    mode: string;
+    dir: string;
+    bytes: number;
+    fingerprint: string;
+    mismatch: string | null;
+    writable: boolean;
   };
 };
 
@@ -482,6 +508,14 @@ export function isPendingVirtualZarr(
     | undefined
 ): boolean {
   return node?.virtual_zarr === true && node.zarrbridge_state !== undefined;
+}
+
+/** The multiscale pyramid finished since the last status: the thumbnail changes. */
+export function pyramidJustFinished(
+  prevState: string | undefined,
+  state: string | undefined
+): boolean {
+  return state === 'multiscale' && isZarrbridgeBusy(prevState);
 }
 
 export function zarrbridgePollInterval(

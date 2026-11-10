@@ -31,11 +31,14 @@ import {
   areZarrMetadataFilesPresent,
   useZarrbridgeStatusQuery,
   shouldRefreshListing,
-  isPendingVirtualZarr
+  isPendingVirtualZarr,
+  pyramidJustFinished
 } from '@/queries/zarrQueries';
 import { getBrowserRenderableType } from '@/utils/fileTypes';
 import { detectN5, getN5DetectionSignals } from '@/queries/n5Queries';
 import { makeMapKey } from '@/utils';
+import { browseLinkForAbsolutePath } from '@/utils/pathHandling';
+import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { isReadOnlyFsp } from '@/utils/cloudStorage';
 import type { FileOrFolder } from '@/shared.types';
 
@@ -118,6 +121,11 @@ export default function FileBrowser({
     fileQuery.data?.currentFileOrFolder?.zarrbridge_state;
   const prevZarrbridgeState = useRef<string | undefined>(undefined);
   const queryClient = useQueryClient();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
+  const cacheHref = browseLinkForAbsolutePath(
+    zonesAndFspQuery.data,
+    zarrbridgeStatusQuery.data?.cache?.dir
+  );
   const refetchListing = fileQuery.refetch;
   const metadataKey = [
     'zarr',
@@ -136,8 +144,13 @@ export default function FileBrowser({
     if (!shouldRefreshListing(prev, zarrbridgeState, pendingNodeState)) {
       return;
     }
+    const finished = pyramidJustFinished(prev, zarrbridgeState);
     refetchListing().then(() => {
       queryClient.invalidateQueries({ queryKey: metadataKey });
+      if (finished) {
+        // The lowest level changed: the thumbnail is built from it.
+        queryClient.invalidateQueries({ queryKey: ['zarr', 'thumbnail'] });
+      }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zarrbridgeState, pendingNodeState]);
@@ -303,17 +316,17 @@ export default function FileBrowser({
         <MetadataHint
           variant={{
             case: 'virtual-zarr',
-            state: 'error',
-            reason: zarrbridgeStatusQuery.error?.message
+            error:
+              zarrbridgeStatusQuery.error?.message ??
+              'zarrbridge did not answer.'
           }}
         />
       ) : isVirtualZarr && zarrbridgeStatusQuery.data ? (
         <MetadataHint
           variant={{
             case: 'virtual-zarr',
-            state: zarrbridgeState,
-            reason: zarrbridgeStatusQuery.data.levels?.reason,
-            progress: zarrbridgeStatusQuery.data.levels?.progress
+            status: zarrbridgeStatusQuery.data,
+            cacheHref
           }}
         />
       ) : null}
