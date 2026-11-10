@@ -13,7 +13,7 @@ type MetadataHintVariant =
   | { case: 'zarr-v3-no-multiscales' }
   | { case: 'zarr-query-error'; errorMessage?: string }
   // Zarr - an image file served as virtual OME-Zarr by zarrbridge
-  | { case: 'virtual-zarr'; state?: string }
+  | { case: 'virtual-zarr'; state?: string; reason?: string | null }
   // Zarr - metadata is valid, but the layout will make viewing awkward
   | { case: 'zarr-single-level'; size: string }
   | {
@@ -57,7 +57,10 @@ const n5Hint: HintConfig = {
   href: 'https://fileglancer-docs.janelia.org/features/image-support/#when-the-n5-preview-panel-appears'
 };
 
-function virtualZarrDescription(state: string | undefined): string {
+function virtualZarrDescription(
+  state: string | undefined,
+  reason: string | null | undefined
+): string {
   switch (state) {
     case 'multiscale':
       return `This image file is served as OME-Zarr without conversion. A multiscale pyramid is cached beside it, so viewers can zoom out quickly.`;
@@ -67,7 +70,7 @@ function virtualZarrDescription(state: string | undefined): string {
       return `This image file is served as OME-Zarr without conversion. A multiscale pyramid is being built in the background; until it is done, viewers read full resolution at every zoom level.`;
     case 'failed':
     case 'unservable':
-      return `This image file is served as OME-Zarr without conversion, but no multiscale pyramid could be built (${state}). Viewers read full resolution at every zoom level.`;
+      return `This image file is served as OME-Zarr without conversion, but no multiscale pyramid could be built${reason ? `: ${reason}` : ` (${state})`}. Viewers read full resolution at every zoom level.`;
     default:
       return `This image file is served as OME-Zarr without conversion. Only the native resolution is available, so viewers read full resolution at every zoom level.`;
   }
@@ -102,7 +105,7 @@ function getHintConfig(variant: MetadataHintVariant): HintConfig {
       return {
         kind: 'info',
         title: 'Virtual OME-Zarr',
-        description: virtualZarrDescription(variant.state)
+        description: virtualZarrDescription(variant.state, variant.reason)
       };
     case 'zarr-single-level':
       return {

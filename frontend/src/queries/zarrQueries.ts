@@ -439,7 +439,20 @@ export type ZarrbridgeStatus = {
   };
 };
 
+// The only transient states. Everything else (native, multiscale, failed,
+// unservable, or no answer at all) is terminal, so polling stops.
 const BUILDING_STATES = new Set(['indexing', 'queued', 'building']);
+
+export function zarrbridgePollInterval(
+  status: ZarrbridgeStatus | undefined,
+  error: unknown
+): number | false {
+  if (error) {
+    return false;
+  }
+  const state = status?.levels?.state;
+  return state && BUILDING_STATES.has(state) ? 5000 : false;
+}
 
 export function useZarrbridgeStatusQuery(
   fspName: string | undefined,
@@ -452,10 +465,8 @@ export function useZarrbridgeStatusQuery(
       (await fetchFileAsJson(fspName!, `${path}/_status`)) as ZarrbridgeStatus,
     enabled: enabled && !!fspName && !!path,
     // Keep polling while a pyramid is being built so the badge flips over.
-    refetchInterval: query => {
-      const state = query.state.data?.levels?.state;
-      return state && BUILDING_STATES.has(state) ? 5000 : false;
-    },
+    refetchInterval: query =>
+      zarrbridgePollInterval(query.state.data, query.state.error),
     retry: false
   });
 }
