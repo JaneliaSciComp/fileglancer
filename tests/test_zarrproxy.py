@@ -224,3 +224,49 @@ class TestVirtualZarr:
         assert r.status_code == 404
         r = zarr_app.get(f"/files/{key}/tiny.tif")
         assert r.status_code == 200 and r.content[:2] in (b"II", b"MM")
+
+    def test_transport_error_is_503_not_plain_file(self, zarr_app, monkeypatch):
+        import httpx
+        _mock_client(monkeypatch, lambda req: (_ for _ in ()).throw(httpx.ConnectError("gone")))
+        r = zarr_app.get("/api/files/share", params={"subpath": "data/tiny.tif"})
+        assert r.status_code == 503 and "zarrbridge unavailable" in r.text
+
+    def test_upstream_5xx_is_503_not_plain_file(self, zarr_app, monkeypatch):
+        import httpx
+
+        def handler(req):
+            if req.url.path == "/_status":
+                return httpx.Response(200, json={"levels": {"state": "native"}})
+            return httpx.Response(503, text="worker restarting")
+        _mock_client(monkeypatch, handler)
+        r = zarr_app.get("/api/files/share", params={"subpath": "data/tiny.tif"})
+        assert r.status_code == 503
+
+    def test_upstream_4xx_is_plain_file(self, zarr_app, monkeypatch):
+        import httpx
+        _mock_client(monkeypatch, lambda req: httpx.Response(422, text="unservable: no reader"))
+        r = zarr_app.get("/api/files/share", params={"subpath": "data/tiny.tif"})
+        assert r.status_code == 200 and r.json()["info"].get("virtual_zarr") is None and "files" not in r.json()
+
+
+def _mock_client(monkeypatch, handler):
+    import httpx
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://zarrbridge")
+    monkeypatch.setattr(zarrproxy, "_client", lambda sock: client)
+
+
+@pytest.mark.asyncio
+async def test_virtual_node_root_while_indexing(monkeypatch):
+    import httpx
+    seen = []
+
+    def handler(req):
+        seen.append(req.url.path)
+        if req.url.path == "/_status":
+            return httpx.Response(200, json={"classification": "pending", "levels": {"state": "indexing"}})
+        return httpx.Response(200, json={"zarr_format": 3, "node_type": "group"})
+    _mock_client(monkeypatch, handler)
+    info = {"name": "a.czi", "path": "d/a.czi", "is_dir": False, "size": 1}
+    node = await zarrproxy.virtual_node("/tmp/x.sock", "/abs/d/a.czi", info)
+    assert node == {"info": {**info, "virtual_zarr": True, "zarrbridge_state": "indexing"}, "files": []}
+    assert seen == ["/_status"]

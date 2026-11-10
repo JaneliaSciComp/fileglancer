@@ -621,9 +621,13 @@ def create_app(settings):
         try:
             sock = await worker_pool.dataserver(username)
             return await zarrproxy.virtual_node(sock, resolved["path"], info, key)
-        except Exception as e:  # not servable, or no zarrbridge: plain file
+        except ValueError as e:  # zarrbridge does not serve this file: plain file
             logger.info(f"No virtual Zarr for {info['path']}: {e}")
             return result if not key else None
+        except (httpx.HTTPError, WorkerDead, WorkerError) as e:
+            # zarrbridge is down, restarting or failing: say so rather than show the raw bytes
+            logger.warning(f"zarrbridge unavailable for {info['path']}: {e}")
+            raise HTTPException(status_code=503, detail=f"zarrbridge unavailable: {e}")
 
     def _writable_store(username: str, fsp_name: str) -> WriteStore:
         """Like _store_for, but 405 before anything touches a read-only backend."""

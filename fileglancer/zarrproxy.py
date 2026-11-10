@@ -35,6 +35,9 @@ SUFFIXES = frozenset({
 })
 
 STATUS_KEY = "_status"  # zarrbridge's reserved key for the file's build status
+# States in which zarrbridge has no hierarchy to show yet: still reading the file,
+# or gave up. The root node is returned pending, with the state, and no entries.
+PENDING_STATES = frozenset({"indexing", "unindexed"})
 
 _PASS_UP = ("range", "if-none-match", "accept-encoding")
 _PASS_DOWN = ("content-type", "content-length", "content-range", "accept-ranges",
@@ -131,12 +134,19 @@ async def virtual_node(socket_path: str, abs_path: str, info: dict, key: str = "
     file, ``{"info"}`` for a leaf such as ``zarr.json`` or a chunk, None when
     zarrbridge has nothing at ``key``.
 
-    Raises httpx.HTTPError when zarrbridge cannot be reached and ValueError
-    when it does not serve this file.
+    Raises httpx.HTTPError when zarrbridge cannot be reached or fails (5xx)
+    and ValueError when it does not serve this file (4xx).
     """
     client = _client(socket_path)
     headers = _path_header(abs_path)
+    if not key:
+        status = await client.get("/" + STATUS_KEY, headers=headers)
+        state = (status.json().get("levels") or {}).get("state") if status.status_code == 200 else None
+        if state in PENDING_STATES:
+            return {"info": {**info, "virtual_zarr": True, "zarrbridge_state": state}, "files": []}
     resp = await client.get("/" + quote(posixpath.join(key, "zarr.json")), headers=headers)
+    if resp.status_code >= 500:
+        resp.raise_for_status()
     if resp.status_code == 200:
         images = []
         meta = resp.json()
