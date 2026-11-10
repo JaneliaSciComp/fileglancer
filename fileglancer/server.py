@@ -624,8 +624,15 @@ def create_app(settings):
         except ValueError as e:  # zarrbridge does not serve this file: plain file
             logger.info(f"No virtual Zarr for {info['path']}: {e}")
             return result if not key else None
-        except (httpx.HTTPError, WorkerDead, WorkerError) as e:
-            # zarrbridge is down, restarting or failing: say so rather than show the raw bytes
+        except WorkerError as e:
+            # No dataserver for this user at all (zarrbridge not installed, spawn
+            # failed, user denied): the file is still a file. Logged loudly because
+            # a deployment that meant to serve virtual Zarr wants to know.
+            logger.warning(f"No zarrbridge dataserver for {username}: {e}; serving {info['path']} as a plain file")
+            return result if not key else None
+        except (httpx.HTTPError, WorkerDead) as e:
+            # A dataserver existed and is down, restarting or failing: say so
+            # rather than show the raw bytes of an image as if it were plain.
             logger.warning(f"zarrbridge unavailable for {info['path']}: {e}")
             raise HTTPException(status_code=503, detail=f"zarrbridge unavailable: {e}")
 

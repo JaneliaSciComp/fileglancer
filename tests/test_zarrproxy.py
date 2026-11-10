@@ -270,3 +270,17 @@ async def test_virtual_node_root_while_indexing(monkeypatch):
     node = await zarrproxy.virtual_node("/tmp/x.sock", "/abs/d/a.czi", info)
     assert node == {"info": {**info, "virtual_zarr": True, "zarrbridge_state": "indexing"}, "files": []}
     assert seen == ["/_status"]
+
+
+@needs_zarrbridge
+def test_no_dataserver_for_user_is_plain_file(zarr_app, monkeypatch):
+    # The supervisor could not provide a dataserver at all (zarrbridge not installed,
+    # spawn failed, user denied): the file is still a file. Only a dataserver that
+    # existed and then failed is a 503.
+    from fileglancer.worker_pool import SupervisedWorkerPool, WorkerError
+
+    async def no_dataserver(self, username):
+        raise WorkerError("spawn_failed: zarrbridge is not installed", status_code=500)
+    monkeypatch.setattr(SupervisedWorkerPool, "dataserver", no_dataserver)
+    r = zarr_app.get("/api/files/share", params={"subpath": "data/tiny.tif"})
+    assert r.status_code == 200 and "files" not in r.json() and r.json()["info"].get("virtual_zarr") is None
