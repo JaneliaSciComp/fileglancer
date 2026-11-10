@@ -450,6 +450,25 @@ export function isZarrbridgeBusy(state: string | undefined): boolean {
   return state !== undefined && BUSY_STATES.has(state);
 }
 
+/**
+ * Whether the file listing must be fetched again because zarrbridge's state
+ * changed what it would contain. `nodeState` is the listing's own
+ * `zarrbridge_state`: set only while the node was returned pending, so a
+ * terminal status reconciles it even when it is the very first answer we see.
+ * A busy-to-terminal transition also refreshes: a finished build changes
+ * zarr.json.
+ */
+export function shouldRefreshListing(
+  prevState: string | undefined,
+  state: string | undefined,
+  nodeState: string | undefined
+): boolean {
+  if (state === undefined || isZarrbridgeBusy(state)) {
+    return false;
+  }
+  return nodeState !== undefined || isZarrbridgeBusy(prevState);
+}
+
 export function zarrbridgePollInterval(
   status: ZarrbridgeStatus | undefined,
   error: unknown
