@@ -435,13 +435,20 @@ export type ZarrbridgeStatus = {
     built?: number;
     planned?: number | null;
     progress?: number;
+    eta_s?: number | null;
+    elapsed_s?: number;
     reason?: string;
   };
 };
 
 // The only transient states. Everything else (native, multiscale, failed,
-// unservable, or no answer at all) is terminal, so polling stops.
-const BUILDING_STATES = new Set(['indexing', 'queued', 'building']);
+// unservable, unindexed, or no answer at all) is terminal, so polling stops.
+const BUSY_STATES = new Set(['indexing', 'queued', 'building']);
+
+/** True while zarrbridge is doing something in the background for this file. */
+export function isZarrbridgeBusy(state: string | undefined): boolean {
+  return state !== undefined && BUSY_STATES.has(state);
+}
 
 export function zarrbridgePollInterval(
   status: ZarrbridgeStatus | undefined,
@@ -451,7 +458,12 @@ export function zarrbridgePollInterval(
     return false;
   }
   const state = status?.levels?.state;
-  return state && BUILDING_STATES.has(state) ? 5000 : false;
+  if (!isZarrbridgeBusy(state)) {
+    return false;
+  }
+  // Indexing is bounded to about a minute and changes the listing when it
+  // ends, so watch it closely; a pyramid build runs for minutes.
+  return state === 'indexing' ? 2000 : 5000;
 }
 
 export function useZarrbridgeStatusQuery(

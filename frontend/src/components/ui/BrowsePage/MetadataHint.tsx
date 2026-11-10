@@ -3,6 +3,7 @@ import {
   getNotificationStyles
 } from '@/components/ui/Notifications/NotificationItem';
 import FgExternalLink from '@/components/designSystem/atoms/FgExternalLink';
+import { Spinner } from '@/components/ui/widgets/Loaders';
 import logger from '@/logger';
 
 type MetadataHintVariant =
@@ -13,7 +14,12 @@ type MetadataHintVariant =
   | { case: 'zarr-v3-no-multiscales' }
   | { case: 'zarr-query-error'; errorMessage?: string }
   // Zarr - an image file served as virtual OME-Zarr by zarrbridge
-  | { case: 'virtual-zarr'; state?: string; reason?: string | null }
+  | {
+      case: 'virtual-zarr';
+      state?: string;
+      reason?: string | null;
+      progress?: number;
+    }
   // Zarr - metadata is valid, but the layout will make viewing awkward
   | { case: 'zarr-single-level'; size: string }
   | {
@@ -37,6 +43,8 @@ type HintConfig = {
   title: string;
   description: string;
   href?: string;
+  // zarrbridge is working on the file in the background: show a spinner.
+  busy?: boolean;
 };
 
 const zarrHint: HintConfig = {
@@ -57,22 +65,71 @@ const n5Hint: HintConfig = {
   href: 'https://fileglancer-docs.janelia.org/features/image-support/#when-the-n5-preview-panel-appears'
 };
 
-function virtualZarrDescription(
+const VIRTUAL_ZARR_TITLE = 'Virtual OME-Zarr';
+
+function virtualZarrHint(
   state: string | undefined,
-  reason: string | null | undefined
-): string {
+  reason: string | null | undefined,
+  progress: number | undefined
+): HintConfig {
   switch (state) {
-    case 'multiscale':
-      return `This image file is served as OME-Zarr without conversion. A multiscale pyramid is cached beside it, so viewers can zoom out quickly.`;
     case 'indexing':
+      return {
+        kind: 'info',
+        busy: true,
+        title: 'Reading image structure',
+        description:
+          'zarrbridge is indexing this image file so it can be served as OME-Zarr. This usually takes seconds and is given up after a minute.'
+      };
     case 'queued':
+      return {
+        kind: 'info',
+        busy: true,
+        title: 'Multiscale pyramid queued',
+        description:
+          'A multiscale pyramid will be built in the background. Until it is done, viewers read full resolution at every zoom level.'
+      };
     case 'building':
-      return `This image file is served as OME-Zarr without conversion. A multiscale pyramid is being built in the background; until it is done, viewers read full resolution at every zoom level.`;
+      return {
+        kind: 'info',
+        busy: true,
+        title: 'Building multiscale pyramid',
+        description: `${progress === undefined ? '' : `${Math.round(progress * 100)}% done. `}Until it finishes, viewers read full resolution at every zoom level.`
+      };
+    case 'unindexed':
+      return {
+        kind: 'warning',
+        title: 'Too large to index automatically',
+        description:
+          reason ??
+          'Indexing did not finish in time, so this file must be indexed manually.'
+      };
     case 'failed':
     case 'unservable':
-      return `This image file is served as OME-Zarr without conversion, but no multiscale pyramid could be built${reason ? `: ${reason}` : ` (${state})`}. Viewers read full resolution at every zoom level.`;
+      return {
+        kind: 'warning',
+        title: VIRTUAL_ZARR_TITLE,
+        description: `This image file is served as OME-Zarr without conversion, but no multiscale pyramid could be built${reason ? `: ${reason}` : ` (${state})`}. Viewers read full resolution at every zoom level.`
+      };
+    case 'multiscale':
+      return {
+        kind: 'info',
+        title: VIRTUAL_ZARR_TITLE,
+        description:
+          'This image file is served as OME-Zarr without conversion. A multiscale pyramid is cached beside it, so viewers can zoom out quickly.'
+      };
+    case 'error':
+      return {
+        kind: 'warning',
+        title: 'Virtual OME-Zarr status unavailable',
+        description: reason ?? 'zarrbridge did not answer.'
+      };
     default:
-      return `This image file is served as OME-Zarr without conversion. Only the native resolution is available, so viewers read full resolution at every zoom level.`;
+      return {
+        kind: 'info',
+        title: VIRTUAL_ZARR_TITLE,
+        description: `This image file is served as OME-Zarr without conversion. Only the native resolution is available, so viewers read full resolution at every zoom level.${reason ? ` ${reason}` : ''}`
+      };
   }
 }
 
@@ -102,11 +159,7 @@ function getHintConfig(variant: MetadataHintVariant): HintConfig {
           : 'Could not read Zarr metadata.'
       };
     case 'virtual-zarr':
-      return {
-        kind: 'info',
-        title: 'Virtual OME-Zarr',
-        description: virtualZarrDescription(variant.state, variant.reason)
-      };
+      return virtualZarrHint(variant.state, variant.reason, variant.progress);
     case 'zarr-single-level':
       return {
         kind: 'warning',
@@ -146,7 +199,7 @@ function getHintConfig(variant: MetadataHintVariant): HintConfig {
 }
 
 export default function MetadataHint({ variant }: MetadataHintProps) {
-  const { kind, title, description, href } = getHintConfig(variant);
+  const { kind, title, description, href, busy } = getHintConfig(variant);
   const styles = getNotificationStyles(kind);
 
   // Only the description is a link, so the rest of the box stays selectable.
@@ -158,12 +211,23 @@ export default function MetadataHint({ variant }: MetadataHintProps) {
     description
   );
 
+  const item = (
+    <NotificationItem
+      notification={{ id: 0, type: kind, title, message }}
+      showDismissButton={false}
+    />
+  );
+
   return (
     <div className={`${styles.container} p-4 mb-3 rounded-md`}>
-      <NotificationItem
-        notification={{ id: 0, type: kind, title, message }}
-        showDismissButton={false}
-      />
+      {busy ? (
+        <div className="flex items-start gap-3" data-testid="zarrbridge-busy">
+          <Spinner sizeClasses="w-4 h-4 border-2" />
+          {item}
+        </div>
+      ) : (
+        item
+      )}
     </div>
   );
 }

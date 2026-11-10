@@ -4,14 +4,20 @@ import { zarrbridgePollInterval } from '@/queries/zarrQueries';
 const status = (state: string) => ({ levels: { state } });
 
 describe('zarrbridgePollInterval', () => {
-  it('polls only while a pyramid is actually in progress', () => {
-    expect(zarrbridgePollInterval(status('indexing'), null)).toBe(5000);
+  it('polls only while zarrbridge is busy, faster while indexing', () => {
+    expect(zarrbridgePollInterval(status('indexing'), null)).toBe(2000);
     expect(zarrbridgePollInterval(status('queued'), null)).toBe(5000);
     expect(zarrbridgePollInterval(status('building'), null)).toBe(5000);
   });
 
   it('stops on every terminal state', () => {
-    for (const s of ['native', 'multiscale', 'failed', 'unservable']) {
+    for (const s of [
+      'native',
+      'multiscale',
+      'failed',
+      'unservable',
+      'unindexed'
+    ]) {
       expect(zarrbridgePollInterval(status(s), null)).toBe(false);
     }
     expect(zarrbridgePollInterval(undefined, null)).toBe(false);
