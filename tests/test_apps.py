@@ -3059,16 +3059,11 @@ class TestSubmitJobAssembly:
         assert "FG_SERVICE_PORT" in script
 
     @pytest.mark.parametrize("apps,entry_point,expected", [
-        ({"service_proxy_domain": "svc.example.org",
-          "service_proxy_address": "10.1.2.3,10.9.0.0/16"},
-         {}, True),
+        ({"service_proxy_domain": "svc.example.org"}, {}, True),
         # No domain: the proxy is not in use.
-        ({"service_proxy_address": "10.1.2.3"}, {}, False),
-        # No address configured.
-        ({"service_proxy_domain": "svc.example.org"}, {}, False),
+        ({}, {}, False),
         # Entry point opted out of the proxy.
-        ({"service_proxy_domain": "svc.example.org",
-          "service_proxy_address": "10.1.2.3"},
+        ({"service_proxy_domain": "svc.example.org"},
          {"service_proxy": False}, False),
     ])
     def test_service_proxy_address_export(self, tmp_path, monkeypatch,
@@ -3080,7 +3075,8 @@ class TestSubmitJobAssembly:
         script = self._submitted(calls)["command"]
         assert ("export FG_SERVICE_PROXY_ADDRESS=" in script) is expected
         if expected:
-            assert "export FG_SERVICE_PROXY_ADDRESS=10.1.2.3,10.9.0.0/16" in script
+            # Taken from external_proxy_url, not a separate setting.
+            assert "export FG_SERVICE_PROXY_ADDRESS=localhost\n" in script
 
     def test_container_wraps_command_and_binds_default_paths(self, tmp_path, monkeypatch):
         input_file = tmp_path / "input.txt"
