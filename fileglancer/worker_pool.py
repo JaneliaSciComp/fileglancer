@@ -1,55 +1,56 @@
-"""Per-user persistent worker pool.
+"""Client side of the per-user worker system.
 
-Manages a pool of long-lived subprocess workers, one per active user.
-Each worker runs with the target user's real UID/GID/groups (set at
-fork time via subprocess.Popen kwargs), so the main Uvicorn process
-never calls seteuid/setegid/setgroups.
+SupervisedWorkerPool obtains per-user workers from a fileglancer-supervisor
+process through a lease API over a unix socket. Acquisition is the only
+supervisor round-trip: after a lease is granted, requests flow directly
+between this process and the worker on a socket the supervisor handed us
+(including SCM_RIGHTS file-descriptor passing), so the supervisor is never
+on the data path.
 
-Workers communicate with the main process over a Unix socketpair using
-a length-prefixed JSON protocol.  When a worker response includes a file
-descriptor (e.g. an opened file for streaming), it arrives transparently
-via SCM_RIGHTS — callers see a ``_file_handle`` key in the response dict.
+In ``external`` mode the supervisor is a separately deployed (root) process;
+in ``embedded`` mode this pool launches one as an unprivileged child at
+startup, shared between uvicorn processes via a lock file.
+
+LegacyWorkerPool is the pre-supervisor fork+setuid pool, kept behind
+``supervisor_mode: legacy`` for one release as the rollback path.
 
 Usage from server.py:
 
-    pool = WorkerPool(settings)
-    worker = await pool.get_worker(username)
-    result = await worker.execute("list_dir", fsp_name="home", subpath="Documents")
+    pool = SupervisedWorkerPool(settings)
+    await pool.start()
+    result = await pool.execute(username, "list_dir", fsp_name="home")
 
     # For actions that open files, the fd arrives automatically:
-    result = await worker.execute("open_file", fsp_name="home", subpath="data.bin")
+    result = await pool.execute(username, "open_file", fsp_name="home", subpath="data.bin")
     file_handle = result.get("_file_handle")  # open file object, or None
 """
 
 from __future__ import annotations
 
-import array
 import asyncio
-import json
+import fcntl
 import os
-import pwd
 import socket
-import struct
 import subprocess
 import sys
+import tempfile
 import time
-from typing import Any, Optional
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator, Optional
 
 from cachetools import TTLCache
 from loguru import logger
 
 from fileglancer.database import FSP_CACHE_TTL_SECONDS
 from fileglancer.settings import Settings
+from fileglancer.supervisor import PROTOCOL_VERSION
+from fileglancer.supervisor.protocol import ProtocolError, recv_msg, send_msg
+from fileglancer.supervisor.spawn import spawn_worker
 
 # Worker-bound (JSON-serialized) file share paths, keyed by database URL for the
 # same reason the model-level cache is; see _fetch_fsp_rows.
 _fsp_row_cache = TTLCache(maxsize=8, ttl=FSP_CACHE_TTL_SECONDS)
 
-
-# Length-prefix format: 4-byte big-endian unsigned int
-_HEADER_FMT = "!I"
-_HEADER_SIZE = struct.calcsize(_HEADER_FMT)
-_MAX_MESSAGE_SIZE = 64 * 1024 * 1024  # 64 MB safety limit
 
 # Per-request receive timeout (seconds). The default covers ordinary IPC
 # round-trips. Git-heavy actions get a far larger ceiling because they
@@ -110,70 +111,6 @@ def prepare_worker_request(request: dict, db_url: str) -> dict:
     return {**request, "file_share_paths": _fetch_fsp_rows(db_url)}
 
 
-# Worker env is an allowlist, not a denylist: workers run as the (untrusted)
-# target user, so anything in their environment is readable by that user via
-# /proc/<pid>/environ. Only pass variables the worker legitimately needs (git,
-# ssh, locale, tmp, the scheduler, environment modules, conda/pixi, containers)
-# so no server secret leaks — not Fileglancer's own FGC_* vars, and not generic
-# deployment secrets like AWS_SECRET_ACCESS_KEY or GITHUB_TOKEN. Site-specific
-# additions go through settings.apps.worker_env_passthrough, not code.
-_WORKER_ENV_ALLOW_NAMES = frozenset({
-    "PATH", "HOME", "USER", "LOGNAME", "SHELL", "PWD",
-    "LANG", "LANGUAGE", "TZ", "TERM",
-    "TMPDIR", "TMP", "TEMP",
-    "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
-    "http_proxy", "https_proxy", "no_proxy",
-    "SSH_AUTH_SOCK",
-    # Needed for the worker's own imports under path-based installs (not a
-    # secret); harmless when unused (site-packages installs don't rely on it).
-    "PYTHONPATH", "VIRTUAL_ENV",
-})
-_WORKER_ENV_ALLOW_PREFIXES = (
-    "LC_",                          # locale
-    "LSF_", "LSB_", "EGO_",         # IBM Spectrum LSF
-    "SLURM_",                       # Slurm
-    "SGE_", "PBS_",                 # SGE / PBS / Torque
-    "MODULE", "MODULES_", "LMOD_",  # environment modules
-    "CONDA_", "MAMBA_", "PIXI_",    # conda / pixi
-    "APPTAINER_", "SINGULARITY_",   # containers
-    "GIT_",                         # git config via env (not secrets by convention)
-)
-
-
-def _build_worker_env(base_env: dict, home_dir: str, log_level: str,
-                      child_fd: int, passthrough: Optional[list] = None,
-                      log_format: str = "text") -> dict:
-    """Build the environment for a worker subprocess (allowlist).
-
-    Keeps only allowlisted variables (see the module constants) plus any
-    operator-configured ``passthrough`` names/prefixes, then always sets the
-    two operational vars the worker itself needs. FGC_* is dropped
-    unconditionally — even if an operator lists it in passthrough — so
-    Fileglancer secrets (session key, Okta/Atlassian secrets, DB URL) can never
-    reach the user. The worker gets its config over the IPC socket instead (DB
-    data is attached to the request by the parent).
-
-    A passthrough entry ending in ``_`` is treated as a prefix; otherwise it is
-    an exact variable name.
-    """
-    extra_names = {p for p in (passthrough or []) if not p.endswith("_")}
-    extra_prefixes = tuple(p for p in (passthrough or []) if p.endswith("_"))
-    allow_names = _WORKER_ENV_ALLOW_NAMES | extra_names
-    allow_prefixes = _WORKER_ENV_ALLOW_PREFIXES + extra_prefixes
-
-    def _allowed(key: str) -> bool:
-        if key.upper().startswith("FGC_"):
-            return False  # never leak Fileglancer secrets
-        return key in allow_names or key.startswith(allow_prefixes)
-
-    env = {k: v for k, v in base_env.items() if _allowed(k)}
-    env["HOME"] = home_dir
-    env["FGC_LOG_LEVEL"] = log_level
-    env["FGC_LOG_FORMAT"] = log_format
-    env["FGC_WORKER_FD"] = str(child_fd)
-    return env
-
-
 class WorkerError(Exception):
     """Raised when a worker returns an error response."""
     def __init__(self, message: str, status_code: int = 500):
@@ -186,13 +123,361 @@ class WorkerDead(Exception):
     pass
 
 
+def _attach_file_handle(response: dict, fds: list[int]) -> dict:
+    """Wrap a received SCM_RIGHTS fd into the response's ``_file_handle``.
+
+    Actions that open a file for writing (write_file) set _fd_mode so the fd
+    is wrapped writable; reads default to "rb".
+    """
+    if fds:
+        fd_mode = response.pop("_fd_mode", "rb")
+        response["_file_handle"] = os.fdopen(fds[0], fd_mode)
+        for extra_fd in fds[1:]:
+            try:
+                os.close(extra_fd)
+            except OSError:
+                pass
+    return response
+
+
+def _send_and_recv(sock: socket.socket, username: str, request: dict,
+                   db_url: Optional[str], timeout: float) -> dict:
+    """Send a request on a worker socket and receive the response (blocking).
+
+    ``timeout`` bounds each blocking receive on the socket; it is set per
+    request so that a long git clone/snapshot isn't misread as a dead worker.
+
+    Any DB data the worker needs is attached to the request before it is
+    sent.  The worker never gets DB credentials and never sends reverse DB
+    RPCs; this remains a simple one request / one response exchange.
+    """
+    sock.settimeout(timeout)
+    try:
+        request = prepare_worker_request(request, db_url)
+    except Exception as e:
+        logger.exception(
+            f"Failed to prepare {request.get('action')} request for {username}")
+        raise WorkerError(f"Failed to prepare worker request: {e}") from e
+    send_msg(sock, request)
+    try:
+        response, fds = recv_msg(sock)
+    except ProtocolError as e:
+        raise WorkerError(str(e)) from e
+    if response is None:
+        raise ConnectionError("Worker closed connection")
+    return _attach_file_handle(response, fds)
+
+
+def _raise_from_response(response: dict) -> dict:
+    """Translate an error response into WorkerError, closing any attached fd."""
+    if response.get("error"):
+        fh = response.pop("_file_handle", None)
+        if fh is not None:
+            fh.close()
+        raise WorkerError(response["error"],
+                          status_code=response.get("status_code", 500))
+    return response
+
+
+def _preexec_pdeathsig():
+    """Die with the web app (Linux): the embedded supervisor must not outlive
+    the process that launched it, and its workers carry their own pdeathsig."""
+    import ctypes
+    import signal
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.prctl(1, signal.SIGTERM, 0, 0, 0)  # PR_SET_PDEATHSIG
+
+
+# ---------------------------------------------------------------------------
+# Supervised pool (external / embedded modes)
+# ---------------------------------------------------------------------------
+
+class Lease:
+    """One leased worker socket, valid for the duration of one HTTP request.
+
+    A lease may carry several consecutive request/response pairs; closing the
+    socket (done by the pool's context manager) releases the worker.
+    """
+
+    def __init__(self, username: str, sock: socket.socket, worker_pid: int,
+                 db_url: Optional[str]):
+        self.username = username
+        self.sock = sock
+        self.worker_pid = worker_pid
+        self.db_url = db_url
+
+    async def execute(self, action: str, **kwargs) -> Any:
+        """Send a request to the leased worker and return the parsed response.
+
+        If the worker sends a file descriptor (SCM_RIGHTS), the response dict
+        will contain a ``_file_handle`` key with an open file object.
+
+        Raises WorkerError on application-level errors from the worker.
+        Raises WorkerDead if the worker went away.
+        """
+        logger.debug(f"Delegating {action} to worker for {self.username} "
+                     f"(pid={self.worker_pid})")
+        request = {"action": action, **kwargs}
+        loop = asyncio.get_event_loop()
+        try:
+            response = await loop.run_in_executor(
+                None, _send_and_recv, self.sock, self.username, request,
+                self.db_url, _timeout_for_action(action))
+        except WorkerError:
+            raise
+        except (BrokenPipeError, ConnectionResetError, ConnectionError, OSError) as e:
+            raise WorkerDead(f"Worker for {self.username} connection lost: {e}") from e
+        return _raise_from_response(response)
+
+
+class SupervisedWorkerPool:
+    """Obtains per-user workers from a fileglancer-supervisor over its socket.
+
+    Keeps a small pool of long-lived control connections; each request takes
+    one for its duration. An acquire for a user whose workers are all busy
+    parks inside the supervisor until one frees up or the timeout passes, so
+    it occupies one connection while unrelated users' requests go over the
+    others. On connection loss, in-flight requests fail with WorkerDead (503)
+    and a background task reconnects with exponential backoff. Leases already
+    granted don't route through the supervisor and are unaffected.
+    """
+
+    # Control connections. Each waiting acquire holds one; beyond this many,
+    # requests queue in the app. The supervisor's spawn rate limit is per
+    # connection, so the effective limit is this many times higher.
+    POOL_SIZE = 8
+
+    def __init__(self, settings: Settings):
+        self.settings = settings
+        self.mode = settings.supervisor_mode  # "external" or "embedded"
+        self._idle: list[socket.socket] = []
+        self._slots = asyncio.Semaphore(self.POOL_SIZE)
+        self._reconnect_task: Optional[asyncio.Task] = None
+        self._child: Optional[subprocess.Popen] = None
+        self._lock_file = None
+        self._tmpdir: Optional[str] = None
+        self.hello: dict = {}
+
+    # -- socket path / embedded child ---------------------------------------
+
+    def _socket_path(self) -> str:
+        if self.mode == "external" or "supervisor_socket" in self.settings.model_fields_set:
+            return self.settings.supervisor_socket
+        run_dir = os.environ.get("XDG_RUNTIME_DIR")
+        if run_dir:
+            path = os.path.join(run_dir, "fileglancer")
+        else:
+            # Stable per-user fallback so sibling uvicorn processes find the
+            # same socket; mode 0700 below keeps it private.
+            path = os.path.join(tempfile.gettempdir(),
+                                f"fileglancer-{os.getuid()}")
+            self._tmpdir = path
+        os.makedirs(path, mode=0o700, exist_ok=True)
+        return os.path.join(path, "supervisor.sock")
+
+    def _embedded_args(self, socket_path: str) -> list[str]:
+        args = [
+            sys.executable, "-m", "fileglancer.supervisor",
+            "--socket", socket_path,
+            "--max-workers", str(self.settings.worker_pool_max_workers),
+            "--idle-timeout", str(self.settings.worker_pool_idle_timeout),
+            "--log-level", self.settings.log_level,
+            "--log-format", self.settings.log_format,
+        ]
+        for entry in self.settings.apps.worker_env_passthrough:
+            args += ["--env-passthrough", entry]
+        args += self.settings.supervisor_embedded_args
+        return args
+
+    def _ensure_embedded(self, socket_path: str) -> None:
+        """Spawn an embedded supervisor child, unless a live one owns the socket.
+
+        Ownership is decided by a lock file next to the socket, so
+        ``uvicorn --workers N`` shares one supervisor: the first process wins
+        the flock and spawns, the rest connect.
+        """
+        if self._child is not None and self._child.poll() is None:
+            return
+        if self._lock_file is None:
+            self._lock_file = open(socket_path + ".lock", "a")
+        try:
+            fcntl.flock(self._lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return  # another process owns the supervisor; just connect
+        logger.info("Starting embedded supervisor")
+        preexec = _preexec_pdeathsig if sys.platform == "linux" else None
+        self._child = subprocess.Popen(self._embedded_args(socket_path),
+                                       preexec_fn=preexec)
+
+    # -- connection ----------------------------------------------------------
+
+    def _connect_blocking(self) -> socket.socket:
+        socket_path = self._socket_path()
+        if self.mode == "embedded":
+            self._ensure_embedded(socket_path)
+        deadline = time.monotonic() + 15
+        last_err: Optional[Exception] = None
+        while time.monotonic() < deadline:
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            try:
+                sock.connect(socket_path)
+                break
+            except OSError as e:
+                sock.close()
+                last_err = e
+                time.sleep(0.2)
+        else:
+            raise ConnectionError(
+                f"Cannot connect to supervisor at {socket_path}: {last_err}")
+        sock.settimeout(10)
+        send_msg(sock, {"op": "hello", "protocol": PROTOCOL_VERSION,
+                        "client": "fileglancer-web", "pid": os.getpid()})
+        hello, _fds = recv_msg(sock)
+        if not hello or not hello.get("ok"):
+            sock.close()
+            raise ConnectionError(f"Supervisor rejected hello: {hello}")
+        if not self.hello:
+            logger.info(f"Connected to supervisor at {socket_path} "
+                        f"(privileged={hello.get('privileged')}, "
+                        f"version={hello.get('version')})")
+        self.hello = hello
+        return sock
+
+    async def start(self):
+        """Connect (external) or ensure a child and connect (embedded)."""
+        self._idle.append(await asyncio.get_event_loop().run_in_executor(
+            None, self._connect_blocking))
+
+    def _drop_idle(self) -> None:
+        for sock in self._idle:
+            sock.close()
+        self._idle.clear()
+
+    async def _call(self, fn):
+        """Run blocking ``fn(sock)`` on a pooled control connection.
+
+        Connections are opened on demand up to POOL_SIZE. A failure closes the
+        connection, drops the idle ones (they share the supervisor's fate),
+        and starts the reconnect loop; until it succeeds, calls fail fast.
+        """
+        async with self._slots:
+            if self._reconnect_task is not None and not self._reconnect_task.done():
+                raise WorkerDead("Supervisor unavailable: reconnecting")
+            loop = asyncio.get_event_loop()
+            sock = self._idle.pop() if self._idle else None
+            try:
+                if sock is None:
+                    sock = await loop.run_in_executor(None, self._connect_blocking)
+                result = await loop.run_in_executor(None, fn, sock)
+            except (ConnectionError, OSError) as e:
+                if sock is not None:
+                    sock.close()
+                self._drop_idle()
+                self._kick_reconnect()
+                raise WorkerDead(f"Supervisor unavailable: {e}") from e
+            self._idle.append(sock)
+            return result
+
+    async def stop(self):
+        """Close the connections; terminate the embedded child if we spawned it."""
+        if self._reconnect_task is not None:
+            self._reconnect_task.cancel()
+        self._drop_idle()
+        if self._child is not None and self._child.poll() is None:
+            self._child.terminate()
+            try:
+                await asyncio.get_event_loop().run_in_executor(
+                    None, self._child.wait, 10)
+            except Exception:
+                self._child.kill()
+        if self._lock_file is not None:
+            self._lock_file.close()
+            self._lock_file = None
+
+    def _kick_reconnect(self) -> None:
+        if self._reconnect_task is None or self._reconnect_task.done():
+            self._reconnect_task = asyncio.create_task(self._reconnect_loop())
+
+    async def _reconnect_loop(self) -> None:
+        delay = 0.2
+        while True:
+            await asyncio.sleep(delay)
+            try:
+                self._idle.append(await asyncio.get_event_loop().run_in_executor(
+                    None, self._connect_blocking))
+                logger.info("Reconnected to supervisor")
+                return
+            except Exception as e:
+                logger.warning(f"Supervisor reconnect failed: {e}")
+                delay = min(delay * 2, 5.0)
+
+    # -- leasing -------------------------------------------------------------
+
+    def _acquire_blocking(self, sock: socket.socket, username: str) -> tuple[dict, list[int]]:
+        timeout = self.settings.supervisor_acquire_timeout
+        sock.settimeout(timeout + 5)
+        send_msg(sock, {"op": "acquire", "kind": "worker", "user": username,
+                        "timeout_ms": int(timeout * 1000)})
+        reply, fds = recv_msg(sock)
+        if reply is None:
+            raise ConnectionError("Supervisor closed connection")
+        return reply, fds
+
+    @asynccontextmanager
+    async def lease(self, username: str) -> AsyncIterator[Lease]:
+        """Acquire a worker lease; the socket is closed (= released) on exit.
+
+        A lease must not outlive its HTTP request: nothing may store it on a
+        long-lived object.
+        """
+        reply, fds = await self._call(lambda sock: self._acquire_blocking(sock, username))
+        if not reply.get("ok"):
+            for fd in fds:
+                os.close(fd)
+            code = reply.get("code", "error")
+            status = 403 if code in ("invalid_user", "denied") else 503
+            raise WorkerError(
+                f"Worker unavailable ({code}): {reply.get('error')}",
+                status_code=status)
+        if not fds:
+            raise WorkerDead("Supervisor granted a lease without a socket")
+        sock = socket.socket(fileno=fds[0])
+        for extra in fds[1:]:
+            os.close(extra)
+        sock.setblocking(True)
+        try:
+            yield Lease(username, sock, reply.get("worker_pid"),
+                        self.settings.db_url)
+        finally:
+            sock.close()
+
+    async def execute(self, username: str, action: str, **kwargs) -> Any:
+        """Acquire a lease, run one action, release the lease."""
+        async with self.lease(username) as lease:
+            return await lease.execute(action, **kwargs)
+
+    async def status(self) -> dict:
+        """Fetch the supervisor's status payload."""
+        def _status_blocking(sock: socket.socket) -> dict:
+            sock.settimeout(10)
+            send_msg(sock, {"op": "status"})
+            reply, _fds = recv_msg(sock)
+            if reply is None:
+                raise ConnectionError("Supervisor closed connection")
+            return reply
+
+        return await self._call(_status_blocking)
+
+
+# ---------------------------------------------------------------------------
+# Legacy pool (fork + setuid in-process) — rollback path, one release only
+# ---------------------------------------------------------------------------
+
 class UserWorker:
-    """Wraps a single persistent worker subprocess for one user.
+    """Wraps a single persistent worker subprocess for one user (legacy mode).
 
     IPC uses a blocking Unix socket accessed from a thread (via
     run_in_executor) so the async event loop is never blocked.
-    All receives use recvmsg(), which transparently handles both
-    plain messages and messages carrying file descriptors via SCM_RIGHTS.
     """
 
     def __init__(self, username: str, process: subprocess.Popen,
@@ -216,15 +501,9 @@ class UserWorker:
     async def execute(self, action: str, **kwargs) -> Any:
         """Send a request to the worker and return the parsed response.
 
-        If the worker sends a file descriptor (SCM_RIGHTS), the response
-        dict will contain a ``_file_handle`` key with an open file object.
-
         Requests are serialized per-worker via an asyncio lock — the worker
         subprocess handles one request at a time, so concurrent callers
         must not interleave their sends/receives on the shared socket.
-
-        Raises WorkerError on application-level errors from the worker.
-        Raises WorkerDead if the subprocess has exited.
         """
         if not self.is_alive:
             raise WorkerDead(f"Worker for {self.username} is dead (rc={self.process.returncode})")
@@ -237,127 +516,24 @@ class UserWorker:
             try:
                 request = {"action": action, **kwargs}
                 loop = asyncio.get_event_loop()
-                timeout = _timeout_for_action(action)
                 response = await loop.run_in_executor(
-                    None, self._send_and_recv, request, timeout)
-
-                if response.get("error"):
-                    # Close any fd that arrived with an error response
-                    fh = response.pop("_file_handle", None)
-                    if fh is not None:
-                        fh.close()
-                    raise WorkerError(
-                        response["error"],
-                        status_code=response.get("status_code", 500),
-                    )
-
-                return response
-            except (BrokenPipeError, ConnectionResetError, OSError) as e:
+                    None, _send_and_recv, self.sock, self.username, request,
+                    self.db_url, _timeout_for_action(action))
+                return _raise_from_response(response)
+            except WorkerError:
+                raise
+            except (BrokenPipeError, ConnectionResetError, ConnectionError, OSError) as e:
                 raise WorkerDead(f"Worker for {self.username} connection lost: {e}") from e
             finally:
                 self._busy = False
                 self.last_activity = time.monotonic()
-
-    def _send_and_recv(self, request: dict, timeout: float = _DEFAULT_REQUEST_TIMEOUT) -> dict:
-        """Send a request and receive the action response (blocking, runs in thread).
-
-        ``timeout`` bounds each blocking receive on the socket; it is set per
-        request (requests are serialized under the per-worker lock, so this is
-        safe) so that a long git clone/snapshot isn't misread as a dead worker.
-
-        Any DB data the worker needs is attached to the request before it is
-        sent.  The worker never gets DB credentials and never sends reverse DB
-        RPCs; this remains a simple one request / one response exchange.
-        """
-        self.sock.settimeout(timeout)
-        try:
-            request = prepare_worker_request(request, self.db_url)
-        except Exception as e:
-            logger.exception(
-                f"Failed to prepare {request.get('action')} request for "
-                f"{self.username}"
-            )
-            raise WorkerError(f"Failed to prepare worker request: {e}") from e
-        self._send_msg(request)
-        return self._recv_msg()
-
-    def _send_msg(self, msg: dict):
-        """Send a length-prefixed JSON message."""
-        payload = json.dumps(msg).encode()
-        header = struct.pack(_HEADER_FMT, len(payload))
-        self.sock.sendall(header + payload)
-
-    def _recv_msg(self) -> dict:
-        """Receive one length-prefixed JSON message, capturing any SCM_RIGHTS fd.
-
-        All receives use recvmsg() so that SCM_RIGHTS file descriptors are
-        captured transparently — the ancillary data arrives with the first
-        bytes of the message, so we must use recvmsg for the header too.
-        """
-        fds = array.array("i")
-        raw = b""
-        try:
-            while len(raw) < _HEADER_SIZE:
-                msg, ancdata, flags, addr = self.sock.recvmsg(
-                    max(_HEADER_SIZE - len(raw), 4096),
-                    socket.CMSG_LEN(struct.calcsize("i")),
-                )
-                if not msg:
-                    raise ConnectionError("Worker closed connection")
-                raw += msg
-                for cmsg_level, cmsg_type, cmsg_data in ancdata:
-                    if cmsg_level == socket.SOL_SOCKET and cmsg_type == socket.SCM_RIGHTS:
-                        fds.frombytes(cmsg_data[:len(cmsg_data) - (len(cmsg_data) % fds.itemsize)])
-
-            (length,) = struct.unpack(_HEADER_FMT, raw[:_HEADER_SIZE])
-            if length > _MAX_MESSAGE_SIZE:
-                raise WorkerError(f"Response too large: {length} bytes")
-
-            total_needed = _HEADER_SIZE + length
-            while len(raw) < total_needed:
-                msg, ancdata, flags, addr = self.sock.recvmsg(
-                    total_needed - len(raw),
-                    socket.CMSG_LEN(struct.calcsize("i")),
-                )
-                if not msg:
-                    raise ConnectionError("Worker closed connection mid-message")
-                raw += msg
-                for cmsg_level, cmsg_type, cmsg_data in ancdata:
-                    if cmsg_level == socket.SOL_SOCKET and cmsg_type == socket.SCM_RIGHTS:
-                        fds.frombytes(cmsg_data[:len(cmsg_data) - (len(cmsg_data) % fds.itemsize)])
-
-            body = raw[_HEADER_SIZE:_HEADER_SIZE + length]
-            response = json.loads(body)
-        except Exception:
-            # Close any fds received before the error to prevent leaks
-            for fd_val in fds:
-                try:
-                    os.close(fd_val)
-                except OSError:
-                    pass
-            raise
-
-        if fds:
-            # Actions that open a file for writing (write_file) set _fd_mode so
-            # the fd is wrapped writable; reads default to "rb".
-            fd_mode = response.pop("_fd_mode", "rb")
-            response["_file_handle"] = os.fdopen(fds[0], fd_mode)
-            for extra_fd in fds[1:]:
-                try:
-                    os.close(extra_fd)
-                except OSError:
-                    pass
-
-        return response
 
     async def shutdown(self, timeout: float = 5.0):
         """Ask the worker to shut down gracefully, then force-kill if needed."""
         if not self.is_alive:
             return
         try:
-            payload = json.dumps({"action": "shutdown"}).encode()
-            header = struct.pack(_HEADER_FMT, len(payload))
-            self.sock.sendall(header + payload)
+            send_msg(self.sock, {"action": "shutdown"})
         except (BrokenPipeError, ConnectionResetError, OSError):
             pass
 
@@ -378,10 +554,12 @@ class UserWorker:
             pass
 
 
-class WorkerPool:
-    """Manages per-user persistent worker subprocesses.
+class LegacyWorkerPool:
+    """Manages per-user persistent worker subprocesses by forking directly
+    (requires root when use_access_flags is set).
 
-    Workers are spawned on demand and evicted after idle timeout.
+    Kept behind ``supervisor_mode: legacy`` for one release as the rollback
+    path; removed in the following release.
     """
 
     def __init__(self, settings: Settings):
@@ -391,6 +569,10 @@ class WorkerPool:
         self._eviction_task: Optional[asyncio.Task] = None
         self.max_workers = settings.worker_pool_max_workers
         self.idle_timeout = settings.worker_pool_idle_timeout
+
+    async def execute(self, username: str, action: str, **kwargs) -> Any:
+        worker = await self.get_worker(username)
+        return await worker.execute(action, **kwargs)
 
     def _get_lock(self, username: str) -> asyncio.Lock:
         if username not in self._locks:
@@ -433,57 +615,15 @@ class WorkerPool:
 
     async def _spawn_worker(self, username: str) -> UserWorker:
         """Spawn a new persistent worker subprocess for the given user."""
-        # Build identity kwargs. With use_access_flags the worker setuids to
-        # the target user (requires root; the precondition is enforced in
-        # create_app). Without use_access_flags the worker runs as the parent
-        # process's user — used for local debugging of the worker code path.
-        identity_kwargs: dict = {}
-        if self.settings.use_access_flags:
-            pw = pwd.getpwnam(username)
-            groups = os.getgrouplist(username, pw.pw_gid)
-            identity_kwargs = {
-                "user": pw.pw_uid,
-                "group": pw.pw_gid,
-                "extra_groups": groups,
-            }
-            home_dir = pw.pw_dir
-            log_uid, log_gid = pw.pw_uid, pw.pw_gid
-        else:
-            home_dir = os.path.expanduser("~")
-            log_uid, log_gid = os.getuid(), os.getgid()
-
-        # Create Unix socketpair for IPC
-        parent_sock, child_sock = socket.socketpair()
-
-        # The worker runs as the (untrusted) target user, so its environment is
-        # readable via /proc/<pid>/environ. Build it from an allowlist so no
-        # server secret leaks — neither Fileglancer's FGC_* vars nor generic
-        # deployment secrets. See _build_worker_env.
-        env = _build_worker_env(
-            os.environ, home_dir, self.settings.log_level, child_sock.fileno(),
-            passthrough=self.settings.apps.worker_env_passthrough,
+        logger.info(f"Spawning persistent worker for {username}")
+        process, parent_sock, _uid = spawn_worker(
+            username,
+            privileged=self.settings.use_access_flags,
+            env_passthrough=self.settings.apps.worker_env_passthrough,
+            log_level=self.settings.log_level,
             log_format=self.settings.log_format,
+            worker_mode="legacy",
         )
-
-        logger.info(
-            f"Spawning persistent worker for {username} "
-            f"(uid={log_uid} gid={log_gid})"
-        )
-
-        process = subprocess.Popen(
-            [sys.executable, "-m", "fileglancer.user_worker"],
-            env=env,
-            pass_fds=(child_sock.fileno(),),
-            stderr=subprocess.PIPE,
-            **identity_kwargs,
-        )
-
-        # Close child's end in the parent
-        child_sock.close()
-
-        # Keep the socket blocking — all I/O runs in a thread via run_in_executor.
-        # Set a timeout so a hung worker can't block a thread forever.
-        parent_sock.setblocking(True)
         parent_sock.settimeout(120)
 
         # Start a background task to forward worker stderr to loguru
