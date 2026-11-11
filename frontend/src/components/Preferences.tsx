@@ -36,7 +36,7 @@ export default function Preferences() {
 
           <div>
             <Typography className="font-semibold mb-4" type="lead">
-              Neuroglancer links
+              Neuroglancer
             </Typography>
             <div className="pl-4 max-w-md">
               <NeuroglancerOptions />

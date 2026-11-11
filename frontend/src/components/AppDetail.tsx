@@ -19,6 +19,7 @@ import { useAppsQuery, useAppUpdateAvailable } from '@/queries/appsQueries';
 import { useJobsQuery } from '@/queries/jobsQueries';
 import { useAppActions } from '@/hooks/useAppActions';
 import { buildGithubUrl, canonicalGithubUrl, formatDateString } from '@/utils';
+import { showErrorToast } from '@/utils/errorToast';
 import type { UserApp } from '@/shared.types';
 
 const RECENT_JOBS_LIMIT = 5;
@@ -161,6 +162,14 @@ export default function AppDetail() {
         appName={app.name}
         homeLabel="My Apps"
         homeTo="/apps"
+        onRenameApp={async name => {
+          try {
+            await actions.rename(app, name);
+          } catch (error) {
+            showErrorToast(error, 'Failed to rename app');
+            throw error;
+          }
+        }}
       >
         {isShared ? (
           <span className="inline-block px-2 py-0.5 rounded-sm bg-success/10 text-success text-xs font-medium flex-shrink-0">

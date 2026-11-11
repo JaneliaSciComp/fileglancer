@@ -36,6 +36,14 @@ class ClusterSettings(BaseModel):
     poll_all_users: bool = False
 
 
+class CloudStorageSettings(BaseModel):
+    """User-added cloud buckets (Cloud Storage sidebar section)."""
+    enabled: bool = True
+    # None: any https endpoint that resolves to public address space.
+    # []: AWS only. A list of https origins: only those.
+    allowed_endpoints: Optional[List[str]] = None
+
+
 class AppsSettings(BaseModel):
     """Apps-specific configuration (not passed to py-cluster-api)."""
     extra_paths: List[str] = []
@@ -149,6 +157,11 @@ class Settings(BaseSettings):
     # The external URL of the proxy server for accessing proxied paths.
     # Maps to the /files/ end points of the fileglancer-central app.
     external_proxy_url: Optional[HttpUrl] = None
+    # Dev-only: serve an external Neuroglancer (e.g. Janelia's fork) at the
+    # same-origin path /neuroglancer/ so View editing can be tested locally.
+    # Point Neuroglancer's instance_template_url in the viewers config at it.
+    # Production serves its Neuroglancer from the reverse proxy instead.
+    neuroglancer_url: Optional[str] = None
 
     # Maximum size of the sharing key LRU cache
     sharing_key_cache_size: int = 1000
@@ -219,6 +232,8 @@ class Settings(BaseSettings):
 
     # Apps-specific settings (not passed to py-cluster-api)
     apps: AppsSettings = AppsSettings()
+
+    cloud_storage: CloudStorageSettings = CloudStorageSettings()
 
     # Test API key for automated integration testing.
     # NEVER set on production. The bypass activates when this value is set.

@@ -18,6 +18,59 @@
   }
 }
 
+/* Rendered markdown descriptions (MarkdownText). Tailwind preflight strips
+   default element styles, so restore just enough for readable prose. */
+.fg-markdown > :first-child {
+  margin-top: 0;
+}
+.fg-markdown p,
+.fg-markdown ul,
+.fg-markdown ol,
+.fg-markdown table,
+.fg-markdown pre,
+.fg-markdown blockquote {
+  margin-top: 0.5rem;
+}
+.fg-markdown h1,
+.fg-markdown h2,
+.fg-markdown h3,
+.fg-markdown h4,
+.fg-markdown h5,
+.fg-markdown h6 {
+  @apply font-semibold mt-3;
+}
+.fg-markdown ul {
+  @apply list-disc pl-5;
+}
+.fg-markdown ol {
+  @apply list-decimal pl-5;
+}
+.fg-markdown a {
+  @apply text-primary underline;
+}
+.fg-markdown code {
+  @apply font-mono text-sm bg-surface rounded px-1;
+}
+.fg-markdown pre {
+  @apply bg-surface rounded p-2 overflow-x-auto;
+}
+.fg-markdown pre code {
+  @apply bg-transparent p-0;
+}
+.fg-markdown table {
+  @apply border-collapse;
+}
+.fg-markdown th,
+.fg-markdown td {
+  @apply border border-surface-dark px-2 py-1 text-left;
+}
+.fg-markdown th {
+  @apply bg-surface font-semibold;
+}
+.fg-markdown blockquote {
+  @apply border-l-4 border-surface-dark pl-3 italic;
+}
+
 /* Indent only those file share paths nested inside a zone in the sidebar */
 .file-share-path-list > .file-share-path {
   padding-left: 2.5rem;

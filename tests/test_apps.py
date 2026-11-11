@@ -1701,6 +1701,28 @@ class TestFindManifestsAdapterFallback:
         # The failing adapter must not prevent the later one from handling it.
         assert _find_manifests_in_repo(tmp_path) == [("", manifest)]
 
+    def test_first_handling_adapter_wins(self, tmp_path, monkeypatch):
+        # A Fractal repo that also ships pixi config matches both adapters; each
+        # yields manifest_path "", so returning both would duplicate the app.
+        first = AppManifest(
+            name="From Next",
+            runnables=[AppEntryPoint(id="run", name="Run", command="echo")],
+        )
+        second = AppManifest(
+            name="From Pixi",
+            runnables=[AppEntryPoint(id="run", name="Run", command="echo")],
+        )
+        monkeypatch.setattr(
+            adapters_module,
+            "MANIFEST_ADAPTERS",
+            [
+                _NextStub(handles=True, manifest=first),
+                _PixiStub(handles=True, manifest=second),
+            ],
+        )
+
+        assert _find_manifests_in_repo(tmp_path) == [("", first)]
+
     def test_all_adapters_fail_aggregates_errors(self, tmp_path, monkeypatch):
         monkeypatch.setattr(
             adapters_module,

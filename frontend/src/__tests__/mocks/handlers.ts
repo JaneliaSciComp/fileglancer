@@ -3,6 +3,12 @@
 import { http, HttpResponse } from 'msw';
 
 export const handlers = [
+  http.get('/api/neuroglancer/views/relinkable', () =>
+    HttpResponse.json({ views: [] }, { status: 200 })
+  ),
+  http.post('/api/neuroglancer/views/relink', () =>
+    HttpResponse.json({ views: [] }, { status: 200 })
+  ),
   // Proxied paths
   http.get('/api/proxied-path', ({ request }) => {
     const url = new URL(request.url);
@@ -90,7 +96,8 @@ export const handlers = [
           mount_path: '/test/fsp',
           mac_path: 'smb://test/fsp',
           windows_path: '\\\\test\\fsp',
-          linux_path: '/test/fsp'
+          linux_path: '/test/fsp',
+          protocol: 'file'
         },
         {
           name: 'another_fsp',
@@ -100,9 +107,18 @@ export const handlers = [
           mount_path: '/another/path',
           mac_path: 'smb://another/path',
           windows_path: '\\\\another\\path',
-          linux_path: '/another/path'
+          linux_path: '/another/path',
+          protocol: 'file'
         }
       ]
+    });
+  }),
+
+  http.get('/api/cloud-storage/config', () => {
+    return HttpResponse.json({
+      enabled: true,
+      endpoint_url_allowed: true,
+      allowed_endpoints: null
     });
   }),
 

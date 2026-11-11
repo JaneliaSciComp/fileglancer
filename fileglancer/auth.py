@@ -235,13 +235,19 @@ ANY_SCOPE = ""
 # Maps a request path prefix to the resource whose scope guards it. Order does
 # not matter; prefixes are mutually exclusive.
 #
-# Deliberately absent: /api/file-share-paths, /api/external-buckets and
-# /api/version have no get_current_user dependency and are already
-# unauthenticated, so this table is never consulted for them. That is what
-# lets the Python client resolve paths regardless of a token's scopes.
+# Deliberately absent: /api/external-buckets and /api/version have no
+# get_current_user dependency and are already unauthenticated, so this table
+# is never consulted for them.
+#
+# /api/file-share-paths is listed so a files:read token sees the caller's
+# buckets alongside the site shares. It stays reachable without auth (or with
+# a token lacking files:read): such callers still get the site list, which is
+# what lets the Python client resolve paths regardless of a token's scopes.
 _SCOPE_PREFIXES = (
     ("/api/files", "files"),
     ("/api/content", "files"),
+    ("/api/cloud-storage", "files"),
+    ("/api/file-share-paths", "files"),
     ("/api/proxied-path", "links"),
     ("/api/neuroglancer", "links"),
     ("/api/jobs", "jobs"),

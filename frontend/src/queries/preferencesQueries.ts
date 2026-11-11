@@ -18,6 +18,8 @@ import type {
   FileSharePathPreference,
   FolderPreference,
   FolderFavorite,
+  NeuroglancerButtonTarget,
+  ViewerUrlSource,
   ViewerUrlSources
 } from '@/contexts/PreferencesContext';
 import {
@@ -25,6 +27,17 @@ import {
   sendRequestAndThrowForNotOk,
   throwResponseNotOkError
 } from './queryUtils';
+
+/**
+ * A single Neuroglancer layer-cart entry (identity: fsp_name + path + channel).
+ */
+export type CartItem = {
+  fsp_name: string;
+  path: string;
+  channel?: string;
+  channelIndex?: number;
+  label: string;
+};
 
 /**
  * Raw API response structure from /api/preference endpoint
@@ -39,6 +52,8 @@ type PreferencesApiResponse = {
   disableHeuristicalLayerTypeDetection?: { value: boolean };
   useLegacyMultichannelApproach?: { value: boolean };
   viewerUrlSources?: { value: ViewerUrlSources };
+  neuroglancerButtonTarget?: { value: NeuroglancerButtonTarget };
+  viewsNeuroglancerUrlSource?: { value: ViewerUrlSource };
   isFilteredByGroups?: { value: boolean };
   showTutorial?: { value: boolean };
   defaultExtraArgs?: { value: string };
@@ -47,6 +62,7 @@ type PreferencesApiResponse = {
   fileSharePath?: { value: FileSharePathPreference[] };
   folder?: { value: FolderPreference[] };
   recentlyViewedFolders?: { value: FolderPreference[] };
+  neuroglancerCart?: { value: CartItem[] };
 };
 
 /**
@@ -73,10 +89,13 @@ export type PreferencesQueryData = {
   disableHeuristicalLayerTypeDetection: boolean;
   useLegacyMultichannelApproach: boolean;
   viewerUrlSources: ViewerUrlSources;
+  neuroglancerButtonTarget: NeuroglancerButtonTarget;
+  viewsNeuroglancerUrlSource: ViewerUrlSource;
   isFilteredByGroups: boolean;
   showTutorial: boolean;
   defaultExtraArgs: string;
   apptainerCacheDir: string;
+  neuroglancerCart: CartItem[];
 };
 
 /**
@@ -246,10 +265,17 @@ const createTransformPreferences = (
       useLegacyMultichannelApproach:
         rawData.useLegacyMultichannelApproach?.value || false,
       viewerUrlSources: rawData.viewerUrlSources?.value || {},
+      neuroglancerButtonTarget:
+        rawData.neuroglancerButtonTarget?.value ?? 'views',
+      viewsNeuroglancerUrlSource:
+        rawData.viewsNeuroglancerUrlSource?.value ?? 'configured',
       isFilteredByGroups: rawData.isFilteredByGroups?.value ?? true,
       showTutorial: rawData.showTutorial?.value ?? true,
       defaultExtraArgs: rawData.defaultExtraArgs?.value || '',
-      apptainerCacheDir: rawData.apptainerCacheDir?.value || ''
+      apptainerCacheDir: rawData.apptainerCacheDir?.value || '',
+      // ponytail: cart lives in the generic preference blob (no new table/endpoint);
+      // a table only if it ever needs indexing or cross-user sharing.
+      neuroglancerCart: rawData.neuroglancerCart?.value ?? []
     };
   };
 };

@@ -258,6 +258,45 @@ describe('DataToolLinks - Edge Cases', () => {
       expect(screen.queryByText('Test Tools')).not.toBeInTheDocument();
     });
   });
+
+  describe('Incompatible viewers section', () => {
+    it('moves incompatible viewers into a collapsed section with reasons', async () => {
+      const urls: OpenWithToolUrls = {
+        copy: 'http://localhost:3000/copy',
+        neuroglancer: 'http://localhost:3000/neuroglancer',
+        avivator: 'http://localhost:3000/avivator'
+      };
+
+      render(
+        <ViewersProvider>
+          <DataToolLinks
+            incompatibleViewers={{
+              avivator: ['Viewer does not support OME-Zarr v0.6']
+            }}
+            onToolClick={vi.fn()}
+            showCopiedTooltip={false}
+            title="Test Tools"
+            urls={urls}
+          />
+        </ViewersProvider>,
+        { initialEntries: ['/browse/test_fsp/test_file'] }
+      );
+
+      // Compatible viewer renders in the main row
+      await screen.findByAltText('View in Neuroglancer', {}, { timeout: 3000 });
+
+      // Incompatible viewer is behind the collapsed section, still clickable
+      expect(screen.getByText('1 incompatible viewer')).toBeInTheDocument();
+      expect(screen.getByAltText('View in Avivator')).toBeInTheDocument();
+    });
+
+    it('renders no collapsed section when all viewers are compatible', async () => {
+      renderDataToolLinks();
+
+      await screen.findByAltText('View in Neuroglancer', {}, { timeout: 3000 });
+      expect(screen.queryByText(/incompatible viewer/)).toBeNull();
+    });
+  });
 });
 
 describe('DataToolLinks - Expected Behavior', () => {
@@ -321,6 +360,55 @@ describe('DataToolLinks - Expected Behavior', () => {
       // Copy button is an SVG icon, find by aria-label
       const copyButton = screen.getByLabelText('Copy data URL');
       expect(copyButton).toBeInTheDocument();
+    });
+
+    it('offers Add to cart instead of creating a View', async () => {
+      const onAddToCart = vi.fn();
+      render(
+        <ViewersProvider>
+          <DataToolLinks
+            onAddToCart={onAddToCart}
+            onToolClick={vi.fn()}
+            showCopiedTooltip={false}
+            title="Test Tools"
+            urls={mockOpenWithToolUrls}
+          />
+        </ViewersProvider>,
+        { initialEntries: ['/browse/test_fsp/test_file'] }
+      );
+
+      expect(screen.getByText('Add to cart')).toBeInTheDocument();
+      expect(screen.queryByText(/create view/i)).toBeNull();
+      screen.getAllByLabelText('Add this dataset to the Layer Cart')[0].click();
+      expect(onAddToCart).toHaveBeenCalled();
+    });
+
+    it('routes the Neuroglancer button to onOpenNeuroglancer when given', async () => {
+      const onOpenNeuroglancer = vi.fn();
+      const onToolClick = vi.fn(async () => {});
+      render(
+        <ViewersProvider>
+          <DataToolLinks
+            onOpenNeuroglancer={onOpenNeuroglancer}
+            onToolClick={onToolClick}
+            showCopiedTooltip={false}
+            title="Test Tools"
+            urls={mockOpenWithToolUrls}
+          />
+        </ViewersProvider>,
+        { initialEntries: ['/browse/test_fsp/test_file'] }
+      );
+
+      const logo = await screen.findByAltText(
+        'View in Neuroglancer',
+        {},
+        { timeout: 3000 }
+      );
+      expect(screen.getByText('Neuroglancer View')).toBeInTheDocument();
+      logo.click();
+
+      await waitFor(() => expect(onOpenNeuroglancer).toHaveBeenCalled());
+      expect(onToolClick).not.toHaveBeenCalled();
     });
 
     it('should call onToolClick when copy icon is clicked', async () => {

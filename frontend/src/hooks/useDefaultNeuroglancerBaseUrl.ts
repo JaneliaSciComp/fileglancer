@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
+import type { ViewerUrlSource } from '@/contexts/PreferencesContext';
 import { useViewersContext } from '@/contexts/ViewersContext';
 import { resolveViewerTemplate } from '@/utils/viewerUrl';
 
@@ -9,16 +10,13 @@ export const DEFAULT_NEUROGLANCER_BASE_URL =
   'https://neuroglancer-demo.appspot.com/';
 
 /**
- * The Neuroglancer base URL (the part before the '#!' state fragment) that new
- * short links should default to, honoring the deployment's configured URL and
- * the user's per-viewer URL preference.
+ * The Neuroglancer base URL (the part before the '#!' state fragment) for the
+ * given URL preference, honoring the deployment's configured URL.
  */
-export function useDefaultNeuroglancerBaseUrl(): string {
+function useNeuroglancerBaseUrl(source: ViewerUrlSource | undefined): string {
   const { validViewers } = useViewersContext();
-  const { viewerUrlSources } = usePreferencesContext();
 
   return useMemo(() => {
-    const source = viewerUrlSources['neuroglancer'];
     const neuroglancer = validViewers.find(v => v.key === 'neuroglancer');
     if (neuroglancer) {
       const template = resolveViewerTemplate(neuroglancer, source);
@@ -33,5 +31,50 @@ export function useDefaultNeuroglancerBaseUrl(): string {
       return source.custom.split('#!')[0] || DEFAULT_NEUROGLANCER_BASE_URL;
     }
     return DEFAULT_NEUROGLANCER_BASE_URL;
-  }, [validViewers, viewerUrlSources]);
+  }, [validViewers, source]);
+}
+
+/**
+ * The base URL for standalone Neuroglancer: the metadata panel's button and
+ * new short links. Follows the user's standalone Neuroglancer URL preference.
+ */
+export function useDefaultNeuroglancerBaseUrl(): string {
+  const { viewerUrlSources } = usePreferencesContext();
+  return useNeuroglancerBaseUrl(viewerUrlSources['neuroglancer']);
+}
+
+/**
+ * The base URL for a View's "Open in Neuroglancer" link-out. Follows its own
+ * preference, separate from standalone Neuroglancer.
+ */
+export function useViewsNeuroglancerBaseUrl(): string {
+  const { viewsNeuroglancerUrlSource } = usePreferencesContext();
+  return useNeuroglancerBaseUrl(viewsNeuroglancerUrlSource);
+}
+
+/**
+ * The Internal (deployment-configured) Neuroglancer base URL, ignoring the
+ * user's Internal/External viewer-URL preference. The embedded viewer uses
+ * this because the "External" preference (e.g. neuroglancer-demo.appspot.com)
+ * sends X-Frame-Options and won't render in an iframe; the configured/internal
+ * deployment is same-origin/frameable. Portable: no hardcoded URL — falls back
+ * to DEFAULT_NEUROGLANCER_BASE_URL only where no internal NG is configured.
+ * Null until the viewers config has loaded, so callers don't settle on the
+ * fallback while the configured URL is still on its way.
+ */
+export function useInternalNeuroglancerBaseUrl(): string | null {
+  const { validViewers, isInitialized } = useViewersContext();
+  return useMemo(() => {
+    if (!isInitialized) {
+      return null;
+    }
+    const neuroglancer = validViewers.find(v => v.key === 'neuroglancer');
+    if (neuroglancer) {
+      return (
+        resolveViewerTemplate(neuroglancer, 'configured').split('#!')[0] ||
+        DEFAULT_NEUROGLANCER_BASE_URL
+      );
+    }
+    return DEFAULT_NEUROGLANCER_BASE_URL;
+  }, [validViewers, isInitialized]);
 }

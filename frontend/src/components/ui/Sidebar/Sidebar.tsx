@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Card, Input } from '@material-tailwind/react';
 import { HiOutlineFunnel, HiXMark } from 'react-icons/hi2';
@@ -5,6 +6,8 @@ import { HiOutlineFunnel, HiXMark } from 'react-icons/hi2';
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FavoritesBrowser from './FavoritesBrowser';
 import ZonesBrowser from './ZonesBrowser';
+import CloudStorageBrowser from './CloudStorageBrowser';
+import AddBucketDialog from '@/components/ui/Dialogs/AddBucket';
 import useFilteredZonesAndFavorites from '@/hooks/useFilteredZonesAndFavorites';
 
 export default function Sidebar() {
@@ -18,6 +21,7 @@ export default function Sidebar() {
     filteredFolderFavorites,
     hasResultsOutsideGroups
   } = useFilteredZonesAndFavorites();
+  const [showAddBucket, setShowAddBucket] = useState(false);
 
   return (
     <Card
@@ -59,7 +63,15 @@ export default function Sidebar() {
           hasResultsOutsideGroups={hasResultsOutsideGroups}
           searchQuery={searchQuery}
         />
+        <CloudStorageBrowser
+          onAddBucket={() => setShowAddBucket(true)}
+          searchQuery={searchQuery}
+        />
       </div>
+      <AddBucketDialog
+        onClose={() => setShowAddBucket(false)}
+        open={showAddBucket}
+      />
     </Card>
   );
 }

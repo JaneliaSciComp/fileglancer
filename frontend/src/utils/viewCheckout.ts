@@ -1,0 +1,339 @@
+import {
+  getOmeZarrMetadata,
+  getOmeZarrThumbnail,
+  determineLayerType,
+  generateNeuroglancerStateForOmeZarr,
+  generateNeuroglancerStateForDataURL,
+  generateStateForPlainZarr
+} from '@/omezarr-helper';
+import type { LayerType, Metadata } from '@/omezarr-helper';
+import type { ViewLayer, ViewLayerInput } from '@/queries/viewQueries';
+import { default as log } from '@/logger';
+
+export type DatasetKind = 'ome' | 'array' | 'unsupported';
+
+// A dataset that produced no Neuroglancer layer is still recorded as a
+// ViewLayer (so the Views table can list it as a source), flagged via opts.
+export const UNSUPPORTED_LAYER_OPTS = { unsupported: true } as const;
+export function isUnsupportedLayer(layer: Pick<ViewLayer, 'opts'>): boolean {
+  return layer.opts?.unsupported === true;
+}
+export type DatasetProbe =
+  | { kind: 'ome'; metadata: Metadata }
+  | { kind: 'array'; state: string }
+  | { kind: 'unsupported'; errors: unknown[] };
+
+// Single source of truth for "what will this dataset become in Neuroglancer":
+// the cart indicator and checkout both call this, so they cannot disagree.
+export async function probeDataset(url: string): Promise<DatasetProbe> {
+  try {
+    return { kind: 'ome', metadata: await getOmeZarrMetadata(url) };
+  } catch (omeError) {
+    try {
+      const state = await generateStateForPlainZarr(url);
+      return { kind: 'array', state };
+    } catch (plainError) {
+      return { kind: 'unsupported', errors: [omeError, plainError] };
+    }
+  }
+}
+
+export type ResolvedCheckoutDataset = {
+  url: string;
+  /** Null for a dataset in a public bucket, which has no Data Link. */
+  sharing_key: string | null;
+  url_prefix: string;
+  fsp_name: string;
+  path: string;
+  channel?: string;
+  channelIndex?: number;
+  label: string;
+};
+
+export type NgLayer = Record<string, unknown> & { name?: string };
+export type NgState = Record<string, unknown> & { layers?: NgLayer[] };
+
+function decodeState(encoded: string | null): NgState | null {
+  if (!encoded) {
+    return null;
+  }
+  try {
+    return JSON.parse(decodeURIComponent(encoded)) as NgState;
+  } catch (error) {
+    log.error('Failed to decode generated Neuroglancer state', error);
+    return null;
+  }
+}
+
+// Same thumbnail-edge heuristic the single-dataset preview uses, so the
+// metadata panel and the View agree on image vs segmentation.
+// ponytail: renders a fresh thumbnail per dataset (not the preview's cached
+// one, whose URL differs); cache by dataset if checkout of big carts drags.
+async function inferLayerType(url: string): Promise<LayerType> {
+  const [thumbnail, error] = await getOmeZarrThumbnail(url);
+  if (error) {
+    log.debug(`No thumbnail for ${url}, using image layer type: ${error}`);
+  }
+  return determineLayerType(true, thumbnail);
+}
+
+async function generateStateForDataset(
+  ds: ResolvedCheckoutDataset,
+  detectLayerType: boolean
+): Promise<NgState | null> {
+  const probe = await probeDataset(ds.url);
+  if (probe.kind === 'unsupported') {
+    log.error(
+      `Failed to generate Neuroglancer state for ${ds.url}`,
+      ...probe.errors
+    );
+    return null;
+  }
+  try {
+    if (probe.kind === 'array') {
+      return decodeState(probe.state);
+    }
+    const { metadata } = probe;
+    const multiscale = metadata.multiscales?.[0];
+    const layerType =
+      multiscale && detectLayerType ? await inferLayerType(ds.url) : 'image';
+    const encoded = multiscale
+      ? generateNeuroglancerStateForOmeZarr(
+          ds.url,
+          metadata.zarrVersion,
+          layerType,
+          multiscale,
+          metadata.arr,
+          metadata.labels,
+          metadata.omero,
+          ds.channel !== undefined
+        )
+      : generateNeuroglancerStateForDataURL(ds.url, metadata.zarrVersion);
+    return decodeState(encoded);
+  } catch (error) {
+    log.error(`Failed to generate Neuroglancer state for ${ds.url}`, error);
+    return null;
+  }
+}
+
+// With a channel selection, checkout forces the per-channel layer path, so
+// layers are in c-axis index order; pick the selected channel's layer by
+// index. No channel → keep every layer the dataset produced.
+function selectLayers(state: NgState, channelIndex?: number): NgLayer[] {
+  const layers = state.layers ?? [];
+  if (channelIndex === undefined) {
+    return layers;
+  }
+  const picked = layers[channelIndex];
+  return picked ? [picked] : layers;
+}
+
+// ponytail: merge per-dataset generated states instead of refactoring the
+// generator to emit objects. Ceiling: cross-dataset coordinate spaces aren't
+// reconciled (first dataset's dimensions win) — fine for curated read-only
+// carts; revisit if mixed-resolution overlays misalign.
+
+// Fileglancer's own rule, not a Neuroglancer default (Neuroglancer never
+// archives a layer on its own): image layers from index 4 on start archived,
+// mirroring `archived: i >= 4` in the standalone generator's channel loop
+// (omezarr-helper.ts, generateFullNeuroglancerStateForOmeZarr). That loop
+// never touches label layers, so segmentation layers always stay shown and a
+// one-dataset View matches the standalone Neuroglancer button. Keep the two
+// in sync.
+function startsArchived(layer: NgLayer, index: number): boolean {
+  return layer.type !== 'segmentation' && index >= 4;
+}
+export async function buildViewState(
+  datasets: ResolvedCheckoutDataset[],
+  // Mirrors the disableHeuristicalLayerTypeDetection preference (inverted).
+  detectLayerType: boolean
+): Promise<{ ng_state: Record<string, unknown>; layers: ViewLayerInput[] }> {
+  const combinedLayers: NgLayer[] = [];
+  const viewLayers: ViewLayerInput[] = [];
+  const unsupported: ResolvedCheckoutDataset[] = [];
+  let base: NgState | null = null;
+  const taken = new Set<string>();
+
+  // Every channel entry of a dataset generates the same state; generate it
+  // once per dataset and layer path, then slice it per entry. All datasets
+  // start up front: each one probes metadata and renders a thumbnail, so
+  // awaiting them one at a time would make checkout time grow with cart size.
+  const stateCache = new Map<string, Promise<NgState | null>>();
+  const cacheKeyFor = (ds: ResolvedCheckoutDataset) =>
+    `${ds.url}::${ds.channel !== undefined}`;
+  for (const ds of datasets) {
+    if (!stateCache.has(cacheKeyFor(ds))) {
+      stateCache.set(
+        cacheKeyFor(ds),
+        generateStateForDataset(ds, detectLayerType)
+      );
+    }
+  }
+
+  for (const ds of datasets) {
+    const state = await stateCache.get(cacheKeyFor(ds))!;
+    if (!state) {
+      unsupported.push(ds);
+      continue;
+    }
+    if (!base) {
+      base = state;
+    }
+    for (const layer of selectLayers(state, ds.channelIndex)) {
+      const layer_index = combinedLayers.length;
+      // Datasets can share layer names (e.g. two with a "DAPI" channel).
+      const name = uniqueName(layer.name ?? 'layer', taken);
+      taken.add(name);
+      combinedLayers.push({
+        ...layer,
+        name,
+        archived: startsArchived(layer, layer_index)
+      });
+      viewLayers.push({
+        sharing_key: ds.sharing_key,
+        layer_index,
+        channel: ds.channel ?? null,
+        opts: null
+      });
+    }
+  }
+
+  // Unsupported datasets get indices past the real layers: unique, and they
+  // never point into ng_state.layers.
+  for (const ds of unsupported) {
+    viewLayers.push({
+      sharing_key: ds.sharing_key,
+      layer_index: viewLayers.length,
+      channel: ds.channel ?? null,
+      opts: { ...UNSUPPORTED_LAYER_OPTS }
+    });
+  }
+
+  const first = combinedLayers[0];
+  const ng_state: Record<string, unknown> = {
+    ...(base ?? {}),
+    layers: combinedLayers,
+    selectedLayer: first ? { visible: true, layer: first.name } : undefined,
+    layout: (base?.layout as string) ?? '4panel-alt'
+  };
+  return { ng_state, layers: viewLayers };
+}
+
+// NG requires unique layer names: `name`, else `name (2)`, `name (3)`, …
+// NG splits a multichannel OME-Zarr layer `name` into `name <channel>`
+// layers, so a name is also taken when one of its split layers exists.
+// ponytail: a different dataset named `name <something>` also counts as
+// taken; that only costs an unneeded ` (2)`.
+function uniqueName(name: string, taken: Set<string>): string {
+  const isTaken = (n: string) =>
+    [...taken].some(t => t === n || t.startsWith(`${n} `));
+  if (!isTaken(name)) {
+    return name;
+  }
+  let n = 2;
+  while (isTaken(`${name} (${n})`)) {
+    n++;
+  }
+  return `${name} (${n})`;
+}
+
+// Adds layers to an existing View's state. The View keeps its dimensions,
+// layout and selected layer. Added layers start archived by the same rule
+// as checkout, unless `shown` asks for them to stay visible.
+export function appendLayers(
+  current: NgState,
+  added: NgLayer[],
+  shown = false
+): NgState {
+  const layers = [...(current.layers ?? [])];
+  const taken = new Set(
+    layers.map(l => l.name).filter((n): n is string => typeof n === 'string')
+  );
+  for (const layer of added) {
+    const name = uniqueName(layer.name ?? 'layer', taken);
+    taken.add(name);
+    layers.push({
+      ...layer,
+      name,
+      archived: !shown && startsArchived(layer, layers.length)
+    });
+  }
+  return { ...current, layers };
+}
+
+// Python's quote(s, safe='/'), which the server uses in Data Link URLs.
+function quotePrefix(prefix: string): string {
+  return encodeURIComponent(prefix)
+    .replace(/[!'()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replace(/%2F/g, '/');
+}
+
+/** A Data Link's part of a source URL: `/{sharing_key}/{url_prefix}`. */
+export function dataLinkSegment(sharingKey: string, urlPrefix: string): string {
+  return `/${sharingKey}/${quotePrefix(urlPrefix)}`;
+}
+
+// A segment ends at `/`, `|`, `?`, `#` or the end, so `/K/img.zarr` never
+// matches `/K/img.zarr2` (ngstate._SEGMENT_END on the server).
+function segmentPattern(segment: string, flags?: string): RegExp {
+  const escaped = segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`${escaped}(?=[/|?#]|$)`, flags);
+}
+
+// Applies `fix` to each URL in a layer source: a string, a {url} object, or
+// an array of either.
+function mapSourceUrls(source: unknown, fix: (url: string) => string): unknown {
+  if (typeof source === 'string') {
+    return fix(source);
+  }
+  if (Array.isArray(source)) {
+    return source.map(s => mapSourceUrls(s, fix));
+  }
+  if (
+    source &&
+    typeof source === 'object' &&
+    typeof (source as { url?: unknown }).url === 'string'
+  ) {
+    return { ...source, url: fix((source as { url: string }).url) };
+  }
+  return source;
+}
+
+/** Whether any of the layer's sources uses `segment` (ngstate.layer_uses_segment). */
+export function layerUsesSegment(layer: NgLayer, segment: string): boolean {
+  const pattern = segmentPattern(segment);
+  let found = false;
+  mapSourceUrls(layer.source, url => {
+    found ||= pattern.test(url);
+    return url;
+  });
+  return found;
+}
+
+/**
+ * Points every layer source that uses `oldSegment` at `newSegment`, like the
+ * server's relink (ngstate.rewrite_layer_segment).
+ */
+export function rewriteDataLinkSegment(
+  state: NgState,
+  oldSegment: string,
+  newSegment: string
+): NgState {
+  const pattern = segmentPattern(oldSegment, 'g');
+  if (!state.layers) {
+    return state;
+  }
+  return {
+    ...state,
+    layers: state.layers.map(l =>
+      'source' in l
+        ? {
+            ...l,
+            source: mapSourceUrls(l.source, url =>
+              url.replace(pattern, () => newSegment)
+            )
+          }
+        : l
+    )
+  };
+}

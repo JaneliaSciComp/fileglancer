@@ -181,17 +181,61 @@ type OmeZarrChannel = {
 
 const COLORS = ['magenta', 'green', 'cyan', 'white', 'red', 'yellow', 'blue'];
 
-const UNIT_CONVERSIONS: Record<string, string> = {
-  micron: 'um', // Micron is not a valid UDUNITS-2, but some data still uses it
-  micrometer: 'um',
-  millimeter: 'mm',
-  nanometer: 'nm',
-  centimeter: 'cm',
-  meter: 'm',
-  second: 's',
-  millisecond: 'ms',
-  microsecond: 'us',
-  nanosecond: 'ns'
+// OME-NGFF axis units mapped to [scale factor, Neuroglancer unit].
+// Neuroglancer only accepts SI base units with SI prefixes, so non-SI units
+// (and the hecto/deci prefixes, to avoid relying on them) are rescaled to a
+// base unit.
+const NEUROGLANCER_UNITS: Record<string, [number, string]> = {
+  micron: [1, 'um'], // Micron is not a valid UDUNITS-2, but some data still uses it
+  yoctometer: [1, 'ym'],
+  zeptometer: [1, 'zm'],
+  attometer: [1, 'am'],
+  femtometer: [1, 'fm'],
+  picometer: [1, 'pm'],
+  angstrom: [1e-10, 'm'],
+  nanometer: [1, 'nm'],
+  micrometer: [1, 'um'],
+  millimeter: [1, 'mm'],
+  centimeter: [1, 'cm'],
+  decimeter: [0.1, 'm'],
+  meter: [1, 'm'],
+  hectometer: [100, 'm'],
+  kilometer: [1, 'km'],
+  megameter: [1, 'Mm'],
+  gigameter: [1, 'Gm'],
+  terameter: [1, 'Tm'],
+  petameter: [1, 'Pm'],
+  exameter: [1, 'Em'],
+  zettameter: [1, 'Zm'],
+  yottameter: [1, 'Ym'],
+  inch: [0.0254, 'm'],
+  foot: [0.3048, 'm'],
+  yard: [0.9144, 'm'],
+  mile: [1609.344, 'm'],
+  parsec: [3.085677581491367e16, 'm'],
+  yoctosecond: [1, 'ys'],
+  zeptosecond: [1, 'zs'],
+  attosecond: [1, 'as'],
+  femtosecond: [1, 'fs'],
+  picosecond: [1, 'ps'],
+  nanosecond: [1, 'ns'],
+  microsecond: [1, 'us'],
+  millisecond: [1, 'ms'],
+  centisecond: [1, 'cs'],
+  decisecond: [0.1, 's'],
+  second: [1, 's'],
+  hectosecond: [100, 's'],
+  kilosecond: [1, 'ks'],
+  megasecond: [1, 'Ms'],
+  gigasecond: [1, 'Gs'],
+  terasecond: [1, 'Ts'],
+  petasecond: [1, 'Ps'],
+  exasecond: [1, 'Es'],
+  zettasecond: [1, 'Zs'],
+  yottasecond: [1, 'Ys'],
+  minute: [60, 's'],
+  hour: [3600, 's'],
+  day: [86400, 's']
 };
 
 const SHADER = `#uicontrol invlerp contrast
@@ -207,16 +251,35 @@ void main() {
 }`;
 
 /**
- * Convert UDUNITS-2 units to Neuroglancer SI units.
+ * Convert a UDUNITS-2 unit to its Neuroglancer name. Units that need a
+ * rescale to convert (such as minute or angstrom) keep their original name,
+ * since this returns a unit without a value; use toNeuroglancerDimension to
+ * convert a scale and unit together.
  */
 function translateUnitToNeuroglancer(unit: string): string {
   if (unit === null || unit === undefined) {
     return '';
   }
-  if (UNIT_CONVERSIONS[unit]) {
-    return UNIT_CONVERSIONS[unit];
+  const conversion = NEUROGLANCER_UNITS[unit];
+  if (conversion && conversion[0] === 1) {
+    return conversion[1];
   }
   return unit;
+}
+
+/**
+ * Convert an OME-Zarr axis scale and UDUNITS-2 unit to a Neuroglancer
+ * dimension, e.g. [5, 'minute'] becomes [300, 's'].
+ */
+function toNeuroglancerDimension(
+  scale: number,
+  unit: string
+): [number, string] {
+  const conversion = NEUROGLANCER_UNITS[unit];
+  if (conversion) {
+    return [scale * conversion[0], conversion[1]];
+  }
+  return [scale, translateUnitToNeuroglancer(unit)];
 }
 
 /**
@@ -227,7 +290,14 @@ function translateUnitToNeuroglancer(unit: string): string {
 function getScaleTransform(
   coordinateTransformations: CoordinateTransformation[] | undefined
 ) {
-  return coordinateTransformations?.find(ct => ct.type === 'scale') as {
+  // OME-Zarr 0.6 (RFC-5) wraps the scale in a `sequence` transformation, so
+  // search one level inside those too.
+  const flattened = coordinateTransformations?.flatMap(
+    ct =>
+      (ct as { transformations?: CoordinateTransformation[] })
+        .transformations ?? [ct]
+  );
+  return flattened?.find(ct => ct.type === 'scale') as {
     scale: number[];
   };
 }
@@ -524,8 +594,10 @@ function generateFullNeuroglancerStateForOmeZarr(
   for (const name of dimensionNames) {
     if (axesMap[name]) {
       const axis = axesMap[name];
-      const unit = translateUnitToNeuroglancer(axis.unit);
-      state.dimensions[name] = [scales[axis.index], unit];
+      state.dimensions[name] = toNeuroglancerDimension(
+        scales[axis.index],
+        axis.unit
+      );
       imageDimensions.delete(name);
     } else {
       log.trace('Dimension not found in axes map: ', name);
@@ -608,8 +680,13 @@ function generateFullNeuroglancerStateForOmeZarr(
       channels[0].color = 'white';
     }
 
-    // Add layers for each channel
+    // Add layers for each channel. NG layer names must be unique, and some
+    // datasets repeat a channel label, so repeats become `name (2)`, ...
+    const nameCounts = new Map<string, number>();
     channels.forEach((channel, i) => {
+      const count = (nameCounts.get(channel.name) ?? 0) + 1;
+      nameCounts.set(channel.name, count);
+
       // Format color
       let color = channel.color;
       if (/^[\dA-F]{6}$/.test(color)) {
@@ -622,7 +699,7 @@ function generateFullNeuroglancerStateForOmeZarr(
       const transform = { outputDimensions: localDimensions };
 
       const layer: Record<string, any> = {
-        name: channel.name,
+        name: count > 1 ? `${channel.name} (${count})` : channel.name,
         type: layerType,
         source: {
           url: sourceUrl,
@@ -727,9 +804,11 @@ async function getZarrArray(
   dataUrl: string,
   zarrVersion: 2 | 3
 ): Promise<zarr.Array<any>> {
+  // 'same-origin', not 'include': public buckets answer CORS with
+  // Allow-Origin '*', which browsers reject for credentialed requests.
   const store = new zarr.FetchStore(dataUrl, {
     overrides: {
-      credentials: 'include'
+      credentials: 'same-origin'
     }
   });
   return await omezarr.getArray(store, '/', zarrVersion);
@@ -741,11 +820,12 @@ async function getZarrArray(
 async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
   const store = new zarr.FetchStore(dataUrl, {
     overrides: {
-      credentials: 'include'
+      credentials: 'same-origin'
     }
   });
   const { arr, shapes, multiscale, omero, scales, zarr_version } =
     await omezarr.getMultiscaleWithArray(store, 0);
+  const labels = await getOmeZarrLabels(store, zarr_version);
 
   // ome-zarr.js returns a single `multiscale` with its own, looser types.
   // Normalize it once here, at the ingestion boundary, into the canonical
@@ -778,24 +858,104 @@ async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
     multiscales: normalizedMultiscale ? [normalizedMultiscale] : undefined,
     axes: normalizedMultiscale?.axes,
     omero: omero2,
-    labels: undefined
+    labels
   };
 
   return metadata;
+}
+
+/**
+ * The label image names listed by the OME-NGFF `labels` group (v3
+ * `attributes.ome.labels`, v2 `.zattrs` `labels`), or undefined when the
+ * dataset has no labels group or an empty list.
+ */
+async function getOmeZarrLabels(
+  store: zarr.FetchStore,
+  zarrVersion: 2 | 3
+): Promise<string[] | undefined> {
+  try {
+    const location = zarr.root(store).resolve('labels');
+    const group =
+      zarrVersion === 3
+        ? await zarr.open.v3(location, { kind: 'group' })
+        : await zarr.open.v2(location, { kind: 'group' });
+    const attrs = group.attrs as {
+      ome?: { labels?: string[] };
+      labels?: string[];
+    };
+    const labels = attrs?.ome?.labels ?? attrs?.labels;
+    return Array.isArray(labels) && labels.length > 0 ? labels : undefined;
+  } catch (error) {
+    // No labels group: fine, most datasets have none.
+    log.trace('Could not load labels group: ', error);
+    return undefined;
+  }
+}
+
+/**
+ * Open a plain Zarr array (not an OME-Zarr multiscale group) with auto-detected
+ * storage version and emit a single-layer Neuroglancer state. Used by the Views
+ * checkout when a cart dataset is a bare array, so each added directory still
+ * becomes one layer.
+ */
+async function generateStateForPlainZarr(dataUrl: string): Promise<string> {
+  // Probe the storage version (needed for the |zarrN: source suffix): try v2
+  // first (most fileglancer data), then v3. If neither opens, this throws and
+  // the caller skips the dataset.
+  let zarrVersion: 2 | 3 = 2;
+  try {
+    await getZarrArray(dataUrl, 2);
+  } catch {
+    await getZarrArray(dataUrl, 3);
+    zarrVersion = 3;
+  }
+  // Plain arrays have no thumbnail for the edge heuristic, so the standalone
+  // Neuroglancer button always opens them as 'image'; match it.
+  return generateNeuroglancerStateForZarrArray(dataUrl, zarrVersion, 'image');
+}
+
+/**
+ * Get the channel labels for an OME-Zarr dataset: from `omero.channels[].label`
+ * when present, else synthesized `Channel 0..n-1` from the `c` axis length,
+ * else `[]` when there is no channel axis.
+ */
+async function getOmeZarrChannels(dataUrl: string): Promise<string[]> {
+  let metadata;
+  try {
+    metadata = await getOmeZarrMetadata(dataUrl);
+  } catch {
+    // Plain array / no multiscale group: no channels to enumerate. Return []
+    // instead of throwing so the cart row shows its no-channel hint.
+    return [];
+  }
+  const multiscale = metadata.multiscales?.[0];
+  if (!multiscale) {
+    return [];
+  }
+  if (metadata.omero?.channels?.length) {
+    return metadata.omero.channels.map((ch, i) => ch.label || `Channel ${i}`);
+  }
+  const axesMap = getAxesMap(multiscale);
+  const cAxis = axesMap['c'];
+  if (!cAxis) {
+    return [];
+  }
+  const count = metadata.arr.shape[cAxis.index];
+  return Array.from({ length: count }, (_, i) => `Channel ${i}`);
 }
 
 type ThumbnailResult = [thumbnail: string | null, errorMessage: string | null];
 
 async function getOmeZarrThumbnail(
   dataUrl: string,
-  signal: AbortSignal,
+  signal?: AbortSignal,
   thumbnailSize: number = 300,
   maxThumbnailSize: number = 1024,
   autoBoost: boolean = true
 ): Promise<ThumbnailResult> {
   const store = new zarr.FetchStore(dataUrl, {
     overrides: {
-      credentials: 'include',
+      credentials: 'same-origin',
       signal
     }
   });
@@ -923,14 +1083,18 @@ async function determineLayerType(
 export {
   getScaleTransform,
   getResolvedScales,
+  getAxesMap,
   getNeuroglancerSource,
   getZarrArray,
   getOmeZarrMetadata,
+  getOmeZarrChannels,
   getOmeZarrThumbnail,
   generateNeuroglancerStateForDataURL,
+  generateStateForPlainZarr,
   generateNeuroglancerStateForZarrArray,
   generateNeuroglancerStateForOmeZarr,
   translateUnitToNeuroglancer,
+  toNeuroglancerDimension,
   determineLayerType,
   analyzeThumbnailEdgeContent
 };

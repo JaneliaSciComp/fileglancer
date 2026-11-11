@@ -239,27 +239,12 @@ _user_groups_cache: dict[str, list[str]] = {}
 
 
 def _get_user_groups(username: str) -> list[str]:
-    """Return the supplementary group names for a user.
-
-    Uses os.getgrouplist (NSS initgroups) instead of grp.getgrall, which
-    enumerates every group on the system and is very slow on LDAP/NIS hosts.
-    Result is cached for the lifetime of the process.
-    """
+    """Supplementary group names for a user, cached for the lifetime of the process."""
     cached = _user_groups_cache.get(username)
-    if cached is not None:
-        return cached
-
-    import grp as _grp
-    pw = pwd.getpwnam(username)
-    gids = os.getgrouplist(username, pw.pw_gid)
-    names = []
-    for gid in gids:
-        try:
-            names.append(_grp.getgrgid(gid).gr_name)
-        except KeyError:
-            continue
-    _user_groups_cache[username] = names
-    return names
+    if cached is None:
+        from fileglancer.utils import get_user_groups
+        cached = _user_groups_cache[username] = get_user_groups(username)
+    return cached
 
 
 def _get_filestore(fsp_name: str, fsps: list):
@@ -454,27 +439,25 @@ def _action_open_file(request: dict, ctx: WorkerContext, filestore, fsps) -> dic
     from fileglancer.utils import guess_content_type
 
     try:
-        file_info = filestore.get_file_info(subpath)
-        if file_info.is_dir:
-            return {"error": "Cannot download directory content", "status_code": 400}
-
-        file_name = subpath.split('/')[-1] if subpath else ''
-        content_type = guess_content_type(file_name)
         full_path = filestore._check_path_in_root(subpath)
 
         # Open the file — the fd retains user's access rights
         file_handle = open(full_path, 'rb')
-        fd = file_handle.fileno()
+        # Describe the file we actually opened, not whatever was at the path a moment ago
+        st = os.fstat(file_handle.fileno())
 
+        file_name = subpath.split('/')[-1] if subpath else ''
         return {
-            "file_size": file_info.size,
-            "last_modified": file_info.last_modified,
-            "content_type": content_type,
-            "_fd": fd,
+            "file_size": st.st_size,
+            "last_modified": st.st_mtime,
+            "content_type": guess_content_type(file_name),
+            "_fd": file_handle.fileno(),
             "_file_handle": file_handle,  # kept alive until fd is sent
         }
     except RootCheckError as e:
         return _redirect_or_error(e, fsps)
+    except IsADirectoryError:
+        return {"error": "Cannot download directory content", "status_code": 400}
     except FileNotFoundError:
         return {"error": f"File or directory not found: {fsp_name}/{subpath}", "status_code": 404}
     except PermissionError:

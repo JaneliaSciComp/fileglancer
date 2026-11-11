@@ -13,6 +13,7 @@ import {
   sendRequestAndThrowForNotOk,
   throwResponseNotOkError
 } from './queryUtils';
+import { toastRelinked, viewQueryKeys, type ViewSummary } from './viewQueries';
 
 /**
  * Raw API response structure from /api/proxied-path endpoints
@@ -35,7 +36,24 @@ type CreateProxiedPathPayload = {
  */
 type DeleteProxiedPathPayload = {
   sharing_key: string;
+  confirm?: boolean;
 };
+
+/**
+ * Thrown when a data link backs Views the caller owns and `confirm` was not
+ * set. Carries the dependent Views so the UI can list them and re-issue the
+ * delete with confirm=true. The backend returns 409 with this structured body
+ * (see server.py delete_proxied_path); the app's usual {error} envelope would
+ * lose the list, so we branch on status manually here.
+ */
+export class DependentViewsError extends Error {
+  views: { short_key: string; name: string }[];
+  constructor(message: string, views: { short_key: string; name: string }[]) {
+    super(message);
+    this.name = 'DependentViewsError';
+    this.views = views;
+  }
+}
 
 // Query key factory for proxied paths
 export const proxiedPathQueryKeys = {
@@ -162,6 +180,10 @@ export function useProxiedPathByFspAndPathQuery(
   });
 }
 
+export type CreatedProxiedPath = ProxiedPath & {
+  relinked_views?: ViewSummary[];
+};
+
 /**
  * Mutation hook for creating a new proxied path
  *
@@ -170,7 +192,7 @@ export function useProxiedPathByFspAndPathQuery(
  * mutation.mutate({ fsp_name: 'my-fsp', path: '/data/file.zarr' });
  */
 export function useCreateProxiedPathMutation(): UseMutationResult<
-  ProxiedPath,
+  CreatedProxiedPath,
   Error,
   CreateProxiedPathPayload,
   { previousPaths?: ProxiedPath[] }
@@ -188,7 +210,7 @@ export function useCreateProxiedPathMutation(): UseMutationResult<
       }
       const url = buildUrl('/api/proxied-path', null, queryParams);
       const proxiedPath = await sendRequestAndThrowForNotOk(url, 'POST');
-      return proxiedPath as ProxiedPath;
+      return proxiedPath as CreatedProxiedPath;
     },
     // Optimistic update for all proxied paths list
     onMutate: async (newPath: CreateProxiedPathPayload) => {
@@ -203,7 +225,7 @@ export function useCreateProxiedPathMutation(): UseMutationResult<
       return { previousPaths };
     },
     // On success, update both the list and the specific proxied path detail
-    onSuccess: (newProxiedPath: ProxiedPath) => {
+    onSuccess: (newProxiedPath: CreatedProxiedPath) => {
       // Update the detail query for this specific proxied path
       queryClient.setQueryData(
         proxiedPathQueryKeys.detail(
@@ -217,6 +239,11 @@ export function useCreateProxiedPathMutation(): UseMutationResult<
       queryClient.invalidateQueries({
         queryKey: proxiedPathQueryKeys.all
       });
+      // Creating a Data Link relinks the caller's broken Views on that
+      // dataset (server side); refetch so the Views table drops the
+      // broken-link icon without a page reload.
+      queryClient.invalidateQueries({ queryKey: viewQueryKeys.all });
+      toastRelinked(newProxiedPath.relinked_views ?? []);
     },
     // On error, rollback
     onError: (_err, _variables, context) => {
@@ -247,8 +274,28 @@ export function useDeleteProxiedPathMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: async (payload: DeleteProxiedPathPayload) => {
-      const url = buildUrl('/api/proxied-path/', payload.sharing_key, null);
-      await sendRequestAndThrowForNotOk(url, 'DELETE');
+      const url = buildUrl(
+        '/api/proxied-path/',
+        payload.sharing_key,
+        payload.confirm ? { confirm: 'true' } : null
+      );
+      const response = await sendFetchRequest(url, 'DELETE');
+      if (response.status === 409) {
+        const body = (await getResponseJsonOrError(response)) as {
+          detail?: {
+            message?: string;
+            dependent_views?: { short_key: string; name: string }[];
+          };
+        };
+        throw new DependentViewsError(
+          body?.detail?.message ?? 'This data link is used by Views you own.',
+          body?.detail?.dependent_views ?? []
+        );
+      }
+      if (!response.ok) {
+        const body = await getResponseJsonOrError(response);
+        throwResponseNotOkError(response, body);
+      }
     },
     // Optimistic update
     onMutate: async (deletedPath: DeleteProxiedPathPayload) => {
@@ -275,6 +322,9 @@ export function useDeleteProxiedPathMutation(): UseMutationResult<
       queryClient.invalidateQueries({
         queryKey: proxiedPathQueryKeys.all
       });
+      // Deleting a Data Link marks dependent View layers broken; refetch so
+      // the Views table shows the broken-link icon without a page reload.
+      queryClient.invalidateQueries({ queryKey: viewQueryKeys.all });
     },
     // On error, rollback
     onError: (_err, _variables, context) => {

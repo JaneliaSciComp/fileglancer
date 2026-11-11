@@ -41,11 +41,23 @@ export interface ValidViewer {
   manifest: ViewerManifest;
 }
 
+/** A configured viewer whose capability manifest rejected the dataset. */
+export interface IncompatibleViewer {
+  viewer: ValidViewer;
+  /** Human-readable reasons from the capability check. */
+  reasons: string[];
+}
+
+export interface ViewerCompatibility {
+  compatible: ValidViewer[];
+  incompatible: IncompatibleViewer[];
+}
+
 interface ViewersContextType {
   validViewers: ValidViewer[];
   isInitialized: boolean;
   error: string | null;
-  getViewersCompatibleWithImage: (metadata: OmeZarrMetadata) => ValidViewer[];
+  getViewerCompatibility: (metadata: OmeZarrMetadata) => ViewerCompatibility;
 }
 
 const ViewersContext = createContext<ViewersContextType | undefined>(undefined);
@@ -197,26 +209,32 @@ export function ViewersProvider({
     }
   }, [isConfigError, configError]);
 
-  const getViewersCompatibleWithImage = useCallback(
-    (metadata: OmeZarrMetadata): ValidViewer[] => {
+  const getViewerCompatibility = useCallback(
+    (metadata: OmeZarrMetadata): ViewerCompatibility => {
+      const compatible: ValidViewer[] = [];
+      const incompatible: IncompatibleViewer[] = [];
       if (!isInitialized || !metadata) {
-        return [];
+        return { compatible, incompatible };
       }
 
-      return validViewers.filter(viewer => {
+      for (const viewer of validViewers) {
         const result = validateViewer(viewer.manifest, metadata);
-        if (!result.dataCompatible) {
+        if (result.dataCompatible) {
+          compatible.push(viewer);
+        } else {
+          const reasons = result.errors.map(e => e.message);
           log.info(
-            `Viewer "${viewer.displayName}" is not compatible with this dataset: ${result.errors.map(e => e.message).join('; ')}`
+            `Viewer "${viewer.displayName}" is not compatible with this dataset: ${reasons.join('; ')}`
           );
+          incompatible.push({ viewer, reasons });
         }
         if (result.warnings.length > 0) {
           log.info(
             `Viewer "${viewer.displayName}" warnings: ${result.warnings.map(w => w.message).join('; ')}`
           );
         }
-        return result.dataCompatible;
-      });
+      }
+      return { compatible, incompatible };
     },
     [validViewers, isInitialized]
   );
@@ -227,7 +245,7 @@ export function ViewersProvider({
         validViewers,
         isInitialized,
         error,
-        getViewersCompatibleWithImage
+        getViewerCompatibility
       }}
     >
       {children}

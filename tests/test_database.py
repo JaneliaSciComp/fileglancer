@@ -64,6 +64,8 @@ def db_session(temp_dir):
         session.query(FileSharePathDB).delete()
         session.query(LastRefreshDB).delete()
         session.query(UserPreferenceDB).delete()
+        session.query(CloudBucketDB).delete()
+        session.query(ProxiedPathDB).delete()
         session.commit()
     finally:
         session.close()
@@ -320,6 +322,145 @@ def test_delete_proxied_path(db_session, fsp):
     delete_proxied_path(db_session, username, created_path.sharing_key)
     deleted_path = get_proxied_path_by_sharing_key(db_session, created_path.sharing_key)
     assert deleted_path is None
+
+
+def test_create_and_get_view(db_session):
+    layers = [
+        {"data_link_id": None, "layer_index": 0, "channel": "Ch0", "opts": {"color": "red"}},
+        {"data_link_id": None, "layer_index": 1, "channel": None, "opts": None},
+    ]
+    view = create_view(
+        db_session,
+        username="testuser",
+        name="seed6 overlay",
+        ng_state={"layers": []},
+        layers=layers,
+        sharing_mode="read",
+    )
+    assert view.short_key is not None
+    assert view.read_key is not None
+    assert view.edit_key is not None
+    assert view.short_key != view.read_key != view.edit_key
+    assert view.owner == "testuser"
+    assert view.sharing_mode == "read"
+
+    fetched = get_view_by_short_key(db_session, view.short_key)
+    assert fetched is not None
+    assert fetched.name == "seed6 overlay"
+    assert len(fetched.layers) == 2
+    assert {l.layer_index for l in fetched.layers} == {0, 1}
+    assert fetched.layers[0].channel == "Ch0"
+    assert fetched.layers[0].broken is False
+
+
+def test_get_views_and_read_key(db_session):
+    v1 = create_view(db_session, "u", "one", {"layers": []}, [], "read")
+    v2 = create_view(db_session, "u", "two", {"layers": []}, [], "private")
+    create_view(db_session, "other", "three", {"layers": []}, [], "read")
+
+    mine = get_views(db_session, "u")
+    assert [v.name for v in mine] == ["two", "one"]  # newest first
+
+    assert get_view_by_read_key(db_session, v1.read_key).short_key == v1.short_key
+    assert get_view_by_read_key(db_session, "nope") is None
+    assert v2.sharing_mode == "private"
+
+
+def test_update_and_delete_view(db_session):
+    layers = [{"data_link_id": None, "layer_index": 0, "channel": None, "opts": None}]
+    v = create_view(db_session, "u", "before", {"layers": [1]}, layers, "read")
+    view_id = v.id
+    updated = update_view(db_session, v, name="after", ng_state={"layers": [2], "title": "x"})
+    assert updated.name == "after"
+    assert updated.ng_state == {"layers": [2]}  # injected title stripped
+
+    assert db_session.query(ViewLayerDB).filter_by(view_id=view_id).count() == 1
+    assert delete_view(db_session, "u", v.short_key) == 1
+    assert get_view_by_short_key(db_session, v.short_key) is None
+    assert db_session.query(ViewLayerDB).filter_by(view_id=view_id).count() == 0
+
+
+def test_get_views_for_data_link(db_session):
+    layers = [
+        {"data_link_id": 42, "layer_index": 0, "channel": None, "opts": None},
+        {"data_link_id": 42, "layer_index": 1, "channel": "Ch1", "opts": None},
+    ]
+    v = create_view(db_session, "u", "linked", {"layers": []}, layers, "read")
+    create_view(db_session, "u", "unlinked", {"layers": []}, [], "read")
+
+    dependents = get_views_for_data_link(db_session, 42)
+    assert [d.short_key for d in dependents] == [v.short_key]  # distinct: one entry despite two matching layers
+    assert get_views_for_data_link(db_session, 999) == []
+
+
+def test_mark_view_layers_broken(db_session):
+    layers = [
+        {"data_link_id": 7, "layer_index": 0, "channel": None, "opts": None},
+        {"data_link_id": 7, "layer_index": 1, "channel": "Ch1", "opts": None},
+        {"data_link_id": 8, "layer_index": 2, "channel": None, "opts": None},
+    ]
+    v = create_view(db_session, "u", "mixed", {"layers": []}, layers, "read")
+
+    updated = mark_view_layers_broken(db_session, 7)
+    assert updated == 2
+
+    db_session.refresh(v)
+    by_index = {l.layer_index: l for l in v.layers}
+    assert by_index[0].data_link_id is None and by_index[0].broken is True
+    assert by_index[1].data_link_id is None and by_index[1].broken is True
+    # the data_link_id=8 layer is untouched
+    assert by_index[2].data_link_id == 8 and by_index[2].broken is False
+    # the View itself still exists
+    assert get_view_by_short_key(db_session, v.short_key) is not None
+
+
+def test_view_layers_keep_source_after_broken(db_session):
+    layers = [
+        {"data_link_id": 5, "layer_index": 0, "channel": None, "opts": None,
+         "fsp_name": "scratch", "path": "/data/img.zarr"},
+    ]
+    v = create_view(db_session, "u", "src", {"layers": []}, layers, "read")
+    layer = get_view_by_short_key(db_session, v.short_key).layers[0]
+    assert layer.fsp_name == "scratch"
+    assert layer.path == "/data/img.zarr"
+
+    mark_view_layers_broken(db_session, 5)
+    db_session.refresh(v)
+    layer = v.layers[0]
+    assert layer.broken is True and layer.data_link_id is None
+    # Source survives the break so a broken View can be restored later.
+    assert layer.fsp_name == "scratch"
+    assert layer.path == "/data/img.zarr"
+
+
+def test_get_views_for_data_link_owner_filter(db_session):
+    layer = [{"data_link_id": 11, "layer_index": 0, "channel": None, "opts": None}]
+    mine = create_view(db_session, "me", "mine", {"layers": []}, layer, "read")
+    create_view(db_session, "other", "theirs", {"layers": []}, layer, "read")
+
+    # unfiltered: both owners' views
+    all_deps = get_views_for_data_link(db_session, 11)
+    assert {v.owner for v in all_deps} == {"me", "other"}
+    # owner-scoped: only mine
+    mine_only = get_views_for_data_link(db_session, 11, owner="me")
+    assert [v.short_key for v in mine_only] == [mine.short_key]
+
+
+def test_view_pydantic_from_orm(db_session):
+    from fileglancer.model import View
+    layers = [{"data_link_id": 7, "layer_index": 0, "channel": "Ch0", "opts": None}]
+    view_db = create_view(db_session, "u", "demo", {"layers": []}, layers, "read")
+
+    model = View.model_validate(view_db)
+    assert model.short_key == view_db.short_key
+    assert model.read_key == view_db.read_key
+    assert model.name == "demo"
+    assert model.sharing_mode == "read"
+    assert len(model.layers) == 1
+    assert model.layers[0].channel == "Ch0"
+    assert model.layers[0].broken is False
+    # edit_key must NOT be exposed in read-only scope
+    assert not hasattr(model, "edit_key")
 
 
 def test_create_proxied_path_for_file(db_session, fsp):
@@ -721,3 +862,341 @@ class TestFindBestFspMatch:
         )
         assert result is None
 
+
+def test_view_request_models_validate_sharing_mode():
+    from pydantic import ValidationError
+    from fileglancer.model import ViewCreateRequest, ViewLayerInput
+
+    req = ViewCreateRequest(
+        name="demo",
+        ng_state={"layers": []},
+        sharing_mode="read",
+        layers=[ViewLayerInput(sharing_key="abc", layer_index=0)],
+    )
+    assert req.sharing_mode == "read"
+    assert req.layers[0].sharing_key == "abc"
+    assert req.layers[0].channel is None
+
+    # default sharing_mode
+    assert ViewCreateRequest(name="d", ng_state={}).sharing_mode == "read"
+
+    # invalid sharing_mode is rejected at the boundary
+    import pytest
+    with pytest.raises(ValidationError):
+        ViewCreateRequest(name="d", ng_state={}, sharing_mode="public")
+
+
+
+def test_create_view_stores_data_link_identity(db_session):
+    layers = [{"data_link_id": 3, "layer_index": 0, "channel": None, "opts": None,
+               "fsp_name": "nrs", "path": "a/img.zarr",
+               "sharing_key": "KEY", "url_prefix": "img.zarr"}]
+    v = create_view(db_session, "u", "ident", {"layers": []}, layers, "read")
+    layer = get_view_by_short_key(db_session, v.short_key).layers[0]
+    assert (layer.sharing_key, layer.url_prefix) == ("KEY", "img.zarr")
+
+    mark_view_layers_broken(db_session, 3)
+    db_session.refresh(v)
+    # identity survives the break — it is what relink needs
+    assert (v.layers[0].sharing_key, v.layers[0].url_prefix) == ("KEY", "img.zarr")
+
+
+PROXY = "http://localhost/files"
+
+
+def _pp(db_session, fsp, path, url_prefix=None, username="u"):
+    os.makedirs(os.path.join(fsp.mount_path, path), exist_ok=True)
+    prefix = url_prefix if url_prefix is not None else (os.path.basename(path) or fsp.name)
+    return create_proxied_path(db_session, username, prefix, fsp.name, path, url_prefix=prefix)
+
+
+def _src(pp):
+    return f"{PROXY}/{pp.sharing_key}/{pp.url_prefix}|zarr2:"
+
+
+def _row(pp, i, **extra):
+    return {"data_link_id": pp.id, "layer_index": i, "channel": None, "opts": None,
+            "fsp_name": pp.fsp_name, "path": pp.path,
+            "sharing_key": pp.sharing_key, "url_prefix": pp.url_prefix, **extra}
+
+
+def test_reconcile_follows_reorder_remove_and_add(db_session, fsp):
+    a, b, c = _pp(db_session, fsp, "a.zarr"), _pp(db_session, fsp, "b.zarr"), _pp(db_session, fsp, "c.zarr")
+    state = {"layers": [{"name": "a", "source": _src(a)}, {"name": "b", "source": _src(b)}]}
+    v = create_view(db_session, "u", "r", state, [_row(a, 0, channel="Ch0"), _row(b, 1)], "read")
+
+    # owner removed a, added c at the front, kept b
+    new_state = {"layers": [{"name": "c", "source": _src(c)}, {"name": "b", "source": _src(b)}]}
+    update_view(db_session, v, ng_state=new_state, proxy_url=PROXY)
+
+    rows = sorted(v.layers, key=lambda l: l.layer_index)
+    assert [(r.layer_index, r.sharing_key, r.data_link_id) for r in rows] == [
+        (0, c.sharing_key, c.id), (1, b.sharing_key, b.id)]
+    assert rows[1].broken is False
+
+
+def test_reconcile_carries_unsupported_and_dead_key_rows(db_session, fsp):
+    a, dead = _pp(db_session, fsp, "a.zarr"), _pp(db_session, fsp, "dead.zarr")
+    plain = _pp(db_session, fsp, "plain_dir")
+    state = {"layers": [{"name": "dead", "source": _src(dead)}, {"name": "a", "source": _src(a)}]}
+    v = create_view(db_session, "u", "r", state,
+                    [_row(dead, 0, channel="Ch1"), _row(a, 1), _row(plain, 2, opts={"unsupported": True})], "read")
+    mark_view_layers_broken(db_session, dead.id)
+    delete_proxied_path(db_session, "u", dead.sharing_key)
+
+    # swap order
+    update_view(db_session, v, ng_state={"layers": [state["layers"][1], state["layers"][0]]}, proxy_url=PROXY)
+    rows = sorted(v.layers, key=lambda l: l.layer_index)
+    assert rows[0].sharing_key == a.sharing_key and rows[0].broken is False
+    assert rows[1].sharing_key == dead.sharing_key and rows[1].broken is True
+    assert (rows[1].fsp_name, rows[1].path, rows[1].url_prefix, rows[1].channel) == (
+        fsp.name, "dead.zarr", "dead.zarr", "Ch1")
+    assert rows[2].opts == {"unsupported": True} and rows[2].layer_index == 2
+
+
+def test_update_view_records_unsupported_sources_once(db_session, fsp):
+    a, plain = _pp(db_session, fsp, "a.zarr"), _pp(db_session, fsp, "plain_dir")
+    state = {"layers": [{"name": "a", "source": _src(a)}]}
+    v = create_view(db_session, "u", "r", state, [_row(a, 0)], "read")
+
+    update_view(db_session, v, ng_state=state, proxy_url=PROXY, unsupported=[plain, plain])
+    update_view(db_session, v, ng_state=state, proxy_url=PROXY, unsupported=[plain])
+    rows = sorted(v.layers, key=lambda l: l.layer_index)
+    assert [(r.layer_index, r.sharing_key, r.opts) for r in rows] == [
+        (0, a.sharing_key, None), (1, plain.sharing_key, {"unsupported": True})]
+    assert (rows[1].data_link_id, rows[1].fsp_name, rows[1].path) == (plain.id, fsp.name, "plain_dir")
+
+
+def test_reconcile_adopts_legacy_broken_row(db_session, fsp):
+    # A pre-migration broken row: fsp/path known, sharing_key unknown.
+    state = {"layers": [{"name": "x", "source": f"{PROXY}/GONE/x.zarr|zarr2:"}]}
+    v = create_view(db_session, "u", "legacy", state,
+                    [{"data_link_id": None, "layer_index": 0, "channel": None, "opts": None,
+                      "fsp_name": fsp.name, "path": "x.zarr"}], "read")
+    v.layers[0].broken = True
+    db_session.commit()
+
+    update_view(db_session, v, ng_state=state, proxy_url=PROXY)
+    row = v.layers[0]
+    assert (row.sharing_key, row.url_prefix, row.path, row.broken) == ("GONE", "x.zarr", "x.zarr", True)
+
+
+def test_reconcile_tolerates_sourceless_layers(db_session, fsp):
+    v = create_view(db_session, "u", "odd", {"layers": []}, [], "read")
+    state = {"layers": [{"type": "annotation", "source": "local://annotations"},
+                        {"name": "nosource"}, "not-a-dict",
+                        {"name": "ext", "source": "s3://bucket/x.zarr"}]}
+    update_view(db_session, v, ng_state=state, proxy_url=PROXY)
+    assert [(l.layer_index, l.sharing_key, l.broken) for l in sorted(v.layers, key=lambda l: l.layer_index)] == [
+        (0, None, False), (1, None, False), (2, None, False), (3, None, False)]
+
+    update_view(db_session, v, ng_state={"position": [1, 2, 3]}, proxy_url=PROXY)  # no "layers" key
+    assert v.layers == []
+
+
+def test_remove_view_sources_drops_layers_and_rows(db_session, fsp):
+    a, b, plain = _pp(db_session, fsp, "a.zarr"), _pp(db_session, fsp, "b.zarr"), _pp(db_session, fsp, "plain_dir")
+    # a split per channel by Neuroglancer: two NG layers, two rows
+    state = {"layers": [{"name": "a c0", "source": _src(a)}, {"name": "b", "source": _src(b)},
+                        {"name": "a c1", "source": _src(a)}]}
+    v = create_view(db_session, "u", "rm", state,
+                    [_row(a, 0), _row(b, 1), _row(a, 2), _row(plain, 3, opts={"unsupported": True})], "read")
+
+    assert remove_view_sources(db_session, v, [(fsp.name, "a.zarr")])
+    assert [ng["name"] for ng in v.ng_state["layers"]] == ["b"]
+    assert [(l.layer_index, l.sharing_key) for l in sorted(v.layers, key=lambda l: l.layer_index)] == [
+        (0, b.sharing_key), (1, plain.sharing_key)]
+
+    assert remove_view_sources(db_session, v, [(fsp.name, "plain_dir"), (fsp.name, "b.zarr")])
+    assert v.layers == [] and v.ng_state["layers"] == []
+    assert not remove_view_sources(db_session, v, [(fsp.name, "missing.zarr")])
+
+
+def test_rename_only_update_leaves_layers(db_session, fsp):
+    a = _pp(db_session, fsp, "a.zarr")
+    v = create_view(db_session, "u", "keep", {"layers": []}, [_row(a, 0)], "read")
+    update_view(db_session, v, name="renamed", proxy_url=PROXY)
+    assert len(v.layers) == 1 and v.layers[0].sharing_key == a.sharing_key
+
+
+def _break(db_session, pp, username="u"):
+    mark_view_layers_broken(db_session, pp.id)
+    delete_proxied_path(db_session, username, pp.sharing_key)
+
+
+def test_relink_rewrites_every_layer_using_the_key(db_session, fsp):
+    old = _pp(db_session, fsp, "img.zarr")
+    state = {"layers": [
+        {"name": "ch0", "source": _src(old)},
+        {"name": "ch1", "source": _src(old)},
+        {"name": "labels", "source": {"url": f"{PROXY}/{old.sharing_key}/{old.url_prefix}/labels/cells|zarr2:"}},
+    ]}
+    v = create_view(db_session, "u", "multi", state, [_row(old, 0), _row(old, 1), _row(old, 2)], "read")
+    _break(db_session, old)
+
+    new = _pp(db_session, fsp, "img.zarr")
+    views = get_relinkable_views(db_session, "u", fsp.name, "img.zarr")
+    assert [x.short_key for x in views] == [v.short_key]
+    changed = relink_broken_layers(db_session, views, new)
+    assert [x.short_key for x in changed] == [v.short_key]
+
+    db_session.refresh(v)
+    assert all(l.broken is False and l.data_link_id == new.id and l.sharing_key == new.sharing_key for l in v.layers)
+    urls = [l["source"] if isinstance(l["source"], str) else l["source"]["url"] for l in v.ng_state["layers"]]
+    assert all(f"/{new.sharing_key}/img.zarr" in u and old.sharing_key not in u for u in urls)
+    assert get_relinkable_views(db_session, "u", fsp.name, "img.zarr") == []
+
+
+def test_relink_rewrites_custom_prefix_with_slash(db_session, fsp):
+    old = _pp(db_session, fsp, "deep/img.zarr", url_prefix="custom/prefix")
+    v = create_view(db_session, "u", "c", {"layers": [{"name": "i", "source": _src(old)}]}, [_row(old, 0)], "read")
+    _break(db_session, old)
+    new = _pp(db_session, fsp, "deep/img.zarr")
+    relink_broken_layers(db_session, get_relinkable_views(db_session, "u", fsp.name, "deep/img.zarr"), new)
+    db_session.refresh(v)
+    assert v.ng_state["layers"][0]["source"] == f"{PROXY}/{new.sharing_key}/img.zarr|zarr2:"
+
+
+def test_relinkable_matches_fsp_root_path(db_session, fsp):
+    old = _pp(db_session, fsp, "")
+    assert old.url_prefix == fsp.name
+    v = create_view(db_session, "u", "root", {"layers": [{"name": "r", "source": _src(old)}]}, [_row(old, 0)], "read")
+    _break(db_session, old)
+    assert [x.short_key for x in get_relinkable_views(db_session, "u", fsp.name, "")] == [v.short_key]
+
+
+
+def test_relink_matches_legacy_dot_fsp_root_path(db_session, fsp):
+    # Rows written before path normalization stored the FSP root as ".".
+    old = _pp(db_session, fsp, "")
+    v = create_view(db_session, "u", "legacy", {"layers": [{"name": "r", "source": _src(old)}]},
+                    [_row(old, 0, path=".")], "read")
+    _break(db_session, old)
+    new = _pp(db_session, fsp, "")
+    views = get_relinkable_views(db_session, "u", fsp.name, "")
+    assert [x.short_key for x in views] == [v.short_key]
+    assert [x.short_key for x in relink_broken_layers(db_session, views, new)] == [v.short_key]
+    db_session.refresh(v)
+    assert v.layers[0].broken is False and v.layers[0].sharing_key == new.sharing_key
+
+def test_relinkable_is_owner_scoped_and_skips_unrecoverable(db_session, fsp):
+    old = _pp(db_session, fsp, "s.zarr")
+    create_view(db_session, "other", "theirs", {"layers": [{"source": _src(old)}]}, [_row(old, 0)], "read")
+    create_view(db_session, "u", "no-prefix", {"layers": []},
+                [_row(old, 0, url_prefix=None)], "read")
+    _break(db_session, old)
+    assert get_relinkable_views(db_session, "u", fsp.name, "s.zarr") == []
+    assert len(get_relinkable_views(db_session, "other", fsp.name, "s.zarr")) == 1
+
+
+def test_file_share_path_protocol_defaults_to_file(db_session, fsp):
+    path = get_file_share_path(db_session, "tempdir")
+    assert path.protocol == "file"
+    assert path.model_dump()["protocol"] == "file"
+
+
+def _add_bucket(session, username="alice", name="cosem", bucket="janelia-cosem-datasets", prefix="", endpoint_url=None, label=None):
+    return create_cloud_bucket(session, username, name, "s3", label or name, bucket, prefix, endpoint_url)
+
+def test_cloud_bucket_to_fsp_shape(db_session):
+    row = _add_bucket(db_session, prefix="zarr/v0.4", label="IDR zarr")
+    fsp = cloud_bucket_to_fsp(row)
+    assert fsp.model_dump() == {
+        "name": "cosem", "zone": "S3", "group": "cloud", "storage": "IDR zarr",
+        "mount_path": "https://janelia-cosem-datasets.s3.amazonaws.com/zarr/v0.4",
+        "mac_path": None, "windows_path": None, "linux_path": None, "protocol": "s3",
+    }
+
+def test_cloud_bucket_mount_path_without_prefix(db_session):
+    assert cloud_bucket_to_fsp(_add_bucket(db_session)).mount_path == "https://janelia-cosem-datasets.s3.amazonaws.com"
+
+def test_file_share_paths_include_callers_buckets_only_with_username(db_session, fsp):
+    _add_bucket(db_session, username="alice")
+    _add_bucket(db_session, username="bob", name="bobs")
+    assert [p.name for p in get_file_share_paths(db_session)] == ["tempdir"]
+    assert [p.name for p in get_file_share_paths(db_session, username="alice")] == ["tempdir", "cosem"]
+    assert get_file_share_path(db_session, "cosem", username="alice").protocol == "s3"
+    assert get_file_share_path(db_session, "cosem", username="bob") is None
+
+def test_site_share_wins_over_same_named_bucket(db_session, fsp):
+    _add_bucket(db_session, name="tempdir")
+    assert get_file_share_path(db_session, "tempdir", username="alice").protocol == "file"
+
+def test_duplicate_bucket_name_per_user_is_rejected(db_session):
+    _add_bucket(db_session)
+    with pytest.raises(ValueError, match="already exists"):
+        _add_bucket(db_session)
+
+def test_delete_cloud_bucket(db_session):
+    _add_bucket(db_session)
+    assert delete_cloud_bucket(db_session, "alice", "cosem") is True
+    assert get_cloud_bucket(db_session, "alice", "cosem") is None
+    assert delete_cloud_bucket(db_session, "alice", "cosem") is False
+
+def test_create_proxied_path_on_bucket_is_rejected(db_session):
+    _add_bucket(db_session)
+    with pytest.raises(ValueError, match="does not exist"):
+        create_proxied_path(db_session, "alice", "a", "cosem", "x", url_prefix="x")
+
+
+
+def test_reconcile_keeps_bucket_layers_as_dataset_rows(db_session):
+    create_cloud_bucket(db_session, "u", "idr", "s3", "IDR", "idr", "", None)
+    src = "zarr://https://idr.s3.amazonaws.com/zarr/img.zarr|zarr2:"
+    state = {"layers": [{"name": "img", "source": src}]}
+    v = create_view(db_session, "u", "b", state,
+                    [{"layer_index": 0, "channel": "DAPI", "opts": None, "fsp_name": "idr", "path": "zarr/img.zarr"}], "read")
+
+    # reorder behind a foreign layer: the row follows its layer and keeps its channel
+    new_state = {"layers": [{"name": "ext", "source": "https://elsewhere/x.zarr"}, state["layers"][0]]}
+    update_view(db_session, v, ng_state=new_state, proxy_url=PROXY)
+    rows = sorted(v.layers, key=lambda l: l.layer_index)
+    assert [(r.fsp_name, r.path, r.channel, r.broken) for r in rows] == [
+        (None, None, None, False), ("idr", "zarr/img.zarr", "DAPI", False)]
+
+
+def test_reconcile_keeps_externally_mapped_layers_as_dataset_rows(db_session):
+    db_session.add(ExternalBucketDB(full_path="/nrs/lab/data_external", external_url="https://s3.example.org/lab/",
+                                    fsp_name="nrs_lab", relative_path="data_external"))
+    db_session.commit()
+    src = "https://s3.example.org/lab/a/img.zarr/|zarr3:"
+    state = {"layers": [{"name": "img", "source": src}]}
+    v = create_view(db_session, "u", "e", state,
+                    [{"layer_index": 0, "channel": None, "opts": None,
+                      "fsp_name": "nrs_lab", "path": "data_external/a/img.zarr"}], "read")
+
+    update_view(db_session, v, ng_state=state, proxy_url=PROXY)
+    assert [(r.fsp_name, r.path, r.broken) for r in v.layers] == [("nrs_lab", "data_external/a/img.zarr", False)]
+
+
+def test_get_views_for_dataset_matches_layers_without_data_links(db_session):
+    def layer(i, fsp_name, path, channel=None):
+        return {"layer_index": i, "channel": channel, "opts": None, "fsp_name": fsp_name, "path": path}
+
+    bucket = create_view(db_session, "u", "bucket", {"layers": []}, [layer(0, "idr", "zarr/img.zarr")], "read")
+    external = create_view(db_session, "u", "ext", {"layers": []},
+                           [layer(0, "nrs_lab", "data_external/a/img.zarr")], "read")
+    channels = create_view(db_session, "u", "channels", {"layers": []},
+                           [layer(0, "idr", "zarr/img.zarr", "DAPI"), layer(1, "idr", "zarr/img.zarr", "GFP")], "read")
+    create_view(db_session, "other", "theirs", {"layers": []}, [layer(0, "idr", "zarr/img.zarr")], "read")
+
+    found = get_views_for_dataset(db_session, "u", "idr", "zarr/img.zarr")
+    assert sorted(v.short_key for v in found) == sorted([bucket.short_key, channels.short_key])
+    assert [v.short_key for v in get_views_for_dataset(db_session, "u", "nrs_lab", "data_external/a/img.zarr")] == [external.short_key]
+
+
+def test_get_views_for_dataset_skips_broken_layers_and_matches_legacy_root(db_session):
+    v = create_view(db_session, "u", "root", {"layers": []},
+                    [{"layer_index": 0, "channel": None, "opts": None, "fsp_name": "nrs", "path": "."}], "read")
+    assert [x.short_key for x in get_views_for_dataset(db_session, "u", "nrs", "")] == [v.short_key]
+    v.layers[0].broken = True
+    db_session.commit()
+    assert get_views_for_dataset(db_session, "u", "nrs", "") == []
+
+
+def test_plain_postgresql_url_loads_installed_driver():
+    """SQLAlchemy 2.1 maps postgresql:// to psycopg (v3); it must be installed."""
+    from sqlalchemy.engine import make_url
+    dialect = make_url("postgresql://u:p@host/db").get_dialect()
+    assert dialect.driver == "psycopg"
+    dialect.import_dbapi()

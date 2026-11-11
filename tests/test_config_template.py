@@ -128,3 +128,8 @@ def test_profile_endpoint_no_error(client):
     assert response.status_code == 200
     data = response.json()
     assert data["username"] == TEST_USERNAME
+
+
+def test_cloud_storage_defaults(template_settings):
+    assert template_settings.cloud_storage.enabled is True
+    assert template_settings.cloud_storage.allowed_endpoints is None

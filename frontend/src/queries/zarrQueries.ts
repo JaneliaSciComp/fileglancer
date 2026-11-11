@@ -223,16 +223,6 @@ async function fetchZarrMetadata({
         // Stamp the OME-NGFF spec version from the group attrs so the metadata
         // is self-describing for downstream capability checks.
         metadata.version = ngffVersion;
-        // Check for labels (optional - may not exist)
-        try {
-          const labelsAttrs = (await fetchFileAsJson(
-            fspName,
-            currentFileOrFolder.path + '/labels/zarr.json'
-          )) as ZarrV3Attrs;
-          metadata.labels = labelsAttrs?.attributes?.ome?.labels;
-        } catch {
-          // Labels directory doesn't exist - that's fine
-        }
 
         // Populate group-level OME attributes used by viewer capability checks
         const ome = attrs.attributes?.ome;
@@ -308,19 +298,6 @@ async function fetchZarrMetadata({
         // Stamp the OME-NGFF spec version from the .zattrs so the metadata is
         // self-describing for downstream capability checks.
         metadata.version = ngffVersion;
-        // Check for labels
-        try {
-          const labelsAttrs = (await fetchFileAsJson(
-            fspName,
-            currentFileOrFolder.path + '/labels/.zattrs'
-          )) as ZarrV2Attrs;
-          metadata.labels = labelsAttrs?.labels;
-          if (metadata.labels) {
-            log.info('OME-Zarr Labels found: ', metadata.labels);
-          }
-        } catch (error) {
-          log.trace('Could not fetch labels attrs: ', error);
-        }
 
         // Populate group-level OME attributes used by viewer capability checks
         const layout = attrs['bioformats2raw.layout'];

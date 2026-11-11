@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { List, Typography, IconButton } from '@material-tailwind/react';
 import { HiOutlineStar, HiStar } from 'react-icons/hi';
 import { HiOutlineRectangleStack } from 'react-icons/hi2';
+import { TbBucket } from 'react-icons/tb';
 import toast from 'react-hot-toast';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
@@ -14,6 +15,7 @@ import {
   makeMapKey,
   getPreferredPathForDisplay
 } from '@/utils';
+import { isReadOnlyFsp } from '@/utils/cloudStorage';
 
 type FileSharePathComponentProps = {
   readonly fsp: FileSharePath;
@@ -42,7 +44,7 @@ export default function FileSharePathComponent({
         <div className="flex gap-1 items-center max-w-full">
           <FgIcon
             className="short:icon-xsmall stroke-2"
-            icon={HiOutlineRectangleStack}
+            icon={isReadOnlyFsp(fsp) ? TbBucket : HiOutlineRectangleStack}
             size="sm"
           />
           <Typography className="truncate text-sm leading-4 short:text-xs font-semibold">

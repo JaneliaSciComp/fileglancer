@@ -1,14 +1,9 @@
 # Fileglancer OME-Zarr Viewers Configuration
 #
-# To customize, copy this file to frontend/viewers.config.yaml (which is
-# gitignored) and edit your copy. The override takes precedence at build time.
-#
-# After editing, rebuild with: pixi run node-build
-# (or use watch mode: pixi run dev-watch)
-#
-# For system deployments (e.g. installed from PyPI), you can also set
-# FGC_VIEWERS_CONFIG=/path/to/viewers.config.yaml to override viewers at
-# runtime without rebuilding. See docs/ViewersConfiguration.md for details.
+# This is the default bundled into the build. To customize, copy this file
+# outside frontend/ and set FGC_VIEWERS_CONFIG=/path/to/copy (or
+# viewers_config in config.yaml) to override viewers at runtime without
+# rebuilding. See docs/ViewersConfiguration.md for details.
 #
 # Each viewer entry requires:
 #   - manifest_url: URL or absolute path to a capability manifest YAML file

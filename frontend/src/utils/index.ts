@@ -408,6 +408,7 @@ export type {
 // Re-export app URL utilities
 export {
   appRevision,
+  shortRevision,
   parseGithubUrl,
   repoLabel,
   isGithubRepoUrl,

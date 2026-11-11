@@ -2,6 +2,7 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 
 import { sendFetchRequest, buildUrl } from '@/utils';
 import { default as log } from '@/logger';
+import { normalizeFspRootPath } from '@/utils/pathHandling';
 import { getResponseJsonOrError, throwResponseNotOkError } from './queryUtils';
 
 export type ExternalBucket = {
@@ -20,7 +21,7 @@ export const externalBucketQueryKeys = {
  * Fetches an external bucket by FSP name
  * Returns null if no external bucket exists (404)
  */
-const fetchExternalBucket = async (
+export const fetchExternalBucket = async (
   fspName: string,
   signal?: AbortSignal
 ): Promise<ExternalBucket | null> => {
@@ -58,9 +59,11 @@ export function transformBucketToDataUrl(
   currentFilePath: string | undefined,
   fspName: string | undefined
 ): string | null {
-  if (!bucket || !currentFilePath || !fspName) {
+  if (!bucket || currentFilePath === undefined || !fspName) {
     return null;
   }
+  // The FSP root arrives as "." and must not end up in the URL
+  currentFilePath = normalizeFspRootPath(currentFilePath);
 
   // Check if current path is within the bucket path and FSP matches
   if (

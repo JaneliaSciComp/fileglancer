@@ -1,5 +1,6 @@
 import path from 'path';
 import type { FileSharePath } from '@/shared.types';
+import { isReadOnlyFsp } from '@/utils/cloudStorage';
 
 const PATH_DELIMITER = '/';
 
@@ -83,6 +84,28 @@ function joinPaths(...paths: string[]): string {
  */
 function normalizeFspRootPath(filePath: string | null | undefined): string {
   return !filePath || filePath === '.' ? '' : filePath;
+}
+
+/**
+ * The public URL a bucket dataset is served at: what its View layers point
+ * to. `bucket.mount_path` is the bucket's public base URL.
+ */
+function bucketDatasetUrl(bucket: FileSharePath, filePath: string): string {
+  const base = bucket.mount_path.replace(/\/+$/, '');
+  const sub = normalizeFspRootPath(filePath);
+  return sub ? `${base}/${escapePathForUrl(sub)}` : base;
+}
+
+/**
+ * Builds the key used to identify a unique dataset (fsp_name + normalized
+ * path) across the cart/checkout/views pipeline. Uses normalizeFspRootPath
+ * so lookups against Data Links match what was actually created/stored.
+ * Example:
+ * datasetKey('myFSP', '.'); // Returns 'myFSP::'
+ * datasetKey('myFSP', 'my_folder/my_zarr'); // Returns 'myFSP::my_folder/my_zarr'
+ */
+function datasetKey(fsp_name: string, path: string): string {
+  return `${fsp_name}::${normalizeFspRootPath(path)}`;
 }
 
 /**
@@ -175,12 +198,20 @@ function getPreferredPathForDisplay(
     return '';
   }
 
-  const basePath = fsp[pathKey] ?? fsp.linux_path ?? fsp.mount_path;
+  // || not ??: the zones map normalizes null OS paths to ''
+  const basePath = fsp[pathKey] || fsp.linux_path || fsp.mount_path;
+  const fromMountPath = !fsp[pathKey] && !fsp.linux_path;
 
   if (!basePath) {
     return '';
   } else if (!subPath) {
     return basePath;
+  } else if (
+    isReadOnlyFsp(fsp) ||
+    (fromMountPath && /^[a-z][a-z0-9+.-]*:\/\//i.test(basePath))
+  ) {
+    // A URL (https://bucket.s3.amazonaws.com/prefix): POSIX normalization would collapse the '//'
+    return `${basePath.replace(/\/+$/, '')}/${subPath.replace(/^\/+/, '')}`;
   } else {
     let fullPath = joinPaths(basePath, subPath); // Linux = POSIX style
 
@@ -273,7 +304,9 @@ function resolvePathToFsp(
 }
 
 export {
+  bucketDatasetUrl,
   convertBackToForwardSlash,
+  datasetKey,
   escapePathForUrl,
   getFileURL,
   getLastSegmentFromPath,

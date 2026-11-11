@@ -57,6 +57,10 @@ If the precondition fails the server returns `412 Precondition Failed` and **lea
 
 ETag caveat: it's based on mtime + size, so two writes within the filesystem's mtime resolution (coarse on some NFS) that also keep the same size can share an ETag. Good enough for interactive save-conflict detection, not a substitute for locking.
 
+The `ETag` is specific to `/api/content`: data links served under `/files/` carry S3-style ETags computed differently, so never compare validators across the two. `Last-Modified` is an HTTP-date (`Tue, 14 Nov 2023 22:13:20 GMT`); `If-Unmodified-Since` also accepts the ISO 8601 form older clients may have stored.
+
+`GET /api/content` honours a single byte `Range` (`bytes=0-499`, `bytes=500-`, `bytes=-500`) with `206`; a range starting past the end of the file is `416`. A multi-range or malformed `Range` header is ignored and the whole file is returned with `200`, as S3 does.
+
 ## The connect (login) flow
 
 A dedicated bare page, `GET /connect-complete`, drives the popup handshake. The integrating app opens it (in a popup, or a hidden iframe with `?silent=1`) with an `origin` query parameter naming the app's own origin. Once the user is authenticated, the page posts a message back to that origin and, for a popup, closes itself:

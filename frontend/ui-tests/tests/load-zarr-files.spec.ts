@@ -36,7 +36,7 @@ test.describe('Zarr File Type Representation', () => {
     await expect(page.getByAltText(/vol-e/i)).toHaveCount(0);
   });
 
-  test('Zarr V3 OME-Zarr should show all viewers except avivator', async ({
+  test('Zarr V3 OME-Zarr should show avivator collapsed as incompatible', async ({
     fileglancerPage: page
   }) => {
     // Move mouse away to avoid tooltip interference
@@ -52,7 +52,13 @@ test.describe('Zarr File Type Representation', () => {
     await expect(page.getByAltText(/neuroglancer/i)).toBeVisible();
     await expect(page.getByAltText(/vol-e/i)).toBeVisible();
     await expect(page.getByAltText(/validator/i)).toBeVisible();
-    await expect(page.getByAltText(/avivator/i)).toHaveCount(0);
+
+    // Avivator is incompatible: hidden in the collapsed section until expanded
+    const incompatibleSummary = page.getByText('1 incompatible viewer');
+    await expect(incompatibleSummary).toBeVisible();
+    await expect(page.getByAltText(/avivator/i)).toBeHidden();
+    await incompatibleSummary.click();
+    await expect(page.getByAltText(/avivator/i)).toBeVisible();
   });
 
   test('Zarr V2 Array should show only neuroglancer', async ({

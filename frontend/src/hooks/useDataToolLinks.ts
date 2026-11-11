@@ -7,6 +7,7 @@ import {
   type ProxiedPath
 } from '@/contexts/ProxiedPathContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
+import { DependentViewsError } from '@/queries/proxiedPathQueries';
 import { useExternalBucketContext } from '@/contexts/ExternalBucketContext';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import {
@@ -19,6 +20,33 @@ import useCopyTooltip from './useCopyTooltip';
 import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
 
 const VALID_URL_PREFIX_RE = /^[A-Za-z0-9\-._~/!@$&'()*+,;:=%]+$/;
+
+/**
+ * The url_prefix a new Data Link gets from the user's subpath-mode preference
+ * when no custom prefix is supplied. `path` is already FSP-root-normalized.
+ */
+export function defaultUrlPrefix(
+  mode: 'name' | 'full_path' | 'custom',
+  path: string,
+  fspName: string,
+  linuxPath: string | null | undefined
+): string {
+  switch (mode) {
+    case 'full_path':
+      return escapePathForUrl(
+        normalizePosixStylePath(
+          linuxPath ? joinPaths(linuxPath, path) : path || fspName
+        )
+      );
+    case 'custom':
+      return path.split('/').pop() || fspName;
+    case 'name':
+    default:
+      // basename of "" is "" — fall back to the FSP name for FSP-root
+      // links so the URL still has a meaningful trailing segment.
+      return escapePathForUrl(path.split('/').pop() || fspName);
+  }
+}
 
 export function validateUrlPrefix(value: string): string | null {
   if (!value || !value.trim()) {
@@ -52,7 +80,10 @@ export default function useDataToolLinks(
   setPendingToolKey: Dispatch<SetStateAction<PendingToolKey>>
 ): {
   handleCreateDataLink: (pathOverride?: string) => Promise<boolean>;
-  handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
+  handleDeleteDataLink: (
+    proxiedPath: ProxiedPath,
+    confirm?: boolean
+  ) => Promise<void>;
   handleToolClick: (toolKey: PendingToolKey) => Promise<void>;
   handleDialogConfirm: (urlPrefixOverride?: string) => Promise<void>;
   handleDialogCancel: () => void;
@@ -64,7 +95,10 @@ export default function useDataToolLinks(
   setShowDataLinkDialog: Dispatch<SetStateAction<boolean>>
 ): {
   handleCreateDataLink: (pathOverride?: string) => Promise<boolean>;
-  handleDeleteDataLink: (proxiedPath: ProxiedPath) => Promise<void>;
+  handleDeleteDataLink: (
+    proxiedPath: ProxiedPath,
+    confirm?: boolean
+  ) => Promise<void>;
   handleToolClick: (toolKey: PendingToolKey) => Promise<void>;
   handleDialogConfirm: (urlPrefixOverride?: string) => Promise<void>;
   handleDialogCancel: () => void;
@@ -114,30 +148,14 @@ export default function useDataToolLinks(
     const fspName = fileQuery.data.currentFileSharePath.name;
 
     try {
-      let urlPrefix: string;
-      if (urlPrefixOverride !== undefined) {
-        urlPrefix = urlPrefixOverride;
-      } else {
-        const linuxPath = fileQuery.data.currentFileSharePath.linux_path;
-        switch (dataLinkSubpathMode) {
-          case 'full_path':
-            urlPrefix = escapePathForUrl(
-              normalizePosixStylePath(
-                linuxPath ? joinPaths(linuxPath, path) : path || fspName
-              )
-            );
-            break;
-          case 'custom':
-            urlPrefix = path.split('/').pop() || fspName;
-            break;
-          case 'name':
-          default:
-            // basename of "" is "" — fall back to the FSP name for FSP-root
-            // links so the URL still has a meaningful trailing segment.
-            urlPrefix = escapePathForUrl(path.split('/').pop() || fspName);
-            break;
-        }
-      }
+      const urlPrefix =
+        urlPrefixOverride ??
+        defaultUrlPrefix(
+          dataLinkSubpathMode,
+          path,
+          fspName,
+          fileQuery.data.currentFileSharePath.linux_path
+        );
 
       const validationError = validateUrlPrefix(urlPrefix);
       if (validationError) {
@@ -294,7 +312,10 @@ export default function useDataToolLinks(
     setShowDataLinkDialog(false);
   };
 
-  const handleDeleteDataLink = async (proxiedPath: ProxiedPath) => {
+  const handleDeleteDataLink = async (
+    proxiedPath: ProxiedPath,
+    confirm = false
+  ) => {
     if (!proxiedPath) {
       toast.error('Proxied path not found');
       return;
@@ -302,11 +323,15 @@ export default function useDataToolLinks(
 
     try {
       await deleteProxiedPathMutation.mutateAsync({
-        sharing_key: proxiedPath.sharing_key
+        sharing_key: proxiedPath.sharing_key,
+        confirm
       });
       await allProxiedPathsQuery.refetch();
       toast.success('Successfully deleted data link');
     } catch (error) {
+      if (error instanceof DependentViewsError) {
+        throw error; // the dialog catches this to show the confirm step
+      }
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       toast.error(`Error deleting data link: ${errorMessage}`);

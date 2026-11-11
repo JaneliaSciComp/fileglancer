@@ -1,7 +1,7 @@
 import { Typography } from '@material-tailwind/react';
 import { Link } from 'react-router';
 import fallback_logo from '@/assets/fallback_logo.png';
-import { HiOutlineClipboardCopy } from 'react-icons/hi';
+import { HiOutlineClipboardCopy, HiOutlineShoppingCart } from 'react-icons/hi';
 import { HiOutlineEllipsisHorizontalCircle } from 'react-icons/hi2';
 
 import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
@@ -64,6 +64,9 @@ export default function DataToolLinks({
   compact = false,
   dataLinkUrl,
   fspName,
+  incompatibleViewers,
+  onAddToCart,
+  onOpenNeuroglancer,
   onToolClick,
   path,
   showCopiedTooltip,
@@ -73,6 +76,12 @@ export default function DataToolLinks({
   readonly compact?: boolean;
   readonly dataLinkUrl?: string;
   readonly fspName?: string;
+  // Viewer key -> reasons the capability manifest rejected the dataset.
+  // These viewers are shown in a collapsed section instead of the main row.
+  readonly incompatibleViewers?: Record<string, string[]>;
+  readonly onAddToCart?: () => void;
+  // Replaces the Neuroglancer link (e.g. to create a View instead).
+  readonly onOpenNeuroglancer?: () => void;
   readonly onToolClick: (toolKey: PendingToolKey) => Promise<void>;
   readonly path?: string;
   readonly showCopiedTooltip: boolean;
@@ -85,6 +94,13 @@ export default function DataToolLinks({
     return null;
   }
 
+  const incompatible = validViewers.filter(
+    viewer =>
+      incompatibleViewers?.[viewer.key] &&
+      urls[viewer.key] !== null &&
+      urls[viewer.key] !== undefined
+  );
+
   return (
     <div className="my-1" data-tour="data-tool-links">
       <Typography className="font-semibold text-sm text-surface-foreground mb-1">
@@ -96,20 +112,30 @@ export default function DataToolLinks({
         {validViewers.map(viewer => {
           const url = urls[viewer.key];
 
-          // null means incompatible, don't show
-          if (url === null || url === undefined) {
+          // null means no URL for this viewer, don't show; viewers the
+          // capability manifest rejected go in the collapsed section below
+          if (
+            url === null ||
+            url === undefined ||
+            incompatibleViewers?.[viewer.key]
+          ) {
             return null;
           }
 
+          const opensView = viewer.key === 'neuroglancer' && onOpenNeuroglancer;
           return (
             <ToolLink
               key={viewer.key}
-              label={viewer.displayName}
+              label={opensView ? 'Neuroglancer View' : viewer.displayName}
               logoAlt={viewer.label}
               logoSrc={viewer.logoPath}
-              onToolClick={onToolClick}
+              onToolClick={
+                opensView ? async () => onOpenNeuroglancer() : onToolClick
+              }
               toolKey={viewer.key as PendingToolKey}
-              tooltipLabel={viewer.label}
+              tooltipLabel={
+                opensView ? 'Create a View from this dataset' : viewer.label
+              }
               url={url}
             />
           );
@@ -129,6 +155,23 @@ export default function DataToolLinks({
           </FgTooltip>
           <span className={LABEL_CLASSES}>Copy</span>
         </div>
+
+        {onAddToCart ? (
+          <div className="flex flex-col items-center w-16">
+            <FgTooltip
+              as="button"
+              label="Add this dataset to the Layer Cart"
+              onClick={() => onAddToCart()}
+              triggerClasses={CIRCLE_CLASSES}
+            >
+              <FgIcon
+                className="text-foreground"
+                icon={HiOutlineShoppingCart}
+              />
+            </FgTooltip>
+            <span className={LABEL_CLASSES}>Add to cart</span>
+          </div>
+        ) : null}
 
         {dataLinkUrl && fspName && path ? (
           <div className="flex flex-col items-center w-16">
@@ -151,6 +194,33 @@ export default function DataToolLinks({
           </div>
         ) : null}
       </div>
+
+      {incompatible.length > 0 ? (
+        <details className="mt-2">
+          <summary className="text-xs text-foreground/70 cursor-pointer select-none hover:text-foreground">
+            {incompatible.length} incompatible viewer
+            {incompatible.length > 1 ? 's' : ''}
+          </summary>
+          <div
+            className={`flex flex-wrap gap-2 items-start mt-2 ${compact ? 'max-w-[13.5rem]' : ''}`}
+          >
+            {incompatible.map(viewer => (
+              <ToolLink
+                key={viewer.key}
+                label={viewer.displayName}
+                logoAlt={viewer.label}
+                logoSrc={viewer.logoPath}
+                onToolClick={onToolClick}
+                toolKey={viewer.key as PendingToolKey}
+                tooltipLabel={(incompatibleViewers?.[viewer.key] ?? []).join(
+                  '; '
+                )}
+                url={urls[viewer.key] as string}
+              />
+            ))}
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }

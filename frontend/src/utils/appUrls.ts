@@ -115,6 +115,11 @@ export function splitGithubRef(url: string): {
   }
 }
 
+/** Revision label capped for tiles and table cells; full value goes in a tooltip. */
+export function shortRevision(revision: string, max = 16): string {
+  return revision.length > max ? `${revision.slice(0, max - 1)}…` : revision;
+}
+
 /**
  * The revision actually cloned, parsed out of the canonical app URL (which
  * always carries it). Falls back to the requested branch, then null.

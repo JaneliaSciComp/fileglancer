@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/AppsPage/appMenuItems';
 import type { AppActions } from '@/hooks/useAppActions';
 import { useAppUpdateAvailable } from '@/queries/appsQueries';
-import { getAppIconType } from '@/utils';
+import { appRevision, getAppIconType, shortRevision } from '@/utils';
 import type { UserApp } from '@/shared.types';
 
 interface AppCardProps {
@@ -27,6 +27,7 @@ interface AppCardProps {
 export default function AppCard({ app, actions }: AppCardProps) {
   const isShared = isAppShared(app);
   const updateAvailable = useAppUpdateAvailable(app);
+  const revision = appRevision(app.url, app.branch);
 
   const menuItems = buildAppMenuItems(app, actions);
 
@@ -87,6 +88,14 @@ export default function AppCard({ app, actions }: AppCardProps) {
         >
           {app.name}
         </Typography>
+
+        {revision ? (
+          <FgTooltip label={revision} triggerClasses="-mt-2 self-start">
+            <Typography className="text-foreground/70 text-xs">
+              {shortRevision(revision)}
+            </Typography>
+          </FgTooltip>
+        ) : null}
 
         {app.description ? (
           <Typography className="text-sm md:text-base text-foreground">
