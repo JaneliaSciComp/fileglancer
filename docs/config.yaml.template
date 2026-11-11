@@ -1,77 +1,139 @@
+# Fileglancer server configuration
+#
+# Every setting here is optional and shown at its default (or as an example
+# where there is no default), so an empty file is a valid config. Settings
+# can also be given as environment variables with an FGC_ prefix
+# (FGC_LOG_LEVEL, FGC_CLUSTER__EXECUTOR for nested ones); those take
+# precedence over this file.
+#
+# Where the file lives:
+#   - `fileglancer start` (personal server) reads
+#     ~/.config/fileglancer/config.yaml, creating a commented default on
+#     first run, and logs the path it read. --config PATH or FGC_CONFIG_FILE
+#     picks another file.
+#   - A server started with uvicorn directly reads ./config.yaml from the
+#     current directory unless FGC_CONFIG_FILE says otherwise.
+#   - A .env file next to the config is read for FGC_* variables.
+
+###############################################################################
+# Who is this server for?
+#
+# Fileglancer runs in one of two modes, and these settings pick it:
+#
+#                       single-user (default)        multi-user
+#   enable_okta_auth    false                        true
+#   use_access_flags    false                        true (run as root)
+#   login               simple_auth_password         Okta
+#   runs as             the process's own user       each logged-in user
+#   cluster.executor    local or lsf                 lsf
+#
+# Single-user is what the `fileglancer` CLI and local development use:
+# every request runs as the OS user who started the server, and the login
+# page asks for one password. Multi-user requires Okta, because acting as
+# other users is only safe when an identity provider vouches for who is
+# asking. There is deliberately no multi-user mode with password login.
+# Mixing the columns (setuid workers without Okta, or with the local
+# executor) is refused at startup.
+###############################################################################
+
+#
+# Require Okta login. When false the server is single-user.
+#
+# enable_okta_auth: false
+
+#
+# Run each user's file access in a worker that switches to that user's OS
+# identity. Requires enable_okta_auth, running as root, and a real scheduler
+# (cluster.executor: lsf).
+#
+# use_access_flags: false
+
+#
+# Password for the single-user login page. When unset, a random one is
+# generated at startup and printed to the server log. Set it when running
+# more than one worker process, since each worker would otherwise print its
+# own.
+#
+# simple_auth_password: change-me
+
+###############################################################################
+# Logging
+###############################################################################
+
 #
 # Loguru logging level (ERROR, WARNING, INFO, DEBUG, TRACE)
 #
-log_level: INFO
+# log_level: INFO
 
 #
 # Log output format: 'text' for human-readable logs, or 'json' for one
 # ECS-shaped JSON object per line on stdout, ready for a log shipper to
 # forward to Elasticsearch/Kibana. See docs/StructuredLogging.md.
 #
-log_format: text
+# log_format: text
+
+###############################################################################
+# Database
+###############################################################################
 
 #
-# Database URL (runtime - unprivileged user)
-# For SQLite: sqlite:///fileglancer.db
-# For PostgreSQL: postgresql://username:password@hostname:port/database_name
+# Database URL (runtime - unprivileged user). The default is a SQLite file in
+# the current directory; the `fileglancer` CLI uses
+# ~/.local/share/fileglancer/fileglancer.db instead. Use an absolute path for
+# SQLite (four slashes) so it does not depend on where the server starts.
 #
-db_url: sqlite:///fileglancer.db
+# db_url: sqlite:////var/lib/fileglancer/fileglancer.db
+# db_url: postgresql://username:password@hostname:port/database_name
 
 #
 # Database admin URL (migrations - privileged user)
 # If not specified, db_url will be used for migrations
-# For PostgreSQL: postgresql://admin_user:admin_password@hostname:port/database_name
 #
 # db_admin_url: postgresql://admin_user:admin_password@localhost/fileglancer
 
 #
 # Database connection pool settings (applies to non-SQLite databases)
-# These settings control the connection pool size for database connections
 #
 # db_pool_size: 5          # Number of connections to keep in the pool
 # db_max_overflow: 0       # Number of additional connections allowed beyond pool_size
 
-# If true, use seteuid/setegid for file access
-# Set to False for local testing
-#
-use_access_flags: False
+###############################################################################
+# Files and data links
+###############################################################################
 
 #
-# File share mount paths to view in the UI. 
-# If not set, defaults to the user's home directory
+# File share mount paths to view in the UI. Defaults to the user's home
+# directory. Set to an empty list to use the file share paths stored in the
+# database instead.
 #
 # file_share_mounts:
 #   - "~/"
 #   - /tmp
-# 
-# To view paths from fileglancer.db, use:
-#
-# file_share_mounts: []
 
 #
-# Atlassian Cloud info. Used for retrieving JIRA tickets.
+# Public base URL of the /files/ data-link proxy. Unset, data links use the
+# URL the request arrived on, which is right whenever this server serves
+# /files/ itself. Set it only when data links are served from a different
+# host than the UI.
 #
-# atlassian_url: https://YOUR_ORG_ID.atlassian.net
-# atlassian_username: your_email@example.com
-# atlassian_token: your_api_token
+# external_proxy_url: https://data.example.org/files
 
 #
-# JIRA browse URL for constructing ticket links
-# If not specified, defaults to {atlassian_url}/browse
+# Maximum size in bytes accepted by a PUT /api/content upload. Guards the
+# streaming write path against an unbounded upload filling the disk. Set to 0
+# to disable the limit. Default is 50 GiB.
 #
-# jira_browse_url: https://YOUR_ORG_ID.atlassian.net/browse
+# max_upload_size_bytes: 53687091200
 
 #
-# External URL for proxied paths
+# Maximum size of the sharing key LRU cache. Higher values use more memory
+# but reduce database queries.
 #
-external_proxy_url: http://localhost:7878/files
+# sharing_key_cache_size: 1000
 
-#
-# Dev-only: pass /neuroglancer/* through to this Neuroglancer so the embedded
-# viewer is same-origin and View editing can be tested locally (see
-# docs/Development.md).
-#
-# neuroglancer_url: https://fileglancer.int.janelia.org/neuroglancer
+###############################################################################
+# Viewers
+###############################################################################
 
 #
 # Absolute path to a viewers config YAML that overrides the bundled default
@@ -81,18 +143,15 @@ external_proxy_url: http://localhost:7878/files
 # viewers_config: /opt/deploy/viewers.config.yaml
 
 #
-# Maximum size of the sharing key LRU cache
-# This controls how many sharing key lookups are cached in memory
-# Higher values use more memory but reduce database queries
+# Dev-only: pass /neuroglancer/* through to this Neuroglancer so the embedded
+# viewer is same-origin and View editing can be tested locally (see
+# docs/Development.md).
 #
-sharing_key_cache_size: 1000
+# neuroglancer_url: https://neuroglancer.example.org
 
-#
-# OKTA OAuth/OIDC Authentication Settings
-# Set enable_okta_auth to true to require OKTA authentication
-# When false, the application uses the $USER environment variable
-#
-# enable_okta_auth: false
+###############################################################################
+# Okta (multi-user mode)
+###############################################################################
 
 #
 # OKTA domain (e.g., your-domain.okta.com)
@@ -116,50 +175,57 @@ sharing_key_cache_size: 1000
 #
 # okta_redirect_uri: https://<your_domain>/api/oauth_callback
 
-#
-# Session Management Settings
-#
+###############################################################################
+# Sessions
+###############################################################################
 
 #
-# Secret key for signing session cookies
-# If not set, a random key will be generated on each server start (sessions won't persist across restarts)
-# For production, set this to a strong random string to maintain sessions across restarts
-# Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+# Secret key for signing session cookies. If not set, a random key is
+# generated at each server start, so sessions do not survive restarts and
+# worker processes disagree with each other. Set it for any deployment with
+# more than one worker. Generate with:
+#   python -c "import secrets; print(secrets.token_urlsafe(32))"
+# (The `fileglancer` CLI generates and keeps one for you.)
 #
 # session_secret_key: your-generated-secret-key-here
 
 #
 # Session expiry time in hours
 #
-session_expiry_hours: 24
+# session_expiry_hours: 24
 
 #
 # Name of the session cookie
 #
-session_cookie_name: fg_session
+# session_cookie_name: fg_session
 
 #
-# Whether to use secure flag on session cookies
-# Set to false for development with self-signed certificates
-# Set to true for production with valid HTTPS certificates
+# Secure flag on the session cookie. Unset, the cookie is Secure exactly when
+# the login request arrived over https, so plain-http development and https
+# deployments both work. Set it explicitly only behind a TLS-terminating
+# proxy that does not forward the scheme (X-Forwarded-Proto).
 #
-session_cookie_secure: true
+# session_cookie_secure: true
+
+###############################################################################
+# Programmatic API
+###############################################################################
 
 #
-# Programmatic API — cross-origin allowlist
-#
-# Browser apps on other origins (subdomains/ports under the same base domain)
-# that may call the authenticated Fileglancer API using the logged-in user's
-# session cookie. List full origins (scheme + host + optional port). The
-# Fileglancer UI's own origin is always allowed and need not be listed.
-# Requests carrying an Origin header not in this list are rejected with 403 on
-# authenticated endpoints — this is the CSRF / cross-site boundary. Empty
-# (default) means only same-origin calls work. See docs/ProgrammaticAPI.md.
+# Cross-origin allowlist. Browser apps on other origins (subdomains/ports
+# under the same base domain) that may call the authenticated Fileglancer API
+# using the logged-in user's session cookie. List full origins (scheme + host
+# + optional port). The Fileglancer UI's own origin is always allowed and
+# need not be listed. Requests carrying an Origin header not in this list are
+# rejected with 403 on authenticated endpoints — this is the CSRF /
+# cross-site boundary. Empty (default) means only same-origin calls work.
+# See docs/ProgrammaticAPI.md.
 #
 # api_allowed_origins:
-#   - https://ai-cryoet.int.janelia.org
-#   - https://nextflow.int.janelia.org:8444
+#   - https://other-app.example.org
+#   - https://pipelines.example.org:8444
 
+#
 # Which API token scopes this server supports. A scope left out cannot be
 # granted to a new token, and is ignored on tokens that already hold it -- so
 # removing one here revokes the capability from existing tokens rather than
@@ -178,18 +244,32 @@ session_cookie_secure: true
 #   - jobs:read
 #   - jobs:write
 
+###############################################################################
+# JIRA (Help menu tickets)
+###############################################################################
+
 #
-# Maximum size in bytes accepted by a PUT /api/content upload. Guards the
-# streaming write path against an unbounded upload filling the disk. Set to 0
-# to disable the limit. Default is 50 GiB.
+# Atlassian Cloud info. Used for retrieving JIRA tickets.
 #
-# max_upload_size_bytes: 53687091200
+# atlassian_url: https://YOUR_ORG_ID.atlassian.net
+# atlassian_username: your_email@example.com
+# atlassian_token: your_api_token
+
+#
+# JIRA browse URL for constructing ticket links
+# If not specified, defaults to {atlassian_url}/browse
+#
+# jira_browse_url: https://YOUR_ORG_ID.atlassian.net/browse
+
+###############################################################################
+# Apps and jobs
+###############################################################################
 
 #
 # Environment setup — sourced at startup before any scheduler commands.
 # Useful when running as a systemd service where login scripts don't run.
 #
-# env_source_script: /misc/lsf/conf/profile.lsf  # Source a shell script to set env vars
+# env_source_script: /opt/lsf/conf/profile.lsf  # Source a shell script to set env vars
 
 #
 # Settings for the Apps feature
@@ -246,17 +326,18 @@ session_cookie_secure: true
 #                               # space. Empty list ([]): AWS only. A list of
 #                               # https origins: only those.
 
+#
 # Cluster configuration
 # Mirrors py-cluster-api ClusterConfig - all fields are optional
 # See: https://github.com/JaneliaSciComp/py-cluster-api
 #
-cluster:
-  executor: local            # "local" or "lsf". "local" is for single-user
-                             # deployments (dev, CLI mode) only: its poll loop
-                             # reads job state from the work directory in the
-                             # server process, and work directories are private
-                             # to the user who owns the job. A multi-user
-                             # deployment must use "lsf".
+# cluster:
+#   executor: local            # "local" or "lsf". "local" is for single-user
+#                              # deployments (dev, CLI mode) only: its poll loop
+#                              # reads job state from the work directory in the
+#                              # server process, and work directories are private
+#                              # to the user who owns the job. A multi-user
+#                              # deployment must use "lsf".
 #   job_name_prefix: fg        # Prefix for cluster job names. REQUIRED for job
 #                              # reconnection after server restarts. Without this,
 #                              # active jobs will not be re-tracked and will
@@ -275,5 +356,3 @@ cluster:
 #     - "your_project"
 #   script_prologue:            # Commands to run before each job
 #     - "module load java/11"
-
-

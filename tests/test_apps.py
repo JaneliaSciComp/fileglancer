@@ -2888,7 +2888,8 @@ class TestSubmitJobAssembly:
     }
 
     def _submit(self, tmp_path, monkeypatch, entry_point=None, cluster=None,
-                file_share_mounts=None, validate_errors=None, **submit_kwargs):
+                file_share_mounts=None, validate_errors=None, cli_mode=True,
+                **submit_kwargs):
         """Run submit_job with worker seams mocked; return (job, dispatch calls)."""
         import asyncio
         from unittest.mock import AsyncMock
@@ -2900,7 +2901,7 @@ class TestSubmitJobAssembly:
         db.Base.metadata.create_all(db._get_engine(db_url))
         settings = Settings(db_url=db_url,
                             file_share_mounts=file_share_mounts or [],
-                            cli_mode=True,
+                            cli_mode=cli_mode,
                             cluster=cluster or {})
         monkeypatch.setattr(jobs_mod, "get_settings", lambda: settings)
         # build_command validates path params against the file shares, which
@@ -3034,6 +3035,19 @@ class TestSubmitJobAssembly:
         # The login shell's profile builds PATH; no clean-mode guards needed.
         assert 'export PATH="${PATH:-' not in submitted["command"]
         assert job.clean_env is False
+
+    def test_cli_mode_inherits_server_env(self, tmp_path, monkeypatch):
+        # A personal CLI server runs as the user from their own shell, so the
+        # job inherits that env (PATH with pixi, PIXI_*/CONDA_* etc.) on top of
+        # the login profile. Clean mode still opts out.
+        _, calls = self._submit(tmp_path, monkeypatch, cli_mode=True)
+        assert self._submitted(calls)["inherit_env"] is True
+        _, calls = self._submit(tmp_path, monkeypatch, cli_mode=True, clean_env=True)
+        assert self._submitted(calls)["inherit_env"] is False
+
+    def test_shared_server_never_inherits_env(self, tmp_path, monkeypatch):
+        _, calls = self._submit(tmp_path, monkeypatch, cli_mode=False)
+        assert self._submitted(calls)["inherit_env"] is False
 
     def test_clean_env_starts_script_with_guards(self, tmp_path, monkeypatch):
         job, calls = self._submit(tmp_path, monkeypatch, clean_env=True)
