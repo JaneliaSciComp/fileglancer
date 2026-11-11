@@ -31,6 +31,21 @@ requires_ssh_keygen = pytest.mark.skipif(
 
 
 @pytest.fixture(autouse=True)
+def _no_local_config(tmp_path_factory, monkeypatch):
+    """Read an empty config instead of whatever config.yaml sits in the checkout.
+
+    Settings reads ./config.yaml by default, so a developer's local file would
+    otherwise leak into every test that asserts a default. A test that needs a
+    specific config sets FGC_CONFIG_FILE itself; its monkeypatch runs later
+    and wins.
+    """
+    # Not tmp_path: tests use that as a file share root and list it.
+    empty = tmp_path_factory.mktemp("config") / "empty.yaml"
+    empty.write_text("")
+    monkeypatch.setenv("FGC_CONFIG_FILE", str(empty))
+
+
+@pytest.fixture(autouse=True)
 def _clear_service_proxy_cache():
     """Drop the service-proxy resolution cache between tests.
 

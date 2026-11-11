@@ -20,15 +20,7 @@ def test_config_file_env_picks_the_yaml_and_its_sibling_dotenv(tmp_path, monkeyp
     assert settings.model_fields_set >= {"log_level", "session_cookie_name"}
 
 
-@pytest.fixture
-def no_local_config(tmp_path, monkeypatch):
-    """Read an empty config instead of whatever config.yaml sits in the checkout."""
-    empty = tmp_path / "empty.yaml"
-    empty.write_text("")
-    monkeypatch.setenv("FGC_CONFIG_FILE", str(empty))
-
-
-def test_proxy_url_and_cookie_secure_are_optional(monkeypatch, no_local_config):
+def test_proxy_url_and_cookie_secure_are_optional(monkeypatch):
     monkeypatch.delenv("FGC_EXTERNAL_PROXY_URL", raising=False)
     settings = Settings(db_url="sqlite://", file_share_mounts=[])
     assert settings.external_proxy_url is None
@@ -43,7 +35,7 @@ def test_access_flags_need_a_scheduler():
              use_access_flags=True, cluster={"executor": "lsf"})
 
 
-def test_jira_browse_url_stays_unset_without_atlassian(no_local_config):
+def test_jira_browse_url_stays_unset_without_atlassian():
     settings = Settings(db_url="sqlite://", file_share_mounts=[])
     assert settings.jira_browse_url is None
     settings = Settings(db_url="sqlite://", file_share_mounts=[],
