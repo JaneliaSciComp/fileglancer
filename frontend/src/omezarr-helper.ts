@@ -800,16 +800,38 @@ function generateNeuroglancerStateForOmeZarr(
   );
 }
 
+/**
+ * RequestInit for a zarrita FetchStore over `dataUrl`.
+ *
+ * 'same-origin', not 'include': public buckets answer CORS with
+ * Allow-Origin '*', which browsers reject for credentialed requests.
+ *
+ * Our own /api/content responses are fetched with cache 'no-store' so the
+ * browser bypasses its HTTP cache, including entries it stored before the
+ * server started sending Cache-Control: no-store; those would otherwise be
+ * served stale until they expire. External buckets keep their own policy.
+ */
+function storeRequestInit(
+  dataUrl: string,
+  extra: RequestInit = {}
+): RequestInit {
+  const url = new URL(dataUrl, window.location.origin);
+  const ownContent =
+    url.origin === window.location.origin &&
+    url.pathname.startsWith('/api/content/');
+  return {
+    credentials: 'same-origin',
+    ...(ownContent && { cache: 'no-store' as const }),
+    ...extra
+  };
+}
+
 async function getZarrArray(
   dataUrl: string,
   zarrVersion: 2 | 3
 ): Promise<zarr.Array<any>> {
-  // 'same-origin', not 'include': public buckets answer CORS with
-  // Allow-Origin '*', which browsers reject for credentialed requests.
   const store = new zarr.FetchStore(dataUrl, {
-    overrides: {
-      credentials: 'same-origin'
-    }
+    overrides: storeRequestInit(dataUrl)
   });
   return await omezarr.getArray(store, '/', zarrVersion);
 }
@@ -819,9 +841,7 @@ async function getZarrArray(
  */
 async function getOmeZarrMetadata(dataUrl: string): Promise<Metadata> {
   const store = new zarr.FetchStore(dataUrl, {
-    overrides: {
-      credentials: 'same-origin'
-    }
+    overrides: storeRequestInit(dataUrl)
   });
   const { arr, shapes, multiscale, omero, scales, zarr_version } =
     await omezarr.getMultiscaleWithArray(store, 0);
@@ -954,10 +974,7 @@ async function getOmeZarrThumbnail(
   autoBoost: boolean = true
 ): Promise<ThumbnailResult> {
   const store = new zarr.FetchStore(dataUrl, {
-    overrides: {
-      credentials: 'same-origin',
-      signal
-    }
+    overrides: storeRequestInit(dataUrl, { signal })
   });
   try {
     return [
@@ -1081,6 +1098,7 @@ async function determineLayerType(
 }
 
 export {
+  storeRequestInit,
   getScaleTransform,
   getResolvedScales,
   getAxesMap,
