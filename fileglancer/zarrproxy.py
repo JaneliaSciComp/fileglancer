@@ -25,8 +25,10 @@ from starlette.background import BackgroundTask
 from fileglancer.supervisor.spawn import DATASERVER_HEADER
 
 # Keep in step with zarrbridge's readers: MRC family, TIFF, and everything
-# refkv zarrifies. A directory named like one of these would be misrouted;
-# ponytail: accepted, a stat through the worker fixes it if it ever matters.
+# refkv zarrifies. The split is syntactic: a directory named like one of these
+# (a `.zarrbridge` cache is named after its file) splits too, and the server's
+# resolve through the worker, which accepts only a regular file, sends it back
+# to the ordinary filesystem routes.
 SUFFIXES = frozenset({
     ".mrc", ".rec", ".st", ".ali", ".map", ".mrcs",
     ".tif", ".tiff",

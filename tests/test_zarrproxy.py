@@ -53,6 +53,12 @@ def zarr_app():
                      np.arange(64 * 64, dtype=np.uint16).reshape(64, 64))
     with open(os.path.join(temp_dir, "data", "notes.tif"), "w") as f:
         f.write("not a tiff at all")
+    # A beside cache: a directory named after its image file, holding plain files.
+    os.makedirs(os.path.join(temp_dir, "data", ".zarrbridge", "tiny.tif", "0"))
+    with open(os.path.join(temp_dir, "data", ".zarrbridge", "tiny.tif", "index.json"), "w") as f:
+        f.write('{"saved": true}')
+    with open(os.path.join(temp_dir, "data", ".zarrbridge", "tiny.tif", "0", "chunk.bin"), "wb") as f:
+        f.write(b"\x00\x01")
     tifffile.imwrite(os.path.join(temp_dir, "data", "échantillon 100%.tif"),
                      np.arange(16 * 16, dtype=np.uint8).reshape(16, 16))
     # An image outside the share, plus a symlink to it from inside: neither may be served.
@@ -124,6 +130,29 @@ class TestVirtualZarr:
         r = zarr_app.get("/api/files/share", params={"subpath": "data/tiny.tif/nope"})
         assert r.status_code == 404
 
+    def test_directory_named_like_an_image_is_a_directory(self, zarr_app):
+        # The cache beside tiny.tif is the directory .zarrbridge/tiny.tif: a path through
+        # it looks like a virtual Zarr key but is ordinary filesystem.
+        r = zarr_app.get("/api/files/share", params={"subpath": "data/.zarrbridge/tiny.tif/0"})
+        assert r.status_code == 200, r.text
+        assert r.json()["info"]["is_dir"] is True and r.json()["info"].get("virtual_zarr") is None
+        assert [f["name"] for f in r.json()["files"]] == ["chunk.bin"]
+        r = zarr_app.get("/api/content/share/data/.zarrbridge/tiny.tif/index.json")
+        assert r.status_code == 200 and r.json() == {"saved": True}
+        r = zarr_app.head("/api/content/share", params={"subpath": "data/.zarrbridge/tiny.tif/index.json"})
+        assert r.status_code == 200 and "X-Zarrbridge-Source" not in r.headers
+        # A key zarrbridge does not have inside a real image file is still a 404.
+        r = zarr_app.get("/api/files/share", params={"subpath": "data/tiny.tif/nope"})
+        assert r.status_code == 404
+        # Through a data link too.
+        r = zarr_app.post("/api/proxied-path", params={"fsp_name": "share", "path": "data/.zarrbridge"})
+        assert r.status_code == 200, r.text
+        from urllib.parse import urlparse
+        link = urlparse(r.json()["url"]).path  # /files/<key>/.zarrbridge
+        r = zarr_app.get(f"{link}/tiny.tif/index.json")
+        assert r.status_code == 200 and r.json() == {"saved": True}
+        assert zarr_app.head(f"{link}/tiny.tif/index.json").status_code == 200
+
     def test_head_content_inside_image_file(self, zarr_app):
         r = zarr_app.head("/api/content/share", params={"subpath": "data/tiny.tif/zarr.json"})
         assert r.status_code == 200, r.text
@@ -149,13 +178,15 @@ class TestVirtualZarr:
         # Absolute and traversing subpaths stay inside the share.
         for sub in (f"{secret}/zarr.json", f"data/{secret}/zarr.json",
                     f"../{os.path.basename(zarr_app.outside)}/secret.tif/zarr.json"):
+            # Not an image file zarrbridge may open, so the ordinary route answers, as it
+            # always has for an escaping path: 400 for an absolute or traversing one.
             r = zarr_app.get("/api/content/share", params={"subpath": sub})
-            assert r.status_code == 404, (sub, r.status_code, r.text)
-            assert zarr_app.head("/api/content/share", params={"subpath": sub}).status_code == 404
+            assert r.status_code in (400, 404), (sub, r.status_code, r.text)
+            assert zarr_app.head("/api/content/share", params={"subpath": sub}).status_code in (400, 404)
             assert zarr_app.get("/api/files/share", params={"subpath": sub}).status_code in (400, 404)
         # A symlink pointing out of the share is a plain file, never a virtual Zarr.
         r = zarr_app.get("/api/content/share", params={"subpath": "data/escape.tif/zarr.json"})
-        assert r.status_code == 404, r.text
+        assert r.status_code in (400, 404), r.text
         r = zarr_app.get("/api/files/share", params={"subpath": "data/escape.tif"})
         assert r.status_code == 404 or "files" not in r.json()
         # A data link is confined to its own path: not the share, not the link owner's other files.

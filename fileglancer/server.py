@@ -566,16 +566,26 @@ def create_app(settings):
     async def _resolve_image(username: str, fsp_name: str, file_subpath: str, within: str = "") -> dict:
         """The worker, as the user, turns a share-relative image path into the real
         absolute path zarrbridge may open, or returns an error dict. Nothing else
-        may feed the dataserver's path header."""
-        return await _worker_exec(username, "resolve_image", fsp_name=fsp_name,
-                                  path=file_subpath, within=within)
+        may feed the dataserver's path header. A client error (not a regular file,
+        outside the bound, unreadable) comes back as the dict; server errors raise."""
+        try:
+            return await _worker_exec(username, "resolve_image", fsp_name=fsp_name,
+                                      path=file_subpath, within=within)
+        except HTTPException as e:
+            if e.status_code >= 500:
+                raise
+            return {"error": e.detail, "status_code": e.status_code}
 
     async def _zarr_proxy(request: Request, username: str, fsp_name: str,
-                          split: tuple[str, str], within: str = "") -> Response:
+                          split: tuple[str, str], within: str = "") -> Optional[Response]:
+        """Stream ``key`` of the image file from the user's dataserver, or None when
+        the split is only syntactic: the image-named segment is not a regular file
+        the user can read (a directory such as a ``.zarrbridge`` cache named after
+        its file), so the caller serves the path as ordinary filesystem."""
         file_subpath, key = split
         resolved = await _resolve_image(username, fsp_name, file_subpath, within)
         if "error" in resolved:
-            raise HTTPException(status_code=resolved.get("status_code", 400), detail=resolved["error"])
+            return None
         sock = await _dataserver_socket(username)
         return await zarrproxy.proxy(sock, resolved["path"], key, request)
 
@@ -606,30 +616,32 @@ def create_app(settings):
 
         At the root (no key) returns ``result`` with synthetic entries added, or
         unchanged when the file is not servable. Below the root returns the
-        node, or None when zarrbridge has nothing there.
+        node, None when zarrbridge has nothing there, or False when the path is
+        not virtual at all (the image-named segment is a directory or a file
+        zarrbridge does not serve) and the caller lists it as ordinary filesystem.
         """
         if result is None:
             result = await store.list_dir(file_subpath)
         info = result.get("info")
         if not info or info.get("is_dir") or "files" in result or not zarrproxy.is_image_file(info["name"]):
-            return result if not key else None
+            return result if not key else False
         if not isinstance(worker_pool, SupervisedWorkerPool):
-            return result if not key else None
+            return result if not key else False
         resolved = await _resolve_image(username, fsp_name, info["path"])
         if "error" in resolved:
-            return result if not key else None
+            return result if not key else False
         try:
             sock = await worker_pool.dataserver(username)
             return await zarrproxy.virtual_node(sock, resolved["path"], info, key)
         except ValueError as e:  # zarrbridge does not serve this file: plain file
             logger.info(f"No virtual Zarr for {info['path']}: {e}")
-            return result if not key else None
+            return result if not key else False
         except WorkerError as e:
             # No dataserver for this user at all (zarrbridge not installed, spawn
             # failed, user denied): the file is still a file. Logged loudly because
             # a deployment that meant to serve virtual Zarr wants to know.
             logger.warning(f"No zarrbridge dataserver for {username}: {e}; serving {info['path']} as a plain file")
-            return result if not key else None
+            return result if not key else False
         except (httpx.HTTPError, WorkerDead) as e:
             # A dataserver existed and is down, restarting or failing: say so
             # rather than show the raw bytes of an image as if it were plain.
@@ -2002,8 +2014,10 @@ def create_app(settings):
 
             split = _link_virtual_split(info, subpath)
             if split:
-                return await _zarr_proxy(request, info["username"], info["fsp_name"], split[:2],
-                                         within=split[2])
+                proxied = await _zarr_proxy(request, info["username"], info["fsp_name"], split[:2],
+                                            within=split[2])
+                if proxied is not None:
+                    return proxied
 
             range_header = request.headers.get("range")
 
@@ -2052,8 +2066,10 @@ def create_app(settings):
                 return info
             split = _link_virtual_split(info, subpath)
             if split:
-                return await _zarr_proxy(request, info["username"], info["fsp_name"], split[:2],
-                                         within=split[2])
+                proxied = await _zarr_proxy(request, info["username"], info["fsp_name"], split[:2],
+                                            within=split[2])
+                if proxied is not None:
+                    return proxied
             result = await _worker_exec(info["username"], "s3_head_object",
                                         mount_path=info["mount_path"],
                                         target_name=info["target_name"],
@@ -2192,7 +2208,9 @@ def create_app(settings):
         store = _store_for(username, filestore_name)
         split = zarrproxy.split_virtual_path(subpath)
         if split and isinstance(store, WorkerStore):
-            return await _zarr_proxy(request, username, filestore_name, split)
+            proxied = await _zarr_proxy(request, username, filestore_name, split)
+            if proxied is not None:
+                return proxied
         result = await store.head_file(subpath)
         if "error" in result:
             raise HTTPException(status_code=result.get("status_code", 500), detail=result["error"])
@@ -2230,7 +2248,9 @@ def create_app(settings):
         store = _store_for(username, filestore_name)
         split = zarrproxy.split_virtual_path(subpath)
         if split and isinstance(store, WorkerStore):
-            return await _zarr_proxy(request, username, filestore_name, split)
+            proxied = await _zarr_proxy(request, username, filestore_name, split)
+            if proxied is not None:
+                return proxied
         try:
             status, headers, body = await store.open_range(subpath, request.headers.get('Range'))
         except StoreError as e:
@@ -2334,7 +2354,8 @@ def create_app(settings):
             node = await _virtual_node(username, filestore_name, store, *split)
             if node is None:
                 return JSONResponse(content={"error": "File or directory not found", "status_code": 404}, status_code=404)
-            return node
+            if node is not False:
+                return node
         if limit is not None:
             result = await store.list_dir_paged(subpath, limit, cursor, settings.max_directory_count)
         else:
