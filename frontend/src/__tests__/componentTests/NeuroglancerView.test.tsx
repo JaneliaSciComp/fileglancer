@@ -31,6 +31,9 @@ vi.mock('@/hooks/useNeuroglancerViewer', () => ({
 vi.mock('@/queries/viewQueries', () => ({
   useViewStateByReadKey
 }));
+vi.mock('@/queries/versionQuery', () => ({
+  default: () => ({ data: { version: '9.9.9' }, isPending: false })
+}));
 vi.mock('@/contexts/ViewsContext', () => ({
   useViewsContext: () => ({
     allViewsQuery: useViewsQuery(),
@@ -350,7 +353,8 @@ describe('NeuroglancerView', () => {
     });
     render(<NeuroglancerView />);
     const iframe = screen.getByTitle(/neuroglancer/i) as HTMLIFrameElement;
-    expect(iframe.src).toContain('https://ng.example/#!');
+    // The version query busts a stale cached Neuroglancer index.html.
+    expect(iframe.src).toContain('https://ng.example/?v=9.9.9#!');
     expect(iframe.src).toContain(
       encodeURIComponent(
         JSON.stringify({ title: 'My View', layers: [{ name: 'L0' }] })
@@ -366,6 +370,18 @@ describe('NeuroglancerView', () => {
     expect(
       screen.getByRole('button', { name: /open in neuroglancer/i })
     ).toBeInTheDocument();
+  });
+
+  it('cache-busts a relative Neuroglancer base URL', () => {
+    ngBase.current = '/neuroglancer/';
+    useViewStateByReadKey.mockReturnValue({
+      data: { title: 'My View', layers: [] },
+      isPending: false,
+      isError: false
+    });
+    render(<NeuroglancerView />);
+    const iframe = screen.getByTitle(/neuroglancer/i) as HTMLIFrameElement;
+    expect(iframe.src).toContain('/neuroglancer/?v=9.9.9#!');
   });
 
   it('shows a breadcrumb linking back to the Views list', () => {
@@ -613,7 +629,7 @@ describe('NeuroglancerView', () => {
     rerender(<NeuroglancerView />);
     expect(
       (screen.getByTitle(/neuroglancer/i) as HTMLIFrameElement).src
-    ).toContain('https://ng.example/#!');
+    ).toContain('https://ng.example/?v=9.9.9#!');
   });
 
   it('does not warn a non-owner before leaving', async () => {
@@ -767,6 +783,8 @@ describe('NeuroglancerView', () => {
       expect(open.mock.calls[0][0]).toMatch(
         /^https:\/\/ng-preferred\.example\//
       );
+      // Only the iframe carries the cache-busting query; shared URLs stay clean.
+      expect(open.mock.calls[0][0]).not.toContain('?v=');
       await userEvent.click(
         screen.getByRole('button', { name: 'Copy link to share' })
       );
