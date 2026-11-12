@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { waitFor } from '@testing-library/react';
+import { fireEvent, waitFor } from '@testing-library/react';
 import { render, screen } from '@/__tests__/test-utils';
 import DataToolLinks from '@/components/ui/BrowsePage/DataToolLinks';
 import type { OpenWithToolUrls, PendingToolKey } from '@/hooks/useZarrMetadata';
@@ -219,6 +219,25 @@ describe('DataToolLinks - Edge Cases', () => {
         },
         { timeout: 3000 }
       );
+    });
+  });
+
+  describe('Hit area', () => {
+    it('the whole circle is the link, so a click anywhere in it opens the tool', async () => {
+      const onToolClick = vi.fn().mockResolvedValue(undefined);
+      renderDataToolLinks(undefined, onToolClick);
+
+      const logo = await screen.findByAltText(
+        'View in Neuroglancer',
+        {},
+        { timeout: 3000 }
+      );
+      const link = logo.closest('a');
+      // Regression: the circle used to be a wrapper div around a logo-sized link.
+      expect(link).toHaveClass('rounded-full', 'w-12', 'h-12');
+
+      fireEvent.click(link!);
+      expect(onToolClick).toHaveBeenCalledWith('neuroglancer');
     });
   });
 

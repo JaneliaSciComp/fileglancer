@@ -35,8 +35,10 @@ function ToolLink({
 }) {
   return (
     <div className="flex flex-col items-center w-16">
-      <FgTooltip label={tooltipLabel} triggerClasses={CIRCLE_CLASSES}>
+      <FgTooltip label={tooltipLabel}>
+        {/* The circle is the link itself so a click anywhere in it opens the tool. */}
         <Link
+          className={CIRCLE_CLASSES}
           onClick={async e => {
             e.preventDefault();
             await onToolClick(toolKey);
