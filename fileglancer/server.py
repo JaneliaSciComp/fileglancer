@@ -2090,6 +2090,7 @@ def create_app(settings):
         headers = {
             'Accept-Ranges': 'bytes',
             'X-Is-Binary': 'true' if is_binary else 'false',
+            'Cache-Control': 'no-store',
         }
         if content_type == 'application/octet-stream' and file_name:
             headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
@@ -2123,6 +2124,11 @@ def create_app(settings):
         content_type = guess_content_type(file_name)
         if content_type == 'application/octet-stream' and file_name:
             headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+        # Without an explicit policy, browsers derive freshness from
+        # Last-Modified (about 10% of the file's age) and keep serving an old
+        # file's cached body for days after it changes on disk. The viewer
+        # always wants the live file, so forbid caching outright.
+        headers['Cache-Control'] = 'no-store'
         return StreamingResponse(body, status_code=status, headers=headers, media_type=content_type)
 
 
