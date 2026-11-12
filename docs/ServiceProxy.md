@@ -36,6 +36,27 @@ Leave `service_proxy_domain` empty to disable; the direct `http://<node>:<port>`
 
 `session_secret_key` is required when the proxy domain is set, and the server refuses to start without it. An unset key is generated at random per process, so under `uvicorn --workers N` each worker would sign hostnames with a different key and most proxied requests would be refused. Rotating it invalidates live service URLs, on top of the session revocation rotation already causes.
 
+## Restricting a service to the proxy
+
+Every proxied service job gets `FG_SERVICE_PROXY_ADDRESS` in its environment: the address of the reverse proxy, which is the same address jobs use to reach Fileglancer itself. No extra setting is needed; it is the host of the existing `external_proxy_url` (`FGC_EXTERNAL_PROXY_URL`). The proxy only carries HTTPS to the service's plain HTTP.
+
+A service can use it to accept connections from the proxy only, so nothing else on the cluster network can reach it directly. The variable is set only when the proxy is in use for that job. It is absent when `service_proxy_domain` is empty, and when the entry point sets `service_proxy: false`. Test for that case and keep your normal behavior, since the service is then reached directly:
+
+```yaml
+runnables:
+  - id: serve
+    name: Serve
+    type: service
+    command: |
+      if [ -n "$FG_SERVICE_PROXY_ADDRESS" ]; then
+        exec my-server --port "$FG_SERVICE_PORT" --allow-from "$FG_SERVICE_PROXY_ADDRESS"
+      else
+        exec my-server --port "$FG_SERVICE_PORT"
+      fi
+```
+
+This narrows who can connect. It does not replace the service's own token (`FG_SERVICE_TOKEN`), and if proxy and users share a source address it adds nothing.
+
 ## Apps that opt out
 
 An individual service can decline to be republished by setting `service_proxy: false` on its entry point. Its direct `http://<node>:<port>` URL is published instead, and the resolve endpoint refuses its hostname, so it cannot be reached through the proxy even by someone who can derive the signed label. Refusals are counted as `refused_proxy_disabled` in the aggregate resolve log line.

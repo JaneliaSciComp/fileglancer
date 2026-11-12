@@ -942,6 +942,18 @@ async def submit_job(
         if entry_point.type == "service":
             preamble_lines.append('export SERVICE_URL_PATH="$FG_WORK_DIR/service_url"')
             preamble_lines.append(_SERVICE_PORT_HELPER)
+            # The reverse proxy runs in front of Fileglancer and is used only
+            # to carry HTTPS to the service's plain HTTP. Jobs see it at the
+            # same address as Fileglancer itself, i.e. the host of
+            # external_proxy_url. Skipped when the proxy is off or the entry
+            # point opted out.
+            if settings.apps.service_proxy_domain and entry_point.service_proxy:
+                proxy_host = (settings.external_proxy_url.host
+                              if settings.external_proxy_url else None)
+                if proxy_host:
+                    preamble_lines.append(
+                        f"export FG_SERVICE_PROXY_ADDRESS={shlex.quote(proxy_host)}"
+                    )
             # With auto_url, Fileglancer publishes the URL for the author: a
             # background probe waits for $FG_SERVICE_PORT to accept connections and
             # then writes http://$FG_HOSTNAME:$FG_SERVICE_PORT plus the optional
