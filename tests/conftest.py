@@ -31,6 +31,21 @@ requires_ssh_keygen = pytest.mark.skipif(
 
 
 @pytest.fixture(autouse=True)
+def _no_local_config(tmp_path_factory, monkeypatch):
+    """Read an empty config instead of whatever config.yaml sits in the checkout.
+
+    Settings reads ./config.yaml by default, so a developer's local file would
+    otherwise leak into every test that asserts a default. A test that needs a
+    specific config sets FGC_CONFIG_FILE itself; its monkeypatch runs later
+    and wins.
+    """
+    # Not tmp_path: tests use that as a file share root and list it.
+    empty = tmp_path_factory.mktemp("config") / "empty.yaml"
+    empty.write_text("")
+    monkeypatch.setenv("FGC_CONFIG_FILE", str(empty))
+
+
+@pytest.fixture(autouse=True)
 def _clear_service_proxy_cache():
     """Drop the service-proxy resolution cache between tests.
 
@@ -49,11 +64,15 @@ def _clear_fsp_caches():
 
     They are keyed by database URL, so tests can't read each other's shares,
     but a test that adds a share to its own database and reads it back would
-    otherwise be racing the TTL.
+    otherwise be racing the TTL. The in-process worker's Filestore cache is
+    keyed by share name alone, so without clearing it a share called
+    "tempdir" in one test would serve the next test's "tempdir" from a
+    directory that no longer exists.
     """
-    from fileglancer import database, worker_pool
+    from fileglancer import database, worker_pool, user_worker
     database._fsp_cache.clear()
     worker_pool._fsp_row_cache.clear()
+    user_worker._filestore_cache.clear()
     yield
 
 

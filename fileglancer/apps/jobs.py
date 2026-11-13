@@ -665,11 +665,13 @@ async def submit_job(
     submits to the executor, and creates a DB record.
     Each job runs in its own directory under ~/.fileglancer/jobs/.
 
-    The job's environment is always constructed, never inherited from the
-    server or worker process. By default the job runs under the user's login
-    shell, so their own profile builds PATH/modules/conda as if they had
-    SSH'd to the node. With clean_env=True the job instead starts from a
-    minimal environment (see the preamble guards below) for reproducibility.
+    On a shared server the job's environment is constructed, never inherited
+    from the server or worker process. By default the job runs under the
+    user's login shell, so their own profile builds PATH/modules/conda as if
+    they had SSH'd to the node. A personal CLI server additionally inherits
+    the user's own shell env under that profile. With clean_env=True the job
+    instead starts from a minimal environment (see the preamble guards below)
+    for reproducibility.
     """
     settings = get_settings()
 
@@ -1031,6 +1033,12 @@ async def submit_job(
             # Default: login shell, so the user's own profile builds the
             # job environment. Clean mode: no profile, minimal environment.
             login_shell=not clean_env,
+            # A personal CLI server runs as the user, launched from their own
+            # shell, so the job also inherits that env (PATH with pixi, etc.)
+            # as a floor under the profile. Tools installed via ~/.bashrc are
+            # otherwise invisible to a non-interactive login shell. A shared
+            # server never inherits: the worker env is the service account's.
+            inherit_env=settings.cli_mode and not clean_env,
             resources={
                 "cpus": resource_spec.cpus,
                 "gpus": resource_spec.gpus,

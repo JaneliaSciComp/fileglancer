@@ -1,4 +1,5 @@
 import asyncio
+import getpass
 import os
 import re
 import shlex
@@ -205,13 +206,9 @@ def _convert_external_bucket(db_bucket: db.ExternalBucketDB) -> ExternalBucket:
     )
 
 
-def _convert_proxied_path(db_path: db.ProxiedPathDB, external_proxy_url: Optional[HttpUrl]) -> ProxiedPath:
+def _convert_proxied_path(db_path: db.ProxiedPathDB, proxy_url: str) -> ProxiedPath:
     """Convert a database ProxiedPathDB model to a Pydantic ProxiedPath model."""
-    if external_proxy_url:
-        url = f"{external_proxy_url}/{db_path.sharing_key}/{quote(db_path.url_prefix, safe='/')}"
-    else:
-        logger.warning(f"No external proxy URL was provided, proxy links will not be available.")
-        url = None
+    url = f"{proxy_url}/{db_path.sharing_key}/{quote(db_path.url_prefix, safe='/')}"
     return ProxiedPath(
         id=db_path.id,
         username=db_path.username,
@@ -284,9 +281,12 @@ def _can_edit_view(view: db.ViewDB, username: str) -> bool:
     return view.owner == username
 
 
-def _proxy_url(settings) -> Optional[str]:
-    """Data Link base URL as a plain string, or None when unconfigured."""
-    return str(settings.external_proxy_url).rstrip('/') if settings.external_proxy_url else None
+def _proxy_url(settings, request: Request) -> str:
+    """Data Link base URL: the configured external_proxy_url, else the
+    /files/ proxy this server serves itself, at the URL the request used."""
+    if settings.external_proxy_url:
+        return str(settings.external_proxy_url).rstrip('/')
+    return f"{request.url.scheme}://{request.url.netloc}/files"
 
 
 def _convert_ticket(db_ticket: db.TicketDB) -> Ticket:
@@ -642,6 +642,13 @@ def create_app(settings):
         # Configure logging based on the log level/format in the settings
         configure_logging(settings.log_level, settings.log_format)
 
+        if not settings.enable_okta_auth and not settings.simple_auth_password:
+            settings.simple_auth_password = secrets.token_urlsafe(12)
+            logger.info(
+                f"No simple_auth_password configured. Log in with this "
+                f"password for the lifetime of this process:\n\n"
+                f"        {settings.simple_auth_password}\n")
+
         # use_access_flags requires root + non-CLI mode. Workers themselves
         # are used in any server mode (CLI mode runs in-process).
         if settings.use_access_flags:
@@ -797,7 +804,10 @@ def create_app(settings):
         session_cookie="oauth_session",
         max_age=3600,  # 1 hour for OAuth flow
         same_site="lax",
-        https_only=settings.session_cookie_secure  # Match session cookie security setting
+        # Only the Okta flow uses this cookie, and it round-trips on the
+        # redirect URI, so that URI's scheme is the right default.
+        https_only=(settings.session_cookie_secure if settings.session_cookie_secure is not None
+                    else bool(settings.okta_redirect_uri and settings.okta_redirect_uri.scheme == 'https'))
     )
 
     app.add_middleware(
@@ -935,7 +945,7 @@ def create_app(settings):
             redirect_response = RedirectResponse(url=next_url)
 
             # Set session cookie on the redirect response
-            auth.create_session_cookie(redirect_response, session_id, settings)
+            auth.create_session_cookie(redirect_response, session_id, settings, request)
 
             logger.info(f"User {username} authenticated successfully via OKTA")
 
@@ -962,7 +972,7 @@ def create_app(settings):
         redirect_response = RedirectResponse(url="/", status_code=303)
 
         # Delete cookie on the redirect response
-        auth.delete_session_cookie(redirect_response, settings)
+        auth.delete_session_cookie(redirect_response, settings, request)
 
         return redirect_response
 
@@ -990,7 +1000,7 @@ def create_app(settings):
         redirect_response = RedirectResponse(url="/browse")
 
         # Set session cookie
-        auth.create_session_cookie(redirect_response, session_id, settings)
+        auth.create_session_cookie(redirect_response, session_id, settings, request)
 
         logger.info(f"User {username} auto-logged in via CLI")
 
@@ -1000,10 +1010,11 @@ def create_app(settings):
     @app.get("/api/auth/status", description="Check authentication status")
     async def auth_status(request: Request):
         """Check if user is authenticated"""
+        auth_method = "okta" if settings.enable_okta_auth else "simple"
+
         user_session = auth.get_session_from_cookie(request, settings)
 
         if user_session:
-            auth_method = "okta" if settings.enable_okta_auth else "simple"
             return {
                 "authenticated": True,
                 "username": user_session.username,
@@ -1011,7 +1022,6 @@ def create_app(settings):
                 "auth_method": auth_method
             }
 
-        auth_method = "okta" if settings.enable_okta_auth else "simple"
         return {"authenticated": False, "auth_method": auth_method}
 
 
@@ -1424,7 +1434,8 @@ def create_app(settings):
 
     @app.post("/api/proxied-path", response_model=ProxiedPathCreateResponse,
               description="Create a new proxied path")
-    async def create_proxied_path(fsp_name: str = Query(..., description="The name of the file share path that this proxied path is associated with"),
+    async def create_proxied_path(request: Request,
+                                  fsp_name: str = Query(..., description="The name of the file share path that this proxied path is associated with"),
                                   path: str = Query(..., description="The path relative to the file share path mount point"),
                                   url_prefix: Optional[str] = Query(None, description="The URL path prefix after the sharing key. Defaults to basename of path."),
                                   username: str = Depends(get_current_user)):
@@ -1464,14 +1475,15 @@ def create_app(settings):
             views = db.get_relinkable_views(session, username, new_path.fsp_name, new_path.path)
             relinked = db.relink_broken_layers(session, views, new_path)
             return ProxiedPathCreateResponse(
-                **_convert_proxied_path(new_path, settings.external_proxy_url).model_dump(),
+                **_convert_proxied_path(new_path, _proxy_url(settings, request)).model_dump(),
                 relinked_views=[ViewSummary(short_key=v.short_key, name=v.name) for v in relinked],
             )
 
 
     @app.get("/api/proxied-path", response_model=ProxiedPathResponse,
              description="Query proxied paths for a user")
-    async def get_proxied_paths(fsp_name: str = Query(None, description="The name of the file share path that this proxied path is associated with"),
+    async def get_proxied_paths(request: Request,
+                                fsp_name: str = Query(None, description="The name of the file share path that this proxied path is associated with"),
                                 path: str = Query(None, description="The path being proxied"),
                                 username: str = Depends(get_current_user)):
 
@@ -1484,13 +1496,15 @@ def create_app(settings):
 
         with db.get_db_session(settings.db_url) as session:
             db_proxied_paths = db.get_proxied_paths(session, username, fsp_name, path)
-            proxied_paths = [_convert_proxied_path(db_path, settings.external_proxy_url) for db_path in db_proxied_paths]
+            proxy_url = _proxy_url(settings, request)
+            proxied_paths = [_convert_proxied_path(db_path, proxy_url) for db_path in db_proxied_paths]
             return ProxiedPathResponse(paths=proxied_paths)
 
 
     @app.get("/api/proxied-path/{sharing_key}", response_model=ProxiedPath,
              description="Retrieve a proxied path by sharing key")
-    async def get_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path"),
+    async def get_proxied_path(request: Request,
+                               sharing_key: str = Path(..., description="The sharing key of the proxied path"),
                                username: str = Depends(get_current_user)):
 
         with db.get_db_session(settings.db_url) as session:
@@ -1499,7 +1513,7 @@ def create_app(settings):
                 raise HTTPException(status_code=404, detail="Proxied path not found for sharing key {sharing_key}")
             if path.username != username:
                 raise HTTPException(status_code=404, detail="Proxied path not found for username {username} and sharing key {sharing_key}")
-            return _convert_proxied_path(path, settings.external_proxy_url)
+            return _convert_proxied_path(path, _proxy_url(settings, request))
 
 
     @app.get("/api/proxied-path/{sharing_key}/views", response_model=ViewResponse,
@@ -1515,7 +1529,8 @@ def create_app(settings):
 
 
     @app.put("/api/proxied-path/{sharing_key}", description="Update a proxied path by sharing key")
-    async def update_proxied_path(sharing_key: str = Path(..., description="The sharing key of the proxied path"),
+    async def update_proxied_path(request: Request,
+                                  sharing_key: str = Path(..., description="The sharing key of the proxied path"),
                                   fsp_name: Optional[str] = Query(default=None, description="The name of the file share path that this proxied path is associated with"),
                                   path: Optional[str] = Query(default=None, description="The path relative to the file share path mount point"),
                                   sharing_name: Optional[str] = Query(default=None, description="The sharing path of the proxied path"),
@@ -1542,7 +1557,7 @@ def create_app(settings):
         with db.get_db_session(settings.db_url) as session:
             try:
                 updated = db.update_proxied_path(session, username, sharing_key, new_path=path, new_sharing_name=sharing_name, new_fsp_name=fsp_name)
-                return _convert_proxied_path(updated, settings.external_proxy_url)
+                return _convert_proxied_path(updated, _proxy_url(settings, request))
             except ValueError as e:
                 logger.error(f"Error updating proxied path: {e}")
                 raise HTTPException(status_code=400, detail=str(e))
@@ -1801,7 +1816,8 @@ def create_app(settings):
 
     @app.put("/api/neuroglancer/views/{short_key}", response_model=View,
              description="Update (rename / restate) one of the current user's Views")
-    async def update_view_endpoint(payload: ViewUpdateRequest,
+    async def update_view_endpoint(request: Request,
+                                   payload: ViewUpdateRequest,
                                    short_key: str = Path(..., description="The View's short key"),
                                    username: str = Depends(get_current_user)):
         with db.get_db_session(settings.db_url) as session:
@@ -1817,7 +1833,7 @@ def create_app(settings):
                     raise HTTPException(status_code=400, detail=f"Unknown data link sharing key: {key}")
                 unsupported.append(pp)
             view = db.update_view(session, view, name=payload.name,
-                                  ng_state=payload.ng_state, proxy_url=_proxy_url(settings),
+                                  ng_state=payload.ng_state, proxy_url=_proxy_url(settings, request),
                                   unsupported=unsupported,
                                   removed_unsupported=payload.removed_unsupported_sharing_keys)
             return View.model_validate(view)
@@ -3239,18 +3255,24 @@ def create_app(settings):
 
     @app.post("/api/auth/simple-login", include_in_schema=not settings.enable_okta_auth)
     async def simple_login_handler(request: Request, body: dict = Body(...)):
-        """Handle simple login JSON submission"""
+        """Handle the single-user password login"""
         if settings.enable_okta_auth:
             raise HTTPException(status_code=404, detail="Use OKTA authentication")
 
         # Parse JSON body
-        username = body.get("username")
+        password = body.get("password") or ""
         next_url = body.get("next", "/browse")
 
-        if not username or not username.strip():
-            raise HTTPException(status_code=400, detail="Username is required")
+        # The lifespan generates a password when none is configured, so this
+        # only trips for an app whose lifespan never ran: fail closed.
+        if not settings.simple_auth_password or not secrets.compare_digest(
+                password.encode(), settings.simple_auth_password.encode()):
+            raise HTTPException(status_code=401, detail="Incorrect password")
 
-        username = username.strip()
+        # Every request runs as the server's OS user, so the body carries no
+        # username: a typed one could only split this user's DB rows from
+        # the files they belong to.
+        username = getpass.getuser()
 
         # Validate next_url to prevent open redirect vulnerabilities
         # Only allow relative URLs that start with /
@@ -3276,7 +3298,7 @@ def create_app(settings):
         response = JSONResponse(content={"success": True, "username": username, "redirect": next_url})
 
         # Set session cookie
-        auth.create_session_cookie(response, session_id, settings)
+        auth.create_session_cookie(response, session_id, settings, request)
 
         logger.info(f"User {username} logged in via simple authentication")
 
@@ -3311,7 +3333,7 @@ def create_app(settings):
             session_id = user_session.session_id
 
         response = JSONResponse(content={"success": True, "username": username})
-        auth.create_session_cookie(response, session_id, settings)
+        auth.create_session_cookie(response, session_id, settings, request)
 
         logger.info(f"User {username} logged in via test API key")
 

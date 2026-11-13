@@ -61,11 +61,8 @@ const openFileglancer = async (page: Page) => {
     waitUntil: 'domcontentloaded'
   });
   await page.waitForSelector('text=Log In', { timeout: 10000 });
-
-  const loginForm = page.getByRole('textbox', { name: 'Username' });
-  const loginSubmitBtn = page.getByRole('button', { name: 'Log In' });
-  await loginForm.fill('testUser');
-  await loginSubmitBtn.click();
+  await page.getByRole('textbox', { name: 'Password' }).fill('playwright');
+  await page.getByRole('button', { name: 'Log In' }).click();
 
   await page.waitForSelector('text=Zones', { timeout: 10000 });
 };

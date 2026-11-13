@@ -14,11 +14,50 @@ import webbrowser
 import threading
 import time
 import socket
+from importlib import resources
 from pathlib import Path
 from datetime import datetime, timedelta, UTC
 from loguru import logger
 
 from fileglancer import database as db
+from fileglancer.settings import CONFIG_FILE_ENV, get_settings, reload_settings
+
+
+def user_config_path() -> Path:
+    """The personal server's config: $XDG_CONFIG_HOME/fileglancer/config.yaml."""
+    base = Path(os.environ.get('XDG_CONFIG_HOME') or Path.home() / '.config')
+    return base / 'fileglancer' / 'config.yaml'
+
+
+def user_data_dir() -> Path:
+    """Where the personal server keeps its database and generated secrets."""
+    return Path.home() / '.local' / 'share' / 'fileglancer'
+
+
+def ensure_config_file(path: Path) -> bool:
+    """Write the packaged default config at path if nothing is there yet.
+
+    The default sets nothing: it is the list of settings a personal server
+    user might want, commented, so there is always a file to edit. It is
+    private because simple_auth_password may end up in it. Returns True
+    when the file was created.
+    """
+    if path.exists():
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.touch(mode=0o600)
+    path.write_text(resources.files('fileglancer').joinpath('personal-config.yaml').read_text())
+    return True
+
+
+def persistent_session_key(data_dir: Path) -> str:
+    """A session signing key that survives restarts, so the browser stays
+    logged in across them. Generated once, kept private next to the database."""
+    key_file = data_dir / 'session_secret_key'
+    if not key_file.exists():
+        key_file.touch(mode=0o600)
+        key_file.write_text(secrets.token_urlsafe(32))
+    return key_file.read_text().strip()
 
 
 def run_server_with_interrupt_handler(config, url, cleanup_callback=None):
@@ -135,50 +174,74 @@ def cli():
               help='Automatically find an available port if the specified port is in use.')
 @click.option('--no-browser', is_flag=True, default=False,
               help='Do not open web browser automatically.')
+@click.option('--config', 'config', default=None, type=click.Path(dir_okay=False),
+              help='Config file to read. Defaults to FGC_CONFIG_FILE, then '
+                   '~/.config/fileglancer/config.yaml, which is created on first run.')
 
 def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
           ssl_ca_certs, ssl_version, ssl_cert_reqs, ssl_ciphers, timeout_keep_alive, auto_port, no_browser,
-          file_share_mounts):
+          file_share_mounts, config):
     """Start the Fileglancer server using uvicorn."""
+
+    # Which config to read: --config, then FGC_CONFIG_FILE, then the user's
+    # own file, created from the packaged default on first run so there is
+    # always something to edit. The choice is exported so server processes
+    # that uvicorn starts (--reload, --workers) read the same file.
+    explicit = config or os.environ.get(CONFIG_FILE_ENV)
+    config_path = Path(explicit or user_config_path()).expanduser()
+    created = False
+    if explicit:
+        if not config_path.is_file():
+            raise click.ClickException(f"Config file not found: {config_path}")
+    else:
+        created = ensure_config_file(config_path)
+    os.environ[CONFIG_FILE_ENV] = str(config_path)
 
     # Set file share mounts from CLI if provided
     if file_share_mounts:
         os.environ['FGC_FILE_SHARE_MOUNTS'] = json.dumps(list(file_share_mounts))
         logger.debug(f"Setting FGC_FILE_SHARE_MOUNTS={os.environ['FGC_FILE_SHARE_MOUNTS']}")
 
-    # Set up default external proxy URL if not already configured
-    # Need to set this before loading settings as it is required in the Settings model
-    if 'FGC_EXTERNAL_PROXY_URL' not in os.environ:
-        protocol = 'https' if ssl_keyfile else 'http'
-        external_proxy_url = f"{protocol}://{host}:{port}/files"
-        os.environ['FGC_EXTERNAL_PROXY_URL'] = external_proxy_url
-        logger.debug(f"Setting FGC_EXTERNAL_PROXY_URL={external_proxy_url}")
-
-    # Configure loguru logger based on settings (if present)
-    from fileglancer.settings import get_settings, reload_settings
     settings = get_settings()
-    log_level = settings.log_level
     from fileglancer.logconf import configure_logging
-    configure_logging(log_level, settings.log_format,
+    configure_logging(settings.log_level, settings.log_format,
                       text_sink=lambda msg: click.echo(msg, nl=False), colorize=True)
+    if created:
+        logger.info(f"Created default config at {config_path}")
+    logger.info(f"Reading config from {config_path}")
 
-    # Set up default database location if not already configured
-    if 'FGC_DB_URL' not in os.environ:
-        # Create data directory in user's home
-        data_dir = Path.home() / '.local' / 'share' / 'fileglancer'
-        data_dir.mkdir(parents=True, exist_ok=True)
+    # Fill in the personal server's defaults for whatever the config leaves
+    # unset. They go through the environment, which beats the config file,
+    # so only fields the user did not set are touched.
+    configured = settings.model_fields_set
+
+    # The data directory holds the database (session ids and service URLs,
+    # which are live credentials) and the session signing key, so it must
+    # not be readable by other users on a shared home. The directory mode
+    # also covers SQLite's -wal and -shm sidecars. Both modes are set
+    # unconditionally, to fix an install created under a laxer umask.
+    data_dir = user_data_dir()
+    data_dir.mkdir(parents=True, exist_ok=True)
+    os.chmod(data_dir, 0o700)
+
+    if 'db_url' not in configured:
         db_path = data_dir / 'fileglancer.db'
-        # The database holds session ids and service URLs, both of which are
-        # live credentials, so it must not be readable by other users on a
-        # shared home. The directory mode is what covers SQLite's -wal and -shm
-        # sidecars too; the file mode is set as well so a copy of it stays
-        # private. Both run unconditionally, to fix an install created before
-        # this or under a laxer umask.
-        os.chmod(data_dir, 0o700)
         db_path.touch(mode=0o600, exist_ok=True)
         os.chmod(db_path, 0o600)
         os.environ['FGC_DB_URL'] = f'sqlite:///{db_path}'
         logger.debug(f"Setting FGC_DB_URL=sqlite:///{db_path}")
+
+    if 'session_secret_key' not in configured:
+        os.environ['FGC_SESSION_SECRET_KEY'] = persistent_session_key(data_dir)
+
+    # In-process job execution and the auto-login endpoint.
+    os.environ['FGC_CLI_MODE'] = 'true'
+
+    if (workers or 0) > 1 and not settings.enable_okta_auth \
+            and 'simple_auth_password' not in configured:
+        raise click.ClickException(
+            f"--workers needs simple_auth_password set in {config_path}: "
+            f"each worker would otherwise print its own login password")
 
     # Find available port if auto_port is enabled
     if auto_port:
@@ -215,30 +278,11 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
     if workers is not None:
         config_kwargs['workers'] = workers
 
-    # Set up external proxy URL based on host/port/SSL configuration
-    # This is only set if not already configured in the environment
-    if 'FGC_EXTERNAL_PROXY_URL' not in os.environ:
-        protocol = 'https' if ssl_keyfile else 'http'
-        external_proxy_url = f"{protocol}://{host}:{port}/files"
-        os.environ['FGC_EXTERNAL_PROXY_URL'] = external_proxy_url
-        logger.debug(f"Setting FGC_EXTERNAL_PROXY_URL={external_proxy_url}")
-
     if ssl_keyfile:
         config_kwargs['ssl_keyfile'] = ssl_keyfile
-    else:
-        # If there is no SSL, we need to set FGC_SESSION_COOKIE_SECURE=false
-        # in the environment so that the session cookie is not marked as secure
-        os.environ['FGC_SESSION_COOKIE_SECURE'] = 'false'
-        logger.debug("No SSL keyfile provided, setting FGC_SESSION_COOKIE_SECURE=false in environment")
 
-    # Reload settings to pick up environment variables we set above
-    # This ensures the app will see the updated FGC_DB_URL, FGC_EXTERNAL_PROXY_URL, etc.
+    # Reload settings to pick up the environment variables set above.
     settings = reload_settings()
-
-    # Re-apply CLI mode and session secret key after reload
-    settings.cli_mode = True
-    if settings.session_secret_key is None:
-        settings.session_secret_key = secrets.token_urlsafe(32)
 
     # Initialize database (run migrations) before creating session
     # This is normally done in app.py lifespan, but we need it earlier for CLI session
@@ -284,7 +328,9 @@ def start(host, port, reload, workers, ssl_keyfile, ssl_certfile,
     browser_host = '127.0.0.1' if host == '0.0.0.0' else host
 
     if not no_browser:
-        # Create auto-login session for the system user
+        # Create auto-login session for the system user. The session id in the
+        # URL is what lets the browser we open skip the password prompt; any
+        # other browser logs in with the password the server prints at startup.
         system_username = getpass.getuser()
         expires_at = datetime.now(UTC) + timedelta(hours=settings.session_expiry_hours)
 

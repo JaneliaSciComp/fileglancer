@@ -11,7 +11,7 @@ test('jobs list is only fetched on the jobs page', async ({ page }) => {
 
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('text=Log In', { timeout: 10000 });
-  await page.getByRole('textbox', { name: 'Username' }).fill('testUser');
+  await page.getByRole('textbox', { name: 'Password' }).fill('playwright');
   await page.getByRole('button', { name: 'Log In' }).click();
   await page.waitForSelector('text=Zones', { timeout: 10000 });
   await page.waitForTimeout(1500);

@@ -1,15 +1,24 @@
 from typing import List, Optional
 from functools import cache
 import ipaddress
+import os
 import sys
+from pathlib import Path
 
 from pydantic import BaseModel, HttpUrl, ValidationError, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
+    DotEnvSettingsSource,
     PydanticBaseSettingsSource,
     SettingsConfigDict,
     YamlConfigSettingsSource
 )
+
+# Environment variable naming the config file to read. Unset, the server
+# reads ./config.yaml and ./.env from the current directory, which suits a
+# repo checkout. The `fileglancer` CLI sets it to the user's own config so
+# the server reads the same file no matter where it was launched from.
+CONFIG_FILE_ENV = 'FGC_CONFIG_FILE'
 
 
 class ClusterSettings(BaseModel):
@@ -118,10 +127,11 @@ class AppsSettings(BaseModel):
 
 
 class Settings(BaseSettings):
-    """ Settings can be read from a settings.yaml file, 
-        or from the environment, with environment variables prepended 
-        with "fgc_" (case insensitive). The environment variables can
-        be passed in the environment or in a .env file. 
+    """ Settings can be read from a config.yaml file, or from the
+        environment, with environment variables prepended with "fgc_"
+        (case insensitive). The environment variables can be passed in
+        the environment or in a .env file next to the config file.
+        FGC_CONFIG_FILE picks the config file; the default is ./config.yaml.
     """
 
     log_level: str = 'INFO'
@@ -137,8 +147,11 @@ class Settings(BaseSettings):
 
     # If true, each per-user worker subprocess setuids to the target user
     # before handling requests. Requires root + non-CLI mode (validated at
-    # app startup). When false, workers run as the parent process's user —
-    # useful for local debugging of the worker code path without root.
+    # app startup) and enable_okta_auth (validated here): acting as other
+    # users is only safe when an identity provider vouches for who is asking.
+    # When false, workers run as the parent process's user — the server is
+    # then single-user, which is what the `fileglancer` CLI and local
+    # development use.
     use_access_flags: bool = False
 
     # Atlassian settings for accessing JIRA services
@@ -154,8 +167,11 @@ class Settings(BaseSettings):
     # You can specify the home directory using a ~/ prefix (will be expanded per-user).
     file_share_mounts: List[str] = ["~/"]
     
-    # The external URL of the proxy server for accessing proxied paths.
-    # Maps to the /files/ end points of the fileglancer-central app.
+    # Public base URL of the /files/ data-link proxy, e.g.
+    # https://fileglancer.example.org/files. Unset, data links use the URL
+    # the request arrived on, which is right whenever this server serves
+    # /files/ itself (the CLI, local development, a single public host).
+    # Set it when data links are served from a different host than the UI.
     external_proxy_url: Optional[HttpUrl] = None
     # Dev-only: serve an external Neuroglancer (e.g. Janelia's fork) at the
     # same-origin path /neuroglancer/ so View editing can be tested locally.
@@ -185,10 +201,26 @@ class Settings(BaseSettings):
     session_secret_key: Optional[str] = None
     session_expiry_hours: int = 24
     session_cookie_name: str = 'fg_session'
-    session_cookie_secure: bool = True  # Set to False for development with self-signed certs
+    # Secure flag on the session cookie. Unset, the cookie is Secure exactly
+    # when the login request arrived over https, so plain-http development
+    # and https deployments both work without configuration. Set it
+    # explicitly only behind a TLS-terminating proxy that does not forward
+    # the scheme (X-Forwarded-Proto).
+    session_cookie_secure: Optional[bool] = None
 
-    # Authentication toggle - if False, falls back to $USER environment variable
+    # Authentication toggle. When False the server is single-user: every
+    # request runs as the server's own OS user, and the login form asks for
+    # simple_auth_password only. There is deliberately no way to pick a
+    # username without Okta.
     enable_okta_auth: bool = False
+
+    # Password for the single-user login form. Without Okta this is the only
+    # thing standing between anyone who can reach the server and your files,
+    # so it is always enforced: when unset, a random one is generated at
+    # startup and printed to the server log. Set it explicitly when running
+    # more than one worker, since each worker would otherwise generate its
+    # own.
+    simple_auth_password: Optional[str] = None
 
     # Cross-origin browser apps allowed to call the authenticated API using the
     # logged-in user's session cookie. List full origins (scheme + host + optional
@@ -255,13 +287,6 @@ class Settings(BaseSettings):
         env_file_encoding='utf-8'
     )
 
-    @field_validator('external_proxy_url')
-    @classmethod
-    def validate_external_proxy_url(cls, v):
-        if v is None or (isinstance(v, str) and v.strip() == ''):
-            raise ValueError("Add external_proxy_url to your config.yaml or FGC_EXTERNAL_PROXY_URL to your .env file")
-        return v
-
     @field_validator('api_token_scopes')
     @classmethod
     def validate_api_token_scopes(cls, v: List[str]) -> List[str]:
@@ -298,11 +323,18 @@ class Settings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
+        config_file = os.environ.get(CONFIG_FILE_ENV)
+        if config_file:
+            # A .env beside the chosen config, not one in the current directory.
+            dotenv_settings = DotEnvSettingsSource(
+                settings_cls, env_file=Path(config_file).parent / '.env')
         return (
             init_settings,
             env_settings,
             dotenv_settings,
-            YamlConfigSettingsSource(settings_cls),
+            YamlConfigSettingsSource(
+                settings_cls,
+                yaml_file=config_file or settings_cls.model_config.get('yaml_file')),
             file_secret_settings,
         )
     
@@ -323,9 +355,36 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode='after')
+    def validate_access_flags_need_okta(self):
+        """Running as other users requires knowing who is asking.
+
+        A shared password cannot establish that, so setuid workers are only
+        allowed behind Okta. Fail at startup, where the cause is obvious.
+        """
+        if self.use_access_flags and not self.enable_okta_auth:
+            raise ValueError(
+                "use_access_flags requires enable_okta_auth: without an "
+                "identity provider anyone with the login password could act "
+                "as any user. Set enable_okta_auth=true, or set "
+                "use_access_flags=false to run as a single user")
+        return self
+
+    @model_validator(mode='after')
+    def validate_access_flags_need_a_real_scheduler(self):
+        """The local executor polls job state from the server process and
+        keeps work directories private to the job owner, which only holds
+        for one user. Multi-user servers must hand jobs to a scheduler."""
+        if self.use_access_flags and self.cluster.executor == 'local':
+            raise ValueError(
+                "use_access_flags requires a real scheduler: set "
+                "cluster.executor to lsf, or set use_access_flags=false to "
+                "run as a single user")
+        return self
+
+    @model_validator(mode='after')
     def set_jira_browse_url(self):
-        if self.jira_browse_url is None:
-            self.jira_browse_url = f"{self.atlassian_url}/browse"
+        if self.jira_browse_url is None and self.atlassian_url:
+            self.jira_browse_url = f"{str(self.atlassian_url).rstrip('/')}/browse"
         return self
 
 
