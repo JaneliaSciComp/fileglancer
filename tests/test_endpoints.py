@@ -160,6 +160,15 @@ def test_root_endpoint(test_client):
     assert response.status_code == 200
     assert 'text/html' in response.headers.get('content-type', '')
 
+def test_spa_index_is_revalidated(test_client):
+    """index.html is unhashed: without Cache-Control browsers apply heuristic
+    freshness and keep an old index that references deleted hashed bundles."""
+    for path in ("/", "/browse", "/view/abc"):
+        response = test_client.get(path, follow_redirects=False)
+        assert response.status_code == 200
+        assert response.headers.get("Cache-Control") == "no-cache"
+
+
 def test_spa_routing(test_client):
     """Test /browse and other SPA routes - should serve SPA index.html"""
     response = test_client.get("/browse", follow_redirects=False)

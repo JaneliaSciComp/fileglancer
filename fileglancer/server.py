@@ -3395,7 +3395,12 @@ def create_app(settings):
         # Otherwise serve index.html for SPA routing
         index_path = ui_dir / "index.html"
         if index_path.exists():
-            return FileResponse(index_path, media_type="text/html")
+            # index.html is unhashed: without Cache-Control browsers apply
+            # heuristic freshness and keep an index that references deleted
+            # hashed bundles after a release. no-cache still allows a 304.
+            return FileResponse(
+                index_path, media_type="text/html", headers={"Cache-Control": "no-cache"}
+            )
         raise HTTPException(status_code=404, detail="Not found")
 
     return app
