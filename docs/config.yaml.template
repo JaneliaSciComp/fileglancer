@@ -217,7 +217,7 @@ session_cookie_secure: true
 #                               # resolving upstreams via /api/apps/resolve, and
 #                               # session_secret_key (which signs the hostname);
 #                               # see docs/ServiceProxy.md. Empty = direct URL.
-#   service_proxy_address: 10.1.2.3
+#   service_proxy_source_address: 10.1.2.3
 #                               # Address the reverse proxy connects from, as
 #                               # the compute nodes see it: an IP, a CIDR
 #                               # network, or a comma-separated list. Exported

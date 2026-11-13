@@ -3060,18 +3060,18 @@ class TestSubmitJobAssembly:
 
     @pytest.mark.parametrize("apps,entry_point,expected", [
         ({"service_proxy_domain": "svc.example.org",
-          "service_proxy_address": "10.1.2.3,10.9.0.0/16"},
+          "service_proxy_source_address": "10.1.2.3,10.9.0.0/16"},
          {}, True),
         # No domain: the proxy is not in use.
-        ({"service_proxy_address": "10.1.2.3"}, {}, False),
+        ({"service_proxy_source_address": "10.1.2.3"}, {}, False),
         # No address configured.
         ({"service_proxy_domain": "svc.example.org"}, {}, False),
         # Entry point opted out of the proxy.
         ({"service_proxy_domain": "svc.example.org",
-          "service_proxy_address": "10.1.2.3"},
+          "service_proxy_source_address": "10.1.2.3"},
          {"service_proxy": False}, False),
     ])
-    def test_service_proxy_address_export(self, tmp_path, monkeypatch,
+    def test_service_proxy_source_address_export(self, tmp_path, monkeypatch,
                                           apps, entry_point, expected):
         _, calls = self._submit(
             tmp_path, monkeypatch, apps=apps,

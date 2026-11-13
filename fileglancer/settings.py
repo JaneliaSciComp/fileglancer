@@ -72,7 +72,7 @@ class AppsSettings(BaseModel):
     # It is exported to proxied service jobs as FG_SERVICE_PROXY_ADDRESS so a
     # service can refuse connections from anywhere else. Only used when
     # service_proxy_domain is set; empty (the default) exports nothing.
-    service_proxy_address: str = ""
+    service_proxy_source_address: str = ""
     # Restricts which hosts the service proxy will dial. When set, a service's
     # published upstream hostname must sit inside this DNS zone, e.g.
     # "nodes.example.org" to allow only cluster nodes. Matching is on whole DNS

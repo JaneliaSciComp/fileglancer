@@ -944,11 +944,11 @@ async def submit_job(
             # it can accept only the proxy. Skipped when the proxy is off, the
             # entry point opted out, or no address is configured.
             if (settings.apps.service_proxy_domain
-                    and settings.apps.service_proxy_address
+                    and settings.apps.service_proxy_source_address
                     and entry_point.service_proxy):
                 preamble_lines.append(
                     "export FG_SERVICE_PROXY_ADDRESS="
-                    f"{shlex.quote(settings.apps.service_proxy_address)}"
+                    f"{shlex.quote(settings.apps.service_proxy_source_address)}"
                 )
             # With auto_url, Fileglancer publishes the URL for the author: a
             # background probe waits for $FG_SERVICE_PORT to accept connections and
