@@ -1,5 +1,5 @@
 import path from 'path';
-import type { FileSharePath } from '@/shared.types';
+import type { FileSharePath, ZonesAndFileSharePathsMap } from '@/shared.types';
 import { isReadOnlyFsp } from '@/utils/cloudStorage';
 
 const PATH_DELIMITER = '/';
@@ -302,8 +302,49 @@ function resolvePathToFsp(
   }
   return { fsp: bestFsp, subpath };
 }
+/**
+ * The browse link for an absolute filesystem path, or null when no file share
+ * path mounts it. Matches whole path segments (a share at /nrs/dudman does not
+ * claim /nrs/dudmanX) and prefers the deepest mount.
+ */
+function browseLinkForAbsolutePath(
+  map: ZonesAndFileSharePathsMap | undefined,
+  absolutePath: string | null | undefined
+): string | null {
+  if (!map || !absolutePath) {
+    return null;
+  }
+  const fsps: FileSharePath[] = [];
+  for (const entry of Object.values(map)) {
+    if ('fileSharePaths' in entry) {
+      fsps.push(...entry.fileSharePaths);
+    } else {
+      fsps.push(entry);
+    }
+  }
+  let best: FileSharePath | null = null;
+  for (const fsp of fsps) {
+    const mount = fsp.mount_path?.replace(/\/+$/, '');
+    if (!mount) {
+      continue;
+    }
+    const inside =
+      absolutePath === mount || absolutePath.startsWith(`${mount}/`);
+    if (inside && (!best || mount.length > best.mount_path.length)) {
+      best = fsp;
+    }
+  }
+  if (!best) {
+    return null;
+  }
+  const relative = absolutePath
+    .slice(best.mount_path.length)
+    .replace(/^\/+/, '');
+  return makeBrowseLink(best.name, relative || undefined);
+}
 
 export {
+  browseLinkForAbsolutePath,
   bucketDatasetUrl,
   convertBackToForwardSlash,
   datasetKey,

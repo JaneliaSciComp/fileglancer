@@ -1,4 +1,6 @@
+import { useEffect, useRef } from 'react';
 import type { MouseEvent } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Typography } from '@material-tailwind/react';
 import { useHotkey } from '@tanstack/react-hotkeys';
 import toast from 'react-hot-toast';
@@ -25,10 +27,18 @@ import type { OutletContextType } from '@/layouts/BrowseLayout';
 import useHideDotFiles from '@/hooks/useHideDotFiles';
 import { useHandleDownload } from '@/hooks/useHandleDownload';
 import { useHandleView } from '@/hooks/useHandleView';
-import { areZarrMetadataFilesPresent } from '@/queries/zarrQueries';
+import {
+  areZarrMetadataFilesPresent,
+  useZarrbridgeStatusQuery,
+  shouldRefreshListing,
+  isPendingVirtualZarr,
+  pyramidJustFinished
+} from '@/queries/zarrQueries';
 import { getBrowserRenderableType } from '@/utils/fileTypes';
 import { detectN5, getN5DetectionSignals } from '@/queries/n5Queries';
 import { makeMapKey } from '@/utils';
+import { browseLinkForAbsolutePath } from '@/utils/pathHandling';
+import { useZoneAndFspMapContext } from '@/contexts/ZonesAndFspMapContext';
 import { isReadOnlyFsp } from '@/utils/cloudStorage';
 import type { FileOrFolder } from '@/shared.types';
 
@@ -96,6 +106,54 @@ export default function FileBrowser({
   const readOnly = isReadOnlyFsp(fileQuery.data?.currentFileSharePath);
 
   const isZarrDir = areZarrMetadataFilesPresent(files);
+  // An image file (TIFF, MRC, ...) served as virtual OME-Zarr through
+  // zarrbridge, or any group inside it: the backend flags every such node,
+  // including the root while zarrbridge is still indexing it (no entries yet).
+  const isVirtualZarr =
+    fileQuery.data?.currentFileOrFolder?.virtual_zarr === true;
+  const zarrbridgeStatusQuery = useZarrbridgeStatusQuery(
+    fileQuery.data?.currentFileSharePath?.name,
+    fileQuery.data?.currentFileOrFolder?.path,
+    isVirtualZarr
+  );
+  const zarrbridgeState = zarrbridgeStatusQuery.data?.levels?.state;
+  const pendingNodeState =
+    fileQuery.data?.currentFileOrFolder?.zarrbridge_state;
+  const prevZarrbridgeState = useRef<string | undefined>(undefined);
+  const queryClient = useQueryClient();
+  const { zonesAndFspQuery } = useZoneAndFspMapContext();
+  const cacheHref = browseLinkForAbsolutePath(
+    zonesAndFspQuery.data,
+    zarrbridgeStatusQuery.data?.cache?.dir
+  );
+  const refetchListing = fileQuery.refetch;
+  const metadataKey = [
+    'zarr',
+    'metadata',
+    fileQuery.data?.currentFileSharePath?.name || '',
+    fileQuery.data?.currentFileOrFolder?.path || ''
+  ];
+  // When zarrbridge finishes indexing or building, the listing (entries) and
+  // zarr.json (levels) change under us: fetch the listing again, then mark the
+  // metadata stale so an enabled metadata query refetches with the new files.
+  // Never refetch the metadata directly: with no files yet it would cache an
+  // empty result as fresh.
+  useEffect(() => {
+    const prev = prevZarrbridgeState.current;
+    prevZarrbridgeState.current = zarrbridgeState;
+    if (!shouldRefreshListing(prev, zarrbridgeState, pendingNodeState)) {
+      return;
+    }
+    const finished = pyramidJustFinished(prev, zarrbridgeState);
+    refetchListing().then(() => {
+      queryClient.invalidateQueries({ queryKey: metadataKey });
+      if (finished) {
+        // The lowest level changed: the thumbnail is built from it.
+        queryClient.invalidateQueries({ queryKey: ['zarr', 'thumbnail'] });
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zarrbridgeState, pendingNodeState]);
   const isN5Dir = detectN5(files);
 
   const hasZarrExt = currentName.endsWith('.zarr');
@@ -254,6 +312,24 @@ export default function FileBrowser({
   return (
     <>
       <Crumbs />
+      {isVirtualZarr && zarrbridgeStatusQuery.isError ? (
+        <MetadataHint
+          variant={{
+            case: 'virtual-zarr',
+            error:
+              zarrbridgeStatusQuery.error?.message ??
+              'zarrbridge did not answer.'
+          }}
+        />
+      ) : isVirtualZarr && zarrbridgeStatusQuery.data ? (
+        <MetadataHint
+          variant={{
+            case: 'virtual-zarr',
+            status: zarrbridgeStatusQuery.data,
+            cacheHref
+          }}
+        />
+      ) : null}
       {isZarrDir && zarrMetadataQuery.isPending ? (
         <div className="flex shadow-sm rounded-md w-full min-h-96 bg-surface animate-appear animate-pulse animate-delay-150 opacity-0">
           <Typography className="place-self-center text-center w-full">
@@ -267,7 +343,7 @@ export default function FileBrowser({
             errorMessage: zarrMetadataQuery.error?.message
           }}
         />
-      ) : zarrMetadataQuery.data?.metadata ? (
+      ) : isZarrDir && zarrMetadataQuery.data?.metadata ? (
         <ZarrPreview
           availableZarrVersions={availableZarrVersions}
           fspName={fileQuery.data?.currentFileSharePath?.name ?? ''}
@@ -344,8 +420,15 @@ export default function FileBrowser({
             {fileQuery.data.errorMessage}
           </Typography>
         </div>
+      ) : isPendingVirtualZarr(fileQuery.data.currentFileOrFolder) ? (
+        // zarrbridge is still indexing this image (or gave up): the hint
+        // above says so; there is nothing to list and the bytes are not for
+        // the file viewer. Leaves inside a virtual Zarr (zarr.json, chunks)
+        // carry no state and fall through to the viewer below.
+        <div className="pl-3 py-1" />
       ) : fileQuery.data.currentFileOrFolder &&
-        !fileQuery.data.currentFileOrFolder.is_dir ? (
+        !fileQuery.data.currentFileOrFolder.is_dir &&
+        !isZarrDir ? (
         // If current item is a file, render the FileViewer instead of the file browser
         <div className="relative flex-1 min-h-0 overflow-hidden">
           <div className="absolute inset-0">

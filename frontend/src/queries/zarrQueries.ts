@@ -423,6 +423,134 @@ export function useZarrMetadataQuery(
   });
 }
 
+/**
+ * zarrbridge's status for an image file served as virtual OME-Zarr. The
+ * `_status` key is reserved by zarrbridge and proxied like any other key.
+ */
+export type ZarrbridgeStatus = {
+  classification?: string;
+  reader?: string | null;
+  // The polling contract: see zarrbridgePollInterval.
+  levels?: {
+    state: string;
+    built?: number;
+    planned?: number | null;
+    progress?: number;
+    eta_s?: number | null;
+    elapsed_s?: number;
+    reason?: string | null;
+  };
+  // The refkv index: reading | saved | unsaved | none | failed.
+  index?: {
+    state: string;
+    bytes: number | null;
+    reason: string | null;
+  };
+  // The multiscale cache: queued | building | built | failed | not_built.
+  pyramid?: {
+    state: string;
+    reason: string | null;
+    progress: number;
+    eta_s: number | null;
+    built: number;
+    planned: number | null;
+    levels: number | null;
+    bytes: number;
+  };
+  cache?: {
+    mode: string;
+    dir: string;
+    bytes: number;
+    fingerprint: string;
+    mismatch: string | null;
+    writable: boolean;
+  };
+};
+
+// The only transient states. Everything else (native, multiscale, failed,
+// unservable, unindexed, or no answer at all) is terminal, so polling stops.
+const BUSY_STATES = new Set(['indexing', 'queued', 'building']);
+
+/** True while zarrbridge is doing something in the background for this file. */
+export function isZarrbridgeBusy(state: string | undefined): boolean {
+  return state !== undefined && BUSY_STATES.has(state);
+}
+
+/**
+ * Whether the file listing must be fetched again because zarrbridge's state
+ * changed what it would contain. `nodeState` is the listing's own
+ * `zarrbridge_state`: set only while the node was returned pending, so a
+ * terminal status reconciles it even when it is the very first answer we see.
+ * A busy-to-terminal transition also refreshes: a finished build changes
+ * zarr.json.
+ */
+export function shouldRefreshListing(
+  prevState: string | undefined,
+  state: string | undefined,
+  nodeState: string | undefined
+): boolean {
+  if (state === undefined || isZarrbridgeBusy(state)) {
+    return false;
+  }
+  return nodeState !== undefined || isZarrbridgeBusy(prevState);
+}
+
+/**
+ * The root of an image file zarrbridge has no hierarchy for yet: still
+ * indexing it, or gave up. Only such a root carries `zarrbridge_state`;
+ * zarr.json and chunk leaves inside a virtual Zarr are flagged `virtual_zarr`
+ * but have no state and are ordinary viewable files.
+ */
+export function isPendingVirtualZarr(
+  node:
+    | Pick<FileOrFolder, 'virtual_zarr' | 'zarrbridge_state'>
+    | null
+    | undefined
+): boolean {
+  return node?.virtual_zarr === true && node.zarrbridge_state !== undefined;
+}
+
+/** The multiscale pyramid finished since the last status: the thumbnail changes. */
+export function pyramidJustFinished(
+  prevState: string | undefined,
+  state: string | undefined
+): boolean {
+  return state === 'multiscale' && isZarrbridgeBusy(prevState);
+}
+
+export function zarrbridgePollInterval(
+  status: ZarrbridgeStatus | undefined,
+  error: unknown
+): number | false {
+  if (error) {
+    return false;
+  }
+  const state = status?.levels?.state;
+  if (!isZarrbridgeBusy(state)) {
+    return false;
+  }
+  // Indexing is bounded to about a minute and changes the listing when it
+  // ends, so watch it closely; a pyramid build runs for minutes.
+  return state === 'indexing' ? 2000 : 5000;
+}
+
+export function useZarrbridgeStatusQuery(
+  fspName: string | undefined,
+  path: string | undefined,
+  enabled: boolean
+): UseQueryResult<ZarrbridgeStatus, Error> {
+  return useQuery({
+    queryKey: ['zarr', 'zarrbridge-status', fspName || '', path || ''],
+    queryFn: async () =>
+      (await fetchFileAsJson(fspName!, `${path}/_status`)) as ZarrbridgeStatus,
+    enabled: enabled && !!fspName && !!path,
+    // Keep polling while a pyramid is being built so the badge flips over.
+    refetchInterval: query =>
+      zarrbridgePollInterval(query.state.data, query.state.error),
+    retry: false
+  });
+}
+
 async function fetchOmeZarrThumbnail(
   omeZarrUrl: string,
   signal: AbortSignal

@@ -256,3 +256,13 @@ def test_parse_range_header_is_x2s3s():
     import x2s3.utils
     from fileglancer.utils import parse_range_header
     assert parse_range_header is x2s3.utils.parse_range_header
+
+
+def test_is_likely_binary_nul_bytes_in_mostly_ascii_sample():
+    """A BigTIFF (EER, OME-TIFF) starts with a short header and then ASCII
+    metadata: under 1% control characters, yet the NUL bytes make it binary.
+    Treating it as text would download the whole file as a text preview."""
+    header = b"II+\x00\x08\x00\x00\x00\x08\x8b\x07\x00\x00\x00\x00\x00"
+    sample = header + b"<?xml version='1.0'?><Metadata>" + b"a" * 4000 + b"</Metadata>"
+    assert is_likely_binary(sample)
+    assert not is_likely_binary(b"plain text without a single control character\n" * 80)

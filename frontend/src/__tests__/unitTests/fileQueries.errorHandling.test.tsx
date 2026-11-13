@@ -100,4 +100,25 @@ describe('useFileQuery 500 Error Reproduction', () => {
     expect(error?.message).toBe('Server returned 500 Internal Server Error');
     expect(error?.message).not.toContain('Unexpected token');
   });
+
+  it('does not retry a 404: the folder is gone, asking again will not bring it back', async () => {
+    const retrying = new QueryClient({
+      defaultOptions: { queries: { retryDelay: 0 } } // the hook's own retry rule applies
+    });
+    vi.mocked(utils.sendFetchRequest).mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({ error: 'File or directory not found' })
+    } as unknown as Response);
+
+    const { result } = renderHook(() => useFileQuery('test-fsp', 'gone'), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={retrying}>{children}</QueryClientProvider>
+      )
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error?.message).toBe('Folder not found');
+    expect(utils.sendFetchRequest).toHaveBeenCalledTimes(1);
+  });
 }, 15000);

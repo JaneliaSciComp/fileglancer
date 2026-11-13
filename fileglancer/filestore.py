@@ -268,6 +268,24 @@ class Filestore:
         return full_path
 
 
+    def resolve_file(self, path: str, within: Optional[str] = None) -> str:
+        """Real path of a regular file for another process to open on the user's behalf.
+
+        Symlinks are followed and the target must stay inside the root and, when
+        given, inside the share-relative directory ``within`` (a data link's path).
+
+        Raises RootCheckError when the path escapes either bound and
+        FileNotFoundError when it is not a regular file.
+        """
+        real = self._check_path_in_root(path)
+        if within:
+            bound = self._check_path_in_root(within)
+            if real != bound and not real.startswith(bound + os.sep):
+                raise RootCheckError(f"Path ({real}) escapes shared path ({bound})", real)
+        if not os.path.isfile(real):
+            raise FileNotFoundError(path)
+        return real
+
     def _get_file_info_from_path(self, full_path: str, current_user: str = None,
                                     fsps: Optional[list] = None,
                                     user_groups: Optional[set[str]] = None) -> FileInfo:

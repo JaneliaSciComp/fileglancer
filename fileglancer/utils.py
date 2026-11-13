@@ -93,6 +93,12 @@ def is_likely_binary(data: bytes) -> bool:
     if not data:
         return False
 
+    # A NUL byte never occurs in text; it is how git decides too. Without
+    # this, a binary container whose header is followed by ASCII metadata
+    # (BigTIFF, EER, OME-TIFF) can slip under the control-character ratio.
+    if b"\x00" in data:
+        return True
+
     control_count = 0
     for byte in data:
         # Count control characters, excluding common whitespace:

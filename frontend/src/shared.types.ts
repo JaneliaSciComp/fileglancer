@@ -14,6 +14,12 @@ type FileOrFolder = {
     fsp_name: string;
     subpath: string;
   } | null;
+  // Set by the backend on an image file served as virtual OME-Zarr and on
+  // every node inside it.
+  virtual_zarr?: boolean;
+  // Set on the root of a virtual OME-Zarr while zarrbridge has no hierarchy
+  // to list yet: 'indexing' (still reading the file) or 'unindexed' (gave up).
+  zarrbridge_state?: string;
 };
 
 type FileSharePath = {

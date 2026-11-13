@@ -170,7 +170,8 @@ export default function useFileQuery(
     retry: (failureCount, error) => {
       if (
         error instanceof Error &&
-        (error.message.includes('permission') ||
+        (error.message === 'Folder not found' ||
+          error.message.includes('permission') ||
           error.message.includes('Internal Server Error'))
       ) {
         return false;

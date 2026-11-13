@@ -4,6 +4,7 @@ runs --unprivileged, so workers run as the test user.
 """
 
 import getpass
+import importlib.util
 import os
 import socket
 import struct
@@ -456,16 +457,6 @@ class TestSupervisorLifecycle:
         finally:
             sock.close()
 
-    def test_unsupported_kind(self, run_supervisor):
-        cfg = run_supervisor()
-        sock, _ = connect(cfg)
-        try:
-            send_msg(sock, {"op": "acquire", "kind": "dataserver", "user": "x"})
-            reply, _ = recv_msg(sock)
-            assert reply["code"] == "unsupported_kind"
-        finally:
-            sock.close()
-
     def test_idle_reaping(self, run_supervisor):
         cfg = run_supervisor(idle_timeout=0.5)
         sock, _ = connect(cfg)
@@ -716,6 +707,25 @@ class TestSupervisedWorkerPool:
             await pool.stop()
 
     @pytest.mark.asyncio
+    async def test_dataserver_socket_is_cached_briefly(self, embedded_settings, monkeypatch):
+        from fileglancer.worker_pool import SupervisedWorkerPool
+        pool = SupervisedWorkerPool(embedded_settings)
+        await pool.start()
+        try:
+            calls = []
+            monkeypatch.setattr(pool, "_acquire_dataserver_blocking",
+                                lambda sock, user: calls.append(user) or {"ok": True, "socket": f"/zb-{user}", "pid": 1})
+            assert await pool.dataserver("alice") == "/zb-alice"
+            assert await pool.dataserver("alice") == "/zb-alice"
+            assert await pool.dataserver("bob") == "/zb-bob"
+            assert calls == ["alice", "bob"]
+            pool._dataserver_cache["alice"] = ("/zb-alice", 0.0)  # expired
+            await pool.dataserver("alice")
+            assert calls == ["alice", "bob", "alice"]
+        finally:
+            await pool.stop()
+
+    @pytest.mark.asyncio
     async def test_acquire_after_supervisor_death_is_503(self, embedded_settings):
         from fileglancer.worker_pool import SupervisedWorkerPool, WorkerDead
         pool = SupervisedWorkerPool(embedded_settings)
@@ -747,3 +757,93 @@ def test_access_flags_with_unprivileged_supervisor_fails_startup(tmp_path):
     with pytest.raises(RuntimeError, match="privileged"):
         with TestClient(app):
             pass
+
+
+# ---------------------------------------------------------------------------
+# Data servers (zarrbridge)
+# ---------------------------------------------------------------------------
+
+needs_zarrbridge = pytest.mark.skipif(
+    importlib.util.find_spec("zarrbridge") is None, reason="zarrbridge not installed")
+
+
+def acquire_dataserver(sock, user):
+    send_msg(sock, {"op": "acquire", "kind": "dataserver", "user": user})
+    reply, fds = recv_msg(sock)
+    assert not fds
+    return reply
+
+
+@pytest.fixture
+def tiny_tiff(tmp_path):
+    import numpy as np
+    import tifffile
+    path = tmp_path / "tiny.tif"
+    tifffile.imwrite(path, np.arange(64 * 64, dtype=np.uint16).reshape(64, 64))
+    return path
+
+
+@needs_zarrbridge
+class TestDataServer:
+
+    def test_acquire_spawns_once_and_serves_virtual_zarr(self, run_supervisor, tiny_tiff):
+        import httpx
+        from fileglancer.supervisor.spawn import DATASERVER_HEADER
+        cfg = run_supervisor()
+        sock, _ = connect(cfg)
+        user = getpass.getuser()
+
+        reply = acquire_dataserver(sock, user)
+        assert reply["ok"], reply
+        assert os.path.exists(reply["socket"])
+        again = acquire_dataserver(sock, user)
+        assert again["pid"] == reply["pid"], "second acquire must reuse the process"
+
+        client = httpx.Client(transport=httpx.HTTPTransport(uds=reply["socket"]),
+                              base_url="http://zarrbridge", timeout=60)
+        headers = {DATASERVER_HEADER: str(tiny_tiff)}
+        meta = client.get("/zarr.json", headers=headers)
+        assert meta.status_code == 200
+        assert meta.json()["attributes"]["ome"]["multiscales"]
+        chunk = client.get("/0/c/0/0", headers=headers)
+        assert chunk.status_code == 200 and chunk.headers["x-zarrbridge-source"] == "native"
+        status = client.get("/_status", headers=headers).json()
+        assert status["classification"] == "servable"
+        assert client.get("/zarr.json").status_code == 400, "header is required"
+
+        st = get_status(sock)
+        assert [d["user"] for d in st["dataservers"]] == [user]
+        assert st["spawns_total"] == 1
+        sock.close()
+
+    def test_idle_dataserver_is_reaped(self, run_supervisor):
+        cfg = run_supervisor(idle_timeout=0.5)
+        sock, _ = connect(cfg)
+        reply = acquire_dataserver(sock, getpass.getuser())
+        assert reply["ok"], reply
+        assert wait_for(lambda: not get_status(sock)["dataservers"], timeout=15)
+        assert not os.path.exists(reply["socket"])
+        # A later acquire respawns transparently.
+        again = acquire_dataserver(sock, getpass.getuser())
+        assert again["ok"] and again["pid"] != reply["pid"]
+        sock.close()
+
+    def test_dead_dataserver_is_respawned(self, run_supervisor):
+        import signal
+        cfg = run_supervisor()
+        sock, _ = connect(cfg)
+        reply = acquire_dataserver(sock, getpass.getuser())
+        assert reply["ok"], reply
+        os.kill(reply["pid"], signal.SIGKILL)
+        assert wait_for(lambda: not get_status(sock)["dataservers"], timeout=15)
+        again = acquire_dataserver(sock, getpass.getuser())
+        assert again["ok"] and again["pid"] != reply["pid"]
+        sock.close()
+
+    def test_unsupported_kind_still_refused(self, run_supervisor):
+        cfg = run_supervisor()
+        sock, _ = connect(cfg)
+        send_msg(sock, {"op": "acquire", "kind": "printer", "user": getpass.getuser()})
+        reply, _ = recv_msg(sock)
+        assert reply["code"] == "unsupported_kind"
+        sock.close()
