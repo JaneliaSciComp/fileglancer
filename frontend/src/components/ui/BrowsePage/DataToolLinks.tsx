@@ -11,8 +11,11 @@ import DialogIconBtn from '@/components/ui/buttons/DialogIconBtn';
 import DataLinkUsageDialog from '@/components/ui/Dialogs/dataLinkUsage/DataLinkUsageDialog';
 import { useViewersContext } from '@/contexts/ViewersContext';
 
+// The pressed circle shrinks, so a press at its edge would release outside it
+// and the browser would drop the click. The ::after overlay grows by the
+// inverse (1 / 0.9) to keep the full circle as the click target.
 const CIRCLE_CLASSES =
-  'rounded-full bg-surface-light dark:bg-primary/15 hover:bg-surface dark:hover:bg-primary/25 w-12 h-12 flex items-center justify-center cursor-pointer transform active:scale-90 transition-all duration-75';
+  'rounded-full bg-surface-light dark:bg-primary/15 hover:bg-surface dark:hover:bg-primary/25 w-12 h-12 flex items-center justify-center cursor-pointer transform active:scale-90 transition-all duration-75 relative after:absolute after:inset-0 after:rounded-full active:after:scale-[1.12]';
 
 const LABEL_CLASSES = 'text-xs text-center text-foreground mt-1';
 
@@ -35,8 +38,10 @@ function ToolLink({
 }) {
   return (
     <div className="flex flex-col items-center w-16">
-      <FgTooltip label={tooltipLabel} triggerClasses={CIRCLE_CLASSES}>
+      <FgTooltip label={tooltipLabel}>
+        {/* The circle is the link itself so a click anywhere in it opens the tool. */}
         <Link
+          className={CIRCLE_CLASSES}
           onClick={async e => {
             e.preventDefault();
             await onToolClick(toolKey);
