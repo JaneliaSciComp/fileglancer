@@ -37,7 +37,7 @@ test('viewer shows an on-disk edit to an old file after refresh', async ({
     await utimes(file, oldTime, oldTime);
 
     await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await page.getByRole('textbox', { name: 'Username' }).fill('testUser');
+    await page.getByRole('textbox', { name: 'Password' }).fill('playwright');
     await page.getByRole('button', { name: 'Log In' }).click();
     await expect(page.getByText('Zones').first()).toBeVisible();
     await page.goto(`/browse/${FSP_NAME}/${testDir}/probe.json`);
