@@ -202,10 +202,17 @@ def test_create_bucket_custom_endpoint_stores_origin(test_client, fake_s3):
     ({"bucket": "idr", "label": "***"}, "Display name must contain"),
     ({"bucket": "idr", "endpoint_url": "http://s3.example.org"}, "must be an https"),
     ({"bucket": "idr", "endpoint_url": "https://10.0.0.5"}, "not an IP address"),
+    ({"bucket": "idr", "endpoint_url": "https://my_bucket.s3.example.org"}, "not a valid host name"),
 ])
 def test_create_bucket_validation_400(test_client, fake_s3, body, message):
     r = test_client.post("/api/cloud-storage/buckets", json=body)
     assert r.status_code == 400 and message in r.json()["error"]
+
+
+def test_create_bucket_underscore_name_201(test_client, fake_s3):
+    # AWS forbids underscores in bucket names but Ceph and other stores allow them
+    r = test_client.post("/api/cloud-storage/buckets", json={"bucket": "spatial_demo_datasets", "endpoint_url": "https://s3.example.org"})
+    assert r.status_code == 201, r.text
 
 
 def test_create_bucket_private_host_400(test_client, fake_s3, monkeypatch):

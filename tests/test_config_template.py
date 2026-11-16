@@ -1,4 +1,5 @@
 import os
+import re
 import yaml
 import pytest
 from fastapi.testclient import TestClient
@@ -13,18 +14,17 @@ def template_settings():
     """Load settings from the docs/config.yaml.template file"""
     template_path = os.path.join(os.path.dirname(__file__), "..", "docs", "config.yaml.template")
     with open(template_path, "r") as f:
-        config_data = yaml.safe_load(f)
-    
-    # We need to provide a valid external_proxy_url if it's required by validation
-    # The template has http://localhost:7878/files which should be fine
-    
+        text = f.read()
+    # Every setting in the template is commented out, so loading it yields
+    # nothing and the server runs on code defaults. The commented top-level
+    # settings must still be real ones, so a renamed field shows up here.
+    config_data = yaml.safe_load(text) or {}
+    assert config_data == {}, "template must not set anything by default"
+    keys = set(re.findall(r"^# ([a-z_]+):(?: |$)", text, re.MULTILINE))
+    assert keys and keys <= set(Settings.model_fields), keys - set(Settings.model_fields)
+
     # Use a memory database for testing
     config_data['db_url'] = "sqlite:///:memory:"
-    
-    # Ensure use_access_flags is False (this is what we are testing is the default)
-    # We don't explicitly set it here because we want to see what's in the template.
-    # But if the template HAS it, yaml.safe_load will grab it.
-    
     return Settings(**config_data)
 
 @pytest.fixture
@@ -93,12 +93,9 @@ def client(template_app):
     return TestClient(template_app)
 
 def test_config_template_defaults(template_settings):
-    """
-    Verify specifically that use_access_flags is False in the loaded settings.
-    This test MUST fail if the template is configured with use_access_flags: True.
-    """
-    assert template_settings.use_access_flags is False, \
-        "The configuration template should have use_access_flags set to False by default."
+    """The template must leave the server single-user by default."""
+    assert template_settings.use_access_flags is False
+    assert template_settings.enable_okta_auth is False
 
 def test_server_launches_with_template(client):
     """Verify that the server launches and responds to basic API calls"""

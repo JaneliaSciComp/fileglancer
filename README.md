@@ -22,15 +22,14 @@ See the [documentation](https://janeliascicomp.github.io/fileglancer-docs/) for 
 
 ### Personal Deployment
 
-Fileglancer can be run in a manner similar to Jupyter notebooks, by starting a web server from the command-line:
+Fileglancer can be run in a manner similar to Jupyter notebooks, by starting a web server from the command-line. Install it as a standalone tool with [uv](https://docs.astral.sh/uv/getting-started/installation/):
 
 ```bash
-# Install from PyPI
-pip install fileglancer
-
-# Start the server
+uv tool install fileglancer
 fileglancer start
 ```
+
+[pipx](https://pipx.pypa.io/) works the same way (`pipx install fileglancer`), or you can `pip install fileglancer` into a virtual environment you manage yourself. See the [CLI guide](docs/CLI.md) for details and upgrading.
 
 This will start your personal server locally and open a web browser with Fileglancer loaded. By default, only your home directory (`~/`) will be browsable. You can browse and view your own data this way, but links to data will only work as long as your server is running. To share data reliably with others, you will need a persistent shared deployment.
 

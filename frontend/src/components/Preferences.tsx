@@ -5,6 +5,7 @@ import DisplayOptions from '@/components/ui/PreferencesPage/DisplayOptions';
 import JobOptions from '@/components/ui/PreferencesPage/JobOptions';
 import NeuroglancerOptions from '@/components/ui/PreferencesPage/NeuroglancerOptions';
 import PathFormatOptions from '@/components/ui/PreferencesPage/PathFormatOptions';
+import WebknossosOptions from '@/components/ui/PreferencesPage/WebknossosOptions';
 
 export default function Preferences() {
   return (
@@ -42,6 +43,8 @@ export default function Preferences() {
               <NeuroglancerOptions />
             </div>
           </div>
+
+          <WebknossosOptions />
 
           <div>
             <Typography className="font-semibold mb-4" type="lead">

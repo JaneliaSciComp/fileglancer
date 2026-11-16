@@ -1,0 +1,53 @@
+# Fileglancer personal server configuration
+#
+# `fileglancer start` reads this file (and a .env beside it) at every start
+# and logs the path it read. Every setting is optional; the values shown are
+# the defaults. Settings can also be given as environment variables with an
+# FGC_ prefix, which take precedence over this file.
+#
+# The full list of settings, including the multi-user options a personal
+# server does not use, is in docs/config.yaml.template in the source
+# repository: https://github.com/JaneliaSciComp/fileglancer
+
+# Password for the login page. Without one, a new random password is printed
+# in the terminal at every start. The browser that `fileglancer start` opens
+# is logged in automatically either way.
+#
+# simple_auth_password: change-me
+
+# Directories to browse. ~/ is your home directory.
+#
+# file_share_mounts:
+#   - ~/
+#   - /data/shared
+
+# ERROR, WARNING, INFO, DEBUG or TRACE
+#
+# log_level: INFO
+
+# Where the database lives. The default is a SQLite file under
+# ~/.local/share/fileglancer/.
+#
+# db_url: sqlite:////absolute/path/to/fileglancer.db
+
+# Apps run on this machine by default. On a cluster login node, hand them to
+# the scheduler instead:
+#
+# cluster:
+#   executor: lsf
+#   queue: normal
+#   job_name_prefix: fg        # needed to pick jobs back up after a restart
+#
+# apps:
+#   extra_paths:               # added to $PATH for every job
+#     - /opt/nextflow/bin
+
+# A viewers config that replaces the built-in list of OME-Zarr viewers.
+#
+# viewers_config: /absolute/path/to/viewers.config.yaml
+
+# JIRA integration for the Help menu.
+#
+# atlassian_url: https://YOUR_ORG.atlassian.net
+# atlassian_username: you@example.org
+# atlassian_token: your_api_token

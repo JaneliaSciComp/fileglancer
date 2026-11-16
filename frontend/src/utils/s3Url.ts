@@ -37,6 +37,18 @@ export function parseS3Url(input: string): ParsedS3Url | null {
         endpointUrl: ''
       };
     }
+    // A host with an underscore cannot be an S3 endpoint (botocore rejects it), so
+    // it must be a bucket served as a subdomain, e.g. my_bucket.store.example.org
+    const [first, ...rest] = url.hostname.split('.');
+    if (first.includes('_') && rest.length > 0) {
+      const endpoint = new URL(url);
+      endpoint.hostname = rest.join('.');
+      return {
+        bucket: first,
+        prefix: segments.join('/'),
+        endpointUrl: endpoint.origin
+      };
+    }
     if (segments.length === 0) {
       return null;
     }

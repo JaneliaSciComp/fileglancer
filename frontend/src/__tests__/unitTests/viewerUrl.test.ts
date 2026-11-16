@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { resolveViewerTemplate } from '@/utils/viewerUrl';
+import { resolveViewerTemplate, withHost } from '@/utils/viewerUrl';
 import type { ValidViewer } from '@/contexts/ViewersContext';
 
 const viewer = {
@@ -44,5 +44,34 @@ describe('resolveViewerTemplate', () => {
     expect(resolveViewerTemplate(viewer, { custom: '' })).toBe(
       viewer.urlTemplate
     );
+  });
+});
+
+describe('withHost', () => {
+  const template = 'https://wk.janelia.org/import?url={dataLink}';
+
+  test('swaps in a bare host and keeps the path and placeholder', () => {
+    expect(withHost(template, ' webknossos.example.org ')).toBe(
+      'https://webknossos.example.org/import?url={dataLink}'
+    );
+  });
+
+  test('accepts an https origin with a port and trailing slash', () => {
+    expect(withHost(template, 'https://wk.example.org:8443/')).toBe(
+      'https://wk.example.org:8443/import?url={dataLink}'
+    );
+  });
+
+  test('rejects empty input, http, paths and credentials', () => {
+    for (const input of [
+      '',
+      'http://wk.example.org',
+      'wk.example.org/import',
+      'wk.example.org?x=1',
+      'https://user:pw@wk.example.org',
+      'javascript:alert(1)'
+    ]) {
+      expect(withHost(template, input)).toBeNull();
+    }
   });
 });

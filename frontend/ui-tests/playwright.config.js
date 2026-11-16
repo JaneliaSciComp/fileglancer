@@ -49,7 +49,8 @@ export default defineConfig({
       FGC_FILE_SHARE_MOUNTS: JSON.stringify([scratchDir]),
       FGC_EXTERNAL_PROXY_URL: 'http://testURL/files',
       FGC_USE_ACCESS_FLAGS: false,
-      FGC_ENABLE_OKTA_AUTH: false
+      FGC_ENABLE_OKTA_AUTH: false,
+      FGC_SIMPLE_AUTH_PASSWORD: 'playwright'
     }
   }
 });

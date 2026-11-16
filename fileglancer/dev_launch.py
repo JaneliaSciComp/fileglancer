@@ -31,7 +31,7 @@ def main():
         'uvicorn', 'fileglancer.server:app',
         '--host', '0.0.0.0',
         '--port', '443',
-        '--reload',
+        '--reload', '--reload-dir', 'fileglancer',
         '--ssl-keyfile', str(key_file),
         '--ssl-certfile', str(cert_file)
     ]

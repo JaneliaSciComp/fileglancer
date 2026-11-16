@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 import type { MouseEvent } from 'react';
 import { useNavigate } from 'react-router';
 import {
@@ -7,6 +14,7 @@ import {
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
+  type ColumnSizingState,
   type SortingState
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -29,10 +37,15 @@ import {
   getNotificationStyles
 } from '@/components/ui/Notifications/NotificationItem';
 import {
+  COLUMN_MIN_WIDTH,
   typeColumn,
   lastModifiedColumn,
   sizeColumn
 } from '@/components/ui/BrowsePage/fileTableColumns';
+import {
+  fitColumnResize,
+  fitColumnsToWidth
+} from '@/components/ui/BrowsePage/columnSizing';
 
 const ROW_HEIGHT = 44;
 const OVERSCAN = 10;
@@ -85,6 +98,7 @@ export default function Table({
   const checkedPaths = fileBrowserState.checkedPaths;
   const navigate = useNavigate();
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const tableRef = useRef<HTMLDivElement>(null);
 
   // Use the nearest scrollable ancestor (the main panel) as the virtualizer's
@@ -159,7 +173,7 @@ export default function Table({
       {
         accessorKey: 'name',
         header: 'Name',
-        minSize: 100,
+        minSize: COLUMN_MIN_WIDTH,
         size: 500,
         cell: ({ getValue, row }) => {
           const file = row.original;
@@ -248,8 +262,10 @@ export default function Table({
           );
         },
         size: 90,
-        minSize: 80,
-        enableSorting: false
+        minSize: COLUMN_MIN_WIDTH,
+        enableSorting: false,
+        // Last column: no right neighbour to trade width with
+        enableResizing: false
       }
     ],
     [
@@ -275,12 +291,32 @@ export default function Table({
     data,
     columns,
     state: {
-      sorting
+      sorting,
+      columnSizing
     },
     onSortingChange: setSorting,
+    onColumnSizingChange: updater => {
+      const resizedId = table.getState().columnSizingInfo.isResizingColumn;
+      setColumnSizing(prev => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        if (!resizedId) {
+          return next;
+        }
+        // Before the first width measurement, sizes come from column defaults
+        const current = Object.fromEntries(
+          table.getAllLeafColumns().map(col => [col.id, col.getSize()])
+        );
+        return fitColumnResize(
+          { ...current, ...prev },
+          next,
+          resizedId,
+          sizableColumns()
+        );
+      });
+    },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    columnResizeMode: 'onEnd',
+    columnResizeMode: 'onChange',
     enableColumnResizing: true,
     enableColumnFilters: false,
     enableSorting: sortingEnabled
@@ -288,11 +324,85 @@ export default function Table({
 
   const rows = table.getRowModel().rows;
 
-  // Build CSS grid template using fr units proportional to each column's size.
+  const sizableColumns = () =>
+    table.getAllLeafColumns().map(col => ({
+      id: col.id,
+      minSize: col.columnDef.minSize ?? 0
+    }));
+
+  // Column `size` values are relative weights. Convert them to pixels that
+  // fill the table's width, so a resize drag of N px moves the column edge
+  // by N px (TanStack adds the mouse delta to the column size). On later
+  // width changes the Name column absorbs the difference.
+  useLayoutEffect(() => {
+    const el = tableRef.current;
+    if (!el) {
+      return;
+    }
+    const fit = (width: number) => {
+      if (!width) {
+        return;
+      }
+      setColumnSizing(prev => {
+        if (Object.keys(prev).length > 0) {
+          return fitColumnsToWidth(prev, sizableColumns(), width, 'name');
+        }
+        const cols = table.getAllLeafColumns();
+        const totalWeight = cols.reduce(
+          (sum, col) => sum + (col.columnDef.size ?? 0),
+          0
+        );
+        return Object.fromEntries(
+          cols.map(col => [
+            col.id,
+            Math.max(
+              col.columnDef.minSize ?? 0,
+              Math.floor((width * (col.columnDef.size ?? 0)) / totalWeight)
+            )
+          ])
+        );
+      });
+    };
+    fit(el.clientWidth);
+    const observer = new ResizeObserver(entries =>
+      fit(Math.floor(entries[0].contentRect.width))
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+    // `table` and `sizableColumns` are stable enough; run once per mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cursor shows which way a divider can still move: the column on its
+  // left can shrink down to minSize, the one on its right can shrink to
+  // let it grow.
+  const leafColumns = table.getVisibleLeafColumns();
+  const resizeCursor = (index: number) => {
+    const left = leafColumns[index];
+    const right = leafColumns[index + 1];
+    const canShrink = left.getSize() > (left.columnDef.minSize ?? 0);
+    const canGrow = right
+      ? right.getSize() > (right.columnDef.minSize ?? 0)
+      : false;
+    if (canShrink && canGrow) {
+      return 'cursor-col-resize';
+    }
+    if (canShrink) {
+      return 'cursor-w-resize';
+    }
+    if (canGrow) {
+      return 'cursor-e-resize';
+    }
+    // Nothing to move: let hover and drags pass through so the divider
+    // does not light up
+    return 'pointer-events-none';
+  };
+
   const gridTemplateColumns = table
     .getVisibleLeafColumns()
-    .map(col => `minmax(${col.columnDef.minSize ?? 0}px, ${col.getSize()}fr)`)
+    .map(col => `${col.getSize()}px`)
     .join(' ');
+  const tableWidth = `${table.getTotalSize()}px`;
 
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -414,11 +524,11 @@ export default function Table({
       <div className="bg-background border-b border-surface">
         {table.getHeaderGroups().map(headerGroup => (
           <div
-            className="grid w-full"
+            className="grid min-w-full"
             key={headerGroup.id}
-            style={{ gridTemplateColumns }}
+            style={{ gridTemplateColumns, width: tableWidth }}
           >
-            {headerGroup.headers.map(header => (
+            {headerGroup.headers.map((header, index) => (
               <div
                 className="text-left p-3 font-bold text-sm relative min-w-0"
                 key={header.id}
@@ -436,10 +546,12 @@ export default function Table({
                         : undefined
                     }
                   >
-                    {flexRender(
-                      header.column.columnDef.header,
-                      header.getContext()
-                    )}
+                    <span className="truncate">
+                      {flexRender(
+                        header.column.columnDef.header,
+                        header.getContext()
+                      )}
+                    </span>
                     {header.column.columnDef.enableSorting !== false ? (
                       sortingEnabled ? (
                         <SortIcons header={header} />
@@ -455,16 +567,9 @@ export default function Table({
                 )}
                 {header.column.getCanResize() ? (
                   <div
-                    className="cursor-col-resize absolute z-10 -right-1 top-0 h-full w-3 bg-transparent group"
+                    className={`${resizeCursor(index)} absolute z-10 -right-1 top-0 h-full w-3 bg-transparent group`}
                     onMouseDown={header.getResizeHandler()}
                     onTouchStart={header.getResizeHandler()}
-                    style={{
-                      transform:
-                        table.getState().columnSizingInfo.isResizingColumn ===
-                        header.column.id
-                          ? `translateX(${table.getState().columnSizingInfo.deltaOffset ?? 0}px)`
-                          : undefined
-                    }}
                   >
                     <div className="absolute left-1/2 top-0 h-full w-[1px] bg-surface group-hover:bg-primary group-hover:w-[2px] group-focus:bg-primary group-focus:w-[2px] -translate-x-1/2" />
                   </div>
@@ -475,9 +580,11 @@ export default function Table({
         ))}
       </div>
       <div
+        className="min-w-full"
         style={{
           height: `${virtualizer.getTotalSize()}px`,
-          position: 'relative'
+          position: 'relative',
+          width: tableWidth
         }}
       >
         {virtualItems.map(virtualRow => {
@@ -499,7 +606,8 @@ export default function Table({
                 position: 'absolute',
                 top: 0,
                 left: 0,
-                width: '100%',
+                width: tableWidth,
+                minWidth: '100%',
                 transform: `translateY(${virtualRow.start - virtualizer.options.scrollMargin}px)`
               }}
             >

@@ -1627,10 +1627,6 @@ def run_debug(db_url: Optional[str] = None,
         print("fileglancer debug requires a POSIX terminal (curses).", file=sys.stderr)
         sys.exit(1)
 
-    # Settings require external_proxy_url; the debug tool doesn't serve
-    # anything, so satisfy the validator with a placeholder (as `start` does).
-    os.environ.setdefault("FGC_EXTERNAL_PROXY_URL", "http://127.0.0.1:0/files")
-
     # Silence loguru (sqlalchemy/database modules log through it) so nothing
     # writes to the terminal underneath curses.
     try:

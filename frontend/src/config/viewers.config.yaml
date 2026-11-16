@@ -22,3 +22,11 @@ viewers:
   - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/validator.yaml'
 
   - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/vole.yaml'
+
+  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/vizarr.yaml'
+
+  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/fiji.yaml'
+
+  - manifest_url: 'https://raw.githubusercontent.com/BioImageTools/capability-manifest/main/manifests/webknossos.yaml'
+    instance_template_url: 'https://wk.janelia.org/import?url={dataLink}'
+    label: 'Import into WEBKNOSSOS'

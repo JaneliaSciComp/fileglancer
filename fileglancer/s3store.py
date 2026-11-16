@@ -18,6 +18,7 @@ import aiohttp
 import botocore
 import botocore.exceptions
 import botocore.parsers
+import botocore.utils
 from aiobotocore.config import AioConfig
 from aiobotocore.httpsession import AIOHTTPSession
 from aiobotocore.session import get_session
@@ -28,7 +29,8 @@ from .filestore import FileInfo
 from .store import StoreError
 from .utils import format_timestamp, guess_content_type, is_likely_binary, make_etag, s3_public_url
 
-BUCKET_NAME_RE = re.compile(r'^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$')
+# Underscores are invalid on AWS but allowed by Ceph and other S3 implementations
+BUCKET_NAME_RE = re.compile(r'^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$')
 
 # Bytes per chunk when streaming object bodies (aiobotocore defaults to 1 KiB)
 STREAM_CHUNK_SIZE = 64 * 1024
@@ -139,6 +141,10 @@ def validate_endpoint_url(endpoint_url: str, allowed: Optional[List[str]]) -> st
     else:
         raise ValueError("Endpoint must be a host name, not an IP address")
     origin = f"https://{host}" if port in (None, 443) else f"https://{host}:{port}"
+    if not botocore.utils.is_valid_endpoint_url(origin):
+        # botocore raises a bare ValueError for this at client creation, well after validation
+        raise ValueError("Endpoint is not a valid host name; if it begins with the bucket name, "
+                         "use the rest of the host as the endpoint")
     if allowed is not None and origin not in allowed:
         raise ValueError("Endpoint is not allowed on this server; ask the administrator to add it")
     # ponytail: resolved at add time only; pin addresses on the client if DNS rebinding ever matters

@@ -26,7 +26,7 @@ List full origins: scheme, host, and port if non-default. The Fileglancer UI's o
 
 This list is the cross-site security boundary. On every authenticated endpoint, a request that carries an `Origin` header which is neither same-origin nor on this list is rejected with `403` before the session is consulted. Requests with no `Origin` header (same-origin GETs, server-to-server, curl) are unaffected. This closes a latent exposure: the CORS policy is intentionally wide open (`*`) so anonymous `/files/{sharing_key}` data links work in external viewers like Neuroglancer, which would otherwise let any same-site page ride a logged-in cookie. The allowlist gates the cookie-authenticated surface specifically.
 
-For local development over plain HTTP, set `session_cookie_secure: false` so the cookie is sent without HTTPS.
+The session cookie is marked Secure when the login happened over HTTPS and not otherwise, so local development over plain HTTP needs no extra setting.
 
 ## API endpoints
 

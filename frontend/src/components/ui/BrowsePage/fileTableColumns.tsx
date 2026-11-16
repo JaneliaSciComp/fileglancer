@@ -4,6 +4,9 @@ import type { ColumnDef } from '@tanstack/react-table';
 import type { FileOrFolder } from '@/shared.types';
 import { formatUnixTimestamp, formatFileSize } from '@/utils';
 
+/** Shared minimum width; headers and cells truncate below their content */
+export const COLUMN_MIN_WIDTH = 85;
+
 /**
  * Shared column definition for Type column
  */
@@ -14,9 +17,13 @@ export const typeColumn: ColumnDef<FileOrFolder> = {
     const file = row.original;
     if (file.is_symlink) {
       // Valid symlink
-      return <Typography>Symlink</Typography>;
+      return <Typography className="truncate">Symlink</Typography>;
     }
-    return <Typography>{file.is_dir ? 'Folder' : 'File'}</Typography>;
+    return (
+      <Typography className="truncate">
+        {file.is_dir ? 'Folder' : 'File'}
+      </Typography>
+    );
   },
   sortingFn: (rowA, rowB) => {
     const a = rowA.original.is_dir;
@@ -27,7 +34,7 @@ export const typeColumn: ColumnDef<FileOrFolder> = {
     return a ? -1 : 1; // Folders first
   },
   size: 90,
-  minSize: 80
+  minSize: COLUMN_MIN_WIDTH
 };
 
 /**
@@ -42,7 +49,7 @@ export const lastModifiedColumn: ColumnDef<FileOrFolder> = {
     </Typography>
   ),
   size: 200,
-  minSize: 200
+  minSize: COLUMN_MIN_WIDTH
 };
 
 /**
@@ -52,7 +59,7 @@ export const sizeColumn: ColumnDef<FileOrFolder> = {
   accessorKey: 'size',
   header: 'Size',
   cell: ({ getValue, row }) => (
-    <Typography>
+    <Typography className="truncate">
       {row.original.is_dir ? '—' : formatFileSize(getValue() as number)}
     </Typography>
   ),
@@ -62,5 +69,5 @@ export const sizeColumn: ColumnDef<FileOrFolder> = {
     return a - b;
   },
   size: 100,
-  minSize: 100
+  minSize: COLUMN_MIN_WIDTH
 };

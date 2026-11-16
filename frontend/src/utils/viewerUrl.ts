@@ -22,3 +22,34 @@ export function resolveViewerTemplate(
   }
   return viewer.urlTemplate;
 }
+
+/**
+ * Point a viewer's URL template at a different host, keeping its path and
+ * query. Accepts a bare host (`wk.example.org`) or an https origin
+ * (`https://wk.example.org`, with an optional port and trailing slash).
+ * Returns null when the input is anything else, such as a path or http.
+ */
+export function withHost(template: string, input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return null;
+  }
+  let target: URL;
+  try {
+    target = new URL(trimmed.includes('://') ? trimmed : `https://${trimmed}`);
+  } catch {
+    return null;
+  }
+  if (
+    target.protocol !== 'https:' ||
+    target.pathname !== '/' ||
+    target.search ||
+    target.hash ||
+    target.username ||
+    target.password
+  ) {
+    return null;
+  }
+  const { origin } = new URL(template);
+  return target.origin + template.slice(origin.length);
+}

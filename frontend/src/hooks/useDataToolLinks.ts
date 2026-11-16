@@ -73,6 +73,15 @@ export function validateUrlPrefix(value: string): string | null {
 }
 
 // Overload for ZarrPreview usage with required parameters
+/**
+ * Whether a viewer link opens in a new tab. Links to desktop apps, such as
+ * fiji://, hand off to the OS, so a new tab would stay blank.
+ */
+export function opensInNewTab(url: string): boolean {
+  const { protocol } = new URL(url, window.location.href);
+  return protocol === 'http:' || protocol === 'https:';
+}
+
 export default function useDataToolLinks(
   setShowDataLinkDialog: Dispatch<SetStateAction<boolean>>,
   openWithToolUrls: OpenWithToolUrls | null,
@@ -198,7 +207,9 @@ export default function useDataToolLinks(
           // This is more reliable than window.open and doesn't trigger DevTools errors
           const link = document.createElement('a');
           link.href = navigationUrl;
-          link.target = '_blank';
+          if (opensInNewTab(navigationUrl)) {
+            link.target = '_blank';
+          }
           link.rel = 'noopener noreferrer';
           link.style.display = 'none';
           document.body.appendChild(link);

@@ -186,10 +186,19 @@ def get_current_user(request: Request, settings: Settings) -> str:
     return user_session.username
 
 
+def cookie_secure(settings: Settings, request: Request) -> bool:
+    """Whether the session cookie carries the Secure flag: the configured
+    value, else whatever matches the scheme this request arrived on."""
+    if settings.session_cookie_secure is not None:
+        return settings.session_cookie_secure
+    return request.url.scheme == 'https'
+
+
 def create_session_cookie(
     response: Response,
     session_id: str,
-    settings: Settings
+    settings: Settings,
+    request: Request,
 ):
     """
     Set session cookie on response
@@ -201,13 +210,13 @@ def create_session_cookie(
         value=session_id,
         max_age=max_age,
         httponly=True,
-        secure=settings.session_cookie_secure,
+        secure=cookie_secure(settings, request),
         samesite='lax',  # CSRF protection while allowing navigation
         path='/'  # Ensure cookie is sent for all paths
     )
 
 
-def delete_session_cookie(response: Response, settings: Settings):
+def delete_session_cookie(response: Response, settings: Settings, request: Request):
     """
     Delete session cookie from response
     """
@@ -215,7 +224,7 @@ def delete_session_cookie(response: Response, settings: Settings):
         key=settings.session_cookie_name,
         path='/',  # Must match the path used when setting the cookie
         httponly=True,
-        secure=settings.session_cookie_secure,
+        secure=cookie_secure(settings, request),
         samesite='lax'
     )
 
