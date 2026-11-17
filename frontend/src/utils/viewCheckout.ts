@@ -89,7 +89,7 @@ async function generateStateForDataset(
   prefs: ViewStatePrefs
 ): Promise<NgState | null> {
   // A channel entry needs the generated per-channel layers to pick from, so
-  // it overrides "Disable Neuroglancer state generation".
+  // it generates state even when "Generate Neuroglancer state" is off.
   const sourceOnly =
     prefs.disableNeuroglancerStateGeneration && ds.channel === undefined;
   const probe = await probeDataset(ds.url);

@@ -2,6 +2,7 @@ import toast from 'react-hot-toast';
 import { Typography } from '@material-tailwind/react';
 
 import FgSwitch from '@/components/designSystem/atoms/formElements/FgSwitch';
+import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import FgRadio from '@/components/designSystem/atoms/formElements/FgRadio';
 import FgFieldSet from '@/components/designSystem/molecules/FgFieldSet';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
@@ -112,6 +113,29 @@ export default function NeuroglancerOptions() {
       'Neuroglancer button preference updated'
     );
 
+  const multichannelSwitch = (
+    <FgSwitch
+      checked={useLegacyMultichannelApproach ?? false}
+      // Without generated state there are no channel layers to shape.
+      disabled={disableNeuroglancerStateGeneration}
+      id="use_legacy_multichannel_approach"
+      label="Generate multichannel state for Neuroglancer"
+      onChange={async () => {
+        const result = await toggleUseLegacyMultichannelApproach();
+        if (result.success) {
+          toast.success(
+            useLegacyMultichannelApproach
+              ? 'Disabled multichannel state generation for Neuroglancer'
+              : 'Enabled multichannel state generation for Neuroglancer'
+          );
+        } else {
+          toast.error(result.error);
+        }
+      }}
+      showState
+    />
+  );
+
   return (
     <div className="space-y-6">
       <FgFieldSet legend="The Neuroglancer button on Zarr/OME-Zarr metadata panels opens the dataset in:">
@@ -137,27 +161,9 @@ export default function NeuroglancerOptions() {
 
       <FgFieldSet legend="State generation options">
         <FgSwitch
-          checked={useLegacyMultichannelApproach ?? false}
-          id="use_legacy_multichannel_approach"
-          label="Generate multichannel state for Neuroglancer"
-          onChange={async () => {
-            const result = await toggleUseLegacyMultichannelApproach();
-            if (result.success) {
-              toast.success(
-                useLegacyMultichannelApproach
-                  ? 'Disabled multichannel state generation for Neuroglancer'
-                  : 'Enabled multichannel state generation for Neuroglancer'
-              );
-            } else {
-              toast.error(result.error);
-            }
-          }}
-          showState
-        />
-        <FgSwitch
-          checked={disableNeuroglancerStateGeneration}
+          checked={!disableNeuroglancerStateGeneration}
           id="disable_neuroglancer_state_generation"
-          label="Disable Neuroglancer state generation"
+          label="Generate Neuroglancer state"
           onChange={async () => {
             const result = await toggleDisableNeuroglancerStateGeneration();
             if (result.success) {
@@ -172,17 +178,26 @@ export default function NeuroglancerOptions() {
           }}
           showState
         />
+        {disableNeuroglancerStateGeneration ? (
+          <FgTooltip
+            label={`Your saved setting is ${useLegacyMultichannelApproach ? 'On' : 'Off'}. It does not apply while "Generate Neuroglancer state" is off.`}
+          >
+            {multichannelSwitch}
+          </FgTooltip>
+        ) : (
+          multichannelSwitch
+        )}
         <FgSwitch
-          checked={disableHeuristicalLayerTypeDetection ?? false}
+          checked={!disableHeuristicalLayerTypeDetection}
           id="disable_heuristical_layer_type_detection"
-          label="Disable heuristical layer type determination"
+          label="Use heuristic to identify segmentation layers"
           onChange={async () => {
             const result = await toggleDisableHeuristicalLayerTypeDetection();
             if (result.success) {
               toast.success(
                 disableHeuristicalLayerTypeDetection
-                  ? 'Heuristical layer type determination is now enabled'
-                  : 'Heuristical layer type determination is now disabled'
+                  ? 'Segmentation layer heuristic is now enabled'
+                  : 'Segmentation layer heuristic is now disabled'
               );
             } else {
               toast.error(result.error);
