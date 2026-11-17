@@ -16,6 +16,7 @@ import {
   getOmeZarrThumbnail,
   determineLayerType,
   generateNeuroglancerStateForOmeZarr,
+  generateNeuroglancerStateForDataURL,
   generateStateForPlainZarr
 } from '@/omezarr-helper';
 import {
@@ -29,8 +30,15 @@ import {
 const md = { multiscales: [{}], arr: {}, zarrVersion: 2 };
 const buildViewState = (
   datasets: Parameters<typeof buildViewStateImpl>[0],
-  detectLayerType = true
-) => buildViewStateImpl(datasets, detectLayerType);
+  detectLayerType = true,
+  prefs: Partial<Parameters<typeof buildViewStateImpl>[1]> = {}
+) =>
+  buildViewStateImpl(datasets, {
+    disableHeuristicalLayerTypeDetection: !detectLayerType,
+    useLegacyMultichannelApproach: false,
+    disableNeuroglancerStateGeneration: false,
+    ...prefs
+  });
 
 beforeEach(() => {
   (getOmeZarrMetadata as any).mockReset().mockResolvedValue(md);
@@ -75,6 +83,47 @@ describe('buildViewState', () => {
     expect((generateNeuroglancerStateForOmeZarr as any).mock.calls[0][2]).toBe(
       'image'
     );
+  });
+
+  it('uses the legacy multichannel generator when the preference is on', async () => {
+    await buildViewState([one]);
+    await buildViewState([one], true, { useLegacyMultichannelApproach: true });
+    const calls = (generateNeuroglancerStateForOmeZarr as any).mock.calls;
+    expect(calls.map((c: unknown[]) => c[7])).toEqual([false, true]);
+  });
+
+  it('builds source-only layers when state generation is disabled', async () => {
+    (generateNeuroglancerStateForDataURL as any).mockReturnValue(
+      encoded({ layers: [{ name: 'a', source: 'a|zarr2:', type: 'new' }] })
+    );
+    const off = { disableNeuroglancerStateGeneration: true };
+    const { ng_state } = await buildViewState([one], true, off);
+    expect(generateNeuroglancerStateForOmeZarr).not.toHaveBeenCalled();
+    expect(getOmeZarrThumbnail).not.toHaveBeenCalled();
+    expect((ng_state.layers as any[])[0]).toMatchObject({ type: 'new' });
+
+    // A channel entry still needs the generated per-channel layers.
+    await buildViewState(
+      [{ ...one, channel: 'c0', channelIndex: 0 }],
+      true,
+      off
+    );
+    expect(generateNeuroglancerStateForOmeZarr).toHaveBeenCalledTimes(1);
+
+    // Plain arrays drop to the same source-only layer.
+    (getOmeZarrMetadata as any).mockRejectedValue(new Error('not ome'));
+    (generateStateForPlainZarr as any).mockResolvedValue(
+      encoded({
+        layers: [{ name: 'a', source: 's', type: 'image', tab: 'rendering' }]
+      })
+    );
+    const plain = await buildViewState([{ ...one, url: 'plain' }], true, off);
+    expect((plain.ng_state.layers as any[])[0]).toEqual({
+      name: 'a',
+      source: 's',
+      type: 'new',
+      archived: false
+    });
   });
 
   it('concatenates layers across datasets and maps ViewLayerInput', async () => {

@@ -44,7 +44,11 @@ export function useAddToView(
   options?: { shown?: boolean; urlPrefixes?: UrlPrefixes }
 ) => Promise<void> {
   const { resolveCartDatasets } = useCartCheckout();
-  const { disableHeuristicalLayerTypeDetection } = usePreferencesContext();
+  const {
+    disableHeuristicalLayerTypeDetection,
+    useLegacyMultichannelApproach,
+    disableNeuroglancerStateGeneration
+  } = usePreferencesContext();
   // The sidebar unmounts when NG reloads (the bridge leaves `ready`). An add
   // still in flight then holds the dead viewer, so it must stop.
   const mounted = useRef(true);
@@ -64,10 +68,11 @@ export function useAddToView(
       // broken layers on that dataset server-side and refetches the rows.
       const broken = viewLayers.filter(isRelinkableLayer);
       const resolved = await resolveCartDatasets(items, options?.urlPrefixes);
-      const { ng_state, layers } = await buildViewState(
-        resolved,
-        !disableHeuristicalLayerTypeDetection
-      );
+      const { ng_state, layers } = await buildViewState(resolved, {
+        disableHeuristicalLayerTypeDetection,
+        useLegacyMultichannelApproach,
+        disableNeuroglancerStateGeneration
+      });
       const added = (ng_state.layers ?? []) as NgLayer[];
       const unsupportedKeys = [
         ...new Set(
@@ -132,6 +137,8 @@ export function useAddToView(
     [
       resolveCartDatasets,
       disableHeuristicalLayerTypeDetection,
+      useLegacyMultichannelApproach,
+      disableNeuroglancerStateGeneration,
       bridge,
       viewLayers,
       onEdited,
