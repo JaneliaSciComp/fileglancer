@@ -90,7 +90,9 @@ export function useCreateViewFlow() {
     areDataLinksAutomatic,
     dataLinkSubpathMode,
     toggleAutomaticDataLinks,
-    disableHeuristicalLayerTypeDetection
+    disableHeuristicalLayerTypeDetection,
+    useLegacyMultichannelApproach,
+    disableNeuroglancerStateGeneration
   } = usePreferencesContext();
   const allProxiedPathsQuery = useAllProxiedPathsQuery();
   const navigate = useNavigate();
@@ -143,10 +145,11 @@ export function useCreateViewFlow() {
   ) => {
     try {
       const resolved = await resolveCartDatasets(datasets, prefixes);
-      const { ng_state, layers } = await buildViewState(
-        resolved,
-        !disableHeuristicalLayerTypeDetection
-      );
+      const { ng_state, layers } = await buildViewState(resolved, {
+        disableHeuristicalLayerTypeDetection,
+        useLegacyMultichannelApproach,
+        disableNeuroglancerStateGeneration
+      });
       const draft: ViewDraft = { name, ng_state, layers, datasets: resolved };
       if (tab) {
         tab.location.href = storeDraft(draft);

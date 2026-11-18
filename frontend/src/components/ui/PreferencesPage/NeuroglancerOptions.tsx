@@ -135,6 +135,63 @@ export default function NeuroglancerOptions() {
         />
       </FgFieldSet>
 
+      <FgFieldSet legend="State generation options">
+        <FgSwitch
+          checked={useLegacyMultichannelApproach ?? false}
+          id="use_legacy_multichannel_approach"
+          label="Generate multichannel state for Neuroglancer"
+          onChange={async () => {
+            const result = await toggleUseLegacyMultichannelApproach();
+            if (result.success) {
+              toast.success(
+                useLegacyMultichannelApproach
+                  ? 'Disabled multichannel state generation for Neuroglancer'
+                  : 'Enabled multichannel state generation for Neuroglancer'
+              );
+            } else {
+              toast.error(result.error);
+            }
+          }}
+          showState
+        />
+        <FgSwitch
+          checked={disableNeuroglancerStateGeneration}
+          id="disable_neuroglancer_state_generation"
+          label="Disable Neuroglancer state generation"
+          onChange={async () => {
+            const result = await toggleDisableNeuroglancerStateGeneration();
+            if (result.success) {
+              toast.success(
+                disableNeuroglancerStateGeneration
+                  ? 'Neuroglancer state generation is now enabled'
+                  : 'Neuroglancer state generation is now disabled'
+              );
+            } else {
+              toast.error(result.error);
+            }
+          }}
+          showState
+        />
+        <FgSwitch
+          checked={disableHeuristicalLayerTypeDetection ?? false}
+          id="disable_heuristical_layer_type_detection"
+          label="Disable heuristical layer type determination"
+          onChange={async () => {
+            const result = await toggleDisableHeuristicalLayerTypeDetection();
+            if (result.success) {
+              toast.success(
+                disableHeuristicalLayerTypeDetection
+                  ? 'Heuristical layer type determination is now enabled'
+                  : 'Heuristical layer type determination is now disabled'
+              );
+            } else {
+              toast.error(result.error);
+            }
+          }}
+          showState
+        />
+      </FgFieldSet>
+
       {hosts ? (
         <div className="space-y-4">
           <SubHeading>Views</SubHeading>
@@ -153,13 +210,13 @@ export default function NeuroglancerOptions() {
         </div>
       ) : null}
 
-      <div className="space-y-4">
-        <SubHeading>Standalone Neuroglancer</SubHeading>
-        <Typography className="text-sm text-foreground">
-          Used when the Neuroglancer button opens a standalone Neuroglancer, and
-          as the default for new Neuroglancer links.
-        </Typography>
-        {hosts ? (
+      {hosts ? (
+        <div className="space-y-4">
+          <SubHeading>Standalone Neuroglancer</SubHeading>
+          <Typography className="text-sm text-foreground">
+            Used when the Neuroglancer button opens a standalone Neuroglancer,
+            and as the default for new Neuroglancer links.
+          </Typography>
           <BaseUrlChoice
             hosts={hosts}
             idPrefix="neuroglancer_url_source"
@@ -172,64 +229,8 @@ export default function NeuroglancerOptions() {
             }
             source={viewerUrlSources['neuroglancer']}
           />
-        ) : null}
-        <FgFieldSet legend="State generation options">
-          <FgSwitch
-            checked={useLegacyMultichannelApproach ?? false}
-            id="use_legacy_multichannel_approach"
-            label="Generate multichannel state for Neuroglancer"
-            onChange={async () => {
-              const result = await toggleUseLegacyMultichannelApproach();
-              if (result.success) {
-                toast.success(
-                  useLegacyMultichannelApproach
-                    ? 'Disabled multichannel state generation for Neuroglancer'
-                    : 'Enabled multichannel state generation for Neuroglancer'
-                );
-              } else {
-                toast.error(result.error);
-              }
-            }}
-            showState
-          />
-          <FgSwitch
-            checked={disableNeuroglancerStateGeneration}
-            id="disable_neuroglancer_state_generation"
-            label="Disable Neuroglancer state generation"
-            onChange={async () => {
-              const result = await toggleDisableNeuroglancerStateGeneration();
-              if (result.success) {
-                toast.success(
-                  disableNeuroglancerStateGeneration
-                    ? 'Neuroglancer state generation is now enabled'
-                    : 'Neuroglancer state generation is now disabled'
-                );
-              } else {
-                toast.error(result.error);
-              }
-            }}
-            showState
-          />
-          <FgSwitch
-            checked={disableHeuristicalLayerTypeDetection ?? false}
-            id="disable_heuristical_layer_type_detection"
-            label="Disable heuristical layer type determination"
-            onChange={async () => {
-              const result = await toggleDisableHeuristicalLayerTypeDetection();
-              if (result.success) {
-                toast.success(
-                  disableHeuristicalLayerTypeDetection
-                    ? 'Heuristical layer type determination is now enabled'
-                    : 'Heuristical layer type determination is now disabled'
-                );
-              } else {
-                toast.error(result.error);
-              }
-            }}
-            showState
-          />
-        </FgFieldSet>
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }
