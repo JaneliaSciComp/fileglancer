@@ -123,6 +123,7 @@ export default function useDataToolLinks(
   // Store current URLs in a ref to avoid stale closure issues
   const currentUrlsRef = useRef(openWithToolUrls);
   currentUrlsRef.current = openWithToolUrls;
+  const creatingRef = useRef(false);
 
   const { fileQuery, fileBrowserState } = useFileBrowserContext();
   const {
@@ -137,46 +138,48 @@ export default function useDataToolLinks(
   const { externalDataUrlQuery } = useExternalBucketContext();
   const { handleCopy, showCopiedTooltip } = useCopyTooltip();
 
-  const handleCreateDataLink = async (
+  // Sync validation half of link creation: toasts and returns null on any
+  // guard failure, so callers can bail before doing anything visible.
+  const prepareDataLink = (
     pathOverride?: string,
     urlPrefixOverride?: string
-  ): Promise<boolean> => {
+  ) => {
     const rawPath = pathOverride ?? fileBrowserState.dataLinkPath;
     if (!fileQuery.data?.currentFileSharePath) {
       toast.error('No file share path selected');
-      return false;
+      return null;
     }
     if (rawPath === null || rawPath === undefined) {
       toast.error('No file or folder selected');
-      return false;
+      return null;
     }
     // Filestore returns the FSP root as ".", but a literal "." in the share
     // URL gets collapsed by URL normalization at the recipient, producing
     // path mismatch / NoSuchBucket errors. Send "" to the backend instead.
     const path = normalizeFspRootPath(rawPath);
     const fspName = fileQuery.data.currentFileSharePath.name;
-
-    try {
-      const urlPrefix =
-        urlPrefixOverride ??
-        defaultUrlPrefix(
-          dataLinkSubpathMode,
-          path,
-          fspName,
-          fileQuery.data.currentFileSharePath.linux_path
-        );
-
-      const validationError = validateUrlPrefix(urlPrefix);
-      if (validationError) {
-        toast.error(validationError);
-        return false;
-      }
-
-      await createProxiedPathMutation.mutateAsync({
-        fsp_name: fspName,
+    const urlPrefix =
+      urlPrefixOverride ??
+      defaultUrlPrefix(
+        dataLinkSubpathMode,
         path,
-        url_prefix: urlPrefix
-      });
+        fspName,
+        fileQuery.data.currentFileSharePath.linux_path
+      );
+
+    const validationError = validateUrlPrefix(urlPrefix);
+    if (validationError) {
+      toast.error(validationError);
+      return null;
+    }
+    return { fsp_name: fspName, path, url_prefix: urlPrefix };
+  };
+
+  const submitDataLink = async (
+    request: NonNullable<ReturnType<typeof prepareDataLink>>
+  ): Promise<boolean> => {
+    try {
+      await createProxiedPathMutation.mutateAsync(request);
       toast.success('Data link created successfully');
       await allProxiedPathsQuery.refetch();
       return true;
@@ -188,9 +191,18 @@ export default function useDataToolLinks(
     }
   };
 
+  const handleCreateDataLink = async (
+    pathOverride?: string,
+    urlPrefixOverride?: string
+  ): Promise<boolean> => {
+    const request = prepareDataLink(pathOverride, urlPrefixOverride);
+    return request ? submitDataLink(request) : false;
+  };
+
   const executeToolAction = async (
     toolKey: PendingToolKey,
-    urls: OpenWithToolUrls
+    urls: OpenWithToolUrls,
+    tab?: Window | null
   ) => {
     if (!urls) {
       return;
@@ -202,7 +214,11 @@ export default function useDataToolLinks(
       } else if (toolKey) {
         const navigationUrl = urls[toolKey];
 
-        if (navigationUrl) {
+        if (navigationUrl && tab && !tab.closed) {
+          tab.location.href = navigationUrl;
+        } else if (navigationUrl) {
+          // Also the fallback when the user closed the pre-opened tab:
+          // setting location on a closed window is a silent no-op.
           // Create anchor element and simulate click to open URL
           // This is more reliable than window.open and doesn't trigger DevTools errors
           const link = document.createElement('a');
@@ -216,6 +232,7 @@ export default function useDataToolLinks(
           link.click();
           document.body.removeChild(link);
         } else {
+          tab?.close();
           toast.error('URL not available');
         }
       }
@@ -230,20 +247,44 @@ export default function useDataToolLinks(
   };
 
   const createLinkAndExecuteAction = async (
-    clickedToolKey?: PendingToolKey
+    clickedToolKey?: PendingToolKey,
+    urlPrefixOverride?: string
   ) => {
     const toolKey = clickedToolKey || pendingToolKey;
     if (!toolKey) {
       return;
     }
 
+    // A second click while the first is still creating the link would POST
+    // a duplicate (409) and flash a second blank tab. Ignore it.
+    if (creatingRef.current) {
+      return;
+    }
     // Viewer icon flow: always create data link for the current directory,
     // not the properties target (which may be a selected subdirectory row)
-    const success = await handleCreateDataLink(
-      fileQuery.data?.currentFileOrFolder?.path
+    const request = prepareDataLink(
+      fileQuery.data?.currentFileOrFolder?.path,
+      urlPrefixOverride
     );
+    if (!request) {
+      return;
+    }
+
+    // Open the tab now, while the click's user activation is still fresh:
+    // creating the data link (worker validation, refetch) can outlast it and
+    // get the popup blocked. Falls back to an anchor click if blocked anyway.
+    const tab = toolKey === 'copy' ? null : window.open('', '_blank');
+    if (tab) {
+      tab.opener = null;
+    }
+
+    creatingRef.current = true;
+    const success = await submitDataLink(request).finally(() => {
+      creatingRef.current = false;
+    });
     if (!success) {
       // If link creation fails, exit immediately without waiting or showing navigation error
+      tab?.close();
       return;
     }
 
@@ -255,7 +296,7 @@ export default function useDataToolLinks(
       const currentUrls = currentUrlsRef.current;
 
       if (currentUrls && currentUrls.copy && currentUrls.copy !== '') {
-        await executeToolAction(toolKey, currentUrls);
+        await executeToolAction(toolKey, currentUrls, tab);
         break;
       }
 
@@ -264,6 +305,7 @@ export default function useDataToolLinks(
     }
 
     if (attempts >= maxAttempts) {
+      tab?.close();
       toast.error(
         `${toolKey === 'copy' ? 'Error copying data link' : `Error navigating to ${toolKey}`}`
       );
@@ -290,28 +332,7 @@ export default function useDataToolLinks(
   // Second case is for link creation through the PropertiesDrawer dialog
   const handleDialogConfirm = async (urlPrefixOverride?: string) => {
     if (pendingToolKey) {
-      if (urlPrefixOverride !== undefined) {
-        const success = await handleCreateDataLink(
-          fileQuery.data?.currentFileOrFolder?.path,
-          urlPrefixOverride
-        );
-        if (success) {
-          // Wait for URLs to update then execute tool action
-          let attempts = 0;
-          const maxAttempts = 50;
-          while (attempts < maxAttempts) {
-            const currentUrls = currentUrlsRef.current;
-            if (currentUrls && currentUrls.copy && currentUrls.copy !== '') {
-              await executeToolAction(pendingToolKey, currentUrls);
-              break;
-            }
-            await new Promise(resolve => setTimeout(resolve, 100));
-            attempts++;
-          }
-        }
-      } else {
-        await createLinkAndExecuteAction();
-      }
+      await createLinkAndExecuteAction(undefined, urlPrefixOverride);
     } else {
       await handleCreateDataLink(undefined, urlPrefixOverride);
     }
