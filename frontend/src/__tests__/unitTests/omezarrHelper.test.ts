@@ -3,6 +3,7 @@ import {
   generateNeuroglancerStateForOmeZarr,
   getNeuroglancerSource,
   getResolvedScales,
+  storeRequestInit,
   toNeuroglancerDimension,
   translateUnitToNeuroglancer
 } from '@/omezarr-helper';
@@ -140,5 +141,27 @@ describe('generateNeuroglancerStateForOmeZarr per-channel layers', () => {
       'Pale',
       'Gpb5 (2)'
     ]);
+  });
+});
+
+describe('storeRequestInit', () => {
+  it('bypasses the browser cache for our own /api/content URLs', () => {
+    const init = storeRequestInit(
+      `${window.location.origin}/api/content/fsp/data.zarr`
+    );
+    expect(init).toEqual({ credentials: 'same-origin', cache: 'no-store' });
+  });
+
+  it('leaves external buckets on their own cache policy', () => {
+    const init = storeRequestInit('https://s3.example.com/bucket/data.zarr');
+    expect(init).toEqual({ credentials: 'same-origin' });
+  });
+
+  it('merges extra options', () => {
+    const signal = new AbortController().signal;
+    const init = storeRequestInit('https://s3.example.com/b/d.zarr', {
+      signal
+    });
+    expect(init.signal).toBe(signal);
   });
 });

@@ -165,6 +165,10 @@ async function sendFetchRequest(
   const requestOptions: RequestInit = {
     method,
     credentials: 'include',
+    // Bypass the browser HTTP cache, including entries stored before the
+    // server sent Cache-Control: no-store on /api/content. Those stale
+    // bodies otherwise keep being served until they expire.
+    cache: 'no-store',
     headers: {
       ...(method !== 'GET' &&
         method !== 'HEAD' &&
