@@ -33,18 +33,22 @@ const FgSwitch = forwardRef<HTMLDivElement, FgSwitchProps>(
     const combinedSwitchClassName = `${switchClassName} ${className}`.trim();
 
     const stateText = checked ? 'On' : 'Off';
+    // Dim the text too, so a disabled "On" does not read as locked on.
+    const dim = disabled ? 'opacity-50' : '';
 
     return (
       <div className="flex items-center justify-between gap-2" ref={ref}>
         <div>
           <label
-            className={`text-foreground text-sm block ${disabled ? 'cursor-default' : 'cursor-pointer'}`}
+            className={`text-foreground text-sm block ${disabled ? 'cursor-default' : 'cursor-pointer'} ${dim}`}
             htmlFor={inputId}
           >
             {label}
           </label>
           {showState ? (
-            <span className="block font-semibold text-base text-foreground sm:hidden">
+            <span
+              className={`block font-semibold text-base text-foreground sm:hidden ${dim}`}
+            >
               {stateText}
             </span>
           ) : null}
@@ -58,7 +62,9 @@ const FgSwitch = forwardRef<HTMLDivElement, FgSwitchProps>(
             onChange={onChange}
           />
           {showState ? (
-            <span className="hidden font-semibold text-sm text-foreground sm:inline">
+            <span
+              className={`hidden font-semibold text-sm text-foreground sm:inline ${dim}`}
+            >
               {stateText}
             </span>
           ) : null}

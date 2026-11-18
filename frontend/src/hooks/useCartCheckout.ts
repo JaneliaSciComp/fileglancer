@@ -64,8 +64,12 @@ export function useCartCheckout() {
   const createProxiedPath = useCreateProxiedPathMutation();
   const { createViewMutation } = useViewsContext();
   const { zonesAndFspQuery } = useZoneAndFspMapContext();
-  const { disableHeuristicalLayerTypeDetection, dataLinkSubpathMode } =
-    usePreferencesContext();
+  const {
+    disableHeuristicalLayerTypeDetection,
+    useLegacyMultichannelApproach,
+    disableNeuroglancerStateGeneration,
+    dataLinkSubpathMode
+  } = usePreferencesContext();
   const queryClient = useQueryClient();
 
   const fspFor = useCallback(
@@ -210,16 +214,19 @@ export function useCartCheckout() {
       urlPrefixes?: UrlPrefixes
     ): Promise<View> => {
       const resolved = await resolveCartDatasets(rawDatasets, urlPrefixes);
-      const { ng_state, layers } = await buildViewState(
-        resolved,
-        !disableHeuristicalLayerTypeDetection
-      );
+      const { ng_state, layers } = await buildViewState(resolved, {
+        disableHeuristicalLayerTypeDetection,
+        useLegacyMultichannelApproach,
+        disableNeuroglancerStateGeneration
+      });
       return createViewMutation.mutateAsync({ name, ng_state, layers });
     },
     [
       resolveCartDatasets,
       createViewMutation,
-      disableHeuristicalLayerTypeDetection
+      disableHeuristicalLayerTypeDetection,
+      useLegacyMultichannelApproach,
+      disableNeuroglancerStateGeneration
     ]
   );
 

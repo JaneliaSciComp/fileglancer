@@ -50,6 +50,13 @@ export type ResolvedCheckoutDataset = {
   label: string;
 };
 
+/** The Neuroglancer state-generation preferences, named as in Preferences. */
+export type ViewStatePrefs = {
+  disableHeuristicalLayerTypeDetection: boolean;
+  useLegacyMultichannelApproach: boolean;
+  disableNeuroglancerStateGeneration: boolean;
+};
+
 export type NgLayer = Record<string, unknown> & { name?: string };
 export type NgState = Record<string, unknown> & { layers?: NgLayer[] };
 
@@ -79,8 +86,12 @@ async function inferLayerType(url: string): Promise<LayerType> {
 
 async function generateStateForDataset(
   ds: ResolvedCheckoutDataset,
-  detectLayerType: boolean
+  prefs: ViewStatePrefs
 ): Promise<NgState | null> {
+  // A channel entry needs the generated per-channel layers to pick from, so
+  // it generates state even when "Generate Neuroglancer state" is off.
+  const sourceOnly =
+    prefs.disableNeuroglancerStateGeneration && ds.channel === undefined;
   const probe = await probeDataset(ds.url);
   if (probe.kind === 'unsupported') {
     log.error(
@@ -91,12 +102,25 @@ async function generateStateForDataset(
   }
   try {
     if (probe.kind === 'array') {
-      return decodeState(probe.state);
+      const state = decodeState(probe.state);
+      // Same layer the standalone button builds with generation disabled.
+      return state && sourceOnly
+        ? {
+            ...state,
+            layers: state.layers?.map(({ name, source }) => ({
+              name,
+              source,
+              type: 'new'
+            }))
+          }
+        : state;
     }
     const { metadata } = probe;
-    const multiscale = metadata.multiscales?.[0];
+    const multiscale = sourceOnly ? undefined : metadata.multiscales?.[0];
     const layerType =
-      multiscale && detectLayerType ? await inferLayerType(ds.url) : 'image';
+      multiscale && !prefs.disableHeuristicalLayerTypeDetection
+        ? await inferLayerType(ds.url)
+        : 'image';
     const encoded = multiscale
       ? generateNeuroglancerStateForOmeZarr(
           ds.url,
@@ -106,7 +130,7 @@ async function generateStateForDataset(
           metadata.arr,
           metadata.labels,
           metadata.omero,
-          ds.channel !== undefined
+          prefs.useLegacyMultichannelApproach || ds.channel !== undefined
         )
       : generateNeuroglancerStateForDataURL(ds.url, metadata.zarrVersion);
     return decodeState(encoded);
@@ -145,8 +169,7 @@ function startsArchived(layer: NgLayer, index: number): boolean {
 }
 export async function buildViewState(
   datasets: ResolvedCheckoutDataset[],
-  // Mirrors the disableHeuristicalLayerTypeDetection preference (inverted).
-  detectLayerType: boolean
+  prefs: ViewStatePrefs
 ): Promise<{ ng_state: Record<string, unknown>; layers: ViewLayerInput[] }> {
   const combinedLayers: NgLayer[] = [];
   const viewLayers: ViewLayerInput[] = [];
@@ -163,10 +186,7 @@ export async function buildViewState(
     `${ds.url}::${ds.channel !== undefined}`;
   for (const ds of datasets) {
     if (!stateCache.has(cacheKeyFor(ds))) {
-      stateCache.set(
-        cacheKeyFor(ds),
-        generateStateForDataset(ds, detectLayerType)
-      );
+      stateCache.set(cacheKeyFor(ds), generateStateForDataset(ds, prefs));
     }
   }
 

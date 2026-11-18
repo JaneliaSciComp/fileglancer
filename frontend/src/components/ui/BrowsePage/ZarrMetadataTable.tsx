@@ -57,12 +57,12 @@ export default function ZarrMetadataTable({
                   icon={HiQuestionMarkCircle}
                   interactiveLabel={
                     <>
-                      Heuristical layer type detection is disabled in{' '}
+                      The segmentation layer heuristic is off in{' '}
                       <FgLink to="/preferences">preferences</FgLink>.
                     </>
                   }
                   isInteractive={true}
-                  label="Heuristical layer type detection is disabled in preferences"
+                  label="The segmentation layer heuristic is off in preferences"
                 />
               </td>
             ) : layerType ? (
