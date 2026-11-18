@@ -35,21 +35,13 @@ function useNeuroglancerBaseUrl(source: ViewerUrlSource | undefined): string {
 }
 
 /**
- * The base URL for standalone Neuroglancer: the metadata panel's button and
- * new short links. Follows the user's standalone Neuroglancer URL preference.
+ * The base URL for any Neuroglancer opened in its own tab: the metadata
+ * panel's button and a View's "Open in Neuroglancer" link-out. Follows the
+ * user's Neuroglancer URL preference.
  */
 export function useDefaultNeuroglancerBaseUrl(): string {
   const { viewerUrlSources } = usePreferencesContext();
   return useNeuroglancerBaseUrl(viewerUrlSources['neuroglancer']);
-}
-
-/**
- * The base URL for a View's "Open in Neuroglancer" link-out. Follows its own
- * preference, separate from standalone Neuroglancer.
- */
-export function useViewsNeuroglancerBaseUrl(): string {
-  const { viewsNeuroglancerUrlSource } = usePreferencesContext();
-  return useNeuroglancerBaseUrl(viewsNeuroglancerUrlSource);
 }
 
 /**

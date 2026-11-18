@@ -1,7 +1,7 @@
 import toast from 'react-hot-toast';
-import { Typography } from '@material-tailwind/react';
 
 import FgSwitch from '@/components/designSystem/atoms/formElements/FgSwitch';
+import FgTooltip from '@/components/ui/widgets/FgTooltip';
 import FgRadio from '@/components/designSystem/atoms/formElements/FgRadio';
 import FgFieldSet from '@/components/designSystem/molecules/FgFieldSet';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
@@ -36,7 +36,12 @@ function BaseUrlChoice({
 }) {
   const current = source === 'manifest' ? 'manifest' : 'configured';
   return (
-    <FgFieldSet legend={legend}>
+    <FgFieldSet
+      helperText={
+        'Used when Neuroglancer opens in its own tab: standalone Neuroglancer from the metadata panel button, and "Open in Neuroglancer" from a View\'s toolbar. The viewer embedded in a View always uses the internal Neuroglancer.'
+      }
+      legend={legend}
+    >
       <FgRadio
         checked={current === 'configured'}
         color="primary"
@@ -59,14 +64,6 @@ function BaseUrlChoice({
   );
 }
 
-function SubHeading({ children }: { readonly children: string }) {
-  return (
-    <Typography className="font-semibold text-foreground">
-      {children}
-    </Typography>
-  );
-}
-
 export default function NeuroglancerOptions() {
   const {
     useLegacyMultichannelApproach,
@@ -78,9 +75,7 @@ export default function NeuroglancerOptions() {
     viewerUrlSources,
     setViewerUrlSource,
     neuroglancerButtonTarget,
-    setNeuroglancerButtonTarget,
-    viewsNeuroglancerUrlSource,
-    setViewsNeuroglancerUrlSource
+    setNeuroglancerButtonTarget
   } = usePreferencesContext();
   const { validViewers } = useViewersContext();
 
@@ -112,6 +107,29 @@ export default function NeuroglancerOptions() {
       'Neuroglancer button preference updated'
     );
 
+  const multichannelSwitch = (
+    <FgSwitch
+      checked={useLegacyMultichannelApproach ?? false}
+      // Without generated state there are no channel layers to shape.
+      disabled={disableNeuroglancerStateGeneration}
+      id="use_legacy_multichannel_approach"
+      label="Generate multichannel state for Neuroglancer"
+      onChange={async () => {
+        const result = await toggleUseLegacyMultichannelApproach();
+        if (result.success) {
+          toast.success(
+            useLegacyMultichannelApproach
+              ? 'Disabled multichannel state generation for Neuroglancer'
+              : 'Enabled multichannel state generation for Neuroglancer'
+          );
+        } else {
+          toast.error(result.error);
+        }
+      }}
+      showState
+    />
+  );
+
   return (
     <div className="space-y-6">
       <FgFieldSet legend="The Neuroglancer button on Zarr/OME-Zarr metadata panels opens the dataset in:">
@@ -137,27 +155,9 @@ export default function NeuroglancerOptions() {
 
       <FgFieldSet legend="State generation options">
         <FgSwitch
-          checked={useLegacyMultichannelApproach ?? false}
-          id="use_legacy_multichannel_approach"
-          label="Generate multichannel state for Neuroglancer"
-          onChange={async () => {
-            const result = await toggleUseLegacyMultichannelApproach();
-            if (result.success) {
-              toast.success(
-                useLegacyMultichannelApproach
-                  ? 'Disabled multichannel state generation for Neuroglancer'
-                  : 'Enabled multichannel state generation for Neuroglancer'
-              );
-            } else {
-              toast.error(result.error);
-            }
-          }}
-          showState
-        />
-        <FgSwitch
-          checked={disableNeuroglancerStateGeneration}
+          checked={!disableNeuroglancerStateGeneration}
           id="disable_neuroglancer_state_generation"
-          label="Disable Neuroglancer state generation"
+          label="Generate Neuroglancer state"
           onChange={async () => {
             const result = await toggleDisableNeuroglancerStateGeneration();
             if (result.success) {
@@ -172,17 +172,26 @@ export default function NeuroglancerOptions() {
           }}
           showState
         />
+        {disableNeuroglancerStateGeneration ? (
+          <FgTooltip
+            label={`Your saved setting is ${useLegacyMultichannelApproach ? 'On' : 'Off'}. It does not apply while "Generate Neuroglancer state" is off.`}
+          >
+            {multichannelSwitch}
+          </FgTooltip>
+        ) : (
+          multichannelSwitch
+        )}
         <FgSwitch
-          checked={disableHeuristicalLayerTypeDetection ?? false}
+          checked={!disableHeuristicalLayerTypeDetection}
           id="disable_heuristical_layer_type_detection"
-          label="Disable heuristical layer type determination"
+          label="Use heuristic to identify segmentation layers"
           onChange={async () => {
             const result = await toggleDisableHeuristicalLayerTypeDetection();
             if (result.success) {
               toast.success(
                 disableHeuristicalLayerTypeDetection
-                  ? 'Heuristical layer type determination is now enabled'
-                  : 'Heuristical layer type determination is now disabled'
+                  ? 'Segmentation layer heuristic is now enabled'
+                  : 'Segmentation layer heuristic is now disabled'
               );
             } else {
               toast.error(result.error);
@@ -193,43 +202,18 @@ export default function NeuroglancerOptions() {
       </FgFieldSet>
 
       {hosts ? (
-        <div className="space-y-4">
-          <SubHeading>Views</SubHeading>
-          <BaseUrlChoice
-            hosts={hosts}
-            idPrefix="views_neuroglancer_url"
-            legend='"Open in Neuroglancer" base URL'
-            onChange={async source =>
-              report(
-                await setViewsNeuroglancerUrlSource(source),
-                'Views Neuroglancer URL preference updated'
-              )
-            }
-            source={viewsNeuroglancerUrlSource}
-          />
-        </div>
-      ) : null}
-
-      {hosts ? (
-        <div className="space-y-4">
-          <SubHeading>Standalone Neuroglancer</SubHeading>
-          <Typography className="text-sm text-foreground">
-            Used when the Neuroglancer button opens a standalone Neuroglancer,
-            and as the default for new Neuroglancer links.
-          </Typography>
-          <BaseUrlChoice
-            hosts={hosts}
-            idPrefix="neuroglancer_url_source"
-            legend="Base URL"
-            onChange={async source =>
-              report(
-                await setViewerUrlSource('neuroglancer', source),
-                'Neuroglancer URL preference updated'
-              )
-            }
-            source={viewerUrlSources['neuroglancer']}
-          />
-        </div>
+        <BaseUrlChoice
+          hosts={hosts}
+          idPrefix="neuroglancer_url_source"
+          legend="Base URL"
+          onChange={async source =>
+            report(
+              await setViewerUrlSource('neuroglancer', source),
+              'Neuroglancer URL preference updated'
+            )
+          }
+          source={viewerUrlSources['neuroglancer']}
+        />
       ) : null}
     </div>
   );
