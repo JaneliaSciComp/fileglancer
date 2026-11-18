@@ -20,6 +20,7 @@ import {
   HiOutlinePlusCircle
 } from 'react-icons/hi';
 
+import useVersionQuery from '@/queries/versionQuery';
 import { useViewStateByReadKey } from '@/queries/viewQueries';
 import type { ViewLayer } from '@/queries/viewQueries';
 import { useViewsContext } from '@/contexts/ViewsContext';
@@ -155,6 +156,22 @@ export default function NeuroglancerView() {
   // Wait out the mount refetch: a cached state can predate a Save made just
   // before leaving this page.
   const [iframeSrc, setIframeSrc] = useState<string | null>(null);
+  // nginx serves /neuroglancer/ with a long max-age, so a browser can hold a
+  // stale index.html that references a deleted bundle hash. Keying the iframe
+  // URL on the Fileglancer version forces a fresh fetch once per release. The
+  // copy/share URLs stay clean; Neuroglancer reads state from the hash only.
+  const versionQuery = useVersionQuery();
+  const ngVersion = versionQuery.data?.version;
+  const bustCache = (url: string) => {
+    if (!ngVersion) {
+      return url;
+    }
+    const hashAt = url.indexOf('#!');
+    // A configured instance_template_url may be relative (e.g. /neuroglancer/).
+    const base = new URL(url.slice(0, hashAt), window.location.href);
+    base.searchParams.set('v', ngVersion);
+    return base.toString() + url.slice(hashAt);
+  };
   // null when the sidebar is closed.
   const [sidebarTab, setSidebarTab] = useState<SidebarTab | null>(null);
   const toggleSidebar = (tab: SidebarTab) =>
@@ -180,8 +197,14 @@ export default function NeuroglancerView() {
     ? Math.min(50, (SIDEBAR_MIN_WIDTH_PX / panelsWidth) * 100)
     : 15;
   const awaitingFreshState = iframeSrc === null && stateQuery.isFetching;
-  if (ngState && baseUrl && iframeSrc === null && !stateQuery.isFetching) {
-    setIframeSrc(constructNeuroglancerUrl(ngState, baseUrl));
+  if (
+    ngState &&
+    baseUrl &&
+    iframeSrc === null &&
+    !stateQuery.isFetching &&
+    !versionQuery.isPending
+  ) {
+    setIframeSrc(bustCache(constructNeuroglancerUrl(ngState, baseUrl)));
   }
   const [relinkTarget, setRelinkTarget] = useState<RelinkTarget | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(
@@ -239,7 +262,13 @@ export default function NeuroglancerView() {
     return <Navigate replace to="/ngviews" />;
   }
 
-  if (!baseUrl || (!draft && (stateQuery.isPending || awaitingFreshState))) {
+  // Wait for the version too: mounting the iframe before it arrives would load
+  // Neuroglancer once un-busted and again once the ?v= URL replaces it.
+  if (
+    !baseUrl ||
+    versionQuery.isPending ||
+    (!draft && (stateQuery.isPending || awaitingFreshState))
+  ) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <Typography className="text-foreground">Loading View…</Typography>
@@ -358,7 +387,7 @@ export default function NeuroglancerView() {
       bridge.setState(data);
       editState.rebaseline();
     } else {
-      setIframeSrc(constructNeuroglancerUrl(data, baseUrl));
+      setIframeSrc(bustCache(constructNeuroglancerUrl(data, baseUrl)));
     }
   };
 
