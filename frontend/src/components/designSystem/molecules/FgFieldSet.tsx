@@ -39,7 +39,7 @@ function FgFieldSet({
       {inline ? (
         <div className="flex items-center gap-4">{children}</div>
       ) : (
-        <div className="pl-4 flex flex-col gap-2">{children}</div>
+        <div className="flex flex-col gap-2">{children}</div>
       )}
     </fieldset>
   );
