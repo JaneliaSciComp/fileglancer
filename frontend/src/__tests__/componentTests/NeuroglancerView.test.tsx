@@ -46,7 +46,7 @@ const ngBase = vi.hoisted(() => ({
 }));
 vi.mock('@/hooks/useDefaultNeuroglancerBaseUrl', () => ({
   useInternalNeuroglancerBaseUrl: () => ngBase.current,
-  useViewsNeuroglancerBaseUrl: () => 'https://ng-preferred.example/'
+  useDefaultNeuroglancerBaseUrl: () => 'https://ng-preferred.example/'
 }));
 const navigate = vi.hoisted(() => vi.fn());
 vi.mock('react-router', () => ({

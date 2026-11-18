@@ -1,5 +1,4 @@
 import toast from 'react-hot-toast';
-import { Typography } from '@material-tailwind/react';
 
 import FgSwitch from '@/components/designSystem/atoms/formElements/FgSwitch';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
@@ -37,7 +36,12 @@ function BaseUrlChoice({
 }) {
   const current = source === 'manifest' ? 'manifest' : 'configured';
   return (
-    <FgFieldSet legend={legend}>
+    <FgFieldSet
+      helperText={
+        'Used when Neuroglancer opens in its own tab: standalone Neuroglancer from the metadata panel button, and "Open in Neuroglancer" from a View\'s toolbar. The viewer embedded in a View always uses the internal Neuroglancer.'
+      }
+      legend={legend}
+    >
       <FgRadio
         checked={current === 'configured'}
         color="primary"
@@ -60,14 +64,6 @@ function BaseUrlChoice({
   );
 }
 
-function SubHeading({ children }: { readonly children: string }) {
-  return (
-    <Typography className="font-semibold text-foreground">
-      {children}
-    </Typography>
-  );
-}
-
 export default function NeuroglancerOptions() {
   const {
     useLegacyMultichannelApproach,
@@ -79,9 +75,7 @@ export default function NeuroglancerOptions() {
     viewerUrlSources,
     setViewerUrlSource,
     neuroglancerButtonTarget,
-    setNeuroglancerButtonTarget,
-    viewsNeuroglancerUrlSource,
-    setViewsNeuroglancerUrlSource
+    setNeuroglancerButtonTarget
   } = usePreferencesContext();
   const { validViewers } = useViewersContext();
 
@@ -208,43 +202,18 @@ export default function NeuroglancerOptions() {
       </FgFieldSet>
 
       {hosts ? (
-        <div className="space-y-4">
-          <SubHeading>Views</SubHeading>
-          <BaseUrlChoice
-            hosts={hosts}
-            idPrefix="views_neuroglancer_url"
-            legend='"Open in Neuroglancer" base URL'
-            onChange={async source =>
-              report(
-                await setViewsNeuroglancerUrlSource(source),
-                'Views Neuroglancer URL preference updated'
-              )
-            }
-            source={viewsNeuroglancerUrlSource}
-          />
-        </div>
-      ) : null}
-
-      {hosts ? (
-        <div className="space-y-4">
-          <SubHeading>Standalone Neuroglancer</SubHeading>
-          <Typography className="text-sm text-foreground">
-            Used when the Neuroglancer button opens a standalone Neuroglancer,
-            and as the default for new Neuroglancer links.
-          </Typography>
-          <BaseUrlChoice
-            hosts={hosts}
-            idPrefix="neuroglancer_url_source"
-            legend="Base URL"
-            onChange={async source =>
-              report(
-                await setViewerUrlSource('neuroglancer', source),
-                'Neuroglancer URL preference updated'
-              )
-            }
-            source={viewerUrlSources['neuroglancer']}
-          />
-        </div>
+        <BaseUrlChoice
+          hosts={hosts}
+          idPrefix="neuroglancer_url_source"
+          legend="Base URL"
+          onChange={async source =>
+            report(
+              await setViewerUrlSource('neuroglancer', source),
+              'Neuroglancer URL preference updated'
+            )
+          }
+          source={viewerUrlSources['neuroglancer']}
+        />
       ) : null}
     </div>
   );

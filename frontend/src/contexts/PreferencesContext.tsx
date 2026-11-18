@@ -69,7 +69,6 @@ type PreferencesContextType = {
   useLegacyMultichannelApproach: boolean;
   viewerUrlSources: ViewerUrlSources;
   neuroglancerButtonTarget: NeuroglancerButtonTarget;
-  viewsNeuroglancerUrlSource: ViewerUrlSource;
   isFilteredByGroups: boolean;
   showTutorial: boolean;
   defaultExtraArgs: string;
@@ -108,9 +107,6 @@ type PreferencesContextType = {
   ) => Promise<Result<void>>;
   setNeuroglancerButtonTarget: (
     target: NeuroglancerButtonTarget
-  ) => Promise<Result<void>>;
-  setViewsNeuroglancerUrlSource: (
-    source: ViewerUrlSource
   ) => Promise<Result<void>>;
   toggleFilterByGroups: () => Promise<Result<void>>;
   toggleShowTutorial: () => Promise<Result<void>>;
@@ -312,20 +308,6 @@ export const PreferencesProvider = ({
       await updatePreferenceMutation.mutateAsync({
         key: 'neuroglancerButtonTarget',
         value: target
-      });
-      return createSuccess(undefined);
-    } catch (error) {
-      return handleError(error);
-    }
-  };
-
-  const setViewsNeuroglancerUrlSource = async (
-    source: ViewerUrlSource
-  ): Promise<Result<void>> => {
-    try {
-      await updatePreferenceMutation.mutateAsync({
-        key: 'viewsNeuroglancerUrlSource',
-        value: source
       });
       return createSuccess(undefined);
     } catch (error) {
@@ -662,8 +644,6 @@ export const PreferencesProvider = ({
     viewerUrlSources: preferencesQuery.data?.viewerUrlSources || {},
     neuroglancerButtonTarget:
       preferencesQuery.data?.neuroglancerButtonTarget ?? 'views',
-    viewsNeuroglancerUrlSource:
-      preferencesQuery.data?.viewsNeuroglancerUrlSource ?? 'configured',
     isFilteredByGroups: preferencesQuery.data?.isFilteredByGroups ?? true,
     showTutorial: preferencesQuery.data?.showTutorial ?? true,
     defaultExtraArgs: preferencesQuery.data?.defaultExtraArgs || '',
@@ -695,7 +675,6 @@ export const PreferencesProvider = ({
     toggleUseLegacyMultichannelApproach,
     setViewerUrlSource,
     setNeuroglancerButtonTarget,
-    setViewsNeuroglancerUrlSource,
     toggleFilterByGroups,
     toggleShowTutorial,
     updateDefaultExtraArgs,

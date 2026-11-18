@@ -25,8 +25,8 @@ import { useViewStateByReadKey } from '@/queries/viewQueries';
 import type { ViewLayer } from '@/queries/viewQueries';
 import { useViewsContext } from '@/contexts/ViewsContext';
 import {
-  useInternalNeuroglancerBaseUrl,
-  useViewsNeuroglancerBaseUrl
+  useDefaultNeuroglancerBaseUrl,
+  useInternalNeuroglancerBaseUrl
 } from '@/hooks/useDefaultNeuroglancerBaseUrl';
 import { useCanEditView } from '@/hooks/useCanEditView';
 import { useNeuroglancerViewer } from '@/hooks/useNeuroglancerViewer';
@@ -143,8 +143,8 @@ export default function NeuroglancerView() {
   const ownedView = owned.view;
   const canEdit = owned.canEdit || !!draft;
   const baseUrl = useInternalNeuroglancerBaseUrl();
-  // The new tab isn't framed, so it can honor the Views Internal/Public preference.
-  const preferredBaseUrl = useViewsNeuroglancerBaseUrl();
+  // The new tab isn't framed, so it can honor the Internal/Public preference.
+  const preferredBaseUrl = useDefaultNeuroglancerBaseUrl();
   const containerRef = useRef<HTMLDivElement>(null);
   const [iframe, setIframe] = useState<HTMLIFrameElement | null>(null);
   const bridge = useNeuroglancerViewer(iframe);
