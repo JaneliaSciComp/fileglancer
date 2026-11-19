@@ -176,7 +176,10 @@ the entry point before the existing `location /neuroglancer/`:
 ```nginx
 # The entry point is unhashed: revalidate it on every load, or a redeploy
 # leaves browsers requesting the old bundle hash (black Neuroglancer).
-location ~ ^/neuroglancer/(index\.html)?$ {
+# Exact match, not a regex that also takes /neuroglancer/: with an alias to
+# a file, nginx appends the index name to a URI ending in / and returns 404.
+# /neuroglancer/ gets here through the index redirect in the block below.
+location = /neuroglancer/index.html {
   alias /opt/deploy/neuroglancer/dist/client/index.html;
   add_header Cache-Control "no-cache";
 }
