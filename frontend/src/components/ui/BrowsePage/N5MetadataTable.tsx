@@ -2,7 +2,6 @@ import { HiExclamationTriangle } from 'react-icons/hi2';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
-import { translateUnitToNeuroglancer } from '@/omezarr-helper';
 import type { N5Metadata } from '@/queries/n5Queries';
 
 type N5MetadataTableProps = {
@@ -49,7 +48,8 @@ function getAxisData(metadata: N5Metadata) {
 
     // Priority: units[index] -> pixelResolution.unit -> '' (not specified)
     const rawUnit = units?.[index] || pixelResolution?.unit || '';
-    const displayUnit = rawUnit ? translateUnitToNeuroglancer(rawUnit) : '';
+    // Show the unit as stored, so the panel matches the file on disk
+    const displayUnit = rawUnit;
     const shape = dim;
 
     return {
