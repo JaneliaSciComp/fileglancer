@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 
 import FgIcon from '@/components/designSystem/atoms/FgIcon';
 import FgTooltip from '@/components/ui/widgets/FgTooltip';
+import PrecomputedMetadataTable from '@/components/ui/BrowsePage/PrecomputedMetadataTable';
 import ZarrAxisTable from '@/components/ui/BrowsePage/ZarrAxisTable';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import useZoneAndFileSharePathMapQuery from '@/queries/zoneAndFileSharePathMapQuery';
@@ -23,6 +24,8 @@ import {
   makeMapKey
 } from '@/utils';
 import { getFileURL } from '@/utils/pathHandling';
+import { fetchPrecomputedInfo } from '@/utils/precomputed';
+import type { PrecomputedInfo } from '@/utils/precomputed';
 import type { FileSharePath } from '@/shared.types';
 import type { DatasetKind } from '@/utils/viewCheckout';
 
@@ -53,6 +56,7 @@ const loads = {
 const LAYER_STATUS = {
   ome: loads,
   array: loads,
+  precomputed: loads,
   unsupported: {
     icon: HiExclamationTriangle,
     color: 'warning',
@@ -98,6 +102,8 @@ export default function DatasetRow({
     undefined
   );
 
+  const [precomputed, setPrecomputed] = useState<PrecomputedInfo | null>(null);
+
   // Fetch once, on first open (by this row or by expand all).
   const requested = useRef(false);
   useEffect(() => {
@@ -119,6 +125,16 @@ export default function DatasetRow({
       // Metadata is a nice-to-have here; ignore fetch failures.
       .catch(() => setMetadata(null));
   }, [isOpen, fsp_name, path]);
+
+  // A precomputed dataset has no channels or axes; show its info instead.
+  useEffect(() => {
+    if (isOpen && kind === 'precomputed') {
+      fetchPrecomputedInfo(getFileURL(fsp_name, path))
+        .then(setPrecomputed)
+        // The table is a nice-to-have here; ignore fetch failures.
+        .catch(() => undefined);
+    }
+  }, [isOpen, kind, fsp_name, path]);
   const loading = channels === undefined || metadata === undefined;
 
   // A plain (non-OME) Zarr array has no multiscale axes and no channels, so its
@@ -182,6 +198,12 @@ export default function DatasetRow({
           {loading ? (
             <Typography className="text-foreground/70 text-sm">
               Loading...
+            </Typography>
+          ) : precomputed ? (
+            <PrecomputedMetadataTable precomputed={precomputed} />
+          ) : kind === 'precomputed' ? (
+            <Typography className="text-foreground/70 text-sm">
+              Neuroglancer precomputed dataset.
             </Typography>
           ) : !hasOmeContent ? (
             <Typography className="text-foreground/70 text-sm">

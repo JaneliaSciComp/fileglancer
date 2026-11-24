@@ -7,10 +7,12 @@ import {
   generateStateForPlainZarr
 } from '@/omezarr-helper';
 import type { LayerType, Metadata } from '@/omezarr-helper';
+import { fetchPrecomputedInfo, precomputedState } from '@/utils/precomputed';
+import type { PrecomputedInfo } from '@/utils/precomputed';
 import type { ViewLayer, ViewLayerInput } from '@/queries/viewQueries';
 import { default as log } from '@/logger';
 
-export type DatasetKind = 'ome' | 'array' | 'unsupported';
+export type DatasetKind = 'ome' | 'array' | 'precomputed' | 'unsupported';
 
 // A dataset that produced no Neuroglancer layer is still recorded as a
 // ViewLayer (so the Views table can list it as a source), flagged via opts.
@@ -21,6 +23,7 @@ export function isUnsupportedLayer(layer: Pick<ViewLayer, 'opts'>): boolean {
 export type DatasetProbe =
   | { kind: 'ome'; metadata: Metadata }
   | { kind: 'array'; state: string }
+  | { kind: 'precomputed'; precomputed: PrecomputedInfo }
   | { kind: 'unsupported'; errors: unknown[] };
 
 // Single source of truth for "what will this dataset become in Neuroglancer":
@@ -33,7 +36,17 @@ export async function probeDataset(url: string): Promise<DatasetProbe> {
       const state = await generateStateForPlainZarr(url);
       return { kind: 'array', state };
     } catch (plainError) {
-      return { kind: 'unsupported', errors: [omeError, plainError] };
+      try {
+        return {
+          kind: 'precomputed',
+          precomputed: await fetchPrecomputedInfo(url)
+        };
+      } catch (precomputedError) {
+        return {
+          kind: 'unsupported',
+          errors: [omeError, plainError, precomputedError]
+        };
+      }
     }
   }
 }
@@ -100,6 +113,9 @@ async function generateStateForDataset(
     );
     return null;
   }
+  if (probe.kind === 'precomputed') {
+    return precomputedState(ds.url, probe.precomputed, sourceOnly);
+  }
   try {
     if (probe.kind === 'array') {
       const state = decodeState(probe.state);
@@ -163,9 +179,11 @@ function selectLayers(state: NgState, channelIndex?: number): NgLayer[] {
 // (omezarr-helper.ts, generateFullNeuroglancerStateForOmeZarr). That loop
 // never touches label layers, so segmentation layers always stay shown and a
 // one-dataset View matches the standalone Neuroglancer button. Keep the two
-// in sync.
+// in sync. Annotation layers stay shown too: they are overlays, and cheap.
 function startsArchived(layer: NgLayer, index: number): boolean {
-  return layer.type !== 'segmentation' && index >= 4;
+  return (
+    layer.type !== 'segmentation' && layer.type !== 'annotation' && index >= 4
+  );
 }
 export async function buildViewState(
   datasets: ResolvedCheckoutDataset[],
