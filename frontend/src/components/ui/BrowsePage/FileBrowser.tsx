@@ -8,6 +8,7 @@ import Crumbs from './Crumbs';
 import MetadataHint from './MetadataHint';
 import ZarrPreview from './ZarrPreview';
 import N5Preview from './N5Preview';
+import PrecomputedPreview from './PrecomputedPreview';
 import Table from './FileTable';
 import FileViewer from './FileViewer';
 import SelectionBar from './SelectionBar';
@@ -18,6 +19,7 @@ import { FileRowSkeleton } from '@/components/ui/widgets/Loaders';
 import useContextMenu from '@/hooks/useContextMenu';
 import useZarrMetadata from '@/hooks/useZarrMetadata';
 import useN5Metadata from '@/hooks/useN5Metadata';
+import usePrecomputedMetadata from '@/hooks/usePrecomputedMetadata';
 import { useFileBrowserContext } from '@/contexts/FileBrowserContext';
 import { usePreferencesContext } from '@/contexts/PreferencesContext';
 import { useCartContext } from '@/contexts/CartContext';
@@ -91,6 +93,9 @@ export default function FileBrowser({
 
   const { n5MetadataQuery, openWithToolUrls: n5OpenWithToolUrls } =
     useN5Metadata();
+
+  const { precomputedQuery, openWithToolUrls: precomputedOpenWithToolUrls } =
+    usePrecomputedMetadata();
 
   const files = (fileQuery.data?.files ?? []) as FileOrFolder[];
   const currentName = fileQuery.data?.currentFileOrFolder?.name ?? '';
@@ -311,6 +316,16 @@ export default function FileBrowser({
           n5MetadataQuery={n5MetadataQuery}
           openWithToolUrls={n5OpenWithToolUrls}
           path={fileQuery.data?.currentFileOrFolder?.path ?? ''}
+        />
+      ) : null}
+
+      {precomputedQuery.data ? (
+        <PrecomputedPreview
+          fspName={fileQuery.data?.currentFileSharePath?.name ?? ''}
+          mainPanelWidth={mainPanelWidth}
+          openWithToolUrls={precomputedOpenWithToolUrls}
+          path={fileQuery.data?.currentFileOrFolder?.path ?? ''}
+          precomputed={precomputedQuery.data}
         />
       ) : null}
 

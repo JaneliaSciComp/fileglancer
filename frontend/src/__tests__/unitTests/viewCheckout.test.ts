@@ -11,6 +11,13 @@ vi.mock('@/omezarr-helper', () => ({
   generateStateForPlainZarr: vi.fn()
 }));
 
+// Only the fetch is faked; the state builder is the real one.
+vi.mock('@/utils/precomputed', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/utils/precomputed')>()),
+  fetchPrecomputedInfo: vi.fn()
+}));
+
+import { fetchPrecomputedInfo } from '@/utils/precomputed';
 import {
   getOmeZarrMetadata,
   getOmeZarrThumbnail,
@@ -47,6 +54,9 @@ beforeEach(() => {
   (generateStateForPlainZarr as any)
     .mockReset()
     .mockRejectedValue(new Error('not a plain array'));
+  (fetchPrecomputedInfo as any)
+    .mockReset()
+    .mockRejectedValue(new Error('no info file'));
   (generateNeuroglancerStateForOmeZarr as any)
     .mockReset()
     .mockImplementation((url: string) =>
@@ -207,6 +217,69 @@ describe('buildViewState', () => {
     expect(layers).toEqual([
       { sharing_key: 'ka', layer_index: 0, channel: null, opts: null },
       { sharing_key: 'kb', layer_index: 1, channel: null, opts: null }
+    ]);
+  });
+
+  it('adds a Neuroglancer precomputed dataset as a layer', async () => {
+    (getOmeZarrMetadata as any).mockRejectedValue(new Error('not ome'));
+    (fetchPrecomputedInfo as any).mockResolvedValue({
+      kind: 'annotations',
+      layerType: 'annotation',
+      info: {}
+    });
+    const ds = { ...one, url: 'https://h/files/ka/crops' };
+    const { ng_state, layers } = await buildViewState([ds]);
+    expect(ng_state.layers).toEqual([
+      {
+        name: 'crops',
+        source: 'precomputed://https://h/files/ka/crops',
+        type: 'annotation',
+        archived: false
+      }
+    ]);
+    expect(layers).toEqual([
+      { sharing_key: 'ka', layer_index: 0, channel: null, opts: null }
+    ]);
+  });
+
+  it('takes dimensions from the first dataset that has them', async () => {
+    (getOmeZarrMetadata as any).mockImplementation((url: string) =>
+      url === 'crops' ? Promise.reject(new Error('not ome')) : md
+    );
+    (fetchPrecomputedInfo as any).mockResolvedValue({
+      kind: 'annotations',
+      layerType: 'annotation',
+      info: {}
+    });
+    const { ng_state } = await buildViewState([{ ...one, url: 'crops' }, one]);
+    expect(ng_state.dimensions).toEqual({ x: [1, 'm'] });
+    expect((ng_state.layers as any[]).map(l => l.name)).toEqual([
+      'crops',
+      'a-L0'
+    ]);
+  });
+
+  it('keeps annotation layers shown past index 4', async () => {
+    (getOmeZarrMetadata as any).mockImplementation((url: string) =>
+      url === 'crops' ? Promise.reject(new Error('not ome')) : md
+    );
+    (fetchPrecomputedInfo as any).mockResolvedValue({
+      kind: 'annotations',
+      layerType: 'annotation',
+      info: {}
+    });
+    const images = ['a', 'b', 'c', 'd', 'e'].map(url => ({ ...one, url }));
+    const { ng_state } = await buildViewState([
+      ...images,
+      { ...one, url: 'crops' }
+    ]);
+    expect((ng_state.layers as any[]).map(l => l.archived)).toEqual([
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
     ]);
   });
 
@@ -464,14 +537,24 @@ describe('probeDataset', () => {
     expect(await probeDataset('u')).toEqual({ kind: 'array', state: '%7B%7D' });
   });
 
-  it('reports unsupported when neither loads, carrying both failure causes', async () => {
+  it('falls back to precomputed when it is not a Zarr but has a valid info', async () => {
+    const precomputed = { kind: 'volume', layerType: 'image', info: {} };
+    (getOmeZarrMetadata as any).mockRejectedValueOnce(new Error('no ome'));
+    (fetchPrecomputedInfo as any).mockResolvedValueOnce(precomputed);
+    expect(await probeDataset('u')).toEqual({
+      kind: 'precomputed',
+      precomputed
+    });
+  });
+
+  it('reports unsupported when nothing loads, carrying every failure cause', async () => {
     (getOmeZarrMetadata as any).mockRejectedValueOnce(new Error('no ome'));
     (generateStateForPlainZarr as any).mockRejectedValueOnce(
       new Error('no array')
     );
     const probe = await probeDataset('u');
     expect(probe).toMatchObject({ kind: 'unsupported' });
-    expect((probe as { errors: unknown[] }).errors).toHaveLength(2);
+    expect((probe as { errors: unknown[] }).errors).toHaveLength(3);
   });
 });
 
