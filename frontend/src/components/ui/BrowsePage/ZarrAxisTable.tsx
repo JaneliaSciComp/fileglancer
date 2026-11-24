@@ -1,10 +1,6 @@
 import type { AxisMetadata } from '@bioimagetools/capability-manifest';
 import { default as log } from '@/logger';
-import {
-  Metadata,
-  translateUnitToNeuroglancer,
-  getResolvedScales
-} from '@/omezarr-helper';
+import { Metadata, getResolvedScales } from '@/omezarr-helper';
 
 type ZarrAxisTableProps = {
   readonly metadata: Metadata;
@@ -29,7 +25,8 @@ function getAxisData(metadata: Metadata) {
             ? resolvedScales[index].toString()
             : resolvedScales[index].toFixed(4)
           : 'Unknown';
-      const unit = translateUnitToNeuroglancer(axis.unit as string) || '';
+      // Show the unit as stored, so the panel matches the file on disk
+      const unit = (axis.unit as string) || '';
       return { name: axis.name.toUpperCase(), shape, chunkSize, scale, unit };
     });
   } catch (error) {
