@@ -242,6 +242,23 @@ describe('buildViewState', () => {
     ]);
   });
 
+  it('takes dimensions from the first dataset that has them', async () => {
+    (getOmeZarrMetadata as any).mockImplementation((url: string) =>
+      url === 'crops' ? Promise.reject(new Error('not ome')) : md
+    );
+    (fetchPrecomputedInfo as any).mockResolvedValue({
+      kind: 'annotations',
+      layerType: 'annotation',
+      info: {}
+    });
+    const { ng_state } = await buildViewState([{ ...one, url: 'crops' }, one]);
+    expect(ng_state.dimensions).toEqual({ x: [1, 'm'] });
+    expect((ng_state.layers as any[]).map(l => l.name)).toEqual([
+      'crops',
+      'a-L0'
+    ]);
+  });
+
   it('keeps annotation layers shown past index 4', async () => {
     (getOmeZarrMetadata as any).mockImplementation((url: string) =>
       url === 'crops' ? Promise.reject(new Error('not ome')) : md
