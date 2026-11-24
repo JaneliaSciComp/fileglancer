@@ -170,7 +170,7 @@ function selectLayers(state: NgState, channelIndex?: number): NgLayer[] {
 
 // ponytail: merge per-dataset generated states instead of refactoring the
 // generator to emit objects. Ceiling: cross-dataset coordinate spaces aren't
-// reconciled (first dataset's dimensions win) — fine for curated read-only
+// reconciled (the first dataset with dimensions wins) — fine for curated read-only
 // carts; revisit if mixed-resolution overlays misalign.
 
 // Fileglancer's own rule, not a Neuroglancer default (Neuroglancer never
@@ -214,7 +214,8 @@ export async function buildViewState(
       unsupported.push(ds);
       continue;
     }
-    if (!base) {
+    // A precomputed state has no dimensions; take them from the first that does.
+    if (!base || (!base.dimensions && state.dimensions)) {
       base = state;
     }
     for (const layer of selectLayers(state, ds.channelIndex)) {
