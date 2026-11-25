@@ -298,6 +298,47 @@ describe('NeuroglancerView', () => {
       expect(screen.queryByText(/leaving this page discards them/i)).toBeNull();
     });
 
+    it('Download JSON asks first; Save and continue creates then downloads', async () => {
+      renderDraft();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Download JSON' })
+      );
+      expect(screen.getByText('Unsaved View')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Continue without saving' })
+      ).toBeInTheDocument();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Save and continue' })
+      );
+      expect(createMutateAsync).toHaveBeenCalled();
+      expect(downloadTextFile).toHaveBeenCalledWith(
+        JSON.stringify({ layers: [{ name: 'L0' }] }, null, 2),
+        'my.zarr.json'
+      );
+    });
+
+    it('Copy link requires a save and copies the created View link', async () => {
+      const user = userEvent.setup();
+      renderDraft();
+      await user.click(
+        screen.getByRole('button', { name: 'Copy link to share' })
+      );
+      expect(
+        screen.getByText(/save it to get a link you can share/i)
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Continue without saving' })
+      ).toBeNull();
+      await user.click(
+        screen.getByRole('button', { name: 'Save and continue' })
+      );
+      await waitFor(() =>
+        expect(copyToClipboard).toHaveBeenCalledWith(
+          `${window.location.origin}/view/rk-new`
+        )
+      );
+    });
+
     it('loads a new-tab draft from localStorage via ?draft=id and clears it on Save', async () => {
       route.readKey = 'new';
       route.search = '?draft=d1';
