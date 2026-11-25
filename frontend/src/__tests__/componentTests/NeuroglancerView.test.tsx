@@ -286,9 +286,11 @@ describe('NeuroglancerView', () => {
       expect(toast.success).not.toHaveBeenCalledWith('Created View "my.zarr"');
     });
 
-    it('leaves without asking', async () => {
+    it('leaves without asking and offers no Discard', async () => {
       renderDraft();
       await findEnabledSave();
+      expect(screen.getByText('Save to access View later')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull();
       const leave = new Event('beforeunload', { cancelable: true });
       window.dispatchEvent(leave);
       expect(leave.defaultPrevented).toBe(false);

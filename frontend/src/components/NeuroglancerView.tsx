@@ -435,6 +435,7 @@ export default function NeuroglancerView() {
           {canEdit ? (
             <ViewSaveControls
               dirty={dirty}
+              draft={!!draft}
               onDiscard={editState.discard}
               onSave={() => void handleSave()}
               saving={saving}
