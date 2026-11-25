@@ -91,13 +91,20 @@ const SIDEBAR_MIN_WIDTH_PX = 300;
 type PendingAction = {
   readonly message: string;
   /** Gets the saved state: the one just saved, or the last saved one. */
-  readonly run: (state: NgState) => void;
+  readonly run: (state: NgState, readKey: string | undefined) => void;
+  /** The action can't run until the View is saved. */
+  readonly saveOnly?: boolean;
 };
 
 const LEAVE_MESSAGE =
   'This View has unsaved changes. Leaving this page discards them.';
 const EXPORT_MESSAGE =
   "This View has unsaved changes. Without saving, this uses the last saved version, which doesn't include them.";
+
+const DRAFT_EXPORT_MESSAGE =
+  "This View isn't saved yet. Without saving, this uses the View as first opened, without your changes.";
+const DRAFT_LINK_MESSAGE =
+  "This View isn't saved yet. Save it to get a link you can share.";
 
 const warnChangesLost = () =>
   toast.error('Neuroglancer reloaded, so unsaved changes may have been lost');
@@ -216,7 +223,8 @@ export default function NeuroglancerView() {
   const canAddData = canEdit && bridge.status === 'ready';
   const saving = updateViewMutation.isPending || createViewMutation.isPending;
   useEffect(() => {
-    if (!dirty || !canEdit) {
+    // A draft is often opened just for a look: let its tab close unprompted.
+    if (!dirty || !canEdit || draft) {
       return;
     }
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -256,7 +264,7 @@ export default function NeuroglancerView() {
       window.removeEventListener('beforeunload', onBeforeUnload);
       document.removeEventListener('click', onLinkClick, true);
     };
-  }, [dirty, canEdit, navigate]);
+  }, [dirty, canEdit, draft, navigate]);
 
   if (isDraftRoute && !draft) {
     return <Navigate replace to="/ngviews" />;
@@ -293,16 +301,27 @@ export default function NeuroglancerView() {
   const externalUrl = constructNeuroglancerUrl(ngState, baseUrl);
 
   // Owner with unsaved edits: ask first. Otherwise run on the saved state.
-  const confirmUnsaved = (run: (state: NgState) => void) => {
+  const confirmUnsaved = (run: PendingAction['run'], needsLink = false) => {
     if (canEdit && dirty) {
-      setPendingAction({ message: EXPORT_MESSAGE, run });
+      // A draft has no link until it is saved.
+      const saveOnly = !!draft && needsLink;
+      setPendingAction({
+        message: !draft
+          ? EXPORT_MESSAGE
+          : saveOnly
+            ? DRAFT_LINK_MESSAGE
+            : DRAFT_EXPORT_MESSAGE,
+        run,
+        saveOnly
+      });
     } else {
-      run(ngState);
+      run(ngState, readKey);
     }
   };
 
-  const handleCopy = async () => {
-    const shortLink = `${window.location.origin}/view/${readKey}`;
+  // Takes the key: after Save and continue on a draft, it is the new View's.
+  const handleCopy = async (key: string | undefined) => {
+    const shortLink = `${window.location.origin}/view/${key}`;
     const result = await copyToClipboard(shortLink);
     if (result.success) {
       toast.success('View link copied');
@@ -318,8 +337,11 @@ export default function NeuroglancerView() {
     void containerRef.current?.requestFullscreen?.();
   };
 
-  /** Resolves to the state that was saved, or null if the save failed. */
-  const handleSave = async (): Promise<NgState | null> => {
+  /** Resolves to what was saved and where, or null if the save failed. */
+  const handleSave = async (): Promise<{
+    state: NgState;
+    readKey: string | undefined;
+  } | null> => {
     if (!ownedView && !draft) {
       return null;
     }
@@ -348,7 +370,7 @@ export default function NeuroglancerView() {
         }
         editState.markSaved(sent);
         toast.success(`Created View "${draft.name}"`);
-        return sent;
+        return { state: sent, readKey: view.read_key };
       }
       await updateViewMutation.mutateAsync({
         short_key: ownedView!.short_key,
@@ -362,7 +384,7 @@ export default function NeuroglancerView() {
       });
       editState.markSaved(sent);
       toast.success('View saved');
-      return sent;
+      return { state: sent, readKey };
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Save failed');
       return null;
@@ -370,10 +392,10 @@ export default function NeuroglancerView() {
   };
 
   const saveThenRun = async (action: PendingAction) => {
-    const sent = await handleSave();
-    if (sent) {
+    const saved = await handleSave();
+    if (saved) {
       setPendingAction(null);
-      action.run(sent);
+      action.run(saved.state, saved.readKey);
     }
   };
 
@@ -434,6 +456,7 @@ export default function NeuroglancerView() {
           {canEdit ? (
             <ViewSaveControls
               dirty={dirty}
+              draft={!!draft}
               onDiscard={editState.discard}
               onSave={() => void handleSave()}
               saving={saving}
@@ -462,7 +485,9 @@ export default function NeuroglancerView() {
             <ToolbarIconButton
               icon={HiOutlineShare}
               label="Copy link to share"
-              onClick={() => confirmUnsaved(() => void handleCopy())}
+              onClick={() =>
+                confirmUnsaved((_state, key) => void handleCopy(key), true)
+              }
             />
             <ToolbarIconButton
               icon={HiOutlineDownload}
@@ -555,12 +580,17 @@ export default function NeuroglancerView() {
         <UnsavedChangesDialog
           message={pendingAction.message}
           onClose={() => setPendingAction(null)}
-          onContinue={() => {
-            setPendingAction(null);
-            pendingAction.run(ngState);
-          }}
+          onContinue={
+            pendingAction.saveOnly
+              ? undefined
+              : () => {
+                  setPendingAction(null);
+                  pendingAction.run(ngState, readKey);
+                }
+          }
           onSave={() => void saveThenRun(pendingAction)}
           saving={saving}
+          title={draft ? 'Unsaved View' : undefined}
         />
       ) : null}
       {relinkTarget ? (

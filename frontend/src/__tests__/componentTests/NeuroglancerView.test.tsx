@@ -286,14 +286,57 @@ describe('NeuroglancerView', () => {
       expect(toast.success).not.toHaveBeenCalledWith('Created View "my.zarr"');
     });
 
-    it('asks before leaving; Save and continue creates then leaves', async () => {
+    it('leaves without asking and offers no Discard', async () => {
       renderDraft();
+      await findEnabledSave();
+      expect(screen.getByText('Save to access View later')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull();
+      const leave = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(leave);
+      expect(leave.defaultPrevented).toBe(false);
       await userEvent.click(screen.getByRole('link', { name: /^views$/i }));
+      expect(screen.queryByText(/leaving this page discards them/i)).toBeNull();
+    });
+
+    it('Download JSON asks first; Save and continue creates then downloads', async () => {
+      renderDraft();
       await userEvent.click(
-        await screen.findByRole('button', { name: 'Save and continue' })
+        screen.getByRole('button', { name: 'Download JSON' })
+      );
+      expect(screen.getByText('Unsaved View')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Continue without saving' })
+      ).toBeInTheDocument();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Save and continue' })
       );
       expect(createMutateAsync).toHaveBeenCalled();
-      expect(navigate).toHaveBeenLastCalledWith('/ngviews');
+      expect(downloadTextFile).toHaveBeenCalledWith(
+        JSON.stringify({ layers: [{ name: 'L0' }] }, null, 2),
+        'my.zarr.json'
+      );
+    });
+
+    it('Copy link requires a save and copies the created View link', async () => {
+      const user = userEvent.setup();
+      renderDraft();
+      await user.click(
+        screen.getByRole('button', { name: 'Copy link to share' })
+      );
+      expect(
+        screen.getByText(/save it to get a link you can share/i)
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Continue without saving' })
+      ).toBeNull();
+      await user.click(
+        screen.getByRole('button', { name: 'Save and continue' })
+      );
+      await waitFor(() =>
+        expect(copyToClipboard).toHaveBeenCalledWith(
+          `${window.location.origin}/view/rk-new`
+        )
+      );
     });
 
     it('loads a new-tab draft from localStorage via ?draft=id and clears it on Save', async () => {
