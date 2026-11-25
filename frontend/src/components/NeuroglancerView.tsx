@@ -112,6 +112,18 @@ const warnChangesLost = () =>
 export default function NeuroglancerView() {
   const { readKey } = useParams();
   const navigate = useNavigate();
+  // A filled-in favicon tells View tabs apart from other Fileglancer tabs.
+  useEffect(() => {
+    const icon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (!icon) {
+      return;
+    }
+    const original = icon.href;
+    icon.href = '/logo-filled.svg';
+    return () => {
+      icon.href = original;
+    };
+  }, []);
   // /view/new shows an unsaved draft: opened in a new tab it comes from
   // localStorage (?draft=id), otherwise from router state. Save creates it
   // and moves to its real URL.
