@@ -286,14 +286,14 @@ describe('NeuroglancerView', () => {
       expect(toast.success).not.toHaveBeenCalledWith('Created View "my.zarr"');
     });
 
-    it('asks before leaving; Save and continue creates then leaves', async () => {
+    it('leaves without asking', async () => {
       renderDraft();
+      await findEnabledSave();
+      const leave = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(leave);
+      expect(leave.defaultPrevented).toBe(false);
       await userEvent.click(screen.getByRole('link', { name: /^views$/i }));
-      await userEvent.click(
-        await screen.findByRole('button', { name: 'Save and continue' })
-      );
-      expect(createMutateAsync).toHaveBeenCalled();
-      expect(navigate).toHaveBeenLastCalledWith('/ngviews');
+      expect(screen.queryByText(/leaving this page discards them/i)).toBeNull();
     });
 
     it('loads a new-tab draft from localStorage via ?draft=id and clears it on Save', async () => {

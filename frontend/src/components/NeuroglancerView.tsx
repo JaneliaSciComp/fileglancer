@@ -216,7 +216,8 @@ export default function NeuroglancerView() {
   const canAddData = canEdit && bridge.status === 'ready';
   const saving = updateViewMutation.isPending || createViewMutation.isPending;
   useEffect(() => {
-    if (!dirty || !canEdit) {
+    // A draft is often opened just for a look: let its tab close unprompted.
+    if (!dirty || !canEdit || draft) {
       return;
     }
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -256,7 +257,7 @@ export default function NeuroglancerView() {
       window.removeEventListener('beforeunload', onBeforeUnload);
       document.removeEventListener('click', onLinkClick, true);
     };
-  }, [dirty, canEdit, navigate]);
+  }, [dirty, canEdit, draft, navigate]);
 
   if (isDraftRoute && !draft) {
     return <Navigate replace to="/ngviews" />;
