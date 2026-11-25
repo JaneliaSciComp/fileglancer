@@ -183,6 +183,21 @@ describe('FileBrowser row context menu - Add to cart', () => {
     expect(addToCart).not.toHaveBeenCalled();
   });
 
+  it('copies the row path to the clipboard', async () => {
+    const user = userEvent.setup();
+    renderFileBrowser();
+
+    await user.click(await screen.findByText('menu-file1.txt'));
+    await user.click(await screen.findByText('Copy path'));
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Path copied to clipboard!');
+    });
+    expect(await navigator.clipboard.readText()).toMatch(
+      /my_folder\/file1\.txt$/
+    );
+  });
+
   it('no longer offers "View in Neuroglancer"', async () => {
     const user = userEvent.setup();
     renderFileBrowser();

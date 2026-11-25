@@ -30,7 +30,8 @@ import { useHandleView } from '@/hooks/useHandleView';
 import { areZarrMetadataFilesPresent } from '@/queries/zarrQueries';
 import { getBrowserRenderableType } from '@/utils/fileTypes';
 import { detectN5, getN5DetectionSignals } from '@/queries/n5Queries';
-import { makeMapKey } from '@/utils';
+import { getPreferredPathForDisplay, makeMapKey } from '@/utils';
+import { copyToClipboard } from '@/utils/copyText';
 import { isReadOnlyFsp } from '@/utils/cloudStorage';
 import type { FileOrFolder } from '@/shared.types';
 
@@ -66,7 +67,7 @@ export default function FileBrowser({
     updateFilesWithContextMenuClick,
     clearSelection
   } = useFileBrowserContext();
-  const { folderPreferenceMap, handleContextMenuFavorite } =
+  const { folderPreferenceMap, handleContextMenuFavorite, pathPreference } =
     usePreferencesContext();
   const { addToCart } = useCartContext();
   const outlet = useOutletContext<OutletContextType | null | undefined>();
@@ -152,6 +153,23 @@ export default function FileBrowser({
           togglePropertiesDrawer();
         },
         shouldShow: !showPropertiesDrawer
+      },
+      {
+        name: 'Copy path',
+        action: async () => {
+          const result = await copyToClipboard(
+            getPreferredPathForDisplay(
+              pathPreference,
+              fileQuery.data?.currentFileSharePath,
+              propertiesTarget.path
+            )
+          );
+          if (result.success) {
+            toast.success('Path copied to clipboard!');
+          } else {
+            toast.error(`Failed to copy path. Error: ${result.error}`);
+          }
+        }
       },
       {
         name: 'View',
