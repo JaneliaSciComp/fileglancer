@@ -10,6 +10,8 @@ type ViewSaveControlsProps = {
   readonly saving: boolean;
   readonly onSave: () => void;
   readonly onDiscard: () => void;
+  /** An unsaved draft: it has no saved state to discard back to. */
+  readonly draft?: boolean;
 };
 
 /** Owner-only Save/Discard controls that sit in the viewer toolbar. */
@@ -18,7 +20,8 @@ export default function ViewSaveControls({
   dirty,
   saving,
   onSave,
-  onDiscard
+  onDiscard,
+  draft = false
 }: ViewSaveControlsProps) {
   if (status === 'unavailable') {
     return (
@@ -31,16 +34,29 @@ export default function ViewSaveControls({
     <div className="flex shrink-0 items-center gap-2">
       <FgTooltip
         label={
-          dirty
-            ? 'Saving updates this View for everyone with its link'
-            : 'No unsaved changes'
+          draft
+            ? 'Saving adds this View to your Views list'
+            : dirty
+              ? 'Saving updates this View for everyone with its link'
+              : 'No unsaved changes'
         }
       >
-        <FgButton disabled={!dirty} loading={saving} onClick={onSave} size="sm">
+        <FgButton
+          color={draft ? 'secondary' : undefined}
+          disabled={!dirty}
+          loading={saving}
+          onClick={onSave}
+          size="sm"
+        >
           Save
         </FgButton>
       </FgTooltip>
-      {dirty ? (
+      {draft ? (
+        <Typography className="text-foreground/70" variant="small">
+          Save to access View later
+        </Typography>
+      ) : null}
+      {dirty && !draft ? (
         <FgButton
           disabled={saving}
           onClick={onDiscard}
